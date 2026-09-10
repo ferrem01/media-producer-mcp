@@ -34,17 +34,27 @@
       </div>
       <a id="signout" href="#" style="font-size:10px;color:#9ca3af;text-decoration:none;flex:0 0 auto;">Sign out</a>
     </div>
+    <!-- THREE THINGS, THREE SWITCHES. The old pair overlapped: "Narrate live"
+         claimed to control the mic, but ticking "Camera bubble" recorded the
+         mic too, so the box governed nothing except the teleprompter -- and
+         a user who wanted a prompter had to pretend to want something else.
+         Each switch now owns exactly one outcome. -->
     <label style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer;font-size:12px;color:#17171c;">
       <input type="checkbox" id="mic" style="width:auto;margin:0;" />
-      &#127897; Narrate live (record my mic while demoing)
+      &#127897; Record my voice
     </label>
-    <div id="mic-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">Only idle moments where you're also silent get cut. A teleprompter window opens when you start.
+    <div id="mic-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">Your narration is the film's soundtrack; idle moments where you're also silent get cut.
       <a href="#" id="mic-test" style="color:#393bf5;text-decoration:none;font-weight:600;">Test microphone &rsaquo;</a></div>
     <label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;font-size:12px;color:#17171c;">
       <input type="checkbox" id="camera" style="width:auto;margin:0;" />
-      &#128247; Camera bubble (face + voice over the demo)
+      &#128247; Show my face
     </label>
-    <div style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">Records your camera and mic alongside the tab; the film shows you as a picture-in-picture bubble.</div>
+    <div id="cam-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">A picture-in-picture bubble of you over the demo.</div>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;font-size:12px;color:#17171c;">
+      <input type="checkbox" id="prompter" style="width:auto;margin:0;" />
+      &#128220; Open the teleprompter
+    </label>
+    <div id="prompter-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">A separate window with your script, scrolling while you talk. Never appears on film.</div>
     <!-- Destination: new project (assembled walkthrough, today's behavior) or
          append the take as a scene into an existing project. -->
     <label for="dest">Save to</label>

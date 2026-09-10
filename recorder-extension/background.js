@@ -11,7 +11,9 @@
 // clock (the film has no paused footage, so events must not either).
 let session = null; // { tabId, phase, startedMs, pausedMs, pauseBegan, events, settings, prompterWin }
 
-const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false, camera: false, destProject: "", micDeviceId: "" };
+// mic defaults ON: "Record my voice" is what almost every walkthrough wants,
+// and the old default of off was masked by the camera capturing audio anyway.
+const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: true, camera: false, prompter: false, destProject: "", micDeviceId: "" };
 
 // The one server this build talks to. Users never see or enter it -- the
 // whole setup is "Sign in with Google". (Override via settings.server only
@@ -20,7 +22,18 @@ const SERVER = "https://159-203-115-164.nip.io";
 
 async function getSettings() {
   const s = await chrome.storage.sync.get(DEFAULTS);
-  return { ...DEFAULTS, ...s };
+  const merged = { ...DEFAULTS, ...s };
+  // MIGRATION. Under the old pair, ticking "Camera bubble" recorded the mic
+  // whether or not "Narrate live" was on -- so someone running camera-only
+  // was getting voice while their stored mic flag said false. Now that the
+  // flag actually governs the microphone, honouring that stored false would
+  // silently take their narration away. Anyone with a camera and mic:false
+  // was hearing themselves in the film; keep it that way, once.
+  if (merged.camera && s.mic === false && !s.micMigrated) {
+    merged.mic = true;
+    try { await chrome.storage.sync.set({ mic: true, micMigrated: true }); } catch (e) {}
+  }
+  return merged;
 }
 
 // ── Sign in with Google (server-brokered OAuth code + PKCE) ─────────────────
@@ -357,7 +370,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // Mode A gets a teleprompter in a SEPARATE window: tab capture films
         // the tab, so anything injected into the page would end up on film.
-        if (settings.mic) {
+        // The prompter is its OWN choice now. It used to ride on the mic
+        // flag, which meant no way to narrate without a script window and
+        // no way to get one except by ticking something else.
+        if (settings.prompter && settings.mic) {
           try {
             const win = await chrome.windows.create({
               url: "prompter.html", type: "popup", width: 480, height: 360, focused: false,
@@ -515,6 +531,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       if (msg.type === "qr-tick") {
         if (session?.phase === "recording" && !chapterFlash) badgeRecording();
+        return;
+      }
+
+      // Input level, offscreen -> HUD. The HUD lives in the recorded tab and
+      // cannot reach the capture stream, so the worker forwards it. Dropped
+      // silently when there is no session: a stray frame is not worth an
+      // error, and the meter is cosmetic.
+      if (msg.type === "qr-level") {
+        if (session?.tabId != null) {
+          try { chrome.tabs.sendMessage(session.tabId, { type: "qr-level", level: msg.level }); } catch (e) {}
+        }
         return;
       }
 

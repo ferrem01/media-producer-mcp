@@ -135,8 +135,30 @@
       pip.setInterval(() => { dot.style.opacity = dot.style.opacity === "0.3" ? "1" : "0.3"; }, 700);
       const time = d.createElement("span");
       time.textContent = "0:00";
-      time.style.cssText = "font-variant-numeric:tabular-nums;flex:1;font-size:15px;";
+      time.style.cssText = "font-variant-numeric:tabular-nums;font-size:15px;";
       d.body.appendChild(time);
+
+      // LEVEL METER. A silent take is invisible until the film is finished --
+      // two whole walkthroughs shipped mute before anyone knew. The one moment
+      // it is cheap to notice is while you are still talking, so the bar lives
+      // here, in the thing you are already looking at.
+      const meterWrap = d.createElement("span");
+      meterWrap.style.cssText = "flex:1;height:8px;border-radius:4px;background:#262a3d;overflow:hidden;position:relative;min-width:34px;";
+      const meterBar = d.createElement("span");
+      meterBar.style.cssText = "position:absolute;left:0;top:0;bottom:0;width:0%;background:#22c55e;border-radius:4px;transition:width 90ms linear;";
+      meterWrap.appendChild(meterBar);
+      d.body.appendChild(meterWrap);
+      hudState.meterBar = meterBar;
+      hudState.meterWrap = meterWrap;
+      hudState.lastSound = 0;
+      // Nothing for a sustained stretch while rolling turns the bar red: not
+      // "you paused", but "this take is recording silence".
+      pip.setInterval(() => {
+        if (!hudState.rolling || hudState.paused) return;
+        const quietFor = Date.now() - (hudState.lastSound || Date.now());
+        meterBar.style.background = quietFor > 4000 ? "#ef4444" : "#22c55e";
+        meterWrap.title = quietFor > 4000 ? "No sound reaching the recorder" : "Input level";
+      }, 1000);
       const mkBtn = (label, title) => {
         const b = d.createElement("button");
         b.textContent = label;
@@ -243,5 +265,11 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === "qr-content-stop") stop();
     else if (msg?.type === "qr-arm") arm();
+    else if (msg?.type === "qr-level" && hudState.meterBar) {
+      const lv = Math.max(0, Math.min(1, Number(msg.level) || 0));
+      hudState.meterBar.style.width = (lv * 100).toFixed(0) + "%";
+      // -60dB floor maps to 0, so anything above a whisper clears ~0.08.
+      if (lv > 0.08) hudState.lastSound = Date.now();
+    }
   });
 })();
