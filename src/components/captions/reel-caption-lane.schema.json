@@ -1,0 +1,35 @@
+{
+  "type": "reel-caption-lane",
+  "label": "Reel Caption Lane (timed kinetic phrases)",
+  "category": "captions",
+  "description": "THE caption lane for vertical/square social cuts (9:16, 4:5): a timeline-driven stack of BIG kinetic phrases that fill their own box, one at a time, word-by-word. Unlike narration-track (a small lower-third pill over footage) this is the type FIELD itself -- give it the empty half of the frame under a camera card and it becomes the ad's headline track. Each phrase auto-fits its box, so a long line shrinks instead of overflowing. Wrap a word or run of words in *stars* to tint them with the brand's primary (re-mixed at runtime against the measured ground so the accent always clears 4.5:1).",
+  "data": {
+    "phrases": {
+      "type": "array",
+      "label": "Phrases",
+      "required": true,
+      "description": "[{ text, start, end }] in scene-local seconds -- one entry per on-screen line. Drive start/end from the speaker transcript's word times so the type lands with the voice."
+    },
+    "align": {
+      "type": "string",
+      "label": "Alignment: center (default) | left",
+      "optional": true
+    },
+    "uppercase": {
+      "type": "boolean",
+      "label": "Render phrases in caps",
+      "optional": true,
+      "default": false
+    },
+    "max_font": {
+      "type": "number",
+      "label": "Starting font size in px before auto-fit (default 104)",
+      "optional": true
+    },
+    "min_font": {
+      "type": "number",
+      "label": "Floor the auto-fit will not shrink past (default 44)",
+      "optional": true
+    }
+  }
+}

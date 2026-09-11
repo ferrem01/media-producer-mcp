@@ -1,0 +1,212 @@
+<template>
+  <div class="rcl">
+    <div class="rcl-stack"></div>
+  </div>
+</template>
+
+<style scoped>
+  .rcl {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .rcl-stack {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Every phrase occupies the WHOLE lane and the timeline toggles which one is
+     lit. Stacked (not flowed) so a long phrase never shifts the one before it. */
+  .rcl-phrase {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .rcl-inner {
+    display: block;
+    width: 100%;
+    font-size: 104px;
+    font-weight: 800;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    text-align: center;
+    text-wrap: balance;
+    color: var(--mp-color-text, #ffffff);
+  }
+
+  .rcl-w {
+    display: inline-block;
+    white-space: pre;
+    transform-origin: 50% 100%;
+  }
+
+  /* Emphasis words (*starred*) ride the brand's chromatic statement. The
+     script re-tints this against the measured ground when the raw token is
+     too dim to clear contrast on it. */
+  .rcl-w.em {
+    color: var(--mp-color-primary, #6366f1);
+  }
+
+  .rcl-align-left .rcl-inner {
+    text-align: left;
+  }
+
+  .rcl-kicker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--mp-color-text-muted, #94a3b8);
+    opacity: 0;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var stack = el.querySelector('.rcl-stack');
+    if (!stack) return tl;
+
+    var phrases = (data && data.phrases) || [];
+    if (!phrases.length) return tl;
+
+    if (data && data.align === 'left') el.classList.add('rcl-align-left');
+
+    var maxFont = (data && data.max_font) || 104;
+    var minFont = (data && data.min_font) || 44;
+    var upper = !!(data && data.uppercase);
+
+    // ── Emphasis ink ───────────────────────────────────────────────────────
+    // The brand primary is a saturated statement color, not a legible one:
+    // #393bf5 on a near-black lane measures ~2.4:1. Mix it toward the ground's
+    // opposite until it clears 4.5:1, the same repair caption-kinetic-slam
+    // does for its accent words.
+    var emInk = null;
+    var lum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof lum === 'number' && window.mpInkContrast && window.mpParseColor) {
+      var probe = document.createElement('span');
+      probe.className = 'rcl-w em';
+      stack.appendChild(probe);
+      var raw = getComputedStyle(probe).color;
+      stack.removeChild(probe);
+      var rc = mpParseColor(raw);
+      var target = mpParseColor(lum < 0.4 ? '#ffffff' : '#0b0b12');
+      if (rc && target) {
+        for (var mix = 0; mix <= 0.9; mix += 0.1) {
+          var cand = 'rgb(' + Math.round(rc.r + (target.r - rc.r) * mix) + ',' +
+            Math.round(rc.g + (target.g - rc.g) * mix) + ',' +
+            Math.round(rc.b + (target.b - rc.b) * mix) + ')';
+          var ratio = mpInkContrast(cand, lum);
+          if (ratio === null || ratio >= 4.5) { emInk = cand; break; }
+          emInk = cand;
+        }
+      }
+    }
+
+    // ── Build every phrase up front ────────────────────────────────────────
+    var built = [];
+    for (var i = 0; i < phrases.length; i++) {
+      var p = phrases[i] || {};
+      var raw2 = String(p.text || '');
+      if (!raw2) continue;
+
+      var wrap = document.createElement('div');
+      wrap.className = 'rcl-phrase';
+      var inner = document.createElement('div');
+      inner.className = 'rcl-inner';
+      wrap.appendChild(inner);
+      stack.appendChild(wrap);
+
+      // *starred* spans mark emphasis. Split on the stars FIRST so a phrase
+      // with unbalanced stars degrades to plain text instead of looping.
+      var words = [];
+      var segs = raw2.split('*');
+      for (var s = 0; s < segs.length; s++) {
+        if (!segs[s]) continue;
+        var isEm = (s % 2 === 1) && (segs.length % 2 === 1);
+        var chunk = segs[s].split(/\s+/).filter(function (w) { return w.length; });
+        for (var c = 0; c < chunk.length; c++) {
+          var sp = document.createElement('span');
+          sp.className = 'rcl-w' + (isEm ? ' em' : '');
+          sp.textContent = upper ? chunk[c].toUpperCase() : chunk[c];
+          if (isEm && emInk) sp.style.color = emInk;
+          inner.appendChild(sp);
+          inner.appendChild(document.createTextNode(' '));
+          words.push(sp);
+        }
+      }
+      if (!words.length) { stack.removeChild(wrap); continue; }
+
+      built.push({
+        wrap: wrap, inner: inner, words: words,
+        start: Number(p.start) || 0,
+        end: (p.end != null ? Number(p.end) : (Number(p.start) || 0) + 2.4),
+      });
+    }
+    if (!built.length) return tl;
+
+    // ── Fit each phrase to the lane ────────────────────────────────────────
+    // Measured once, while the phrase is laid out but still invisible: step the
+    // size down until the block clears the lane box in BOTH axes.
+    var boxW = stack.clientWidth || el.clientWidth;
+    var boxH = stack.clientHeight || el.clientHeight;
+    for (var b = 0; b < built.length; b++) {
+      var it = built[b];
+      it.wrap.style.visibility = 'hidden';
+      it.wrap.style.opacity = '0';
+      var fs = maxFont;
+      it.inner.style.fontSize = fs + 'px';
+      var guard = 0;
+      while (guard++ < 40 && fs > minFont &&
+        (it.inner.scrollHeight > boxH || it.inner.scrollWidth > boxW + 1)) {
+        fs = Math.round(fs * 0.92);
+        it.inner.style.fontSize = fs + 'px';
+      }
+      it.fontSize = fs;
+    }
+
+    // ── Timeline ───────────────────────────────────────────────────────────
+    var rise = ctx.motion === 'minimal' ? 0.42 : ctx.motion === 'punchy' ? 0.3 : 0.36;
+    var stepBase = ctx.motion === 'minimal' ? 0.07 : ctx.motion === 'punchy' ? 0.055 : 0.06;
+
+    for (var j = 0; j < built.length; j++) {
+      var itm = built[j];
+      var span = Math.max(0.4, itm.end - itm.start);
+      var step = stepBase;
+      // Never let the word cascade outrun the phrase's own slot.
+      var cascade = (itm.words.length - 1) * step + rise;
+      if (cascade > span * 0.7) step = Math.max(0.02, (span * 0.7 - rise) / Math.max(1, itm.words.length - 1));
+
+      tl.set(itm.wrap, { autoAlpha: 1, y: 0 }, itm.start);
+      for (var w = 0; w < itm.words.length; w++) {
+        tl.fromTo(itm.words[w],
+          { autoAlpha: 0, y: 34, scale: 0.92, filter: 'blur(7px)' },
+          {
+            autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+            duration: rise, ease: 'back.out(1.7)', immediateRender: false,
+          },
+          itm.start + w * step);
+      }
+
+      var exit = Math.max(itm.start + 0.2, itm.end - 0.28);
+      tl.to(itm.wrap, { autoAlpha: 0, y: -26, duration: 0.26, ease: 'power2.in' }, exit);
+      tl.set(itm.wrap, { autoAlpha: 0, y: 0 }, itm.end);
+    }
+
+    return tl;
+  }
+</script>
