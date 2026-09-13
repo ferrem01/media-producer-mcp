@@ -1,0 +1,34 @@
+{
+  "type": "pipeline-flow",
+  "label": "Pipeline Flow (animated step rail)",
+  "category": "effects",
+  "description": "A compact motion-graphic chip that plays a process as motion: 2-5 labelled nodes on a rail, a glowing pulse travelling between them, each node lighting as the pulse arrives and the rail filling behind it. Built to ride OVER footage -- it carries its own dark blurred card, so it stays legible on a ground whose brightness the author does not control. Time it to the words: give `at` the second the speaker starts describing the process and `step` the beat between stages, and the graphic reads as authored to the script rather than decoration.",
+  "data": {
+    "nodes": {
+      "type": "array",
+      "label": "Nodes",
+      "required": true,
+      "description": "2-5 entries of { label, icon }. icon is one of: mail, spark, video, chart, check, doc, bolt, cloud."
+    },
+    "at": {
+      "type": "number",
+      "label": "Scene second the card enters (default 0.3)",
+      "optional": true
+    },
+    "step": {
+      "type": "number",
+      "label": "Seconds per hop between nodes (default 0.9)",
+      "optional": true
+    },
+    "hold": {
+      "type": "number",
+      "label": "Seconds the completed rail holds before it exits (default 1.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade the card out after the hold (default true; false leaves it standing)",
+      "optional": true
+    }
+  }
+}
