@@ -2,7 +2,7 @@
   "type": "reel-caption-lane",
   "label": "Reel Caption Lane (timed kinetic phrases)",
   "category": "captions",
-  "description": "THE caption lane for vertical/square social cuts (9:16, 4:5): a timeline-driven stack of BIG kinetic phrases that fill their own box, one at a time, word-by-word. Unlike narration-track (a small lower-third pill over footage) this is the type FIELD itself -- give it the empty half of the frame under a camera card and it becomes the ad's headline track. Each phrase auto-fits its box, so a long line shrinks instead of overflowing. Wrap a word or run of words in *stars* to tint them with the brand's primary (re-mixed at runtime against the measured ground so the accent always clears 4.5:1).",
+  "description": "THE caption lane for vertical/square social cuts (9:16, 4:5): a timeline-driven stack of BIG kinetic phrases that fill their own box, one at a time, word-by-word. Unlike narration-track (a small lower-third pill over footage) this is the type FIELD itself -- give it the empty half of the frame under a camera card and it becomes the ad's headline track. Each phrase auto-fits its box, so a long line shrinks instead of overflowing. Burning the lane over live footage instead of a flat field? Set scrim:'plate' (or 'shadow') -- a moving ground is one the contrast gate cannot pre-empt, so the phrase carries its own. Wrap a word or run of words in *stars* to tint them with the brand's primary (re-mixed at runtime against the measured ground so the accent always clears 4.5:1).",
   "data": {
     "phrases": {
       "type": "array",
@@ -29,6 +29,11 @@
     "min_font": {
       "type": "number",
       "label": "Floor the auto-fit will not shrink past (default 44)",
+      "optional": true
+    },
+    "scrim": {
+      "type": "string",
+      "label": "Scrim over live footage: none (default, for a flat brand field) | shadow (text-shadow only) | plate (translucent blurred card behind each phrase -- the burned-in caption look)",
       "optional": true
     }
   }
