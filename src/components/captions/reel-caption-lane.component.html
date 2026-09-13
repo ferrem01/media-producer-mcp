@@ -60,6 +60,31 @@
     text-align: left;
   }
 
+  /* ── Scrims ────────────────────────────────────────────────────────────
+     A lane over a FLAT brand field needs nothing. A lane burned over live
+     footage does: a kitchen window behind the words is a moving ground the
+     contrast gate cannot pre-empt, so the phrase carries its own. */
+  .rcl-scrim-shadow .rcl-inner {
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.62), 0 8px 38px rgba(0, 0, 0, 0.5);
+  }
+
+  .rcl-scrim-plate .rcl-inner {
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0.26em 0.42em;
+    border-radius: 0.24em;
+    background: rgba(10, 10, 16, 0.62);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    backdrop-filter: blur(10px) saturate(120%);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.32);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+  }
+
+  .rcl-scrim-plate.rcl-align-left .rcl-inner {
+    margin: 0;
+  }
+
   .rcl-kicker {
     position: absolute;
     left: 0;
@@ -84,7 +109,14 @@
     var phrases = (data && data.phrases) || [];
     if (!phrases.length) return tl;
 
-    if (data && data.align === 'left') el.classList.add('rcl-align-left');
+    // Modifier classes go on the TEMPLATE root, not the component wrapper --
+    // scoped styles only match inside the template, so a class on the wrapper
+    // silently matches nothing.
+    var root = el.querySelector('.rcl') || stack;
+    if (data && data.align === 'left') root.classList.add('rcl-align-left');
+    var scrim = (data && data.scrim) || 'none';
+    if (scrim === 'shadow') root.classList.add('rcl-scrim-shadow');
+    else if (scrim === 'plate') root.classList.add('rcl-scrim-plate');
 
     var maxFont = (data && data.max_font) || 104;
     var minFont = (data && data.min_font) || 44;
@@ -96,7 +128,9 @@
     // opposite until it clears 4.5:1, the same repair caption-kinetic-slam
     // does for its accent words.
     var emInk = null;
-    var lum = window.mpGroundLum ? mpGroundLum() : null;
+    // Under a plate the words sit on the PLATE, not on the scene ground --
+    // measuring the scene would mix the accent toward the wrong end.
+    var lum = scrim === 'plate' ? 0.02 : (window.mpGroundLum ? mpGroundLum() : null);
     if (typeof lum === 'number' && window.mpInkContrast && window.mpParseColor) {
       var probe = document.createElement('span');
       probe.className = 'rcl-w em';
