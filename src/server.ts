@@ -338,14 +338,15 @@ BEFORE GENERATING
 - Ask first: audience, goal/CTA, target length, and which film grammar fits.
 - FILM GRAMMARS (what carries the argument; pass film_grammar to pin, omit to let the director choose):
   * launch-film -- few long cinematic scenes, one continuous world.
-  * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover.
-  * hype-cut -- story-first: one-bar kinetic type interstitials alternating with longer product beats; premise, escalation, payoff. Use-case stories, hook-first ads.
+  * tempo-cut -- product-first montage: driving music, bar-quantized cuts, on-screen type IS the voiceover.
+  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats; premise, escalation, payoff. Hook-first ads.
   * editorial -- typography-first: huge serif statements alternating with full-bleed evidence.
   * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene; real figures only.
-  * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type is PERFORMED where it lives.
-  * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble on camera, or voice-only). Set by screencast_source.
+  * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
+  * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
   * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
-- FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok/Shorts (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else -- never changes the grammar. An Instagram ad = 9x16 + any grammar.
+  Choosing: ask what carries the argument.
+- FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else -- never changes the grammar. Instagram ad = 9x16 + any grammar.
 - THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper|plain, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
 - Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
 - A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
