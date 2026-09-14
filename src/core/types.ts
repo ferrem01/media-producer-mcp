@@ -566,6 +566,17 @@ export interface Project {
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
+  /** The delivered take for a speaker film, recorded from the /take page (or
+   *  attached by hand). speaker_track points at the same file; this records
+   *  what was recorded and when, for the measured-spine re-time that follows. */
+  take?: {
+    source: string;
+    recorded_at: string;
+    duration?: number;
+    mime?: string;
+    width?: number;
+    height?: number;
+  };
   /** Film-level color grade applied to the final concatenated video for
    *  cross-scene consistency (subtle S-curve + saturation + grain).
    *  "none" disables. The generate pipeline defaults videos to "cinematic". */

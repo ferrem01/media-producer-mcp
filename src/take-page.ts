@@ -1,0 +1,379 @@
+/**
+ * The take page -- served at /take?tenant=&project=&token=.
+ *
+ * Open it on a phone and it IS the booth for a speaker film: the board's
+ * script (voiceover_text, beat by beat) as a teleprompter over the front
+ * camera, a level meter so a silent take is visible while you are still
+ * talking, record / review / retake, and an upload that attaches the take to
+ * the project as its speaker base. The operator never touches a file.
+ *
+ * This is Phase 2's front door (SPEC-format-and-spine.md): the board's
+ * ASSERTED spine -- her lines, her estimated durations -- driving the
+ * prompter. Re-timing the board to the delivered take (the MEASURED spine)
+ * is the step after this one and belongs behind a button on this page.
+ *
+ * Why a page and not the extension: the extension films a browser tab with
+ * the camera as a bubble -- a 16:9 webcam shot, the wrong shape for a Reel.
+ * A phone's front camera is native 9:16 (measured: 1080x1920, no crop).
+ *
+ * Auth: reads ?tenant= ?project= ?token= from its own URL (the tenant-scoped
+ * Studio token) and forwards the token on every request. The shell itself is
+ * behind the auth middleware, so a link without a valid token gets a 401.
+ */
+export function getTakeHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0e0e14">
+<link rel="icon" href="data:,">
+<title>Record a take · Media Studio</title>
+<style>
+  :root { --bg:#0e0e14; --panel:#17171f; --ink:#f4f4f8; --muted:#9a9aad; --line:#26262f;
+    --accent:#393bf5; --ok:#22c55e; --err:#ef4444; --warn:#f59e0b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none; }
+  body { display:flex; flex-direction:column; min-height:100dvh; }
+  section { display:none; flex:1; flex-direction:column; }
+  section.on { display:flex; }
+  .pad { padding: calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom)); }
+  h1 { font-size:20px; font-weight:600; letter-spacing:-.02em; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; }
+  .beat { font-size:19px; line-height:1.45; margin:0 0 14px; }
+  .beat b { color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; display:block; margin-bottom:4px; }
+  .note { color:var(--muted); font-size:13px; line-height:1.5; }
+  .btn { appearance:none; border:0; border-radius:14px; padding:16px 20px; font:inherit; font-size:17px; font-weight:600;
+    color:#fff; background:var(--accent); width:100%; cursor:pointer; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); }
+  .btn.stop { background:var(--err); }
+  .btn:disabled { opacity:.45; }
+  .row { display:flex; gap:10px; margin-top:12px; }
+  .row .btn { flex:1; }
+  .spacer { flex:1; }
+
+  /* ── stage: camera full-bleed, prompter over it ── */
+  #stage { position:relative; background:#000; }
+  #live { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 55%, rgba(0,0,0,.75) 100%); pointer-events:none; }
+  #top { position:absolute; left:0; right:0; top:0; padding: calc(12px + env(safe-area-inset-top)) 16px 0; display:flex; align-items:center; gap:10px; }
+  #timer { font-variant-numeric:tabular-nums; font-weight:600; font-size:15px; }
+  #timer.rec::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--err); margin-right:8px; animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.25; } }
+  #meterWrap { flex:1; height:6px; border-radius:3px; background:rgba(255,255,255,.18); overflow:hidden; }
+  #meter { height:100%; width:0%; background:var(--ok); transition:width .08s linear; }
+  #meterWrap.silent #meter { background:var(--err); }
+  #silent { position:absolute; left:16px; right:16px; top: calc(44px + env(safe-area-inset-top)); font-size:13px; color:#fff; background:rgba(239,68,68,.9);
+    padding:8px 12px; border-radius:10px; display:none; }
+  #count { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:140px; font-weight:700; color:#fff; text-shadow:0 8px 40px rgba(0,0,0,.6); }
+  #prompt { position:absolute; left:0; right:0; bottom: calc(96px + env(safe-area-inset-bottom)); padding:0 22px; text-align:center; }
+  #cue { font-size:30px; line-height:1.28; font-weight:600; color:#fff; text-shadow:0 2px 14px rgba(0,0,0,.7); text-wrap:balance; }
+  #next { margin-top:10px; font-size:17px; line-height:1.3; color:rgba(255,255,255,.55); text-shadow:0 2px 10px rgba(0,0,0,.6); }
+  #bar { position:absolute; left:0; right:0; bottom: calc(86px + env(safe-area-inset-bottom)); height:3px; background:rgba(255,255,255,.18); }
+  #barFill { height:100%; width:0%; background:var(--accent); }
+  #stopWrap { position:absolute; left:18px; right:18px; bottom: calc(18px + env(safe-area-inset-bottom)); }
+
+  /* ── review ── */
+  #play { width:100%; max-height:62dvh; border-radius:16px; background:#000; }
+  .prog { height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin:14px 0 8px; }
+  .prog i { display:block; height:100%; width:0%; background:var(--accent); transition:width .2s; }
+  .big { font-size:40px; margin:0 0 8px; }
+  a.btn { display:block; text-align:center; text-decoration:none; }
+  .meta { font-size:12px; color:var(--muted); margin-top:10px; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+
+<section id="ready" class="pad on">
+  <h1 id="title">Loading…</h1>
+  <p class="sub" id="subtitle"></p>
+  <div class="card" id="script"></div>
+  <div class="spacer"></div>
+  <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script scrolls over the camera at speaking pace.</p>
+  <button class="btn" id="recordBtn" disabled>Record</button>
+</section>
+
+<section id="stage">
+  <video id="live" autoplay muted playsinline></video>
+  <div id="veil"></div>
+  <div id="top"><span id="timer">0:00</span><div id="meterWrap"><div id="meter"></div></div></div>
+  <div id="silent">No sound is reaching the mic — this take is recording nothing.</div>
+  <div id="count"></div>
+  <div id="prompt"><div id="cue"></div><div id="next"></div></div>
+  <div id="bar"><div id="barFill"></div></div>
+  <div id="stopWrap"><button class="btn stop" id="stopBtn">Stop</button></div>
+</section>
+
+<section id="review" class="pad">
+  <h1>Review</h1>
+  <p class="sub" id="reviewMeta"></p>
+  <video id="play" controls playsinline></video>
+  <div class="spacer"></div>
+  <div class="row">
+    <button class="btn ghost" id="retakeBtn">Retake</button>
+    <button class="btn" id="useBtn">Use this take</button>
+  </div>
+</section>
+
+<section id="upload" class="pad">
+  <h1>Uploading…</h1>
+  <p class="sub" id="uploadMeta"></p>
+  <div class="prog"><i id="uploadFill"></i></div>
+  <p class="note" id="uploadNote">Sending the take to the project.</p>
+</section>
+
+<section id="done" class="pad">
+  <p class="big">✓</p>
+  <h1>Attached</h1>
+  <p class="sub" id="doneMeta"></p>
+  <p class="note">The take is now the speaker base of this project. Open Studio to build the scenes over it, or record another.</p>
+  <div class="spacer"></div>
+  <a class="btn" id="studioLink" href="#">Open in Studio</a>
+  <div class="row"><button class="btn ghost" id="againBtn">Record another</button></div>
+</section>
+
+<section id="err" class="pad">
+  <h1>Something went wrong</h1>
+  <p class="sub" id="errMsg"></p>
+  <div class="spacer"></div>
+  <button class="btn ghost" id="errBtn">Try again</button>
+</section>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var qp = new URLSearchParams(location.search);
+  var tenant = qp.get('tenant') || '';
+  var project = qp.get('project') || '';
+  var token = qp.get('token') || '';
+  var WORDS_PER_SEC = 2.4;
+
+  function show(id) {
+    ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
+  }
+  function fail(msg) { $('errMsg').textContent = msg; show('err'); }
+  function withToken(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
+  function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
+
+  if (!tenant || !project) { fail('Missing ?tenant= and ?project= in the link. Ask your agent for the take link for this board.'); return; }
+
+  // ── the script: the board's asserted spine ────────────────────────────
+  // One cue per beat; a long beat is split into sentences, each given a share
+  // of the beat's seconds by word count, so a single 15s line still paces.
+  var cues = [];
+  var total = 0;
+  var projectName = '';
+
+  function buildCues(scenes) {
+    var out = [];
+    (scenes || []).forEach(function (s, i) {
+      var text = String(s.voiceover_text || '').trim();
+      if (!text) return;
+      var dur = Number(s.duration_seconds) || Math.max(1.5, text.split(/\\s+/).length / WORDS_PER_SEC);
+      var parts = text.match(/[^.!?…]+[.!?…]+["')\\]]*|[^.!?…]+$/g) || [text];
+      var words = parts.map(function (p) { return p.trim().split(/\\s+/).filter(Boolean).length; });
+      var sum = words.reduce(function (a, b) { return a + b; }, 0) || 1;
+      parts.forEach(function (p, k) {
+        var t = p.trim(); if (!t) return;
+        out.push({ text: t, dur: dur * (words[k] / sum), beat: i });
+      });
+    });
+    return out;
+  }
+
+  fetch(withToken('/api/projects/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)))
+    .then(function (r) { if (!r.ok) throw new Error('Could not load the project (' + r.status + '). Is the link still valid?'); return r.json(); })
+    .then(function (p) {
+      projectName = p.name || project;
+      var scenes = (p.storyboard && p.storyboard.scenes) || [];
+      cues = buildCues(scenes);
+      total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
+      $('title').textContent = projectName;
+      var g = (p.treatment && p.treatment.filmGrammar) || '';
+      var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
+      $('subtitle').textContent = beats
+        ? beats + (beats === 1 ? ' beat' : ' beats') + ' · about ' + fmt(total) + ' at speaking pace' + (g ? ' · ' + g : '')
+        : 'This board has no spoken lines' + (g ? ' (grammar: ' + g + ')' : '') + '. You can still record; there will be no prompter.';
+      var sc = $('script'); sc.innerHTML = '';
+      if (!beats) { sc.innerHTML = '<p class="note">No script on this board.</p>'; }
+      scenes.forEach(function (s, i) {
+        var t = String(s.voiceover_text || '').trim(); if (!t) return;
+        var d = document.createElement('p'); d.className = 'beat';
+        var b = document.createElement('b'); b.textContent = 'Beat ' + (i + 1) + (s.duration_seconds ? ' · ' + Number(s.duration_seconds).toFixed(0) + 's' : '');
+        d.appendChild(b); d.appendChild(document.createTextNode(t)); sc.appendChild(d);
+      });
+      $('recordBtn').disabled = false;
+    })
+    .catch(function (e) { fail(e.message || String(e)); });
+
+  // ── recording ──────────────────────────────────────────────────────────
+  var stream = null, rec = null, chunks = [], mime = '', ext = 'webm';
+  var t0 = 0, tickTimer = null, cueTimers = [], audioCtx = null, meterRaf = null, lastLoud = 0, wake = null;
+  var blob = null, blobDuration = 0, trackW = 0, trackH = 0;
+
+  var CANDS = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  function pickMime() {
+    if (!window.MediaRecorder) return '';
+    for (var i = 0; i < CANDS.length; i++) { try { if (MediaRecorder.isTypeSupported(CANDS[i])) return CANDS[i]; } catch (e) {} }
+    return '';
+  }
+
+  function startMeter(s) {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      audioCtx = new AC();
+      var src = audioCtx.createMediaStreamSource(s);
+      var an = audioCtx.createAnalyser(); an.fftSize = 1024; src.connect(an);
+      var buf = new Float32Array(an.fftSize);
+      lastLoud = performance.now();
+      var loop = function () {
+        an.getFloatTimeDomainData(buf);
+        var sum = 0; for (var i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        var rms = Math.sqrt(sum / buf.length);
+        var db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+        var pct = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+        $('meter').style.width = pct + '%';
+        var now = performance.now();
+        if (db > -45) lastLoud = now;
+        var silent = rec && rec.state === 'recording' && (now - lastLoud) > 3000;
+        $('meterWrap').classList.toggle('silent', silent);
+        $('silent').style.display = silent ? 'block' : 'none';
+        meterRaf = requestAnimationFrame(loop);
+      };
+      loop();
+    } catch (e) { /* a meter is a courtesy; recording does not depend on it */ }
+  }
+  function stopMeter() {
+    if (meterRaf) cancelAnimationFrame(meterRaf); meterRaf = null;
+    if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; }
+    $('meter').style.width = '0%'; $('meterWrap').classList.remove('silent'); $('silent').style.display = 'none';
+  }
+
+  function runPrompter() {
+    var at = 0;
+    $('barFill').style.width = '0%';
+    cues.forEach(function (c, i) {
+      cueTimers.push(setTimeout(function () {
+        $('cue').textContent = c.text;
+        $('next').textContent = cues[i + 1] ? cues[i + 1].text : '';
+      }, at * 1000));
+      at += c.dur;
+    });
+    cueTimers.push(setTimeout(function () { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; }, at * 1000));
+  }
+  function clearPrompter() { cueTimers.forEach(clearTimeout); cueTimers = []; $('cue').textContent = ''; $('next').textContent = ''; }
+
+  function tick() {
+    var el = (performance.now() - t0) / 1000;
+    $('timer').textContent = fmt(el) + (total ? ' / ' + fmt(total) : '');
+    if (total) $('barFill').style.width = Math.min(100, (el / total) * 100) + '%';
+  }
+
+  $('recordBtn').addEventListener('click', function () {
+    $('recordBtn').disabled = true;
+    var constraints = {
+      video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 }, frameRate: { ideal: 30 } },
+      // Mirrors the recorder extension so a take behaves the same on every device.
+      audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true },
+    };
+    navigator.mediaDevices.getUserMedia(constraints).then(function (s) {
+      stream = s;
+      var vt = s.getVideoTracks()[0]; var st = vt && vt.getSettings ? vt.getSettings() : {};
+      trackW = st.width || 0; trackH = st.height || 0;
+      $('live').srcObject = s;
+      show('stage');
+      $('timer').textContent = '0:00'; $('timer').classList.remove('rec');
+      startMeter(s);
+      if (navigator.wakeLock && navigator.wakeLock.request) { navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); }
+      // 3-2-1 count-in, then roll.
+      var n = 3; $('count').style.display = 'flex'; $('count').textContent = String(n);
+      var cd = setInterval(function () {
+        n -= 1;
+        if (n > 0) { $('count').textContent = String(n); return; }
+        clearInterval(cd); $('count').style.display = 'none';
+        mime = pickMime(); ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+        chunks = [];
+        try { rec = mime ? new MediaRecorder(s, { mimeType: mime }) : new MediaRecorder(s); }
+        catch (e) { stopAll(); fail('This browser cannot record video here (' + (e.message || e) + ').'); return; }
+        rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+        rec.onstop = onStopped;
+        rec.start(1000);
+        t0 = performance.now();
+        $('timer').classList.add('rec');
+        tickTimer = setInterval(tick, 200);
+        runPrompter();
+      }, 1000);
+    }).catch(function (e) {
+      $('recordBtn').disabled = false;
+      fail('Camera or microphone was not allowed (' + (e.name || e) + '). Allow both for this site and try again.');
+    });
+  });
+
+  function stopAll() {
+    if (tickTimer) clearInterval(tickTimer); tickTimer = null;
+    clearPrompter(); stopMeter();
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+    $('live').srcObject = null;
+  }
+
+  $('stopBtn').addEventListener('click', function () {
+    if (rec && rec.state === 'recording') { blobDuration = (performance.now() - t0) / 1000; rec.stop(); }
+    else { stopAll(); show('ready'); $('recordBtn').disabled = false; }
+  });
+
+  function onStopped() {
+    blob = new Blob(chunks, { type: mime || 'video/webm' });
+    stopAll();
+    if (!blob.size) { fail('The recording came back empty. Try again.'); return; }
+    var url = URL.createObjectURL(blob);
+    var v = $('play'); v.src = url; v.load();
+    $('reviewMeta').textContent = fmt(blobDuration) + (total ? ' recorded · script is ' + fmt(total) : '') + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB'
+      + (trackW && trackH ? ' · ' + trackW + '×' + trackH : '') + ' · ' + ext;
+    show('review');
+  }
+
+  $('retakeBtn').addEventListener('click', function () { blob = null; chunks = []; $('play').src = ''; show('ready'); $('recordBtn').disabled = false; });
+
+  // ── upload + attach ────────────────────────────────────────────────────
+  $('useBtn').addEventListener('click', function () {
+    if (!blob) return;
+    var name = 'take-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
+    show('upload');
+    $('uploadMeta').textContent = name + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB';
+    $('uploadFill').style.width = '0%';
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', withToken('/api/upload-asset/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + '?name=' + encodeURIComponent(name)));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = function (ev) { if (ev.lengthComputable) $('uploadFill').style.width = Math.round((ev.loaded / ev.total) * 100) + '%'; };
+    xhr.onerror = function () { fail('Upload failed (network). Check the connection and try again.'); };
+    xhr.onload = function () {
+      if (xhr.status < 200 || xhr.status >= 300) { fail('Upload failed (' + xhr.status + '): ' + (xhr.responseText || '').slice(0, 200)); return; }
+      var up; try { up = JSON.parse(xhr.responseText); } catch (e) { fail('Upload returned something unexpected.'); return; }
+      $('uploadFill').style.width = '100%';
+      $('uploadNote').textContent = 'Attaching to the project…';
+      fetch(withToken('/api/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, width: trackW, height: trackH }),
+      }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
+        .then(function (j) {
+          $('doneMeta').textContent = projectName + ' · ' + fmt(blobDuration) + ' take';
+          $('studioLink').href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&token=' + encodeURIComponent(token);
+          show('done');
+        })
+        .catch(function (e) { fail(e.message || String(e)); });
+    };
+    xhr.send(blob);
+  });
+
+  $('againBtn').addEventListener('click', function () { blob = null; chunks = []; show('ready'); $('recordBtn').disabled = false; });
+  $('errBtn').addEventListener('click', function () { stopAll(); show('ready'); $('recordBtn').disabled = !cues && false; $('recordBtn').disabled = false; });
+})();
+</script>
+</body>
+</html>`;
+}
