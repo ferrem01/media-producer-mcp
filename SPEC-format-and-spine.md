@@ -262,41 +262,40 @@ whisper rendered an unknown name as "Prana" with no prior available.
 ## The multi-format workflow (in scope)
 
 "Make a LinkedIn version of this, now make it for Instagram" is close to the
-most common ad request there is. It is a requirement of this design, not a
-follow-on.
+most common ad request there is. It is a requirement of this design.
 
-**Recommendation: one project, one board, staging per format.**
+**Decision: separate projects, joined by a first-class derive operation.**
 
-What must stay single is the **board** — the beats, the copy, the footage, the
-order. That is the film. If a format request forks the project, the script
-forks with it, and the failure mode is shipping an ad with a typo fixed in one
-aspect ratio and not the other. Copy edits are the most common edit there is;
-they must land once.
+    derive(project_id, format: '9x16') → new project_id
 
-What must be allowed to differ is the **staging** — component positions and
-sizes, caption placement, occasionally which component is used at all (a
-desktop shell that is legal at 16x9 is banned at 9x16). That is a per-format
-overlay on shared scenes, not a copy of them.
+The board (beats, copy, footage, order) is **copied**, the new format is set,
+the scenes are **re-staged for the new geometry as a proposal** (the
+`proposed: true` idiom the compress-the-waiting EDL already uses), and
+`derived_from` records the lineage. The two projects are independent from
+that moment on.
 
-    project
-      board            ← beats, copy, footage, order      (single)
-      staging[16x9]    ← positions, sizes, caption band   (per format)
-      staging[9x16]
-    render(project, format) → output-9x16.mp4
+Why separate, not shared (this reverses an earlier draft):
 
-**First draft of a staging is derived, proposed, and editable** — the
-`proposed: true` idiom the compress-the-waiting EDL already uses. The system
-re-stages for the new geometry and opens Studio with it; nothing is imposed.
-This matters because the two hand-built reels of 2026-09-11/13 made genuinely
-different creative choices at 4:5 and 9:16 (a framed card with a type field
-below, versus full-bleed footage with burned captions). An auto-relayout would
-have produced neither, so it must be a starting point rather than an answer.
+- **Approval.** Once a format is signed off, a copy edit elsewhere must not
+  silently change it. Propagation across formats is a liability for anything
+  already shipped, not a convenience.
+- **Independent editing is the norm.** A 9:16 and a 16:9 of the same ad make
+  different creative decisions, not just different positions — the two
+  hand-built reels of 2026-09-11/13 chose a framed card with a type field at
+  4:5 and full-bleed footage with burned captions at 9:16. Once a variant is
+  edited independently it is a separate thing, and it is always edited
+  independently.
+- **It is how design tools work.** Canva's resize produces a new design;
+  Figma duplicates the frame. Nobody keeps N bodies in one document.
+- **Every per-project mechanism keeps working unchanged** — render, stills,
+  jobs, the scene cache, Studio. A shared project would have needed a Studio
+  format switcher and per-format edit state; that machinery existed only
+  because of the shared-project choice, which was the design saying it was
+  wrong.
 
-**Separate projects only when the EDIT differs.** A 15s reel and a 45s
-LinkedIn cut with different beats are two different films that happen to share
-source footage. Forcing them into one project buys nothing. The test: if the
-board changes, it is a new project; if only the staging changes, it is a
-format variant.
+What is given up: copy fixes do not propagate. If that ever matters, the
+lineage link is enough to offer "the source changed — re-derive?" later. Not
+in scope now.
 
 ## Conflicts this spec must resolve
 
@@ -325,21 +324,60 @@ Genuinely good and currently unsayable: `9x16` × `speaker` (the ad this all
 started from), `9x16` × `tempo-cut`, `9x16` × `hype-cut` (what `social-reel`
 was reaching for), `9x16` × `canvas-tour`.
 
-## Open questions
+## Decisions recorded from review (2026-09-14)
 
-1. **Do the occluded bands belong to the format?** They are numbers about the
-   screen, so they fit the geometry rule — but they are *platform*-specific,
-   not geometric: Reels and TikTok are both 9:16 and occlude differently. Two
-   options: formats stay purely geometric and occlusion moves to a separate
-   platform profile, or each geometric format carries a default mask for its
-   most common platform, overridable. The spec currently assumes the latter.
-2. **Does `format` infer or must it be pinned?** RESOLVED by scope: now that
-   format is only geometry, inference is a lookup ("for Instagram Reels" →
-   `9x16`) with no editorial judgement attached, so it infers like the other
-   three axes.
-3. **Where does the story arc live?** RESOLVED: grammar. Hook, escalation,
-   payoff and the loop seam are editorial. `hype-cut` already carries that
-   shape.
+- **Format is geometry only.** No duration, no story shape. Both belong to
+  the grammar.
+- **Format infers.** Now that it is a lookup with no editorial judgement
+  attached ("for Instagram Reels" → `9x16`), it infers like the other axes.
+- **The story arc lives in the brief, not the grammar.** `speaker` makes the
+  person own the clock; "15-second Instagram ad, open with a hook" is the
+  brief's job, and the model knows what one looks like. If the script is
+  good and the performance is off, that is the humans' problem.
+- **`screencast` assumes a narrator; the face is optional.** Camera on → PiP
+  bubble; camera off → voice-only. Both are the same grammar because the
+  screen is the base layer either way. `speaker` is the same spine with the
+  layering inverted.
+- **Occluded bands stay on the format** as a default mask for the geometry's
+  most common platform, overridable. (Reels and TikTok are both `9x16` and
+  occlude differently; the default covers the common case.)
+- **Multi-format is derive-a-copy, not shared staging.** See above.
+
+## Remaining small items (implementation, not design)
+
+- Explicit `canvas_width` / `canvas_height` on `generate` still exist. Format
+  sets them; explicit dimensions override.
+- Existing projects on disk carry `canvas.preset`. Map to `format` on load.
+- The footage-first path (`screencast_source` → deterministic assemble, no
+  board) is **left untouched** by this change. It has been agreed separately
+  that it should produce a proposed board; that is its own PR.
+
+## Phasing — three phases, each shippable
+
+**Phase 1 — the structural change.** Add the `format` axis. Delete
+`social-reel` everywhere (13 occurrences across 5 files). Split
+`speaker-screencast` into `speaker` and `screencast`; delete the
+"only choose it when a recording exists" rule so `speaker` is choosable
+before the take. Move the vertical-composition rules into a format block in
+the storyboard builder. Subsume `canvas.preset`.
+
+Exit test: `generate({ film_grammar: 'speaker', format: '9x16', mode:
+'storyboard' })` with the `proj_ddca872c` brief returns a board with
+`voiceover_text` populated on every beat and staged in the middle band.
+
+Known risk: the vertical rules were tuned inside `social-reel`, knowing the
+film would be caption-led motion graphics. They will now fire against
+`tempo-cut`, `canvas-tour` and `speaker`, which have never had to obey a
+format constraint. Run three or four combinations before calling Phase 1
+done; expect to tune.
+
+**Phase 2 — script-first.** Board → prompter cues (arithmetic on the
+board's own durations, no LLM). Script-biased transcription (the board's copy
+as whisper's prior). Measured spine re-times the board and sources the
+captions.
+
+**Phase 3 — derive.** `derive(project_id, format)`: clone, set format,
+re-stage as a proposal, record lineage.
 
 ## Non-goals
 
