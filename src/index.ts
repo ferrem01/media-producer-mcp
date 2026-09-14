@@ -16,6 +16,7 @@ import { createMcpServer } from "./server.js";
 import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
+import { getTakeHtml } from "./take-page.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
@@ -807,7 +808,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -823,6 +824,15 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       if (urlPath === "/upload") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getUploadHtml());
+        return;
+      }
+
+      // ── Take page: the phone booth for a speaker film. The board's script
+      // as a teleprompter over the front camera; record, review, upload,
+      // attach as the speaker base. Same token-in-the-link auth as /upload. ──
+      if (urlPath === "/take") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getTakeHtml());
         return;
       }
 
@@ -2131,6 +2141,42 @@ Rules:
       }
 
       // ── API: Direct binary asset upload ──
+      // POST /api/take/{tenant}/{project} {url, duration?, mime?, width?, height?}
+      // Attach a recorded take (already uploaded to this project's assets) as
+      // the project's speaker base: speaker_track = one clip from 0. The take
+      // page calls this after its upload; the MCP `add` tool does the same
+      // thing by hand. Refuses a URL outside this project's own asset dir so a
+      // tenant token cannot point a project at someone else's file.
+      const takeMatch = urlPath.match(/^\/api\/take\/([^/]+)\/([^/]+)$/);
+      if (takeMatch && method === "POST") {
+        const [, tkTenant, tkProject] = takeMatch.map(decodeURIComponent);
+        let tkBody: Record<string, unknown> = {};
+        try { tkBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
+        const tkUrl = String(tkBody.url || "");
+        const expectedPrefix = `/assets/${tkTenant}/projects/${tkProject}/assets/`;
+        if (!tkUrl.startsWith(expectedPrefix) || tkUrl.includes("..")) {
+          jsonResponse(res, 400, { error: `url must be an asset of this project (${expectedPrefix}...)` });
+          return;
+        }
+        const tkProjectObj = await loadProject(tkTenant, tkProject);
+        if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const duration = Number(tkBody.duration);
+        tkProjectObj.speaker_track = { clips: [{ source: tkUrl, start: 0 }] };
+        tkProjectObj.take = {
+          source: tkUrl,
+          recorded_at: new Date().toISOString(),
+          duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100 : undefined,
+          mime: typeof tkBody.mime === "string" ? tkBody.mime : undefined,
+          width: Number(tkBody.width) || undefined,
+          height: Number(tkBody.height) || undefined,
+        };
+        tkProjectObj.updated_at = new Date().toISOString();
+        await saveProject(tkProjectObj);
+        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)}${tkProjectObj.take.duration ? ` (${tkProjectObj.take.duration}s)` : ""}`);
+        jsonResponse(res, 200, { ok: true, project_id: tkProject, speaker_track: tkProjectObj.speaker_track, take: tkProjectObj.take });
+        return;
+      }
+
       // POST /api/upload-asset/{tenant}/{project}?name=camera.mp4 with the raw
       // file bytes as the request body. The MCP upload tool only ingests via a
       // fetchable URL; this is the push path for local files (a speaker camera
