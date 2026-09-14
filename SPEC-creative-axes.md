@@ -7,15 +7,19 @@ rules that keep growth from becoming sprawl. Read this FIRST when asked to
 
 ## The model (the film-craft triad)
 
-Every film the system makes is defined by a prompt, the brand kit, and THREE
-creative axes — the same triad film craft has used for a century:
+Every film the system makes is defined by a prompt, the brand kit, and FOUR
+creative axes — the triad film craft has used for a century, plus the one
+that only became an axis once the same film started shipping to a feed, a
+phone and a landing page in the same week:
 
 | Axis | Field on `generate` | What it decides | Analog |
 | --- | --- | --- | --- |
 | RHYTHM | `film_grammar` | who narrates, what earns a cut, music's role, scene assembly | editing |
-| | | *values: launch-film, tempo-cut, hype-cut, editorial, social-reel, data-story, speaker-screencast, canvas-tour* | |
+| | | *values: launch-film, tempo-cut, hype-cut, editorial, data-story, canvas-tour, screencast, speaker* | |
 | LOOK | `visual_system` | the surface, the physics, the type voice, recurring devices | art direction |
 | SOUND | `audio_system` | music personality, narration voice, (future: SFX) | sound design |
+| FRAME | `frame` | the delivery geometry -- canvas plus the bands a platform draws over; a size and nothing else | delivery format |
+| | | *values: 16x9, 9x16, 4x5, 1x1* -- see `SPEC-format-and-spine.md` | |
 
 One contract for all three: **omitted → the creative director infers from the
 prompt; provided → pinned** (the director must commit and design around it).
@@ -132,7 +136,11 @@ A style is a VALUE BUNDLE someone can ask for by name — never new machinery:
 
 ## Anticipated future FIELD (the only one forecast)
 
-None beyond the triad. Type voice folded into `visual_system` (it is part of
+The fourth axis, FRAME, landed 2026-09-14 after the rule-3 review in
+`SPEC-format-and-spine.md`: it is orthogonal to rhythm, look and sound, and
+"make it for Instagram" is as operator-worthy as a pin gets. The field count
+grew by one; the concept count did not -- `social-reel` had been encoding
+format inside the rhythm axis all along. Beyond that: none. Type voice folded into `visual_system` (it is part of
 the look). Sound completed the triad. Duration targets, language, palette
 tints are scalar params or subfields, not axes. If a fourth axis ever seems
 necessary, run rule 3's test and hold a design review — the triad has held

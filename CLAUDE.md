@@ -39,6 +39,12 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
 1. **Creative Director** (`creative-director.ts`) → a `Treatment` (concept,
    `visualStyle.{colorMood,typographyAttitude,motionPersonality,spatialStrategy}`,
    emotionalArc, directorNote). Takes the raw prompt directly (no expander step).
+   Commits the film to its four axes: `filmGrammar` (what carries the argument --
+   eight values, `screencast`/`speaker` among them), `visualSystem`, `audioSystem`,
+   and `frame` (the delivery geometry: `16x9|9x16|4x5|1x1`, inferred from where
+   the prompt says the film ships, pinnable). A frame is a SIZE and nothing else --
+   see `SPEC-format-and-spine.md`. The tall-frame composition laws fire from the
+   canvas, for any grammar.
 2. **Storyboard Builder** (`storyboard-builder.ts`) → `DraftScene[]`. Each scene has
    `purpose` (its job) + `visual_notes` (visual direction) + `components[]` + `voiceover_text`.
    The LLM is prompted to emit `purpose`/`visual_notes` JSON keys.

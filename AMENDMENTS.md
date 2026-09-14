@@ -6,6 +6,44 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-14 — FRAME axis; `social-reel` deleted; `speaker-screencast` split
+
+`SPEC-format-and-spine.md`. A storyboard for a performed 15-second vertical ad
+came back with `voiceover_text` null on every scene (proj_ddca872c): the
+`social-reel` contract forbade the field. Its own first line said "the FORMAT
+carries the film" -- a delivery surface filed in the axis whose every other
+value names what carries the ARGUMENT. Seven of its ten rules were phone-screen
+or feed consequences; the two that were not were the two that broke.
+
+- **`frame`** is the fourth axis: `16x9 | 9x16 | 4x5 | 1x1`. A size and the
+  bands a platform draws over -- no duration, no story shape. Pinnable on
+  `generate`/`create`; the director infers it from where the prompt says the
+  film ships; explicit `canvas_width/height` override it. `canvas.preset` is
+  gone (`canvas.frame` replaces it; on-disk projects migrate on load).
+- **`social-reel` is deleted**, not aliased -- from the type, the enum, the
+  director's prose, the builder's contract block, the scene band, the length
+  discipline, the tool schema and the MCP instructions. Its measured
+  vertical-composition laws moved to a FRAME block in the builder's universal
+  preamble, gated on the canvas being tall, so they fire for ANY grammar --
+  citations (`proj_56358b25`) carried verbatim. Its story arc already
+  existed as `hype-cut`'s; its no-voiceover rule was the bug.
+- **`speaker-screencast` split**: `screencast` (the screen carries it; the
+  narrator drives the clock, on camera in a bubble or voice-only -- the
+  `screencast_source` assemble path lands here) and `speaker` (a person
+  carries it; full-bleed, graphics over them, `voiceover_text` required).
+  The "only choose it when a recording exists" rule is deleted: `speaker` is
+  chosen at script time as often as after a take. The `st-speaker-screencast`
+  scene-template COMPONENT keeps its name -- components are a different
+  namespace and on-disk scenes reference it.
+- Spine is named in the spec as an internal concept (what the beats are
+  indexed by: bars, sentences, places, figures) and never a parameter.
+  Asserted vs measured spines are what make script-first production work;
+  that is Phase 2.
+- Known risk, called in the spec: the vertical laws were tuned inside one
+  grammar and now fire against grammars that never had to obey a frame.
+  Exit tests: `speaker`+`9x16` on the proj_ddca872c brief, `hype-cut`+`9x16`,
+  `tempo-cut`+`16x9` as the landscape control.
+
 ## 2026-07-19 — Words-lag-audio drift: the cache shift ran on RAW words (PR #435)
 
 Marc: after cutting, "the words in speaker track are way behind what the

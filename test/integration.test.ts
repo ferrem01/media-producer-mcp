@@ -75,7 +75,7 @@ async function main() {
     tenant_id: TENANT,
     name: "Integration Test Video",
     format: "video",
-    preset: "landscape",
+    frame: "16x9",
     fps: 30,
   });
   assert(project.project_id.startsWith("proj_"), "Project ID prefix");

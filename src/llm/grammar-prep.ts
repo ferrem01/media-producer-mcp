@@ -31,7 +31,7 @@ export interface GrammarPrep {
   music?: MusicTrack | null;
   /** Beat grid of the music bed -- the "bars" timing spine. */
   beatMap?: BeatMap;
-  /** Given screen recording to feature (speaker-screencast assemble path). */
+  /** Given screen recording to feature (screencast assemble path). */
   screencast?: { source: string; narrationSource?: string };
 }
 
@@ -43,7 +43,7 @@ export interface GrammarPrepCtx {
   backgroundMusic?: boolean;
   /** audio_system.music_mood commitment: overrides the prompt-keyword mood. */
   musicMood?: string;
-  /** A screen recording to feature (selects the speaker-screencast assemble path). */
+  /** A screen recording to feature (selects the screencast assemble path). */
   screencastSource?: string;
   /** The narration that owns the clock (audio, or camera+voice). */
   narrationSource?: string;
@@ -66,10 +66,10 @@ export function pickMusicMood(prompt: string): string {
  * failing the whole run.
  */
 export async function runGrammarPrep(grammar: FilmGrammar, ctx: GrammarPrepCtx): Promise<GrammarPrep> {
-  // ── speaker-screencast with a GIVEN recording -> assemble ──
+  // ── screencast with a GIVEN recording -> assemble ──
   // The visuals are provided (the recording); nothing to invent. The mandate
   // routes the shared pipeline to deterministic placement + compress-to-narration.
-  if (grammar === "speaker-screencast" && ctx.screencastSource) {
+  if (grammar === "screencast" && ctx.screencastSource) {
     return {
       grammar,
       mandate: "assemble",

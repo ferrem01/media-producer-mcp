@@ -141,7 +141,7 @@ async function setupVariant(v: Variant): Promise<string> {
     name: `Video Scene Smoke (${v.componentType})`,
     format: "video",
     status: "generated",
-    canvas: { width: 640, height: 360, preset: "landscape", fps: 15, background: "#000000" },
+    canvas: { width: 640, height: 360, frame: "16x9", fps: 15, background: "#000000" },
     brand_kit: BRAND_KIT,
     scenes: [
       { id: "scene_main", label: v.componentType, duration_seconds: 2,

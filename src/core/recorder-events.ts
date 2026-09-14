@@ -2,7 +2,7 @@
  * Recorder events sidecar (`<video>.events.json`) -- ground truth captured by
  * the Quotient Recorder extension at record time (SPEC-recorder.md).
  *
- * The speaker-screencast grammar otherwise reverse-engineers semantics from
+ * The screencast grammar otherwise reverse-engineers semantics from
  * pixels (motion-profile idle detection, seam detection, vision grounding).
  * When a recording carries this sidecar, the browser has already told us the
  * truth: where the user clicked (and on WHAT), when pages changed, and when

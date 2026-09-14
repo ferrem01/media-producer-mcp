@@ -1,8 +1,8 @@
 # SPEC: Format and spine — separating what a film IS from where it SHIPS
 
-Status: PROPOSED — design review (Marc + Claude session, 2026-09-14). This is
+Status: AGREED — design review (Marc + Claude session, 2026-09-14); Phase 1 built the same day. This is
 the rule-4 review that `SPEC-creative-axes.md` demands before a fourth field
-exists. It proposes one new axis (`format`), the removal of one grammar value
+exists. It proposes one new axis (`frame` -- the word `format` already means the output TYPE, video|image|presentation, on the project and the create tool, so the axis takes the name the table below already gave it), the removal of one grammar value
 (`social-reel`), the splitting of another (`speaker-screencast`), and names an
 internal concept (`spine`) that the code already has but never made explicit.
 
@@ -78,7 +78,7 @@ design review — the triad has held for a hundred years of cinema."*
 
 Rule 3 requires **orthogonal to every existing axis AND operator-worthy**.
 
-| Axis | Does `format` overlap it? |
+| Axis | Does `frame` overlap it? |
 | --- | --- |
 | RHYTHM (`film_grammar`) | No. Aspect ratio, duration envelope and platform safe areas say nothing about who narrates, what earns a cut, or music's role. |
 | LOOK (`visual_system`) | No. Not the surface, the physics, the type voice, or a recurring motif. |
@@ -105,15 +105,15 @@ relocates a mis-filed value; it does not invent ambition.
 | RHYTHM | `film_grammar` | what carries the argument, what earns a cut | editing |
 | LOOK | `visual_system` | surface, physics, type voice, motif | art direction |
 | SOUND | `audio_system` | music personality, narration voice | sound design |
-| **FRAME** | **`format`** | **the canvas and the bands the platform occludes — geometry, nothing else** | **delivery format** |
+| **FRAME** | **`frame`** | **the canvas and the bands the platform occludes — geometry, nothing else** | **delivery format** |
 
 Same contract as the other three: omitted → inferred; provided → pinned.
 
-## Axis: `format` — the geometry of the output surface, and nothing else
+## Axis: `frame` — the geometry of the output surface, and nothing else
 
-**A format is a size.** It carries the canvas and the bands the platform
+**A frame is a size.** It carries the canvas and the bands the platform
 occludes. It carries no duration, no story shape, no editorial rule. If a
-thing is not a number about the screen, it is not in the format.
+thing is not a number about the screen, it is not in the frame.
 
 | Value | Canvas | Occluded bands | Typical home |
 | --- | --- | --- | --- |
@@ -122,18 +122,18 @@ thing is not a number about the screen, it is not in the format.
 | `4x5` | 1080×1350 | none — the media is not overlaid | Instagram/LinkedIn feed |
 | `1x1` | 1080×1080 | none | feed, ad units |
 
-Platform names are a **lookup that resolves to a format**, not values of their
+Platform names are a **lookup that resolves to a frame**, not values of their
 own: "for Instagram Reels" → `9x16`; "for the LinkedIn feed" → `4x5`. The
 system knows the mapping so the operator never types dimensions.
 
-### What the format decides
+### What the frame decides
 
 Layout, and only layout. Given the canvas and the occluded bands, the agent
 stages the scene: what fits, how big, where the captions sit, whether a
 landscape surface must be cropped rather than shrunk.
 
 These are the measured vertical-composition learnings, carried across from
-`social-reel` verbatim with their cited evidence. They apply to any format
+`social-reel` verbatim with their cited evidence. They apply to any frame
 taller than it is wide:
 
 - Closed layout vocabulary: TYPE CARD / STACK / HERO
@@ -142,7 +142,7 @@ taller than it is wide:
 - Evidence at phone scale; whole desktop workspaces banned
   (cited: `proj_56358b25` scene 4 — full-width but illegible)
 
-### What the format does NOT decide
+### What the frame does NOT decide
 
 **Duration.** A 9:16 film is not inherently short. Duration belongs to the
 grammar, which knows what it is arguing and how long that takes.
@@ -183,9 +183,9 @@ Its rules disperse:
 
 | social-reel rule | Goes to |
 | --- | --- |
-| Vertical composition, 12% / 18% occlusion | `format: 9x16` |
-| Closed layout vocabulary; side-by-side banned | format (any tall canvas) |
-| Crop-don't-shrink; phone-scale evidence; no desktop shells | format (any tall canvas) |
+| Vertical composition, 12% / 18% occlusion | `frame: 9x16` |
+| Closed layout vocabulary; side-by-side banned | frame (any tall canvas) |
+| Crop-don't-shrink; phone-scale evidence; no desktop shells | frame (any tall canvas) |
 | Hook ≤2s, escalation beats, payoff | **grammar** — and see the note below |
 | Loop seam | **grammar** (an editorial choice about how a film ends) |
 | 15–28s envelope, 5–8 scenes | **grammar** |
@@ -195,8 +195,8 @@ Its rules disperse:
 **Its story arc already existed.** `hype-cut` is "premise-first open, two-act
 escalation, click-driven cut into the payoff app" — hook, escalation, payoff,
 the same shape written twice. So `social-reel` was not only a mis-filed
-format; it also duplicated a grammar. `format: 9x16` + `hype-cut` is what it
-was reaching for, and that combination is expressible the moment the format
+format; it also duplicated a grammar. `frame: 9x16` + `hype-cut` is what it
+was reaching for, and that combination is expressible the moment the frame
 axis exists.
 
 ## Concept: spine (internal — NOT a field)
@@ -266,9 +266,9 @@ most common ad request there is. It is a requirement of this design.
 
 **Decision: separate projects, joined by a first-class derive operation.**
 
-    derive(project_id, format: '9x16') → new project_id
+    derive(project_id, frame: '9x16') → new project_id
 
-The board (beats, copy, footage, order) is **copied**, the new format is set,
+The board (beats, copy, footage, order) is **copied**, the new frame is set,
 the scenes are **re-staged for the new geometry as a proposal** (the
 `proposed: true` idiom the compress-the-waiting EDL already uses), and
 `derived_from` records the lineage. The two projects are independent from

@@ -1,6 +1,6 @@
 /**
  * Deterministic "narrated screencast" assembly -- the runtime branch behind
- * film_grammar: "speaker-screencast" when the speaker is a recorded NARRATION
+ * film_grammar: "screencast" when the speaker is a recorded NARRATION
  * (audio, no camera) driving a SCREEN RECORDING.
  *
  * This is the fast path: NO LLM storyboard, NO codegen. It stamps out the

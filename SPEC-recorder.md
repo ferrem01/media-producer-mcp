@@ -1,12 +1,12 @@
 # SPEC-recorder.md — the Quotient Recorder (Chrome extension + instrumented capture)
 
 Status: **specced 2026-07-17, pre-MVP.** Companion docs: `SPEC-motion-architecture.md`,
-`AMENDMENTS.md` (2026-07-17 entries: the speaker-screencast arc + the auto-callouts
+`AMENDMENTS.md` (2026-07-17 entries: the screencast-grammar arc + the auto-callouts
 parking that motivates this).
 
 ## Why this exists (the one-paragraph argument)
 
-The speaker-screencast grammar spends all of its difficulty reverse-engineering
+The screencast grammar spends all of its difficulty reverse-engineering
 semantics out of a flat mp4: motion profiles to guess idle, seam detection to guess
 page changes, vision models to guess what a click target was (parked — see
 AMENDMENTS). At record time, the **browser knows all of it**. A recording

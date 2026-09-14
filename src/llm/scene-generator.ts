@@ -183,7 +183,7 @@ if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
     }
   }
   // st-speaker-screencast is a SHELL too: the recording + camera bubble ride
-  // in a sibling screencast-frame stamped with the known-good speaker-screencast
+  // in a sibling screencast-frame stamped with the known-good screencast
   // recipe (frameless, rounded, inset, circular PiP wired to the speaker track).
   // The scene is OPAQUE so it covers the speaker base except the PiP.
   var stSpeakerOpaque = false;
@@ -482,7 +482,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
   }
 
   // ── VERTICAL (9:16) LAYOUT: the landscape recipes below have no width to
-  // live in. The social-reel contract's closed vocabulary, deterministic:
+  // live in. The tall-frame composition contract's closed vocabulary, deterministic:
   // TYPE CARD (captions only, middle band), STACK (caption band on top, ONE
   // surface below, full width), or stacked surfaces -- side-by-side never.
   // Desktop-style surfaces render full-width; measured on the maiden flight,

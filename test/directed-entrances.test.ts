@@ -151,7 +151,7 @@ describe("the storyboard can reach the choreography", () => {
   it("makes canvas-tour pair the directions across a boundary", async () => {
     const src = await read("../src/llm/storyboard-builder.ts");
     const at = src.indexOf('__g("canvas-tour")');
-    const laws = src.slice(at, src.indexOf('__g("speaker-screencast")', at));
+    const laws = src.slice(at, src.indexOf('__g("screencast")', at));
     expect(laws).toMatch(/THE CONTENT TRAVELS/);
     // The crossing belongs to the BEAT. Measured on proj_14767f06: the model
     // read "ONE ELEMENT CARRIES THE FILM" as licence to give the direction to

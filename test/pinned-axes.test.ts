@@ -134,13 +134,14 @@ describe("the active grammar sets the scene budget", () => {
     const at = src.indexOf("const GRAMMAR_SCENE_BAND");
     expect(at).toBeGreaterThan(0);
     const table = src.slice(at, src.indexOf("};", at));
-    for (const g of ["tempo-cut", "hype-cut", "editorial", "social-reel", "data-story", "canvas-tour"]) {
+    for (const g of ["tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour"]) {
       expect(table, `${g} states a scene count in its contract but has no band`).toContain(`"${g}"`);
     }
-    // launch-film IS the 3-4 default and speaker-screencast's length comes from
-    // the recording -- neither wants a band, and adding one would be wrong.
+    // launch-film IS the 3-4 default; screencast and speaker take their length
+    // from the narration -- none wants a band, and adding one would be wrong.
     expect(table).not.toContain('"launch-film"');
-    expect(table).not.toContain('"speaker-screencast"');
+    expect(table).not.toContain('"screencast"');
+    expect(table).not.toContain('"speaker"');
   });
 
   it("no longer hardcodes the two-exception list", async () => {

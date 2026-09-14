@@ -23,7 +23,7 @@ const read = () => fs.readFile(path.resolve(__dirname, "../src/llm/storyboard-bu
 // must live in the UNIVERSAL block, never be inherited by accident from a
 // dialect that happens to be loaded.
 
-const GRAMMARS = ["tempo-cut","hype-cut","editorial","social-reel","data-story","canvas-tour","speaker-screencast"];
+const GRAMMARS = ["tempo-cut","hype-cut","editorial","data-story","canvas-tour","screencast","speaker"];
 
 /** Split the prompt into the universal preamble and each gated section. */
 async function sections(): Promise<{ universal: string; byGrammar: Record<string,string> }> {
@@ -62,7 +62,7 @@ describe("grammar contracts: only the active one ships", () => {
     expect(universal, "OBJECTS, NOT STRINGS must live in the universal block")
       .toMatch(/OBJECTS, NOT STRINGS \(every grammar\)/);
     // And it must actually reach the grammars that never carried it themselves.
-    for (const g of ["editorial", "speaker-screencast"]) {
+    for (const g of ["editorial", "screencast", "speaker"]) {
       expect(byGrammar[g], `${g} still has no copy of its own -- the universal one is load-bearing`)
         .not.toMatch(/OBJECTS, NOT STRINGS/);
     }
@@ -85,7 +85,7 @@ describe("grammar contracts: only the active one ships", () => {
     const PER_DIALECT: Record<string, string> = {
       "THE EDIT": "each states its own scene count and duration band (6-9 in 30-45s vs 6-10 in 20-40s vs 5-8 in 25-45s)",
       "THE SHAPE": "each states its own runtime and beat structure",
-      "NO VOICEOVER": "means opposite things -- editorial's type IS the voice, speaker-screencast's human narrates",
+      "NO VOICEOVER": "means opposite things -- editorial's type IS the voice, the speaker and screencast grammars' human narrates",
       "TEXT IS THE VOICEOVER": "tempo-cut docks it beside evidence, data-story states claims above figures",
     };
     // Laws repeated across 4+ dialects with no universal home are the smell.
@@ -120,7 +120,7 @@ describe("grammars do not name a world's materials", () => {
     expect(src).toMatch(/WHAT CARRIES THE ARGUMENT/);
     // The swap test is the operative part -- it is how the next law gets placed.
     expect(src).toMatch(/still be true after swapping the world/);
-    expect(src, "the sound-drives-the-cut exception has to survive, or tempo-cut's music grid and speaker-screencast's voice clock read as misplaced")
+    expect(src, "the sound-drives-the-cut exception has to survive, or tempo-cut's music grid and the speaker/screencast voice clock read as misplaced")
       .toMatch(/sound drives the cut/);
   });
 
@@ -140,9 +140,8 @@ describe("grammars do not name a world's materials", () => {
     // check it, not as a drive-by. Tracked as its own task.
     const KNOWN_LEAKS = new Set([
       "tempo-cut:composer", "tempo-cut:kinetic-text", "tempo-cut:annotation",
-      "social-reel:composer", "social-reel:kinetic-text",
       "data-story:kinetic-text", "data-story:annotation",
-      "speaker-screencast:annotation",
+      "screencast:annotation",
     ]);
 
     const found = new Set<string>();

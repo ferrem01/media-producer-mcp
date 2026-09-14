@@ -1,5 +1,5 @@
 /**
- * Sentence spine: the speaker-screencast grammar's structural beat.
+ * Sentence spine: the structural beat of the speaker and screencast grammars.
  *
  * Tempo-cut's spine is the bar grid (music-first); the narrated walkthrough's
  * spine is the SENTENCE. Whisper gives word-level timestamps (transcribe.ts);

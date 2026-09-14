@@ -40,7 +40,7 @@ function seedProject() {
   const scene = (i, comp) => ({ id: `scene_${i}`, label: `Scene ${i}`, duration_seconds: 4, components: [comp] });
   const project = {
     project_id: PROJECT, tenant_id: TENANT, name: "SPA Smoke Test", format: "video", status: "generated",
-    canvas: { width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#0b0b14" },
+    canvas: { width: 1920, height: 1080, frame: "16x9", fps: 30, background: "#0b0b14" },
     scenes: [
       scene(1, { id: "comp_0", type: "stat-card", data: { value: 340, suffix: "%", label: "ROI Increase" }, z_index: 1 }),
       scene(2, { id: "comp_0", type: "stat-card", data: { value: 2.5, suffix: "M", label: "Users" }, z_index: 1 }),

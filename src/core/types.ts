@@ -8,18 +8,61 @@ export type OutputFormat = "video" | "image" | "slideshow" | "presentation" | "o
 
 // ── Canvas ──
 
-export type ResolutionPreset = "landscape" | "vertical" | "square";
+/**
+ * FRAME -- the fourth creative axis (SPEC-format-and-spine.md). A frame is
+ * the geometry of the output surface and NOTHING else: the canvas, plus the
+ * bands a platform draws its own UI over. It carries no duration and no
+ * story shape; those belong to the film grammar. Platform names are a lookup
+ * that resolves to a frame ("Instagram Reels" -> 9x16), never values here.
+ */
+export type Frame = "16x9" | "9x16" | "4x5" | "1x1";
+export const FRAMES: Frame[] = ["16x9", "9x16", "4x5", "1x1"];
 
-export const RESOLUTION_DIMENSIONS: Record<ResolutionPreset, { width: number; height: number }> = {
-  landscape: { width: 1920, height: 1080 },
-  vertical: { width: 1080, height: 1920 },
-  square: { width: 1080, height: 1080 },
+export interface FrameSpec {
+  width: number;
+  height: number;
+  /** Fraction of the canvas height a platform covers with its own UI, from
+   *  each edge. 0 means the media is shown whole (a feed post is not
+   *  overlaid; a Reel is). Composition must keep content out of these bands. */
+  safe: { top: number; bottom: number };
+  /** The most common homes for this geometry -- for inference prose only. */
+  homes: string;
+}
+
+export const FRAME_SPECS: Record<Frame, FrameSpec> = {
+  "16x9": { width: 1920, height: 1080, safe: { top: 0, bottom: 0 }, homes: "embeds, landing pages, YouTube" },
+  "9x16": { width: 1080, height: 1920, safe: { top: 0.12, bottom: 0.18 }, homes: "Reels, TikTok, Shorts, Stories" },
+  "4x5":  { width: 1080, height: 1350, safe: { top: 0, bottom: 0 }, homes: "Instagram and LinkedIn feed" },
+  "1x1":  { width: 1080, height: 1080, safe: { top: 0, bottom: 0 }, homes: "feed, ad units" },
 };
+
+/** The nearest named frame for arbitrary dimensions (images get odd sizes
+ *  like 1200x630; the canvas still needs a frame so composition rules can
+ *  reason about it). */
+export function frameFromDims(width: number, height: number): Frame {
+  const r = width / height;
+  let best: Frame = "16x9";
+  let bestD = Infinity;
+  for (const f of FRAMES) {
+    const spec = FRAME_SPECS[f];
+    const d = Math.abs(Math.log(r) - Math.log(spec.width / spec.height));
+    if (d < bestD) { bestD = d; best = f; }
+  }
+  return best;
+}
+
+/** Taller than wide: the vertical-composition laws apply. */
+export function frameIsTall(frame: Frame): boolean {
+  const s = FRAME_SPECS[frame];
+  return s.height > s.width;
+}
 
 export interface Canvas {
   width: number;
   height: number;
-  preset: ResolutionPreset;
+  /** The FRAME axis. Derived from width/height when a caller gives explicit
+   *  dimensions; set directly when a frame is pinned or inferred. */
+  frame: Frame;
   fps: number;
   background: string;
 }
@@ -527,7 +570,7 @@ export interface Project {
    *  cross-scene consistency (subtle S-curve + saturation + grain).
    *  "none" disables. The generate pipeline defaults videos to "cinematic". */
   film_grade?: "cinematic" | "none";
-  /** Sentence spine of the narration (speaker-screencast grammar): what was
+  /** Sentence spine of the narration (speaker and screencast grammars): what was
    *  said, when, grouped into chapters. Times are FILM seconds. Feeds
    *  captions/chapter cards at assembly and future clipping/social cuts. */
   spine?: {

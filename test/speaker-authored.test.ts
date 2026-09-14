@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 
 // Speaker films through the AUTHORED path: the camera recording is the base
-// layer. proj_11bcf413 (a Veo talking head driving speaker-screencast)
+// layer. proj_11bcf413 (a Veo talking head driving the speaker grammar)
 // measured the failure modes these guards pin: an opaque world backdrop
 // buried the speaker, the board filled 84% of frame instead of docking,
 // and -- with speaker_source alone -- nothing was ever transcribed, so the

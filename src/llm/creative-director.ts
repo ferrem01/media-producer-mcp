@@ -20,7 +20,8 @@
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { getStorytellingGuide } from "./design-skills.js";
-import type { BrandKit, OutputFormat, ReferenceImage } from "../core/types.js";
+import type { BrandKit, OutputFormat, ReferenceImage, Frame } from "../core/types.js";
+import { FRAMES, FRAME_SPECS } from "../core/types.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -32,9 +33,13 @@ import {
  *  cross-cutting -- who narrates, what earns a cut, the music's role, the
  *  camera policy, and how scenes are assembled. Components (L1), scene
  *  templates (L2) and scenes/beats (L3) all live INSIDE one of these. */
-export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story" | "canvas-tour";
+export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "editorial" | "data-story" | "canvas-tour" | "screencast" | "speaker";
 
-export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story", "canvas-tour"];
+/** Every value answers ONE question -- what carries the argument: the brand
+ *  moment, the product, the story, the words, the numbers, one surface, the
+ *  screen, a person. Where a film SHIPS is not on this list; that is the
+ *  FRAME axis (core/types.ts, SPEC-format-and-spine.md). */
+export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "screencast", "speaker"];
 
 /** ── The LOOK axis (visual_system) and SOUND axis (audio_system) ──
  * The film-craft triad on the generate surface: film_grammar = the RHYTHM,
@@ -81,8 +86,13 @@ export interface ConceptDirectorOpts {
    *  director infers only the omitted ones. */
   visualSystem?: VisualSystem;
   audioSystem?: AudioSystem;
-  /** A speaker video is attached (forces/implies speaker-screencast). */
+  /** A speaker video is attached with no screen recording -- a talking head.
+   *  Implies the "speaker" grammar. (A screen recording never reaches the
+   *  director: it takes the deterministic assemble path.) */
   hasSpeaker?: boolean;
+  /** Caller-pinned FRAME (the delivery geometry). Omitted -> the director
+   *  infers it from the prompt and echoes it as "frame". */
+  frame?: Frame;
 }
 
 export interface Treatment {
@@ -121,6 +131,9 @@ export interface Treatment {
   visualSystem?: VisualSystem;
   /** The SOUND this treatment commits to: music mood + narration voice. */
   audioSystem?: AudioSystem;
+  /** The FRAME this treatment commits to -- the delivery geometry. Read as
+   *  DATA by the pipeline, which sizes the canvas from it. */
+  frame?: Frame;
 }
 
 /**
@@ -160,9 +173,9 @@ Every film commits to exactly ONE grammar. It is not a mood -- it is the contrac
 - "launch-film" (the default): few long WORLDS with 3-6 beats inside each, dark-forward cinematic look, density arcs, throws/stamps, crossfades earned at world changes. For brand films, launches, and emotional arcs that need breath.
 - "tempo-cut": the HeyGen-explainer dialect. A driving music bed picked FIRST, 6-9 hard cuts in 30-45s each quantized to the track's bars, ONE thought per cut, on-screen type IS the voiceover (no narrator, no statement slides mid-film), evidence appears as DETAIL CUTS (one cropped element huge -- an isolated composer typing the ask -- not a whole miniaturized app), captions at display scale BESIDE windows, one brand accent, at most one gag (a struck-through card). Scenes are assembled from the component kit, not custom codegen. For product explainers, connector demos, and launch clips that should feel fast, confident, music-driven. The story must be told through the REAL product surfaces (the library's product mocks), never through invented abstractions.
 - "hype-cut": the story-first hype dialect -- tempo-cut's edit driving editorial's alternation: the words HYPE, the product PROVES. A driving bed picked FIRST; ONE-BAR kinetic type interstitials (st-statement at hype pace -- premise lines, reactions, turns) alternate with LONGER product beats (2-6 bars) where the library's named product mocks PERFORM a single use-case story. The film opens PREMISE-FIRST (1-2 type beats set the stakes before any product pixel); the product beats form ONE CONTINUOUS story-world (the same session carries its transcript and state across every cut back to it -- never reset); the story escalates in TWO ACTS (first payoff, then the user asks for more in-product, then the bigger payoff); and the cut into the payoff surface is CAUSED on screen (the cursor clicks the link that becomes the next scene). For product-story hype films, MCP/integration demos, and launch clips where a use-case narrative -- not a feature run -- is the argument. Reference cut: the "Word for Word" Cowork x Quotient film (proj_bf247f37).
-- "speaker-screencast": a human on camera owns the film. The speaker video is the base layer and THE CLOCK -- cuts and content entrances follow the speaker's sentences, overlays dock in a content region beside the speaker or take over with the speaker in PiP, the human voice narrates (no text-as-VO), music absent or ducked far under the voice. Only choose it when a speaker recording exists.
+- "screencast": the screen carries the film. A real screen recording is the base layer; a narrator drives THE CLOCK -- cuts and content entrances follow the narration's sentences -- and rides along on camera as a corner bubble, or is voice-only. Dead "waiting" stretches in the recording are time-lapsed to fit the narration. The human voice narrates (no text-as-VO); music absent or ducked far under it. For narrated product walkthroughs and demos. Only choose it when a screen recording exists.
+- "speaker": a person on camera carries the film. The camera is the base layer of every scene, full-bleed; graphics ride OVER the person (a stat, a rail, a callout entering on the sentence that introduces it), never beside them. The human voice narrates and voiceover_text carries the exact spoken line for every beat -- these are the words the speaker reads off a prompter, so they must be natural spoken sentences. Chosen at SCRIPT time as often as after a take: a recording need not exist yet; when it does not, beat durations are estimates at speaking pace that the take will re-time. For talking-head ads, founder notes, testimonials, and anything where the argument is a person saying it.
 - "editorial": the typography-first manifesto dialect. The story is told in huge display-SERIF statements on a warm cream (or near-black) canvas -- one thought per beat, ONE word per statement emphasized in gradient italic -- ALTERNATING with full-bleed evidence beats (a motion demo, a product surface, a chart) that prove the statement just made. Statement / evidence / statement / evidence. Deliberate canvas-temperature flips (cream <-> dark) at chapter turns are part of the rhythm. Music: a restrained bed. For thought-leadership clips, launch manifestos, "why we built this" films, and library/catalog showcases -- anywhere the WORDS are the product.
-- "social-reel": the vertical feed dialect (9:16, 15-30s TOTAL). The FORMAT carries the film: a HOOK beat in the first 2 seconds (a bold claim or question in giant type -- the thumb-stopper), 3-5 escalation beats that each pay off the hook a little more, one payoff beat, and a LOOP SEAM (the closing frame composes into the opening frame so the loop replays cleanly). Captions ARE the voiceover at display scale; every beat composes for a vertical phone held in one hand -- content stacked in the middle band, top ~12% and bottom ~18% left clear for platform UI. One brand accent, driving music, hard cuts. For Reels/Shorts/TikTok product moments, feature drops, and social announcements -- anywhere the film ships to a feed. sceneCount for this dialect counts BEATS: hook + each escalation + payoff are separate scenes, so commit to 6-9 -- a sceneCount of 3 contradicts the shape and deadlocks the storyboard.
 - "data-story": the numbers-as-protagonist dialect. The film IS a sequence of data beats: each one stages ONE number or chart as the hero of its scene (a counter counting up live, a bar chart racing, a line drawing its climb, a progress bar filling) with a short claim in type that the number then PROVES. Claim -> proof, claim -> proof, numbers escalating toward the biggest figure, which is the payoff -- the money number lands last and largest. Every figure must come from the brief (never invent statistics); every chart DRAWS on screen, never appears pre-drawn. A dashboard recap is earned only as the finale. For metrics announcements, quarterly recaps, benchmark results, growth stories, ROI cases -- anywhere the argument is quantitative. sceneCount: 5-8 (each data beat is its own scene; setup claims may share the data beat's scene as a leading beat).
 
 - "canvas-tour": the continuous-surface dialect -- the film reads as ONE unbroken shot across a single surface, with NO cuts the viewer can name. Beats are PLACES on that surface, not slides: the content TRAVELS between them, each beat leaving toward one edge and the next arriving from the opposite one, and display type is PERFORMED where it lives -- made in front of the viewer, never slammed in. Every scene change is CAUSED by the outgoing scene (something falls out of frame and the next beat enters from where it left; a click, a stamp, a line that keeps travelling), and the film's first beat is often a MACRO detail that pulls back to reveal the whole surface. Music is a quiet bed; the words carry the film. For craft-forward brand films, manifestos with a made-by-hand feeling, and single-surface launches.
@@ -223,7 +236,8 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
-  "filmGrammar": "launch-film | tempo-cut | hype-cut | speaker-screencast | editorial | social-reel | data-story | canvas-tour",
+  "filmGrammar": "launch-film | tempo-cut | hype-cut | editorial | data-story | canvas-tour | screencast | speaker",
+  "frame": "16x9 | 9x16 | 4x5 | 1x1 -- the DELIVERY GEOMETRY, inferred from where the prompt says the film ships: Reels / TikTok / Shorts / Stories -> 9x16; an Instagram or LinkedIn FEED post -> 4x5; 'square' -> 1x1; anything else or unstated -> 16x9. When the caller pinned it, echo it. A frame is a size and nothing more -- it never changes the grammar.",
   "visualSystem": {
     "world": "light | dark | paper -- the film's continuous surface. paper = the print/letterpress world (painted sheet, warm ink): choose it when the prompt asks for a paper/print/zine/letterpress/illustrated-sticker feel. Otherwise omit and the brand decides.",
     "motion": "punchy | calm | cutout-physics -- the physics contract. calm = settle-never-bounce editorial restraint. cutout-physics = rigid flat pieces that drop/settle/swing like physical stickers (pairs with paper + a cutout motif). Default punchy.",
@@ -248,9 +262,20 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
   if (opts.filmGrammar) {
     grammarDirective = `\n\nTHE CALLER HAS FIXED THE FILM GRAMMAR: "${opts.filmGrammar}". Commit to it -- output it as filmGrammar and shape every choice around its contract.`;
   } else if (opts.hasSpeaker) {
-    grammarDirective = `\n\nA speaker recording IS attached to this project -- "speaker-screencast" is almost certainly the right filmGrammar.`;
-  } else {
-    grammarDirective = `\n\nNo speaker recording exists -- do NOT choose "speaker-screencast".`;
+    grammarDirective = `\n\nA speaker recording IS attached to this project with no screen recording -- "speaker" is almost certainly the right filmGrammar.`;
+  }
+  // Deliberately no clause forbidding "speaker" without a recording: that
+  // grammar is chosen at script time as often as after a take
+  // (SPEC-format-and-spine.md -- the asserted spine).
+  // FRAME: pinned -> a constraint the concept is designed around; omitted ->
+  // the director infers it from where the prompt says the film ships.
+  if (opts.format === "video") {
+    if (opts.frame) {
+      const fs = FRAME_SPECS[opts.frame];
+      grammarDirective += `\n\nTHE CALLER HAS FIXED THE FRAME: "${opts.frame}" (${fs.width}x${fs.height}${fs.height > fs.width ? ", vertical -- compose every beat for a phone held in one hand" : ""}). Echo it as "frame" and design the concept for that geometry.`;
+    } else {
+      grammarDirective += `\n\nDecide the FRAME from where the prompt says the film ships and output it as "frame" (16x9 unless the prompt names a vertical or feed destination).`;
+    }
   }
   // Pinned look/sound: the caller's commitments are constraints the concepts
   // must be designed AROUND, not suggestions.
@@ -319,6 +344,7 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
     directorNote: result.directorNote || `Concept: ${selected.idea}. Pattern: ${selected.pattern}. Through-line: ${selected.throughLine}.`,
     sceneCount: typeof result.sceneCount === "number" ? result.sceneCount : undefined,
     filmGrammar: resolveFilmGrammar(opts, result.filmGrammar),
+    frame: resolveFrame(opts, result.frame),
     visualSystem: resolveVisualSystem(opts, result.visualSystem),
     audioSystem: resolveAudioSystem(opts, result.audioSystem),
   };
@@ -357,7 +383,16 @@ function resolveFilmGrammar(opts: ConceptDirectorOpts, raw: unknown): FilmGramma
   if (typeof raw === "string" && (FILM_GRAMMARS as string[]).includes(raw.trim())) {
     return raw.trim() as FilmGrammar;
   }
-  return opts.hasSpeaker ? "speaker-screencast" : "launch-film";
+  return opts.hasSpeaker ? "speaker" : "launch-film";
+}
+
+/** The caller's frame always wins; otherwise validate the director's pick.
+ *  Video only -- images size their canvas from the prompt elsewhere. */
+export function resolveFrame(opts: ConceptDirectorOpts, raw: unknown): Frame | undefined {
+  if (opts.format !== "video") return undefined;
+  if (opts.frame) return opts.frame;
+  if (typeof raw === "string" && (FRAMES as string[]).includes(raw.trim())) return raw.trim() as Frame;
+  return undefined;
 }
 
 /**

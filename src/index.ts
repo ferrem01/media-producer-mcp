@@ -2277,7 +2277,7 @@ Rules:
 
       // ── API: Recorder-triggered generate ──
       // POST /api/recorder-generate/{tenant}  { video_url, narration_url?, prompt? }
-      // Fire-and-forget: kicks the speaker-screencast assemble and returns
+      // Fire-and-forget: kicks the screencast assemble and returns
       // immediately; the extension points the user at Studio for the result.
       const recGenMatch = urlPath.match(/^\/api\/recorder-generate\/([^/]+)$/);
       if (recGenMatch && method === "POST") {
@@ -2369,8 +2369,8 @@ Rules:
             tenant_id: rgTenant,
             llmConfig,
             brandKit: (brandKit || {}) as any,
-            canvas: { width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#0f172a" } as any,
-            film_grammar: "speaker-screencast",
+            canvas: { width: 1920, height: 1080, frame: "16x9", fps: 30, background: "#0f172a" } as any,
+            film_grammar: "screencast",
             screencast_source: videoUrl,
             // Mode A: the recording carries its own live narration -- flagged
             // by pointing the narration at the video itself. With a camera,

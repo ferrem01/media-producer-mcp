@@ -41,6 +41,7 @@ import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateVideoClip } from "../media/video-gen.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
 import type { BrandKit, Canvas, OutputFormat, StoryboardScene, Project, Storyboard, ReferenceImage, Scene, SceneBeat, SceneTransition } from "../core/types.js";
+import { frameFromDims, FRAME_SPECS } from "../core/types.js";
 import { beatMidpoints, formatBeatSheet, rescaleBeats } from "../core/beats.js";
 import { measureBeatActivity } from "../core/beat-gate.js";
 import { TraceBuilder } from "../trace/index.js";
@@ -125,9 +126,12 @@ export interface PipelineOpts {
   speaker_trim_start?: number;
   speaker_trim_end?: number;
   /** A screen recording to feature. Selects the deterministic "assemble"
-   *  mandate of the speaker-screencast grammar (place + compress-to-narration,
+   *  mandate of the screencast grammar (place + compress-to-narration,
    *  no LLM storyboard). */
   screencast_source?: string;
+  /** The FRAME axis, pinned by the caller. Omitted -> the creative director
+   *  infers it from the prompt (video only). */
+  frame?: import("../core/types.js").Frame;
 
   // Storyboard-only mode: run concept director + storyboard builder, save storyboard, stop before scene generation
   storyboardOnly?: boolean;
@@ -220,7 +224,7 @@ const DEFAULT_BRAND_KIT: BrandKit = {
 const DEFAULT_CANVAS: Canvas = {
   width: 1920,
   height: 1080,
-  preset: "landscape",
+  frame: "16x9",
   fps: 30,
   background: "#0f172a",
 };
@@ -327,7 +331,7 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
     canvas = {
       width: opts.canvasWidth,
       height: opts.canvasHeight,
-      preset: opts.canvasWidth === opts.canvasHeight ? "square" : opts.canvasWidth > opts.canvasHeight ? "landscape" : "vertical",
+      frame: frameFromDims(opts.canvasWidth, opts.canvasHeight),
       fps: canvas.fps,
       background: brandKit.colors?.background || canvas.background,
     };
@@ -1221,7 +1225,7 @@ async function critiqueAndRetryScene(opts: {
       } else {
         // MEASUREMENT GATES for assembled scenes: until now these ran only on
         // the codegen path, so component-first films (tempo-cut, editorial,
-        // social-reel, data-story) shipped exactly the defects the gates
+        // data-story, any tall-frame film) shipped exactly the defects the gates
         // exist to catch -- measured live: dark-on-dark compose text, a fully
         // empty mid-film frame, 1-3s dead entrance gaps (proj_48475b3d,
         // proj_56358b25). No regen exists for a curated composition, so
@@ -2240,14 +2244,14 @@ async function runUnifiedPipeline(
   }
 
   // ── Per-grammar PREP: ASSEMBLE mandate (early short-circuit) ──
-  // speaker-screencast with a GIVEN screen recording: the visuals are provided,
+  // screencast with a GIVEN screen recording: the visuals are provided,
   // so there is nothing for the creative director / storyboard / codegen to
   // invent. Run the deterministic prep + placement and return. Same pipeline
   // entry, same project/render model -- the LLM steps simply don't run, because
   // the grammar's mandate is "assemble", not "generate".
   if (opts.screencast_source && format === "video" && !opts.storyboardOnly) {
     trace?.beginEvent("grammar_prep_assemble");
-    const prep = await runGrammarPrep("speaker-screencast", {
+    const prep = await runGrammarPrep("screencast", {
       prompt: opts.prompt,
       brandKit,
       tenantId: opts.tenant_id,
@@ -2264,7 +2268,7 @@ async function runUnifiedPipeline(
           tenant_id: opts.tenant_id,
           name: (opts.name || opts.prompt || "Narrated Screencast").slice(0, 60),
           format: "video",
-          preset: canvas.preset,
+          frame: canvas.frame,
           fps: canvas.fps,
         });
       }
@@ -2299,7 +2303,7 @@ async function runUnifiedPipeline(
       if (!asm.project.created_at) asm.project.created_at = new Date().toISOString();
       asm.project.updated_at = new Date().toISOString();
       await saveProject(asm.project);
-      console.log(`  [assemble:speaker-screencast] ${asm.summary}`);
+      console.log(`  [assemble:screencast] ${asm.summary}`);
       trace?.endEvent({ mandate: "assemble", scenes: asm.project.scenes.length });
       opts.onProgress?.({ step: "complete", percent: 100, detail: asm.summary });
       return { status: "completed", target: opts.target, project: asm.project };
@@ -2385,7 +2389,17 @@ async function runUnifiedPipeline(
         visualSystem: opts.visual_system,
         audioSystem: opts.audio_system,
         hasSpeaker: !!opts.speaker_source || pipelineHasNarration,
+        frame: opts.frame,
       });
+      // FRAME: caller pin > director's inference > the canvas as given.
+      // Explicit pixel dimensions from the caller always win over both.
+      if (treatment.frame && !(opts.canvasWidth && opts.canvasHeight) && format === "video") {
+        const spec = FRAME_SPECS[treatment.frame];
+        if (canvas.width !== spec.width || canvas.height !== spec.height) {
+          console.log(`  Frame: ${treatment.frame} (${spec.width}x${spec.height}) -- ${opts.frame ? "pinned by the caller" : "inferred by the director"}`);
+        }
+        canvas = { ...canvas, width: spec.width, height: spec.height, frame: treatment.frame };
+      }
       // Inject creative direction into the prompt for the storyboard builder
       var conceptContext = formatTreatmentForStoryboard(treatment);
       richPrompt = conceptContext + "\n\n---\n\n" + opts.prompt;
@@ -2410,7 +2424,7 @@ async function runUnifiedPipeline(
     : /tempo-cut/i.test(
       (treatment?.visualStyle?.motionPersonality || "") + (treatment?.directorNote || "") + (opts.prompt || ""),
     ) ? "tempo-cut"
-      : (opts.speaker_source || pipelineHasNarration) ? "speaker-screencast" : "launch-film");
+      : (opts.speaker_source || pipelineHasNarration) ? "speaker" : "launch-film");
   console.log(`  Film grammar: ${filmGrammar}`);
 
   // Assembly policy per grammar: tempo-cut's materials exist as library
@@ -2434,14 +2448,6 @@ async function runUnifiedPipeline(
     opts.creativity = 0.15;
     creativity = 0.15;
     console.log("  Editorial grammar: creativity clamped to 0.15 (template/component-first assembly)");
-  }
-  // Social-reel is the same discipline at feed speed: caption/template beats
-  // from the kit, composed for 9:16 -- freeform codegen is where safe zones
-  // and caption scale die.
-  if (filmGrammar === "social-reel" && opts.creativity === undefined) {
-    opts.creativity = 0.15;
-    creativity = 0.15;
-    console.log("  Social-reel grammar: creativity clamped to 0.15 (component-first assembly)");
   }
   // Data-story lives or dies on the data kit performing real figures --
   // freeform codegen is where invented statistics and pre-drawn charts
@@ -2472,7 +2478,7 @@ async function runUnifiedPipeline(
   // defaults ON for tempo-cut; an explicit false still wins.
   const wantsMusic = opts.backgroundMusic !== undefined
     ? opts.backgroundMusic
-    : filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story" || filmGrammar === "canvas-tour";
+    : filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour";
   if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }
@@ -2602,16 +2608,15 @@ async function runUnifiedPipeline(
   }
 
   // ── Grammar length discipline (deterministic) ──
-  // Formats with hard length contracts get them enforced in code: the
-  // storyboard still ships over-long beats (measured live: social-reel
-  // proj_56358b25 -- 32s of scene time vs the <30s ceiling; data-story
-  // proj_a7b3ffbd -- 50.4s vs the 45s cap). Cap any scene, then squeeze
+  // Grammars with hard length contracts get them enforced in code: the
+  // storyboard still ships over-long beats (measured live: data-story
+  // proj_a7b3ffbd -- 50.4s vs the 45s cap; a retired vertical-feed grammar did
+  // the same on proj_56358b25). Cap any scene, then squeeze
   // proportionally until the total fits, BEFORE bar quantization. Beats
   // rescale with their scene.
   let grammarSceneCap: number | undefined;
   {
     const LENGTH_DISCIPLINE: Record<string, { sceneCap: number; totalCap: number; minScene: number }> = {
-      "social-reel": { sceneCap: 6, totalCap: 28, minScene: 1.5 },
       "data-story": { sceneCap: 7, totalCap: 42, minScene: 2 },
     };
     const rule = LENGTH_DISCIPLINE[filmGrammar];
@@ -2649,7 +2654,7 @@ async function runUnifiedPipeline(
   // tempo-cut/hype-cut/editorial belong on this list too: proj_bf247f37
   // (tempo-cut) shipped EIGHT baked voiceover tracks reading its scene
   // LABELS out loud -- the exact failure this strip exists to prevent.
-  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story" || filmGrammar === "canvas-tour") && !opts.voiceover;
+  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour") && !opts.voiceover;
   if (textIsVoiceover) {
     for (const d of storyboard.scenes as any[]) {
       if (d.voiceover_text) d.voiceover_text = undefined;
@@ -2666,7 +2671,7 @@ async function runUnifiedPipeline(
   // (too fast to read a product screen), and both carried shader
   // transitions that blended the presenter back in mid-cut. Three rounds of
   // hand repair fixed what code can simply guarantee.
-  if (filmGrammar === "speaker-screencast") {
+  if (filmGrammar === "speaker" || filmGrammar === "screencast") {
     const TAKEOVER_MIN = 2.5;
     const SURFACE_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|screencast-frame|product-screenshot|browser-|app-|ui-|device-showcase|metric-dashboard)/;
     for (const d of storyboard.scenes as any[]) {
@@ -3760,8 +3765,8 @@ export function quantizeScenesToBars(
     if (seconds <= barSec * 0.75) return Math.round((barSec / 2) * 10000) / 10000;
     let bars = Math.max(1, Math.round(seconds / barSec));
     // Grammar length discipline runs BEFORE this pass, so rounding UP can
-    // re-inflate a just-clamped scene past its cap (a 6s-capped social-reel
-    // scene on a 3.4s bar rounded to 6.8s). Snap DOWN instead -- the cut
+    // re-inflate a just-clamped scene past its cap (a 6s-capped scene on a
+    // 3.4s bar rounded to 6.8s, measured on a retired vertical-feed film). Snap DOWN instead -- the cut
     // stays on the grid AND the film keeps its promised length.
     if (sceneCap && bars * barSec > sceneCap + 0.05 && bars > 1) bars -= 1;
     return Math.round(bars * barSec * 10000) / 10000;
