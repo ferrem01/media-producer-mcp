@@ -53,7 +53,16 @@ import { renderStoryboardCards } from "./core/storyboard-cards.js";
 import { reviseDraftSceneSurgical } from "./llm/storyboard-surgical.js";
 import path from "node:path";
 import fs from "node:fs/promises";
-import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types.js";
+import type { Scene, SceneComponent, BrandKit, SpeakerTrack, Frame, Canvas } from "./core/types.js";
+import { FRAME_SPECS, frameFromDims } from "./core/types.js";
+/** Canvas from the FRAME axis. Explicit pixel dimensions always win; then the
+ *  pinned frame; then 16x9. (SPEC-format-and-spine.md) */
+function canvasFor(frame: Frame | undefined, w?: number, h?: number): Canvas {
+  if (w && h) return { width: w, height: h, frame: frameFromDims(w, h), fps: 30, background: "#0f172a" };
+  const f: Frame = frame || "16x9";
+  return { width: FRAME_SPECS[f].width, height: FRAME_SPECS[f].height, frame: f, fps: 30, background: "#0f172a" };
+}
+
 import { normalizeBeats } from "./core/beats.js";
 import { normalizeSpeakerPipRefs } from "./core/scene-assembler.js";
 import { generateTTS } from "./audio/tts.js";
@@ -327,16 +336,17 @@ THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterat
 
 BEFORE GENERATING
 - Ask first: audience, goal/CTA, target length, and which film grammar fits.
-- FILM GRAMMARS (the film's dialect; pass film_grammar to pin, omit to let the director choose):
-  * launch-film -- few long cinematic scenes, one continuous world. Expansive brand moments.
-  * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover. Fast explainers.
-  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats forming ONE continuous session. Use-case narratives.
-  * editorial -- typography-first manifesto: huge serif statements alternating with full-bleed evidence. The words are the product.
-  * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, loop seam.
-  * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number; figures come from the brief, never invented.
-  * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never chosen without one.
-  * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels, type is PERFORMED where it lives. Craft-forward brand/print films.
-  Choosing: ask what carries the argument -- product, words, numbers, a person, one surface, or the feed.
+- FILM GRAMMARS (what carries the argument; pass film_grammar to pin, omit to let the director choose):
+  * launch-film -- few long cinematic scenes, one continuous world.
+  * tempo-cut -- product-first montage: driving music, bar-quantized cuts, on-screen type IS the voiceover.
+  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats; premise, escalation, payoff. Hook-first ads.
+  * editorial -- typography-first: huge serif statements alternating with full-bleed evidence.
+  * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene; real figures only.
+  * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
+  * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
+  * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
+  Choosing: ask what carries the argument.
+- FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else -- never changes the grammar. Instagram ad = 9x16 + any grammar.
 - THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper|plain, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
 - Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
 - A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
@@ -562,6 +572,8 @@ export async function queueStoryboardGeneration(params: {
   feedback?: string;
   canvas_width?: number;
   canvas_height?: number;
+  /** The FRAME axis, pinned by the caller (omit -> the director infers). */
+  frame?: Frame;
   creativity?: number;
   film_grammar?: import("./llm/creative-director.js").FilmGrammar;
   visual_system?: import("./llm/creative-director.js").VisualSystem;
@@ -647,13 +659,10 @@ export async function queueStoryboardGeneration(params: {
         fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
         style: { border_radius: "12px", motion: "cinematic" as const },
       },
-      // Social-reel ships to a feed: default the canvas vertical unless
-      // the caller sized it explicitly.
-      canvas: (params.canvas_width && params.canvas_height)
-        ? { width: params.canvas_width, height: params.canvas_height, preset: (params.canvas_height > params.canvas_width ? ("vertical" as const) : ("landscape" as const)), fps: 30, background: "#0f172a" }
-        : params.film_grammar === "social-reel"
-          ? { width: 1080, height: 1920, preset: "vertical" as const, fps: 30, background: "#0f172a" }
-          : { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+      // FRAME: explicit pixels > pinned frame > 16x9. When neither is given
+      // the director may still infer a frame and the pipeline resizes.
+      canvas: canvasFor(params.frame, params.canvas_width, params.canvas_height),
+      frame: params.frame,
       creativity: params.creativity,
       film_grammar: params.film_grammar,
       visual_system: params.visual_system,
@@ -833,7 +842,7 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string().optional().describe("Tenant identifier (optional on authenticated sessions -- the session's tenant is used)"),
       name: z.string().describe("Project name"),
       format: z.enum(["video", "image", "slideshow", "presentation", "one-pager", "gif", "social", "email-header", "thumbnail"]).describe("Output format"),
-      preset: z.enum(["landscape", "vertical", "square"]).optional().describe("Resolution preset (default: landscape)"),
+      frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry (default: 16x9). 9x16 for Reels/TikTok/Shorts, 4x5 for feed posts, 1x1 square."),
       fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
     async (params) => {
@@ -841,7 +850,7 @@ export function createMcpServer(): McpServer {
         tenant_id: params.tenant_id,
         name: params.name,
         format: params.format as any,
-        preset: params.preset,
+        frame: params.frame,
         fps: params.fps,
       });
       return ok(withStudio(project));
@@ -1077,7 +1086,7 @@ export function createMcpServer(): McpServer {
       canvas: z.object({
         width: z.number().optional(),
         height: z.number().optional(),
-        preset: z.enum(["landscape", "vertical", "square"]).optional(),
+        frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional(),
         fps: z.number().optional(),
         background: z.string().optional(),
       }).optional(),
@@ -1312,7 +1321,16 @@ export function createMcpServer(): McpServer {
           updated = true;
         }
         if (params.canvas !== undefined) {
+          const c = params.canvas as { width?: number; height?: number; frame?: Frame };
           Object.assign(project.canvas, params.canvas);
+          // Frame and dimensions are one fact: a frame with no explicit size
+          // sets the size; a size with no explicit frame re-derives it.
+          if (c.frame && !(c.width || c.height)) {
+            project.canvas.width = FRAME_SPECS[c.frame].width;
+            project.canvas.height = FRAME_SPECS[c.frame].height;
+          } else if ((c.width || c.height) && !c.frame) {
+            project.canvas.frame = frameFromDims(project.canvas.width, project.canvas.height);
+          }
           updated = true;
         }
         // speaker_track is a PROJECT-level field (the film's canonical camera +
@@ -2581,14 +2599,15 @@ export function createMcpServer(): McpServer {
         music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
       })).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc. Accepts an object or a JSON string."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story", "canvas-tour"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives (pen-written, typed, commanded), one physical element stitches the film together; for craft-forward brand films and print/letterpress launches. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "screencast", "speaker"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
+      frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry, and nothing else. 16x9 (default): embeds, landing pages, YouTube. 9x16: Reels, TikTok, Shorts, Stories (top 12% / bottom 18% are platform UI). 4x5: Instagram or LinkedIn feed post (shown whole). 1x1: square. Omit to let the director infer it from where the prompt says the film ships; pass to pin. Explicit canvas_width/canvas_height override it. A frame never changes the grammar."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
       voiceover: z.boolean().optional().describe("Generate TTS voiceover narration for each scene (default: false)"),
       background_music: z.boolean().optional().describe("Add royalty-free background music with voiceover ducking (requires JAMENDO_CLIENT_ID)"),
       voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice for voiceover (default: nova)"),
       speaker_source: z.string().optional().describe("Path or URL to speaker video. When provided, uses speaker track mode: speaker video plays full-screen as base layer with content overlaid on top."),
-      screencast_source: z.string().optional().describe("Path or URL to a SCREEN RECORDING to feature. Providing this selects the deterministic film_grammar:'speaker-screencast' path (NO LLM storyboard, NO codegen): the recording's dead 'waiting' stretches are auto-time-lapsed and fit to the narration length, bookended by the brand intro/outro. Pair with speaker_source as the narration (audio-only narration = no camera; a camera+voice recording = talking head). The fast, reliable path for a narrated product walkthrough."),
+      screencast_source: z.string().optional().describe("Path or URL to a SCREEN RECORDING to feature. Providing this selects the deterministic film_grammar:'screencast' path (NO LLM storyboard, NO codegen): the recording's dead 'waiting' stretches are auto-time-lapsed and fit to the narration length, bookended by the brand intro/outro. Pair with speaker_source as the narration (audio-only narration = no camera; a camera+voice recording = talking head). The fast, reliable path for a narrated product walkthrough."),
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
@@ -2613,8 +2632,8 @@ export function createMcpServer(): McpServer {
         return err("Invalid token");
       }
       try {
-        // ── film_grammar: "speaker-screencast" (deterministic assemble) ──
-        // A screencast_source is the speaker-screencast declaration. Route it
+        // ── film_grammar: "screencast" (deterministic assemble) ──
+        // A screencast_source is the screencast declaration. Route it
         // through the SHARED pipeline: runGrammarPrep returns the "assemble"
         // mandate and the pipeline places + compresses the recording (no LLM
         // storyboard). Run inline (it's fast) rather than as a background job.
@@ -2622,10 +2641,7 @@ export function createMcpServer(): McpServer {
           let llmConfig;
           try { llmConfig = llmConfigFromEnv(); } catch (e: any) { return err(`LLM not configured: ${e.message}`); }
           const brandKit = await loadBrandKit(params.tenant_id);
-          const preset = (params.canvas_width && params.canvas_height && params.canvas_height > params.canvas_width) ? "vertical" as const : "landscape" as const;
-          const canvas = (preset === "vertical"
-            ? { width: 1080, height: 1920, preset, fps: 30, background: "#0f172a" }
-            : { width: 1920, height: 1080, preset, fps: 30, background: "#0f172a" }) as any;
+          const canvas = canvasFor(params.frame, params.canvas_width, params.canvas_height);
           const result = await runGeneratePipeline({
             prompt: params.prompt || "Narrated Screencast",
             target: "video" as PipelineTarget,
@@ -2634,7 +2650,7 @@ export function createMcpServer(): McpServer {
             llmConfig,
             brandKit: (brandKit || {}) as any,
             canvas,
-            film_grammar: "speaker-screencast",
+            film_grammar: "screencast",
             screencast_source: params.screencast_source,
             speaker_source: params.speaker_source,
           });
@@ -2664,6 +2680,7 @@ export function createMcpServer(): McpServer {
             feedback: params.feedback,
             canvas_width: params.canvas_width,
             canvas_height: params.canvas_height,
+            frame: params.frame,
             creativity: params.creativity,
             film_grammar: params.film_grammar,
             visual_system: params.visual_system as any,
@@ -2787,13 +2804,8 @@ export function createMcpServer(): McpServer {
                 fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
                 style: { border_radius: "12px", motion: "cinematic" as const },
               },
-              // Social-reel ships to a feed: default the canvas vertical unless
-              // the caller sized it explicitly.
-              canvas: (params.canvas_width && params.canvas_height)
-                ? { width: params.canvas_width, height: params.canvas_height, preset: (params.canvas_height > params.canvas_width ? ("vertical" as const) : ("landscape" as const)), fps: 30, background: "#0f172a" }
-                : params.film_grammar === "social-reel"
-                  ? { width: 1080, height: 1920, preset: "vertical" as const, fps: 30, background: "#0f172a" }
-                  : { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+              canvas: canvasFor(params.frame, params.canvas_width, params.canvas_height),
+              frame: params.frame,
               canvasWidth: params.canvas_width,
               canvasHeight: params.canvas_height,
               creativity: params.creativity,
@@ -3023,7 +3035,7 @@ export function createMcpServer(): McpServer {
           llmConfig,
           onProgress: genProgress(j, 25, 68),  // render takes it from 70 -> 100
           brandKit: kit,
-          canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: kit.colors?.background || "#0f172a" },
+          canvas: { width: 1920, height: 1080, frame: "16x9" as const, fps: 30, background: kit.colors?.background || "#0f172a" },
           voiceover: params.voiceover ?? false,
           backgroundMusic: params.background_music ?? false,
           sceneCount: Math.max(3, Math.min(10, Math.round(duration / 5.5))),

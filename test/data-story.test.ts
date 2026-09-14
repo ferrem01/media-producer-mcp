@@ -36,13 +36,13 @@ describe("data-story grammar registration", () => {
   it("gets the component-first policy and the music-first spine", async () => {
     const src = await read("../src/llm/pipeline.ts");
     expect(src).toMatch(/filmGrammar === "data-story" && opts\.creativity === undefined/);
-    expect(src).toMatch(/filmGrammar === "social-reel" \|\| filmGrammar === "data-story"/);
+    expect(src).toMatch(/filmGrammar === "editorial" \|\| filmGrammar === "data-story"/);
   });
 
   it("enforces length + no-voiceover in code, not just in the contract", async () => {
     const src = await read("../src/llm/pipeline.ts");
     expect(src).toMatch(/"data-story": \{ sceneCap: 7, totalCap: 42/);
-    expect(src).toMatch(/\(filmGrammar === "tempo-cut" \|\| filmGrammar === "hype-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "social-reel" \|\| filmGrammar === "data-story" \|\| filmGrammar === "canvas-tour"\) && !opts\.voiceover/);
+    expect(src).toMatch(/\(filmGrammar === "tempo-cut" \|\| filmGrammar === "hype-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "data-story" \|\| filmGrammar === "canvas-tour"\) && !opts\.voiceover/);
   });
 
   it("contract bans invented decompositions and rainbow charts, demands hero scale", async () => {
@@ -54,7 +54,7 @@ describe("data-story grammar registration", () => {
 
   it("is exposed on the generate tool and the MCP instructions", async () => {
     const src = await read("../src/server.ts");
-    expect(src).toMatch(/"launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"/);
+    expect(src).toMatch(/"launch-film", "tempo-cut", "hype-cut", "editorial", "data-story"/);
     expect(src).toContain("data-story -- numbers-as-protagonist"); // MCP instructions
     expect(src).toContain("Choosing: ask what carries the argument"); // how to pick one
   });

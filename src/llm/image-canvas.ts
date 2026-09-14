@@ -8,6 +8,7 @@
  */
 
 import type { Canvas } from "../core/types.js";
+import { frameFromDims } from "../core/types.js";
 
 export interface ImageCanvasPreset {
   name: string;
@@ -95,7 +96,7 @@ export function resolveImageCanvas(prompt: string): Canvas {
     return {
       width: inferred.width,
       height: inferred.height,
-      preset: inferred.width === inferred.height ? "square" : inferred.width > inferred.height ? "landscape" : "vertical",
+      frame: frameFromDims(inferred.width, inferred.height),
       fps: 30,
       background: "#0f172a",
     };
@@ -105,7 +106,7 @@ export function resolveImageCanvas(prompt: string): Canvas {
   return {
     width: 1200,
     height: 630,
-    preset: "landscape",
+    frame: "16x9",
     fps: 30,
     background: "#0f172a",
   };

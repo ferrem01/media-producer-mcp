@@ -139,5 +139,5 @@ change — the spine already quantizes; this is prompt + validation range.
 
 - No per-scene world overrides (that is the bug this spec deletes).
 - No new pipeline stage — the world rides prep, like music and the spine.
-- No change to speaker-screencast assemble-mandate films (their world IS the
+- No change to screencast assemble-mandate films (their world IS the
   recording).

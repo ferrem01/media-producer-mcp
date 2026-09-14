@@ -95,7 +95,7 @@ describe("project CRUD", () => {
       tenant_id: TENANT,
       name: "Test Project",
       format: "video",
-      preset: "landscape",
+      frame: "16x9",
       fps: 30,
     });
     projectId = project.project_id;

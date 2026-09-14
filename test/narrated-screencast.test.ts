@@ -5,7 +5,7 @@ import type { Project } from "../src/core/types.js";
 function shell(assets: any[] = []): Project {
   return {
     project_id: "p", tenant_id: "t", name: "N", format: "video", status: "draft",
-    canvas: { width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#000" },
+    canvas: { width: 1920, height: 1080, frame: "16x9", fps: 30, background: "#000" },
     brand_kit: { colors: {}, fonts: [], assets } as any,
     scenes: [],
   } as unknown as Project;

@@ -16,7 +16,7 @@ function makeProject(overrides: Partial<any> = {}): Project {
     name: "cache test",
     format: "video",
     status: "generated",
-    canvas: { width: 1920, height: 1080, preset: "landscape", fps: 30 },
+    canvas: { width: 1920, height: 1080, frame: "16x9", fps: 30 },
     brand_kit: { colors: { primary: "#393bf5" } },
     scenes: [
       {
@@ -61,7 +61,7 @@ describe("scene-cache", () => {
     (edited.scenes[0].components[0].data as any).text = "goodbye";
     expect(await sceneCacheKey(edited, 0, SOURCES, libDir)).not.toBe(base);
 
-    const fps = makeProject({ canvas: { width: 1920, height: 1080, preset: "landscape", fps: 15 } });
+    const fps = makeProject({ canvas: { width: 1920, height: 1080, frame: "16x9", fps: 15 } });
     expect(await sceneCacheKey(fps, 0, SOURCES, libDir)).not.toBe(base);
 
     const brand = makeProject({ brand_kit: { colors: { primary: "#ff0000" } } });

@@ -11,7 +11,7 @@ const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 
 describe("bar quantization respects the grammar's scene cap", () => {
   it("snaps DOWN instead of re-inflating a length-clamped scene", () => {
-    // A social-reel scene clamped to its 6s cap, on a 3.4s bar: 6/3.4 rounds
+    // A 6s-capped scene (a retired vertical-feed grammar), on a 3.4s bar: 6/3.4 rounds
     // to 2 bars = 6.8s -- past the cap the clamp just enforced. With the cap
     // passed through, it snaps down to 1 bar.
     const scenes = [{ label: "hook", duration_seconds: 6 }];

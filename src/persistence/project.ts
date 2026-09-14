@@ -9,7 +9,7 @@ import fs from "node:fs/promises";
 import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Project, OutputFormat, Canvas, BrandKit, Scene, Storyboard, StoryboardScene } from "../core/types.js";
-import { RESOLUTION_DIMENSIONS, type ResolutionPreset } from "../core/types.js";
+import { type Frame, FRAME_SPECS, frameFromDims } from "../core/types.js";
 import {
   projectsDir,
   projectDir,
@@ -25,7 +25,7 @@ import { loadBrandKit } from "./brand-kit.js";
 const DEFAULT_CANVAS: Canvas = {
   width: 1920,
   height: 1080,
-  preset: "landscape",
+  frame: "16x9",
   fps: 30,
   background: "#0f172a",
 };
@@ -50,7 +50,7 @@ export interface CreateProjectInput {
   tenant_id: string;
   name: string;
   format: OutputFormat;
-  preset?: ResolutionPreset;
+  frame?: Frame;
   fps?: number;
   brand_kit?: Partial<BrandKit>;
 }
@@ -58,12 +58,12 @@ export interface CreateProjectInput {
 export async function createProject(input: CreateProjectInput): Promise<Project> {
   const id = `proj_${uuidv4().replace(/-/g, "").slice(0, 8)}`;
 
-  // Resolve canvas from preset
-  const preset = input.preset || "landscape";
-  const dims = RESOLUTION_DIMENSIONS[preset];
+  // Resolve canvas from the frame
+  const frame = input.frame || "16x9";
+  const dims = { width: FRAME_SPECS[frame].width, height: FRAME_SPECS[frame].height };
   const canvas: Canvas = {
     ...dims,
-    preset,
+    frame,
     fps: input.fps ?? DEFAULT_CANVAS.fps,
     background: DEFAULT_CANVAS.background,
   };
@@ -100,10 +100,29 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
 
 // ── Read ──
 
+/**
+ * On-disk projects predate the FRAME axis and the grammar split
+ * (SPEC-format-and-spine.md). Map the retired shapes forward on load so no
+ * migration script is needed: `canvas.preset` -> `canvas.frame`, and the
+ * retired `speaker-screencast` grammar -> `screencast` (every such film WAS a
+ * screencast; the speaker rode along in a bubble).
+ */
+export function migrateProject(p: any): Project {
+  if (p && p.canvas && !p.canvas.frame) {
+    const w = Number(p.canvas.width) || 1920;
+    const h = Number(p.canvas.height) || 1080;
+    p.canvas.frame = frameFromDims(w, h);
+    delete p.canvas.preset;
+  }
+  const t = p?.treatment;
+  if (t && t.filmGrammar === "speaker-screencast") t.filmGrammar = "screencast";
+  return p as Project;
+}
+
 export async function loadProject(tenantId: string, projectId: string): Promise<Project | null> {
   try {
     const raw = await fs.readFile(projectJsonPath(tenantId, projectId), "utf-8");
-    return JSON.parse(raw) as Project;
+    return migrateProject(JSON.parse(raw));
   } catch {
     return null;
   }

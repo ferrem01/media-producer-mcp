@@ -1,3 +1,4 @@
+import { frameFromDims } from "./types.js";
 /**
  * Scene Worker
  *
@@ -206,7 +207,7 @@ async function main() {
     scene,
     components,
     brandKit: project.brand_kit,
-    canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
+    canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, frame: frameFromDims(args.width, args.height), background: "#0f172a" },
     gsapDir: args.gsapDir,
     componentLibDir,
     speakerUrl: args.speakerUrl,

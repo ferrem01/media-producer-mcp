@@ -32,7 +32,7 @@ const BRAND = {
   fonts: [{ family: "Inter", source: "google" as const, weights: [400, 500, 600, 700, 800] }],
   style: { border_radius: "12px", motion: "cinematic" as const },
 };
-const canvas = { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" };
+const canvas = { width: 1920, height: 1080, frame: "16x9" as const, fps: 30, background: "#0f172a" };
 
 // Load the full scene list from the showcase
 const mod = await import("./full-showcase.ts");

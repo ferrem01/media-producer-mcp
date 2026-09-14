@@ -32,7 +32,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     canvas: {
       width: 1920,
       height: 1080,
-      preset: "landscape",
+      frame: "16x9",
       fps: 30,
       background: "#0f172a",
     },

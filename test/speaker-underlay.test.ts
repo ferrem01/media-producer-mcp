@@ -25,7 +25,7 @@ const brandKit = {
   style: { border_radius: "12px", motion: "minimal" },
 } as unknown as BrandKit;
 
-const canvas = { width: 1920, height: 1080, fps: 30, preset: "landscape", background: "#ffffff" } as Canvas;
+const canvas = { width: 1920, height: 1080, fps: 30, frame: "16x9", background: "#ffffff" } as Canvas;
 
 function scene(transparent: boolean | undefined): Scene {
   return {

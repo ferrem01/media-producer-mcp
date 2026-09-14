@@ -70,7 +70,7 @@ export async function generateComponent(input: GenerateComponentInput): Promise<
       type,
       tenant_id,
       canvas: canvas || {
-        width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#0f172a",
+        width: 1920, height: 1080, frame: "16x9", fps: 30, background: "#0f172a",
       },
       brand_kit: brand_kit || {
         colors: {

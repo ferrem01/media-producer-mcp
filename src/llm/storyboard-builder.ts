@@ -246,15 +246,14 @@ export interface StoryboardResult {
  * by the paragraph above it -- the model obeys whichever is louder, and the
  * universal one always is.
  *
- * launch-film and speaker-screencast are deliberately absent: launch-film IS
- * the 3-4 default, and speaker-screencast's length comes from the recording
- * ("the voice is the clock"), so neither wants a band.
+ * launch-film, screencast and speaker are deliberately absent: launch-film IS
+ * the 3-4 default, and the other two take their length from the narration
+ * ("the voice is the clock"), so none of them wants a band.
  */
 const GRAMMAR_SCENE_BAND: Record<string, { min: number; max: number }> = {
   "tempo-cut": { min: 6, max: 9 },
   "hype-cut": { min: 10, max: 16 },
   "editorial": { min: 6, max: 10 },
-  "social-reel": { min: 5, max: 8 },
   "data-story": { min: 5, max: 8 },
   "canvas-tour": { min: 5, max: 9 },
 };
@@ -264,7 +263,7 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
 
   // THE ACTIVE GRAMMAR SETS THE BUDGET. This line used to hardcode "3-4 scenes
   // ... a HARD budget" and name only tempo-cut and hype-cut as exceptions -- so
-  // editorial, social-reel, data-story and canvas-tour were each told 3-4 here
+  // editorial, data-story and canvas-tour were each told 3-4 here
   // and then asked for 5-10 by their own contract twenty lines below. The
   // louder, more universal rule won: canvas-tour shipped intro / 15s middle /
   // outro (proj_ecb05e27) -- three scenes and five beats crammed into the
@@ -368,13 +367,26 @@ A cut is not a gap. Author every scene boundary so the film reads as one continu
 - ONE THING CARRIES OVER: prefer a shared element across the boundary -- the same line, prop, cursor, surface or word persists and re-frames rather than being replaced. (A scene that shares NOTHING with its neighbour needs a reason.)
 - OBJECTS, NOT STRINGS (every grammar): every entry in a scene's components[] must be an OBJECT with type + data (+ script where performable) -- never a bare type string. A single plain-string entry drops the ENTIRE scene to freeform codegen, which then invents its own layout: the one job it reliably botches, and the authored components you wrote are DISCARDED. World backdrops are the only exception (the world injects its own). This law used to reach a film only because four other grammars' contracts happened to be in context; it belongs here, where every film sees it.
 
-### WHAT A FILM GRAMMAR IS (and is not)
-A film grammar is the answer to ONE question -- WHAT CARRIES THE ARGUMENT -- plus the editing logic that follows from that answer. The product (tempo-cut), the story (hype-cut), the words (editorial), the numbers (data-story), a person (speaker-screencast), one surface (canvas-tour), the feed (social-reel). Everything a grammar states is downstream of its protagonist, and only four things are:
+${opts.canvas.height > opts.canvas.width ? `### THIS FILM'S FRAME: ${opts.canvas.frame} (${opts.canvas.width}x${opts.canvas.height}, VERTICAL) -- composition laws for a tall canvas, whatever the grammar
+A frame is a size and nothing else: it decides how things are STAGED, never what the film argues or how long it runs. These laws apply to every grammar on a tall canvas. They are measured, not theoretical -- every one was learned from a shipped film.
+- VERTICAL COMPOSITION: every scene composes for a phone held in one hand. Content lives in the MIDDLE BAND: keep the top ~${Math.round((opts.canvas.frame === "9x16" ? 0.12 : 0) * 100)}% and bottom ~${Math.round((opts.canvas.frame === "9x16" ? 0.18 : 0) * 100)}% of the canvas clear${opts.canvas.frame === "9x16" ? " (platform UI covers them)" : " (this frame is shown whole -- no platform overlay -- but the middle band still reads best)"}. A landscape-composed scene letterboxed into a tall canvas is a blocking defect.
+- THE LAYOUT VOCABULARY IS CLOSED -- every scene is ONE of these patterns:
+  * TYPE CARD: text only. Giant type centered in the middle band. No surface.
+  * STACK: caption on top, ONE surface below. Caption at y 16-30%, the surface at y 34-74% filling the full canvas width. Text above, evidence below -- never beside.
+  * HERO: ONE surface owns the middle band (y 14-74%, full width), with a short caption OVER its lower third on a scrim chip (y 64-72%).
+  * SPEAKER: the person is the surface, full-bleed; captions over their lower third on a scrim chip; any graphic rides OVER them in a band that leaves the face clear.
+  SIDE-BY-SIDE IS BANNED: two components must never share a horizontal band -- there is no width for it. If a beat wants two things, it is two scenes.
+- LANDSCAPE SURFACES GET CROPPED, NOT SHRUNK: a desktop UI scaled to fit 1080px wide is an illegible sliver (measured on the maiden flight: blog editor and campaign calendar unreadable). Stage the CROP: give the component width 160-240% with a negative x so the region the beat is about fills the frame, or drive an anchored camera zoom into it. Prefer portrait-native surfaces (chat panels, phone screens, social cards) over desktop UIs wherever the story allows.
+- EVIDENCE AT PHONE SCALE: product mocks are staged LARGE -- one surface filling the middle band, never two side by side. A device-showcase phone in a tall film is a phone-in-phone: prefer the app surface itself, full-bleed. WHOLE DESKTOP WORKSPACES ARE BANNED as surfaces (quotient-app-shell, liquid-glass-desktop, full browser windows): a desktop shell at 1080px wide is sidebar/breadcrumb soup nobody can read (measured live: proj_56358b25 scene 4 -- full-width but illegible). Stage the specific PANEL the beat is about and if even that reads desktop-dense, crop it (width 160-240%, negative x) so ONE region is phone-legible.
+- READING AT FEED SPEED: max ~8 words on screen at once; the viewer may have the sound off.
+
+` : ""}### WHAT A FILM GRAMMAR IS (and is not)
+A film grammar is the answer to ONE question -- WHAT CARRIES THE ARGUMENT -- plus the editing logic that follows from that answer. The product (tempo-cut), the story (hype-cut), the words (editorial), the numbers (data-story), one surface (canvas-tour), the screen (screencast), a person (speaker). Where the film SHIPS is not a grammar -- that is the FRAME, above. Everything a grammar states is downstream of its protagonist, and only four things are:
   1. WHAT CARRIES IT -- the protagonist, named.
   2. THE CUT LOGIC -- what causes each boundary (a downbeat, a click, a sentence ending, a camera arriving).
   3. THE BEAT STRUCTURE -- scene count, duration band, order, escalation.
   4. THE REFUSALS -- what must never happen because it would upstage the protagonist.
-A grammar does NOT decide what things are MADE of, how they MOVE, or what they SOUND like. Materials and composition are the visual system's (THE WORLD block above names the materials of this film's surface); music and voice are the audio system's. The one exception is when sound drives the cut itself -- tempo-cut's music grid, speaker-screencast's voice clock -- because there the sound IS the cut logic. When a law would still be true after swapping the world, it is grammar; when it would still be true after swapping the grammar, it belongs to the world.
+A grammar does NOT decide what things are MADE of, how they MOVE, or what they SOUND like. Materials and composition are the visual system's (THE WORLD block above names the materials of this film's surface); music and voice are the audio system's. The one exception is when sound drives the cut itself -- tempo-cut's music grid, the speaker and screencast grammars' voice clock -- because there the sound IS the cut logic. When a law would still be true after swapping the world, it is grammar; when it would still be true after swapping the grammar, it belongs to the world.
 
 ${opts.filmGrammar ? `### THIS FILM'S GRAMMAR: ${opts.filmGrammar.toUpperCase()} (committed by the treatment -- its contract section below is MANDATORY, not advisory)
 
@@ -418,22 +430,6 @@ The typography-first manifesto dialect: the story is told IN TYPE, punctuated by
 - KICKERS AS CHAPTERS: number the chapters with st-statement kicker ("01 - THE PROBLEM"). 2-3 chapters max.
 - NO VOICEOVER: the type is the voice. voiceover_text stays empty on statement beats.
 ` : ""}
-${__g("social-reel") ? `### SOCIAL-REEL FILMS (${opts.filmGrammar === "social-reel" ? "ACTIVE for this film" : 'when the director\'s treatment names "social-reel"'})
-The vertical feed dialect: 9:16, built to stop a thumb. Obey this contract exactly:
-- THE SHAPE: 15-28s of SCENE TIME (transitions ride on top; the shipped file must stay under 30s), 5-8 scenes. Scene 1 is the HOOK (<=2s): one bold claim or question in giant type that earns the next second -- no logos, no setup, no "welcome". Then 3-5 ESCALATION beats that each pay the hook off a little more, ONE payoff beat (the money shot: the product doing the thing, a number landing), and a CLOSE that composes into the hook frame so the loop replays cleanly (same canvas color, type landing where the hook's type began).
-- VERTICAL COMPOSITION: every scene composes for a phone held in one hand. Content lives in the MIDDLE BAND: keep the top ~12% and bottom ~18% of the canvas clear (platform UI covers them). A landscape-composed scene letterboxed into 9:16 is a blocking defect.
-- THE LAYOUT VOCABULARY IS CLOSED -- every scene is ONE of these three patterns:
-  * TYPE CARD: text only. Giant type centered in the middle band (the hook, declarations, the close). No surface.
-  * STACK: caption on top, ONE surface below. Caption at y 16-30%, the surface at y 34-74% filling the full canvas width. Text above, evidence below -- never beside.
-  * HERO: ONE surface owns the middle band (y 14-74%, full width), with a short caption OVER its lower third on a scrim chip (y 64-72%). For the money beats where the product is the star.
-  SIDE-BY-SIDE IS BANNED: two components must never share a horizontal band -- there is no width for it. If a beat wants two things, it is two scenes.
-- LANDSCAPE SURFACES GET CROPPED, NOT SHRUNK: a desktop UI scaled to fit 1080px wide is an illegible sliver (measured on the maiden flight: blog editor and campaign calendar unreadable). Stage the CROP: give the component width 160-240% with a negative x so the region the beat is about fills the frame, or drive an anchored camera zoom into it. Prefer portrait-native surfaces (chat panels, phone screens, social cards) over desktop UIs wherever the story allows.
-- CAPTIONS ARE THE VOICEOVER: no narrator. Type at display scale (7-12vw) carries the story -- kinetic-text with entrance:"type-on" for build-ups, st-statement for declarations. Max ~8 words on screen at once; the viewer is reading at feed speed with the sound possibly off. Music still drives the cut rhythm for the sound-on viewer.
-- THE EDIT: hard cuts on downbeats, 1.5-4s per scene. One shader transition maximum, spent on the payoff beat. One brand accent color; the film keeps ONE canvas world end to end.
-- OBJECTS, NOT STRINGS: every scene's components[] entries are OBJECTS with type + data (+ script where performable) -- same rule as tempo-cut, same reason.
-- EVIDENCE AT PHONE SCALE: product mocks (quotient-*, claude-*, device-showcase, cards) are staged LARGE -- one surface filling the middle band, never two side by side. A device-showcase phone in a 9:16 film is a phone-in-phone: prefer the app surface itself, full-bleed. WHOLE DESKTOP WORKSPACES ARE BANNED as surfaces (quotient-app-shell, liquid-glass-desktop, full browser windows): a desktop shell at 1080px wide is sidebar/breadcrumb soup nobody can read (measured live: proj_56358b25 scene 4 -- full-width but illegible). Stage the specific PANEL the beat is about (quotient-chat, composer, the campaign board) and if even that reads desktop-dense, crop it (width 160-240%, negative x) so ONE region is phone-legible.
-- NO VOICEOVER: voiceover_text stays empty; the captions are the script.
-` : ""}
 ${__g("data-story") ? `### DATA-STORY FILMS (${opts.filmGrammar === "data-story" ? "ACTIVE for this film" : 'when the director\'s treatment names "data-story"'})
 The numbers-as-protagonist dialect: every beat stages a figure, and the figures argue the case. Obey this contract exactly:
 - THE SHAPE: 5-8 scenes in 25-45s. Each scene is CLAIM -> PROOF: a short line of type states the claim (2-8 words), then ONE data component proves it at hero scale. The claim may live in the same scene as a leading beat (type lands, then the chart draws) or as its own 2-3s setup scene before a bigger proof.
@@ -462,8 +458,8 @@ The continuous-surface dialect: ONE unbroken shot across a single surface, no cu
 - OBJECTS, NOT STRINGS: every components[] entry is an OBJECT with type + data. The surface component (paper-ground or the world backdrop) is the first entry of every scene.
 - THE SURFACE IS NOT THE SCENE: every PLACE carries a thing. A scene whose components are only the world's backdrop is a dead frame -- 6s of empty surface -- and describing what happens there in visual_notes does not put it on the surface. Cast the actual components from THE WORLD's materials (named in the world block above; the world decides what can credibly sit on it, this grammar decides where the camera goes and in what order).
 ` : ""}
-${__g("speaker-screencast") ? `### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
-The human on camera owns the film; everything else supports them. The contract:
+${__g("screencast") ? `### SCREENCAST FILMS (${opts.filmGrammar === "screencast" ? "ACTIVE for this film" : "when a screen recording drives the film"})
+The screen carries the argument; a narrator drives the clock -- on camera in a corner bubble, or voice-only. The contract:
 - THE VOICE IS THE CLOCK: the speaker's sentences decide when scenes cut and when content enters. Author scene/beat durations against what is being SAID, never against an abstract rhythm -- a cut mid-sentence is a failure.
 - THE HUMAN NARRATES: no text-as-voiceover, no statement slides, no annotation lines that duplicate what the speaker is saying out loud. On-screen text is limited to labels/callouts that ADD to the speech (a metric, a name, a step number).
 - LAYOUT: use the two speaker scene modes (speaker-visible content region vs takeover-with-PiP -- mechanics below). Content overlays enter with the house line-rise ON the sentence that introduces them, and leave when the speaker moves on.
@@ -475,6 +471,15 @@ The human on camera owns the film; everything else supports them. The contract:
   * HARD CUT IN: transition_in {"type":"none"}. A shader/flash transition blends the presenter back in for a few frames mid-cut and reads as a stutter.
   * NEVER cover her with a codegen backdrop: the speaker scenes on either side stay transparent_background:true with NO full-bleed background component -- the camera IS their background.
 - HIDING A MULTI-TAKE SEAM: when the speaker recording was assembled from several generated takes, the brief carries the seam timestamps. A takeover must START ~0.2s BEFORE the seam it hides and run past it -- a cutaway that begins ON the seam exposes the jump it exists to cover.
+- MUSIC: absent, or a bed ducked far under the voice. The voice is always the loudest thing.
+` : ""}
+${__g("speaker") ? `### SPEAKER FILMS (${opts.filmGrammar === "speaker" ? "ACTIVE for this film" : 'when the director\'s treatment names "speaker"'})
+A person on camera carries the argument. The camera is the base layer of every scene, full-bleed; everything else rides over it. The contract:
+- THE VOICE IS THE CLOCK: the speaker's sentences decide when scenes cut and when content enters. Author scene/beat durations against what is being SAID, never against an abstract rhythm -- a cut mid-sentence is a failure.
+- A RECORDING NEED NOT EXIST YET: this grammar is chosen at script time as often as after a take. When no take exists, every duration is an ESTIMATE at speaking pace (~2.4 words per second) that the take will re-time. Write the board as if the person will perform it next.
+- THE HUMAN NARRATES, AND THE SCRIPT LIVES IN voiceover_text: EVERY scene carries voiceover_text -- the exact spoken line for that beat. These are the words the speaker reads off a prompter, so they are natural spoken sentences (contractions, rhythm, a person talking), never display-type fragments and never empty. Captions are derived from the delivered take afterwards; do not author them as on-screen copy.
+- GRAPHICS RIDE OVER THE PERSON, NEVER BESIDE: a stat, a rail, a callout enters with the house line-rise ON the sentence that introduces it, sits in a band that leaves the face clear, and leaves when the speaker moves on. Nothing docks in a side region; nothing covers the person unless the beat is explicitly a cutaway (then the TAKEOVER RECIPE from the screencast contract applies: opaque, full-frame, >=2.5s, hard cut in).
+- NO DUPLICATE TEXT: on-screen type never repeats what is being said; it ADDS (a number, a name, a step).
 - MUSIC: absent, or a bed ducked far under the voice. The voice is always the loudest thing.
 ` : ""}
 ### Writing Great Visual Notes

@@ -48,7 +48,7 @@ async function main() {
   console.log("=== Auto-wire (unwired embedded block still animates) E2E ===\n");
   const meshSource = fs.readFileSync(path.join(ROOT, "src/components/effects/mesh-gradient.component.html"), "utf8");
   const brandKit: any = { colors: { primary: "#393bf5", background: "#0b0b14", text: "#fff" }, fonts: [{ family: "Inter", source: "google", weights: [400, 700] }], style: { motion: "cinematic" } };
-  const canvas: any = { width: 1280, height: 720, preset: "landscape", fps: 30, background: "#0b0b14" };
+  const canvas: any = { width: 1280, height: 720, frame: "16x9", fps: 30, background: "#0b0b14" };
 
   const html = await assembleCodegenScene({
     sceneSource,

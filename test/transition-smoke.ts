@@ -88,7 +88,7 @@ async function setupFixtures(): Promise<void> {
     format: "video",
     status: "generated",
     // 15fps on purpose -- exercises the low-fps last-frame extraction.
-    canvas: { width: 640, height: 360, preset: "landscape", fps: 15, background: "#000000" },
+    canvas: { width: 640, height: 360, frame: "16x9", fps: 15, background: "#000000" },
     brand_kit: BRAND_KIT,
     scenes: [
       { id: "scene_a", label: "One", duration_seconds: SCENE_SECONDS,

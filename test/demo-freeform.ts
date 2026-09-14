@@ -46,7 +46,7 @@ const BRAND_KIT = {
 };
 
 const CANVAS = {
-  width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a",
+  width: 1920, height: 1080, frame: "16x9" as const, fps: 30, background: "#0f172a",
 };
 
 async function main() {

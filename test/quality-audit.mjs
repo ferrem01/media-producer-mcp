@@ -40,7 +40,7 @@ const DATA = { text: "Quotient scales demand generation", title: "Quotient", bod
   words: ["Fast", "Smart", "Bold"], emphasis: ["scales"] };
 
 const brandKit = { colors: { primary: "#6366f1", secondary: "#8b5cf6", accent: "#a78bfa", surface: "#1e1b4b", background: "#0b0b14", text: "#ffffff", text_muted: "#94a3b8" }, fonts: [{ family: "Inter", source: "google", weights: [400, 600, 800] }], style: { motion: "cinematic", border_radius: "14px" } };
-const canvas = { width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#0b0b14" };
+const canvas = { width: 1920, height: 1080, frame: "16x9", fps: 30, background: "#0b0b14" };
 
 function sceneFor(type) {
   return `<template><div class="scene"><component type="${type}" data='${JSON.stringify(DATA).replace(/'/g, "&#39;")}' style="position:absolute;inset:0;" /></div></template>

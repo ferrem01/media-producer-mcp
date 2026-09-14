@@ -286,7 +286,7 @@ async function main() {
     name: "Full Component Showcase",
     format: "video",
     status: "draft",
-    canvas: { width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#0f172a" },
+    canvas: { width: 1920, height: 1080, frame: "16x9", fps: 30, background: "#0f172a" },
     brand_kit: BRAND,
     scenes,
   };

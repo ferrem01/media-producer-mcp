@@ -1,5 +1,5 @@
 /**
- * Golden regression for the SPEAKER-SCREENCAST recipe -- the "product walkthrough
+ * Golden regression for the SCREENCAST recipe (speaker in a corner bubble) -- the "product walkthrough
  * with the presenter's camera as a corner bubble" that took hours to get right by
  * hand. Locks the known-good assembly so it can't silently regress:
  *   - opaque scene (transparent_background:false) => composites OVER the camera as
@@ -34,7 +34,7 @@ const brandKit = {
   style: { border_radius: "12px", motion: "minimal" },
 } as unknown as BrandKit;
 
-const canvas = { width: 1920, height: 1080, fps: 30, preset: "landscape", background: "#ffffff" } as Canvas;
+const canvas = { width: 1920, height: 1080, fps: 30, frame: "16x9", background: "#ffffff" } as Canvas;
 
 const CAMERA = "/assets/t/projects/library/assets/camera.mp4";
 const SCREEN = "/assets/t/projects/library/assets/screencast2.mp4";
@@ -62,7 +62,7 @@ async function build(): Promise<string> {
   } as any);
 }
 
-describe("speaker-screencast recipe assembles to the known-good composite", () => {
+describe("screencast recipe assembles to the known-good composite", () => {
   it("is an OPAQUE composite (full-frame screencast over the camera, not a transparent overlay)", () => {
     expect(sceneCompositesOverSpeaker(recipeScene(), true)).toBe(false);
   });

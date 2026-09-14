@@ -41,7 +41,7 @@ async function canvasTourLaws(): Promise<string> {
   const src = await read();
   const at = src.indexOf('__g("canvas-tour")');
   expect(at, "canvas-tour section not found").toBeGreaterThan(0);
-  const end = src.indexOf('__g("speaker-screencast")', at);
+  const end = src.indexOf('__g("screencast")', at);
   return src.slice(at, end > 0 ? end : at + 6000);
 }
 

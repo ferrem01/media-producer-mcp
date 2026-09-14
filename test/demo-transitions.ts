@@ -30,7 +30,7 @@ const project: Project = {
     width: 1280,
     height: 720,
     fps: 24,
-    preset: "landscape",
+    frame: "16x9",
     background: "#0f172a",
   },
   brand_kit: {
