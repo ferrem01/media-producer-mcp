@@ -105,44 +105,50 @@ relocates a mis-filed value; it does not invent ambition.
 | RHYTHM | `film_grammar` | what carries the argument, what earns a cut | editing |
 | LOOK | `visual_system` | surface, physics, type voice, motif | art direction |
 | SOUND | `audio_system` | music personality, narration voice | sound design |
-| **FRAME** | **`format`** | **canvas, duration envelope, safe areas, distribution behaviour** | **delivery format** |
+| **FRAME** | **`format`** | **the canvas and the bands the platform occludes — geometry, nothing else** | **delivery format** |
 
 Same contract as the other three: omitted → inferred; provided → pinned.
 
-## Axis: `format`
+## Axis: `format` — the geometry of the output surface, and nothing else
 
-| Value | Canvas | Envelope | Safe areas | Distribution facts |
-| --- | --- | --- | --- | --- |
-| `landscape` | 1920×1080 | none | none | default; embeds, landing pages, YouTube |
-| `reel` | 1080×1920 | ≤30s (ads: ≤15s) | top 12%, bottom 18% | hook ≤2s; loop seam; sound-off likely |
-| `feed-portrait` | 1080×1350 | ≤60s | none — media is not overlaid | hook still matters; no loop |
-| `feed-square` | 1080×1080 | ≤60s | none | — |
-| `story` | 1080×1920 | 15s segments | top 14%, bottom 20% | anticipated |
+**A format is a size.** It carries the canvas and the bands the platform
+occludes. It carries no duration, no story shape, no editorial rule. If a
+thing is not a number about the screen, it is not in the format.
 
-A format owns four things and nothing else:
+| Value | Canvas | Occluded bands | Typical home |
+| --- | --- | --- | --- |
+| `16x9` | 1920×1080 | none | default; embeds, landing pages, YouTube |
+| `9x16` | 1080×1920 | top 12%, bottom 18% | Reels, TikTok, Shorts |
+| `4x5` | 1080×1350 | none — the media is not overlaid | Instagram/LinkedIn feed |
+| `1x1` | 1080×1080 | none | feed, ad units |
 
-1. **Canvas** — the dimensions. This absorbs the side-effect where picking
-   `social-reel` silently set vertical.
-2. **Duration envelope** — a ceiling, not a target.
-3. **Safe areas** — which bands platform UI covers. Note `feed-portrait` does
-   *not* overlay the media, which is why its captions can sit lower than a
-   reel's.
-4. **Distribution behaviour** — hook pressure, loop seam, sound-off assumption.
+Platform names are a **lookup that resolves to a format**, not values of their
+own: "for Instagram Reels" → `9x16`; "for the LinkedIn feed" → `4x5`. The
+system knows the mapping so the operator never types dimensions.
 
-Everything in the table above is a fact about where the film ships. None of it
-is a fact about what the film argues.
+### What the format decides
 
-### The vertical composition rules are format rules
+Layout, and only layout. Given the canvas and the occluded bands, the agent
+stages the scene: what fits, how big, where the captions sit, whether a
+landscape surface must be cropped rather than shrunk.
 
-These move from `social-reel`'s contract to any format whose canvas is
-narrower than it is tall, and they are **measured learnings with cited
-evidence** — they must be carried across verbatim, not paraphrased:
+These are the measured vertical-composition learnings, carried across from
+`social-reel` verbatim with their cited evidence. They apply to any format
+taller than it is wide:
 
 - Closed layout vocabulary: TYPE CARD / STACK / HERO
 - SIDE-BY-SIDE IS BANNED ("there is no width for it")
 - Landscape surfaces get CROPPED, not shrunk (width 160–240% + negative x)
 - Evidence at phone scale; whole desktop workspaces banned
   (cited: `proj_56358b25` scene 4 — full-width but illegible)
+
+### What the format does NOT decide
+
+**Duration.** A 9:16 film is not inherently short. Duration belongs to the
+grammar, which knows what it is arguing and how long that takes.
+
+**Story shape.** Hook, escalation, payoff and the loop seam are editorial
+choices. They belong to the grammar — see below.
 
 ## Axis: `film_grammar` — revised
 
@@ -161,10 +167,37 @@ talking-head ad is carried by the person.
 | `canvas-tour` | one surface | — |
 | `screencast` | the screen | renamed from `speaker-screencast` |
 | `speaker` | a person | **new** |
-| ~~`social-reel`~~ | ~~the format~~ | **removed → `format: reel`** |
+| ~~`social-reel`~~ | ~~the format~~ | **deleted — see below** |
 
 Count is unchanged at eight. `speaker` and `screencast` compose: a screencast
 film usually has a speaker in PiP; a speaker film may cut to a screencast beat.
+
+### `social-reel` is deleted, not aliased
+
+No compatibility shim. The value is removed from the enum, the type, the
+director's prose, the builder's contract block, the scene-count table, the
+tool schema and the server's MCP instructions. A caller passing it should get
+an error, not a silent redirect.
+
+Its rules disperse:
+
+| social-reel rule | Goes to |
+| --- | --- |
+| Vertical composition, 12% / 18% occlusion | `format: 9x16` |
+| Closed layout vocabulary; side-by-side banned | format (any tall canvas) |
+| Crop-don't-shrink; phone-scale evidence; no desktop shells | format (any tall canvas) |
+| Hook ≤2s, escalation beats, payoff | **grammar** — and see the note below |
+| Loop seam | **grammar** (an editorial choice about how a film ends) |
+| 15–28s envelope, 5–8 scenes | **grammar** |
+| "Captions ARE the voiceover; `voiceover_text` empty" | **deleted** — this was the bug |
+| Hard cuts on downbeats, 1.5–4s | **grammar** (`tempo-cut` / `hype-cut` already own it) |
+
+**Its story arc already existed.** `hype-cut` is "premise-first open, two-act
+escalation, click-driven cut into the payoff app" — hook, escalation, payoff,
+the same shape written twice. So `social-reel` was not only a mis-filed
+format; it also duplicated a grammar. `format: 9x16` + `hype-cut` is what it
+was reaching for, and that combination is expressible the moment the format
+axis exists.
 
 ## Concept: spine (internal — NOT a field)
 
@@ -226,53 +259,87 @@ script's role is to bias transcription (feed the known copy to whisper as a
 prior) so brand names and proper nouns resolve correctly. Observed failure:
 whisper rendered an unknown name as "Prana" with no prior available.
 
-## Conflicts this spec must resolve
+## The multi-format workflow (in scope)
 
-**Duration.** Format carries an envelope; grammars carry their own ranges
-(`data-story` wants 25–45s, `reel` caps at 30s). **Format wins the envelope;
-the grammar adapts its scene count.** Scene count stops being a grammar
-constant and becomes envelope ÷ the grammar's beat length.
+"Make a LinkedIn version of this, now make it for Instagram" is close to the
+most common ad request there is. It is a requirement of this design, not a
+follow-on.
+
+**Recommendation: one project, one board, staging per format.**
+
+What must stay single is the **board** — the beats, the copy, the footage, the
+order. That is the film. If a format request forks the project, the script
+forks with it, and the failure mode is shipping an ad with a typo fixed in one
+aspect ratio and not the other. Copy edits are the most common edit there is;
+they must land once.
+
+What must be allowed to differ is the **staging** — component positions and
+sizes, caption placement, occasionally which component is used at all (a
+desktop shell that is legal at 16x9 is banned at 9x16). That is a per-format
+overlay on shared scenes, not a copy of them.
+
+    project
+      board            ← beats, copy, footage, order      (single)
+      staging[16x9]    ← positions, sizes, caption band   (per format)
+      staging[9x16]
+    render(project, format) → output-9x16.mp4
+
+**First draft of a staging is derived, proposed, and editable** — the
+`proposed: true` idiom the compress-the-waiting EDL already uses. The system
+re-stages for the new geometry and opens Studio with it; nothing is imposed.
+This matters because the two hand-built reels of 2026-09-11/13 made genuinely
+different creative choices at 4:5 and 9:16 (a framed card with a type field
+below, versus full-bleed footage with burned captions). An auto-relayout would
+have produced neither, so it must be a starting point rather than an answer.
+
+**Separate projects only when the EDIT differs.** A 15s reel and a 45s
+LinkedIn cut with different beats are two different films that happen to share
+source footage. Forcing them into one project buys nothing. The test: if the
+board changes, it is a new project; if only the staging changes, it is a
+format variant.
+
+## Conflicts this spec must resolve
 
 **`canvas.preset` already exists** (`landscape | vertical | square`). It is a
 vestigial format field living on the canvas. `format` must subsume it — one
 concept, one home — not sit beside it.
 
-**Backward compatibility.** `social-reel` is a public value in the `generate`
-tool enum and appears in the server's own MCP instructions. It must survive as
-an **alias** expanding to `format: reel` + an inferred grammar, or every
-existing caller breaks.
+**Duration leaves the format entirely.** Grammars carry their own ranges and
+scene counts, as they already do. A 9:16 film is not inherently short.
 
-**Where the canvas side-effect lives.** Today picking `social-reel` sets
-vertical. That behaviour relocates to `format` and must not be left in two
+**The canvas side-effect relocates.** Today picking `social-reel` silently
+sets vertical. That behaviour becomes `format`'s, and must not survive in two
 places.
 
 ## Not recommended cells
 
-The matrix is open, but not every cell is good. These are quality guidance,
-not architectural blocks:
+The matrix is open, but not every cell is good. Quality guidance, not
+architectural blocks:
 
-- `launch-film` × `reel` — "expansive cinematic worlds" has no room in 15s.
-- `data-story` × `reel` — its own contract already fights 1080px-wide charts;
+- `launch-film` × `9x16` — "expansive cinematic worlds" want width and time.
+- `data-story` × `9x16` — its own contract already fights 1080px-wide charts;
   possible with aggressive cropping, rarely good.
-- `canvas-tour` × `feed-square` — a traverse wants a long axis to travel.
+- `canvas-tour` × `1x1` — a traverse wants a long axis to travel.
 
-Genuinely good and currently unsayable: `reel` × `speaker` (the ad this all
-started from), `reel` × `tempo-cut`, `reel` × `canvas-tour`.
+Genuinely good and currently unsayable: `9x16` × `speaker` (the ad this all
+started from), `9x16` × `tempo-cut`, `9x16` × `hype-cut` (what `social-reel`
+was reaching for), `9x16` × `canvas-tour`.
 
 ## Open questions
 
-1. **Where does hook / escalation / payoff live?** It is listed above as a
-   feed fact, but it is arguably a *story* shape — which is `hype-cut`'s
-   business. If it is a story shape, `format: reel` carries only the hook
-   pressure and the loop seam, and the escalation arc stays with the grammar.
-   Unresolved.
-2. **Does `format` infer, or must it be pinned?** The other three axes infer
-   from the prompt. "An Instagram ad" clearly implies `reel` — but the cost of
-   a wrong inference is an unusable aspect ratio, which is harsher than a wrong
-   motion value.
-3. **One board, many formats?** Rendering one project at 9:16 and 4:5 is the
-   obvious next want. Is that one project with N format renders, or N projects?
-   Safe areas differ, so caption placement differs — it is not a pure re-crop.
+1. **Do the occluded bands belong to the format?** They are numbers about the
+   screen, so they fit the geometry rule — but they are *platform*-specific,
+   not geometric: Reels and TikTok are both 9:16 and occlude differently. Two
+   options: formats stay purely geometric and occlusion moves to a separate
+   platform profile, or each geometric format carries a default mask for its
+   most common platform, overridable. The spec currently assumes the latter.
+2. **Does `format` infer or must it be pinned?** RESOLVED by scope: now that
+   format is only geometry, inference is a lookup ("for Instagram Reels" →
+   `9x16`) with no editorial judgement attached, so it infers like the other
+   three axes.
+3. **Where does the story arc live?** RESOLVED: grammar. Hook, escalation,
+   payoff and the loop seam are editorial. `hype-cut` already carries that
+   shape.
 
 ## Non-goals
 
