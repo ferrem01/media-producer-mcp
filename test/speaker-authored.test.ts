@@ -23,6 +23,20 @@ describe("authored compositions in speaker films", () => {
     expect(sg).toMatch(/pct\(4, spRows\[k\]\[0\], 54/);       // lower-left captions
   });
 
+  it("know the base exists when the take was attached AFTER the board (script-first flow)", async () => {
+    // The take page attaches speaker_track to a project that already has a
+    // storyboard; the build comes later with no speaker_source on the call.
+    // Measured live (proj_c210e5e1): every build site read only
+    // opts.speaker_source, so the recipe painted a full-bleed mesh backdrop
+    // over the speaker. The pipeline already knows (pipelineHasNarration is
+    // what gates TTS and the speaker grammar default) -- the layout must
+    // read the same fact.
+    const pl = await read("../src/llm/pipeline.ts");
+    const sites = pl.match(/hasSpeakerTrack: !!opts\.speaker_source \|\| pipelineHasNarration,/g) || [];
+    expect(sites.length).toBeGreaterThanOrEqual(4);
+    expect(pl).not.toMatch(/hasSpeakerTrack: !!opts\.speaker_source,/);
+  });
+
   it("treat the camera base like a dark backdrop for ink", async () => {
     const sg = await read("../src/llm/scene-generator.ts");
     expect(sg).toMatch(/overLiveBase = mediaBackdrop \|\| speakerBase/);

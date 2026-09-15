@@ -29,6 +29,13 @@ rotation stripped, -35.7 -> -16.4 LUFS, frames untouched.
 Not covered: takes attached by hand through the `add` tool (they never pass
 this endpoint), and final-MIX loudness (-14 LUFS) -- still the separate PR.
 
+Same run, second bug, in the build: every `generateScene` call site set
+`hasSpeakerTrack: !!opts.speaker_source`, so a project whose take was attached
+AFTER the board (the script-first flow the take page exists for) built with
+no speaker base -- the recipe painted a full-bleed mesh backdrop over Marc.
+The pipeline already knew (`pipelineHasNarration` gates TTS and the `speaker`
+grammar default from the loaded project); the four sites now read it too.
+
 ## 2026-09-14 — FRAME axis; `social-reel` deleted; `speaker-screencast` split
 
 `SPEC-format-and-spine.md`. A storyboard for a performed 15-second vertical ad
