@@ -2877,3 +2877,15 @@ one, twice. The render was never wrong: it concatenates the clips.
 takes, that scene's clip from its own trim; with one continuous track,
 the first clip at the film start as before; a per-scene track with no
 take for the scene shows no camera rather than the wrong one.
+
+## A board with no furniture only takes over on the explicit opt-out
+
+Same run: the payoff scene's browser-frame became a 10-second takeover
+that covered Marc. The takeover recipe's heuristic ("a product surface
+with no speaker furniture on the scene") was written for films whose
+presenter scenes carry a lower-third; it needs furniture somewhere to
+compare against. A take-flow speaker board carries none, so under it every
+surface scene was a takeover. The heuristic now only fires when the film
+has furniture on some scene; otherwise the board's explicit
+`transparent_background: false` is the only way to cover the camera, which
+is what the SPEAKER contract already told the storyboard writer.
