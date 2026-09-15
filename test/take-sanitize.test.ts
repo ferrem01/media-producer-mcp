@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
-  probeTake, rotationIsSpurious, measureLoudness, sanitizeTake, TAKE_LOUDNESS_TARGET_LUFS,
+  probeTake, rotationIsSpurious, measureLoudness, sanitizeTake, stripTkhdRotation, TAKE_LOUDNESS_TARGET_LUFS,
 } from "../src/core/take-sanitize.js";
 
 const run = promisify(execFile);
@@ -67,6 +67,16 @@ describe("the take sanitizer", () => {
     expect(after.height).toBe(480);
     const lufs = await measureLoudness(file);
     expect(Math.abs(lufs! - TAKE_LOUDNESS_TARGET_LUFS)).toBeLessThan(1.5);
+  });
+
+  it("resets the tkhd matrix by a byte patch, so it works on any ffmpeg (the deployed box predates -display_rotation)", async () => {
+    const file = await phoneTake(dir, { rotate: 90 });
+    const before = await fs.stat(file);
+    expect((await probeTake(file)).rotation).not.toBe(0);
+    expect(await stripTkhdRotation(file)).toBe(1);        // the video track only; audio is already identity
+    expect((await probeTake(file)).rotation).toBe(0);
+    expect((await fs.stat(file)).size).toBe(before.size); // in place, no remux
+    expect(await stripTkhdRotation(file)).toBe(0);        // idempotent
   });
 
   it("leaves a clean take alone", async () => {

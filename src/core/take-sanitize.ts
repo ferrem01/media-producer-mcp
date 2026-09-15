@@ -8,7 +8,11 @@
  *     matrix. Every honest player -- ffmpeg's autorotate, Chromium's <video>
  *     -- obeys the tag and shows the take on its side. A booth take is
  *     portrait by construction, so a portrait-stored file tagged sideways is
- *     the bug, never the intent: the tag is dropped, frames untouched.
+ *     the bug, never the intent: the tag is dropped, frames untouched. The
+ *     tag lives in the MP4's `tkhd` matrix; it is reset to identity by a
+ *     direct byte patch (ffmpeg's `-display_rotation` only exists from 6.0,
+ *     and the deployed box runs older -- measured live: the first attach
+ *     silently skipped).
  *
  *  2. A QUIET VOICE. A phone at arm's length in a room lands around -35 LUFS;
  *     dialogue that will carry a film wants about -16. The audio is
@@ -112,6 +116,69 @@ async function loudnormMeasure(filePath: string): Promise<Record<string, string>
   try { return JSON.parse(json[0]); } catch { return null; }
 }
 
+// ── tkhd matrix patch ──
+// ISO BMFF: moov > trak > tkhd carries a 3x3 fixed-point display matrix.
+// A quarter-turn tag is that matrix; identity is
+// [0x00010000 0 0 / 0 0x00010000 0 / 0 0 0x40000000]. Version-independent
+// and no remux: 36 bytes rewritten per track that carries a rotation.
+const IDENTITY_MATRIX = Buffer.from([
+  0x00, 0x01, 0x00, 0x00, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0x00, 0x01, 0x00, 0x00, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0x40, 0x00, 0x00, 0x00,
+]);
+
+/** Walk the box tree and return the file offset of every tkhd matrix. */
+async function tkhdMatrixOffsets(fh: fs.FileHandle, size: number): Promise<number[]> {
+  const found: number[] = [];
+  const header = Buffer.alloc(16);
+  const walk = async (start: number, end: number, want: string[]): Promise<void> => {
+    let pos = start;
+    while (pos + 8 <= end) {
+      await fh.read(header, 0, 16, pos);
+      let boxSize = header.readUInt32BE(0);
+      const type = header.toString("latin1", 4, 8);
+      let hdr = 8;
+      if (boxSize === 1) { boxSize = Number(header.readBigUInt64BE(8)); hdr = 16; }
+      else if (boxSize === 0) boxSize = end - pos;
+      if (boxSize < hdr) return;
+      if (type === want[0]) {
+        if (want.length === 1) {
+          // tkhd: version byte decides the fixed-field widths before the matrix.
+          const v = Buffer.alloc(1);
+          await fh.read(v, 0, 1, pos + hdr);
+          found.push(pos + hdr + (v[0] === 1 ? 52 : 40));
+        } else {
+          await walk(pos + hdr, pos + boxSize, want.slice(1));
+        }
+      }
+      pos += boxSize;
+    }
+  };
+  await walk(0, size, ["moov", "trak", "tkhd"]);
+  return found;
+}
+
+/** Reset every non-identity tkhd matrix to identity, in place. Returns how
+ *  many tracks were patched. */
+export async function stripTkhdRotation(filePath: string): Promise<number> {
+  const fh = await fs.open(filePath, "r+");
+  try {
+    const { size } = await fh.stat();
+    const offsets = await tkhdMatrixOffsets(fh, size);
+    let patched = 0;
+    const cur = Buffer.alloc(36);
+    for (const off of offsets) {
+      await fh.read(cur, 0, 36, off);
+      if (cur.equals(IDENTITY_MATRIX)) continue;
+      await fh.write(IDENTITY_MATRIX, 0, 36, off);
+      patched++;
+    }
+    return patched;
+  } finally {
+    await fh.close();
+  }
+}
+
 /**
  * Sanitize a take IN PLACE. Returns what changed. Never throws on a
  * defect it cannot fix -- the caller attaches the take regardless and the
@@ -136,34 +203,33 @@ export async function sanitizeTake(filePath: string): Promise<TakeSanitizeResult
     };
   }
 
-  const ext = path.extname(filePath) || ".mp4";
-  const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
-  const args: string[] = ["-y"];
-  // Input-side: rewrite the display matrix BEFORE the demuxer hands the
-  // stream on, so the copied video stream carries rotation 0.
-  if (stripRotation) args.push("-display_rotation", "0");
-  args.push("-i", filePath, "-map", "0:v:0", "-c:v", "copy");
+  // Loudness first (a remux: the muxer copies the rotation through), then
+  // the matrix patch on whatever file is final.
   let normalizedTo: number | undefined;
-  if (probe.hasAudio) {
-    args.push("-map", "0:a:0");
-    if (normalize) {
-      const m = await loudnormMeasure(filePath);
-      const filter = m
-        ? `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_LRA=${m.input_lra}:measured_TP=${m.input_tp}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`
-        : `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11`;
-      args.push("-af", filter, "-c:a", "aac", "-b:a", "160k", "-ar", "48000");
-      normalizedTo = TAKE_LOUDNESS_TARGET_LUFS;
-    } else {
-      args.push("-c:a", "copy");
+  if (normalize) {
+    const ext = path.extname(filePath) || ".mp4";
+    const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
+    const m = await loudnormMeasure(filePath);
+    const filter = m
+      ? `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_LRA=${m.input_lra}:measured_TP=${m.input_tp}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`
+      : `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11`;
+    const args = [
+      "-y", "-i", filePath, "-map", "0:v:0", "-c:v", "copy", "-map", "0:a:0",
+      "-af", filter, "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
+      "-movflags", "+faststart", tmp,
+    ];
+    try {
+      await execFileAsync("ffmpeg", ["-hide_banner", ...args], { maxBuffer: 16 * 1024 * 1024 });
+      await fs.rename(tmp, filePath);
+    } catch (e: any) {
+      await fs.unlink(tmp).catch(() => {});
+      throw new Error(`take loudness normalize failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
     }
+    normalizedTo = TAKE_LOUDNESS_TARGET_LUFS;
   }
-  args.push("-movflags", "+faststart", tmp);
-  try {
-    await execFileAsync("ffmpeg", ["-hide_banner", ...args], { maxBuffer: 16 * 1024 * 1024 });
-    await fs.rename(tmp, filePath);
-  } catch (e: any) {
-    await fs.unlink(tmp).catch(() => {});
-    throw new Error(`take sanitize failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
+  if (stripRotation) {
+    const patched = await stripTkhdRotation(filePath);
+    if (patched === 0) throw new Error("take rotation strip failed: no tkhd matrix carried the rotation");
   }
 
   return {

@@ -19,7 +19,10 @@ carries a film wants about -16.
 `core/take-sanitize.ts` runs once in `POST /api/take`, in place on the file:
 a quarter-turn tag on a PORTRAIT-stored file is dropped (a booth take is
 portrait by construction, so the tag is the defect; a landscape sensor honestly
-tagged portrait is left alone), and the audio is normalized to -16 LUFS with a
+tagged portrait is left alone -- and the tag is reset by a direct byte patch of
+the MP4's `tkhd` matrix, because ffmpeg's `-display_rotation` only exists from
+6.0 and the deployed box runs older: the first live attach silently skipped),
+and the audio is normalized to -16 LUFS with a
 two-pass linear loudnorm (video stream-copied). What it did lands on
 `project.take` (`rotation_stripped`, `loudness.{measured_lufs,normalized_to_lufs}`).
 A sanitizer failure is logged and the take still attaches. Probing is one
