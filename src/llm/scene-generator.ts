@@ -407,7 +407,47 @@ function stackRows(n: number, bandY: number, bandH: number, gap: number): Array<
  * stage) instead of stacking into the same 84% inset -- the collision that
  * made films read as sloppy.
  */
-function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false, takeover = false, grammar?: string): LayoutSlot[] {
+/** The measured face of a take, as fractions of the frame (core/face-band.ts). */
+type TakeFace = { cx: number; cy: number; size: number };
+
+/**
+ * The bands a tall speaker frame may use, built around the person. With no
+ * measured face the bands are the chest-up defaults; with one, the lower
+ * band starts under the chin (and is dropped when the chin is too low), the
+ * top band ends above the hairline, and accent slots sit beside the head
+ * only where there is room. Fractions of the frame; y downward.
+ */
+export function tallSpeakerBands(face: TakeFace | undefined, frameRatio = 16 / 9): {
+  lower: { top: number; bottom: number } | null;
+  top: { top: number; bottom: number } | null;
+  sides: Array<{ x: number; y: number; width: number; height: number }>;
+} {
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
+  if (!face) {
+    return {
+      lower: { top: 0.68, bottom: 0.82 },
+      top: { top: 0.13, bottom: 0.30 },
+      sides: [{ x: 0.64, y: 0.31, width: 0.31, height: 0.12 }, { x: 0.05, y: 0.31, width: 0.31, height: 0.12 }],
+    };
+  }
+  const chin = face.cy + face.size * 0.45;
+  const hair = face.cy - face.size * 0.5;
+  const lower = chin <= 0.72 ? { top: r3(Math.max(0.55, Math.min(0.70, chin + 0.01))), bottom: 0.82 } : null;
+  const topBottom = r3(Math.max(0.20, Math.min(0.32, hair - 0.02)));
+  const top = topBottom - 0.13 >= 0.08 ? { top: 0.13, bottom: topBottom } : null;
+  // The cascade's square is the face height; in width fractions it is
+  // narrower than it looks on a tall frame, and the head is narrower still.
+  const halfW = face.size * 0.5 * frameRatio * 0.72;
+  const y = r3(Math.max(0.13, Math.min(0.70, face.cy - 0.06)));
+  const sides: Array<{ x: number; y: number; width: number; height: number }> = [];
+  const rx = r3(Math.max(0.5, face.cx + halfW - 0.05));
+  if (0.95 - rx >= 0.18) sides.push({ x: rx, y, width: r3(0.95 - rx), height: 0.12 });
+  const lx = r3(Math.min(0.5, face.cx - halfW + 0.05));
+  if (lx - 0.05 >= 0.18) sides.push({ x: 0.05, y, width: r3(lx - 0.05), height: 0.12 });
+  return { lower, top, sides };
+}
+
+function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false, takeover = false, grammar?: string, face?: TakeFace, frameRatio = 16 / 9): LayoutSlot[] {
   // THE FRAME BELONGS TO ONE THING AT A TIME (tempo-cut / hype-cut): in the
   // cut grammars a product surface owns the whole frame and claim type is a
   // lower-third stamp OVER it (or its own interstitial beat) -- never a side
@@ -469,30 +509,57 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     // proj_234d8a01: the wide dock put the composer, captions and URL in a
     // right-third column with 34px type, and the pills over his eyes.)
     if (vertical && !takeover) {
-      // Measured on the fresh run (proj_7c8380c5, chest-up at eye level):
-      // the chin sits near 65%, so the lower band starts at 68% and holds
-      // ONE row; the top band (13-30%) takes the rest, two rows at most.
+      // The bands follow the PERSON (core/face-band.ts measures the face at
+      // attach): lower band under the chin when the chin leaves room, top
+      // band above the hairline, accents beside the head where there is
+      // width for them. Without a measured face: the chest-up defaults
+      // (measured on the fresh run, proj_7c8380c5).
+      const bands = tallSpeakerBands(face, frameRatio);
+      const p100 = (n: number) => Math.round(n * 1000) / 10;
       var stack = dockSurf.concat(heroIdx, captionIdx).sort((a, b) => a - b);
-      var lower = stack.slice(0, 1), upper = stack.slice(1, 3), dropped = stack.slice(3);
-      lower.forEach((idx, k) => { slots[idx] = { position: pct(5, 68, 90, 14), z_index: 10 + k }; });
-      var upperRows = stackRows(upper.length, 13, 17, 2);
-      upper.forEach((idx, k) => { slots[idx] = { position: pct(5, upperRows[k][0], 90, upperRows[k][1]), z_index: 20 + k }; });
-      dropped.forEach((idx) => { console.log(`    ${authored[idx].type}: no band left on the tall speaker frame (three surfaces already placed) -- dropped`); slots[idx] = null; });
-      // Accents sit BESIDE the head, in the background either side of it
-      // (the head owns roughly the middle third of the width): the top band
-      // belongs to surfaces (measured: the QUOTIENT stamp landed on the
-      // caption lane's "Web"), the bands never share.
-      var TALL_ACCENTS: Array<Record<string, string | number>> = [
-        { x: "64%", y: "31%", width: "31%", height: "12%" },   // right of the head
-        { x: "5%", y: "31%", width: "31%", height: "12%" },    // left of the head
-      ];
+      var placed: number[] = [];
+      var usedLower = false, usedTop = false;
+      if (bands.lower && stack.length) {
+        const idx = stack[0];
+        slots[idx] = { position: pct(5, p100(bands.lower.top), 90, p100(bands.lower.bottom - bands.lower.top)), z_index: 10 };
+        placed.push(idx); usedLower = true;
+      }
+      var rest = stack.filter((i) => placed.indexOf(i) === -1);
+      if (bands.top && rest.length) {
+        const rows = stackRows(Math.min(rest.length, bands.lower ? 2 : 3), p100(bands.top.top), p100(bands.top.bottom - bands.top.top), 2);
+        rest.slice(0, rows.length).forEach((idx, k) => { slots[idx] = { position: pct(5, rows[k][0], 90, rows[k][1]), z_index: 20 + k }; placed.push(idx); });
+        usedTop = true;
+      }
+      stack.filter((i) => placed.indexOf(i) === -1).forEach((idx) => {
+        console.log(`    ${authored[idx].type}: no band left on the tall speaker frame -- dropped`);
+        slots[idx] = null;
+      });
+      // Accents: beside the head; else the corners of a band no surface
+      // uses; else nowhere (an accent on a face or on type is worse than none).
+      var accentSpots: Array<Record<string, string | number>> = bands.sides.map((sp) => ({
+        x: `${p100(sp.x)}%`, y: `${p100(sp.y)}%`, width: `${p100(sp.width)}%`, height: `${p100(sp.height)}%`,
+      }));
+      if (!accentSpots.length) {
+        const free = bands.top && !usedTop ? bands.top : bands.lower && !usedLower ? bands.lower : null;
+        if (free) accentSpots = [
+          { x: "62%", y: `${p100(free.top)}%`, width: "33%", height: "12%" },
+          { x: "5%", y: `${p100(free.top)}%`, width: "33%", height: "12%" },
+        ];
+      }
       var tallAccent = 0;
       authored.forEach((c, i) => {
         if (ACCENT_TYPES.indexOf(c.type) !== -1) {
-          slots[i] = { position: TALL_ACCENTS[Math.min(tallAccent, TALL_ACCENTS.length - 1)], z_index: 40 + tallAccent };
-          tallAccent++;
+          if (accentSpots.length) {
+            slots[i] = { position: accentSpots[Math.min(tallAccent, accentSpots.length - 1)], z_index: 40 + tallAccent };
+            tallAccent++;
+          } else {
+            console.log(`    ${c.type}: no room beside the face on this frame -- dropped`);
+            slots[i] = null;
+          }
         } else if (HIGH_OVERLAY_TYPES.indexOf(c.type) !== -1) {
-          slots[i] = { position: pct(0, 66, 100, 16), z_index: 38 }; // pills drift below the chin
+          // Pills drift in the band with no surface in it, else under the chin.
+          const band = bands.lower && !usedLower ? bands.lower : bands.top && !usedTop ? bands.top : (bands.lower || bands.top);
+          slots[i] = band ? { position: pct(0, p100(band.top), 100, p100(band.bottom - band.top)), z_index: 38 } : null;
         }
       });
       return slots;
@@ -677,7 +744,8 @@ export function buildAuthoredCompositionScene(
   var isTakeover = speakerBase && (draft as any).transparent_background === false;
   var tallFrame = opts.canvas.height > opts.canvas.width;
   var slots = authoredLayout(authored, !!opts.world, tallFrame, speakerBase, isTakeover,
-    (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar);
+    (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar,
+    (draft as any).take_face, opts.canvas.height / Math.max(1, opts.canvas.width));
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
   // The film's ONE world under every scene (SPEC-world.md). The per-scene

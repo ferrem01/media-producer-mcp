@@ -2765,3 +2765,33 @@ shipped as a check that silently never fires.
 The film's value reaches the assembler as `Scene.motion_physics`, stamped per
 scene by the pipeline exactly the way `entrance` is -- the assembler only ever
 sees one scene, so a film-level fact has to ride on each one.
+
+## The layout follows the face
+
+Two live tall-frame runs (kitchen take, bed take) put graphics on Marc's
+face because the band layout assumed a chest-up selfie: chin at 65%,
+captions in the top 13-30%, accents beside a head that was presumed at the
+middle. The bed take had the face at 61% with the head filling 41% of the
+height; the kitchen take at 49%. One fixed set of bands cannot serve both.
+
+The take now carries a measured `face` (`{cx, cy, size, confidence}` as
+frame fractions). `detectFace` in `core/face-band.ts` samples six frames
+through ffmpeg as raw gray 270x480 and runs the vendored pico.js cascade
+(`src/vendor/pico`, MIT, nenadmarkus/picojs -- no native deps, ~1-2s per
+take) and keeps the median box when at least half the frames agree.
+Measured once at attach and written on the `Take`, so the layout never
+re-opens the file.
+
+`tallSpeakerBands(face, frameRatio)` in `scene-generator.ts` builds the
+slots from that box: the lower band starts just under the chin (only if the
+chin leaves room above the platform UI zone), the top band ends above the
+hairline (only if there is 8% or more to fill), and the side slots hug the
+head at eye level, each only if 18% of the width remains. The authored tall
+branch places surfaces lower-band-first, then top-band rows, drops what
+does not fit (logged), puts accents in the side slots, pills in whichever
+band no surface uses. Without a face the old defaults stand, so a take with
+no face found lays out exactly as before.
+
+The pipeline hands `take_face` to the layout per scene through the draft,
+next to the spine. Existing takes have no face until re-attached; the
+default bands cover them.

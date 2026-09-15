@@ -702,6 +702,9 @@ export interface Take {
   reframed?: { from: string; to: string };
   /** The grade applied at ingest ("soft": gentle skin smoothing and warmth). */
   look?: "natural" | "soft";
+  /** Where the face is, measured at ingest (fractions of the frame; the
+   *  layout builds its bands around it). Absent when none was found. */
+  face?: { cx: number; cy: number; size: number; confidence: number };
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
 }
 

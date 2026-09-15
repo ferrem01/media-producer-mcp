@@ -23,6 +23,7 @@ import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } fro
 import type { Take } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
+import { detectFace } from "./core/face-band.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
@@ -2206,6 +2207,11 @@ Rules:
         }
         await primeTakeWords(tkPeek, tkUrl, config.dataDir);
         const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
+        // Where is the face? Measured once here so the layout can build its
+        // bands around the person instead of assuming a chest-up selfie.
+        let tkFace: Take["face"];
+        try { tkFace = (await detectFace(resolveVideoPath(tkUrl, config.dataDir), tkDurationHint)) || undefined; }
+        catch (e: any) { console.warn(`  take: face detection skipped: ${e?.message || e}`); }
         // The breath before the first word and the reach for the stop button
         // after the last are not part of the take: trim to the speech.
         const deair = tkBody.scene_index === "all" ? null : await deAirTake(tkPeek, tkUrl, tkDurationHint, config.dataDir);
@@ -2229,6 +2235,7 @@ Rules:
           rotation_baked: sanitized?.rotation_baked || undefined,
           reframed: sanitized?.reframed,
           look: sanitized?.look,
+          face: tkFace,
           loudness: sanitized?.loudness,
         };
         // "Record all": one recording, cut where each scene's script begins.
@@ -2263,6 +2270,7 @@ Rules:
           sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
           sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
           sanitized?.look ? `${sanitized.look} look` : "",
+          tkFace ? `face at ${Math.round(tkFace.cx * 100)}%/${Math.round(tkFace.cy * 100)}% (${Math.round(tkFace.size * 100)}% tall)` : "no face found",
           deair && (deair.head > 0 || deair.tail > 0) ? `de-aired -${deair.head}s head / -${deair.tail}s tail` : "",
           sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
           retime ? `${retime.spine.source} spine, ${(retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0)} anchor(s) resolved` : "",

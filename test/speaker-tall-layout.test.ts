@@ -4,10 +4,11 @@ import { buildAuthoredCompositionScene } from "../src/llm/scene-generator.js";
 // Measured live on proj_234d8a01: the wide speaker dock put the composer,
 // captions and URL in a 35%-wide right-third column with 34px type, and the
 // floating pills over the speaker's eyes. A tall frame has no "beside her".
-function build(canvas: { width: number; height: number }, authored: any[], transparent?: boolean) {
+function build(canvas: { width: number; height: number }, authored: any[], transparent?: boolean, face?: { cx: number; cy: number; size: number }) {
   const draft: any = {
     label: "Beat", duration_seconds: 12, purpose: "", visual_notes: "", components: [], beats: [],
     ...(transparent === undefined ? {} : { transparent_background: transparent }),
+    ...(face ? { take_face: face } : {}),
   };
   const res = buildAuthoredCompositionScene("s1", draft, authored, {
     sceneIndex: 0, totalScenes: 2, brandKit: { colors: {}, fonts: [] }, canvas, hasSpeakerTrack: true,
@@ -45,7 +46,7 @@ describe("a speaker scene on a TALL frame", () => {
 
   it("puts accents beside the head and floating pills below the chin, not on the face", () => {
     expect(by("sticker-prop").position).toEqual({ x: "64%", y: "31%", width: "31%", height: "12%" }); // beside the head, off both bands
-    expect(by("floating-pills").position).toEqual({ x: "0%", y: "66%", width: "100%", height: "16%" });
+    expect(by("floating-pills").position).toEqual({ x: "0%", y: "68%", width: "100%", height: "14%" });
   });
 
   it("lets the band layout win over a position the board wrote (measured: a 26%-tall composer on the list under it)", () => {
@@ -102,5 +103,21 @@ describe("a speaker scene on a WIDE frame", () => {
     expect(pctNum(composer.position.width)).toBe(35);
     expect(composer.data.scale).toBeUndefined();
     expect(comps.find((c) => c.type === "floating-pills").position).toMatchObject({ x: 0, y: 0, width: "100%", height: "100%" });
+  });
+});
+
+describe("a speaker scene laid out around a MEASURED face", () => {
+  const BED = { cx: 0.569, cy: 0.61, size: 0.406 };
+  it("with the face low in the frame, every surface goes above the hairline and nothing sits under the chin", () => {
+    const comps = build({ width: 1080, height: 1920 }, AUTHORED, undefined, BED);
+    const by = (t: string) => comps.find((c) => c.type === t);
+    for (const t of ["composer", "reel-caption-lane", "auto-tagged-link"]) {
+      const p = by(t).position;
+      expect(pctNum(p.y)).toBeGreaterThanOrEqual(13);
+      expect(pctNum(p.y) + pctNum(p.height)).toBeLessThanOrEqual(32.1);
+    }
+    expect(pctNum(by("sticker-prop").position.x)).toBe(5);       // the one side with room
+    expect(pctNum(by("floating-pills").position.y)).toBeGreaterThanOrEqual(13); // the pills share the free band, never the face
+    expect(pctNum(by("floating-pills").position.y) + pctNum(by("floating-pills").position.height)).toBeLessThanOrEqual(32.1);
   });
 });
