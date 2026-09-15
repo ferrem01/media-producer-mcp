@@ -52,24 +52,41 @@
       var depth = 0.7 + rnd() * 0.6; // faux-3D: nearer pills bigger + faster
       p.style.transform = 'scale(' + depth.toFixed(2) + ')';
       host.appendChild(p);
-      // Keep the whole pill inside the box: the scatter picks a left edge,
+      var amp = 10 + rnd() * 14; // drift amplitude, host px each way
+      // Keep the whole pill inside the FRAME: the scatter picks a left edge,
       // and a wide label at the right side ran past the canvas (measured:
       // "Calendar" 51px beyond the box, "Mail" 54px past the frame).
       try {
-        // The drift (up to ~24px each way) must fit too, so the margin is
-        // the drift, not a hairline (measured: "Calendar" clipped mid-drift).
-        var hostW = host.clientWidth, pw = p.offsetWidth, hostH = host.clientHeight, ph = p.offsetHeight, m = 26;
-        if (hostW > 0 && pw > 0) {
-          var leftPx = (parseFloat(p.style.left) / 100) * hostW;
-          if (leftPx + pw > hostW - m) p.style.left = Math.max(0, ((hostW - pw - m) / hostW) * 100) + '%';
-          if (leftPx < m) p.style.left = Math.min(parseFloat(p.style.left), (m / hostW) * 100) + '%';
+        var hostW = host.clientWidth, hostH = host.clientHeight;
+        var z = Number(host.style.zoom) || 1;
+        // The host's edges are not the frame's: the camera rig bleeds 20px
+        // past the canvas on every side, so a full-width box starts at -20
+        // (measured: a pill clamped to the host edge still ran 8px off the
+        // frame). Work out where the frame is, in host units.
+        var fl = 0, ft = 0, fr = hostW, fb = hostH;
+        var hr = host.getBoundingClientRect(), cw = document.documentElement.clientWidth, chh = document.documentElement.clientHeight;
+        if (hr.width > 0 && cw > 0) { fl = -hr.left / z; fr = (cw - hr.left) / z; ft = -hr.top / z; fb = (chh - hr.top) / z; }
+        // The drift must fit too, so the margin is the drift, not a hairline
+        // (measured: "Calendar" clipped mid-drift). offsetWidth ignores the
+        // depth scale, which grows the pill about its centre: the VISUAL box
+        // is depth x the measured one.
+        var mw = p.offsetWidth, mh = p.offsetHeight, growX = (mw * (depth - 1)) / 2, growY = (mh * (depth - 1)) / 2;
+        // Under CSS zoom GSAP lands the drift at amp x zoom host px
+        // (measured: amp 11.1 at zoom 1.8 moved the pill 20 host px), so
+        // the margin scales with the zoom too.
+        var pw = mw * depth, ph = mh * depth, mx = amp * z + 4, my = amp * 0.8 * z + 4;
+        if (hostW > 0 && mw > 0) {
+          var leftPx = (parseFloat(p.style.left) / 100) * hostW - growX;
+          if (leftPx + pw > fr - mx) p.style.left = Math.max(0, ((fr - mx - pw + growX) / hostW) * 100) + '%';
+          else if (leftPx < fl + mx) p.style.left = ((fl + mx + growX) / hostW) * 100 + '%';
         }
-        if (hostH > 0 && ph > 0) {
-          var topPx = (parseFloat(p.style.top) / 100) * hostH;
-          if (topPx + ph > hostH - m) p.style.top = Math.max(0, ((hostH - ph - m) / hostH) * 100) + '%';
+        if (hostH > 0 && mh > 0) {
+          var topPx = (parseFloat(p.style.top) / 100) * hostH - growY;
+          if (topPx + ph > fb - my) p.style.top = Math.max(0, ((fb - my - ph + growY) / hostH) * 100) + '%';
+          else if (topPx < ft + my) p.style.top = ((ft + my + growY) / hostH) * 100 + '%';
         }
       } catch (e) { /* layout not measurable yet: keep the scatter */ }
-      return { el: p, phase: rnd() * Math.PI * 2, depth: depth, amp: 10 + rnd() * 14 };
+      return { el: p, phase: rnd() * Math.PI * 2, depth: depth, amp: amp };
     });
 
     var at = Math.max(0, Number(data.at) || 0.3);

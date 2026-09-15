@@ -439,11 +439,17 @@ export function tallSpeakerBands(face: TakeFace | undefined, frameRatio = 16 / 9
   // narrower than it looks on a tall frame, and the head is narrower still.
   const halfW = face.size * 0.5 * frameRatio * 0.72;
   const y = r3(Math.max(0.13, Math.min(0.70, face.cy - 0.06)));
+  // A stamp at phone scale fits itself to its slot: below ~26% of the width
+  // it shrinks past legibility (measured live: "QUOTIENT" at 32px in an
+  // 18% slot). A side that narrow is no slot; a second accent stacks under
+  // the first on the side that has room instead.
+  const MIN_SIDE = 0.26;
   const sides: Array<{ x: number; y: number; width: number; height: number }> = [];
   const rx = r3(Math.max(0.5, face.cx + halfW - 0.05));
-  if (0.95 - rx >= 0.18) sides.push({ x: rx, y, width: r3(0.95 - rx), height: 0.12 });
+  if (r3(0.95 - rx) >= MIN_SIDE) sides.push({ x: rx, y, width: r3(0.95 - rx), height: 0.12 });
   const lx = r3(Math.min(0.5, face.cx - halfW + 0.05));
-  if (lx - 0.05 >= 0.18) sides.push({ x: 0.05, y, width: r3(lx - 0.05), height: 0.12 });
+  if (r3(lx - 0.05) >= MIN_SIDE) sides.push({ x: 0.05, y, width: r3(lx - 0.05), height: 0.12 });
+  if (sides.length === 1 && y + 0.25 <= 0.82) sides.push({ ...sides[0], y: r3(y + 0.13) });
   return { lower, top, sides };
 }
 

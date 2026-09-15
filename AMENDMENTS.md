@@ -2823,3 +2823,27 @@ markers are never words: `scriptWords` drops them, so anchors, record-all
 cuts and the speaking-pace estimate never see "(pause)". The storyboard
 builder's SPEAKER contract now asks for the notation and tells the LLM to
 budget the scene for it. Old single-line scripts read exactly as before.
+
+## Two accent-level fixes from the v4 film
+
+Measured on proj_7c8380c5 after the face-aware layout landed.
+
+"Mail" still clipped the right edge. Two causes, one in the pill and one
+in the stage. The clamp read the pill's `offsetWidth`, which ignores the
+depth `scale()` that grows a near pill about its centre by up to 30%; and
+its left-edge push was a `Math.min` no-op. Deeper: the clamp measured
+against the HOST, and a full-width component's host is not the frame --
+the camera rig bleeds 20px past the canvas on every side, so a 0-100% box
+starts at -20 and ends at 1100. The pill now works out where the frame is
+in host units from its own bounding rect, keeps the visual box (measured x
+depth) inside it, and uses its own drift amplitude as the margin. Under
+CSS `zoom`, GSAP lands a translate of `amp` at amp x zoom host px
+(measured: amp 11.1 at zoom 1.8 moved the pill 20 host px), so the margin
+scales with the zoom. Verified over 30 frames across three seeds: every
+pill inside 1080 at every phase of the drift.
+
+"QUOTIENT" beside the head was 32px tall: the stamp fits itself to its
+slot, and the right of that head left 18% of the width. A side slot now
+needs 26% (below that the stamp shrinks past legibility); when only one
+side has room, the second accent stacks under the first on that side
+instead of squeezing into the narrow one.

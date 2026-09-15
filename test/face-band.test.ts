@@ -39,15 +39,20 @@ describe("tall speaker bands around the person", () => {
     expect(b.lower!.bottom).toBe(0.82);
     expect(b.top).not.toBeNull();
     expect(b.top!.bottom).toBeLessThanOrEqual(KITCHEN.cy - KITCHEN.size * 0.5); // above the hairline
+    // The right of this head leaves 21%: too narrow for a stamp, so both
+    // accent slots stack on the left, where there is 30%.
     expect(b.sides.length).toBe(2);
-    for (const sp of b.sides) { expect(sp.width).toBeGreaterThanOrEqual(0.18); expect(sp.y).toBeLessThan(KITCHEN.cy); }
+    for (const sp of b.sides) { expect(sp.width).toBeGreaterThanOrEqual(0.26); expect(sp.x).toBe(0.05); }
+    expect(b.sides[0].y).toBeLessThan(KITCHEN.cy);
+    expect(b.sides[1].y).toBeCloseTo(b.sides[0].y + 0.13, 3);
   });
 
   it("low camera, face at 61%: no lower band (the chin is at 79%), the top band takes everything, one side only", () => {
     const b = tallSpeakerBands(BED, 16 / 9);
     expect(b.lower).toBeNull();
     expect(b.top).toEqual({ top: 0.13, bottom: 0.32 });
-    expect(b.sides.length).toBe(1);
-    expect(b.sides[0].x).toBe(0.05);                        // the left has room; the right does not
+    expect(b.sides.length).toBe(2);
+    expect(b.sides.every((sp) => sp.x === 0.05)).toBe(true); // the left has room; the right does not: both rows stack there
+    expect(b.sides[1].y).toBeCloseTo(b.sides[0].y + 0.13, 3);
   });
 });
