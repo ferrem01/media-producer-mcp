@@ -11,8 +11,8 @@ import { getTranscript, whisperAvailable, snapLeadingWords, snapWordsOutOfSilenc
 import { getWaveformPeaks } from "./waveform.js";
 import { detectSilence } from "./idle-silence.js";
 import { resolveVideoPath } from "./video-path.js";
-import { activeTake } from "./take-needs.js";
-import { assertedSpine, measuredSpine, applySpine, type Spine, type ResolveReport } from "./word-anchors.js";
+import { activeTake, attachTake } from "./take-needs.js";
+import { assertedSpine, measuredSpine, applySpine, splitByScripts, type Spine, type ResolveReport } from "./word-anchors.js";
 
 const dataDirOf = (dataDir?: string) => dataDir || process.env.MP_DATA_DIR || "/data/media-producer";
 
@@ -23,7 +23,7 @@ export async function wordsForTake(project: Project, take: Take, dataDir?: strin
   const file = resolveVideoPath(take.source, dd);
   // One cache per take: the project-level transcript.json is the Studio
   // lane's and is keyed to whatever speaker clip it looked at last.
-  const cacheDir = path.join(dd, project.tenant_id, "projects", project.project_id, "thumbs", take.id);
+  const cacheDir = path.join(dd, project.tenant_id, "projects", project.project_id, "thumbs", `take-${path.basename(take.source).replace(/[^a-zA-Z0-9._-]/g, "_")}`);
   const tr = await getTranscript(file, cacheDir);
   let segs = tr.segments;
   try {
@@ -51,16 +51,61 @@ export async function spineForScene(
   dataDir?: string,
 ): Promise<Spine> {
   const take = project ? activeTake(project, sceneIndex) : undefined;
-  const dur = take?.duration && take.duration > 0 ? take.duration : duration;
+  const dur = takeDuration(take) || duration;
   if (take) {
     try {
       const words = await wordsForTake(project!, take, dataDir);
-      if (words && words.length) return measuredSpine(words, dur);
+      if (words && words.length) return measuredSpine(windowWords(words, take), dur);
     } catch (e: any) {
       console.warn(`  [spine] scene ${sceneIndex + 1}: transcript failed (${e?.message || e}) -- asserting from the script over the take's length`);
     }
   }
   return assertedSpine(script, dur);
+}
+
+/** The scene's share of the recording: the trimmed window's length, else
+ *  the whole take. */
+export function takeDuration(take?: Take): number {
+  if (!take) return 0;
+  if (take.trim_end != null) return Math.max(0, round2(take.trim_end - (take.trim_start || 0)));
+  return take.duration && take.duration > 0 ? take.duration : 0;
+}
+
+/** Words inside the take's window, re-based to the window's start. */
+export function windowWords(words: Array<{ text: string; start: number; end: number }>, take: Take): Array<{ text: string; start: number; end: number }> {
+  const from = take.trim_start || 0;
+  const to = take.trim_end != null ? take.trim_end : Infinity;
+  if (!from && to === Infinity) return words;
+  return words
+    .filter((w) => w.start >= from - 0.05 && w.start < to)
+    .map((w) => ({ text: w.text, start: Math.max(0, round3(w.start - from)), end: Math.max(0, round3(Math.min(w.end, to) - from)) }));
+}
+
+/**
+ * "Record all": one recording for every scene with lines. Transcribes it
+ * once, cuts it where each scene's script begins, and attaches one
+ * windowed take per scene. Falls back to proportional cuts without
+ * whisper. Returns the takes attached, in scene order.
+ */
+export async function attachTakeAcrossScenes(
+  project: Project,
+  base: Omit<Take, "id" | "scene_index">,
+  dataDir?: string,
+): Promise<{ takes: Take[]; windows: Array<{ start: number; end: number }>; measured: boolean }> {
+  const scenes = (project.storyboard?.scenes || []) as any[];
+  const indexes = scenes.map((sc, i) => (String(sc.voiceover_text || "").trim() ? i : -1)).filter((i) => i >= 0);
+  if (!indexes.length) throw new Error("no scene on this board has spoken lines to cut by");
+  const probe: Take = { id: "probe", scene_index: -1, ...base };
+  let words: Array<{ text: string; start: number; end: number }> | null = null;
+  try { words = await wordsForTake(project, probe, dataDir); } catch { words = null; }
+  const total = base.duration && base.duration > 0 ? base.duration : (words?.length ? words[words.length - 1].end : 0);
+  const windows = splitByScripts(indexes.map((i) => String(scenes[i].voiceover_text || "")), words || [], total);
+  const takes: Take[] = [];
+  indexes.forEach((sceneIndex, k) => {
+    const w = windows[k];
+    takes.push(attachTake(project, { ...base, scene_index: sceneIndex, trim_start: w.start, trim_end: w.end, duration: round2(w.end - w.start) }));
+  });
+  return { takes, windows, measured: !!(words && words.length) };
 }
 
 export interface RetimeResult {
@@ -99,3 +144,4 @@ export async function retimeScene(project: Project, sceneIndex: number, dataDir?
 }
 
 function round2(n: number): number { return Math.round(n * 100) / 100; }
+function round3(n: number): number { return Math.round(n * 1000) / 1000; }

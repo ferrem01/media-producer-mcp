@@ -56,7 +56,8 @@ export function ensureSpeakerNeeds(project: Project): boolean {
 export function activeTake(project: Project, sceneIndex: number): Take | undefined {
   const clip = (project.speaker_track?.clips || []).find((c) => c.scene_index === sceneIndex);
   if (!clip) return undefined;
-  return (project.takes || []).find((t) => t.source === clip.source && t.scene_index === sceneIndex);
+  // Newest record wins when the same source was attached more than once.
+  return [...(project.takes || [])].reverse().find((t) => t.source === clip.source && t.scene_index === sceneIndex);
 }
 
 /** Scenes (0-based) whose take need is still open. */
@@ -78,7 +79,11 @@ export function attachTake(project: Project, take: Omit<Take, "id">): Take {
   const id = `take_${(project.takes || []).length}`;
   const rec: Take = { id, ...take };
   project.takes = [...(project.takes || []), rec];
-  const clip: SpeakerTrackClip = { source: rec.source, start: 0, scene_index: rec.scene_index };
+  const clip: SpeakerTrackClip = {
+    source: rec.source, start: 0, scene_index: rec.scene_index,
+    ...(rec.trim_start != null ? { trim_start: rec.trim_start } : {}),
+    ...(rec.trim_end != null ? { trim_end: rec.trim_end } : {}),
+  };
   const others = (project.speaker_track?.clips || []).filter((c) => c.scene_index !== rec.scene_index && c.scene_index !== undefined);
   const clips = [...others, clip].sort((a, b) => (a.scene_index ?? 0) - (b.scene_index ?? 0));
   project.speaker_track = { clips };

@@ -191,4 +191,45 @@ export function clearAnchorsFor(component: { anchors?: AnchorMap }, dataKeys: st
   return n;
 }
 
+/**
+ * "Record all": one recording covers several scenes. Cut it where each
+ * scene's script begins -- the first words of scene i, found in the
+ * transcript after the previous cut. A scene whose opening words are not
+ * found gets a proportional share of what is left. Returns one
+ * [start, end) window per script, in source seconds.
+ */
+export function splitByScripts(scripts: string[], words: SpineWord[], total: number): Array<{ start: number; end: number }> {
+  const n = scripts.length;
+  if (!n) return [];
+  const toks = words.map((w) => normalizeToken(w.text));
+  const cuts: number[] = [0];
+  let cursor = 0;
+  for (let i = 1; i < n; i++) {
+    const head = String(scripts[i] || "").split(/\s+/).map(normalizeToken).filter(Boolean).slice(0, 3);
+    let at: number | null = null;
+    if (head.length) {
+      for (let k = cursor; k < toks.length; k++) {
+        if (toks[k] !== head[0]) continue;
+        // Confirm with the next word when the script has one and the
+        // transcript still has one (a single common word is a weak match).
+        if (head.length > 1 && k + 1 < toks.length && toks[k + 1] !== head[1]) continue;
+        at = Math.max(cuts[cuts.length - 1], round(words[k].start - 0.1));
+        cursor = k;
+        break;
+      }
+    }
+    if (at === null) {
+      // Proportional fallback for the rest of the scripts from here.
+      const prev = cuts[cuts.length - 1];
+      const weights = scripts.slice(i - 1).map((sc) => Math.max(1, String(sc || "").split(/\s+/).filter(Boolean).length));
+      const wsum = weights.reduce((a, b) => a + b, 0);
+      at = round(prev + ((total - prev) * weights[0]) / wsum);
+      // Move the cursor past the words that fall into the previous window.
+      while (cursor < words.length && words[cursor].start < at) cursor++;
+    }
+    cuts.push(at);
+  }
+  return cuts.map((c, i) => ({ start: c, end: i + 1 < cuts.length ? cuts[i + 1] : round(total) }));
+}
+
 function round(n: number): number { return Math.round(n * 1000) / 1000; }

@@ -155,6 +155,9 @@ export function getTakeHtml(): string {
   // ?scene=N (0-based): record ONE scene's lines; without it the whole board
   // is prompted and the take attaches to the first open need.
   var sceneIndex = /^\d+$/.test(qp.get('scene') || '') ? Number(qp.get('scene')) : -1, sceneLabel = '';
+  // ?scene=all: one recording through every scene; the server cuts it per
+  // scene where each scene's script begins.
+  var recordAll = qp.get('scene') === 'all';
   var WORDS_PER_SEC = 2.4;
 
   function show(id) {
@@ -416,7 +419,7 @@ export function getTakeHtml(): string {
       fetch(withToken('/api/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
-          scene_index: sceneIndex >= 0 ? sceneIndex : undefined,
+          scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
           width: capture === 'canvas' ? 1080 : trackW, height: capture === 'canvas' ? 1920 : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
         .then(function (j) {

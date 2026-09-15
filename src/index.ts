@@ -17,9 +17,11 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
+import { getBoardHtml } from "./board-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } from "./core/take-needs.js";
-import { retimeScene, type RetimeResult } from "./core/measured-spine.js";
+import type { Take } from "./core/types.js";
+import { retimeScene, attachTakeAcrossScenes, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
@@ -778,6 +780,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // the app shell is served here -- every byte of data stays token/
       // cookie-gated behind the middleware.
       if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
+        // One link goes around: on a phone the Studio link opens the BOARD
+        // (scenes, script, record/upload, build, render); the desktop app is
+        // the editing surface. ?desktop=1 forces the desktop app anywhere.
+        const ua = String(req.headers["user-agent"] || "");
+        if (urlPath.startsWith("/studio") && /iPhone|iPad|iPod|Android.*Mobile|Mobile Safari/.test(ua) && !/[?&]desktop=1/.test(url)) {
+          const q = url.includes("?") ? url.slice(url.indexOf("?")) : "";
+          res.writeHead(302, { Location: "/board" + q });
+          res.end();
+          return;
+        }
         const t0 = extractToken(req);
         if (isAuthEnabled() && !(t0 && validateToken(t0))) {
           res.writeHead(302, { Location: "/auth/google/login?return_to=" + encodeURIComponent(url) });
@@ -834,6 +846,12 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // ── Take page: the phone booth for a speaker film. The board's script
       // as a teleprompter over the front camera; record, review, upload,
       // attach as the speaker base. Same token-in-the-link auth as /upload. ──
+      if (urlPath === "/board") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getBoardHtml());
+        return;
+      }
+
       if (urlPath === "/take") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getTakeHtml());
@@ -2168,6 +2186,7 @@ Rules:
         if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         ensureSpeakerNeeds(tkProjectObj);
         const open = openTakeNeeds(tkProjectObj);
+        const recordAll = tkBody.scene_index === "all";
         const sceneIndex = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0
           ? Number(tkBody.scene_index) : (open[0] ?? 0);
         let sanitized: TakeSanitizeResult | undefined;
@@ -2177,8 +2196,7 @@ Rules:
           console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
         }
         const duration = Number(tkBody.duration);
-        const take = attachTake(tkProjectObj, {
-          scene_index: sceneIndex,
+        const takeBase = {
           source: tkUrl,
           recorded_at: new Date().toISOString(),
           duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100
@@ -2191,20 +2209,33 @@ Rules:
           rotation_baked: sanitized?.rotation_baked || undefined,
           reframed: sanitized?.reframed,
           loudness: sanitized?.loudness,
-        });
+        };
+        // "Record all": one recording, cut where each scene's script begins.
+        let takes: Take[];
+        let windows: Array<{ start: number; end: number }> | undefined;
+        if (recordAll) {
+          try {
+            const split = await attachTakeAcrossScenes(tkProjectObj, takeBase, config.dataDir);
+            takes = split.takes; windows = split.windows;
+          } catch (e: any) { jsonResponse(res, 400, { error: `record all: ${e?.message || e}` }); return; }
+        } else {
+          takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase })];
+        }
         // The take is now the scene's clock: transcribe it and re-time every
         // word-anchored overlay (storyboard entry and built scene alike).
-        let retime: RetimeResult | undefined;
-        try {
-          retime = await retimeScene(tkProjectObj, sceneIndex, config.dataDir);
-        } catch (e: any) {
-          console.warn(`  take: re-time skipped for scene ${sceneIndex + 1}: ${e?.message || e}`);
+        const retimes: RetimeResult[] = [];
+        for (const t of takes) {
+          try { retimes.push(await retimeScene(tkProjectObj, t.scene_index, config.dataDir)); }
+          catch (e: any) { console.warn(`  take: re-time skipped for scene ${t.scene_index + 1}: ${e?.message || e}`); }
         }
+        const retime = retimes[0];
+        const take = takes[0];
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
-        const released = resolveTakeWaiters(tkTenant, tkProject, take);
+        let released = 0;
+        for (const t of takes) released += resolveTakeWaiters(tkTenant, tkProject, t);
         const tkNotes = [
-          `scene ${sceneIndex + 1}`,
+          recordAll ? `all: ${takes.map((t) => `scene ${t.scene_index + 1} [${t.trim_start}-${t.trim_end}s]`).join(", ")}` : `scene ${sceneIndex + 1}`,
           take.duration ? `${take.duration}s` : "",
           sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
           sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
@@ -2214,7 +2245,7 @@ Rules:
         ].filter(Boolean).join(", ");
         console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)} (${tkNotes})`);
         jsonResponse(res, 200, {
-          ok: true, project_id: tkProject, take, speaker_track: tkProjectObj.speaker_track,
+          ok: true, project_id: tkProject, take, takes, windows, speaker_track: tkProjectObj.speaker_track,
           open_needs: openTakeNeeds(tkProjectObj),
           spine: retime ? { source: retime.spine.source, duration: retime.duration, words: retime.spine.words.length,
             resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0),

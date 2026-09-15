@@ -48,9 +48,25 @@ Studio drops the anchor it overrides. The storyboard builder's SPEAKER block
 now asks for anchors instead of seconds. `scene.spine` records which clock the
 scene was last resolved against.
 
-Still by hand after phase 2: nothing on this project's cut -- but the phone
-board view (phase 3) is not built, so the Studio link on a phone is still the
-desktop app.
+**Phase 3 (same PR): the board in your hand.** `/board?tenant&project&token`
+(`src/board-page.ts`): one card per storyboard scene -- still, script, the
+take need as a pill, Record (the booth for THAT scene) and Upload (the same
+push path as the booth, attached with `scene_index`). "Record all" runs the
+booth through every scene (`/take?scene=all`); the attach handler transcribes
+once, cuts the recording where each scene's script begins
+(`splitByScripts`, second-word confirmation, proportional fallback), and
+attaches one WINDOWED take per scene (`trim_start/trim_end` on the take and
+its clip; the base builder already honours trims; the spine re-bases the
+words to the window). Build is enabled once every need is filled, Render once
+built, both poll their job; a rendered film plays inline. `/studio` on a phone
+302s to `/board` (`?desktop=1` forces the desktop app), so the one link Marc
+passes around is still the Studio link. Verified in a headless iPhone against
+a local server; the real phone is Marc's next test.
+
+Not built: a project- or need-scoped token for handing a link to someone who
+is not the tenant (design it in when a second human records); the desktop
+Studio still reads `speaker_track.clips[0]` only (a multi-scene speaker film
+shows its first clip in the desktop lane); auto-build on arrival.
 
 ## 2026-09-15 — Take ingest sanitizer (orientation baked, reframe, loudness)
 

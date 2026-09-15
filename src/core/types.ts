@@ -694,6 +694,10 @@ export interface Take {
    *  or 'raw' (the camera track as the browser recorded it); 'attach' for a
    *  file attached by hand through the tools. */
   capture?: string;
+  /** Window into the source when one recording covers several scenes
+   *  ("Record all"): this scene's slice, in source seconds. */
+  trim_start?: number;
+  trim_end?: number;
   rotation_baked?: number;
   reframed?: { from: string; to: string };
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };

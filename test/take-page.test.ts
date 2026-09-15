@@ -110,7 +110,7 @@ describe("the server side", () => {
     // the take is attached per scene through the needs module, not by hand
     expect(block).toMatch(/attachTake\(tkProjectObj, \{/);
     expect(block).toMatch(/scene_index: sceneIndex/);
-    expect(block).toMatch(/resolveTakeWaiters\(tkTenant, tkProject, take\)/);
+    expect(block).toMatch(/resolveTakeWaiters\(tkTenant, tkProject, t\)/);      // every attached take releases its waiters
   });
 
   it("records every take on the project, one active per scene (SPEC-take-flow.md)", async () => {
@@ -123,6 +123,6 @@ describe("the server side", () => {
   it("records one scene when the link says which, and tells the server", () => {
     const html = getTakeHtml();
     expect(html).toMatch(/qp\.get\('scene'\)/);
-    expect(html).toMatch(/scene_index: sceneIndex >= 0 \? sceneIndex : undefined/);
+    expect(html).toMatch(/scene_index: recordAll \? 'all' : \(sceneIndex >= 0 \? sceneIndex : undefined\)/);
   });
 });

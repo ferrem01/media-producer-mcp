@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  assertedSpine, measuredSpine, resolveAnchor, extractAnchors, resolveComponent, applySpine, clearAnchorsFor, normalizeToken,
+  assertedSpine, measuredSpine, resolveAnchor, extractAnchors, resolveComponent, applySpine, clearAnchorsFor, normalizeToken, splitByScripts,
 } from "../src/core/word-anchors.js";
-import { retimeSceneWith } from "../src/core/measured-spine.js";
+import { retimeSceneWith, windowWords, takeDuration } from "../src/core/measured-spine.js";
 
 const SCRIPT = "You're juggling a dozen tools and still guessing. Quotient fixes that. One answer, not another dashboard. Go to getquotient.ai.";
 
@@ -135,5 +135,43 @@ describe("re-timing a scene to its take", () => {
     expect(project.storyboard.scenes[0].components[0].data).toEqual({ at: 13.2, strike_at: 13.9 });
     expect(r.storyboard?.resolved).toBe(2);
     expect(r.built?.resolved).toBe(2);
+  });
+});
+
+describe("record all: cutting one recording into scenes", () => {
+  const words = [
+    ["You're", 0.9], ["juggling", 1.2], ["tools.", 1.8], ["Quotient", 2.5], ["fixes", 2.9], ["that.", 3.1],
+    ["How's", 4.0], ["this", 4.2], ["campaign", 4.5], ["doing?", 5.0],
+    ["Go", 6.0], ["to", 6.2], ["getquotient.ai.", 6.4],
+  ].map(([t, s]) => ({ text: t as string, start: s as number, end: (s as number) + 0.2 }));
+
+  it("cuts where each scene's opening words are heard, a beat before the word", () => {
+    const w = splitByScripts(["You're juggling tools. Quotient fixes that.", "How's this campaign doing?", "Go to getquotient.ai."], words, 8);
+    expect(w).toEqual([{ start: 0, end: 3.9 }, { start: 3.9, end: 5.9 }, { start: 5.9, end: 8 }]);
+  });
+
+  it("confirms with the second word so a common opener does not cut early", () => {
+    // "this" appears in scene 1 and opens scene 2: the pair "this year" only matches later.
+    const ws = [["Try", 0.5], ["this", 0.8], ["now.", 1.0], ["This", 2.0], ["year", 2.3], ["we", 2.6]]
+      .map(([t, s]) => ({ text: t as string, start: s as number, end: (s as number) + 0.2 }));
+    expect(splitByScripts(["Try this now.", "This year we grow."], ws, 4)).toEqual([{ start: 0, end: 1.9 }, { start: 1.9, end: 4 }]);
+  });
+
+  it("falls back to a proportional cut for a scene whose words were never heard", () => {
+    const w = splitByScripts(["You're juggling tools.", "Synergy paradigm shift.", "Go to getquotient.ai."], words, 8);
+    expect(w[0].start).toBe(0);
+    expect(w[1].start).toBeGreaterThan(0);
+    expect(w[2].start).toBe(5.9);                 // the third scene is still found by its words
+    expect(w[2].end).toBe(8);
+  });
+});
+
+describe("windowed takes", () => {
+  it("re-base a scene's slice of the recording to the slice's start", () => {
+    const words = [{ text: "a", start: 1, end: 1.2 }, { text: "b", start: 4.0, end: 4.3 }, { text: "c", start: 7, end: 7.5 }];
+    const take: any = { id: "t", scene_index: 1, source: "/x.mp4", recorded_at: "", trim_start: 3.9, trim_end: 5.9 };
+    expect(windowWords(words, take)).toEqual([{ text: "b", start: 0.1, end: 0.4 }]);
+    expect(takeDuration(take)).toBe(2);
+    expect(takeDuration({ ...take, trim_start: undefined, trim_end: undefined, duration: 17.06 })).toBe(17.06);
   });
 });
