@@ -104,14 +104,25 @@ describe("the server side", () => {
     const src = await read("../src/index.ts");
     const at = src.indexOf("const takeMatch = urlPath.match");
     expect(at).toBeGreaterThan(0);
-    const block = src.slice(at, at + 2500);
+    const block = src.slice(at, at + 5000);
     expect(block).toMatch(/expectedPrefix = `\/assets\/\$\{tkTenant\}\/projects\/\$\{tkProject\}\/assets\/`/);
     expect(block).toMatch(/tkUrl\.includes\("\.\."\)/);
-    expect(block).toMatch(/speaker_track = \{ clips: \[\{ source: tkUrl, start: 0 \}\] \}/);
+    // the take is attached per scene through the needs module, not by hand
+    expect(block).toMatch(/attachTake\(tkProjectObj, \{/);
+    expect(block).toMatch(/scene_index: sceneIndex/);
+    expect(block).toMatch(/resolveTakeWaiters\(tkTenant, tkProject, t\)/);      // every attached take releases its waiters
   });
 
-  it("records the take on the project for the measured-spine step that follows", async () => {
+  it("records every take on the project, one active per scene (SPEC-take-flow.md)", async () => {
     const types = await read("../src/core/types.ts");
-    expect(types).toMatch(/take\?: \{\s*source: string;\s*recorded_at: string;/);
+    expect(types).toMatch(/takes\?: Take\[\];/);
+    expect(types).toMatch(/export interface Take \{[\s\S]*scene_index: number;[\s\S]*capture\?: string;/);
+    expect(types).not.toMatch(/\n  take\?: \{/);
+  });
+
+  it("records one scene when the link says which, and tells the server", () => {
+    const html = getTakeHtml();
+    expect(html).toMatch(/qp\.get\('scene'\)/);
+    expect(html).toMatch(/scene_index: recordAll \? 'all' : \(sceneIndex >= 0 \? sceneIndex : undefined\)/);
   });
 });

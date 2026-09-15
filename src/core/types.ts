@@ -162,6 +162,9 @@ export interface SceneComponent {
   id: string;
   type: string;
   data: Record<string, unknown>;
+  /** Word anchors by data path (core/word-anchors.ts): the numeric field in
+   *  `data` holds the resolved time; this says which spoken word it follows. */
+  anchors?: Record<string, { word: string; occurrence?: number; edge?: "start" | "end"; offset?: number }>;
   position?: ComponentPosition;
   z_index?: number;
   pose?: ComponentPose;
@@ -369,6 +372,9 @@ export interface Scene {
    *  when critique was skipped. */
   quality?: SceneQuality;
   audio_hints?: SceneAudioHints;
+  /** The word clock the scene's anchors were last resolved against:
+   *  asserted (script estimate) or measured (the take's transcript). */
+  spine?: { source: "asserted" | "measured"; words: Array<{ text: string; start: number; end: number }>; duration: number };
   /** When set, all components are constrained to this region of the frame.
    *  Used with speaker track so content appears beside the speaker. */
   content_region?: ContentRegion;
@@ -566,24 +572,10 @@ export interface Project {
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
-  /** The delivered take for a speaker film, recorded from the /take page (or
-   *  attached by hand). speaker_track points at the same file; this records
-   *  what was recorded and when, for the measured-spine re-time that follows. */
-  take?: {
-    source: string;
-    recorded_at: string;
-    duration?: number;
-    mime?: string;
-    width?: number;
-    height?: number;
-    /** How the booth captured it: 'canvas' (portrait pixels drawn by the
-     *  page) or 'raw' (the camera track as the browser recorded it). */
-    capture?: string;
-    /** What the ingest sanitizer did to the file (see core/take-sanitize.ts). */
-    rotation_baked?: number;
-    reframed?: { from: string; to: string };
-    loudness?: { measured_lufs: number; normalized_to_lufs?: number };
-  };
+  /** Every take delivered for this film (the /take page, or a hand attach).
+   *  One take is ACTIVE per scene: the one speaker_track carries. A new take
+   *  for the same scene replaces it there; the older record stays here. */
+  takes?: Take[];
   /** Film-level color grade applied to the final concatenated video for
    *  cross-scene consistency (subtle S-curve + saturation + grain).
    *  "none" disables. The generate pipeline defaults videos to "cinematic". */
@@ -668,6 +660,9 @@ export interface Project {
 export interface SpeakerTrackClip {
   /** Path to the speaker video file */
   source: string;
+  /** The storyboard scene this clip is the base for (0-based). Clips are
+   *  played in scene order; a clip without it is the whole film's base. */
+  scene_index?: number;
   /** Start offset into the source video in seconds (skip dead air) */
   start?: number;
   /** Trim: only use video from this timestamp */
@@ -681,6 +676,31 @@ export interface SpeakerTrackClip {
    *  of truncating the tail. The rate is computed at render time from the
    *  probed source duration -- no manual timecodes. Single-clip bases only. */
   fit?: boolean;
+}
+
+/** A delivered take: what was recorded, for which scene, and what the ingest
+ *  sanitizer did to it (see core/take-sanitize.ts). */
+export interface Take {
+  id: string;
+  /** 0-based storyboard scene index the take fulfils. */
+  scene_index: number;
+  source: string;
+  recorded_at: string;
+  duration?: number;
+  mime?: string;
+  width?: number;
+  height?: number;
+  /** How the booth captured it: 'canvas' (portrait pixels drawn by the page)
+   *  or 'raw' (the camera track as the browser recorded it); 'attach' for a
+   *  file attached by hand through the tools. */
+  capture?: string;
+  /** Window into the source when one recording covers several scenes
+   *  ("Record all"): this scene's slice, in source seconds. */
+  trim_start?: number;
+  trim_end?: number;
+  rotation_baked?: number;
+  reframed?: { from: string; to: string };
+  loudness?: { measured_lufs: number; normalized_to_lufs?: number };
 }
 
 export interface SpeakerTrack {

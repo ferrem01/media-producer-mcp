@@ -9,6 +9,7 @@ import fs from "node:fs/promises";
 import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Project, OutputFormat, Canvas, BrandKit, Scene, Storyboard, StoryboardScene } from "../core/types.js";
+import { ensureSpeakerNeeds } from "../core/take-needs.js";
 import { type Frame, FRAME_SPECS, frameFromDims } from "../core/types.js";
 import {
   projectsDir,
@@ -116,6 +117,14 @@ export function migrateProject(p: any): Project {
   }
   const t = p?.treatment;
   if (t && t.filmGrammar === "speaker-screencast") t.filmGrammar = "screencast";
+  // The single `take` record became `takes[]`, one active per scene.
+  if (p && p.take && !Array.isArray(p.takes)) {
+    p.takes = [{ id: "take_0", scene_index: 0, capture: "raw", ...p.take }];
+    delete p.take;
+  }
+  // A speaker board always carries its take needs (idempotent; boards saved
+  // before needs existed get them on first load).
+  if (p && p.storyboard) ensureSpeakerNeeds(p as Project);
   return p as Project;
 }
 

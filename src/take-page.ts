@@ -152,6 +152,12 @@ export function getTakeHtml(): string {
   var tenant = qp.get('tenant') || '';
   var project = qp.get('project') || '';
   var token = qp.get('token') || '';
+  // ?scene=N (0-based): record ONE scene's lines; without it the whole board
+  // is prompted and the take attaches to the first open need.
+  var sceneIndex = /^\d+$/.test(qp.get('scene') || '') ? Number(qp.get('scene')) : -1, sceneLabel = '';
+  // ?scene=all: one recording through every scene; the server cuts it per
+  // scene where each scene's script begins.
+  var recordAll = qp.get('scene') === 'all';
   var WORDS_PER_SEC = 2.4;
 
   function show(id) {
@@ -191,10 +197,12 @@ export function getTakeHtml(): string {
     .then(function (r) { if (!r.ok) throw new Error('Could not load the project (' + r.status + '). Is the link still valid?'); return r.json(); })
     .then(function (p) {
       projectName = p.name || project;
-      var scenes = (p.storyboard && p.storyboard.scenes) || [];
+      var allScenes = (p.storyboard && p.storyboard.scenes) || [];
+      var scenes = sceneIndex >= 0 && allScenes[sceneIndex] ? [allScenes[sceneIndex]] : allScenes;
+      sceneLabel = sceneIndex >= 0 && allScenes[sceneIndex] ? ('Scene ' + (sceneIndex + 1) + (allScenes[sceneIndex].label ? ' · ' + allScenes[sceneIndex].label : '')) : '';
       cues = buildCues(scenes);
       total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
-      $('title').textContent = projectName;
+      $('title').textContent = projectName + (sceneLabel ? ' — ' + sceneLabel : '');
       var g = (p.treatment && p.treatment.filmGrammar) || '';
       var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
       $('subtitle').textContent = beats
@@ -205,7 +213,7 @@ export function getTakeHtml(): string {
       scenes.forEach(function (s, i) {
         var t = String(s.voiceover_text || '').trim(); if (!t) return;
         var d = document.createElement('p'); d.className = 'beat';
-        var b = document.createElement('b'); b.textContent = 'Beat ' + (i + 1) + (s.duration_seconds ? ' · ' + Number(s.duration_seconds).toFixed(0) + 's' : '');
+        var b = document.createElement('b'); b.textContent = (sceneLabel ? 'Lines' : 'Beat ' + (i + 1)) + (s.duration_seconds ? ' · ' + Number(s.duration_seconds).toFixed(0) + 's' : '');
         d.appendChild(b); d.appendChild(document.createTextNode(t)); sc.appendChild(d);
       });
       $('recordBtn').disabled = false;
@@ -411,6 +419,7 @@ export function getTakeHtml(): string {
       fetch(withToken('/api/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
+          scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
           width: capture === 'canvas' ? 1080 : trackW, height: capture === 'canvas' ? 1920 : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
         .then(function (j) {

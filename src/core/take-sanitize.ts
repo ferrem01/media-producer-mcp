@@ -25,7 +25,7 @@
  *     LUFS; dialogue that will carry a film wants about -16. Two-pass linear
  *     loudnorm so the take is not crushed.
  *
- * Everything done lands on `project.take` next to the file it describes.
+ * Everything done lands on the take's record in `project.takes[]`.
  */
 
 import { execFile } from "node:child_process";

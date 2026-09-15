@@ -761,6 +761,9 @@ export function buildAuthoredCompositionScene(
     }
     components.push({
       id, type: c.type, data, position: hasAuthoredPos ? authoredPos : lay.position, z_index: lay.z_index,
+      // Word anchors ride along: the numbers in data are their resolved
+      // values, and a take arriving later re-resolves them in place.
+      ...((c as any).anchors ? { anchors: (c as any).anchors } : {}),
       ...(normalizeAnim((c as any).enter) ? { enter: normalizeAnim((c as any).enter)! } : {}),
       ...(normalizeAnim((c as any).exit) ? { exit: normalizeAnim((c as any).exit)! } : {}),
     });
@@ -773,6 +776,7 @@ export function buildAuthoredCompositionScene(
     };
   }
   var scene: Scene = {
+    ...((draft as any).spine ? { spine: (draft as any).spine } : {}),
     id: sceneId,
     label: draft.label,
     duration_seconds: draft.duration_seconds || 8,

@@ -17,7 +17,12 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
+import { getBoardHtml } from "./board-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
+import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } from "./core/take-needs.js";
+import type { Take } from "./core/types.js";
+import { retimeScene, attachTakeAcrossScenes, type RetimeResult } from "./core/measured-spine.js";
+import { clearAnchorsFor } from "./core/word-anchors.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
@@ -775,6 +780,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // the app shell is served here -- every byte of data stays token/
       // cookie-gated behind the middleware.
       if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
+        // One link goes around: on a phone the Studio link opens the BOARD
+        // (scenes, script, record/upload, build, render); the desktop app is
+        // the editing surface. ?desktop=1 forces the desktop app anywhere.
+        const ua = String(req.headers["user-agent"] || "");
+        if (urlPath.startsWith("/studio") && /iPhone|iPad|iPod|Android.*Mobile|Mobile Safari/.test(ua) && !/[?&]desktop=1/.test(url)) {
+          const q = url.includes("?") ? url.slice(url.indexOf("?")) : "";
+          res.writeHead(302, { Location: "/board" + q });
+          res.end();
+          return;
+        }
         const t0 = extractToken(req);
         if (isAuthEnabled() && !(t0 && validateToken(t0))) {
           res.writeHead(302, { Location: "/auth/google/login?return_to=" + encodeURIComponent(url) });
@@ -831,6 +846,12 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // ── Take page: the phone booth for a speaker film. The board's script
       // as a teleprompter over the front camera; record, review, upload,
       // attach as the speaker base. Same token-in-the-link auth as /upload. ──
+      if (urlPath === "/board") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getBoardHtml());
+        return;
+      }
+
       if (urlPath === "/take") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getTakeHtml());
@@ -2141,12 +2162,14 @@ Rules:
         return;
       }
 
-      // ── API: Direct binary asset upload ──
-      // POST /api/take/{tenant}/{project} {url, duration?, mime?, width?, height?}
+      // ── API: Attach a take ──
+      // POST /api/take/{tenant}/{project} {url, scene_index?, duration?, mime?, width?, height?, capture?}
       // Attach a recorded take (already uploaded to this project's assets) as
-      // the project's speaker base: speaker_track = one clip from 0. The take
-      // page calls this after its upload; the MCP `add` tool does the same
-      // thing by hand. Refuses a URL outside this project's own asset dir so a
+      // the speaker base for ONE scene (default: the first scene whose take
+      // need is open, else scene 0). The file is sanitized in place first
+      // (orientation baked, reframed to the canvas, dialogue loudness); the
+      // scene's need flips to provided; any `take` job waiting on the project
+      // completes. Refuses a URL outside this project's own asset dir so a
       // tenant token cannot point a project at someone else's file.
       const takeMatch = urlPath.match(/^\/api\/take\/([^/]+)\/([^/]+)$/);
       if (takeMatch && method === "POST") {
@@ -2161,19 +2184,19 @@ Rules:
         }
         const tkProjectObj = await loadProject(tkTenant, tkProject);
         if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        const duration = Number(tkBody.duration);
-        // Make the phone's file say one thing to every consumer (orientation
-        // baked, reframed to the canvas, voice at dialogue level) before
-        // anything downstream reads it. A sanitizer failure is logged, not
-        // fatal: the take still attaches.
+        ensureSpeakerNeeds(tkProjectObj);
+        const open = openTakeNeeds(tkProjectObj);
+        const recordAll = tkBody.scene_index === "all";
+        const sceneIndex = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0
+          ? Number(tkBody.scene_index) : (open[0] ?? 0);
         let sanitized: TakeSanitizeResult | undefined;
         try {
           sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkProjectObj.canvas);
         } catch (e: any) {
           console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
         }
-        tkProjectObj.speaker_track = { clips: [{ source: tkUrl, start: 0 }] };
-        tkProjectObj.take = {
+        const duration = Number(tkBody.duration);
+        const takeBase = {
           source: tkUrl,
           recorded_at: new Date().toISOString(),
           duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100
@@ -2182,21 +2205,52 @@ Rules:
           // The file as it now stands (post-sanitize), not what the page saw.
           width: sanitized?.probe.width || Number(tkBody.width) || undefined,
           height: sanitized?.probe.height || Number(tkBody.height) || undefined,
-          capture: typeof tkBody.capture === "string" ? tkBody.capture : undefined,
+          capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw",
           rotation_baked: sanitized?.rotation_baked || undefined,
           reframed: sanitized?.reframed,
           loudness: sanitized?.loudness,
         };
+        // "Record all": one recording, cut where each scene's script begins.
+        let takes: Take[];
+        let windows: Array<{ start: number; end: number }> | undefined;
+        if (recordAll) {
+          try {
+            const split = await attachTakeAcrossScenes(tkProjectObj, takeBase, config.dataDir);
+            takes = split.takes; windows = split.windows;
+          } catch (e: any) { jsonResponse(res, 400, { error: `record all: ${e?.message || e}` }); return; }
+        } else {
+          takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase })];
+        }
+        // The take is now the scene's clock: transcribe it and re-time every
+        // word-anchored overlay (storyboard entry and built scene alike).
+        const retimes: RetimeResult[] = [];
+        for (const t of takes) {
+          try { retimes.push(await retimeScene(tkProjectObj, t.scene_index, config.dataDir)); }
+          catch (e: any) { console.warn(`  take: re-time skipped for scene ${t.scene_index + 1}: ${e?.message || e}`); }
+        }
+        const retime = retimes[0];
+        const take = takes[0];
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
+        let released = 0;
+        for (const t of takes) released += resolveTakeWaiters(tkTenant, tkProject, t);
         const tkNotes = [
-          tkProjectObj.take.duration ? `${tkProjectObj.take.duration}s` : "",
+          recordAll ? `all: ${takes.map((t) => `scene ${t.scene_index + 1} [${t.trim_start}-${t.trim_end}s]`).join(", ")}` : `scene ${sceneIndex + 1}`,
+          take.duration ? `${take.duration}s` : "",
           sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
           sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
           sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
+          retime ? `${retime.spine.source} spine, ${(retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0)} anchor(s) resolved` : "",
+          released ? `${released} waiting job(s) released` : "",
         ].filter(Boolean).join(", ");
-        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)}${tkNotes ? ` (${tkNotes})` : ""}`);
-        jsonResponse(res, 200, { ok: true, project_id: tkProject, speaker_track: tkProjectObj.speaker_track, take: tkProjectObj.take });
+        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)} (${tkNotes})`);
+        jsonResponse(res, 200, {
+          ok: true, project_id: tkProject, take, takes, windows, speaker_track: tkProjectObj.speaker_track,
+          open_needs: openTakeNeeds(tkProjectObj),
+          spine: retime ? { source: retime.spine.source, duration: retime.duration, words: retime.spine.words.length,
+            resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0),
+            unresolved: [...(retime.storyboard?.unresolved || []), ...(retime.built?.unresolved || [])] } : undefined,
+        });
         return;
       }
 
@@ -2972,6 +3026,8 @@ Rules:
         if (!comp) { jsonResponse(res, 404, { error: "Component not found" }); return; }
         if (body.data && typeof body.data === "object") {
           (comp as any).data = { ...((comp as any).data || {}), ...(body.data as Record<string, unknown>) };
+          // A number set by hand wins over the word it used to follow.
+          clearAnchorsFor(comp as any, Object.keys(body.data as object));
         }
         // Stage-lane fields (SPEC-motion-architecture L4): pose/enter/exit/
         // position live on the wrapper, not in data. null clears a field.

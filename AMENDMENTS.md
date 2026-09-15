@@ -6,6 +6,68 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-15 — The take flow, phase 1: needs, per-scene takes, the take job
+
+`SPEC-take-flow.md` (agreed with Marc after the first two live takes). The take
+was a dead end: it attached and nothing knew. Phase 1 gives it a place in the
+model and something for the agent to wait on.
+
+- **Needs.** A `speaker` board declares one `camera_video` need per scene with
+  spoken lines (`recording_instructions` = the script), emitted
+  deterministically after every storyboard save (`core/take-needs.ts`,
+  `ensureSpeakerNeeds`). The concept already existed on `StoryboardScene.assets`
+  and was rendered nowhere; it is now the fulfilment target.
+- **Per-scene takes.** `project.take` -> `project.takes[]` (migrated), one
+  ACTIVE per scene = the clip `speaker_track` carries; `SpeakerTrackClip`
+  gained `scene_index`. `POST /api/take` takes `scene_index` (default: first
+  open need), replaces that scene's clip, keeps every record, flips the need
+  to provided. `/take?scene=N` prompts one scene's lines.
+- **The `take` tool + job.** `take(project_id, scene_index?)` returns the
+  Studio link, the booth link, the open needs and the script, and queues a
+  `take` job that completes when the take attaches (waiters in
+  `core/take-needs.ts`, released by the attach handler). Same poll contract as
+  generate/render. Jobs are in-memory: a reload drops the waiter, the need on
+  disk survives, the agent re-asks.
+- **One ingest.** `add`/`update` with `speaker_track` now run the same
+  sanitizer as the page on this project's own assets.
+
+**Phase 2 (same PR): word anchors + the measured spine.** A component time
+may be authored as a word in the scene's script -- `{"word": "dashboard"}` or
+`"@dashboard"` (options: occurrence, edge start|end, offset) -- at any depth of
+`data` (`at`, `send_at`, `phrases[1].start`, `script[3].at`). `core/word-anchors.ts`
+lifts them into `component.anchors` (by data path) and resolves them into the
+numeric field, so every renderer stays numeric. Two spines, one resolver:
+ASSERTED (script words spread over the estimated duration by character
+weight) at build, MEASURED (the take's whisper words, repaired like the Studio
+lane) at attach -- `core/measured-spine.ts`. The build resolves anchors for
+every speaker scene (`pipeline.ts`, before the takeover pass); `POST /api/take`
+transcribes the take, makes it the scene's clock (duration = take length)
+and re-resolves the storyboard entry AND the built scene, so create-before-
+take and take-before-create are the same code path. A number set by hand in
+Studio drops the anchor it overrides. The storyboard builder's SPEAKER block
+now asks for anchors instead of seconds. `scene.spine` records which clock the
+scene was last resolved against.
+
+**Phase 3 (same PR): the board in your hand.** `/board?tenant&project&token`
+(`src/board-page.ts`): one card per storyboard scene -- still, script, the
+take need as a pill, Record (the booth for THAT scene) and Upload (the same
+push path as the booth, attached with `scene_index`). "Record all" runs the
+booth through every scene (`/take?scene=all`); the attach handler transcribes
+once, cuts the recording where each scene's script begins
+(`splitByScripts`, second-word confirmation, proportional fallback), and
+attaches one WINDOWED take per scene (`trim_start/trim_end` on the take and
+its clip; the base builder already honours trims; the spine re-bases the
+words to the window). Build is enabled once every need is filled, Render once
+built, both poll their job; a rendered film plays inline. `/studio` on a phone
+302s to `/board` (`?desktop=1` forces the desktop app), so the one link Marc
+passes around is still the Studio link. Verified in a headless iPhone against
+a local server; the real phone is Marc's next test.
+
+Not built: a project- or need-scoped token for handing a link to someone who
+is not the tenant (design it in when a second human records); the desktop
+Studio still reads `speaker_track.clips[0]` only (a multi-scene speaker film
+shows its first clip in the desktop lane); auto-build on arrival.
+
 ## 2026-09-15 — Take ingest sanitizer (orientation baked, reframe, loudness)
 
 First real iPhone run of `/take` (`proj_c210e5e1`, 17s): recorded, uploaded and
