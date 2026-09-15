@@ -72,6 +72,17 @@ describe("attaching takes", () => {
     }) as any;
     expect(p.take).toBeUndefined();
     expect(p.takes).toEqual([{ id: "take_0", scene_index: 0, capture: "raw", source: "/x/t.mp4", recorded_at: "then", duration: 17 }]);
+    // ...and the clip it points at is stamped as scene 0's, so the need
+    // reads provided (measured live: proj_c210e5e1 showed "Needs a take"
+    // with a take attached).
+    expect(p.speaker_track.clips[0].scene_index).toBe(0);
+    expect(activeTake(p, 0)).toBe(p.takes[0]);
+  });
+
+  it("stamps legacy clips without a take one per scene, in order", () => {
+    const p = migrateProject({ project_id: "old", canvas: { width: 1920, height: 1080, frame: "16x9" },
+      speaker_track: { clips: [{ source: "/x/a.mp4" }, { source: "/x/b.mp4" }] } }) as any;
+    expect(p.speaker_track.clips.map((c: any) => c.scene_index)).toEqual([0, 1]);
   });
 });
 
