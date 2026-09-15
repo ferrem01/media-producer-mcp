@@ -42,6 +42,19 @@ describe("what the booth does", () => {
     expect(html).toMatch(/echoCancellation: false, noiseSuppression: true, autoGainControl: true/);
   });
 
+  it("records the picture on screen -- a portrait canvas -- not the raw camera track", () => {
+    // iOS hands the recorder the sensor's landscape frame plus a rotation
+    // tag; the screen shows a portrait cover-crop. Measured live
+    // (proj_c210e5e1): the raw track shipped a wide, sideways-stored file.
+    expect(html).toMatch(/<canvas id="cap" width="1080" height="1920">/);
+    expect(html).toMatch(/cv\.captureStream\(30\)/);
+    expect(html).toMatch(/s\.getAudioTracks\(\)\.forEach\(function \(t\) \{ src\.addTrack\(t\); \}\)/); // mic rides along
+    expect(html).toMatch(/Math\.max\(cv\.width \/ vw, cv\.height \/ vh\)/);           // cover-crop, same framing as the screen
+    expect(html).toMatch(/requestVideoFrameCallback/);                              // one draw per camera frame where available
+    expect(html).toMatch(/capture = 'raw'/);                                       // fallback when captureStream is missing
+    expect(html).toMatch(/capture: capture/);                                      // and the server is told which
+  });
+
   it("prefers the container the phone can actually produce", () => {
     // Safari records mp4, Chrome/Android webm; the candidate order tries mp4 first.
     expect(html).toMatch(/'video\/mp4;codecs=avc1,mp4a', 'video\/mp4', 'video\/webm;codecs=vp9,opus'/);

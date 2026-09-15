@@ -59,6 +59,7 @@ export function getTakeHtml(): string {
   /* ── stage: camera full-bleed, prompter over it ── */
   #stage { position:relative; background:#000; }
   #live { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  #cap { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 55%, rgba(0,0,0,.75) 100%); pointer-events:none; }
   #top { position:absolute; left:0; right:0; top:0; padding: calc(12px + env(safe-area-inset-top)) 16px 0; display:flex; align-items:center; gap:10px; }
   #timer { font-variant-numeric:tabular-nums; font-weight:600; font-size:15px; }
@@ -99,6 +100,7 @@ export function getTakeHtml(): string {
 
 <section id="stage">
   <video id="live" autoplay muted playsinline></video>
+    <canvas id="cap" width="1080" height="1920"></canvas>
   <div id="veil"></div>
   <div id="top"><span id="timer">0:00</span><div id="meterWrap"><div id="meter"></div></div></div>
   <div id="silent">No sound is reaching the mic — this take is recording nothing.</div>
@@ -267,6 +269,30 @@ export function getTakeHtml(): string {
   }
   function clearPrompter() { cueTimers.forEach(clearTimeout); cueTimers = []; $('cue').textContent = ''; $('next').textContent = ''; }
 
+  // ── portrait canvas capture ────────────────────────────────────────────
+  var capture = 'raw', drawing = false, drawReq = 0;
+  function drawFrame() {
+    if (!drawing) return;
+    var v = $('live'), cv = $('cap'), ctx = cv.getContext('2d');
+    var vw = v.videoWidth, vh = v.videoHeight;
+    if (vw && vh) {
+      // Cover-crop into the portrait canvas: the same framing the screen shows.
+      var k = Math.max(cv.width / vw, cv.height / vh);
+      var dw = vw * k, dh = vh * k;
+      ctx.drawImage(v, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
+    }
+    if (v.requestVideoFrameCallback) drawReq = v.requestVideoFrameCallback(drawFrame);
+    else drawReq = requestAnimationFrame(drawFrame);
+  }
+  function startDraw() { drawing = true; drawFrame(); }
+  function stopDraw() {
+    drawing = false;
+    var v = $('live');
+    if (drawReq && v.cancelVideoFrameCallback) { try { v.cancelVideoFrameCallback(drawReq); } catch (e) {} }
+    else if (drawReq) cancelAnimationFrame(drawReq);
+    drawReq = 0;
+  }
+
   function tick() {
     var el = (performance.now() - t0) / 1000;
     $('timer').textContent = fmt(el) + (total ? ' / ' + fmt(total) : '');
@@ -297,8 +323,33 @@ export function getTakeHtml(): string {
         clearInterval(cd); $('count').style.display = 'none';
         mime = pickMime(); ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
         chunks = [];
-        try { rec = mime ? new MediaRecorder(s, { mimeType: mime }) : new MediaRecorder(s); }
-        catch (e) { stopAll(); fail('This browser cannot record video here (' + (e.message || e) + ').'); return; }
+        // Record the PICTURE ON SCREEN, not the camera track. iOS hands the
+        // recorder the sensor's landscape frame with a rotation tag (the
+        // screen shows a portrait cover-crop of it); recording the raw track
+        // ships a wide, sideways-stored file. Drawing the displayed video into
+        // a portrait canvas and recording the canvas gives true portrait
+        // pixels at full size and no tag. Falls back to the raw track where
+        // captureStream is missing; the server sanitizer handles that file.
+        var src = s;
+        capture = 'raw';
+        var cv = $('cap');
+        if (cv.captureStream || cv.mozCaptureStream) {
+          try {
+            var cs = (cv.captureStream ? cv.captureStream(30) : cv.mozCaptureStream(30));
+            src = new MediaStream();
+            cs.getVideoTracks().forEach(function (t) { src.addTrack(t); });
+            s.getAudioTracks().forEach(function (t) { src.addTrack(t); });
+            capture = 'canvas';
+            startDraw();
+          } catch (e) { src = s; capture = 'raw'; }
+        }
+        try { rec = mime ? new MediaRecorder(src, { mimeType: mime }) : new MediaRecorder(src); }
+        catch (e1) {
+          // A browser that cannot record a canvas stream still records the camera.
+          stopDraw(); src = s; capture = 'raw';
+          try { rec = mime ? new MediaRecorder(src, { mimeType: mime }) : new MediaRecorder(src); }
+          catch (e) { stopAll(); fail('This browser cannot record video here (' + (e.message || e) + ').'); return; }
+        }
         rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
         rec.onstop = onStopped;
         rec.start(1000);
@@ -314,6 +365,7 @@ export function getTakeHtml(): string {
   });
 
   function stopAll() {
+    stopDraw();
     if (tickTimer) clearInterval(tickTimer); tickTimer = null;
     clearPrompter(); stopMeter();
     if (wake) { try { wake.release(); } catch (e) {} wake = null; }
@@ -333,7 +385,7 @@ export function getTakeHtml(): string {
     var url = URL.createObjectURL(blob);
     var v = $('play'); v.src = url; v.load();
     $('reviewMeta').textContent = fmt(blobDuration) + (total ? ' recorded · script is ' + fmt(total) : '') + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB'
-      + (trackW && trackH ? ' · ' + trackW + '×' + trackH : '') + ' · ' + ext;
+      + (capture === 'canvas' ? ' · 1080×1920' : (trackW && trackH ? ' · ' + trackW + '×' + trackH : '')) + ' · ' + ext;
     show('review');
   }
 
@@ -358,7 +410,8 @@ export function getTakeHtml(): string {
       $('uploadNote').textContent = 'Attaching to the project…';
       fetch(withToken('/api/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, width: trackW, height: trackH }),
+        body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
+          width: capture === 'canvas' ? 1080 : trackW, height: capture === 'canvas' ? 1920 : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
         .then(function (j) {
           $('doneMeta').textContent = projectName + ' · ' + fmt(blobDuration) + ' take';

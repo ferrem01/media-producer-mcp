@@ -2162,12 +2162,13 @@ Rules:
         const tkProjectObj = await loadProject(tkTenant, tkProject);
         if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const duration = Number(tkBody.duration);
-        // Fix what the phone shipped (a sideways rotation tag, a quiet
-        // voice) before anything downstream reads the file. A sanitizer
-        // failure is logged, not fatal: the take still attaches.
+        // Make the phone's file say one thing to every consumer (orientation
+        // baked, reframed to the canvas, voice at dialogue level) before
+        // anything downstream reads it. A sanitizer failure is logged, not
+        // fatal: the take still attaches.
         let sanitized: TakeSanitizeResult | undefined;
         try {
-          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir));
+          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkProjectObj.canvas);
         } catch (e: any) {
           console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
         }
@@ -2178,16 +2179,20 @@ Rules:
           duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100
             : sanitized && sanitized.probe.duration > 0 ? Math.round(sanitized.probe.duration * 100) / 100 : undefined,
           mime: typeof tkBody.mime === "string" ? tkBody.mime : undefined,
-          width: Number(tkBody.width) || sanitized?.probe.width || undefined,
-          height: Number(tkBody.height) || sanitized?.probe.height || undefined,
-          rotation_stripped: sanitized?.rotation_stripped || undefined,
+          // The file as it now stands (post-sanitize), not what the page saw.
+          width: sanitized?.probe.width || Number(tkBody.width) || undefined,
+          height: sanitized?.probe.height || Number(tkBody.height) || undefined,
+          capture: typeof tkBody.capture === "string" ? tkBody.capture : undefined,
+          rotation_baked: sanitized?.rotation_baked || undefined,
+          reframed: sanitized?.reframed,
           loudness: sanitized?.loudness,
         };
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
         const tkNotes = [
           tkProjectObj.take.duration ? `${tkProjectObj.take.duration}s` : "",
-          sanitized?.rotation_stripped ? "rotation tag stripped" : "",
+          sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
+          sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
           sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
         ].filter(Boolean).join(", ");
         console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)}${tkNotes ? ` (${tkNotes})` : ""}`);

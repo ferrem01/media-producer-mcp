@@ -6,31 +6,42 @@ session can pick up mid-thread.
 
 ---
 
-## 2026-09-15 — Take ingest sanitizer (rotation tag, dialogue loudness)
+## 2026-09-15 — Take ingest sanitizer (orientation baked, reframe, loudness)
 
 First real iPhone run of `/take` (`proj_c210e5e1`, 17s): recorded, uploaded and
-attached cleanly, but the file itself shipped two defects that would have
-wrecked the render. iOS Safari's MediaRecorder stores the frames upright
-(1080x1920) and STILL writes a -90 degree display matrix -- ffmpeg's autorotate
-and Chromium's `<video>` both obey it and show the take on its side. And the
-voice landed at -35.7 LUFS (phone at arm's length in a room); dialogue that
-carries a film wants about -16.
+attached cleanly. Two things the file needed, and one thing I got wrong on the
+way.
 
-`core/take-sanitize.ts` runs once in `POST /api/take`, in place on the file:
-a quarter-turn tag on a PORTRAIT-stored file is dropped (a booth take is
-portrait by construction, so the tag is the defect; a landscape sensor honestly
-tagged portrait is left alone -- and the tag is reset by a direct byte patch of
-the MP4's `tkhd` matrix, because ffmpeg's `-display_rotation` only exists from
-6.0 and the deployed box runs older: the first live attach silently skipped),
-and the audio is normalized to -16 LUFS with a
-two-pass linear loudnorm (video stream-copied). What it did lands on
-`project.take` (`rotation_stripped`, `loudness.{measured_lufs,normalized_to_lufs}`).
-A sanitizer failure is logged and the take still attaches. Probing is one
-`ffmpeg -i` stderr parse so it works where there is no ffprobe. Marc's file:
-rotation stripped, -35.7 -> -16.4 LUFS, frames untouched.
+**The file.** iOS Safari's MediaRecorder stored the sensor's LANDSCAPE frame
+sideways in a 1080x1920 buffer with a -90 degree display matrix; the voice sat
+at -35.7 LUFS. The phone's live preview had shown Marc a portrait cover-crop of
+that landscape stream, so the honest picture is wider than what he framed.
 
-Not covered: takes attached by hand through the `add` tool (they never pass
-this endpoint), and final-MIX loudness (-14 LUFS) -- still the separate PR.
+**The wrong turn (PRs #756, #757).** I read the matrix as spurious ("frames
+already upright, tag double-rotates") from a thumbnail, and stripped it. The
+tag was honest: honoring it gives the upright landscape picture; stripping it
+put the speaker on his side in the render, which Marc caught from the MP4.
+Lesson written down so it stays written: judge orientation at full size, and
+treat a container rotation tag as a claim to VERIFY by decoding, never as a
+defect to remove.
+
+**What it does now** (`core/take-sanitize.ts`, run once in `POST /api/take`,
+in place):
+- bakes the rotation tag into the frames (ffmpeg autorotate on decode,
+  re-encode, identity matrix out) so ffmpeg, Chromium and the muxer agree;
+- when the upright take is WIDER than the film's canvas, crops the center
+  column at the canvas aspect and scales to the canvas -- the frame the phone
+  showed the speaker. A take taller than the canvas is left alone;
+- normalizes the voice to -16 LUFS (two-pass linear loudnorm);
+- reports `rotation_baked`, `reframed`, `loudness` on `project.take`.
+Probing is one `ffmpeg -i` stderr parse (no ffprobe on static builds).
+
+**The page.** `/take` now records a portrait CANVAS: the live `<video>` is
+drawn cover-cropped into a 1080x1920 canvas each frame and
+`canvas.captureStream()` + the mic track feed the MediaRecorder, so the file
+carries true portrait pixels at full resolution and no rotation tag. Falls back
+to the raw track where `captureStream` is missing; `take.capture` says which.
+Untested on a real iPhone at merge time -- Marc's next take is the test.
 
 Same run, second bug, in the build: every `generateScene` call site set
 `hasSpeakerTrack: !!opts.speaker_source`, so a project whose take was attached
@@ -38,6 +49,11 @@ AFTER the board (the script-first flow the take page exists for) built with
 no speaker base -- the recipe painted a full-bleed mesh backdrop over Marc.
 The pipeline already knew (`pipelineHasNarration` gates TTS and the `speaker`
 grammar default from the loaded project); the four sites now read it too.
+
+Not covered: takes attached by hand through the `add` tool (they never pass
+this endpoint); final-MIX loudness (-14 LUFS) -- still the separate PR; the
+speaker recipe's dock layout and fixed-px sticker/strike type on a 9x16
+canvas (this cut was placed by hand; `reel-caption-lane` carried the words).
 
 ## 2026-09-14 — FRAME axis; `social-reel` deleted; `speaker-screencast` split
 
