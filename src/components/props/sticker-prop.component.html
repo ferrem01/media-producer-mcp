@@ -52,9 +52,12 @@
     if (kind !== 'ring' && !isImage) {
       var hostW = host.clientWidth;
       var propW = prop.scrollWidth || prop.offsetWidth;
-      if (hostW > 40 && propW > hostW) {
+      // A rotated stamp's corners swing past its text width: fit it to less
+      // of the box (measured: QUOTIENT at -8 degrees clipped at the left edge).
+      var fitFrac = kind === 'stamp' && Math.abs(rot) > 0.5 ? 0.82 : 0.94;
+      if (hostW > 40 && propW > hostW * fitFrac) {
         var base = parseFloat(getComputedStyle(prop).fontSize) || 17;
-        var fit = Math.max(11, Math.floor((base * hostW * 0.94) / propW));
+        var fit = Math.max(11, Math.floor((base * hostW * fitFrac) / propW));
         prop.style.fontSize = fit + 'px';
         if ((prop.scrollWidth || prop.offsetWidth) > hostW) prop.style.whiteSpace = 'normal';
       }
