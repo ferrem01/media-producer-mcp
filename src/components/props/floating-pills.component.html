@@ -56,10 +56,14 @@
       // and a wide label at the right side ran past the canvas (measured:
       // "Calendar" 51px beyond the box, "Mail" 54px past the frame).
       try {
-        var hostW = host.clientWidth, pw = p.offsetWidth;
+        var hostW = host.clientWidth, pw = p.offsetWidth, hostH = host.clientHeight, ph = p.offsetHeight;
         if (hostW > 0 && pw > 0) {
           var leftPx = (parseFloat(p.style.left) / 100) * hostW;
           if (leftPx + pw > hostW - 4) p.style.left = Math.max(0, ((hostW - pw - 4) / hostW) * 100) + '%';
+        }
+        if (hostH > 0 && ph > 0) {
+          var topPx = (parseFloat(p.style.top) / 100) * hostH;
+          if (topPx + ph > hostH - 4) p.style.top = Math.max(0, ((hostH - ph - 4) / hostH) * 100) + '%';
         }
       } catch (e) { /* layout not measurable yet: keep the scatter */ }
       return { el: p, phase: rnd() * Math.PI * 2, depth: depth, amp: 10 + rnd() * 14 };
