@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-15 — The booth, second round: back to the board, de-air, soft look
+
+From Marc's notes after the fresh two-scene run:
+- **Back to the board.** The take page had no way back except the browser
+  button. The ready screen links back; the done screen's primary action is
+  "Back to the board" (desktop Studio moved to a secondary button).
+- **De-air.** Every take ends with the reach for the stop button and starts
+  with a breath. The transcript already knows when the first and last words
+  were said, so the attach step trims the clip to speech: first word minus
+  0.35s, last word plus 0.45s (`deAirWindow` in `core/measured-spine.ts`),
+  never more than 6s off either end (a transcript that missed the ending must
+  not lose it). Record-all windows are tightened the same way. The trims ride
+  on the take and its clip; the base builder already honours them.
+- **Soft look.** A gentle grade at ingest -- temporal denoise that smooths
+  skin without blurring edges, a touch of warmth and contrast
+  (`SOFT_LOOK_FILTER` in `core/take-sanitize.ts`). On by default on the take
+  page (a toggle), applied to board uploads, recorded as `take.look`.
+
 ## 2026-09-15 — Tall speaker frames: stack over the chest, phone-scale type
 
 Both live 9x16 speaker films came out of the recipe with the WIDE speaker

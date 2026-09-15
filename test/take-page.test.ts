@@ -83,6 +83,15 @@ describe("what the booth does", () => {
     expect(html).toMatch(/function withToken/);
   });
 
+  it("gets the human back to the board from the ready and done screens, and offers the soft look", () => {
+    const html = getTakeHtml();
+    expect(html).toMatch(/id="boardLinkTop"/);
+    expect(html).toMatch(/id="boardLink"/);
+    expect(html).toMatch(/var boardHref = '\/board\?tenant='/);
+    expect(html).toMatch(/id="softLook" checked/);
+    expect(html).toMatch(/look: \(\$\('softLook'\) && \$\('softLook'\)\.checked\) \? 'soft' : 'natural'/);
+  });
+
   it("is mobile-safe: playsinline video, safe-area padding, no zoom", () => {
     expect(html).toMatch(/playsinline/);
     expect(html).toMatch(/env\(safe-area-inset-bottom\)/);
@@ -104,7 +113,7 @@ describe("the server side", () => {
     const src = await read("../src/index.ts");
     const at = src.indexOf("const takeMatch = urlPath.match");
     expect(at).toBeGreaterThan(0);
-    const block = src.slice(at, at + 5000);
+    const block = src.slice(at, at + 8000);
     expect(block).toMatch(/expectedPrefix = `\/assets\/\$\{tkTenant\}\/projects\/\$\{tkProject\}\/assets\/`/);
     expect(block).toMatch(/tkUrl\.includes\("\.\."\)/);
     // the take is attached per scene through the needs module, not by hand

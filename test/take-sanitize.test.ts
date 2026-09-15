@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
-  probeTake, orientedDims, reframeCrop, measureLoudness, sanitizeTake, TAKE_LOUDNESS_TARGET_LUFS,
+  probeTake, orientedDims, reframeCrop, measureLoudness, sanitizeTake, TAKE_LOUDNESS_TARGET_LUFS, SOFT_LOOK_FILTER,
 } from "../src/core/take-sanitize.js";
 
 const run = promisify(execFile);
@@ -111,6 +111,18 @@ describe("the take sanitizer", () => {
     expect(r.reframed).toBeUndefined();
     expect(r.loudness?.normalized_to_lufs == null).toBe(within);
     if (within) expect((await fs.stat(file)).mtimeMs).toBe(stat.mtimeMs);
+  });
+
+  it("applies the soft look as a re-encode that changes the pixels and nothing else", async () => {
+    const file = await phoneTake(dir, "soft", { gainDb: 0, scene: "testsrc=size=270x480:rate=30:duration=2" });
+    const natural = path.join(dir, "soft-natural.mp4"); await fs.copyFile(file, natural);
+    const r = await sanitizeTake(file, { width: 270, height: 480 }, "soft");
+    expect(r.look).toBe("soft");
+    expect([r.probe.width, r.probe.height]).toEqual([270, 480]);
+    expect(SOFT_LOOK_FILTER).toMatch(/hqdn3d/);
+    const diff = await frameDiff(dir, file, natural);
+    expect(diff).toBeGreaterThan(0.5);   // graded
+    expect(diff).toBeLessThan(25);       // gently
   });
 
   it("copes with a silent camera-only file: no audio, no normalization, orientation still baked", async () => {
