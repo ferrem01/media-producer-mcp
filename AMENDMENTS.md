@@ -71,6 +71,26 @@ WAITING take job counted as a job in flight, which blocked every auto-deploy
 while a booth link was open. The deploy guard now ignores `take` jobs (a wait,
 not work) and the job route reports them as `waiting`, not `rendering`.
 
+**First real two-scene run (`proj_234d8a01`, Marc on his iPhone).** The
+storyboard LLM wrote word anchors for all seven overlays unprompted; the
+take job woke on arrival; Record-all's transcript cut landed exactly where
+scene 2 begins. Three defects, all fixed the same hour:
+- `/take?scene=N` prompted the WHOLE board: the page is a template literal
+  and the `\d` in its scene-param regex reached the browser as `d`. Marc read
+  both scenes into scene 1's take, then read scene 1 again for scene 2. The
+  test now asserts on the served HTML, not the source.
+- The build's copy-back was WIPED by a stale attach: the attach handler held a
+  loaded project across sanitize + whisper (tens of seconds) and saved last.
+  The handler now does the file work first (and primes the transcript cache),
+  then loads, attaches, re-times and saves within milliseconds.
+- `take.loudness.measured_lufs` read 0 on every take: the ebur128 summary
+  line differs on the droplet's ffmpeg 4.x. Measurement now comes from
+  loudnorm's own first pass, the numbers the normalizing pass already used.
+Also seen, not yet fixed: an anchor to a word the LLM did not put in its own
+script ("juggle") resolves to 0 (the storyboard prompt already forbids it;
+a fuzzy fallback is the next step), and whisper hearing "Quotient" as
+"question" defeats the "Quotient" anchor on one take.
+
 Not built: a project- or need-scoped token for handing a link to someone who
 is not the tenant (design it in when a second human records); the desktop
 Studio still reads `speaker_track.clips[0]` only (a multi-scene speaker film

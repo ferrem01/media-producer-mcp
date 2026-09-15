@@ -123,6 +123,10 @@ describe("the server side", () => {
   it("records one scene when the link says which, and tells the server", () => {
     const html = getTakeHtml();
     expect(html).toMatch(/qp\.get\('scene'\)/);
+    // The SERVED page must carry the digit class -- this file is a template
+    // literal and a lone backslash never reaches the browser (measured live:
+    // every scene link prompted the whole board).
+    expect(html).toMatch(/\/\^\\d\+\$\/\.test\(qp\.get\('scene'\)/);
     expect(html).toMatch(/scene_index: recordAll \? 'all' : \(sceneIndex >= 0 \? sceneIndex : undefined\)/);
   });
 });
