@@ -122,13 +122,14 @@ export function reframeCrop(
   return { w, h: take.height, x: Math.round((take.width - w) / 4) * 2, y: 0 };
 }
 
-/** Integrated loudness in LUFS (EBU R128), or null when unmeasurable. */
+/** Integrated loudness in LUFS (EBU R128), or null when unmeasurable. Read
+ *  from loudnorm's own first pass -- the same numbers the normalizing pass
+ *  uses -- because the ebur128 summary line differs across ffmpeg builds
+ *  (the deployed 4.x reported 0 for every take). */
 export async function measureLoudness(filePath: string): Promise<number | null> {
-  const out = await ffmpegStderr(["-i", filePath, "-vn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"]);
-  const m = out.match(/Integrated loudness:\s*\n\s*I:\s*(-?[\d.]+) LUFS/);
-  if (!m) return null;
-  const v = Number(m[1]);
-  // ebur128 reports -70 for digital silence; treat it as unmeasurable.
+  const m = await loudnormMeasure(filePath);
+  const v = m ? Number(m.input_i) : NaN;
+  // loudnorm reports -70 (or -inf) for digital silence; treat it as unmeasurable.
   return Number.isFinite(v) && v > -69 ? v : null;
 }
 

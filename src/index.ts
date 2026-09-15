@@ -21,7 +21,7 @@ import { getBoardHtml } from "./board-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } from "./core/take-needs.js";
 import type { Take } from "./core/types.js";
-import { retimeScene, attachTakeAcrossScenes, type RetimeResult } from "./core/measured-spine.js";
+import { retimeScene, attachTakeAcrossScenes, primeTakeWords, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
@@ -2189,19 +2189,28 @@ Rules:
           jsonResponse(res, 400, { error: `url must be an asset of this project (${expectedPrefix}...)` });
           return;
         }
+        const tkPeek = await loadProject(tkTenant, tkProject);
+        if (!tkPeek) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const recordAll = tkBody.scene_index === "all";
+        // THE SLOW WORK FIRST, ON THE FILE ONLY. Sanitizing and transcribing
+        // take tens of seconds; holding a loaded project across them and
+        // saving at the end let a build's copy-back land in between and get
+        // wiped (measured live: proj_234d8a01's built scenes vanished under a
+        // stale attach). The project is loaded for mutation only after the
+        // file work is done, and saved within milliseconds.
+        let sanitized: TakeSanitizeResult | undefined;
+        try {
+          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas);
+        } catch (e: any) {
+          console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
+        }
+        await primeTakeWords(tkPeek, tkUrl, config.dataDir);
         const tkProjectObj = await loadProject(tkTenant, tkProject);
         if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         ensureSpeakerNeeds(tkProjectObj);
         const open = openTakeNeeds(tkProjectObj);
-        const recordAll = tkBody.scene_index === "all";
         const sceneIndex = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0
           ? Number(tkBody.scene_index) : (open[0] ?? 0);
-        let sanitized: TakeSanitizeResult | undefined;
-        try {
-          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkProjectObj.canvas);
-        } catch (e: any) {
-          console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
-        }
         const duration = Number(tkBody.duration);
         const takeBase = {
           source: tkUrl,

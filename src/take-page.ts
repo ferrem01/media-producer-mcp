@@ -154,7 +154,10 @@ export function getTakeHtml(): string {
   var token = qp.get('token') || '';
   // ?scene=N (0-based): record ONE scene's lines; without it the whole board
   // is prompted and the take attaches to the first open need.
-  var sceneIndex = /^\d+$/.test(qp.get('scene') || '') ? Number(qp.get('scene')) : -1, sceneLabel = '';
+  // (Doubled backslash: this file is a template literal, and a lone \d
+  // reached the browser as "d" -- measured live, every scene link showed
+  // the whole board.)
+  var sceneIndex = /^\\d+$/.test(qp.get('scene') || '') ? Number(qp.get('scene')) : -1, sceneLabel = '';
   // ?scene=all: one recording through every scene; the server cuts it per
   // scene where each scene's script begins.
   var recordAll = qp.get('scene') === 'all';

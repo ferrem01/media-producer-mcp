@@ -38,6 +38,17 @@ export async function wordsForTake(project: Project, take: Take, dataDir?: strin
   return segs.map((s) => ({ text: s.text, start: s.start, end: s.end }));
 }
 
+/** Warm the transcript cache for a file before the project is loaded for
+ *  mutation, so attach + re-time + save happen in one short window. Best
+ *  effort: no whisper, no cache, no harm. */
+export async function primeTakeWords(project: Project, source: string, dataDir?: string): Promise<void> {
+  try {
+    await wordsForTake(project, { id: "prime", scene_index: -1, source, recorded_at: "" }, dataDir);
+  } catch (e: any) {
+    console.warn(`  [spine] transcript priming failed for ${path.basename(source)}: ${e?.message || e}`);
+  }
+}
+
 /**
  * The spine a scene should be resolved against right now: MEASURED when
  * the scene has a take and whisper can read it, else ASSERTED from the
