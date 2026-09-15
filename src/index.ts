@@ -26,7 +26,7 @@ import { clearAnchorsFor } from "./core/word-anchors.js";
 import { detectFace } from "./core/face-band.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
-import { speakerSceneFilmStarts } from "./core/speaker-track.js";
+import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-track.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
@@ -380,7 +380,11 @@ function parseMcpBody(req: http.IncomingMessage): Promise<unknown> {
 function getSpeakerUrl(project: any): string | undefined {
   const clips = project.speaker_track?.clips;
   if (!clips || clips.length === 0) return undefined;
-  const source = clips[0].source;
+  return speakerUrlFromSource(clips[0].source);
+}
+
+/** A clip source as the browser can fetch it. */
+function speakerUrlFromSource(source: string | undefined): string | undefined {
   if (!source) return undefined;
   const dataDir = config.dataDir;
   if (source.startsWith(dataDir)) {
@@ -1350,10 +1354,12 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         // transparency rule (transparent unless explicitly opted out) and seek
         // the preview's camera underlay to this scene's start offset -- so the
         // Studio preview finally looks like the final composite.
-        const spUrl = getSpeakerUrl(project);
-        const spStarts = speakerSceneFilmStarts(project.scenes);
+        // Per-scene takes: THIS scene's clip from its own trim. One
+        // continuous track: the first clip at the scene's film start.
         const spIdx = project.scenes.findIndex((s) => s.id === scene.id);
-        const spOffset = spIdx >= 0 ? spStarts[spIdx] : 0;
+        const spRef = speakerClipForScene(project.speaker_track?.clips, project.scenes, spIdx);
+        const spUrl = spRef ? speakerUrlFromSource(spRef.source) : getSpeakerUrl(project);
+        const spOffset = spRef ? spRef.offset : 0;
         const sceneForPreview = sceneCompositesOverSpeaker(scene, !!spUrl)
           ? { ...scene, transparent_background: true }
           : scene;

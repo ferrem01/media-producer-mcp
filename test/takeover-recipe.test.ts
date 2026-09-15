@@ -94,6 +94,16 @@ describe("the takeover flag must be AUTHORABLE and DETECTABLE", () => {
     expect(block).toMatch(/!hasFurniture/);
   });
 
+  it("a board with no speaker furniture anywhere only takes over on the explicit opt-out", async () => {
+    // proj_37d090da: three per-scene takes, no lower-thirds on any scene,
+    // and the payoff scene's browser-frame became a 10s takeover that
+    // covered the speaker. The heuristic needs furniture to compare against.
+    const p = await read("../src/llm/pipeline.ts");
+    const block = p.split("Speaker-film TAKEOVERS")[1]?.split("Beat quantization")[0] || "";
+    expect(block).toMatch(/filmHasFurniture && !hasFurniture/);
+    expect(block).toMatch(/d\.transparent_background === false \|\| \(filmHasFurniture/);
+  });
+
   it("the empty-canvas gate is skipped when the camera is the background", async () => {
     const p = await read("../src/llm/pipeline.ts");
     expect(p).toMatch(/cameraIsBackground = sceneCompositesOverSpeaker/);

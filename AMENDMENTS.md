@@ -2863,3 +2863,29 @@ The first board written under the notation put "(pause)" at the end of a
 sentence twice instead of on its own line. `scriptLines` now splits a line
 at an inline marker into its text and the beat, and both page prompters
 do the same, so either spelling is the same second of held silence.
+
+## The preview shows the scene's own take
+
+Third end-to-end run (proj_37d090da, three per-scene takes): Marc saw the
+first take play and the other two scenes show "some final second" of a
+take. The film had not been rendered; that was the Studio scene preview.
+Its camera underlay was always the FIRST clip, seeked to the scene's film
+start (9.99s, 16.66s) modulo the file length -- the last frame of take
+one, twice. The render was never wrong: it concatenates the clips.
+
+`speakerClipForScene` picks the camera for a preview: with per-scene
+takes, that scene's clip from its own trim; with one continuous track,
+the first clip at the film start as before; a per-scene track with no
+take for the scene shows no camera rather than the wrong one.
+
+## A board with no furniture only takes over on the explicit opt-out
+
+Same run: the payoff scene's browser-frame became a 10-second takeover
+that covered Marc. The takeover recipe's heuristic ("a product surface
+with no speaker furniture on the scene") was written for films whose
+presenter scenes carry a lower-third; it needs furniture somewhere to
+compare against. A take-flow speaker board carries none, so under it every
+surface scene was a takeover. The heuristic now only fires when the film
+has furniture on some scene; otherwise the board's explicit
+`transparent_background: false` is the only way to cover the camera, which
+is what the SPEAKER contract already told the storyboard writer.

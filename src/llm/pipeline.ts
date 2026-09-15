@@ -2721,8 +2721,17 @@ async function runUnifiedPipeline(
       // proj_61516d44 -- both seams shipped exposed).
       const FURNITURE_RE = /^(st-speaker-lowerthird|lower-third|speaker-)/;
       const hasFurniture = objects.some((c) => FURNITURE_RE.test(c.type));
+      // The furniture heuristic only tells scenes apart when the film HAS
+      // furniture somewhere. A take-flow speaker board carries none (the
+      // person is the base of every scene), so under it every scene with a
+      // product surface became a takeover -- measured live on
+      // proj_37d090da: the payoff scene's browser covered Marc for its
+      // whole 10s. With no furniture anywhere, only the board's explicit
+      // opt-out (transparent_background: false) makes a takeover.
+      const filmHasFurniture = (storyboard.scenes as any[]).some((sc) =>
+        (Array.isArray(sc.components) ? sc.components : []).some((c: any) => c && typeof c === "object" && typeof c.type === "string" && FURNITURE_RE.test(c.type)));
       const isTakeover = surfaces.length > 0
-        && (d.transparent_background === false || !hasFurniture);
+        && (d.transparent_background === false || (filmHasFurniture && !hasFurniture));
       if (!isTakeover) continue;
 
       const notes: string[] = [];

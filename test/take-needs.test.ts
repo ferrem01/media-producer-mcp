@@ -4,6 +4,7 @@ import {
   TAKE_NEED_DESCRIPTION,
 } from "../src/core/take-needs.js";
 import { migrateProject } from "../src/persistence/project.js";
+import { speakerClipForScene } from "../src/core/speaker-track.js";
 
 function speakerProject(lines: Array<string | undefined>): any {
   return {
@@ -116,5 +117,25 @@ describe("a waiting take job", () => {
     const { readFile } = await import("node:fs/promises");
     const src = await readFile(new URL("../src/index.ts", import.meta.url), "utf8");
     expect(src).toMatch(/\(j\.status === "running" \|\| j\.status === "queued"\) && j\.type !== "take"\)/);
+  });
+});
+
+describe("the preview's camera under a scene", () => {
+  const scenes = [{ duration_seconds: 9.99 }, { duration_seconds: 6.67 }, { duration_seconds: 9.96 }];
+  it("per-scene takes: the scene's own clip from its own trim (measured live: three takes previewed as the first, seeked to the film start)", () => {
+    const clips = [
+      { source: "/a/t0.mp4", start: 0, scene_index: 0, trim_start: 0.22, trim_end: 10.21 },
+      { source: "/a/t1.mp4", start: 0, scene_index: 1, trim_start: 0.78, trim_end: 7.45 },
+      { source: "/a/t2.mp4", start: 0, scene_index: 2, trim_start: 0.95, trim_end: 10.91 },
+    ];
+    expect(speakerClipForScene(clips, scenes, 1)).toEqual({ source: "/a/t1.mp4", offset: 0.78 });
+    expect(speakerClipForScene(clips, scenes, 2)).toEqual({ source: "/a/t2.mp4", offset: 0.95 });
+    expect(speakerClipForScene(clips.slice(0, 2), scenes, 2)).toBeNull(); // no take yet: no camera, not the wrong one
+  });
+  it("one continuous track: the first clip at the scene's film start", () => {
+    const clips = [{ source: "/a/all.mp4", start: 0, trim_start: 1 }];
+    expect(speakerClipForScene(clips, scenes, 0)).toEqual({ source: "/a/all.mp4", offset: 1 });
+    expect(speakerClipForScene(clips, scenes, 2)).toEqual({ source: "/a/all.mp4", offset: 1 + 9.99 + 6.67 });
+    expect(speakerClipForScene(undefined, scenes, 0)).toBeNull();
   });
 });
