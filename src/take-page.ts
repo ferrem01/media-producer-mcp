@@ -50,6 +50,10 @@ export function getTakeHtml(): string {
   .btn { appearance:none; border:0; border-radius:14px; padding:16px 20px; font:inherit; font-size:17px; font-weight:600;
     color:#fff; background:var(--accent); width:100%; cursor:pointer; }
   .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); }
+  a.link { color:var(--muted); font-size:14px; text-decoration:none; }
+  .toggle { display:flex; gap:10px; align-items:flex-start; color:var(--ink); font-size:15px; margin:10px 0 14px; }
+  .toggle input { width:20px; height:20px; margin-top:1px; }
+  .toggle .hint { color:var(--muted); font-size:13px; }
   .btn.stop { background:var(--err); }
   .btn:disabled { opacity:.45; }
   .row { display:flex; gap:10px; margin-top:12px; }
@@ -90,11 +94,13 @@ export function getTakeHtml(): string {
 <body>
 
 <section id="ready" class="pad on">
+  <p><a class="link" id="boardLinkTop" href="#">← Back to the board</a></p>
   <h1 id="title">Loading…</h1>
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
   <div class="spacer"></div>
   <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script scrolls over the camera at speaking pace.</p>
+  <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(gentle skin smoothing and warmth, applied when the take is processed)</span></label>
   <button class="btn" id="recordBtn" disabled>Record</button>
 </section>
 
@@ -132,10 +138,10 @@ export function getTakeHtml(): string {
   <p class="big">✓</p>
   <h1>Attached</h1>
   <p class="sub" id="doneMeta"></p>
-  <p class="note">The take is now the speaker base of this project. Open Studio to build the scenes over it, or record another.</p>
+  <p class="note">The take is now this scene's speaker base. Head back to the board for the next scene, or record this one again.</p>
   <div class="spacer"></div>
-  <a class="btn" id="studioLink" href="#">Open in Studio</a>
-  <div class="row"><button class="btn ghost" id="againBtn">Record another</button></div>
+  <a class="btn" id="boardLink" href="#">Back to the board</a>
+  <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Desktop Studio</a></div>
 </section>
 
 <section id="err" class="pad">
@@ -168,6 +174,8 @@ export function getTakeHtml(): string {
   }
   function fail(msg) { $('errMsg').textContent = msg; show('err'); }
   function withToken(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
+  var boardHref = '/board?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + (token ? '&token=' + encodeURIComponent(token) : '');
+  $('boardLinkTop').href = boardHref;
   function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
 
   if (!tenant || !project) { fail('Missing ?tenant= and ?project= in the link. Ask your agent for the take link for this board.'); return; }
@@ -422,12 +430,14 @@ export function getTakeHtml(): string {
       fetch(withToken('/api/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
+          look: ($('softLook') && $('softLook').checked) ? 'soft' : 'natural',
           scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
           width: capture === 'canvas' ? 1080 : trackW, height: capture === 'canvas' ? 1920 : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
         .then(function (j) {
           $('doneMeta').textContent = projectName + ' · ' + fmt(blobDuration) + ' take';
-          $('studioLink').href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&token=' + encodeURIComponent(token);
+          $('studioLink').href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&token=' + encodeURIComponent(token) + '&desktop=1';
+          $('boardLink').href = boardHref;
           show('done');
         })
         .catch(function (e) { fail(e.message || String(e)); });

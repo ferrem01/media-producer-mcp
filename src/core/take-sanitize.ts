@@ -61,6 +61,8 @@ export interface TakeSanitizeResult {
   oriented: { width: number; height: number };
   /** Set when the wide take was center-cropped to the canvas frame. */
   reframed?: { from: string; to: string };
+  /** The grade that was applied. */
+  look?: TakeLook;
   /** Integrated loudness before, and the target it was normalized to (absent
    *  when no audio or already within tolerance). */
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
@@ -150,15 +152,23 @@ async function loudnormMeasure(filePath: string): Promise<Record<string, string>
  * take is reframed to it. Never throws on a defect it cannot fix -- the
  * caller attaches the take regardless and the report says what was done.
  */
+/** The "soft" look: a phone camera at arm's length is unflattering in a
+ *  way a gentle grade fixes -- temporal denoise smooths skin without
+ *  blurring edges, a touch of warmth and contrast. Deliberately mild. */
+export const SOFT_LOOK_FILTER = "hqdn3d=4:3:6:4,eq=contrast=1.02:brightness=0.02:saturation=1.05,colorbalance=rm=0.02:bm=-0.02";
+export type TakeLook = "natural" | "soft";
+
 export async function sanitizeTake(
   filePath: string,
   canvas?: { width: number; height: number },
+  look: TakeLook = "natural",
 ): Promise<TakeSanitizeResult> {
   const probe = await probeTake(filePath);
   const rotation = ((probe.rotation % 360) + 360) % 360;
   const bake = rotation !== 0;
   const oriented = orientedDims(probe);
   const crop = canvas ? reframeCrop(oriented, canvas) : null;
+  const grade = look === "soft";
 
   let measured: number | null = null;
   let normalize = false;
@@ -173,16 +183,17 @@ export async function sanitizeTake(
     loudness: measured === null ? undefined : { measured_lufs: round1(measured) },
     probe,
   };
-  if (!bake && !crop && !normalize) return base;
+  if (!bake && !crop && !normalize && !grade) return base;
 
   const ext = path.extname(filePath) || ".mp4";
   const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
   // ffmpeg applies the rotation tag on decode (autorotate, every version),
   // so a re-encode stores the frames upright with an identity matrix.
   const args = ["-y", "-i", filePath, "-map", "0:v:0"];
-  if (bake || crop) {
+  if (bake || crop || grade) {
     const vf: string[] = [];
     if (crop && canvas) vf.push(`crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`, `scale=${canvas.width}:${canvas.height}`);
+    if (grade) vf.push(SOFT_LOOK_FILTER);
     if (vf.length) args.push("-vf", vf.join(","));
     args.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p");
   } else {
@@ -216,6 +227,7 @@ export async function sanitizeTake(
 
   return {
     ...base,
+    look: grade ? "soft" : undefined,
     reframed: crop && canvas ? { from: `${oriented.width}x${oriented.height}`, to: `${canvas.width}x${canvas.height}` } : undefined,
     loudness: measured === null ? undefined : { measured_lufs: round1(measured), normalized_to_lufs: normalizedTo },
     probe: await probeTake(filePath),

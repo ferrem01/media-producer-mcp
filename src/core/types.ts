@@ -700,6 +700,8 @@ export interface Take {
   trim_end?: number;
   rotation_baked?: number;
   reframed?: { from: string; to: string };
+  /** The grade applied at ingest ("soft": gentle skin smoothing and warmth). */
+  look?: "natural" | "soft";
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
 }
 

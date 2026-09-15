@@ -38,6 +38,18 @@ export async function wordsForTake(project: Project, take: Take, dataDir?: strin
   return segs.map((s) => ({ text: s.text, start: s.start, end: s.end }));
 }
 
+/** The de-aired window of a whole recording (single-scene attach): the
+ *  breath before the first word and the reach for the stop button after the
+ *  last are cut. Null when no transcript. */
+export async function deAirTake(project: Project, source: string, duration: number, dataDir?: string): Promise<{ start: number; end: number; head: number; tail: number } | null> {
+  if (!(duration > 0)) return null;
+  try {
+    const words = await wordsForTake(project, { id: "deair", scene_index: -1, source, recorded_at: "" }, dataDir);
+    if (!words || !words.length) return null;
+    return deAirWindow(words, { start: 0, end: duration });
+  } catch { return null; }
+}
+
 /** Warm the transcript cache for a file before the project is loaded for
  *  mutation, so attach + re-time + save happen in one short window. Best
  *  effort: no whisper, no cache, no harm. */
@@ -72,6 +84,32 @@ export async function spineForScene(
     }
   }
   return assertedSpine(script, dur);
+}
+
+/** Silence the booth cannot avoid: the breath before the first word and the
+ *  reach for the stop button after the last. */
+export const DEAIR_HEAD_PAD = 0.35;
+export const DEAIR_TAIL_PAD = 0.45;
+const DEAIR_MAX_CUT = 6;
+
+/** Tighten a window to the speech inside it: first word minus a breath,
+ *  last word plus a beat. Words are in source seconds. Never cuts more
+ *  than a few seconds off either end (a transcript that missed the ending
+ *  must not lose the ending), never inverts the window. */
+export function deAirWindow(
+  words: Array<{ start: number; end: number }>,
+  window: { start: number; end: number },
+): { start: number; end: number; head: number; tail: number } {
+  const inside = words.filter((w) => w.start >= window.start - 0.05 && w.start < window.end);
+  if (!inside.length) return { ...window, head: 0, tail: 0 };
+  const first = Math.min(...inside.map((w) => w.start));
+  const last = Math.max(...inside.map((w) => w.end));
+  let start = Math.max(window.start, round3(first - DEAIR_HEAD_PAD));
+  let end = Math.min(window.end, round3(last + DEAIR_TAIL_PAD));
+  if (start - window.start > DEAIR_MAX_CUT) start = window.start;
+  if (window.end - end > DEAIR_MAX_CUT) end = window.end;
+  if (end - start < 1) return { ...window, head: 0, tail: 0 };
+  return { start, end, head: round3(start - window.start), tail: round3(window.end - end) };
 }
 
 /** The scene's share of the recording: the trimmed window's length, else
@@ -110,7 +148,8 @@ export async function attachTakeAcrossScenes(
   let words: Array<{ text: string; start: number; end: number }> | null = null;
   try { words = await wordsForTake(project, probe, dataDir); } catch { words = null; }
   const total = base.duration && base.duration > 0 ? base.duration : (words?.length ? words[words.length - 1].end : 0);
-  const windows = splitByScripts(indexes.map((i) => String(scenes[i].voiceover_text || "")), words || [], total);
+  const cuts = splitByScripts(indexes.map((i) => String(scenes[i].voiceover_text || "")), words || [], total);
+  const windows = cuts.map((w) => (words && words.length ? deAirWindow(words, w) : { ...w, head: 0, tail: 0 }));
   const takes: Take[] = [];
   indexes.forEach((sceneIndex, k) => {
     const w = windows[k];

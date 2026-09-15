@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   assertedSpine, measuredSpine, resolveAnchor, extractAnchors, resolveComponent, applySpine, clearAnchorsFor, normalizeToken, splitByScripts,
 } from "../src/core/word-anchors.js";
-import { retimeSceneWith, windowWords, takeDuration } from "../src/core/measured-spine.js";
+import { retimeSceneWith, windowWords, takeDuration, deAirWindow, DEAIR_HEAD_PAD, DEAIR_TAIL_PAD } from "../src/core/measured-spine.js";
 
 const SCRIPT = "You're juggling a dozen tools and still guessing. Quotient fixes that. One answer, not another dashboard. Go to getquotient.ai.";
 
@@ -173,5 +173,27 @@ describe("windowed takes", () => {
     expect(windowWords(words, take)).toEqual([{ text: "b", start: 0.1, end: 0.4 }]);
     expect(takeDuration(take)).toBe(2);
     expect(takeDuration({ ...take, trim_start: undefined, trim_end: undefined, duration: 17.06 })).toBe(17.06);
+  });
+});
+
+describe("de-airing a take", () => {
+  const words = [{ start: 1.2, end: 1.5 }, { start: 3.0, end: 3.4 }, { start: 12.3, end: 12.9 }];
+  it("cuts the breath before the first word and the reach for the stop button after the last", () => {
+    const w = deAirWindow(words, { start: 0, end: 16.98 });
+    expect(w.start).toBeCloseTo(1.2 - DEAIR_HEAD_PAD, 3);
+    expect(w.end).toBeCloseTo(12.9 + DEAIR_TAIL_PAD, 3);
+    expect(w.head).toBeCloseTo(0.85, 3);
+    expect(w.tail).toBeCloseTo(3.63, 3);
+  });
+  it("never cuts more than a few seconds -- a transcript that missed the ending must not lose it", () => {
+    const w = deAirWindow([{ start: 0.5, end: 0.9 }], { start: 0, end: 30 });
+    expect(w.end).toBe(30);
+    expect(w.tail).toBe(0);
+  });
+  it("respects a record-all window and leaves a wordless window alone", () => {
+    const w = deAirWindow(words, { start: 2.5, end: 13.0 });
+    expect(w.start).toBeCloseTo(3.0 - DEAIR_HEAD_PAD, 3);
+    expect(w.end).toBe(13.0);          // the pad would run past the window
+    expect(deAirWindow([], { start: 0, end: 5 })).toEqual({ start: 0, end: 5, head: 0, tail: 0 });
   });
 });

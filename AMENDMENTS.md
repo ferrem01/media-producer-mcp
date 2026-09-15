@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-15 — The booth, second round: back to the board, de-air, soft look
+
+From Marc's notes after the fresh two-scene run:
+- **Back to the board.** The take page had no way back except the browser
+  button. The ready screen links back; the done screen's primary action is
+  "Back to the board" (desktop Studio moved to a secondary button).
+- **De-air.** Every take ends with the reach for the stop button and starts
+  with a breath. The transcript already knows when the first and last words
+  were said, so the attach step trims the clip to speech: first word minus
+  0.35s, last word plus 0.45s (`deAirWindow` in `core/measured-spine.ts`),
+  never more than 6s off either end (a transcript that missed the ending must
+  not lose it). Record-all windows are tightened the same way. The trims ride
+  on the take and its clip; the base builder already honours them.
+- **Soft look.** A gentle grade at ingest -- temporal denoise that smooths
+  skin without blurring edges, a touch of warmth and contrast
+  (`SOFT_LOOK_FILTER` in `core/take-sanitize.ts`). On by default on the take
+  page (a toggle), applied to board uploads, recorded as `take.look`.
+
 ## 2026-09-15 — Tall speaker frames: stack over the chest, phone-scale type
 
 Both live 9x16 speaker films came out of the recipe with the WIDE speaker
@@ -24,6 +42,14 @@ bands; floating pills drift in the lower band. Four fixed-pixel components
 field (CSS zoom on their root); the authored-scene builder sets 1.8 on a tall
 speaker frame when the board did not, and gives `auto-tagged-link` 72px. The
 wide layout is untouched.
+
+Second pass after the fresh two-scene run (`proj_7c8380c5`, chest-up at eye
+level): the chin sits near 65%, so the lower band is now ONE row at 68-82%
+and the top band takes the next two; accents sit in the top corners; pills
+drift at 66-82% and keep their whole label inside the box. A position the
+board wrote no longer wins on a tall speaker frame (its composer grew to 26%
+and covered the list under it); a `text-list` becomes one plated caption
+phrase (it was 44px dark slide text on his chin).
 
 Not done: reading the face's actual band from the take (a low camera in bed
 puts the face at 70% of the height; the bands are fixed for now).

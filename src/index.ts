@@ -21,7 +21,7 @@ import { getBoardHtml } from "./board-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } from "./core/take-needs.js";
 import type { Take } from "./core/types.js";
-import { retimeScene, attachTakeAcrossScenes, primeTakeWords, type RetimeResult } from "./core/measured-spine.js";
+import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
@@ -2200,11 +2200,15 @@ Rules:
         // file work is done, and saved within milliseconds.
         let sanitized: TakeSanitizeResult | undefined;
         try {
-          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas);
+          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas, tkBody.look === "soft" ? "soft" : "natural");
         } catch (e: any) {
           console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
         }
         await primeTakeWords(tkPeek, tkUrl, config.dataDir);
+        const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
+        // The breath before the first word and the reach for the stop button
+        // after the last are not part of the take: trim to the speech.
+        const deair = tkBody.scene_index === "all" ? null : await deAirTake(tkPeek, tkUrl, tkDurationHint, config.dataDir);
         const tkProjectObj = await loadProject(tkTenant, tkProject);
         if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         ensureSpeakerNeeds(tkProjectObj);
@@ -2224,6 +2228,7 @@ Rules:
           capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw",
           rotation_baked: sanitized?.rotation_baked || undefined,
           reframed: sanitized?.reframed,
+          look: sanitized?.look,
           loudness: sanitized?.loudness,
         };
         // "Record all": one recording, cut where each scene's script begins.
@@ -2234,6 +2239,8 @@ Rules:
             const split = await attachTakeAcrossScenes(tkProjectObj, takeBase, config.dataDir);
             takes = split.takes; windows = split.windows;
           } catch (e: any) { jsonResponse(res, 400, { error: `record all: ${e?.message || e}` }); return; }
+        } else if (deair && (deair.head > 0 || deair.tail > 0)) {
+          takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase, trim_start: deair.start, trim_end: deair.end, duration: Math.round((deair.end - deair.start) * 100) / 100 })];
         } else {
           takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase })];
         }
@@ -2255,6 +2262,8 @@ Rules:
           take.duration ? `${take.duration}s` : "",
           sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
           sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
+          sanitized?.look ? `${sanitized.look} look` : "",
+          deair && (deair.head > 0 || deair.tail > 0) ? `de-aired -${deair.head}s head / -${deair.tail}s tail` : "",
           sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
           retime ? `${retime.spine.source} spine, ${(retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0)} anchor(s) resolved` : "",
           released ? `${released} waiting job(s) released` : "",

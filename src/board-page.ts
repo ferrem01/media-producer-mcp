@@ -239,7 +239,7 @@ export function getBoardHtml(): string {
       var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
       if (xhr.status < 200 || xhr.status >= 300 || !up.url) { say('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), true); return; }
       say('Attaching…');
-      api('POST', '/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, capture: 'upload', mime: f.type })
+      api('POST', '/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, capture: 'upload', mime: f.type, look: 'soft' })
         .then(function () { say('Scene ' + (i + 1) + ' take attached.'); return load(); })
         .catch(function (e) { say(e.message || String(e), true); });
     };
