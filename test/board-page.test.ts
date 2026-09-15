@@ -38,8 +38,19 @@ describe("the board page (SPEC-take-flow.md, phase 3)", () => {
     expect(js).toMatch(/'Edit the lines'/);
     expect(js).toMatch(/take\.lines\.trim\(\) !== script/);
     // Pause notation is shown the way the prompter shows it, and the script keeps its lines.
-    expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\$\/i/);
+    expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\[\.,!\?\]\*\$\/i/);
     expect(html).toMatch(/\.script \{[^}]*white-space:pre-line/);
+  });
+
+  it("the desktop Studio edits the same lines: the draft view before a build, the storyboard editor after", async () => {
+    const app = await read("../src/preview-app/preview-app.ts");
+    expect(app).toMatch(/id="dv-vo-text"/);                                           // editable before anything is built
+    expect(app).toMatch(/api\('PATCH', '\/storyboard\/' \+ encodeURIComponent\(state\.tenantId\)[^\n]*'\/scenes\/' \+ draftSel, \{ voiceover_text: voText\.value \}\)/);
+    expect(app).toMatch(/id="sm-script"/);                                            // the after-build editor
+    const server = await read("../src/index.ts");
+    // Both routes follow through the same way: need re-pointed, anchors re-resolved, take flagged.
+    expect(server.match(/await afterLinesEdit\(project, idx\)/g)?.length).toBe(2);
+    expect(server.match(/script_changed_since_take: linesMovedPastTake\(project, idx\)/g)?.length).toBe(2);
   });
 
   it("builds only once every need is filled, renders once built, and polls the job", () => {

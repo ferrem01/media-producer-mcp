@@ -2847,3 +2847,19 @@ slot, and the right of that head left 18% of the width. A side slot now
 needs 26% (below that the stamp shrinks past legibility); when only one
 side has room, the second accent stacks under the first on that side
 instead of squeezing into the narrow one.
+
+## The lines are editable in the desktop Studio too; an inline (pause) reads
+
+Marc expected to change the voiceover in Studio's storyboard. Before a
+build the draft view showed the lines read-only, and the after-build
+storyboard editor's save skipped the follow-through the board's edit does.
+The draft view now carries a "Lines" textarea and Save on every card,
+wired to the same by-index route as the phone board; the after-build save
+(`/api/storyboard-scene`) runs the same `afterLinesEdit` (need re-pointed,
+anchors re-resolved against the measured or asserted spine) and reports
+`script_changed_since_take`. One helper, two routes, three surfaces.
+
+The first board written under the notation put "(pause)" at the end of a
+sentence twice instead of on its own line. `scriptLines` now splits a line
+at an inline marker into its text and the beat, and both page prompters
+do the same, so either spelling is the same second of held silence.
