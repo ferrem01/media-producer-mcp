@@ -27,23 +27,42 @@ describe("a speaker scene on a TALL frame", () => {
   const comps = build({ width: 1080, height: 1920 }, AUTHORED);
   const by = (t: string) => comps.find((c) => c.type === t);
 
-  it("stacks surfaces and captions full-width in the lower band, spilling to the top band, never a side column", () => {
+  it("puts ONE surface full-width below the chin and the rest under the platform strip, never a side column", () => {
     for (const t of ["composer", "reel-caption-lane", "auto-tagged-link"]) {
       const p = by(t).position;
       expect(pctNum(p.x)).toBe(5);
       expect(pctNum(p.width)).toBe(90);
     }
-    // First two in the lower band over the chest (58%-82%)...
-    expect(pctNum(by("composer").position.y)).toBeGreaterThanOrEqual(58);
-    expect(pctNum(by("reel-caption-lane").position.y) + pctNum(by("reel-caption-lane").position.height)).toBeLessThanOrEqual(82.1);
-    // ...the third under the platform strip (13%-30%), clear of the face.
-    expect(pctNum(by("auto-tagged-link").position.y)).toBeGreaterThanOrEqual(13);
-    expect(pctNum(by("auto-tagged-link").position.y) + pctNum(by("auto-tagged-link").position.height)).toBeLessThanOrEqual(30.1);
+    // The first surface owns the lower band (68%-82%: below a chest-up chin)...
+    expect(by("composer").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "14%" });
+    // ...the next two stack under the platform strip (13%-30%).
+    for (const t of ["reel-caption-lane", "auto-tagged-link"]) {
+      const p = by(t).position;
+      expect(pctNum(p.y)).toBeGreaterThanOrEqual(13);
+      expect(pctNum(p.y) + pctNum(p.height)).toBeLessThanOrEqual(30.1);
+    }
   });
 
-  it("puts accents in the band corners and floating pills over the chest, not the face", () => {
+  it("puts accents in the top corners and floating pills below the chin, not on the face", () => {
     expect(by("sticker-prop").position).toEqual({ x: "62%", y: "13%", width: "32%", height: "12%" });
-    expect(by("floating-pills").position).toEqual({ x: "0%", y: "52%", width: "100%", height: "30%" });
+    expect(by("floating-pills").position).toEqual({ x: "0%", y: "66%", width: "100%", height: "16%" });
+  });
+
+  it("lets the band layout win over a position the board wrote (measured: a 26%-tall composer on the list under it)", () => {
+    const c = build({ width: 1080, height: 1920 }, [
+      { type: "composer", data: { text: "x" }, position: { x: "5%", y: "58%", width: "90%", height: "26%" } },
+    ]);
+    expect(c[0].position).toEqual({ x: "5%", y: "68%", width: "90%", height: "14%" });
+    const wide = build({ width: 1920, height: 1080 }, [
+      { type: "composer", data: { text: "x" }, position: { x: "10%", y: "10%", width: "40%", height: "30%" } },
+    ]);
+    expect(wide[0].position).toEqual({ x: "10%", y: "10%", width: "40%", height: "30%" }); // wide frames still honour the board
+  });
+
+  it("renders a text-list as one plated caption phrase", () => {
+    const c = build({ width: 1080, height: 1920 }, [{ type: "text-list", data: { title: "Running now", items: ["Email", "Social", "Web"], at: 5 } }]);
+    expect(c[0].type).toBe("reel-caption-lane");
+    expect(c[0].data).toMatchObject({ scrim: "plate", phrases: [{ text: "*Email* · *Social* · *Web*", start: 5, end: 12 }] });
   });
 
   it("scales fixed-pixel type for a phone unless the board set its own size", () => {

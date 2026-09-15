@@ -469,15 +469,18 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     // proj_234d8a01: the wide dock put the composer, captions and URL in a
     // right-third column with 34px type, and the pills over his eyes.)
     if (vertical && !takeover) {
+      // Measured on the fresh run (proj_7c8380c5, chest-up at eye level):
+      // the chin sits near 65%, so the lower band starts at 68% and holds
+      // ONE row; the top band (13-30%) takes the rest, two rows at most.
       var stack = dockSurf.concat(heroIdx, captionIdx).sort((a, b) => a - b);
-      var lower = stack.slice(0, 2), upper = stack.slice(2);
-      var lowerRows = stackRows(lower.length, 58, 24, 2);
-      lower.forEach((idx, k) => { slots[idx] = { position: pct(5, lowerRows[k][0], 90, lowerRows[k][1]), z_index: 10 + k }; });
+      var lower = stack.slice(0, 1), upper = stack.slice(1, 3), dropped = stack.slice(3);
+      lower.forEach((idx, k) => { slots[idx] = { position: pct(5, 68, 90, 14), z_index: 10 + k }; });
       var upperRows = stackRows(upper.length, 13, 17, 2);
       upper.forEach((idx, k) => { slots[idx] = { position: pct(5, upperRows[k][0], 90, upperRows[k][1]), z_index: 20 + k }; });
+      dropped.forEach((idx) => { console.log(`    ${authored[idx].type}: no band left on the tall speaker frame (three surfaces already placed) -- dropped`); slots[idx] = null; });
       var TALL_ACCENTS: Array<Record<string, string | number>> = [
         { x: "62%", y: "13%", width: "32%", height: "12%" },   // top-right, under the platform strip
-        { x: "6%", y: "70%", width: "34%", height: "12%" },    // bottom-left, over the chest
+        { x: "6%", y: "13%", width: "34%", height: "12%" },    // top-left, under the platform strip
       ];
       var tallAccent = 0;
       authored.forEach((c, i) => {
@@ -485,7 +488,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
           slots[i] = { position: TALL_ACCENTS[Math.min(tallAccent, TALL_ACCENTS.length - 1)], z_index: 40 + tallAccent };
           tallAccent++;
         } else if (HIGH_OVERLAY_TYPES.indexOf(c.type) !== -1) {
-          slots[i] = { position: pct(0, 52, 100, 30), z_index: 38 };
+          slots[i] = { position: pct(0, 66, 100, 16), z_index: 38 }; // pills drift below the chin
         }
       });
       return slots;
@@ -751,6 +754,17 @@ export function buildAuthoredCompositionScene(
     // 390px phone). The board's own value wins; otherwise 1.8x.
     if (speakerBase && tallFrame && !isTakeover) {
       if (PHONE_SCALE_TYPES.indexOf(c.type) !== -1 && data.scale === undefined) data.scale = 1.8;
+      // A text-list is a desktop slide block (100px padding, 44px title,
+      // unplated). Over a phone selfie its items become ONE plated caption
+      // phrase (measured: "Running now / Email Social Web" was tiny dark
+      // text on his chin).
+      if (c.type === "text-list" && Array.isArray(data.items) && data.items.length) {
+        var at = Number(data.at); if (!Number.isFinite(at)) at = Math.round(draft.duration_seconds * 0.5 * 10) / 10;
+        var phrase = (data.items as unknown[]).map((it) => `*${String(it).trim()}*`).join(" · ");
+        console.log(`    text-list: tall speaker frame -- rendered as a caption phrase "${phrase}" from ${at}s`);
+        (c as any).type = "reel-caption-lane";
+        data = { phrases: [{ text: phrase, start: at, end: draft.duration_seconds }], scrim: "plate", align: "center" };
+      }
       // A pixel font size the board wrote is a desktop number (measured:
       // the URL at 44px on a 1080-wide phone frame). Floor it.
       if (c.type === "auto-tagged-link" || c.type === "kinetic-text") {
@@ -810,6 +824,14 @@ export function buildAuthoredCompositionScene(
     var authoredPos = (c as any).position;
     var hasAuthoredPos = !!authoredPos && typeof authoredPos === "object"
       && authoredPos.x !== undefined && authoredPos.y !== undefined;
+    // ...except on a TALL SPEAKER frame, where the board's numbers are
+    // desktop guesses and the bands are the only thing keeping content off
+    // the face (measured: the board's composer grew to 26% and sat on the
+    // list under it). A takeover's full-bleed position still stands.
+    if (hasAuthoredPos && speakerBase && tallFrame && !isTakeover && lay && STAGE_OVERLAY_TYPES.indexOf(c.type) === -1) {
+      console.log(`    ${c.type}: tall speaker frame -- the band layout wins over the board's position (${JSON.stringify(authoredPos)})`);
+      hasAuthoredPos = false;
+    }
     if (hasAuthoredPos && JSON.stringify(authoredPos) !== JSON.stringify(lay.position)) {
       console.log(`    ${c.type}: honoring the board's own position (${JSON.stringify(authoredPos)}) over the ${c.type} layout slot`);
     }

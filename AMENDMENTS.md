@@ -25,6 +25,14 @@ field (CSS zoom on their root); the authored-scene builder sets 1.8 on a tall
 speaker frame when the board did not, and gives `auto-tagged-link` 72px. The
 wide layout is untouched.
 
+Second pass after the fresh two-scene run (`proj_7c8380c5`, chest-up at eye
+level): the chin sits near 65%, so the lower band is now ONE row at 68-82%
+and the top band takes the next two; accents sit in the top corners; pills
+drift at 66-82% and keep their whole label inside the box. A position the
+board wrote no longer wins on a tall speaker frame (its composer grew to 26%
+and covered the list under it); a `text-list` becomes one plated caption
+phrase (it was 44px dark slide text on his chin).
+
 Not done: reading the face's actual band from the take (a low camera in bed
 puts the face at 70% of the height; the bands are fixed for now).
 
