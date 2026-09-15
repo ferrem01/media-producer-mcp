@@ -20,7 +20,7 @@ import { getTakeHtml } from "./take-page.js";
 import { getBoardHtml } from "./board-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake } from "./core/take-needs.js";
-import type { Take } from "./core/types.js";
+import type { Take, Project } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
 import { detectFace } from "./core/face-band.js";
@@ -197,6 +197,24 @@ function applyStoryboardFields(ps: any, body: any): void {
   if (Array.isArray(body?.beats)) {
     ps.beats = normalizeBeats(body.beats, ps.duration_seconds || 5);
   }
+}
+
+/** After a scene's spoken lines change, wherever they were edited: the take
+ *  need follows the script and the scene's anchors are resolved again --
+ *  against the take's measured spine when one is attached, at speaking
+ *  pace otherwise. Speaker boards only; returns the re-time when it ran. */
+async function afterLinesEdit(project: Project, idx: number): Promise<RetimeResult | null> {
+  ensureSpeakerNeeds(project);
+  if ((project.treatment as any)?.filmGrammar !== "speaker") return null;
+  try { return await retimeScene(project, idx, config.dataDir); }
+  catch (e: any) { console.warn(`  storyboard: re-time after script edit skipped: ${e?.message || e}`); return null; }
+}
+
+/** True when the scene's take was recorded against different lines. */
+function linesMovedPastTake(project: Project, idx: number): boolean {
+  const take = activeTake(project, idx);
+  const lines = String(project.storyboard?.scenes?.[idx]?.voiceover_text || "").trim();
+  return !!(take?.lines && take.lines.trim() !== lines);
 }
 
 const SERVICE_VERSION = "0.1.0";
@@ -2998,22 +3016,17 @@ Rules:
         if (typeof body.visual_notes === "string" && body.visual_notes.trim() !== String(sbScene.visual_notes || "").trim()) { sbScene.visual_notes = body.visual_notes.trim(); changed = true; }
         let retime: RetimeResult | null = null;
         if (changed) {
-          ensureSpeakerNeeds(project);
-          if ((project.treatment as any)?.filmGrammar === "speaker") {
-            try { retime = await retimeScene(project, idx, config.dataDir); }
-            catch (e: any) { console.warn(`  storyboard: re-time after script edit skipped: ${e?.message || e}`); }
-          }
+          retime = await afterLinesEdit(project, idx);
           project.updated_at = new Date().toISOString();
           await saveProject(project);
         }
-        const take = activeTake(project, idx);
         jsonResponse(res, 200, {
           ok: true,
           scene_index: idx,
           changed,
           scene: sbScene,
           open_needs: openTakeNeeds(project),
-          script_changed_since_take: !!(take?.lines && take.lines.trim() !== String(sbScene.voiceover_text || "").trim()),
+          script_changed_since_take: linesMovedPastTake(project, idx),
           spine: retime ? { source: retime.spine.source, resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0) } : undefined,
         });
         return;
@@ -3031,10 +3044,14 @@ Rules:
         const idx = project.scenes.findIndex((s: any) => s.id === sceneId);
         if (idx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
         const storyboardScene = ensureStoryboardScene(project, idx);
+        const linesBefore = String(storyboardScene.voiceover_text || "").trim();
         applyStoryboardFields(storyboardScene, body);
+        // The lines changed: the same follow-through as the board's edit
+        // (need re-pointed, anchors resolved again, the take flagged).
+        if (String(storyboardScene.voiceover_text || "").trim() !== linesBefore) await afterLinesEdit(project, idx);
         project.updated_at = new Date().toISOString();
         await saveProject(project);
-        jsonResponse(res, 200, { ok: true, scene: storyboardScene });
+        jsonResponse(res, 200, { ok: true, scene: storyboardScene, script_changed_since_take: linesMovedPastTake(project, idx) });
         return;
       }
 

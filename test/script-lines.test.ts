@@ -20,6 +20,13 @@ describe("script notation (SPEC-take-flow.md): one sentence per line, (pause) is
     expect(scriptLines("  \n\n")).toEqual([]);
   });
 
+  it("reads an inline (pause) at the end of a sentence as the same beat", () => {
+    const lines = scriptLines("A deck nobody opens. (pause)\nNow what?");
+    expect(lines.map((l) => [l.text, l.pause])).toEqual([["A deck nobody opens.", false], ["", true], ["Now what?", false]]);
+    expect(scriptLines("Wait (pause) for it.").map((l) => l.text)).toEqual(["Wait", "", "for it."]);
+    expect(displayScript("A deck nobody opens. (pause)")).toBe("A deck nobody opens.\n" + PAUSE_GLYPH);
+  });
+
   it("counts only spoken words and totals the authored silence", () => {
     expect(scriptWords(SCRIPT)).toEqual(["Your", "campaign", "is", "live.", "Now", "what", "actually", "happened?", "Email,", "social,", "web."]);
     expect(scriptWords("Hello (PAUSE) there")).toEqual(["Hello", "there"]);

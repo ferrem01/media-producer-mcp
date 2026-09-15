@@ -30,8 +30,15 @@ export interface ScriptLine {
 /** The script as lines the reader sees: sentences and pause beats. Blank
  *  lines are dropped; the last spoken line carries no trailing breath. */
 export function scriptLines(script: string): ScriptLine[] {
-  const raw = String(script || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const out: ScriptLine[] = raw.map((l) => (PAUSE_LINE.test(l) ? { text: "", gapAfter: PAUSE_BEAT_S, pause: true } : { text: l, gapAfter: LINE_BREATH_S, pause: false }));
+  // An inline "(pause)" ("A deck nobody opens. (pause)") is the same beat
+  // written on the sentence's line -- the storyboard writer does that --
+  // so the line splits there into its text and the pause.
+  const raw = String(script || "")
+    .split(/\r?\n/)
+    .flatMap((l) => l.split(/(\(\s*pause\s*\)[.,!?]*)/i))
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const out: ScriptLine[] = raw.map((l) => (PAUSE_LINE.test(l) || PAUSE_TOKEN.test(l) ? { text: "", gapAfter: PAUSE_BEAT_S, pause: true } : { text: l, gapAfter: LINE_BREATH_S, pause: false }));
   for (let i = out.length - 1; i >= 0; i--) {
     if (out[i].pause) continue;
     out[i].gapAfter = 0; // nothing follows the last spoken line

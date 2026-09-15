@@ -192,14 +192,14 @@ export function getTakeHtml(): string {
   // beat (~1s) the prompter shows as "•••". Silences come out of the
   // scene's duration first; the words share what is left.
   var BREATH_S = 0.3, PAUSE_S = 1.0, PAUSE_GLYPH = '\u2022\u2022\u2022';
-  var PAUSE_LINE = /^\\(\\s*pause\\s*\\)$/i;
+  var PAUSE_LINE = /^\\(\\s*pause\\s*\\)[.,!?]*$/i;
   function buildCues(scenes) {
     var out = [];
     (scenes || []).forEach(function (s, i) {
       var text = String(s.voiceover_text || '').trim();
       if (!text) return;
       var items = [];
-      var lines = text.split(/\\r?\\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      var lines = text.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { return l.trim(); }).filter(Boolean);
       lines.forEach(function (ln) {
         if (PAUSE_LINE.test(ln)) { items.push({ text: PAUSE_GLYPH, words: 0, gap: PAUSE_S }); return; }
         var parts = ln.match(/[^.!?…]+[.!?…]+["')\\]]*|[^.!?…]+$/g) || [ln];
@@ -240,7 +240,7 @@ export function getTakeHtml(): string {
         var d = document.createElement('p'); d.className = 'beat';
         var b = document.createElement('b'); b.textContent = (sceneLabel ? 'Lines' : 'Beat ' + (i + 1)) + (s.duration_seconds ? ' · ' + Number(s.duration_seconds).toFixed(0) + 's' : '');
         d.appendChild(b);
-        d.appendChild(document.createTextNode(t.split(/\\r?\\n/).map(function (l) { l = l.trim(); return PAUSE_LINE.test(l) ? PAUSE_GLYPH : l; }).filter(Boolean).join('\\n')));
+        d.appendChild(document.createTextNode(t.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { l = l.trim(); return PAUSE_LINE.test(l) ? PAUSE_GLYPH : l; }).filter(Boolean).join('\\n')));
         sc.appendChild(d);
       });
       $('recordBtn').disabled = false;

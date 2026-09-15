@@ -115,10 +115,10 @@ export function getBoardHtml(): string {
 
   // The script as the reader sees it: one sentence per line; a line that
   // says only (pause) is a held beat, shown as the prompter shows it.
-  var PAUSE_LINE = /^\\(\\s*pause\\s*\\)$/i;
+  var PAUSE_LINE = /^\\(\\s*pause\\s*\\)[.,!?]*$/i;
   function scriptView(script) {
     var sc = document.createElement('div'); sc.className = 'script';
-    var lines = script.split(/\\r?\\n/);
+    var lines = script.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []);
     lines.forEach(function (ln, k) {
       var t = ln.trim(); if (!t) return;
       if (PAUSE_LINE.test(t)) { var pz = document.createElement('span'); pz.className = 'pause'; pz.textContent = '\u2022\u2022\u2022'; sc.appendChild(pz); }

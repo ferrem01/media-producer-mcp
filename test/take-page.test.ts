@@ -36,7 +36,7 @@ describe("what the booth does", () => {
 
   it("cues the prompter by line: a (pause) line is a held beat shown as •••, a line break a breath", () => {
     const js = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
-    expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\$\/i/);
+    expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\[\.,!\?\]\*\$\/i/);
     expect(js).toMatch(/BREATH_S = 0\.3, PAUSE_S = 1\.0/);
     expect(js).toMatch(/text\.split\(\/\\r\?\\n\/\)/);
     expect(js).toMatch(/items\.push\(\{ text: PAUSE_GLYPH, words: 0, gap: PAUSE_S \}\)/);

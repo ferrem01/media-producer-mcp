@@ -997,6 +997,10 @@ export function getPreviewHtml(): string {
     background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
   .dv-chip.authored { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
   .dv-vo { font-size: 12px; color: #6b7280; font-style: italic; margin-bottom: 2px; }
+  .dv-vo-edit textarea { width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical; border: 1px solid #d8dbe4;
+    border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; line-height: 1.45; color: #111827; }
+  .dv-vo-row { display: flex; align-items: center; gap: 10px; margin: 6px 0 4px; }
+  .dv-vo-hint { font-size: 11px; color: #6b7280; }
   .dv-feedback { display: flex; gap: 8px; margin-top: 14px; }
   .dv-feedback textarea { flex: 1; resize: vertical; min-height: 40px; border: 1px solid #d8dbe4;
     border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 12.5px; color: #111827;
@@ -3918,7 +3922,11 @@ export function getPreviewHtml(): string {
       (scenes.length > 1 ? '<button class="dv-del" id="dv-scene-delete" title="Delete this scene from the board">✕</button>' : '') +
       '<span class="dv-dur">' + (Number(s.duration_seconds) || 0) + 's</span></div>';
     if (s.purpose) h += '<div class="dv-purpose">' + escHtml(s.purpose) + '</div>';
-    if (s.voiceover_text) h += '<div class="dv-vo">VO: “' + escHtml(s.voiceover_text) + '”</div>';
+    // The spoken lines, editable in place (the same route the phone board
+    // uses): one sentence per line; a line that says only (pause) is a beat.
+    h += '<div class="dv-vo-edit"><div class="dv-sect">LINES (what is said)</div>' +
+      '<textarea id="dv-vo-text" placeholder="One sentence per line. A line that says only (pause) holds a beat.">' + escHtml(s.voiceover_text || '') + '</textarea>' +
+      '<div class="dv-vo-row"><button class="dv-btn" id="dv-vo-save">Save lines</button><span class="dv-vo-hint">One sentence per line · a line that says only (pause) holds a beat</span></div></div>';
     var tpl = (s.scene_template && s.scene_template.type) || s.template;
     if (tpl) h += '<div class="dv-chips"><span class="dv-chip dv-chip-tpl">' + escHtml('template: ' + tpl) + '</span></div>';
     if (s.visual_notes) h += '<div class="dv-sect">VISUAL NOTES</div><div class="dv-notes">' + escHtml(s.visual_notes) + '</div>';
@@ -4016,6 +4024,17 @@ export function getPreviewHtml(): string {
         '/storyboard-revise/' + state.tenantId + '/' + project.project_id,
         { feedback: txt, scene_index: draftSel },
         'revise', '✎ Revise');
+    });
+    var voSave = document.getElementById('dv-vo-save'), voText = document.getElementById('dv-vo-text');
+    if (voSave && voText) voSave.addEventListener('click', function() {
+      voSave.disabled = true; voSave.textContent = 'Saving…';
+      api('PATCH', '/storyboard/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '/scenes/' + draftSel, { voiceover_text: voText.value })
+        .then(function(res) {
+          if (res && res.scene) project.storyboard.scenes[draftSel] = res.scene;
+          studioStatus(res && res.script_changed_since_take ? 'Lines saved. The take on this scene no longer matches them.' : 'Lines saved.', 'ok');
+          renderDraftView(project);
+        })
+        .catch(function(e) { voSave.disabled = false; voSave.textContent = 'Save lines'; studioStatus('Could not save the lines: ' + (e && e.message ? e.message : e), 'err'); });
     });
     var delBtn = document.getElementById('dv-scene-delete');
     if (delBtn) delBtn.addEventListener('click', function() {
