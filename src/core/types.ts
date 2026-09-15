@@ -162,6 +162,9 @@ export interface SceneComponent {
   id: string;
   type: string;
   data: Record<string, unknown>;
+  /** Word anchors by data path (core/word-anchors.ts): the numeric field in
+   *  `data` holds the resolved time; this says which spoken word it follows. */
+  anchors?: Record<string, { word: string; occurrence?: number; edge?: "start" | "end"; offset?: number }>;
   position?: ComponentPosition;
   z_index?: number;
   pose?: ComponentPose;
@@ -369,6 +372,9 @@ export interface Scene {
    *  when critique was skipped. */
   quality?: SceneQuality;
   audio_hints?: SceneAudioHints;
+  /** The word clock the scene's anchors were last resolved against:
+   *  asserted (script estimate) or measured (the take's transcript). */
+  spine?: { source: "asserted" | "measured"; words: Array<{ text: string; start: number; end: number }>; duration: number };
   /** When set, all components are constrained to this region of the frame.
    *  Used with speaker track so content appears beside the speaker. */
   content_region?: ContentRegion;

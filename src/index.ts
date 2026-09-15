@@ -19,6 +19,8 @@ import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } from "./core/take-needs.js";
+import { retimeScene, type RetimeResult } from "./core/measured-spine.js";
+import { clearAnchorsFor } from "./core/word-anchors.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
@@ -2190,6 +2192,14 @@ Rules:
           reframed: sanitized?.reframed,
           loudness: sanitized?.loudness,
         });
+        // The take is now the scene's clock: transcribe it and re-time every
+        // word-anchored overlay (storyboard entry and built scene alike).
+        let retime: RetimeResult | undefined;
+        try {
+          retime = await retimeScene(tkProjectObj, sceneIndex, config.dataDir);
+        } catch (e: any) {
+          console.warn(`  take: re-time skipped for scene ${sceneIndex + 1}: ${e?.message || e}`);
+        }
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
         const released = resolveTakeWaiters(tkTenant, tkProject, take);
@@ -2199,12 +2209,16 @@ Rules:
           sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
           sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
           sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
+          retime ? `${retime.spine.source} spine, ${(retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0)} anchor(s) resolved` : "",
           released ? `${released} waiting job(s) released` : "",
         ].filter(Boolean).join(", ");
         console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)} (${tkNotes})`);
         jsonResponse(res, 200, {
           ok: true, project_id: tkProject, take, speaker_track: tkProjectObj.speaker_track,
           open_needs: openTakeNeeds(tkProjectObj),
+          spine: retime ? { source: retime.spine.source, duration: retime.duration, words: retime.spine.words.length,
+            resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0),
+            unresolved: [...(retime.storyboard?.unresolved || []), ...(retime.built?.unresolved || [])] } : undefined,
         });
         return;
       }
@@ -2981,6 +2995,8 @@ Rules:
         if (!comp) { jsonResponse(res, 404, { error: "Component not found" }); return; }
         if (body.data && typeof body.data === "object") {
           (comp as any).data = { ...((comp as any).data || {}), ...(body.data as Record<string, unknown>) };
+          // A number set by hand wins over the word it used to follow.
+          clearAnchorsFor(comp as any, Object.keys(body.data as object));
         }
         // Stage-lane fields (SPEC-motion-architecture L4): pose/enter/exit/
         // position live on the wrapper, not in data. null clears a field.

@@ -31,8 +31,26 @@ model and something for the agent to wait on.
 - **One ingest.** `add`/`update` with `speaker_track` now run the same
   sanitizer as the page on this project's own assets.
 
-Still by hand after phase 1: re-timing overlays to the spoken words (phase 2:
-word anchors + measured spine) and the phone board view (phase 3).
+**Phase 2 (same PR): word anchors + the measured spine.** A component time
+may be authored as a word in the scene's script -- `{"word": "dashboard"}` or
+`"@dashboard"` (options: occurrence, edge start|end, offset) -- at any depth of
+`data` (`at`, `send_at`, `phrases[1].start`, `script[3].at`). `core/word-anchors.ts`
+lifts them into `component.anchors` (by data path) and resolves them into the
+numeric field, so every renderer stays numeric. Two spines, one resolver:
+ASSERTED (script words spread over the estimated duration by character
+weight) at build, MEASURED (the take's whisper words, repaired like the Studio
+lane) at attach -- `core/measured-spine.ts`. The build resolves anchors for
+every speaker scene (`pipeline.ts`, before the takeover pass); `POST /api/take`
+transcribes the take, makes it the scene's clock (duration = take length)
+and re-resolves the storyboard entry AND the built scene, so create-before-
+take and take-before-create are the same code path. A number set by hand in
+Studio drops the anchor it overrides. The storyboard builder's SPEAKER block
+now asks for anchors instead of seconds. `scene.spine` records which clock the
+scene was last resolved against.
+
+Still by hand after phase 2: nothing on this project's cut -- but the phone
+board view (phase 3) is not built, so the Studio link on a phone is still the
+desktop app.
 
 ## 2026-09-15 — Take ingest sanitizer (orientation baked, reframe, loudness)
 

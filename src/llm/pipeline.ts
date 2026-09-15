@@ -27,6 +27,8 @@ import { reviseComponent } from "./component-revise.js";
 import { critiqueAndReviseScene } from "./revision-critique.js";
 import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
+import { spineForScene } from "../core/measured-spine.js";
+import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
 import { loadProject, saveProject, createProject } from "../persistence/project.js";
@@ -2663,6 +2665,30 @@ async function runUnifiedPipeline(
     }
   }
 
+  // ── Speaker films: resolve WORD ANCHORS against the scene's spine ──
+  // Overlays authored "on 'dashboard'" become seconds here: from the take's
+  // transcript when the scene has one (the take is then also the clock), else
+  // from the script at speaking pace. A take arriving later re-resolves the
+  // same anchors in place (core/measured-spine.ts).
+  if (filmGrammar === "speaker") {
+    let spineProject: Project | null = null;
+    if (opts.project_id) { try { spineProject = await loadProject(opts.tenant_id, opts.project_id); } catch { /* fresh build */ } }
+    let sceneIdx = 0;
+    for (const d of storyboard.scenes as any[]) {
+      const i = sceneIdx++;
+      const script = String(d.voiceover_text || "");
+      if (!script.trim() && !(Array.isArray(d.components) && d.components.length)) continue;
+      const spine = await spineForScene(spineProject, i, script, Number(d.duration_seconds) || 0);
+      if (spine.source === "measured" && spine.duration > 0 && Math.abs(spine.duration - (Number(d.duration_seconds) || 0)) > 0.05) {
+        console.log(`  Spine: scene ${i + 1} ${d.duration_seconds}s -> ${spine.duration}s (the take is the clock)`);
+        d.duration_seconds = Math.round(spine.duration * 100) / 100;
+      }
+      const r = applySpine(d, spine);
+      if (r.resolved || r.unresolved.length) {
+        console.log(`  Spine: scene ${i + 1} ${spine.source}: ${r.resolved} anchor(s) resolved${r.unresolved.length ? `, ${r.unresolved.length} not in the script: ${r.unresolved.map((u) => `${u.component}.${u.path}="${u.word}"`).join(", ")}` : ""}`);
+      }
+    }
+  }
   // ── Speaker-film TAKEOVERS: enforce the recipe deterministically ──
   // A scene that stages a product surface INSTEAD of the speaker is a
   // takeover, and the storyboard authors it wrong in ways the viewer sees:
