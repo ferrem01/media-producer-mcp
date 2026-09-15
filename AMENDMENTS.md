@@ -63,6 +63,14 @@ built, both poll their job; a rendered film plays inline. `/studio` on a phone
 passes around is still the Studio link. Verified in a headless iPhone against
 a local server; the real phone is Marc's next test.
 
+Live exit test after the merge (`take` tool on `proj_c210e5e1` through an MCP
+client: tool present, job queued, links and script returned) caught two
+things: a clip saved before per-scene takes carried no `scene_index`, so the
+attached take read as "needed" (migration now stamps it -- #760); and a
+WAITING take job counted as a job in flight, which blocked every auto-deploy
+while a booth link was open. The deploy guard now ignores `take` jobs (a wait,
+not work) and the job route reports them as `waiting`, not `rendering`.
+
 Not built: a project- or need-scoped token for handing a link to someone who
 is not the tenant (design it in when a second human records); the desktop
 Studio still reads `speaker_track.clips[0]` only (a multi-scene speaker film

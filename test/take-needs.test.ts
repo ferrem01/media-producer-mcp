@@ -102,3 +102,11 @@ describe("the take job's waiter", () => {
     expect(resolveTakeWaiters("t", "other", t1)).toBe(0);     // other projects untouched
   });
 });
+
+describe("a waiting take job", () => {
+  it("never blocks a deploy (it is a wait, not work)", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const src = await readFile(new URL("../src/index.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/\(j\.status === "running" \|\| j\.status === "queued"\) && j\.type !== "take"\)/);
+  });
+});
