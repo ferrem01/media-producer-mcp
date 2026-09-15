@@ -355,6 +355,8 @@ function normalizeAnim(v: unknown): import("../core/types.js").ComponentAnimatio
 var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 /** Fixed-pixel type that needs a multiplier on a tall speaker frame. */
 var PHONE_SCALE_TYPES = ["sticker-prop", "prop-strike", "floating-pills", "composer"];
+/** Smallest pixel font a board may set for type on a tall speaker frame. */
+var PHONE_MIN_FONT_PX = 72;
 /** Full-stage overlays: performers that cover the whole composition. */
 var STAGE_OVERLAY_TYPES = ["cursor-performer"];
 /** Ambient full-stage text overlays that ride ABOVE the windows (their own
@@ -749,7 +751,15 @@ export function buildAuthoredCompositionScene(
     // 390px phone). The board's own value wins; otherwise 1.8x.
     if (speakerBase && tallFrame && !isTakeover) {
       if (PHONE_SCALE_TYPES.indexOf(c.type) !== -1 && data.scale === undefined) data.scale = 1.8;
-      if (c.type === "auto-tagged-link" && data.font_size === undefined) data.font_size = "72px";
+      // A pixel font size the board wrote is a desktop number (measured:
+      // the URL at 44px on a 1080-wide phone frame). Floor it.
+      if (c.type === "auto-tagged-link" || c.type === "kinetic-text") {
+        var fsPx = typeof data.font_size === "string" ? parseFloat(data.font_size) : NaN;
+        if (data.font_size === undefined || (Number.isFinite(fsPx) && fsPx < PHONE_MIN_FONT_PX)) data.font_size = `${PHONE_MIN_FONT_PX}px`;
+      }
+      // The URL's ink is text over the camera: dark ink vanishes on a dark
+      // room (measured: #17171c on a charcoal wall).
+      if (c.type === "auto-tagged-link" && (typeof data.ink !== "string" || !hexIsLight(data.ink as string))) data.ink = "#f5f6fa";
     }
     // WORLD INK CLAMP: editorial copy must contrast the world it sits on.
     // Storyboards habitually author dark-era caption colors (#f5f6fa) that

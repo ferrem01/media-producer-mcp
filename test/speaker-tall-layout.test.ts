@@ -56,6 +56,19 @@ describe("a speaker scene on a TALL frame", () => {
     expect(own[0].data.scale).toBe(1.2);
   });
 
+  it("floors a desktop pixel font the board wrote, and lights the URL's ink over the camera", () => {
+    const c = build({ width: 1080, height: 1920 }, [
+      { type: "auto-tagged-link", data: { base: "getquotient.ai", font_size: "44px", ink: "#17171c" } },
+      { type: "kinetic-text", data: { text: "hi", font_size: "40px" } },
+      { type: "auto-tagged-link", data: { base: "x.ai", font_size: "96px", ink: "#f5f6fa" } },
+    ]);
+    expect(c[0].data.font_size).toBe("72px");
+    expect(c[0].data.ink).toBe("#f5f6fa");
+    expect(c[1].data.font_size).toBe("72px");
+    expect(c[2].data.font_size).toBe("96px");   // a phone-sized value stands
+    expect(c[2].data.ink).toBe("#f5f6fa");
+  });
+
   it("leaves a takeover scene full-frame", () => {
     const c = build({ width: 1080, height: 1920 }, [{ type: "quotient-app-shell", data: {} }], false);
     expect(c[0].position).toMatchObject({ x: 0, y: 0, width: "100%", height: "100%" });
