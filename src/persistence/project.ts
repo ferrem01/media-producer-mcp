@@ -122,6 +122,17 @@ export function migrateProject(p: any): Project {
     p.takes = [{ id: "take_0", scene_index: 0, capture: "raw", ...p.take }];
     delete p.take;
   }
+  // Clips that predate per-scene takes carry no scene_index: a clip that is a
+  // recorded take belongs to that take's scene; any other clip list is one
+  // clip per scene in order.
+  if (p && Array.isArray(p.speaker_track?.clips)) {
+    p.speaker_track.clips.forEach((c: any, k: number) => {
+      if (c && c.scene_index === undefined) {
+        const t = (p.takes || []).find((t: any) => t.source === c.source);
+        c.scene_index = t ? t.scene_index : k;
+      }
+    });
+  }
   // A speaker board always carries its take needs (idempotent; boards saved
   // before needs existed get them on first load).
   if (p && p.storyboard) ensureSpeakerNeeds(p as Project);
