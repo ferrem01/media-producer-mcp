@@ -47,6 +47,7 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var card = el.querySelector('.pstk-card');
+    if (Number(data.scale) > 0 && Number(data.scale) !== 1) el.querySelector('.pstk').style.zoom = String(Number(data.scale)); // phone scale
     var textEl = el.querySelector('.pstk-text');
 
     // card:false -- the strike happens ON the surface, not on a floating
