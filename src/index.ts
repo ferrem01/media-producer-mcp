@@ -879,7 +879,11 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         }
         let deployBody: any = {};
         try { deployBody = await parseBody(req); } catch { /* empty body is fine */ }
-        const activeJobs = listAllJobs().filter((j: any) => j.status === "running" || j.status === "queued");
+        // A `take` job is a WAIT, not work: it holds no process, a reload
+        // drops its waiter and the need on disk survives (the agent re-asks).
+        // Counting it here blocked every auto-deploy while a human had a
+        // booth link open (measured live: #759's exit test held master back).
+        const activeJobs = listAllJobs().filter((j: any) => (j.status === "running" || j.status === "queued") && j.type !== "take");
         if (activeJobs.length > 0 && deployBody.force !== true) {
           jsonResponse(res, 409, {
             error: "Jobs in flight -- the pm2 reload would kill them. Pass {\"force\": true} to deploy anyway.",
@@ -1976,6 +1980,9 @@ Rules:
           jsonResponse(res, 404, { error: "Job not found" });
           return;
         }
+        // A take job is waiting for a human, not rendering.
+        const jmRaw = getJob(jmId);
+        if (jmRaw?.type === "take" && jmRaw.status === "running") (jmJob as any).status = "waiting";
         jsonResponse(res, 200, jmJob);
         return;
       }
