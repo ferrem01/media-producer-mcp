@@ -478,9 +478,13 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
       var upperRows = stackRows(upper.length, 13, 17, 2);
       upper.forEach((idx, k) => { slots[idx] = { position: pct(5, upperRows[k][0], 90, upperRows[k][1]), z_index: 20 + k }; });
       dropped.forEach((idx) => { console.log(`    ${authored[idx].type}: no band left on the tall speaker frame (three surfaces already placed) -- dropped`); slots[idx] = null; });
+      // Accents sit BESIDE the head, in the background either side of it
+      // (the head owns roughly the middle third of the width): the top band
+      // belongs to surfaces (measured: the QUOTIENT stamp landed on the
+      // caption lane's "Web"), the bands never share.
       var TALL_ACCENTS: Array<Record<string, string | number>> = [
-        { x: "62%", y: "13%", width: "32%", height: "12%" },   // top-right, under the platform strip
-        { x: "6%", y: "13%", width: "34%", height: "12%" },    // top-left, under the platform strip
+        { x: "64%", y: "31%", width: "31%", height: "12%" },   // right of the head
+        { x: "5%", y: "31%", width: "31%", height: "12%" },    // left of the head
       ];
       var tallAccent = 0;
       authored.forEach((c, i) => {

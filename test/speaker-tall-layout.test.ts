@@ -43,8 +43,8 @@ describe("a speaker scene on a TALL frame", () => {
     }
   });
 
-  it("puts accents in the top corners and floating pills below the chin, not on the face", () => {
-    expect(by("sticker-prop").position).toEqual({ x: "62%", y: "13%", width: "32%", height: "12%" });
+  it("puts accents beside the head and floating pills below the chin, not on the face", () => {
+    expect(by("sticker-prop").position).toEqual({ x: "64%", y: "31%", width: "31%", height: "12%" }); // beside the head, off both bands
     expect(by("floating-pills").position).toEqual({ x: "0%", y: "66%", width: "100%", height: "16%" });
   });
 
