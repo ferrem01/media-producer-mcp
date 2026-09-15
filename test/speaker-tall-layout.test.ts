@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { buildPositionStyle } from "../src/core/scene-assembler.js";
 import { buildAuthoredCompositionScene } from "../src/llm/scene-generator.js";
 
 // Measured live on proj_234d8a01: the wide speaker dock put the composer,
@@ -66,14 +67,17 @@ describe("a speaker scene on a TALL frame", () => {
     expect(c[0].data).toMatchObject({ scrim: "plate", phrases: [{ text: "*Email* · *Social* · *Web*", start: 5, end: 12 }] });
   });
 
-  it("scales fixed-pixel type for a phone unless the board set its own size", () => {
-    expect(by("composer").data.scale).toBe(1.8);
-    expect(by("sticker-prop").data.scale).toBe(1.8);
-    expect(by("floating-pills").data.scale).toBe(1.8);
+  it("zooms the wrapper 1.8x for a phone unless the board set the component's own size", () => {
+    expect(by("composer").zoom).toBe(1.8);
+    expect(by("sticker-prop").zoom).toBe(1.8);
+    expect(by("floating-pills").zoom).toBe(1.8);
+    expect(by("kinetic-text")?.zoom ?? by("reel-caption-lane").zoom).toBeUndefined(); // sizes itself already
+    expect(buildPositionStyle({ id: "x", type: "composer", data: {}, position: { x: "5%", y: "60%", width: "90%", height: "20%" }, zoom: 1.8 } as any)).toMatch(/zoom:1\.8/);
     expect(by("auto-tagged-link").data.font_size).toBe("72px");
     expect(by("reel-caption-lane").data.scale).toBeUndefined(); // auto-fits its box already
     const own = build({ width: 1080, height: 1920 }, [{ type: "sticker-prop", data: { kind: "pill", text: "x", scale: 1.2 } }]);
     expect(own[0].data.scale).toBe(1.2);
+    expect(own[0].zoom).toBeUndefined();
   });
 
   it("floors a desktop pixel font the board wrote, and lights the URL's ink over the camera", () => {
@@ -119,5 +123,24 @@ describe("a speaker scene laid out around a MEASURED face", () => {
     expect(pctNum(by("sticker-prop").position.x)).toBe(5);       // the one side with room
     expect(pctNum(by("floating-pills").position.y)).toBeGreaterThanOrEqual(13); // the pills share the free band, never the face
     expect(pctNum(by("floating-pills").position.y) + pctNum(by("floating-pills").position.height)).toBeLessThanOrEqual(32.1);
+  });
+});
+
+describe("desktop furniture on a phone reel", () => {
+  it("drops a progress-bar and turns a notification-stack into floating pills of its apps", () => {
+    const comps = build({ width: 1080, height: 1920 }, [
+      { type: "notification-stack", data: { notifications: [{ app: "Slack", message: "12 new" }, { app: "Gmail", message: "47 unread" }, { app: "Slack", message: "again" }], at: 1.5 } },
+      { type: "progress-bar", data: { value: 100, label: "THE PAIN" } },
+      { type: "composer", data: { text: "hi", at: 2 } },
+    ]);
+    expect(comps.map((c) => c.type)).toEqual(["floating-pills", "composer"]);
+    expect(comps[0].data.items).toEqual(["Slack", "Gmail"]);
+    expect(comps[0].data.at).toBe(1.5);
+    expect(comps[0].zoom).toBe(1.8);
+  });
+  it("leaves them alone on a wide frame", () => {
+    const comps = build({ width: 1920, height: 1080 }, [{ type: "progress-bar", data: { value: 50 } }, { type: "notification-stack", data: { notifications: [{ app: "Slack" }] } }]);
+    expect(comps.map((c) => c.type)).toEqual(["progress-bar", "notification-stack"]);
+    expect(comps[0].zoom).toBeUndefined();
   });
 });

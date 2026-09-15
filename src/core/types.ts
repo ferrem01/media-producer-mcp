@@ -167,6 +167,11 @@ export interface SceneComponent {
   anchors?: Record<string, { word: string; occurrence?: number; edge?: "start" | "end"; offset?: number }>;
   position?: ComponentPosition;
   z_index?: number;
+  /** CSS zoom on the component's wrapper: the box stays where the layout
+   *  put it (percent geometry resolves against the stage), the content
+   *  inside renders that much larger. The phone scale for tall speaker
+   *  frames, where desktop-sized type is unreadable. */
+  zoom?: number;
   pose?: ComponentPose;
   enter?: ComponentAnimation;
   exit?: ComponentAnimation;

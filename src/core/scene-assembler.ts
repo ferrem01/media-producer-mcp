@@ -1943,6 +1943,11 @@ export function buildPositionStyle(comp: SceneComponent): string {
   }
 
   parts.push(`z-index:${z}`);
+  // Percent geometry on an absolutely positioned box resolves against the
+  // stage's real size even under zoom, so the slot holds and only the
+  // content inside grows (measured: a 100%-wide host under zoom 1.8 still
+  // spans the stage, at 1/1.8 the layout units).
+  if (typeof comp.zoom === "number" && comp.zoom > 0 && comp.zoom !== 1) parts.push(`zoom:${comp.zoom}`);
 
   return parts.join("; ");
 }
