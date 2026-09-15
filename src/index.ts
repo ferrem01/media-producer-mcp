@@ -17,6 +17,7 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
+import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
@@ -2161,18 +2162,35 @@ Rules:
         const tkProjectObj = await loadProject(tkTenant, tkProject);
         if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const duration = Number(tkBody.duration);
+        // Fix what the phone shipped (a sideways rotation tag, a quiet
+        // voice) before anything downstream reads the file. A sanitizer
+        // failure is logged, not fatal: the take still attaches.
+        let sanitized: TakeSanitizeResult | undefined;
+        try {
+          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir));
+        } catch (e: any) {
+          console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
+        }
         tkProjectObj.speaker_track = { clips: [{ source: tkUrl, start: 0 }] };
         tkProjectObj.take = {
           source: tkUrl,
           recorded_at: new Date().toISOString(),
-          duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100 : undefined,
+          duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100
+            : sanitized && sanitized.probe.duration > 0 ? Math.round(sanitized.probe.duration * 100) / 100 : undefined,
           mime: typeof tkBody.mime === "string" ? tkBody.mime : undefined,
-          width: Number(tkBody.width) || undefined,
-          height: Number(tkBody.height) || undefined,
+          width: Number(tkBody.width) || sanitized?.probe.width || undefined,
+          height: Number(tkBody.height) || sanitized?.probe.height || undefined,
+          rotation_stripped: sanitized?.rotation_stripped || undefined,
+          loudness: sanitized?.loudness,
         };
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
-        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)}${tkProjectObj.take.duration ? ` (${tkProjectObj.take.duration}s)` : ""}`);
+        const tkNotes = [
+          tkProjectObj.take.duration ? `${tkProjectObj.take.duration}s` : "",
+          sanitized?.rotation_stripped ? "rotation tag stripped" : "",
+          sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
+        ].filter(Boolean).join(", ");
+        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)}${tkNotes ? ` (${tkNotes})` : ""}`);
         jsonResponse(res, 200, { ok: true, project_id: tkProject, speaker_track: tkProjectObj.speaker_track, take: tkProjectObj.take });
         return;
       }

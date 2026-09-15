@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-15 — Take ingest sanitizer (rotation tag, dialogue loudness)
+
+First real iPhone run of `/take` (`proj_c210e5e1`, 17s): recorded, uploaded and
+attached cleanly, but the file itself shipped two defects that would have
+wrecked the render. iOS Safari's MediaRecorder stores the frames upright
+(1080x1920) and STILL writes a -90 degree display matrix -- ffmpeg's autorotate
+and Chromium's `<video>` both obey it and show the take on its side. And the
+voice landed at -35.7 LUFS (phone at arm's length in a room); dialogue that
+carries a film wants about -16.
+
+`core/take-sanitize.ts` runs once in `POST /api/take`, in place on the file:
+a quarter-turn tag on a PORTRAIT-stored file is dropped (a booth take is
+portrait by construction, so the tag is the defect; a landscape sensor honestly
+tagged portrait is left alone), and the audio is normalized to -16 LUFS with a
+two-pass linear loudnorm (video stream-copied). What it did lands on
+`project.take` (`rotation_stripped`, `loudness.{measured_lufs,normalized_to_lufs}`).
+A sanitizer failure is logged and the take still attaches. Probing is one
+`ffmpeg -i` stderr parse so it works where there is no ffprobe. Marc's file:
+rotation stripped, -35.7 -> -16.4 LUFS, frames untouched.
+
+Not covered: takes attached by hand through the `add` tool (they never pass
+this endpoint), and final-MIX loudness (-14 LUFS) -- still the separate PR.
+
 ## 2026-09-14 — FRAME axis; `social-reel` deleted; `speaker-screencast` split
 
 `SPEC-format-and-spine.md`. A storyboard for a performed 15-second vertical ad
