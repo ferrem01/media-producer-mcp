@@ -1,27 +1,31 @@
 /**
  * Take sanitizer -- runs once when a booth recording is attached to a project
- * (POST /api/take). Two defects real phones ship that would otherwise reach
- * the speaker base untouched:
+ * (POST /api/take). Makes the phone's file say the same thing to every
+ * consumer, in place:
  *
- *  1. A SPURIOUS ROTATION TAG. iOS Safari's MediaRecorder stores the frames
- *     already upright (1080x1920) and STILL writes a +/-90 degree display
- *     matrix. Every honest player -- ffmpeg's autorotate, Chromium's <video>
- *     -- obeys the tag and shows the take on its side. A booth take is
- *     portrait by construction, so a portrait-stored file tagged sideways is
- *     the bug, never the intent: the tag is dropped, frames untouched. The
- *     tag lives in the MP4's `tkhd` matrix; it is reset to identity by a
- *     direct byte patch (ffmpeg's `-display_rotation` only exists from 6.0,
- *     and the deployed box runs older -- measured live: the first attach
- *     silently skipped).
+ *  1. ORIENTATION IS BAKED. iOS Safari's MediaRecorder stores the sensor's
+ *     frames sideways and writes a rotation matrix that players apply at
+ *     display time. That tag is HONEST -- honoring it gives the upright
+ *     picture (measured live on proj_c210e5e1: honored, upright landscape;
+ *     stripped, the speaker on his side). But three consumers read it three
+ *     ways (ffmpeg's autorotate, Chromium's <video>, the MP4 muxer on a
+ *     stream copy), so the frames are re-encoded upright and the tag goes
+ *     to identity: what is stored is what is shown.
  *
- *  2. A QUIET VOICE. A phone at arm's length in a room lands around -35 LUFS;
- *     dialogue that will carry a film wants about -16. The audio is
- *     normalized to a dialogue level with a two-pass loudnorm (measure, then
- *     apply the measured values linearly) so the take is not crushed. Video
- *     is stream-copied; only the audio is re-encoded.
+ *  2. THE FRAME THE BOOTH SHOWED. The phone's live preview is a cover-crop of
+ *     the stream into the booth's portrait screen; the sensor frame behind
+ *     it can be wider (iOS delivers the landscape sensor frame for a
+ *     portrait request). When the upright take is WIDER than the film's
+ *     canvas, the center column at the canvas aspect is cropped and scaled
+ *     to the canvas -- the picture the speaker was looking at. A take
+ *     taller than the canvas is left alone (cropping a head off the top is
+ *     worse than a pillarbox).
  *
- * Everything reported back lands on `project.take` so the measurement is
- * visible next to the file it describes.
+ *  3. A QUIET VOICE. A phone at arm's length in a room lands around -35
+ *     LUFS; dialogue that will carry a film wants about -16. Two-pass linear
+ *     loudnorm so the take is not crushed.
+ *
+ * Everything done lands on `project.take` next to the file it describes.
  */
 
 import { execFile } from "node:child_process";
@@ -36,8 +40,12 @@ const execFileAsync = promisify(execFile);
 export const TAKE_LOUDNESS_TARGET_LUFS = -16;
 /** Skip normalization when the take is already this close. */
 const LOUDNESS_TOLERANCE_LU = 1;
+/** Aspect ratios closer than this are the same frame (a 1078x1920 phone
+ *  encode is 9:16). */
+const ASPECT_TOLERANCE = 0.02;
 
 export interface TakeProbe {
+  /** Stored frame dimensions, before any rotation tag. */
   width: number;
   height: number;
   /** Display rotation from the container tag, degrees; 0 when untagged. */
@@ -47,8 +55,12 @@ export interface TakeProbe {
 }
 
 export interface TakeSanitizeResult {
-  /** True when a spurious sideways tag was removed from a portrait file. */
-  rotation_stripped: boolean;
+  /** The rotation that was baked into the frames (0 = tag was identity). */
+  rotation_baked: number;
+  /** Upright dimensions of the take BEFORE any reframe. */
+  oriented: { width: number; height: number };
+  /** Set when the wide take was center-cropped to the canvas frame. */
+  reframed?: { from: string; to: string };
   /** Integrated loudness before, and the target it was normalized to (absent
    *  when no audio or already within tolerance). */
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
@@ -82,16 +94,32 @@ export async function probeTake(filePath: string): Promise<TakeProbe> {
   return {
     width: Number(video[1]),
     height: Number(video[2]),
-    rotation: Number.isFinite(rotation) ? rotation : 0,
+    rotation: Number.isFinite(rotation) ? Math.round(rotation) : 0,
     hasAudio: /Stream #\d+:\d+.*: Audio:/.test(table),
     duration,
   };
 }
 
-/** A portrait-stored file tagged a quarter turn: the tag is the defect. */
-export function rotationIsSpurious(p: Pick<TakeProbe, "width" | "height" | "rotation">): boolean {
+/** Dimensions of the take as a player honoring its tag shows it. */
+export function orientedDims(p: Pick<TakeProbe, "width" | "height" | "rotation">): { width: number; height: number } {
   const quarter = Math.abs(((p.rotation % 360) + 360) % 360 - 180) === 90;
-  return quarter && p.height > p.width;
+  return quarter ? { width: p.height, height: p.width } : { width: p.width, height: p.height };
+}
+
+/** The crop that turns an upright take WIDER than the canvas into the
+ *  canvas frame: the center column at the canvas aspect. Null when the take
+ *  already fits (same aspect) or is taller than the canvas. */
+export function reframeCrop(
+  take: { width: number; height: number },
+  canvas: { width: number; height: number },
+): { w: number; h: number; x: number; y: number } | null {
+  const takeAspect = take.width / take.height;
+  const canvasAspect = canvas.width / canvas.height;
+  if (Math.abs(takeAspect - canvasAspect) / canvasAspect <= ASPECT_TOLERANCE) return null;
+  if (takeAspect < canvasAspect) return null;
+  // Even dimensions keep yuv420p happy.
+  const w = Math.round((take.height * canvasAspect) / 2) * 2;
+  return { w, h: take.height, x: Math.round((take.width - w) / 4) * 2, y: 0 };
 }
 
 /** Integrated loudness in LUFS (EBU R128), or null when unmeasurable. */
@@ -116,77 +144,20 @@ async function loudnormMeasure(filePath: string): Promise<Record<string, string>
   try { return JSON.parse(json[0]); } catch { return null; }
 }
 
-// ── tkhd matrix patch ──
-// ISO BMFF: moov > trak > tkhd carries a 3x3 fixed-point display matrix.
-// A quarter-turn tag is that matrix; identity is
-// [0x00010000 0 0 / 0 0x00010000 0 / 0 0 0x40000000]. Version-independent
-// and no remux: 36 bytes rewritten per track that carries a rotation.
-const IDENTITY_MATRIX = Buffer.from([
-  0x00, 0x01, 0x00, 0x00, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0x00, 0x01, 0x00, 0x00, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0x40, 0x00, 0x00, 0x00,
-]);
-
-/** Walk the box tree and return the file offset of every tkhd matrix. */
-async function tkhdMatrixOffsets(fh: fs.FileHandle, size: number): Promise<number[]> {
-  const found: number[] = [];
-  const header = Buffer.alloc(16);
-  const walk = async (start: number, end: number, want: string[]): Promise<void> => {
-    let pos = start;
-    while (pos + 8 <= end) {
-      await fh.read(header, 0, 16, pos);
-      let boxSize = header.readUInt32BE(0);
-      const type = header.toString("latin1", 4, 8);
-      let hdr = 8;
-      if (boxSize === 1) { boxSize = Number(header.readBigUInt64BE(8)); hdr = 16; }
-      else if (boxSize === 0) boxSize = end - pos;
-      if (boxSize < hdr) return;
-      if (type === want[0]) {
-        if (want.length === 1) {
-          // tkhd: version byte decides the fixed-field widths before the matrix.
-          const v = Buffer.alloc(1);
-          await fh.read(v, 0, 1, pos + hdr);
-          found.push(pos + hdr + (v[0] === 1 ? 52 : 40));
-        } else {
-          await walk(pos + hdr, pos + boxSize, want.slice(1));
-        }
-      }
-      pos += boxSize;
-    }
-  };
-  await walk(0, size, ["moov", "trak", "tkhd"]);
-  return found;
-}
-
-/** Reset every non-identity tkhd matrix to identity, in place. Returns how
- *  many tracks were patched. */
-export async function stripTkhdRotation(filePath: string): Promise<number> {
-  const fh = await fs.open(filePath, "r+");
-  try {
-    const { size } = await fh.stat();
-    const offsets = await tkhdMatrixOffsets(fh, size);
-    let patched = 0;
-    const cur = Buffer.alloc(36);
-    for (const off of offsets) {
-      await fh.read(cur, 0, 36, off);
-      if (cur.equals(IDENTITY_MATRIX)) continue;
-      await fh.write(IDENTITY_MATRIX, 0, 36, off);
-      patched++;
-    }
-    return patched;
-  } finally {
-    await fh.close();
-  }
-}
-
 /**
- * Sanitize a take IN PLACE. Returns what changed. Never throws on a
- * defect it cannot fix -- the caller attaches the take regardless and the
- * report says what was and was not done.
+ * Sanitize a take IN PLACE. `canvas` is the film's frame; pass it so a wide
+ * take is reframed to it. Never throws on a defect it cannot fix -- the
+ * caller attaches the take regardless and the report says what was done.
  */
-export async function sanitizeTake(filePath: string): Promise<TakeSanitizeResult> {
+export async function sanitizeTake(
+  filePath: string,
+  canvas?: { width: number; height: number },
+): Promise<TakeSanitizeResult> {
   const probe = await probeTake(filePath);
-  const stripRotation = rotationIsSpurious(probe);
+  const rotation = ((probe.rotation % 360) + 360) % 360;
+  const bake = rotation !== 0;
+  const oriented = orientedDims(probe);
+  const crop = canvas ? reframeCrop(oriented, canvas) : null;
 
   let measured: number | null = null;
   let normalize = false;
@@ -195,45 +166,56 @@ export async function sanitizeTake(filePath: string): Promise<TakeSanitizeResult
     normalize = measured !== null && Math.abs(measured - TAKE_LOUDNESS_TARGET_LUFS) > LOUDNESS_TOLERANCE_LU;
   }
 
-  if (!stripRotation && !normalize) {
-    return {
-      rotation_stripped: false,
-      loudness: measured === null ? undefined : { measured_lufs: round1(measured) },
-      probe,
-    };
-  }
+  const base: TakeSanitizeResult = {
+    rotation_baked: bake ? probe.rotation : 0,
+    oriented,
+    loudness: measured === null ? undefined : { measured_lufs: round1(measured) },
+    probe,
+  };
+  if (!bake && !crop && !normalize) return base;
 
-  // Loudness first (a remux: the muxer copies the rotation through), then
-  // the matrix patch on whatever file is final.
-  let normalizedTo: number | undefined;
-  if (normalize) {
-    const ext = path.extname(filePath) || ".mp4";
-    const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
-    const m = await loudnormMeasure(filePath);
-    const filter = m
-      ? `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_LRA=${m.input_lra}:measured_TP=${m.input_tp}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`
-      : `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11`;
-    const args = [
-      "-y", "-i", filePath, "-map", "0:v:0", "-c:v", "copy", "-map", "0:a:0",
-      "-af", filter, "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
-      "-movflags", "+faststart", tmp,
-    ];
-    try {
-      await execFileAsync("ffmpeg", ["-hide_banner", ...args], { maxBuffer: 16 * 1024 * 1024 });
-      await fs.rename(tmp, filePath);
-    } catch (e: any) {
-      await fs.unlink(tmp).catch(() => {});
-      throw new Error(`take loudness normalize failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
-    }
-    normalizedTo = TAKE_LOUDNESS_TARGET_LUFS;
+  const ext = path.extname(filePath) || ".mp4";
+  const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
+  // ffmpeg applies the rotation tag on decode (autorotate, every version),
+  // so a re-encode stores the frames upright with an identity matrix.
+  const args = ["-y", "-i", filePath, "-map", "0:v:0"];
+  if (bake || crop) {
+    const vf: string[] = [];
+    if (crop && canvas) vf.push(`crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`, `scale=${canvas.width}:${canvas.height}`);
+    if (vf.length) args.push("-vf", vf.join(","));
+    args.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p");
+  } else {
+    args.push("-c:v", "copy");
   }
-  if (stripRotation) {
-    const patched = await stripTkhdRotation(filePath);
-    if (patched === 0) throw new Error("take rotation strip failed: no tkhd matrix carried the rotation");
+  let normalizedTo: number | undefined;
+  if (probe.hasAudio) {
+    args.push("-map", "0:a:0");
+    if (normalize) {
+      const m = await loudnormMeasure(filePath);
+      const filter = m
+        ? `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_LRA=${m.input_lra}:measured_TP=${m.input_tp}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`
+        : `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11`;
+      // The container decides the codec: a WebM take (Chrome, Firefox) cannot carry AAC.
+      const audioCodec = ext.toLowerCase() === ".webm" ? ["-c:a", "libopus", "-b:a", "128k"] : ["-c:a", "aac", "-b:a", "160k"];
+      args.push("-af", filter, ...audioCodec, "-ar", "48000");
+      normalizedTo = TAKE_LOUDNESS_TARGET_LUFS;
+    } else {
+      args.push("-c:a", "copy");
+    }
+  }
+  if (ext.toLowerCase() !== ".webm") args.push("-movflags", "+faststart");
+  args.push(tmp);
+  try {
+    await execFileAsync("ffmpeg", ["-hide_banner", ...args], { maxBuffer: 16 * 1024 * 1024 });
+    await fs.rename(tmp, filePath);
+  } catch (e: any) {
+    await fs.unlink(tmp).catch(() => {});
+    throw new Error(`take sanitize failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
   }
 
   return {
-    rotation_stripped: stripRotation,
+    ...base,
+    reframed: crop && canvas ? { from: `${oriented.width}x${oriented.height}`, to: `${canvas.width}x${canvas.height}` } : undefined,
     loudness: measured === null ? undefined : { measured_lufs: round1(measured), normalized_to_lufs: normalizedTo },
     probe: await probeTake(filePath),
   };

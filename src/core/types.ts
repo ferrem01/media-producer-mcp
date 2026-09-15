@@ -576,8 +576,12 @@ export interface Project {
     mime?: string;
     width?: number;
     height?: number;
+    /** How the booth captured it: 'canvas' (portrait pixels drawn by the
+     *  page) or 'raw' (the camera track as the browser recorded it). */
+    capture?: string;
     /** What the ingest sanitizer did to the file (see core/take-sanitize.ts). */
-    rotation_stripped?: boolean;
+    rotation_baked?: number;
+    reframed?: { from: string; to: string };
     loudness?: { measured_lufs: number; normalized_to_lufs?: number };
   };
   /** Film-level color grade applied to the final concatenated video for
