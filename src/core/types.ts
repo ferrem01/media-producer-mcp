@@ -576,6 +576,9 @@ export interface Project {
     mime?: string;
     width?: number;
     height?: number;
+    /** What the ingest sanitizer did to the file (see core/take-sanitize.ts). */
+    rotation_stripped?: boolean;
+    loudness?: { measured_lufs: number; normalized_to_lufs?: number };
   };
   /** Film-level color grade applied to the final concatenated video for
    *  cross-scene consistency (subtle S-curve + saturation + grain).
