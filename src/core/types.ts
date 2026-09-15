@@ -706,6 +706,9 @@ export interface Take {
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
+  /** The scene's spoken lines as they stood when this take attached, so a
+   *  later script edit can be flagged against the recording. */
+  lines?: string;
 }
 
 export interface SpeakerTrack {

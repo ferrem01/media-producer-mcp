@@ -19,7 +19,7 @@ import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
 import { getBoardHtml } from "./board-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
-import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } from "./core/take-needs.js";
+import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake } from "./core/take-needs.js";
 import type { Take } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
@@ -825,7 +825,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|storyboard)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2965,6 +2965,57 @@ Rules:
           return { ok: true, scene_id: sceneId };
         });
         jsonResponse(res, 202, { ok: true, job_id: job.id });
+        return;
+      }
+
+      // ── API: Edit a storyboard scene's lines by INDEX (the board) ──
+      // PATCH /api/storyboard/{t}/{p}/scenes/{index} {voiceover_text?, label?, visual_notes?}
+      // The board edits the storyboard record, which exists before any scene
+      // is built (the storyboard-scene route below needs a built scene id).
+      // On a speaker board the need's recording instructions follow the
+      // script and the anchors are resolved again: against the take's
+      // measured spine when one is attached, at speaking pace otherwise.
+      const sbLinesMatch = urlPath.match(/^\/api\/storyboard\/([^/]+)\/([^/]+)\/scenes\/(\d+)$/);
+      if (sbLinesMatch && method === "PATCH") {
+        const [, tenantId, projectId] = sbLinesMatch.map(decodeURIComponent);
+        const idx = parseInt(sbLinesMatch[3], 10);
+        const body = await parseBody(req);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const sbScene = project.storyboard?.scenes?.[idx] as any;
+        if (!sbScene) { jsonResponse(res, 404, { error: `Storyboard scene ${idx + 1} not found` }); return; }
+        let changed = false;
+        if (typeof body.voiceover_text === "string") {
+          const lines = body.voiceover_text.replace(/\r\n/g, "\n").trim();
+          if (lines !== String(sbScene.voiceover_text || "").trim()) {
+            sbScene.voiceover_text = lines;
+            const built = project.scenes?.[idx] as any;
+            if (built?.audio_hints && typeof built.audio_hints.voiceover_text === "string") built.audio_hints.voiceover_text = lines;
+            changed = true;
+          }
+        }
+        if (typeof body.label === "string" && body.label.trim() && body.label.trim() !== sbScene.label) { sbScene.label = body.label.trim(); changed = true; }
+        if (typeof body.visual_notes === "string" && body.visual_notes.trim() !== String(sbScene.visual_notes || "").trim()) { sbScene.visual_notes = body.visual_notes.trim(); changed = true; }
+        let retime: RetimeResult | null = null;
+        if (changed) {
+          ensureSpeakerNeeds(project);
+          if ((project.treatment as any)?.filmGrammar === "speaker") {
+            try { retime = await retimeScene(project, idx, config.dataDir); }
+            catch (e: any) { console.warn(`  storyboard: re-time after script edit skipped: ${e?.message || e}`); }
+          }
+          project.updated_at = new Date().toISOString();
+          await saveProject(project);
+        }
+        const take = activeTake(project, idx);
+        jsonResponse(res, 200, {
+          ok: true,
+          scene_index: idx,
+          changed,
+          scene: sbScene,
+          open_needs: openTakeNeeds(project),
+          script_changed_since_take: !!(take?.lines && take.lines.trim() !== String(sbScene.voiceover_text || "").trim()),
+          spine: retime ? { source: retime.spine.source, resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0) } : undefined,
+        });
         return;
       }
 

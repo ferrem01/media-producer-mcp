@@ -14,6 +14,8 @@
  * "resolve again with the other spine".
  */
 
+import { scriptLines, scriptWords } from "./script-lines.js";
+
 export interface WordAnchor {
   word: string;
   /** 1-based; which occurrence of the word in the script. Default 1. */
@@ -41,20 +43,33 @@ export function normalizeToken(t: string): string {
 /** The script's words spread over `duration` by character weight (longer
  *  words take longer to say), with a short lead-in. */
 export function assertedSpine(script: string, duration: number): Spine {
-  const raw = String(script || "").split(/\s+/).filter((w) => normalizeToken(w));
   const dur = Math.max(0, Number(duration) || 0);
+  const lines = scriptLines(script);
+  const raw = lines.filter((l) => !l.pause).flatMap((l) => l.text.split(/\s+/).filter((w) => normalizeToken(w)));
   if (!raw.length || dur <= 0) return { source: "asserted", words: [], duration: dur };
-  const weights = raw.map((w) => normalizeToken(w).length + 1);
-  const total = weights.reduce((a, b) => a + b, 0);
   // Speech does not start on frame 0 nor end on the last: keep 4% each side.
   const lead = dur * 0.04, usable = dur * 0.92;
+  // Authored silences (a breath at each line end, a beat for "(pause)")
+  // come out of the usable span first; the words share what is left. When
+  // the script is over-paused for the scene, the silences shrink together.
+  const authoredGaps = lines.reduce((s, l) => s + l.gapAfter, 0);
+  const gapScale = authoredGaps > usable * 0.5 ? (usable * 0.5) / authoredGaps : 1;
+  const speech = usable - authoredGaps * gapScale;
+  const weights = raw.map((w) => normalizeToken(w).length + 1);
+  const total = weights.reduce((a, b) => a + b, 0);
   const words: SpineWord[] = [];
-  let t = lead;
-  raw.forEach((w, i) => {
-    const d = (weights[i] / total) * usable;
-    words.push({ text: w, start: round(t), end: round(t + d) });
-    t += d;
-  });
+  let t = lead, wi = 0;
+  for (const line of lines) {
+    if (!line.pause) {
+      for (const w of line.text.split(/\s+/)) {
+        if (!normalizeToken(w)) continue;
+        const d = (weights[wi++] / total) * speech;
+        words.push({ text: w, start: round(t), end: round(t + d) });
+        t += d;
+      }
+    }
+    t += line.gapAfter * gapScale;
+  }
   return { source: "asserted", words, duration: dur };
 }
 
@@ -205,7 +220,7 @@ export function splitByScripts(scripts: string[], words: SpineWord[], total: num
   const cuts: number[] = [0];
   let cursor = 0;
   for (let i = 1; i < n; i++) {
-    const head = String(scripts[i] || "").split(/\s+/).map(normalizeToken).filter(Boolean).slice(0, 3);
+    const head = scriptWords(scripts[i]).map(normalizeToken).filter(Boolean).slice(0, 3);
     let at: number | null = null;
     if (head.length) {
       for (let k = cursor; k < toks.length; k++) {
@@ -221,7 +236,7 @@ export function splitByScripts(scripts: string[], words: SpineWord[], total: num
     if (at === null) {
       // Proportional fallback for the rest of the scripts from here.
       const prev = cuts[cuts.length - 1];
-      const weights = scripts.slice(i - 1).map((sc) => Math.max(1, String(sc || "").split(/\s+/).filter(Boolean).length));
+      const weights = scripts.slice(i - 1).map((sc) => Math.max(1, scriptWords(sc).length));
       const wsum = weights.reduce((a, b) => a + b, 0);
       at = round(prev + ((total - prev) * weights[0]) / wsum);
       // Move the cursor past the words that fall into the previous window.

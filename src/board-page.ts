@@ -40,7 +40,12 @@ export function getBoardHtml(): string {
   .card .label { font-weight:700; font-size:16px; }
   .card .dur { color:var(--muted); font-size:13px; white-space:nowrap; }
   .still { width:100%; border-radius:10px; margin:10px 0 6px; display:block; background:#0a0a10; }
-  .script { font-size:16px; line-height:1.45; margin:8px 0; }
+  .script { font-size:16px; line-height:1.45; margin:8px 0; white-space:pre-line; }
+  .script .pause { color:var(--muted); letter-spacing:.2em; }
+  .edit { margin:8px 0; }
+  .edit textarea { width:100%; box-sizing:border-box; min-height:120px; font:inherit; font-size:16px; line-height:1.45; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); resize:vertical; }
+  .edit .hint { color:var(--muted); font-size:12px; margin:6px 0 8px; }
+  .stale { color:#e0a34a; font-size:13px; margin:6px 0 0; }
   .notes { color:var(--muted); font-size:13px; line-height:1.4; margin:6px 0 10px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .notes.open { display:block; }
   .pill { display:inline-block; font-size:12px; font-weight:700; padding:4px 9px; border-radius:999px; background:#26262f; color:var(--ink); }
@@ -95,7 +100,7 @@ export function getBoardHtml(): string {
   if (!tenant || !project) { say('Missing ?tenant= and ?project= in the link.', true); return; }
   $('desktopLink').href = link('/studio', '&desktop=1');
 
-  var P = null, pickingScene = -1, jobTimer = null;
+  var P = null, pickingScene = -1, jobTimer = null, editing = -1;
 
   function needOf(scene) {
     var a = (scene.assets || []).filter(function (x) { return x && x.type === 'camera_video'; });
@@ -106,6 +111,45 @@ export function getBoardHtml(): string {
     if (!clip) return null;
     var ts = (P.takes || []).filter(function (t) { return t.scene_index === i && t.source === clip.source; });
     return ts.length ? ts[ts.length - 1] : { source: clip.source };
+  }
+
+  // The script as the reader sees it: one sentence per line; a line that
+  // says only (pause) is a held beat, shown as the prompter shows it.
+  var PAUSE_LINE = /^\\(\\s*pause\\s*\\)$/i;
+  function scriptView(script) {
+    var sc = document.createElement('div'); sc.className = 'script';
+    var lines = script.split(/\\r?\\n/);
+    lines.forEach(function (ln, k) {
+      var t = ln.trim(); if (!t) return;
+      if (PAUSE_LINE.test(t)) { var pz = document.createElement('span'); pz.className = 'pause'; pz.textContent = '\u2022\u2022\u2022'; sc.appendChild(pz); }
+      else sc.appendChild(document.createTextNode(t));
+      if (k < lines.length - 1) sc.appendChild(document.createTextNode('\\n'));
+    });
+    return sc;
+  }
+  function scriptEditor(i, script) {
+    var wrap = document.createElement('div'); wrap.className = 'edit';
+    var ta = document.createElement('textarea'); ta.value = script; ta.placeholder = 'What you say in this scene.'; wrap.appendChild(ta);
+    var hint = document.createElement('div'); hint.className = 'hint';
+    hint.textContent = 'One sentence per line. A line that says only (pause) holds a beat of silence.';
+    wrap.appendChild(hint);
+    var row = document.createElement('div'); row.className = 'row';
+    var save = document.createElement('button'); save.className = 'btn small'; save.textContent = 'Save';
+    var cancel = document.createElement('button'); cancel.className = 'btn small ghost'; cancel.textContent = 'Cancel';
+    cancel.onclick = function () { editing = -1; render(); };
+    save.onclick = function () {
+      save.disabled = true; say('Saving the lines…');
+      api('PATCH', '/storyboard/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + '/scenes/' + i, { voiceover_text: ta.value })
+        .then(function (r) {
+          editing = -1;
+          say(r.script_changed_since_take ? 'Saved. The take no longer matches these lines.' : 'Saved.');
+          return load();
+        })
+        .catch(function (e) { save.disabled = false; say(e.message || String(e), true); });
+    };
+    row.appendChild(save); row.appendChild(cancel); wrap.appendChild(row);
+    setTimeout(function () { ta.focus(); }, 0);
+    return wrap;
   }
 
   function render() {
@@ -143,7 +187,17 @@ export function getBoardHtml(): string {
       card.appendChild(img);
 
       var script = String(s.voiceover_text || '').trim();
-      if (script) { var sc = document.createElement('div'); sc.className = 'script'; sc.textContent = script; card.appendChild(sc); }
+      if (editing === i) {
+        card.appendChild(scriptEditor(i, script));
+      } else {
+        if (script) { card.appendChild(scriptView(script)); }
+        if (speaker) {
+          var ed = document.createElement('a'); ed.className = 'link'; ed.href = '#'; ed.style.fontSize = '13px';
+          ed.textContent = script ? 'Edit the lines' : 'Add lines';
+          ed.onclick = function (ev) { ev.preventDefault(); editing = i; render(); };
+          card.appendChild(ed);
+        }
+      }
       var notes = String(s.visual_notes || s.purpose || '').trim();
       if (notes) { var nt = document.createElement('div'); nt.className = 'notes'; nt.textContent = notes; nt.onclick = function () { nt.classList.toggle('open'); }; card.appendChild(nt); }
 
@@ -155,6 +209,11 @@ export function getBoardHtml(): string {
       else if (speaker && !script) { pill.className += ' na'; pill.textContent = 'No lines'; }
       else { pill.className += ' na'; pill.textContent = 'Motion graphics'; }
       line.appendChild(pill); card.appendChild(line);
+      if (take && take.lines && take.lines.trim() !== script) {
+        var st = document.createElement('div'); st.className = 'stale';
+        st.textContent = 'The lines changed after this take was recorded. Re-record to match.';
+        card.appendChild(st);
+      }
 
       if (speaker && script) {
         var acts = document.createElement('div'); acts.className = 'row'; acts.style.marginTop = '10px';

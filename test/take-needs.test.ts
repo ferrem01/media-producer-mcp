@@ -64,6 +64,14 @@ describe("attaching takes", () => {
     expect(p.storyboard.scenes[0].assets[0].path).toBe("/x/second.mp4");
   });
 
+  it("a take remembers the lines it was recorded against, so a later edit can be flagged", () => {
+    const p = speakerProject(["Your campaign is live.\n(pause)\nNow what?"]); ensureSpeakerNeeds(p);
+    const t = attachTake(p, { scene_index: 0, source: "/x/t.mp4", recorded_at: "1", capture: "canvas" });
+    expect(t.lines).toBe("Your campaign is live.\n(pause)\nNow what?");
+    p.storyboard.scenes[0].voiceover_text = "Your campaign is live.\nNow what?";
+    expect(activeTake(p, 0)!.lines).not.toBe(p.storyboard.scenes[0].voiceover_text);
+  });
+
   it("the single `take` record of older projects migrates to takes[] for scene 0", () => {
     const p = migrateProject({
       project_id: "old", canvas: { width: 1080, height: 1920, frame: "9x16" },

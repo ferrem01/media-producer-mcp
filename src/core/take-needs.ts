@@ -77,7 +77,8 @@ export function openTakeNeeds(project: Project): number[] {
  */
 export function attachTake(project: Project, take: Omit<Take, "id">): Take {
   const id = `take_${(project.takes || []).length}`;
-  const rec: Take = { id, ...take };
+  const lines = String(project.storyboard?.scenes?.[take.scene_index]?.voiceover_text || "").trim();
+  const rec: Take = { id, ...take, ...(lines && take.lines == null ? { lines } : {}) };
   project.takes = [...(project.takes || []), rec];
   const clip: SpeakerTrackClip = {
     source: rec.source, start: 0, scene_index: rec.scene_index,

@@ -2795,3 +2795,31 @@ no face found lays out exactly as before.
 The pipeline hands `take_face` to the layout per scene through the draft,
 next to the spine. Existing takes have no face until re-attached; the
 default bands cover them.
+
+## Lines edited by thumb; silences written into the script
+
+Two asks from the second live run. Marc wanted to pass the board link
+around and iterate the spoken lines from a phone, and a reader of the
+script could not see where the pauses were.
+
+Editing: the board card gets "Edit the lines" (a textarea, Save, Cancel)
+against a new `PATCH /api/storyboard/{t}/{p}/scenes/{i}` that edits the
+STORYBOARD record by index. The existing storyboard-scene route needs a
+built scene id, and the board runs before anything is built. On a speaker
+board the save re-points the need's recording instructions and resolves the
+anchors again (measured spine if a take is attached, speaking pace
+otherwise) so the film stays aligned with the new words until the next take.
+A take now records the lines it was performed against (`Take.lines`, set in
+`attachTake` from the storyboard); the card flags a take the lines have
+moved past and offers Re-record. The route name is in the tenant guard.
+
+Silences: the notation is one sentence per line (a breath, 0.3s) and a line
+that says only `(pause)` (a beat, 1s). `core/script-lines.ts` is the one
+parser; the prompter cues by line and shows the beat as "•••" for its
+second; the asserted spine takes the gaps out of the usable span before the
+words share the rest (over-paused short scenes shrink the gaps together
+rather than starving the words); the board and booth keep the lines. The
+markers are never words: `scriptWords` drops them, so anchors, record-all
+cuts and the speaking-pace estimate never see "(pause)". The storyboard
+builder's SPEAKER contract now asks for the notation and tells the LLM to
+budget the scene for it. Old single-line scripts read exactly as before.
