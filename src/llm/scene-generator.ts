@@ -353,6 +353,8 @@ function normalizeAnim(v: unknown): import("../core/types.js").ComponentAnimatio
 /** Overlay accents (celebration/delight seasoning): never windows -- they sit
  *  ON the composition in a corner, small, above everything. */
 var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
+/** Fixed-pixel type that needs a multiplier on a tall speaker frame. */
+var PHONE_SCALE_TYPES = ["sticker-prop", "prop-strike", "floating-pills", "composer"];
 /** Full-stage overlays: performers that cover the whole composition. */
 var STAGE_OVERLAY_TYPES = ["cursor-performer"];
 /** Ambient full-stage text overlays that ride ABOVE the windows (their own
@@ -453,6 +455,39 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
       if (BACKDROP_CAST_TYPES.indexOf(c.type) !== -1) slots[i] = null;
     });
     var dockSurf = surfaceIdx.filter((i) => !slots[i]);
+    // ── TALL SPEAKER FRAME (9x16, 4x5): there is no "beside her". The phone
+    // selfie puts the face in the upper-middle (about 22%-68% of the height
+    // -- measured on both live takes), the platform's UI owns the top 12%
+    // and bottom 18%, and a 35%-wide column is a 378px sliver at phone
+    // scale. So everything STACKS full-width in two bands that miss the
+    // face: the LOWER band over the chest (58%-82%) first, the TOP band
+    // under the platform strip (13%-30%) when the lower one is full.
+    // Accents take the corners of those bands; floating pills drift in the
+    // lower band instead of across the face. (Measured live on
+    // proj_234d8a01: the wide dock put the composer, captions and URL in a
+    // right-third column with 34px type, and the pills over his eyes.)
+    if (vertical && !takeover) {
+      var stack = dockSurf.concat(heroIdx, captionIdx).sort((a, b) => a - b);
+      var lower = stack.slice(0, 2), upper = stack.slice(2);
+      var lowerRows = stackRows(lower.length, 58, 24, 2);
+      lower.forEach((idx, k) => { slots[idx] = { position: pct(5, lowerRows[k][0], 90, lowerRows[k][1]), z_index: 10 + k }; });
+      var upperRows = stackRows(upper.length, 13, 17, 2);
+      upper.forEach((idx, k) => { slots[idx] = { position: pct(5, upperRows[k][0], 90, upperRows[k][1]), z_index: 20 + k }; });
+      var TALL_ACCENTS: Array<Record<string, string | number>> = [
+        { x: "62%", y: "13%", width: "32%", height: "12%" },   // top-right, under the platform strip
+        { x: "6%", y: "70%", width: "34%", height: "12%" },    // bottom-left, over the chest
+      ];
+      var tallAccent = 0;
+      authored.forEach((c, i) => {
+        if (ACCENT_TYPES.indexOf(c.type) !== -1) {
+          slots[i] = { position: TALL_ACCENTS[Math.min(tallAccent, TALL_ACCENTS.length - 1)], z_index: 40 + tallAccent };
+          tallAccent++;
+        } else if (HIGH_OVERLAY_TYPES.indexOf(c.type) !== -1) {
+          slots[i] = { position: pct(0, 52, 100, 30), z_index: 38 };
+        }
+      });
+      return slots;
+    }
     if (dockSurf.length > 0) {
       // A TAKEOVER replaces her: its surface owns the whole frame. The dock
       // recipe below is for scenes where she stays on screen -- applying it
@@ -631,7 +666,8 @@ export function buildAuthoredCompositionScene(
   // A takeover scene is one the storyboard/pipeline marked opaque: it
   // REPLACES the speaker rather than sitting beside her.
   var isTakeover = speakerBase && (draft as any).transparent_background === false;
-  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width, speakerBase, isTakeover,
+  var tallFrame = opts.canvas.height > opts.canvas.width;
+  var slots = authoredLayout(authored, !!opts.world, tallFrame, speakerBase, isTakeover,
     (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar);
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
@@ -707,6 +743,14 @@ export function buildAuthoredCompositionScene(
       return;
     }
     var data: Record<string, unknown> = { ...c.data };
+    // PHONE SCALE: these components size their type in fixed pixels for a
+    // wide frame. On a tall speaker frame the same pixels are unreadable
+    // (measured: a 17px pill, a 44px strike at 1080 wide, viewed on a
+    // 390px phone). The board's own value wins; otherwise 1.8x.
+    if (speakerBase && tallFrame && !isTakeover) {
+      if (PHONE_SCALE_TYPES.indexOf(c.type) !== -1 && data.scale === undefined) data.scale = 1.8;
+      if (c.type === "auto-tagged-link" && data.font_size === undefined) data.font_size = "72px";
+    }
     // WORLD INK CLAMP: editorial copy must contrast the world it sits on.
     // Storyboards habitually author dark-era caption colors (#f5f6fa) that
     // vanish on the light world -- and authored comps skip the codegen

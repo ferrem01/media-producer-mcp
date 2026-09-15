@@ -51,6 +51,7 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var root = el.querySelector('.cmpz');
+    if (Number(data.scale) > 0 && Number(data.scale) !== 1) root.style.zoom = String(Number(data.scale)); // phone scale
     var chars = el.querySelector('.cmpz-chars');
     var caret = el.querySelector('.cmpz-caret');
     var send = el.querySelector('.cmpz-send');

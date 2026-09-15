@@ -32,6 +32,7 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var host = el.querySelector('.stkp');
+    if (Number(data.scale) > 0 && Number(data.scale) !== 1) host.style.zoom = String(Number(data.scale)); // phone scale
     var kind = data.kind || 'pill'; // stamp | gesture | pill | ring | image
     var isImage = kind === 'image' && typeof data.src === 'string' && data.src;
     if (kind === 'image' && !isImage) kind = 'pill'; // junk-data guard: no src, fall back

@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-15 — Tall speaker frames: stack over the chest, phone-scale type
+
+Both live 9x16 speaker films came out of the recipe with the WIDE speaker
+layout: a 35%-wide right-third dock (a 378px sliver on a 1080 canvas), 17-44px
+type designed for a desktop frame, and floating pills drifting across the
+face. The first film only looked right because every overlay was placed by
+hand; the two-scene test (`proj_234d8a01`) showed the raw output.
+
+`authoredLayout` gains a TALL SPEAKER branch (`vertical && speaker &&
+!takeover`): surfaces, heroes and captions stack FULL-WIDTH in two bands that
+miss a phone selfie's face (about 22-68% of the height on both live takes) --
+the LOWER band over the chest (58-82%) first, the TOP band under the platform
+strip (13-30%) when the lower one is full; accents take the corners of those
+bands; floating pills drift in the lower band. Four fixed-pixel components
+(`sticker-prop`, `prop-strike`, `floating-pills`, `composer`) gained a `scale`
+field (CSS zoom on their root); the authored-scene builder sets 1.8 on a tall
+speaker frame when the board did not, and gives `auto-tagged-link` 72px. The
+wide layout is untouched.
+
+Not done: reading the face's actual band from the take (a low camera in bed
+puts the face at 70% of the height; the bands are fixed for now).
+
 ## 2026-09-15 — The take flow, phase 1: needs, per-scene takes, the take job
 
 `SPEC-take-flow.md` (agreed with Marc after the first two live takes). The take
