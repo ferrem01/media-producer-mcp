@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-15 — The take flow, phase 1: needs, per-scene takes, the take job
+
+`SPEC-take-flow.md` (agreed with Marc after the first two live takes). The take
+was a dead end: it attached and nothing knew. Phase 1 gives it a place in the
+model and something for the agent to wait on.
+
+- **Needs.** A `speaker` board declares one `camera_video` need per scene with
+  spoken lines (`recording_instructions` = the script), emitted
+  deterministically after every storyboard save (`core/take-needs.ts`,
+  `ensureSpeakerNeeds`). The concept already existed on `StoryboardScene.assets`
+  and was rendered nowhere; it is now the fulfilment target.
+- **Per-scene takes.** `project.take` -> `project.takes[]` (migrated), one
+  ACTIVE per scene = the clip `speaker_track` carries; `SpeakerTrackClip`
+  gained `scene_index`. `POST /api/take` takes `scene_index` (default: first
+  open need), replaces that scene's clip, keeps every record, flips the need
+  to provided. `/take?scene=N` prompts one scene's lines.
+- **The `take` tool + job.** `take(project_id, scene_index?)` returns the
+  Studio link, the booth link, the open needs and the script, and queues a
+  `take` job that completes when the take attaches (waiters in
+  `core/take-needs.ts`, released by the attach handler). Same poll contract as
+  generate/render. Jobs are in-memory: a reload drops the waiter, the need on
+  disk survives, the agent re-asks.
+- **One ingest.** `add`/`update` with `speaker_track` now run the same
+  sanitizer as the page on this project's own assets.
+
+Still by hand after phase 1: re-timing overlays to the spoken words (phase 2:
+word anchors + measured spine) and the phone board view (phase 3).
+
 ## 2026-09-15 — Take ingest sanitizer (orientation baked, reframe, loudness)
 
 First real iPhone run of `/take` (`proj_c210e5e1`, 17s): recorded, uploaded and

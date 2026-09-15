@@ -116,6 +116,11 @@ export function migrateProject(p: any): Project {
   }
   const t = p?.treatment;
   if (t && t.filmGrammar === "speaker-screencast") t.filmGrammar = "screencast";
+  // The single `take` record became `takes[]`, one active per scene.
+  if (p && p.take && !Array.isArray(p.takes)) {
+    p.takes = [{ id: "take_0", scene_index: 0, capture: "raw", ...p.take }];
+    delete p.take;
+  }
   return p as Project;
 }
 

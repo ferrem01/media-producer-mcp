@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 
 export interface Job {
   id: string;
-  type: "render" | "generate";
+  type: "render" | "generate" | "take";
   tenantId: string;
   projectId?: string;
   status: "queued" | "running" | "completed" | "failed";
@@ -33,7 +33,7 @@ const jobs = new Map<string, Job>();
  * and returns the job immediately with status "queued".
  */
 export function queueJob(
-  type: "render" | "generate",
+  type: "render" | "generate" | "take",
   tenantId: string,
   runner: (job: Job) => Promise<unknown>,
 ): Job {
@@ -81,7 +81,7 @@ export function getJob(jobId: string): Job | null {
 /**
  * List jobs, optionally filtered by tenant and/or type.
  */
-export function listAllJobs(tenantId?: string, type?: "render" | "generate"): Job[] {
+export function listAllJobs(tenantId?: string, type?: "render" | "generate" | "take"): Job[] {
   let all = Array.from(jobs.values());
   if (tenantId) {
     all = all.filter((j) => j.tenantId === tenantId);

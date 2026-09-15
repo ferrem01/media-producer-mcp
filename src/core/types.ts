@@ -566,24 +566,10 @@ export interface Project {
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
-  /** The delivered take for a speaker film, recorded from the /take page (or
-   *  attached by hand). speaker_track points at the same file; this records
-   *  what was recorded and when, for the measured-spine re-time that follows. */
-  take?: {
-    source: string;
-    recorded_at: string;
-    duration?: number;
-    mime?: string;
-    width?: number;
-    height?: number;
-    /** How the booth captured it: 'canvas' (portrait pixels drawn by the
-     *  page) or 'raw' (the camera track as the browser recorded it). */
-    capture?: string;
-    /** What the ingest sanitizer did to the file (see core/take-sanitize.ts). */
-    rotation_baked?: number;
-    reframed?: { from: string; to: string };
-    loudness?: { measured_lufs: number; normalized_to_lufs?: number };
-  };
+  /** Every take delivered for this film (the /take page, or a hand attach).
+   *  One take is ACTIVE per scene: the one speaker_track carries. A new take
+   *  for the same scene replaces it there; the older record stays here. */
+  takes?: Take[];
   /** Film-level color grade applied to the final concatenated video for
    *  cross-scene consistency (subtle S-curve + saturation + grain).
    *  "none" disables. The generate pipeline defaults videos to "cinematic". */
@@ -668,6 +654,9 @@ export interface Project {
 export interface SpeakerTrackClip {
   /** Path to the speaker video file */
   source: string;
+  /** The storyboard scene this clip is the base for (0-based). Clips are
+   *  played in scene order; a clip without it is the whole film's base. */
+  scene_index?: number;
   /** Start offset into the source video in seconds (skip dead air) */
   start?: number;
   /** Trim: only use video from this timestamp */
@@ -681,6 +670,27 @@ export interface SpeakerTrackClip {
    *  of truncating the tail. The rate is computed at render time from the
    *  probed source duration -- no manual timecodes. Single-clip bases only. */
   fit?: boolean;
+}
+
+/** A delivered take: what was recorded, for which scene, and what the ingest
+ *  sanitizer did to it (see core/take-sanitize.ts). */
+export interface Take {
+  id: string;
+  /** 0-based storyboard scene index the take fulfils. */
+  scene_index: number;
+  source: string;
+  recorded_at: string;
+  duration?: number;
+  mime?: string;
+  width?: number;
+  height?: number;
+  /** How the booth captured it: 'canvas' (portrait pixels drawn by the page)
+   *  or 'raw' (the camera track as the browser recorded it); 'attach' for a
+   *  file attached by hand through the tools. */
+  capture?: string;
+  rotation_baked?: number;
+  reframed?: { from: string; to: string };
+  loudness?: { measured_lufs: number; normalized_to_lufs?: number };
 }
 
 export interface SpeakerTrack {

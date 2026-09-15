@@ -41,6 +41,8 @@ import {
 import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
+import { ensureSpeakerNeeds, openTakeNeeds, waitForTake } from "./core/take-needs.js";
+import { sanitizeTake } from "./core/take-sanitize.js";
 import { TraceBuilder } from "./trace/index.js";
 // generateComponent / saveGeneratedComponent used by pipeline internally
 import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
@@ -53,7 +55,7 @@ import { renderStoryboardCards } from "./core/storyboard-cards.js";
 import { reviseDraftSceneSurgical } from "./llm/storyboard-surgical.js";
 import path from "node:path";
 import fs from "node:fs/promises";
-import type { Scene, SceneComponent, BrandKit, SpeakerTrack, Frame, Canvas } from "./core/types.js";
+import type { Scene, SceneComponent, BrandKit, SpeakerTrack, Frame, Canvas, Project } from "./core/types.js";
 import { FRAME_SPECS, frameFromDims } from "./core/types.js";
 /** Canvas from the FRAME axis. Explicit pixel dimensions always win; then the
  *  pinned frame; then 16x9. (SPEC-format-and-spine.md) */
@@ -223,6 +225,24 @@ export function normalizeDownloadUrl(raw: string): string {
  *  tenant-scoped token in the link — otherwise the URL 401s on open. The token
  *  is a non-expiring JWT (when SESSION_SECRET is set) or a static AUTH_TOKENS
  *  entry the caller passed; without either, the link is plain (dev mode). */
+/** Every path that attaches a speaker file gets the same ingest as the take
+ *  page: orientation baked, reframed to the canvas, dialogue loudness. Only
+ *  this project's own assets are touched (external URLs pass through). */
+async function sanitizeSpeakerClips(project: Project): Promise<Array<{ source: string; ok: boolean; note?: string }>> {
+  const out: Array<{ source: string; ok: boolean; note?: string }> = [];
+  for (const clip of project.speaker_track?.clips || []) {
+    const src = String(clip.source || "");
+    if (!src.startsWith(`/assets/${project.tenant_id}/projects/${project.project_id}/assets/`)) continue;
+    try {
+      const r = await sanitizeTake(resolveVideoPath(src, config.dataDir), project.canvas);
+      out.push({ source: src, ok: true, note: [r.rotation_baked ? `rotation ${r.rotation_baked} baked` : "", r.reframed ? `reframed ${r.reframed.from} -> ${r.reframed.to}` : "", r.loudness?.normalized_to_lufs != null ? `${r.loudness.measured_lufs} -> ${r.loudness.normalized_to_lufs} LUFS` : ""].filter(Boolean).join(", ") || undefined });
+    } catch (e: any) {
+      out.push({ source: src, ok: false, note: e?.message || String(e) });
+    }
+  }
+  return out;
+}
+
 function previewUrl(tenantId: string, projectId: string, token?: string): string {
   let url = `${config.publicUrl}/studio?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
   if (isAuthEnabled()) {
@@ -345,16 +365,17 @@ BEFORE GENERATING
   * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
   * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
   * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
+    Real person: take(project_id) -> link the human records on (phone), a job that completes when the take lands.
   Choosing: ask what carries the argument.
 - FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else -- never changes the grammar. Instagram ad = 9x16 + any grammar.
 - THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper|plain, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
 - Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
-- A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
+- A recorded screen demo? The Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
 
 REAL MEDIA (planned and fetched AUTONOMOUSLY -- steer it with the brief)
 - Per beat the director picks real footage, a generated still, or motion graphics (Pexels, AI stills, Veo video -- Veo only for moving shots stock can't hold; 0-1 per film, ~8s, slow).
 - STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk". To FORCE a generated shot, describe it and say "generate this shot" -- that makes it mandatory. Mood-only briefs get motion graphics on UI/data beats, real media on emotional ones.
-- TALKING HEADS are explicit by design (a synthetic presenter is the human's call). generate_clip = one Veo clip (quote the spoken line). generate_presenter = a whole script (~60s) split into consistent takes, ONE stitched clip (relay scripted-vs-heard drift). Feed either asset_url back as speaker_source: that voice becomes the soundtrack, scenes cut on its sentences. reference_image keeps the presenter consistent.
+- TALKING HEADS are explicit by design (a synthetic presenter is the human's call). generate_clip = one Veo clip (quote the spoken line). generate_presenter = a whole script (~60s) split into consistent takes, ONE stitched clip. Feed either asset_url back as speaker_source: that voice becomes the soundtrack, scenes cut on its sentences. reference_image keeps the presenter consistent.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
 1. generate mode='storyboard' -> review the beats with the human, adjust, THEN build scenes.
@@ -369,7 +390,7 @@ EDITING
 
 JOBS AND DELIVERY
 - generate and render are async: they return a job_id; poll job{action:'status'} (or wait). Progress has step + percent -- relay it.
-- When a render completes the job carries download_url (direct MP4) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS. Everything is served over HTTPS -- never a reason for SSH or server filesystem access.
+- When a render completes the job carries download_url (direct MP4) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS; never SSH or server filesystem access.
 - Later, get(project_id) / list return rendered, download_url and render_stale (true = the MP4 predates the latest edits; offer a re-render).
 
 If a scene looks wrong, get{target:'layout'} measures real geometry (element boxes, crop math, warnings) -- diagnose before writing a revise instruction.`;
@@ -683,6 +704,7 @@ export async function queueStoryboardGeneration(params: {
         origProject.prompt = project.prompt;
         origProject.storyboard = project.storyboard;
         origProject.status = "storyboard";
+        ensureSpeakerNeeds(origProject);
         origProject.updated_at = new Date().toISOString();
         await saveProject(origProject);
         project = origProject;
@@ -870,7 +892,7 @@ export function createMcpServer(): McpServer {
       scene_id: z.string().optional(),
       target: z.enum(["project", "brand_kit", "job", "jobs", "layout", "motion"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs, 'layout' for measured scene geometry, 'motion' (with project_id + scene_id) for sampled per-component motion across scene time -- verify 'did the zoom/entrance actually fire' without rendering."),
       job_id: z.string().optional().describe("Job ID to check status (use with target='job')"),
-      job_type: z.enum(["render", "generate"]).optional().describe("Filter jobs by type (use with target='jobs')"),
+      job_type: z.enum(["render", "generate", "take"]).optional().describe("Filter jobs by type (use with target='jobs')"),
       selector: z.string().optional().describe("CSS selector to also measure specific element(s) (use with target='layout')"),
       at_time: z.number().optional().describe("Timeline second to measure at (use with target='layout'; default mid-scene)"),
       samples: z.number().optional().describe("Evenly spaced sample count across the scene (use with target='motion'; default 13, max 40)"),
@@ -1010,8 +1032,9 @@ export function createMcpServer(): McpServer {
         const project = await loadProject(params.tenant_id, params.project_id);
         if (!project) return err("Project not found");
         project.speaker_track = params.speaker_track as SpeakerTrack;
+        const sanitized = await sanitizeSpeakerClips(project);
         await saveProject(project);
-        return ok({ message: "Speaker track set", speaker_track: project.speaker_track });
+        return ok({ message: "Speaker track set", speaker_track: project.speaker_track, sanitized });
       }
 
       if (params.scene_id && params.component) {
@@ -1344,6 +1367,7 @@ export function createMcpServer(): McpServer {
             delete project.speaker_track;
           } else {
             project.speaker_track = st;
+            await sanitizeSpeakerClips(project);
           }
           updated = true;
         }
@@ -1463,6 +1487,54 @@ export function createMcpServer(): McpServer {
   // ─────────────────────────────────────────────
   // delete - Remove a project, scene, component, or brand asset
   // ─────────────────────────────────────────────
+
+  tool(
+    "take",
+    "Ask the human for a camera take of a SPEAKER film (SPEC-take-flow.md). Returns the Studio link to hand them (on a phone it opens the board with Record on each scene; add scene_index to point the booth at one scene), the open needs, and a job that completes when the take lands -- poll job(action='status'). On arrival the file is sanitized (orientation, frame, dialogue loudness), attached as that scene's base, and the scene's need flips to provided. Then build with generate(mode='full') and render.",
+    {
+      tenant_id: z.string(),
+      project_id: z.string(),
+      scene_index: z.number().int().min(0).optional().describe("0-based storyboard scene to record. Omit to wait for a take on any scene."),
+    },
+    async (params) => {
+      const project = await loadProject(params.tenant_id, params.project_id);
+      if (!project) return err("Project not found");
+      if ((project.treatment as any)?.filmGrammar !== "speaker") {
+        return err(`Takes are for speaker films; this project's grammar is '${(project.treatment as any)?.filmGrammar || "unset"}'.`);
+      }
+      if (!project.storyboard?.scenes?.length) return err("This project has no storyboard yet. Build one with generate(mode='storyboard') first.");
+      if (ensureSpeakerNeeds(project)) { project.updated_at = new Date().toISOString(); await saveProject(project); }
+      const open = openTakeNeeds(project);
+      const sceneIndex = params.scene_index;
+      if (sceneIndex !== undefined && !project.storyboard.scenes[sceneIndex]) return err(`scene_index ${sceneIndex} is out of range (${project.storyboard.scenes.length} scenes).`);
+      const job = queueJob("take", params.tenant_id, async (j) => {
+        j.projectId = params.project_id;
+        j.progress = { step: "waiting for the take", percent: 0, detail: sceneIndex !== undefined ? `scene ${sceneIndex + 1}` : `${open.length} open need(s)` };
+        const take = await waitForTake(params.tenant_id, params.project_id, sceneIndex);
+        const after = await loadProject(params.tenant_id, params.project_id);
+        return {
+          take,
+          take_url: `${config.publicUrl}${take.source}`,
+          open_needs: after ? openTakeNeeds(after) : [],
+          speaker_track: after?.speaker_track,
+          studio_url: previewUrl(params.tenant_id, params.project_id),
+          message: "The take is attached. Build with generate(mode='full', project_id) and then render.",
+        };
+      });
+      const studioUrl = previewUrl(params.tenant_id, params.project_id);
+      const takeUrl = studioUrl.replace("/studio?", "/take?") + (sceneIndex !== undefined ? `&scene=${sceneIndex}` : "");
+      return ok({
+        status: "waiting",
+        job_id: job.id,
+        studio_url: studioUrl,
+        take_url: takeUrl,
+        open_needs: open,
+        script: (sceneIndex !== undefined ? [project.storyboard.scenes[sceneIndex]] : project.storyboard.scenes)
+          .map((sc, i) => ({ scene_index: sceneIndex !== undefined ? sceneIndex : i, label: sc.label, lines: sc.voiceover_text || "" })),
+        message: `Hand the human studio_url (or take_url to open the booth directly). Poll job(action='status', job_id='${job.id}'); it completes when the take is attached.`,
+      });
+    },
+  );
 
   tool(
     "delete",
@@ -2866,7 +2938,7 @@ export function createMcpServer(): McpServer {
       action: z.enum(["status", "wait", "list"]),
       job_id: z.string().optional().describe("Job ID to check (required for status/wait)"),
       tenant_id: z.string().optional().describe("Tenant ID (required for list)"),
-      job_type: z.enum(["render", "generate"]).optional().describe("Filter by job type (for list)"),
+      job_type: z.enum(["render", "generate", "take"]).optional().describe("Filter by job type (for list)"),
       timeout_seconds: z.number().optional().default(120).describe("Max seconds to wait (for wait action, default 120)"),
     },
     async (params) => {

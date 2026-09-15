@@ -18,6 +18,7 @@ import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
+import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters } from "./core/take-needs.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
@@ -2141,12 +2142,14 @@ Rules:
         return;
       }
 
-      // ── API: Direct binary asset upload ──
-      // POST /api/take/{tenant}/{project} {url, duration?, mime?, width?, height?}
+      // ── API: Attach a take ──
+      // POST /api/take/{tenant}/{project} {url, scene_index?, duration?, mime?, width?, height?, capture?}
       // Attach a recorded take (already uploaded to this project's assets) as
-      // the project's speaker base: speaker_track = one clip from 0. The take
-      // page calls this after its upload; the MCP `add` tool does the same
-      // thing by hand. Refuses a URL outside this project's own asset dir so a
+      // the speaker base for ONE scene (default: the first scene whose take
+      // need is open, else scene 0). The file is sanitized in place first
+      // (orientation baked, reframed to the canvas, dialogue loudness); the
+      // scene's need flips to provided; any `take` job waiting on the project
+      // completes. Refuses a URL outside this project's own asset dir so a
       // tenant token cannot point a project at someone else's file.
       const takeMatch = urlPath.match(/^\/api\/take\/([^/]+)\/([^/]+)$/);
       if (takeMatch && method === "POST") {
@@ -2161,19 +2164,19 @@ Rules:
         }
         const tkProjectObj = await loadProject(tkTenant, tkProject);
         if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        const duration = Number(tkBody.duration);
-        // Make the phone's file say one thing to every consumer (orientation
-        // baked, reframed to the canvas, voice at dialogue level) before
-        // anything downstream reads it. A sanitizer failure is logged, not
-        // fatal: the take still attaches.
+        ensureSpeakerNeeds(tkProjectObj);
+        const open = openTakeNeeds(tkProjectObj);
+        const sceneIndex = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0
+          ? Number(tkBody.scene_index) : (open[0] ?? 0);
         let sanitized: TakeSanitizeResult | undefined;
         try {
           sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkProjectObj.canvas);
         } catch (e: any) {
           console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
         }
-        tkProjectObj.speaker_track = { clips: [{ source: tkUrl, start: 0 }] };
-        tkProjectObj.take = {
+        const duration = Number(tkBody.duration);
+        const take = attachTake(tkProjectObj, {
+          scene_index: sceneIndex,
           source: tkUrl,
           recorded_at: new Date().toISOString(),
           duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100
@@ -2182,21 +2185,27 @@ Rules:
           // The file as it now stands (post-sanitize), not what the page saw.
           width: sanitized?.probe.width || Number(tkBody.width) || undefined,
           height: sanitized?.probe.height || Number(tkBody.height) || undefined,
-          capture: typeof tkBody.capture === "string" ? tkBody.capture : undefined,
+          capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw",
           rotation_baked: sanitized?.rotation_baked || undefined,
           reframed: sanitized?.reframed,
           loudness: sanitized?.loudness,
-        };
+        });
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
+        const released = resolveTakeWaiters(tkTenant, tkProject, take);
         const tkNotes = [
-          tkProjectObj.take.duration ? `${tkProjectObj.take.duration}s` : "",
+          `scene ${sceneIndex + 1}`,
+          take.duration ? `${take.duration}s` : "",
           sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
           sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
           sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
+          released ? `${released} waiting job(s) released` : "",
         ].filter(Boolean).join(", ");
-        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)}${tkNotes ? ` (${tkNotes})` : ""}`);
-        jsonResponse(res, 200, { ok: true, project_id: tkProject, speaker_track: tkProjectObj.speaker_track, take: tkProjectObj.take });
+        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)} (${tkNotes})`);
+        jsonResponse(res, 200, {
+          ok: true, project_id: tkProject, take, speaker_track: tkProjectObj.speaker_track,
+          open_needs: openTakeNeeds(tkProjectObj),
+        });
         return;
       }
 
