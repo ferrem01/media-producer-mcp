@@ -44,7 +44,7 @@ export function getTakeHtml(): string {
   h1 { font-size:20px; font-weight:600; letter-spacing:-.02em; margin:0 0 4px; }
   .sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; }
-  .beat { font-size:19px; line-height:1.45; margin:0 0 14px; }
+  .beat { font-size:19px; line-height:1.45; margin:0 0 14px; white-space:pre-line; }
   .beat b { color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; display:block; margin-bottom:4px; }
   .note { color:var(--muted); font-size:13px; line-height:1.5; }
   .btn { appearance:none; border:0; border-radius:14px; padding:16px 20px; font:inherit; font-size:17px; font-weight:600;
@@ -187,19 +187,33 @@ export function getTakeHtml(): string {
   var total = 0;
   var projectName = '';
 
+  // Cues follow the script's own notation: one sentence per line (a line
+  // break is a breath, ~0.3s) and a line that says only (pause) is a held
+  // beat (~1s) the prompter shows as "•••". Silences come out of the
+  // scene's duration first; the words share what is left.
+  var BREATH_S = 0.3, PAUSE_S = 1.0, PAUSE_GLYPH = '\u2022\u2022\u2022';
+  var PAUSE_LINE = /^\\(\\s*pause\\s*\\)$/i;
   function buildCues(scenes) {
     var out = [];
     (scenes || []).forEach(function (s, i) {
       var text = String(s.voiceover_text || '').trim();
       if (!text) return;
-      var dur = Number(s.duration_seconds) || Math.max(1.5, text.split(/\\s+/).length / WORDS_PER_SEC);
-      var parts = text.match(/[^.!?…]+[.!?…]+["')\\]]*|[^.!?…]+$/g) || [text];
-      var words = parts.map(function (p) { return p.trim().split(/\\s+/).filter(Boolean).length; });
-      var sum = words.reduce(function (a, b) { return a + b; }, 0) || 1;
-      parts.forEach(function (p, k) {
-        var t = p.trim(); if (!t) return;
-        out.push({ text: t, dur: dur * (words[k] / sum), beat: i });
+      var items = [];
+      var lines = text.split(/\\r?\\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      lines.forEach(function (ln) {
+        if (PAUSE_LINE.test(ln)) { items.push({ text: PAUSE_GLYPH, words: 0, gap: PAUSE_S }); return; }
+        var parts = ln.match(/[^.!?…]+[.!?…]+["')\\]]*|[^.!?…]+$/g) || [ln];
+        parts.forEach(function (p, k) {
+          var t = p.trim(); if (!t) return;
+          items.push({ text: t, words: t.split(/\\s+/).filter(Boolean).length, gap: k === parts.length - 1 ? BREATH_S : 0 });
+        });
       });
+      for (var z = items.length - 1; z >= 0; z--) { if (items[z].words) { items[z].gap = 0; break; } }
+      var words = items.reduce(function (a, it) { return a + it.words; }, 0) || 1;
+      var gaps = items.reduce(function (a, it) { return a + it.gap; }, 0);
+      var dur = Number(s.duration_seconds) || Math.max(1.5, words / WORDS_PER_SEC + gaps);
+      var speech = Math.max(0.5, dur - gaps);
+      items.forEach(function (it) { out.push({ text: it.text, dur: speech * (it.words / words) + it.gap, beat: i }); });
     });
     return out;
   }
@@ -225,7 +239,9 @@ export function getTakeHtml(): string {
         var t = String(s.voiceover_text || '').trim(); if (!t) return;
         var d = document.createElement('p'); d.className = 'beat';
         var b = document.createElement('b'); b.textContent = (sceneLabel ? 'Lines' : 'Beat ' + (i + 1)) + (s.duration_seconds ? ' · ' + Number(s.duration_seconds).toFixed(0) + 's' : '');
-        d.appendChild(b); d.appendChild(document.createTextNode(t)); sc.appendChild(d);
+        d.appendChild(b);
+        d.appendChild(document.createTextNode(t.split(/\\r?\\n/).map(function (l) { l = l.trim(); return PAUSE_LINE.test(l) ? PAUSE_GLYPH : l; }).filter(Boolean).join('\\n')));
+        sc.appendChild(d);
       });
       $('recordBtn').disabled = false;
     })

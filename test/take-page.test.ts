@@ -34,6 +34,15 @@ describe("the take page's client script", () => {
 describe("what the booth does", () => {
   const html = getTakeHtml();
 
+  it("cues the prompter by line: a (pause) line is a held beat shown as •••, a line break a breath", () => {
+    const js = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
+    expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\$\/i/);
+    expect(js).toMatch(/BREATH_S = 0\.3, PAUSE_S = 1\.0/);
+    expect(js).toMatch(/text\.split\(\/\\r\?\\n\/\)/);
+    expect(js).toMatch(/items\.push\(\{ text: PAUSE_GLYPH, words: 0, gap: PAUSE_S \}\)/);
+    expect(html).toMatch(/\.beat \{[^}]*white-space:pre-line/);
+  });
+
   it("records the front camera in portrait with the recorder extension's audio constraints", () => {
     expect(html).toMatch(/facingMode: 'user'/);
     expect(html).toMatch(/width: \{ ideal: 1080 \}, height: \{ ideal: 1920 \}/);
@@ -72,7 +81,7 @@ describe("what the booth does", () => {
     expect(html).toMatch(/voiceover_text/);
     expect(html).toMatch(/duration_seconds/);
     expect(html).toMatch(/WORDS_PER_SEC = 2\.4/);
-    expect(html).toMatch(/dur \* \(words\[k\] \/ sum\)/);
+    expect(html).toMatch(/speech \* \(it\.words \/ words\) \+ it\.gap/);
   });
 
   it("uploads to the project's own assets and then attaches via /api/take", () => {
@@ -106,7 +115,7 @@ describe("the server side", () => {
     expect(src).toMatch(/getTakeHtml\(\)/);
     // the tenant guard regex must list `take` or a tenant token could attach
     // to another tenant's project
-    expect(src).toMatch(/\|traces\|take\)\\\/\(\[\^\/\]\+\)\//);
+    expect(src).toMatch(/\|traces\|take\|storyboard\)\\\/\(\[\^\/\]\+\)\//);
   });
 
   it("refuses a take URL outside the project's own asset dir", async () => {

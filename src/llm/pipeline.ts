@@ -28,6 +28,7 @@ import { critiqueAndReviseScene } from "./revision-critique.js";
 import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
+import { activeTake } from "../core/take-needs.js";
 import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2679,6 +2680,10 @@ async function runUnifiedPipeline(
       const script = String(d.voiceover_text || "");
       if (!script.trim() && !(Array.isArray(d.components) && d.components.length)) continue;
       const spine = await spineForScene(spineProject, i, script, Number(d.duration_seconds) || 0);
+      // The take's measured face rides on the draft: the tall-frame layout
+      // builds its bands around it (core/face-band.ts).
+      const takeFace = spineProject ? activeTake(spineProject, i)?.face : undefined;
+      if (takeFace) { d.take_face = takeFace; console.log(`  Face: scene ${i + 1} at ${Math.round(takeFace.cx * 100)}%/${Math.round(takeFace.cy * 100)}%, ${Math.round(takeFace.size * 100)}% tall`); }
       if (spine.source === "measured" && spine.duration > 0 && Math.abs(spine.duration - (Number(d.duration_seconds) || 0)) > 0.05) {
         console.log(`  Spine: scene ${i + 1} ${d.duration_seconds}s -> ${spine.duration}s (the take is the clock)`);
         d.duration_seconds = Math.round(spine.duration * 100) / 100;

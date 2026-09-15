@@ -65,6 +65,25 @@ all" runs the prompter through every scene with breaks; the transcript cuts
 the take per scene by each scene's first word. The desktop Studio is
 untouched. One link goes around: the Studio link.
 
+**The lines are edited where they are read.** The board card carries the
+scene's lines with an Edit control: `PATCH /api/storyboard/{t}/{p}/scenes/{i}`
+`{voiceover_text}` updates the storyboard record (before or after a build),
+re-points the need's `recording_instructions`, and resolves the scene's
+anchors again -- against the take's measured spine when one is attached, at
+speaking pace otherwise. A take remembers the lines it was recorded against
+(`Take.lines`); when they diverge the card says so and offers Re-record. So
+one link goes around a group and the words get iterated by thumb.
+
+**The silences are written, not guessed.** `voiceover_text` is laid out for a
+reader: ONE SENTENCE PER LINE (the line break is a breath, ~0.3s), and a line
+that says only `(pause)` is a held beat (~1s). Three readers, one parser
+(`core/script-lines.ts`): the prompter cues by line and shows a pause as
+"•••"; the asserted spine opens the gap between the words around it; the
+board and the booth's script panel keep the lines and show the glyph.
+Pause markers are never words -- anchors, record-all cuts and word counts
+ignore them. A measured spine needs none of this: the recording holds its
+own silences.
+
 **Not in this spec.** Auto-build-on-arrival (opt-in later, once needs and
 jobs exist), a project- or need-scoped token for handing a link to someone
 who is not the tenant (design it in when a second human records), final-mix

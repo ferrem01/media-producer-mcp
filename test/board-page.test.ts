@@ -33,6 +33,15 @@ describe("the board page (SPEC-take-flow.md, phase 3)", () => {
     expect(take).toMatch(/scene_index: recordAll \? 'all'/);
   });
 
+  it("lets the reader edit a scene's lines in place and flags a take the lines have moved past", () => {
+    expect(js).toMatch(/api\('PATCH', '\/storyboard\/' \+ encodeURIComponent\(tenant\) \+ '\/' \+ encodeURIComponent\(project\) \+ '\/scenes\/' \+ i, \{ voiceover_text: ta\.value \}\)/);
+    expect(js).toMatch(/'Edit the lines'/);
+    expect(js).toMatch(/take\.lines\.trim\(\) !== script/);
+    // Pause notation is shown the way the prompter shows it, and the script keeps its lines.
+    expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\$\/i/);
+    expect(html).toMatch(/\.script \{[^}]*white-space:pre-line/);
+  });
+
   it("builds only once every need is filled, renders once built, and polls the job", () => {
     expect(js).toMatch(/build\.disabled = open\.length > 0/);
     expect(js).toMatch(/rend\.disabled = !built/);
