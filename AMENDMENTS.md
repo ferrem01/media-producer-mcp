@@ -29,6 +29,16 @@ voice runs the whole time, a cutaway is only what is on screen.
   scene stays over the person), exempt from the phone-reel mock drop, laid
   full-stage at z 36, and never phone-zoomed (`isCutaway` in
   scene-generator).
+- **The writer nests enter/exit inside data.** The second live board
+  (proj_55464519) cast a mock cut-in on every claim, and every one arrived
+  as `data.enter` / `data.exit`, so the anchors were extracted from there
+  and the wrapper never cut. `liftWrapperAnims` (core/word-anchors.ts)
+  moves them beside data, in the normalizer (fresh boards, with a note)
+  and in `extractAnchors` (saved boards at build); the schema now says "a
+  sibling of data, never inside it". The same board also dropped the
+  chapter label and the sticker on every scene and left the hook scene
+  with no cast at all, so the contract now says every scene is cast with
+  three objects, the first one too.
 - **The camera moves on the person by rule** (creator-cut only,
   `creatorCutCameraMoves` in the scene generator, once the cut windows are
   seconds): a claim with no authored moves gets a punch-in aimed at the

@@ -136,7 +136,7 @@ describe("the storyboard can reach the choreography", () => {
     const src = await read("../src/llm/storyboard-builder.ts");
     const at = src.indexOf("Normalize entries to string");
     expect(at).toBeGreaterThan(0);
-    const body = src.slice(at, at + 900);
+    const body = src.slice(at, at + 1200);
     expect(body).toMatch(/c\.enter \? \{ enter: c\.enter \}/);
     expect(body).toMatch(/c\.exit \? \{ exit: c\.exit \}/);
   });
