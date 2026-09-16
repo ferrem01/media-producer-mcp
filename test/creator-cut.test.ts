@@ -238,6 +238,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(pipeline).toMatch(/the standing header "\$\{c\.data\.text\}" becomes the chapter label/);
     // "Weekly Newsletter · Draft" on every scene: the shared head goes, the tail stays.
     expect(pipeline).toMatch(/const tailOf = /);
+    expect(pipeline, "a tail with no letter or digit is no label").toMatch(/\/\[\\p\{L\}\\p\{N\}\]\/u\.test\(t\) \? t : ""/);
     expect(pipeline).toMatch(/const chapter = \(tailOf\(c\) \|\| label\)\.toUpperCase\(\)\.slice\(0, 24\);/);
     // Unresolved enter.at / exit.at on a cut resolve to 0 otherwise -- the person gone for the whole claim.
     expect(pipeline).toMatch(/if \(u\.path !== "enter\.at" && u\.path !== "exit\.at"\) continue;/);

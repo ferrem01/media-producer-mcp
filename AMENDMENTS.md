@@ -50,6 +50,10 @@ voice runs the whole time, a cutaway is only what is on screen.
   whose word was not in the lines resolved to 0 -- with both ends at 0, a
   cutaway for the whole claim -- so unresolved `enter.at` / `exit.at` on a
   cut get the 30% / 80% window instead.
+  Verified on the build: DRAFT / EDITING / SCHEDULED / SENT, windows of
+  1.2s and up, the calm camera on every scene. One tail was a lone dash
+  and became a pill reading "—"; a tail with no letter or digit now falls
+  back to the scene's name.
 - **The contract stands alone; the build covers a writer miss.** The
   first unpinned test (proj_0f1e1b41, a tutorial brief, nothing pinned):
   the director chose creator-cut, 9x16 and calm from the brief alone, and
