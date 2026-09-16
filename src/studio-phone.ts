@@ -1,17 +1,20 @@
 /**
- * The board in your hand -- served at /board?tenant=&project=&token= (and
- * where /studio lands on a phone). One card per storyboard scene: the
- * script, the still, and the scene's take need with Record (the /take
- * booth for that scene) and Upload. "Record all" runs the booth through
- * every scene and the server cuts the recording per scene. Build and
- * Render are one tap each and poll their jobs. The desktop Studio is the
- * editing surface; this is the board, sized for a thumb (SPEC-take-flow.md).
+ * Studio on a phone -- what /studio?tenant=&project=&token= serves when the
+ * user agent is a phone (?desktop=1 forces the desktop app). ONE Studio,
+ * two views: this one shows only what you do on a phone. At the top, what
+ * the film still needs from you (takes, proof); then one card per
+ * storyboard scene: the script, the still, the take need with Record (the
+ * /take booth for that scene) and Upload, and the proof the claim asked
+ * for with Upload. "Record all" runs the booth through every scene and the
+ * server cuts the recording per scene. Build and Render are one tap each
+ * and poll their jobs. The desktop Studio is the editing surface
+ * (SPEC-take-flow.md).
  *
  * Plain HTML in one template literal: the client script must not contain
  * backticks or "${" (the take page's rule).
  */
 
-export function getBoardHtml(): string {
+export function getPhoneStudioHtml(): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -19,7 +22,7 @@ export function getBoardHtml(): string {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:,">
-<title>Board</title>
+<title>Studio</title>
 <style>
   :root { --bg:#0e0e14; --panel:#17171f; --ink:#f4f4f8; --muted:#9a9aad; --line:#26262f;
     --accent:#393bf5; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
@@ -53,6 +56,13 @@ export function getBoardHtml(): string {
   .pill.ok { background:#12331f; color:#4ade80; }
   .pill.na { background:#20202a; color:var(--muted); }
   .meta { color:var(--muted); font-size:13px; margin-top:6px; }
+  .needs { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:12px 14px; margin:0 0 4px; }
+  .needs .lead { color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+  .needs .line { display:flex; justify-content:space-between; gap:10px; font-size:15px; padding:4px 0; }
+  .needs .line .n { color:var(--muted); font-size:13px; white-space:nowrap; }
+  .needs .line.done { color:var(--muted); }
+  .needs .line.done .n { color:#4ade80; }
+  .needs .note { color:var(--muted); font-size:12px; margin-top:6px; }
   .proof { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
   .proof .lead { color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
   .proof .ev { display:flex; gap:10px; align-items:center; padding:6px 0; }
@@ -72,11 +82,12 @@ export function getBoardHtml(): string {
 </head>
 <body>
 <div class="top">
-  <h1 id="title">Board</h1>
-  <p class="sub" id="subtitle">Loading the board…</p>
+  <h1 id="title">Studio</h1>
+  <p class="sub" id="subtitle">Loading…</p>
   <div class="row" id="topActions"></div>
   <div class="status" id="status"></div>
 </div>
+<div id="needs"></div>
 <div id="cards"></div>
 <div class="card" id="filmCard" style="display:none">
   <div class="head"><div class="label">The film</div><div class="dur" id="filmMeta"></div></div>
@@ -84,7 +95,7 @@ export function getBoardHtml(): string {
   <div class="row" id="filmActions" style="margin-top:10px"></div>
   <div class="bar" id="jobBar"><i id="jobFill"></i></div>
 </div>
-<p style="margin:18px 0 0"><a class="link" id="desktopLink" href="#">Open the desktop Studio</a></p>
+<p style="margin:18px 0 0"><a class="link" id="desktopLink" href="#">Open the desktop Studio (screenshots, editing)</a></p>
 <input type="file" id="picker" accept="video/*">
 <input type="file" id="evPicker" accept="image/*,video/*">
 <script>
@@ -182,6 +193,32 @@ export function getBoardHtml(): string {
 
     var open = [];
     scenes.forEach(function (s, i) { var n = needOf(s); if (n && n.status === 'needed') open.push(i); });
+
+    // Needed from you: the takes and the proof, counted across the film,
+    // before a single card -- the list of what to make, not a note per card.
+    var nd = $('needs'); nd.innerHTML = '';
+    var takesTotal = 0, takesOpen = 0, proofTotal = 0, proofOpen = 0, proofKinds = {};
+    scenes.forEach(function (s) {
+      var n = needOf(s); if (n) { takesTotal++; if (n.status === 'needed') takesOpen++; }
+      proofOf(s).forEach(function (p) { proofTotal++; if (p.need.status === 'needed') proofOpen++; var k = EV_LABELS[p.need.type] || p.need.type; proofKinds[k] = (proofKinds[k] || 0) + 1; });
+    });
+    if (takesTotal || proofTotal) {
+      var box = document.createElement('div'); box.className = 'needs';
+      var lead = document.createElement('div'); lead.className = 'lead'; lead.textContent = 'Needed from you'; box.appendChild(lead);
+      if (takesTotal) {
+        var lt = document.createElement('div'); lt.className = 'line' + (takesOpen ? '' : ' done');
+        lt.innerHTML = '<span>' + takesTotal + (takesTotal === 1 ? ' camera take' : ' camera takes') + ' \u00b7 record here</span><span class="n">' + (takesOpen ? takesOpen + ' to go' : 'all in') + '</span>';
+        box.appendChild(lt);
+      }
+      Object.keys(proofKinds).forEach(function (k) {
+        var openK = 0; scenes.forEach(function (s) { proofOf(s).forEach(function (p) { if ((EV_LABELS[p.need.type] || p.need.type) === k && p.need.status === 'needed') openK++; }); });
+        var lp = document.createElement('div'); lp.className = 'line' + (openK ? '' : ' done');
+        lp.innerHTML = '<span>' + proofKinds[k] + ' ' + k.toLowerCase() + (proofKinds[k] === 1 ? '' : 's') + '</span><span class="n">' + (openK ? openK + ' to go' : 'all in') + '</span>';
+        box.appendChild(lp);
+      });
+      if (proofTotal) { var pn = document.createElement('div'); pn.className = 'note'; pn.textContent = 'Proof is listed under each scene. Upload here, or from the desktop Studio where the screenshots are. The film builds without it.'; box.appendChild(pn); }
+      nd.appendChild(box);
+    }
 
     var top = $('topActions'); top.innerHTML = '';
     if (speaker) {

@@ -1,13 +1,13 @@
 /**
  * The take page -- served at /take?tenant=&project=&token=.
  *
- * Open it on a phone and it IS the booth for a speaker film: the board's
+ * Open it on a phone and it IS the booth for a speaker film: the storyboard's
  * script (voiceover_text, beat by beat) as a teleprompter over the front
  * camera, a level meter so a silent take is visible while you are still
  * talking, record / review / retake, and an upload that attaches the take to
  * the project as its speaker base. The operator never touches a file.
  *
- * This is Phase 2's front door (SPEC-format-and-spine.md): the board's
+ * This is Phase 2's front door (SPEC-format-and-spine.md): the storyboard's
  * ASSERTED spine -- her lines, her estimated durations -- driving the
  * prompter. Re-timing the board to the delivered take (the MEASURED spine)
  * is the step after this one and belongs behind a button on this page.
@@ -94,7 +94,7 @@ export function getTakeHtml(): string {
 <body>
 
 <section id="ready" class="pad on">
-  <p><a class="link" id="boardLinkTop" href="#">← Back to the board</a></p>
+  <p><a class="link" id="studioLinkTop" href="#">← Back to Studio</a></p>
   <h1 id="title">Loading…</h1>
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
@@ -138,9 +138,9 @@ export function getTakeHtml(): string {
   <p class="big">✓</p>
   <h1>Attached</h1>
   <p class="sub" id="doneMeta"></p>
-  <p class="note">The take is now this scene's speaker base. Head back to the board for the next scene, or record this one again.</p>
+  <p class="note">The take is now this scene's speaker base. Head back to Studio for the next scene, or record this one again.</p>
   <div class="spacer"></div>
-  <a class="btn" id="boardLink" href="#">Back to the board</a>
+  <a class="btn" id="studioLink" href="#">Back to Studio</a>
   <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Desktop Studio</a></div>
 </section>
 
@@ -174,13 +174,14 @@ export function getTakeHtml(): string {
   }
   function fail(msg) { $('errMsg').textContent = msg; show('err'); }
   function withToken(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
-  var boardHref = '/board?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + (token ? '&token=' + encodeURIComponent(token) : '');
-  $('boardLinkTop').href = boardHref;
+  // Studio serves its phone view to a phone; on a laptop this lands in the desktop app.
+  var studioHref = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + (token ? '&token=' + encodeURIComponent(token) : '');
+  $('studioLinkTop').href = studioHref;
   function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
 
-  if (!tenant || !project) { fail('Missing ?tenant= and ?project= in the link. Ask your agent for the take link for this board.'); return; }
+  if (!tenant || !project) { fail('Missing ?tenant= and ?project= in the link. Ask your agent for the take link for this film.'); return; }
 
-  // ── the script: the board's asserted spine ────────────────────────────
+  // ── the script: the storyboard's asserted spine ───────────────────────
   // One cue per beat; a long beat is split into sentences, each given a share
   // of the beat's seconds by word count, so a single 15s line still paces.
   var cues = [];
@@ -232,9 +233,9 @@ export function getTakeHtml(): string {
       var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
       $('subtitle').textContent = beats
         ? beats + (beats === 1 ? ' beat' : ' beats') + ' · about ' + fmt(total) + ' at speaking pace' + (g ? ' · ' + g : '')
-        : 'This board has no spoken lines' + (g ? ' (grammar: ' + g + ')' : '') + '. You can still record; there will be no prompter.';
+        : 'This film has no spoken lines' + (g ? ' (grammar: ' + g + ')' : '') + '. You can still record; there will be no prompter.';
       var sc = $('script'); sc.innerHTML = '';
-      if (!beats) { sc.innerHTML = '<p class="note">No script on this board.</p>'; }
+      if (!beats) { sc.innerHTML = '<p class="note">No script on this film.</p>'; }
       scenes.forEach(function (s, i) {
         var t = String(s.voiceover_text || '').trim(); if (!t) return;
         var d = document.createElement('p'); d.className = 'beat';
@@ -453,7 +454,7 @@ export function getTakeHtml(): string {
         .then(function (j) {
           $('doneMeta').textContent = projectName + ' · ' + fmt(blobDuration) + ' take';
           $('studioLink').href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&token=' + encodeURIComponent(token) + '&desktop=1';
-          $('boardLink').href = boardHref;
+          $('studioLink').href = studioHref;
           show('done');
         })
         .catch(function (e) { fail(e.message || String(e)); });

@@ -17,7 +17,7 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
-import { getBoardHtml } from "./board-page.js";
+import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries } from "./core/take-needs.js";
 import { provideAsset, openAssetNeeds } from "./core/asset-needs.js";
@@ -806,15 +806,23 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // through Google and come back, not eat the API's raw 401 JSON. Only
       // the app shell is served here -- every byte of data stays token/
       // cookie-gated behind the middleware.
+      // The old phone page's address: ONE Studio now, so it goes to /studio
+      // (which serves the phone view to a phone).
+      if (urlPath === "/board") {
+        const q = url.includes("?") ? url.slice(url.indexOf("?")) : "";
+        res.writeHead(301, { Location: "/studio" + q });
+        res.end();
+        return;
+      }
       if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
-        // One link goes around: on a phone the Studio link opens the BOARD
-        // (scenes, script, record/upload, build, render); the desktop app is
-        // the editing surface. ?desktop=1 forces the desktop app anywhere.
+        // ONE Studio, two views. On a phone the same link serves the phone
+        // view (what you do on a phone: record, upload, what is still
+        // needed, build, render); everywhere else the desktop app, the
+        // editing surface. ?desktop=1 forces the desktop app anywhere.
         const ua = String(req.headers["user-agent"] || "");
         if (urlPath.startsWith("/studio") && /iPhone|iPad|iPod|Android.*Mobile|Mobile Safari/.test(ua) && !/[?&]desktop=1/.test(url)) {
-          const q = url.includes("?") ? url.slice(url.indexOf("?")) : "";
-          res.writeHead(302, { Location: "/board" + q });
-          res.end();
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+          res.end(getPhoneStudioHtml());
           return;
         }
         const t0 = extractToken(req);
@@ -870,15 +878,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
-      // ── Take page: the phone booth for a speaker film. The board's script
+      // ── Take page: the phone booth for a speaker film. The storyboard's script
       // as a teleprompter over the front camera; record, review, upload,
       // attach as the speaker base. Same token-in-the-link auth as /upload. ──
-      if (urlPath === "/board") {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
-        res.end(getBoardHtml());
-        return;
-      }
-
       if (urlPath === "/take") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getTakeHtml());
@@ -2214,9 +2216,9 @@ Rules:
       // ── API: Provide an asset for a storyboard need (the board) ──
       // POST /api/provide-asset/{tenant}/{project} {scene_index, asset_index, url}
       // The HTTP twin of the update tool's provide_asset: a file uploaded to
-      // this project's assets fills one need on the board -- on a creator-cut
-      // board, the proof a claim asked for, which the next build cuts in on
-      // its words. Same asset-dir guard as a take.
+      // this project's assets fills one need -- on a creator-cut film, the
+      // proof a claim asked for, which the next build cuts in on its words.
+      // Same asset-dir guard as a take.
       const evidenceMatch = urlPath.match(/^\/api\/provide-asset\/([^/]+)\/([^/]+)$/);
       if (evidenceMatch && method === "POST") {
         const [, evTenant, evProject] = evidenceMatch.map(decodeURIComponent);
