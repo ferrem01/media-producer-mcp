@@ -145,6 +145,11 @@ const TOOLS: LLMTool[] = [
 
 // ── Types ──
 
+/** Literal "\\n" / "\\\"" sequences the writer double-escaped -> the characters. */
+export function unescapeLines(text: string): string {
+  return String(text).replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\r\n/g, "\n");
+}
+
 export interface StoryboardBuilderOpts {
   prompt: string;
   /** The user's ORIGINAL prompt, before treatment/context enrichment.
@@ -837,6 +842,20 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
    */
   function normalizeSceneMeta(scene: any): string[] {
     var notes: string[] = [];
+
+    // The writer sometimes escapes its line breaks a second time, so the
+    // lines arrive as one line with literal "\n" in it (measured live,
+    // proj_4488f790: "...dozen tools.\nOne for the plan.\n..."). The
+    // prompter, the needs and the spine all read real lines.
+    if (typeof scene.voiceover_text === "string" && /\\n|\\"/.test(scene.voiceover_text)) {
+      scene.voiceover_text = unescapeLines(scene.voiceover_text);
+      notes.push("unescaped the lines' line breaks");
+    }
+    if (Array.isArray(scene.beats)) {
+      for (const b of scene.beats) {
+        if (b && typeof b.voiceover_text === "string" && /\\n|\\"/.test(b.voiceover_text)) b.voiceover_text = unescapeLines(b.voiceover_text);
+      }
+    }
 
     // Camera moves from the LLM. Extracted so the rules are testable without
     // an LLM round-trip -- see sanitizeCameraMoves.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { scriptLines, scriptWords, scriptGaps, speakingEstimate, displayScript, PAUSE_GLYPH, LINE_BREATH_S, PAUSE_BEAT_S } from "../src/core/script-lines.js";
 import { assertedSpine, splitByScripts } from "../src/core/word-anchors.js";
+import { unescapeLines } from "../src/llm/storyboard-builder.js";
 
 const SCRIPT = [
   "Your campaign is live.",
@@ -78,5 +79,14 @@ describe("record-all cuts ignore pause markers when finding where a scene's line
     const windows = splitByScripts(["Your campaign is live.", "(pause)\nNow what actually happened?"], words, 8);
     expect(windows.length).toBe(2);
     expect(windows[1].start).toBeCloseTo(4 - 0.1, 3);
+  });
+});
+
+describe("lines the writer double-escaped", () => {
+  it("become real lines (measured: literal backslash-n on every scene of proj_4488f790)", () => {
+    const raw = String.raw`A marketer's week disappears.\nOne for the plan.\n(pause)\n\"Get more signups.\"`;
+    const fixed = unescapeLines(raw);
+    expect(fixed.split("\n")).toEqual(["A marketer's week disappears.", "One for the plan.", "(pause)", "\"Get more signups.\""]);
+    expect(scriptLines(fixed).map((l) => l.pause)).toEqual([false, false, true, false]);
   });
 });

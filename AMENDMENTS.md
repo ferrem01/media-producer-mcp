@@ -3005,3 +3005,26 @@ film's layout doctrine rather than a wide-frame guess of it.
 
 `core/take-poster.ts` makes the take still (ffmpeg, at the trim, cached
 beside the thumbnails); the speaker-lane route and the cards share it.
+
+## Three writer habits, three rules (the fifth board)
+
+The first board under the new cards showed three things the storyboard
+writer does that the prompt alone does not stop, so each is now a rule.
+
+Lines arrived with literal "\n" in them -- the writer double-escaped its
+line breaks -- so the prompter would have read one long line with
+backslashes in it. `unescapeLines` in the storyboard builder's scene
+normalization turns them (and escaped quotes) back into characters, on
+the scene's lines and each beat's.
+
+Scene 3 cast quotient-chat, the third app mock in three boards. On a
+phone speaker reel any app mock (`PHONE_REEL_MOCK_RE`: quotient-*,
+claude-*, slack-*, chat-simulator, browser-frame, dashboards, editors,
+post cards, st-* templates) is dropped before the layout, with a log; the
+composer is the one mock with a phone form and stays.
+
+Scene 2's beats said "camera slowly pushes in on Marc's face" and
+camera_moves was empty. In the takeover recipe, an over-camera scene with
+no moves whose beat prose describes a push-in gets one: a slow 1.2x zoom
+from that beat's start, held to the cut, aimed at the face by the re-aim
+that follows.
