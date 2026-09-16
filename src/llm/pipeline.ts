@@ -2696,6 +2696,38 @@ async function runUnifiedPipeline(
   // A product surface the library performs: on a creator-cut claim it is
   // the cutaway unless the storyboard cut it in itself.
   const CUTAWAY_MOCK_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|email-compose|chat-simulator|ui-terminal-agent|browser-|app-|ui-|device-showcase|metric-dashboard|gmail-|calendar-view|code-editor|kanban-board)/;
+  // NO STANDING HEADER (creator-cut): the same pill on every scene is a
+  // title that holds for the whole film, which the grammar forbids unless
+  // the brief asks. Measured live, proj_f308b321: "Weekly Newsletter ·
+  // Draft", "Weekly Newsletter · Editing", "· Scheduled", "· Sent" on all
+  // seven scenes -- a title with a per-scene tail. The shared head goes;
+  // the tail is the chapter label (else the scene's own name).
+  if (filmGrammar === "creator-cut") {
+    const scenesArr = storyboard.scenes as any[];
+    const SEP = /\s+[\u00b7\-\u2013\u2014|:]\s+/;
+    const isPill = (c: any) => c && typeof c === "object" && c.type === "sticker-prop" && String(c.data?.kind || "") !== "stamp" && typeof c.data?.text === "string";
+    const headOf = (c: any) => isPill(c) ? c.data.text.trim().split(SEP)[0].trim().toLowerCase() : "";
+    const tailOf = (c: any) => isPill(c) ? c.data.text.trim().split(SEP).slice(1).join(" ").trim() : "";
+    const counts = new Map<string, number>();
+    for (const sc of scenesArr) {
+      const seen = new Set<string>();
+      for (const c of (Array.isArray(sc.components) ? sc.components : [])) { const t = headOf(c); if (t && t.length > 2 && !seen.has(t)) { seen.add(t); counts.set(t, (counts.get(t) || 0) + 1); } }
+    }
+    const withLines = scenesArr.filter((sc) => String(sc.voiceover_text || "").trim()).length;
+    for (const [head, n] of counts) {
+      if (n < 3 || n < Math.max(3, withLines)) continue;
+      scenesArr.forEach((sc, si) => {
+        const label = String(sc.label || "").replace(/^\s*scene\s*\d+\s*[-:.\u2014\u2013]\s*/i, "").trim();
+        for (const c of (Array.isArray(sc.components) ? sc.components : [])) {
+          if (headOf(c) !== head) continue;
+          const chapter = (tailOf(c) || label).toUpperCase().slice(0, 24);
+          if (!chapter) continue;
+          console.log(`  Creator-cut: scene ${si + 1} -- the standing header "${c.data.text}" becomes the chapter label "${chapter}"`);
+          c.data.text = chapter;
+        }
+      });
+    }
+  }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
     if (opts.project_id) { try { spineProject = await loadProject(opts.tenant_id, opts.project_id); } catch { /* fresh build */ } }
@@ -2753,6 +2785,21 @@ async function runUnifiedPipeline(
         d.duration_seconds = Math.round(spine.duration * 100) / 100;
       }
       const r = applySpine(d, spine);
+      // A cut window whose word is not in the lines resolves to 0 -- a
+      // cutaway from the first frame (and with both ends at 0, for the
+      // whole claim: the person gone for seven seconds, measured live on
+      // proj_f308b321). Unresolved cut ends get the default window instead.
+      for (const u of r.unresolved) {
+        if (u.path !== "enter.at" && u.path !== "exit.at") continue;
+        const dur = Number(d.duration_seconds) || 0;
+        for (const c of d.components as any[]) {
+          if (!c || typeof c !== "object" || (c.type !== u.component && c.id !== u.component)) continue;
+          const anim = u.path === "enter.at" ? c.enter : c.exit;
+          if (!anim || typeof anim !== "object" || anim.effect !== "cut") continue;
+          anim.at = Math.round(dur * (u.path === "enter.at" ? 0.3 : 0.8) * 100) / 100;
+          console.log(`  Creator-cut: scene ${i + 1} -- ${c.type} ${u.path} "@${u.word}" is not in the lines; ${u.path === "enter.at" ? "cut in" : "cut out"} at ${anim.at}s instead`);
+        }
+      }
       if (r.resolved || r.unresolved.length) {
         console.log(`  Spine: scene ${i + 1} ${spine.source}: ${r.resolved} anchor(s) resolved${r.unresolved.length ? `, ${r.unresolved.length} not in the script: ${r.unresolved.map((u) => `${u.component}.${u.path}="${u.word}"`).join(", ")}` : ""}`);
       }
