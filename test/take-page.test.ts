@@ -108,8 +108,12 @@ describe("what the booth does", () => {
   it("never makes the human scroll: the script scrolls inside its card, the stage owns the viewport, Record stays in reach", () => {
     expect(html).toMatch(/#ready \{ height:100dvh; overflow:hidden; \}/);
     expect(html).toMatch(/#script \{ flex:0 1 auto; max-height:44dvh; overflow-y:auto;/);
-    expect(html).toMatch(/#stage \{ position:fixed; inset:0; z-index:5; background:#000; \}/);
+    expect(html).toMatch(/#stage \{ position:fixed; inset:0; z-index:5; background:#000; touch-action:manipulation; \}/);
     expect(html).toMatch(/try \{ window\.scrollTo\(0, 0\); \} catch \(eS\) \{\}/);
+    // ...and the page under the stage is locked (a fixed body is the lock iOS honours), touches never scroll it.
+    expect(html).toMatch(/html\.lock body \{ position:fixed; width:100%; top:0; left:0; \}/);
+    expect(html).toMatch(/document\.documentElement\.classList\.toggle\('lock', id === 'stage'\);/);
+    expect(html).toMatch(/document\.addEventListener\('touchmove', function \(ev\) \{ if \(document\.documentElement\.classList\.contains\('lock'\)\) ev\.preventDefault\(\); \}, \{ passive: false \}\);/);
   });
 
   it("asks for the camera once per visit: the stream survives review, retake and record-again, released when the page hides", () => {

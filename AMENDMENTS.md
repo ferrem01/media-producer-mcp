@@ -32,6 +32,12 @@ camera".
   record-again (`stopAll` no longer kills the tracks); it is released when
   the page hides.
 
+- **Locked under the stage** (Marc, on the deploy: "I can still scroll
+  the take screen up"): while the stage is up the document is locked --
+  `html.lock body { position:fixed }`, the one lock iOS Safari honours --
+  and touch moves are swallowed, so the recording screen cannot rubber-
+  band or scroll.
+
 ## 2026-09-16 — One link, any screen: the phone Studio and the take page read the tenant from the token
 
 Marc opened the Studio link on his phone: "Missing ?tenant= and
