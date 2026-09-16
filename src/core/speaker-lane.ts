@@ -28,7 +28,7 @@ export function laneClips(project: Pick<Project, "scenes" | "speaker_track">): L
   if (!isPerSceneTrack(clips)) return null;
   const scenes = project.scenes || [];
   const starts = speakerSceneFilmStarts(scenes);
-  return clips!
+  const lane = clips!
     .filter((c) => c.scene_index !== undefined && c.scene_index !== null && scenes[c.scene_index!])
     .map((c) => ({
       source: c.source,
@@ -39,6 +39,9 @@ export function laneClips(project: Pick<Project, "scenes" | "speaker_track">): L
       duration: scenes[c.scene_index!].duration_seconds || 0,
     }))
     .sort((a, b) => a.scene_index - b.scene_index);
+  // Per-scene markers but nothing to lay them on (no built scenes yet):
+  // not a lane. The caller falls back to the continuous path.
+  return lane.length ? lane : null;
 }
 
 /** Words of every clip on the film clock: each source's words windowed to

@@ -3059,3 +3059,19 @@ thumbnails at half width. The placeholder is a camera-off avatar: a dim
 room with radial falloff, a soft filled bust with a faint rim, the label
 quiet in the platform zone. Light type on plates reads on it the way it
 will on a real take.
+
+## A continuous speaker track keeps no scene markers
+
+Transcribing two reference films on a scratch project (one clip, no
+scenes) returned nothing: the migration from #760 stamped `scene_index` on
+EVERY clip that lacked one ("one per scene in order"), so a single
+continuous recording read as scene 0's take. With no built scenes the
+per-scene lane was empty, so the transcript and waveform routes served
+nothing; with built scenes every scene after the first would have lost
+its camera. That was the second speaker model Marc named -- one recording
+as the spine of the whole film -- silently broken by the first.
+
+A clip is per-scene only when a recorded take says so (its source matches
+a take). Every other clip stays unstamped and plays from film time 0. And
+a per-scene track with nothing to lay its markers on is not a lane; the
+routes fall back to the continuous path.

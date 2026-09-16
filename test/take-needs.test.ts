@@ -88,10 +88,13 @@ describe("attaching takes", () => {
     expect(activeTake(p, 0)).toBe(p.takes[0]);
   });
 
-  it("stamps legacy clips without a take one per scene, in order", () => {
+  it("leaves legacy clips without a take UNSTAMPED: they are the continuous track, not one take per scene", () => {
+    // The first migration stamped these 0, 1 -- which turned a single
+    // continuous recording into "scene 0's take" and blanked every later
+    // scene's camera. A clip is per-scene only when a recorded take says so.
     const p = migrateProject({ project_id: "old", canvas: { width: 1920, height: 1080, frame: "16x9" },
       speaker_track: { clips: [{ source: "/x/a.mp4" }, { source: "/x/b.mp4" }] } }) as any;
-    expect(p.speaker_track.clips.map((c: any) => c.scene_index)).toEqual([0, 1]);
+    expect(p.speaker_track.clips.map((c: any) => c.scene_index)).toEqual([undefined, undefined]);
   });
 });
 
@@ -200,5 +203,20 @@ describe("the Studio draft view shows the film's frame", () => {
     expect(app).toMatch(/body\.frame-tall \.dv-card \{ display: grid; grid-template-columns: 300px/);
     expect(app).toMatch(/\.dv-rail-thumb \{ width: 100%; aspect-ratio: var\(--mp-frame, 16\/9\)/);
     expect(app).toMatch(/h \+= '<div class="dv-body">';/);
+  });
+});
+
+describe("a continuous speaker track keeps no scene markers", () => {
+  it("migration stamps scene_index only on clips that are recorded takes; a lone continuous clip stays unstamped", () => {
+    const cont = migrateProject({ project_id: "c", canvas: { width: 1080, height: 1920, frame: "9x16" },
+      speaker_track: { clips: [{ source: "/x/whole-film.mp4", start: 0 }] } }) as any;
+    expect(cont.speaker_track.clips[0].scene_index).toBeUndefined();
+    const legacyConcat = migrateProject({ project_id: "l", canvas: { width: 1920, height: 1080, frame: "16x9" },
+      speaker_track: { clips: [{ source: "/x/a.mp4", start: 0 }, { source: "/x/b.mp4", start: 0 }] } }) as any;
+    expect(legacyConcat.speaker_track.clips.map((c: any) => c.scene_index)).toEqual([undefined, undefined]);
+    const withTake = migrateProject({ project_id: "t", canvas: { width: 1080, height: 1920, frame: "9x16" },
+      takes: [{ id: "take_0", scene_index: 2, source: "/x/t2.mp4", recorded_at: "1" }],
+      speaker_track: { clips: [{ source: "/x/t2.mp4", start: 0 }] } }) as any;
+    expect(withTake.speaker_track.clips[0].scene_index).toBe(2);
   });
 });

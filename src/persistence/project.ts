@@ -122,14 +122,19 @@ export function migrateProject(p: any): Project {
     p.takes = [{ id: "take_0", scene_index: 0, capture: "raw", ...p.take }];
     delete p.take;
   }
-  // Clips that predate per-scene takes carry no scene_index: a clip that is a
-  // recorded take belongs to that take's scene; any other clip list is one
-  // clip per scene in order.
+  // A clip that is a recorded take belongs to that take's scene. Any other
+  // clip carries NO scene_index: it is the continuous-track model -- one
+  // recording (or a legacy concatenation) as the spine of the whole film,
+  // playing from film time 0. Stamping those "one per scene in order" (the
+  // first version of this migration) made a single continuous clip look
+  // like scene 0's take: every later scene lost its camera, and a project
+  // with no built scenes lost its transcript and waveform lanes entirely
+  // (measured live, proj_27b6ce13).
   if (p && Array.isArray(p.speaker_track?.clips)) {
-    p.speaker_track.clips.forEach((c: any, k: number) => {
+    p.speaker_track.clips.forEach((c: any) => {
       if (c && c.scene_index === undefined) {
         const t = (p.takes || []).find((t: any) => t.source === c.source);
-        c.scene_index = t ? t.scene_index : k;
+        if (t) c.scene_index = t.scene_index;
       }
     });
   }
