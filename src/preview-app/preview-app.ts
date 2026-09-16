@@ -1703,7 +1703,9 @@ export function getPreviewHtml(): string {
         var want = speakerClipForTime(time);
         if (!want) { el.style.display = 'none'; continue; }
         var wantBase = want.url.split('/').pop();
+        var swapped = false;
         if (!el.src || el.src === '' || el.src === window.location.href || el.src.indexOf(wantBase) < 0) {
+          swapped = true;
           var sby = els.speakerBg2;
           if (sby && sby.src && sby.src.indexOf(wantBase) >= 0) {
             // HARD CUT: the standby already holds this take at its trim.
@@ -1727,6 +1729,24 @@ export function getPreviewHtml(): string {
         state.speakerTrimStart = want.trimStart;
         state.speakerTrimEnd = want.trimEnd;
         state.speakerSceneStart = want.sceneStart;
+        // ONE RECORDING, SEVERAL TAKES: the clips are windows of ONE file,
+        // so the source never changes at the cut and the swap above never
+        // fires -- the voice played straight through the dead air between
+        // takes and ran ~1.2s behind the mouth from scene 2 on (measured
+        // live, proj_9e650f1a: the scene's own rig camera cut to 5.85s,
+        // this element kept playing from 4.66s, and the guard below treats
+        // < 2s as "the speaker is the clock"). A new window on the same
+        // file IS a cut: seek to its trim, once.
+        var winKey = wantBase + '|' + want.trimStart + '|' + want.sceneStart;
+        if (clip._window !== undefined && clip._window !== winKey && !swapped) {
+          var cutT = speakerSourceTime(time);
+          if (cutT > want.trimEnd) cutT = want.trimEnd;
+          try { el.currentTime = cutT; } catch (eCut) {}
+          clip.lastOffset = null;
+          clip.driftSamples = 0;
+          clip._lastSeekTs = (window.performance && performance.now) ? performance.now() : Date.now();
+        }
+        clip._window = winKey;
         // Visibility: show on speaker scenes, hide on opaque scenes -- and
         // hide when the scene carries its own camera inside the rig (a
         // scene with camera moves): that one zooms, this one only plays

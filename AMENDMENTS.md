@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — Studio: one recording, several takes -- the voice fell behind
+
+Marc: "by the second scene my mouth is moving and the sound is not
+coming out yet." In Studio the voice comes from the hidden speaker
+underlay and, on a scene with camera moves, the picture from the scene's
+own rig camera. The underlay swaps takes when the FILE changes; seven
+takes cut from one recording are seven windows of one file, so at the
+cut nothing swapped, the underlay played straight through the dead air
+between takes, and the drift guard ("the speaker is the clock" under 2s)
+never corrected it. Separate recordings never showed it.
+
+- `preview-app.ts` (speaker branch of `syncMedia`): the active take is
+  file + trim window; a new window on the same file seeks the underlay to
+  its trim, once, at the cut.
+- The render cuts the audio on the same trims in ffmpeg and is unaffected.
+
 ## 2026-09-16 — Build-from-board: the working copy goes away
 
 Every build of an approved board (`generate mode:'full' + project_id`)
