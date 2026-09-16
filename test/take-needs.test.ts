@@ -153,6 +153,13 @@ describe("the desktop Studio's camera follows the scene too", () => {
     expect(app).toMatch(/el\.src\.indexOf\(wantBase\) < 0/);          // the source swaps at the cut
     expect(app).toMatch(/\? speakerFilmTime\(spkEl\.currentTime\)/);   // the one-stream clock goes through the active clip
     expect(app).not.toMatch(/time \+ state\.speakerTrimStart/);          // no site still assumes film time 0 = clips[0]
+    // ONE RECORDING, SEVERAL TAKES: the clips are windows of one file, so
+    // the source never changes at the cut. A new window on the same file is
+    // a cut too -- the underlay seeks to its trim (measured live: the voice
+    // ran ~1.2s behind the mouth from scene 2 on).
+    expect(app).toMatch(/var winKey = wantBase \+ '\|' \+ want\.trimStart \+ '\|' \+ want\.sceneStart;/);
+    expect(app).toMatch(/if \(clip\._window !== undefined && clip\._window !== winKey && !swapped\) \{\s*var cutT = speakerSourceTime\(time\);/);
+    expect(app).toMatch(/clip\._window = winKey;/);
   });
 });
 
