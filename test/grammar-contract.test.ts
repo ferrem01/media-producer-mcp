@@ -53,8 +53,11 @@ describe("grammar contracts: only the active one ships", () => {
     // Unresolved grammar must still ship everything -- the safety net.
     expect(src).toMatch(/!opts\.filmGrammar \|\|/);
     expect(src).toMatch(/opts\.filmGrammar === "hype-cut" && g === "tempo-cut"/);
-    // creator-cut inherits speaker's spine the same way.
-    expect(src).toMatch(/opts\.filmGrammar === "creator-cut" && g === "speaker"/);
+    // creator-cut does NOT inherit speaker's section: speaker forbids app
+    // mocks on a phone, creator-cut's cutaways are app mocks, and a writer
+    // shown both split the difference (proj_0f1e1b41). It restates the spine
+    // laws it shares instead -- see creator-cut.test.ts.
+    expect(src).not.toMatch(/opts\.filmGrammar === "creator-cut" && g === "speaker"/);
   });
 
   it("keeps the data-format contract UNIVERSAL, not borrowed from a dialect", async () => {

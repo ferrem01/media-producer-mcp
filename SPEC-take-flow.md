@@ -66,8 +66,10 @@ scene -- script, status, Record / Upload where a need is open, the proof the
 claim asked for with Upload. Record opens the booth for that scene. "Record
 all" runs the prompter through every scene with breaks; the transcript cuts
 the take per scene by each scene's first word. The desktop Studio is the
-editing surface and carries the same "Needed from you" list, since
-screenshots are made there. One link goes around: the Studio link. (It was
+editing surface; each scene's card (the draft view before a build, the
+storyboard editor after) carries that scene's needs with Record and
+Upload, since screenshots are made there -- in the scene's details, not a
+section in the nav (Marc). One link goes around: the Studio link. (It was
 briefly a separate page called "the board"; Marc: one Studio.)
 
 **The lines are edited where they are read.** The phone Studio card carries the

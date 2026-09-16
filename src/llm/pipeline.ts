@@ -2693,6 +2693,9 @@ async function runUnifiedPipeline(
   // transcript when the scene has one (the take is then also the clock), else
   // from the script at speaking pace. A take arriving later re-resolves the
   // same anchors in place (core/measured-spine.ts).
+  // A product surface the library performs: on a creator-cut claim it is
+  // the cutaway unless the storyboard cut it in itself.
+  const CUTAWAY_MOCK_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|email-compose|chat-simulator|ui-terminal-agent|browser-|app-|ui-|device-showcase|metric-dashboard|gmail-|calendar-view|code-editor|kanban-board)/;
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
     if (opts.project_id) { try { spineProject = await loadProject(opts.tenant_id, opts.project_id); } catch { /* fresh build */ } }
@@ -2706,10 +2709,32 @@ async function runUnifiedPipeline(
       // builds its bands around it (core/face-band.ts).
       const takeFace = spineProject ? activeTake(spineProject, i)?.face : undefined;
       if (takeFace) { d.take_face = takeFace; console.log(`  Face: scene ${i + 1} at ${Math.round(takeFace.cx * 100)}%/${Math.round(takeFace.cy * 100)}%, ${Math.round(takeFace.size * 100)}% tall`); }
+      if (!Array.isArray(d.components)) d.components = [];
+      // CREATOR-CUT DEFAULTS, so a writer miss still makes the film
+      // (measured live, proj_0f1e1b41: three scenes with no cast at all,
+      // three mocks staged with no cut window):
+      //  - a mock with no entrance is the claim's cutaway, cut in from 30%
+      //    to 80% of the claim;
+      //  - a scene with no cast gets its chapter label from its own name.
+      if (filmGrammar === "creator-cut" && d.transparent_background !== false) {
+        const dur = Number(d.duration_seconds) || 0;
+        for (const c of d.components as any[]) {
+          if (!c || typeof c !== "object" || typeof c.type !== "string") continue;
+          if (!CUTAWAY_MOCK_RE.test(c.type) || c.enter !== undefined || c.data?.enter !== undefined) continue;
+          c.enter = { effect: "cut", at: Math.round(dur * 0.3 * 100) / 100 };
+          if (c.exit === undefined) c.exit = { effect: "cut", at: Math.round(dur * 0.8 * 100) / 100 };
+          console.log(`  Creator-cut: scene ${i + 1} -- ${c.type} staged with no cut window; cut in at ${c.enter.at}s, out at ${c.exit.at}s`);
+        }
+        const cast = (d.components as any[]).some((c) => c && typeof c === "object" && typeof c.type === "string");
+        const label = String(d.label || "").replace(/^\s*scene\s*\d+\s*[-:.\u2014\u2013]\s*/i, "").trim();
+        if (!cast && label) {
+          d.components.push({ type: "sticker-prop", data: { kind: "pill", text: label.toUpperCase().slice(0, 24), at: 0.4, hold: Math.max(1.5, Math.min(2.5, dur * 0.4)) } });
+          console.log(`  Creator-cut: scene ${i + 1} -- no cast at all; the chapter label "${label}" is cast from the scene's name`);
+        }
+      }
       // The proof that arrived (creator-cut): every provided file becomes a
       // full-bleed image or clip cut in on its words -- cast BEFORE the
       // spine pass so its anchors resolve with everyone else's.
-      if (!Array.isArray(d.components)) d.components = [];
       for (const cut of proofComponents(d)) {
         const src = String((cut as any).data?.src);
         if (hasProofFor(d.components, src)) continue;

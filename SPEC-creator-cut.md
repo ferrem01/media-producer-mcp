@@ -135,7 +135,7 @@ Missing (the build list):
    optional fields (`use` cutaway | card, `at` / `until` word anchors,
    `focus`). `core/asset-needs.ts` normalizes what the writer wrote, the
    phone Studio lists every non-take need under its claim with Upload, the
-   desktop Studio lists them at the top of the sidebar, and
+   desktop Studio shows them in the scene's own card, and
    `POST /api/provide-asset/{t}/{p}` (the HTTP twin of the update tool's
    `provide_asset`) fills one. The build casts every provided file as the
    EXISTING `image` or `video` component, full-bleed, with `at` / `exit_at`

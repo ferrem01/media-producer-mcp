@@ -399,10 +399,12 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
     !opts.filmGrammar ||
     opts.filmGrammar === g ||
     // hype-cut genuinely inherits tempo-cut's edit, and its contract says so.
-    (opts.filmGrammar === "hype-cut" && g === "tempo-cut") ||
-    // creator-cut inherits speaker's spine (the person, the voice clock, the
-    // script in voiceover_text, word anchors) and states where its edit departs.
-    (opts.filmGrammar === "creator-cut" && g === "speaker");
+    (opts.filmGrammar === "hype-cut" && g === "tempo-cut");
+  // creator-cut does NOT inherit speaker's section: speaker's tall-frame law
+  // forbids app mocks on a phone, creator-cut's cutaways ARE app mocks, and a
+  // writer shown both split the difference (measured live, proj_0f1e1b41:
+  // mocks in half the scenes, cut in nowhere). Its section restates the
+  // spine laws it shares, word for word.
 
   var systemPrompt = `You are a creative director storyboarding a ${opts.format} project.
 
@@ -590,7 +592,14 @@ A person on camera carries the argument. The camera is the base layer of every s
 - ON A TALL FRAME (9x16 Reel): ONE graphic per beat, BIG -- it fills a band above or below the face and is read on a phone in a glance. The graphic is a PERFORMED WORD OR NUMBER: a 2-4 word slam of what she just said (never the sentence), a stamp (a word, a number, a "?"), a few short words that drift, the sentence typing itself, ONE number, a plated phrase. NEVER a dashboard, a progress rail, a notification list, a browser window, a timeline, a grid or any app mock: desktop furniture reads as grey lines on a phone. Each graphic ENTERS on its word and LEAVES when the speaker moves on; the frame is never crowded.
 ` : ""}
 ${__g("creator-cut") ? `### CREATOR-CUT FILMS (${opts.filmGrammar === "creator-cut" ? "ACTIVE for this film" : 'when the director\'s treatment names "creator-cut"'})
-A person explains and the SCREEN PROVES IT. Everything in the SPEAKER contract above holds (the camera is the base, the voice is the clock, the script lives in voiceover_text, times are word anchors) -- but the edit is BUSY where speaker's is clean, and these laws replace speaker's "one graphic per beat" and "nothing covers the person":
+A person explains and the SCREEN PROVES IT. The camera is the base layer of every scene, full-bleed; everything else rides over it, and the edit is BUSY. The spine:
+- THE VOICE IS THE CLOCK: the speaker's sentences decide when scenes cut and when content enters. Author scene/beat durations against what is being SAID, never against an abstract rhythm -- a cut mid-sentence is a failure.
+- A RECORDING NEED NOT EXIST YET: this grammar is chosen at script time as often as after a take. When no take exists, every duration is an ESTIMATE at speaking pace (~2.4 words per second) that the take will re-time. Write the board as if the person will perform it next.
+- THE HUMAN NARRATES, AND THE SCRIPT LIVES IN voiceover_text: EVERY scene carries voiceover_text -- the exact spoken line for that beat. These are the words the speaker reads off a prompter, so they are natural spoken sentences (contractions, rhythm, a person talking), never display-type fragments and never empty. Captions are derived from the delivered take afterwards; do not author them as on-screen copy.
+- WRITE THE SILENCES: voiceover_text is laid out for the prompter -- ONE SENTENCE PER LINE (a line break is a breath), and a deliberate beat is a line that says only (pause) -- about a second of held silence, used sparingly, where the argument turns or a number needs to land. Budget the scene's duration for them (~0.3s per line break, ~1s per pause).
+- TIME OVERLAYS TO WORDS, NOT SECONDS: every component time field (at, send_at, exit_at, strike_at, hold-start, phrases[].start/end, script[].at) is written as a WORD ANCHOR into that scene's voiceover_text -- {"word": "dashboard"} (options: "occurrence": 2 for a repeated word, "edge": "end" to fire as the word finishes, "offset": 0.3 seconds), or the shorthand "@dashboard". The build resolves anchors to seconds from the script at speaking pace, and AGAIN from the recording once the take lands, so the overlay lands on the spoken word whatever the delivery. A number is only for times with no word to follow (a 0 entrance).
+- NO DUPLICATE TEXT: on-screen type never repeats what is being said; it ADDS (a number, a name, a step).
+The edit:
 - ONE CLAIM PER SCENE: each scene is one thing the person asserts; its beats are what the screen shows WHILE it is said. The film cuts back to the person between every piece of proof -- never a beat with nothing on screen but the person for more than one sentence.
 - EVERY SCENE IS CAST, THE FIRST ONE TOO, with three objects in "components": the chapter label (a plated word or two on the claim, gone when the claim moves on), the icon sticker beside the head naming the thing, and the cutaway that proves the claim. A scene with an empty cast is a slide, never allowed here; the hook is a claim like any other.
 - THE SCREEN PROVES EVERY CLAIM, AND YOU CAST THE PROOF: for each claim, stage the library mock that PERFORMS it (the product surface where the claim happens, with its data.script) in the scene's "components" as a CUTAWAY -- enter: {effect: "cut", at: "@word"} on the word the claim lands, exit: {effect: "cut", at: "@word"} on the word the person moves on -- so the proof takes the whole frame for that beat, HARD cut in and out, and the person is back. The cut is part of the rhythm and breaks up the voice; the voice never stops. Motion graphics are the DEFAULT proof: the film has its cuts on the first build, with nothing supplied. A REAL screen is optional: only where the real thing matters (a real customer's screen, a real number), add a need in "assets" -- {type: screenshot | screen_recording, description: what it must show, at: the same "@word", until: the same "@word", focus: where the eye should go} -- and a provided file replaces the mock in that window. Never ask for a recording where a still would do. A CARD (the proof floating over the person on a plate, the person still visible) ONLY when the brief asks for it.

@@ -39,6 +39,20 @@ voice runs the whole time, a cutaway is only what is on screen.
   chapter label and the sticker on every scene and left the hook scene
   with no cast at all, so the contract now says every scene is cast with
   three objects, the first one too.
+- **The contract stands alone; the build covers a writer miss.** The
+  first unpinned test (proj_0f1e1b41, a tutorial brief, nothing pinned):
+  the director chose creator-cut, 9x16 and calm from the brief alone, and
+  the writer cast half the scenes with nothing, staged mocks with no cut
+  window, and merged the label into the sticker. Cause: creator-cut
+  inherited speaker's whole section, whose tall-frame law forbids app
+  mocks on a phone -- the writer split the difference. Now creator-cut's
+  section restates the six spine laws it shares (verbatim, pulled from
+  the speaker section) and inherits nothing. And two build-time defaults
+  in the pipeline's person-grammar loop: a mock in a creator-cut scene
+  with no entrance is cut in from 30% to 80% of the claim
+  (`CUTAWAY_MOCK_RE`), and a scene with no cast gets its chapter label
+  from its own name. The director's bullet says a tutorial has no music
+  bed (it had chosen "warm").
 - **The person is the base before any take** (`personBase` in the
   pipeline: speaker_source, or clips on file, OR a person grammar). The
   third live board (proj_b04fb594) was built over the slate before Marc
@@ -89,6 +103,12 @@ only what you do on a phone.
   the desktop app; the old `/board` address 301s to `/studio`. The take
   page links back to Studio. The word "board" for the page is retired
   ("storyboard" stays what it was).
+- **Then moved out of the nav.** Marc, on seeing the desktop panel: "I
+  expected it to be in the scene details, not in a section on the left
+  nav." The desktop list is gone; each scene's card carries its own needs
+  (`sceneNeedsHtml`: the draft view under the lines, the storyboard editor
+  above its actions). The phone view keeps its summary at the top, since
+  there the whole page is the list of what to do.
 - **Needed from you, first.** Both views open with the list: the camera
   takes and each kind of proof, counted across the film, with how many are
   still to go. The phone view keeps Record / Upload per scene under it; the
