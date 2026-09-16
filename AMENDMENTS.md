@@ -39,6 +39,17 @@ voice runs the whole time, a cutaway is only what is on screen.
   chapter label and the sticker on every scene and left the hook scene
   with no cast at all, so the contract now says every scene is cast with
   three objects, the first one too.
+- **No standing header, by rule; unresolved cut words get the default
+  window.** The rerun of the tutorial brief (proj_f308b321) obeyed the
+  contract in every other way -- director calm and voice-only, every
+  scene cast, a mock cut in on a word on every claim -- and put "Weekly
+  Newsletter · Draft / · Editing / · Scheduled / · Sent" on all seven
+  scenes: a title with a per-scene tail, and no chapter labels. The
+  pipeline now strips a pill head shared by (nearly) every scene and keeps
+  the tail as the chapter label (else the scene's name). Same board: a cut
+  whose word was not in the lines resolved to 0 -- with both ends at 0, a
+  cutaway for the whole claim -- so unresolved `enter.at` / `exit.at` on a
+  cut get the 30% / 80% window instead.
 - **The contract stands alone; the build covers a writer miss.** The
   first unpinned test (proj_0f1e1b41, a tutorial brief, nothing pinned):
   the director chose creator-cut, 9x16 and calm from the brief alone, and

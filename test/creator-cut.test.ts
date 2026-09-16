@@ -231,6 +231,19 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(cd).toMatch(/audioSystem\.music_mood "none" for a tutorial/);
   });
 
+  it("a standing header becomes chapter labels, and a cut whose word is not in the lines gets the default window", async () => {
+    const pipeline = await read("../src/llm/pipeline.ts");
+    // The same pill on (nearly) every scene is a title that holds for the whole film -- forbidden unless asked.
+    expect(pipeline).toMatch(/if \(n < 3 \|\| n < Math\.max\(3, withLines\)\) continue;/);
+    expect(pipeline).toMatch(/the standing header "\$\{c\.data\.text\}" becomes the chapter label/);
+    // "Weekly Newsletter · Draft" on every scene: the shared head goes, the tail stays.
+    expect(pipeline).toMatch(/const tailOf = /);
+    expect(pipeline).toMatch(/const chapter = \(tailOf\(c\) \|\| label\)\.toUpperCase\(\)\.slice\(0, 24\);/);
+    // Unresolved enter.at / exit.at on a cut resolve to 0 otherwise -- the person gone for the whole claim.
+    expect(pipeline).toMatch(/if \(u\.path !== "enter\.at" && u\.path !== "exit\.at"\) continue;/);
+    expect(pipeline).toMatch(/anim\.at = Math\.round\(dur \* \(u\.path === "enter\.at" \? 0\.3 : 0\.8\) \* 100\) \/ 100;/);
+  });
+
   it("enter/exit the writer nested inside data are lifted to the component (measured live: every cut-in arrived as data.enter)", async () => {
     const { liftWrapperAnims, extractAnchors } = await import("../src/core/word-anchors.js");
     const c: any = { type: "quotient-social", data: { post_text: "x", enter: { effect: "cut", at: "@writes" }, exit: { effect: "cut", at: "@calendar" } } };
