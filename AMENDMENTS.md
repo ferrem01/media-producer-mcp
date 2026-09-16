@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — Build-from-board: the working copy goes away
+
+Every build of an approved board (`generate mode:'full' + project_id`)
+runs the pipeline in a fresh working-copy project, copies scenes,
+components, voiceover and assets back onto the board's project, and left
+the copy behind as a duplicate "generated" project in the tenant's list
+(measured live: proj_0c242038 and proj_2c64fefc, one per build of
+proj_9e650f1a). The job's result also named the twin, not the board.
+
+- `server.ts` (`queueBuildFromStoryboard`): every reference into the copy's
+  project dir (scenes, assets, speaker track -- b-roll, generated stills,
+  the take) is retargeted to the original before the save; the copy is
+  removed once every subdir copied (a failed copy keeps it, loudly); the
+  result carries the original project.
+- `test/build-from-board-cleanup.test.ts`.
+
 ## 2026-09-16 — creator-cut: the plate that hid every cutaway
 
 The second rendered ad (proj_9e650f1a, rebuilt after #789) showed NO

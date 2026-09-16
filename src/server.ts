@@ -503,7 +503,15 @@ export async function queueBuildFromStoryboard(
           // VOICEOVER is new every build and must come through; the MUSIC
           // lane is the one the human owns.
           const priorMusic = (origProject.audio?.tracks || []).filter((t: any) => t.type === "music");
-          origProject.scenes = generatedProject.scenes;
+          // The build ran in a WORKING COPY (a fresh project dir); every
+          // reference into it -- b-roll, generated stills, voiceover, the
+          // take -- is retargeted to the original, whose files are copied
+          // below, so the copy can be removed afterwards instead of
+          // lingering as a duplicate "generated" project in the tenant's
+          // list (measured live: one stray twin per build of proj_9e650f1a).
+          const retarget = <T,>(v: T): T => v === undefined ? v
+            : JSON.parse(JSON.stringify(v).split(`/projects/${newProjectId}/`).join(`/projects/${projectId}/`));
+          origProject.scenes = retarget(generatedProject.scenes);
           origProject.audio = generatedProject.audio;
           // The working copy's audio tracks reference ITS project dir; the
           // files are copied below, so retarget the sources or the original
@@ -518,12 +526,12 @@ export async function queueBuildFromStoryboard(
             origProject.audio = { ...(origProject.audio || {}), tracks: [...priorMusic, ...rebuilt] };
             console.log(`  Build-from-storyboard: kept the project's own music bed (${priorMusic.map((t: any) => t.id).join(", ")}) over the pipeline's re-pick`);
           }
-          origProject.assets = generatedProject.assets;
+          origProject.assets = retarget(generatedProject.assets);
           origProject.canvas = generatedProject.canvas;
           // Never WIPE a speaker track the user already attached: the
           // pipeline only produces one in speaker-source mode, so an
           // undefined here used to clobber a narration set via `add`.
-          if (generatedProject.speaker_track) origProject.speaker_track = generatedProject.speaker_track;
+          if (generatedProject.speaker_track) origProject.speaker_track = retarget(generatedProject.speaker_track);
           origProject.status = "generated";
           origProject.updated_at = new Date().toISOString();
           await saveProject(origProject);
@@ -535,6 +543,7 @@ export async function queueBuildFromStoryboard(
           // components it doesn't have (an empty preview).
           const srcDir = projectDir(tenantId, newProjectId);
           const dstDir = projectDir(tenantId, projectId);
+          let copyFailed = false;
           for (const subdir of ["components", "voiceover", "assets"]) {
             const srcSub = path.join(srcDir, subdir);
             const dstSub = path.join(dstDir, subdir);
@@ -547,11 +556,22 @@ export async function queueBuildFromStoryboard(
               await fs.cp(srcSub, dstSub, { recursive: true, force: true });
               console.log(`  Build-from-storyboard: copied ${subdir}/ from ${newProjectId}`);
             } catch (copyErr: any) {
+              copyFailed = true;
               console.error(`  Build-from-storyboard: FAILED to copy ${subdir}/ from ${newProjectId}: ${copyErr?.message || copyErr}`);
             }
           }
 
           console.log(`  Build-from-storyboard: copied ${generatedProject.scenes.length} scenes from ${newProjectId} to ${projectId}`);
+          // The working copy has served: remove it (kept only when a copy
+          // failed, so nothing the original references is lost), and hand
+          // the caller the project it asked to build, not the twin.
+          if (copyFailed) {
+            console.error(`  Build-from-storyboard: keeping the working copy ${newProjectId} (a copy failed)`);
+          } else {
+            await deleteProject(tenantId, newProjectId);
+            console.log(`  Build-from-storyboard: removed the working copy ${newProjectId}`);
+          }
+          (pipelineResult as any).project = origProject;
         }
       } else {
         // Pipeline wrote to the same project
