@@ -30,6 +30,7 @@ import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface } from "../core/asset-needs.js";
+import { captionLane } from "../core/captions.js";
 import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2190,6 +2191,8 @@ function storyboardToSaved(
       // reviewer signed off on.
       camera_moves: s.camera_moves,
       voiceover_text: s.voiceover_text,
+      // The writer's emphasis words, carried: the captions tint them.
+      ...(Array.isArray((s as any).emphasis) && (s as any).emphasis.length ? { emphasis: (s as any).emphasis } : {}),
       duration_seconds: s.duration_seconds,
       // The needs, carried: the proof a creator-cut writer asked for, and
       // on a build-from-board the provided files -- writing `[]` here threw
@@ -2781,11 +2784,22 @@ async function runUnifiedPipeline(
             }
           }
         }
-        const cast = (d.components as any[]).some((c) => c && typeof c === "object" && typeof c.type === "string");
-        const label = String(d.label || "").replace(/^\s*scene\s*\d+\s*[-:.\u2014\u2013]\s*/i, "").trim();
-        if (!cast && label) {
-          d.components.push({ type: "sticker-prop", data: { kind: "pill", text: label.toUpperCase().slice(0, 24), at: 0.4, hold: Math.max(1.5, Math.min(2.5, dur * 0.4)) } });
-          console.log(`  Creator-cut: scene ${i + 1} -- no cast at all; the chapter label "${label}" is cast from the scene's name`);
+        // THE WORDS ARE ON SCREEN THE WHOLE TIME (all four reference films;
+        // Marc: "I don't like chapter labels as a default"): the scene's
+        // captions come from its spine -- asserted from the script now,
+        // measured from the take when it lands -- as the EXISTING
+        // reel-caption-lane, phrases anchored to their words so the take
+        // re-times them. The writer's *starred* words are the emphasis;
+        // numbers tint by rule. A label is cast only when the writer cast
+        // one; an empty cast is no longer filled from the scene's name.
+        const hasLane = (d.components as any[]).some((c) => c && typeof c === "object" && c.type === "reel-caption-lane");
+        if (!hasLane && spine.words.length) {
+          const lane = captionLane(spine, Array.isArray(d.emphasis) ? d.emphasis.map(String) : []);
+          if (lane) {
+            d.components.push(lane);
+            const marked = (lane.data.phrases as any[]).filter((p) => /\*/.test(String(p.text))).length;
+            console.log(`  Creator-cut: scene ${i + 1} -- captions from the ${spine.source} words: ${(lane.data.phrases as any[]).length} phrases, ${marked} with an emphasis`);
+          }
         }
       }
       // The proof that arrived (creator-cut): every provided file becomes a

@@ -6,6 +6,44 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — creator-cut: the words are on screen the whole time
+
+Four reference films (Matt Rodin, Big Picture Club, Neil Jesani, Air) share
+one text layer: the SPOKEN WORDS, two to four at a time, keyed to the
+voice, one word tinted. Only one of them uses chapter labels -- our first
+default. Marc: "I like that there is a captions layer with certain words
+emphasized in a different color. We had that in earlier versions but it
+does not seem to be default anymore. I don't like chapter labels as a
+default." The pieces existed (`reel-caption-lane` with `*starred*`
+emphasis; the per-scene spine with word times; a contract line saying
+captions are derived from the take) and nothing connected them.
+
+- `core/captions.ts` (new): `captionPhrases` groups the spine's words into
+  phrases (end punctuation, a breath > 0.6s, four words, 1.8s; each holds
+  to the next; a lone trailing word folds back); `captionLane` casts the
+  existing lane, plated, phone-scale, with a word anchor on every phrase
+  edge so a take landing later re-times it; `emphasisFromLines` lifts the
+  writer's `*stars*` off the line; `fallbackEmphasis` tints numbers (and
+  the brand's name when given).
+- Writer (`storyboard-builder.ts`): THE WORDS ARE ON SCREEN THE WHOLE
+  TIME + MARK THE EMPHASIS; the cast is sticker + cutaway, a label ONLY
+  when the claim wants a name. `normalizeSceneShape` lifts the stars into
+  `scene.emphasis` (carried to the saved storyboard); the prompter, the
+  needs and the spine read the clean line.
+- Build (`pipeline.ts`, creator-cut defaults): the lane is cast from the
+  scene's spine unless the writer cast one; the empty-cast label from the
+  scene's name is gone.
+- Layout (`scene-generator.ts`): the lane owns the chest band on a tall
+  frame at z 41 (above the proof at 36 and a label at 39), the band above
+  the hairline when the face sits low (the surfaces that wanted it are
+  dropped -- the words win); the lower third centred on a wide frame.
+- Decided with Marc: the AI picks the emphasized word (writer first, rule
+  fallback, editable in Studio); the words sit over the chest, not beside
+  the head ("not enough room next to the head on a narrow tall view");
+  the captions keep running over the cutaways.
+- Not yet: idea cutaways for a claim no screen can prove ("I am sure
+  there will be a time"), the black-and-white beat, pills on the word.
+
 ## 2026-09-16 — Studio: one recording, several takes -- the voice fell behind
 
 Marc: "by the second scene my mouth is moving and the sound is not

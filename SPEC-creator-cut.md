@@ -23,6 +23,31 @@ Two Instagram films Marc wants to emulate, watched frame by frame:
   Yellow single-word captions, always on. Hard cuts to full-frame screen
   recordings and screenshots with hand-drawn circles and arrows, then back
   to her. Icon stickers beside her. Several cuts per sentence.
+- **@neiljesani, 31s (ad, tax firm).** One chair, one lens. The graphic
+  layer is the spoken words: two to four at a time, keyed to the voice,
+  the key word in gold or red ("avoidable", "Stop overpaying"). Small
+  outlined pill chips land on a phrase ("That's a house", "Click the link
+  below"). Three cutaways, 3-4s each, all motion graphics of the IDEA on a
+  mint plate: a stock portrait with "$3 million", cash falling and a
+  hand-drawn circle around "$1.4 million"; a house photo with a pill; a
+  chess pawn with "strategies / for decades". The footage goes black and
+  white for one line. Ends on the person.
+- **@air.hq, 50s (ad, Air).** Walk-and-talk: every line a different take
+  in a different place (doorway, tree, fence, pond, car), jump cuts
+  between them. Words set beside the person in the negative space, thin
+  white sans. The product idea performed in the world ("AI-native
+  tagging" as tag chips floating on the fence, the tree, the pond).
+  Product screenshots as cutaways with the caption over them. Gags as
+  b-roll (a goat for "brand manager"). Logo wall to open, URL to close.
+
+**What the four share** is the grammar: a person talks, the voice is the
+clock, the spoken words are on screen the whole time keyed to the voice,
+proof cuts in and out on a word, it ends on the person or a URL. What
+varies sits on other axes: the caption convention (three of four use the
+words, only Big Picture Club uses chapter labels), the cutaway KIND
+(screens, idea graphics, the idea performed in the world, gag b-roll), the
+look (visual system, brand kit), and the setting (one chair or a new spot
+per line -- a recording instruction, not a grammar).
 
 ## Why it is a grammar
 
@@ -51,6 +76,15 @@ they still want different contracts, split then, with evidence.
    -- either way the film cuts back to them between every piece of proof.
    The voice is the clock; every scene is one CLAIM; each beat is what the
    screen shows while the claim is said.
+   **The words are on screen the whole time** (decided 2026-09-16, after
+   the four references): the build captions every scene from the take's
+   words -- two to four at a time, on a plate over the chest, keyed to the
+   voice, running through the cutaways too (the voice never stops, so the
+   words never stop). The writer never casts captions; it marks the ONE
+   word each line turns on with `*stars*` in `voiceover_text`, lifted off
+   the line at normalize time and tinted in the brand color; unmarked
+   lines stay plain (numbers tint by rule). Editable in Studio. A chapter
+   label is cast only when the claim wants a name, never as a default.
 2. **The screen proves every claim.** Each beat names its EVIDENCE: a
    screenshot, a screen recording, b-roll, or a product mock the library
    can perform. The proof comes in as a CUTAWAY: it takes the frame for the
@@ -144,8 +178,19 @@ Missing (the build list):
    No new component type. Proof never blocks the build. Not yet: b-roll
    and mocks generated in-house (their needs read "optional"), cards, the
    focus drawn on the proof, captions from the take.
-2. Captions from the take; the evidence card; annotations on cutaways;
-   b-roll needs filled in-house.
+2. Captions from the take. **Built** (`core/captions.ts`): the scene's
+   spine (asserted from the script, measured from the take) becomes the
+   EXISTING `reel-caption-lane` -- phrases broken on punctuation, a
+   breath, four words or 1.8s, each holding until the next; the writer's
+   `*starred*` words tinted, numbers by rule; a word anchor on every
+   phrase edge so a take that lands later re-times the captions with
+   everything else. The lane owns the chest band (the band above the
+   hairline when the face sits low), above the proof and a label. The
+   empty-cast label from the scene's name is gone.
+   Still to come: idea cutaways (an image plus type plus a drawn mark on
+   the plate, for a claim no screen can prove); the evidence card;
+   annotations on cutaways; b-roll needs filled in-house; the black-and-
+   white beat; pills that land on the word.
 3. Layout under the busy edit; the ad pass (punchy, 30s) and the tutorial
    pass (calm, 75s) as the exit test.
 

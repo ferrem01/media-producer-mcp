@@ -219,7 +219,13 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(pipeline).toMatch(/isProofSurface\(c\.type\) && c\.enter === undefined && c\.data\?\.enter === undefined/);
     expect(pipeline).toMatch(/c\.enter = \{ effect: "cut", at: Math\.round\(dur \* 0\.3 \* 100\) \/ 100 \};/);
     expect(pipeline).toMatch(/if \(c\.exit === undefined\) c\.exit = \{ effect: "cut", at: Math\.round\(dur \* 0\.8 \* 100\) \/ 100 \};/);
-    expect(pipeline).toMatch(/the chapter label "\$\{label\}" is cast from the scene's name/);
+    // THE WORDS ARE ON SCREEN THE WHOLE TIME: the captions come from the scene's spine as the existing lane; an
+    // empty cast is NO LONGER filled with a label from the scene's name (Marc: "I don't like chapter labels as a default").
+    expect(pipeline).not.toMatch(/is cast from the scene's name/);
+    expect(pipeline).toMatch(/const lane = captionLane\(spine, Array\.isArray\(d\.emphasis\) \? d\.emphasis\.map\(String\) : \[\]\);/);
+    expect(pipeline).toMatch(/c\.type === "reel-caption-lane"\);\s*if \(!hasLane && spine\.words\.length\)/);
+    // ...carried from the board to the saved storyboard.
+    expect(pipeline).toMatch(/emphasis: \(s as any\)\.emphasis/);
     // Only creator-cut, only over the person, and before the spine pass so the proof cast after it can still replace the window.
     expect(pipeline).toMatch(/if \(filmGrammar === "creator-cut" && d\.transparent_background !== false\) \{\s*const dur = Number\(d\.duration_seconds\)/);
     const defaults = pipeline.indexOf("CREATOR-CUT DEFAULTS");
@@ -331,6 +337,21 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     const sb = await read("../src/llm/storyboard-builder.ts");
     expect(sb).toMatch(/A sibling of data, never inside it/);
     expect(sb).toMatch(/EVERY SCENE IS CAST, THE FIRST ONE TOO/);
+    // The words are the text layer; the writer marks the emphasis in the line; a label only when the claim wants a name.
+    expect(sb).toMatch(/THE WORDS ARE ON SCREEN THE WHOLE TIME: the build captions every scene from the take's words/);
+    expect(sb).toMatch(/MARK THE EMPHASIS: wrap the ONE word each line turns on in \*stars\* inside voiceover_text/);
+    expect(sb).toMatch(/A chapter label \(a plated word or two on the claim, gone when the claim moves on\) ONLY when the claim wants a name/);
+    expect(sb).toMatch(/wrap the ONE word each line turns on in \*stars\* \(\\"One \*brief\*\. Every surface\.\\"\)/);
+    // The normalizer lifts the stars off the line: the prompter reads the clean sentence, the scene keeps the words.
+    const marked: any = { label: "Scene 1 - Hook", voiceover_text: "One *brief*. Every surface.\nThat's *Quotient*.", components: [] };
+    const liftNotes = normalizeSceneShape(marked);
+    expect(marked.voiceover_text).toBe("One brief. Every surface.\nThat's Quotient.");
+    expect(marked.emphasis).toEqual(["brief", "quotient"]);
+    expect(liftNotes.some((n) => /emphasis lifted off the lines: brief, quotient/.test(n))).toBe(true);
+    // The layout: the lane owns the chest band above the proof and a label, and the band is not handed out twice.
+    const gen = await read("../src/llm/scene-generator.ts");
+    expect(gen).toMatch(/if \(c\.type !== "reel-caption-lane"\) return;\s*if \(vertical && !takeover\) \{[\s\S]*?z_index: 41 \};\s*laneLower = !!lb\.lower;/);
+    expect(gen).toMatch(/var usedLower = laneLower, usedTop = laneTop;\s*if \(bands\.lower && stack\.length && !laneLower\) \{/);
   });
 
   it("the cut effect is a hard cut in the choreography: sub-frame, no ease", async () => {

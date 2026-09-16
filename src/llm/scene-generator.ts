@@ -667,6 +667,29 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     authored.forEach((c, i) => {
       if (BACKDROP_CAST_TYPES.indexOf(c.type) !== -1) slots[i] = null;
     });
+    // THE WORDS RIDE OVER EVERYTHING (creator-cut captions, core/captions.ts):
+    // the caption lane takes the chest band on a tall frame -- the lower
+    // third, centred, on a wide one -- above the proof (36) and a label
+    // (39), so it keeps running through the cutaways (Marc: the voice never
+    // stops, so the words never stop). It is slotted here, before the dock,
+    // so the band it owns is not handed to a label as well.
+    var laneLower = false, laneTop = false;
+    authored.forEach((c, i) => {
+      if (c.type !== "reel-caption-lane") return;
+      if (vertical && !takeover) {
+        // The chest band; with the face low in the frame (no room under
+        // the chin) the band above the hairline. The words win the band:
+        // whatever else wanted it stacks elsewhere or is dropped.
+        const lb = tallSpeakerBands(face, frameRatio);
+        const band = lb.lower || lb.top || { top: 0.68, bottom: 0.82 };
+        const q = (n: number) => Math.round(n * 1000) / 10;
+        slots[i] = { position: pct(5, q(band.top), 90, q(band.bottom - band.top)), z_index: 41 };
+        laneLower = !!lb.lower;
+        laneTop = !lb.lower && !!lb.top;
+      } else {
+        slots[i] = { position: pct(15, 74, 70, 16), z_index: 41 };
+      }
+    });
     var dockSurf = surfaceIdx.filter((i) => !slots[i]);
     // ── TALL SPEAKER FRAME (9x16, 4x5): there is no "beside her". The phone
     // selfie puts the face in the upper-middle (about 22%-68% of the height
@@ -687,16 +710,16 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
       // (measured on the fresh run, proj_7c8380c5).
       const bands = tallSpeakerBands(face, frameRatio);
       const p100 = (n: number) => Math.round(n * 1000) / 10;
-      var stack = dockSurf.concat(heroIdx, captionIdx).sort((a, b) => a - b);
+      var stack = dockSurf.concat(heroIdx, captionIdx).filter((i) => !slots[i]).sort((a, b) => a - b);
       var placed: number[] = [];
-      var usedLower = false, usedTop = false;
-      if (bands.lower && stack.length) {
+      var usedLower = laneLower, usedTop = laneTop;
+      if (bands.lower && stack.length && !laneLower) {
         const idx = stack[0];
         slots[idx] = { position: pct(5, p100(bands.lower.top), 90, p100(bands.lower.bottom - bands.lower.top)), z_index: 10 };
         placed.push(idx); usedLower = true;
       }
       var rest = stack.filter((i) => placed.indexOf(i) === -1);
-      if (bands.top && rest.length) {
+      if (bands.top && rest.length && !laneTop) {
         const rows = stackRows(Math.min(rest.length, bands.lower ? 2 : 3), p100(bands.top.top), p100(bands.top.bottom - bands.top.top), 2);
         rest.slice(0, rows.length).forEach((idx, k) => { slots[idx] = { position: pct(5, rows[k][0], 90, rows[k][1]), z_index: 20 + k }; placed.push(idx); });
         usedTop = true;
