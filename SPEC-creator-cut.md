@@ -1,6 +1,6 @@
 # SPEC: creator-cut -- a person explains, the screen proves it
 
-Status: DRAFT for Marc's review (2026-09-16). Ninth film grammar. Builds on
+Status: AGREED (2026-09-16, Marc + Claude). Ninth film grammar. Builds on
 `SPEC-take-flow.md` (needs, takes, word anchors, the board), the speaker
 recipe in `SPEC-motion-architecture.md`, and `SPEC-creative-axes.md`.
 
@@ -51,13 +51,13 @@ they still want different contracts, split then, with evidence.
    screen shows while the claim is said.
 2. **The screen proves every claim.** Each beat names its EVIDENCE: a
    screenshot, a screen recording, b-roll, or a product mock the library
-   can perform. Two ways in, chosen per beat:
-   - a CARD: the evidence floats over the person, plated, entering on its
-     word and leaving when the claim moves on (Matt);
-   - a CUTAWAY: the evidence takes the frame for the beat, hard cut in and
-     out, with an annotation where the eye should go (Big Picture Club).
-   A tutorial leans on cards; an ad leans on cutaways. Never a beat with
-   nothing on screen but the person for more than one sentence.
+   can perform. The proof comes in as a CUTAWAY: it takes the frame for the
+   beat, hard cut in and out, with an annotation where the eye should go
+   (Big Picture Club). The cut is part of the rhythm -- it breaks up the
+   voice and gives the film its motion (Marc). A CARD -- the proof floating
+   over the person on a plate, the person still on screen (Matt) -- only
+   when the brief asks for it. Never a beat with nothing on screen but the
+   person for more than one sentence.
 3. **No standing header.** A chapter label on a claim ("Plugins", "Computer
    use") is a graphic like any other: cast when that claim wants one, gone
    when the claim moves on. A title that holds for the whole film is NOT
@@ -136,7 +136,10 @@ product: a 30s ad (punchy) and a 75s tutorial (calm), each with real
 screenshots supplied through the board and one generated b-roll. Judged
 side by side with the references.
 
-## Open questions for Marc
+## Decisions (2026-09-16)
 
-- Cards vs cutaways: the writer chooses per beat, with the lean above -- or
-  pin it per film?
+- Cutaways are the way proof comes in; cards only when the brief asks.
+- No standing header; a chapter label is a graphic on its claim.
+- A CTA or sponsor line only when the brief asks.
+- Ad and tutorial are one grammar, split on `motion` and length; revisit
+  with evidence after one of each is built.
