@@ -1147,6 +1147,13 @@ async function critiqueAndRetryScene(opts: {
   customSources?: Map<string, string>;
   catalog: ComponentCatalogEntry[];
   critique?: boolean;
+  /** The scene composites over the camera (speaker base, not a takeover).
+   *  The legibility gate boots the scene WITHOUT the camera, on a plain
+   *  page, so its ink findings describe a backdrop the viewer never sees:
+   *  the auto-fix flipped light type to near-black against the transparent
+   *  page and the words vanished on a dark shirt (proj_780a33d0). Over the
+   *  camera, ink findings are dropped; clipping and layout still count. */
+  overCamera?: boolean;
   /** Bookend mode: skip the aesthetic/editorial critique but STILL run the
    *  correctness + brand-theme gate (so an intro/outro can't drift off-brand,
    *  e.g. a dark scene on a light brand) and revise on blocking defects. */
@@ -1242,6 +1249,10 @@ async function critiqueAndRetryScene(opts: {
           });
           for (const d of contrastDefects) {
             const type = d.reason === "clipped" ? "clipped_text" : "illegible";
+            if (type === "illegible" && opts.overCamera) {
+              console.log(`  legibility gate: "${d.text}" measured against the plain page, not the camera -- ink finding dropped (over-camera scene)`);
+              continue;
+            }
             const detail = d.reason === "clipped"
               ? `text "${d.text}" is ${Math.round((d.clippedFraction ?? 0) * 100)}% cut off by the canvas/container edge`
               : `text "${d.text}" -- measured contrast ${d.contrast}:1 (needs >= ${d.threshold}:1)`;
@@ -3165,6 +3176,7 @@ async function runUnifiedPipeline(
         if (opts.critique !== false) {
           const critiqueResult = await critiqueAndRetryScene({
             world,
+            overCamera: (!!opts.speaker_source || pipelineHasNarration) && (generated.scene as any).transparent_background !== false,
             scene: generated.scene,
             draft,
             sceneIndex: i,
@@ -3412,6 +3424,7 @@ async function runUnifiedPipeline(
             // keeps it cheap (render + gates, no aesthetic re-judging).
             const gated = await critiqueAndRetryScene({
               world: (project as any).world,
+              overCamera: (!!opts.speaker_source || pipelineHasNarration) && (re.scene as any).transparent_background !== false,
               scene: re.scene, draft, sceneIndex: idx, totalScenes: project.scenes.length,
               prompt: richPrompt, format, llmConfig: opts.llmConfig, brandKit, canvas,
               tenantId: opts.tenant_id, projectId, compDir, maxRetries: 1,

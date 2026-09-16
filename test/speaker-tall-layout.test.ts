@@ -144,3 +144,22 @@ describe("desktop furniture on a phone reel", () => {
     expect(comps[0].zoom).toBeUndefined();
   });
 });
+
+describe("type over the camera", () => {
+  it("kinetic words ride on a plate, and a typewriter (sized in vw) is not zoomed on top of that", () => {
+    const comps = build({ width: 1080, height: 1920 }, [
+      { type: "kinetic-text", data: { text: "ONE PLACE", at: 0, color: "#101014" } },
+      { type: "typewriter", data: { text: "Get more signups from the webinar.", font_size: "6vw" } },
+    ]);
+    const k = comps.find((c) => c.type === "kinetic-text")!, t = comps.find((c) => c.type === "typewriter")!;
+    expect(k.data.plate).toBe(true);
+    expect(k.zoom).toBeUndefined();
+    expect(t.zoom).toBeUndefined();
+  });
+  it("the legibility gate drops ink findings for a scene that composites over the camera", async () => {
+    const fs = await import("node:fs/promises");
+    const p = await fs.readFile(new URL("../src/llm/pipeline.ts", import.meta.url), "utf8");
+    expect(p).toMatch(/if \(type === "illegible" && opts\.overCamera\)/);
+    expect(p.match(/overCamera: \(!!opts\.speaker_source \|\| pipelineHasNarration\)/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+});
