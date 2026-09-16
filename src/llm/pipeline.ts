@@ -29,7 +29,7 @@ import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
-import { proofComponents, hasProofFor } from "../core/asset-needs.js";
+import { proofComponents, hasProofFor, replaceCutWindow } from "../core/asset-needs.js";
 import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2706,9 +2706,16 @@ async function runUnifiedPipeline(
       for (const cut of proofComponents(d)) {
         const src = String((cut as any).data?.src);
         if (hasProofFor(d.components, src)) continue;
+        // The real screen takes the window the storyboard's mock held.
+        const before = d.components.length;
+        d.components = replaceCutWindow(d.components, (cut as any).data?.at);
         d.components.push(cut);
-        console.log(`  Proof: scene ${i + 1} ${(cut as any).type} cut in from ${src.split("/").pop()}`);
+        console.log(`  Proof: scene ${i + 1} ${(cut as any).type} cut in from ${src.split("/").pop()}${before !== d.components.length - 1 ? " (replacing the mock in that window)" : ""}`);
       }
+      // THE CAMERA MOVES ON THE PERSON (creator-cut) by rule -- authored in
+      // the scene generator once the cut windows are resolved to seconds
+      // (creatorCutCameraMoves), so a punch-in lands on the claim and an
+      // anchored zoom frames each cutaway's performing region.
       if (spine.source === "measured" && spine.duration > 0 && Math.abs(spine.duration - (Number(d.duration_seconds) || 0)) > 0.05) {
         console.log(`  Spine: scene ${i + 1} ${d.duration_seconds}s -> ${spine.duration}s (the take is the clock)`);
         d.duration_seconds = Math.round(spine.duration * 100) / 100;
@@ -2736,7 +2743,10 @@ async function runUnifiedPipeline(
       // A takeover = the scene's content is a product surface and the
       // storyboard already meant to cover the camera (explicit opaque), OR
       // the scene is surface-only with no caption/speaker furniture.
-      const surfaces = objects.filter((c) => SURFACE_RE.test(c.type));
+      // A mock the storyboard CUT IN for a beat (enter {effect:"cut"}) is a
+      // cutaway inside the scene, not a scene that replaces the person.
+      const cutIn = (c: any) => { const e = c.enter; return (typeof e === "string" ? e : e?.effect) === "cut"; };
+      const surfaces = objects.filter((c) => SURFACE_RE.test(c.type) && !cutIn(c));
       // Speaker FURNITURE (a lower-third naming her, a caption at her chin)
       // only exists when she is on screen -- its presence means this is not
       // a takeover. Props and callouts (cursor-performer, annotation) are

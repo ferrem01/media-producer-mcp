@@ -236,7 +236,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
     // Stage wrapper choreography (pose / enter / exit) on this scene's
     // timeline; the composite namespaces wrapper ids, so pass the prefix.
     // The generator emits master.* calls -- rewrite to sceneTl like the rest.
-    const choreo = wrapperChoreoScript(scene.components, scene.duration_seconds, `${scene.id}__`);
+    const choreo = wrapperChoreoScript(scene.components, scene.duration_seconds, `${scene.id}__`, canvas.width, canvas.height);
     if (choreo) componentScripts.push(choreo.replace(/master\./g, "sceneTl."));
 
     // Media source-maps: stamp each edited video with data-mp-edl so the

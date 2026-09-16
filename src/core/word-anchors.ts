@@ -149,6 +149,13 @@ export function extractAnchors(component: { data?: Record<string, unknown>; anch
     walk(v, path);
   };
   walk(component.data || {}, "");
+  // The wrapper's own clock: a directed entrance/exit lands on a word too
+  // (a cut-in on "plugins", a cut-out on "next"). Kept at the component
+  // root under an "enter."/"exit." path so resolve writes it back there.
+  for (const k of ["enter", "exit"] as const) {
+    const anim = (component as any)[k];
+    if (anim && typeof anim === "object") visit(anim, "at", `${k}.at`);
+  }
   if (Object.keys(anchors).length) component.anchors = anchors; else delete component.anchors;
   return Object.keys(anchors).length;
 }
@@ -176,7 +183,8 @@ export function resolveComponent(component: { id?: string; type?: string; data?:
   for (const [path, a] of Object.entries(component.anchors || {})) {
     const t = resolveAnchor(spine, a);
     if (t === null) { report.unresolved.push({ component: component.id || component.type || "?", path, word: a.word }); continue; }
-    if (setPath(component.data || (component.data = {}), path, t)) report.resolved++;
+    const root = /^(enter|exit)\./.test(path) ? component : (component.data || (component.data = {}));
+    if (setPath(root, path, t)) report.resolved++;
   }
   return report;
 }

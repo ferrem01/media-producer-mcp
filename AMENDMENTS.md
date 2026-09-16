@@ -6,6 +6,52 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — creator-cut: motion graphics are the proof by default, the camera moves by rule
+
+The first live board (proj_6b42ee1c) asked for seven screen recordings
+and cut to nothing, and authored no camera move on any of six scenes.
+Marc: why are we obsessed with a screenshot when the library is full of
+motion graphics -- default to those, let the user replace one; and the
+voice runs the whole time, a cutaway is only what is on screen.
+
+- **The proof is cast, not requested.** The writer stages the library mock
+  that performs each claim as a CUTAWAY in `components[]`: `enter:
+  {effect: "cut", at: "@word"}`, `exit: {effect: "cut", at: "@word"}`. The
+  wrapper's entrance/exit `at` takes a word anchor like any data time
+  (`extractAnchors`/`resolveComponent` walk `enter`/`exit` under an
+  `enter.`/`exit.` path); `cut` is a choreography effect -- the fade pose
+  played in 0.02s, no ease. A real screenshot/recording is an optional
+  `assets[]` need; a provided file replaces the mock cut in on the same
+  word (`replaceCutWindow`). "Never ask for a recording where a still
+  would do."
+- **A cutaway is not a takeover, not furniture, not zoomed.** A mock cut
+  in for a beat is excluded from the takeover heuristic's surfaces (the
+  scene stays over the person), exempt from the phone-reel mock drop, laid
+  full-stage at z 36, and never phone-zoomed (`isCutaway` in
+  scene-generator).
+- **The camera moves on the person by rule** (creator-cut only,
+  `creatorCutCameraMoves` in the scene generator, once the cut windows are
+  seconds): a claim with no authored moves gets a punch-in aimed at the
+  face (scale 1.22 in 0.45s), the camera comes to rest on each cutaway
+  and back to the person on its exit, and a claim of 3.5s or more pulls
+  back on the turn; calm motion gets a slow push (1.1 over 2-4s). Speaker
+  films are unchanged.
+- **A cutaway mock on a tall frame is FRAMED on its region.** Probed in the
+  assembler: a desktop mock at full frame on a 1080x1920 canvas filled the
+  top quarter and left the rest empty, and the camera's anchored zoom could
+  not help (it FITS a region, never crops one; a region as wide as the
+  canvas fits at 1x). So the generator stamps `frame_anchor` (the region
+  the mock's script performs in, else its first content region -- read from
+  the component's own `data-anchor`s) on tall-frame cutaways, and the
+  wrapper choreography scales and shifts the wrapper at the cut's first
+  render: about two columns' worth of zoom, an overflowing region shown
+  from its left edge and top, a fitting one centred, clamped so the
+  wrapper always covers the frame. First render, not mount: the region may
+  be a pane the mock's script only switches to later (the tasks tab was
+  0x0 at t=0). Layout boxes, not client rects: the rig may be mid-zoom.
+
+---
+
 ## 2026-09-16 — One Studio: the phone view is Studio, and it says what it needs
 
 Marc ran the first creator-cut board and did not know the proof had been

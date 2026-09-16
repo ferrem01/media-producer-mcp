@@ -70,8 +70,14 @@ describe("creator-cut is a film grammar a person carries", () => {
     // Ad and tutorial are one grammar split on motion and length.
     expect(block).toMatch(/AD is punchy and about 30s/);
     expect(block).toMatch(/TUTORIAL is calm and 60-90s/);
-    // The proof is written on the scene's existing needs, not a new field.
-    expect(block).toMatch(/NAMES ITS PROOF in the scene's "assets" array/);
+    // Motion graphics are the default proof: the writer cuts a library mock
+    // in on a word; a real screen is an OPTIONAL need on the scene's existing
+    // assets[] (Marc: default to motion-graphic cutaways; the user can replace).
+    expect(block).toMatch(/YOU CAST THE PROOF/);
+    expect(block).toMatch(/enter: \{effect: "cut", at: "@word"\}/);
+    expect(block).toMatch(/Motion graphics are the DEFAULT proof/);
+    expect(block).toMatch(/A REAL screen is optional/);
+    expect(block).toMatch(/Never ask for a recording where a still would do/);
     expect(sb).toMatch(/assets: \{\s*type: "array"/);
     expect(sb).not.toMatch(/evidence: \{/);
   });
@@ -160,11 +166,17 @@ describe("proof on the board: the needs a claim asks for", () => {
     const index = await read("../src/index.ts");
     expect(index).toMatch(/\/api\/provide-asset\//);
     expect(index).toMatch(/provideAsset\(evProjectObj, evScene, evIndex, evUrl\)/);
-    // The layout: a full-bleed image/video is the proof layer -- never banded, never phone-zoomed.
+    // The layout: a cutaway (a mock cut in, or a full-bleed image/video) is the
+    // proof layer -- full stage, never banded, never phone-zoomed, never dropped
+    // as desktop furniture on a phone reel.
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/function isFullBleedMedia/);
-    expect(gen).toMatch(/isFullBleedMedia\(c as any\)\) \{\s*slots\[i\] = \{ position: \{ \.\.\.FULL_STAGE \}, z_index: 36 \}/);
+    expect(gen).toMatch(/function isCutaway/);
+    expect(gen).toMatch(/isCutaway\(c as any\)\) \{\s*slots\[i\] = \{ position: \{ \.\.\.FULL_STAGE \}, z_index: 36 \}/);
+    expect(gen).toMatch(/PHONE_REEL_MOCK_RE\.test\(c\.type\) && !isCutaway\(c as any\)/);
+    expect(gen).toMatch(/data\.scale === undefined && !isCutaway\(c as any\)\) zoom = PHONE_ZOOM/);
     expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"video", "image"\]/);
+    // ...and a mock cut in for a beat never turns its scene into a takeover.
+    expect(pipeline).toMatch(/SURFACE_RE\.test\(c\.type\) && !cutIn\(c\)/);
     // No component type was added for it.
     const media = await fs.readdir(path.resolve(__dirname, "../src/components/media"));
     expect(media.some((f) => /cutaway/.test(f))).toBe(false);
@@ -179,5 +191,98 @@ describe("proof on the board: the needs a claim asks for", () => {
     }
     const video = await read("../src/components/media/video.component.html");
     expect(video).toMatch(/startAt: timed && at > 0 \? -at : 0/);
+  });
+});
+
+describe("the cut, the words, and the camera (Marc: motion graphics by default, the voice never stops)", () => {
+  it("a directed entrance or exit lands on a word like any data time", async () => {
+    const { extractAnchors, resolveComponent, assertedSpine } = await import("../src/core/word-anchors.js");
+    const c: any = { type: "quotient-campaign", data: { script: [] }, enter: { effect: "cut", at: "@plans" }, exit: { effect: "cut", at: { word: "itself", edge: "end" } } };
+    expect(extractAnchors(c)).toBe(2);
+    expect(c.anchors["enter.at"]).toEqual({ word: "plans" });
+    expect(c.anchors["exit.at"]).toEqual({ word: "itself", edge: "end" });
+    const spine = assertedSpine("An agent reads that brief and plans the whole campaign itself.", 5);
+    const r = resolveComponent(c, spine);
+    expect(r.resolved).toBe(2);
+    expect(c.enter.at).toBeGreaterThan(0);
+    expect(c.exit.at).toBeGreaterThan(c.enter.at);
+  });
+
+  it("the cut effect is a hard cut in the choreography: sub-frame, no ease", async () => {
+    const asm = await read("../src/core/scene-assembler.ts");
+    expect(asm).toMatch(/'cut': \{ autoAlpha: 0 \}/);
+    expect(asm).toMatch(/var CUT = 0\.02;/);
+    expect(asm).toMatch(/var eDur = eCut \? CUT : \(c\.enter\.duration \|\| 0\.8\)/);
+    expect(asm).toMatch(/var xDur = xCut \? CUT : \(c\.exit\.duration \|\| 0\.8\)/);
+    const gen = await read("../src/llm/scene-generator.ts");
+    expect(gen).toMatch(/"cut",\s*\]\);/);
+  });
+
+  it("a provided real screen replaces the mock cut in on the same word, and nothing else", async () => {
+    const { replaceCutWindow } = await import("../src/core/asset-needs.js");
+    const comps = [
+      { type: "sticker-prop", data: { kind: "pill", text: "THE PLAN" } },
+      { type: "quotient-campaign", data: {}, enter: { effect: "cut", at: "@plans" }, exit: { effect: "cut", at: "@itself" } },
+      { type: "quotient-social", data: {}, enter: { effect: "cut", at: 2.1 }, anchors: { "enter.at": { word: "posts" } } },
+    ];
+    expect(replaceCutWindow(comps, "@plans").map((c: any) => c.type)).toEqual(["sticker-prop", "quotient-social"]);
+    expect(replaceCutWindow(comps, "@posts").map((c: any) => c.type)).toEqual(["sticker-prop", "quotient-campaign"]);
+    expect(replaceCutWindow(comps, "@nowhere")).toHaveLength(3);
+    expect(replaceCutWindow(comps, undefined)).toHaveLength(3);
+  });
+
+  it("the camera moves on the person by rule: a punch-in on the claim, a zoom on each cutaway's region, back to the person, a pull-back on the turn", async () => {
+    const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
+    const face = { cx: 0.48, cy: 0.36, size: 0.3, confidence: 0.9 } as any;
+    const comps: any[] = [
+      { id: "sticker-prop", type: "sticker-prop", data: { kind: "pill", text: "THE PLAN" } },
+      { id: "quotient-campaign", type: "quotient-campaign", data: { script: [{ action: "switch-tab", at: 0.2, tab: "tasks" }] }, enter: { effect: "cut", at: 1.4 }, exit: { effect: "cut", at: 3.6 } },
+    ];
+    const punchy = creatorCutCameraMoves(comps, { grammar: "creator-cut", motion: "punchy", face, duration: 6, takeover: false })!;
+    expect(punchy.map((m) => [m.at, m.type, m.scale])).toEqual([
+      [0.2, "zoom", 1.22],        // punch-in on the claim, at the face
+      [1.4, "reset", undefined],  // the cutaway: the camera rests (the wrapper frames the mock)
+      [3.6, "zoom", 1.22],        // back to the person on its exit
+      [4.9, "reset", undefined],  // pull-back on the turn
+    ]);
+    expect(punchy[0]).toMatchObject({ x: 48, y: 36 });
+    // Calm: one slow push, no pull-back; a cutaway with no anchors (a provided still) rests the camera.
+    const calm = creatorCutCameraMoves([{ id: "image", type: "image", data: { src: "/x.png" }, enter: { effect: "cut", at: 2 }, position: { x: "0%", y: "0%", width: "100%", height: "100%" } }],
+      { grammar: "creator-cut", motion: "calm", duration: 6, takeover: false })!;
+    expect(calm.map((m) => [m.at, m.type, m.scale])).toEqual([[0.3, "zoom", 1.1], [2, "reset", undefined]]);
+    // Not for speaker films, not for takeovers; and a storyboard's own moves win (the generator only asks when there are none).
+    expect(creatorCutCameraMoves(comps, { grammar: "speaker", duration: 6, takeover: false })).toBeNull();
+    expect(creatorCutCameraMoves(comps, { grammar: "creator-cut", duration: 6, takeover: true })).toBeNull();
+    const gen = await read("../src/llm/scene-generator.ts");
+    expect(gen).toMatch(/var cameraMoves: any\[\] \| undefined = \(draft as any\)\.camera_moves\?\.length \? \(draft as any\)\.camera_moves : undefined;\s*if \(!cameraMoves\) \{/);
+  });
+
+  it("a cutaway mock on a tall frame is FRAMED on the region it performs in (a desktop mock at full frame fills the top quarter of a phone)", async () => {
+    const { componentAnchors, frameAnchorFor } = await import("../src/llm/scene-generator.js");
+    const lib = path.resolve(__dirname, "../src/components");
+    // The anchors come from the library itself.
+    expect(componentAnchors("quotient-campaign", lib)).toEqual(expect.arrayContaining(["tasks", "calendar", "metrics"]));
+    expect(componentAnchors("sticker-prop", lib)).toEqual([]);
+    // The region the script performs in wins; else the first content region; chrome never.
+    const anchorsOf = (t: string) => t === "quotient-campaign" ? ["tabs", "brief", "tasks", "calendar"] : t === "quotient-social" ? ["toolbar", "post", "status"] : [];
+    expect(frameAnchorFor("quotient-campaign", { script: [{ action: "switch-tab", tab: "tasks" }] }, anchorsOf)).toBe("tasks");
+    expect(frameAnchorFor("quotient-campaign", {}, anchorsOf)).toBe("brief");
+    expect(frameAnchorFor("quotient-social", {}, anchorsOf)).toBe("post");
+    expect(frameAnchorFor("image", {}, anchorsOf)).toBeNull();
+    // The generator stamps it on tall-frame cutaways; the assembler frames the wrapper at mount.
+    const gen = await read("../src/llm/scene-generator.ts");
+    expect(gen).toMatch(/var frameAnchor = tallFrame && isCutaway\(c as any\) \? frameAnchorFor\(c\.type, data\) : null;/);
+    expect(gen).toMatch(/\.\.\.\(frameAnchor \? \{ frame_anchor: frameAnchor \} : \{\}\)/);
+    const asm = await read("../src/core/scene-assembler.ts");
+    expect(asm).toMatch(/frame: \(c as any\)\.frame_anchor \|\| null,/);
+    // Framed at the cut's first render (the region may be a pane switched to later), from layout boxes, clamped to cover the frame.
+    expect(asm).toMatch(/function frameOf\(el, name\)/);
+    expect(asm).toMatch(/if \(eCut && c\.frame\) \{/);
+    expect(asm).toMatch(/duration: 0\.001, ease: 'none', immediateRender: false,/);
+    expect(asm).toMatch(/tx = Math\.max\(CW - W \* sc, Math\.min\(0, tx\)\)/);
+    // Both assemblers pass the frame through.
+    expect(asm).toMatch(/wrapperChoreoScript\(scene\.components, scene\.duration_seconds, "", canvas\.width, canvas\.height\)/);
+    const comp = await read("../src/core/composite-assembler.ts");
+    expect(comp).toMatch(/wrapperChoreoScript\(scene\.components, scene\.duration_seconds, `\$\{scene\.id\}__`, canvas\.width, canvas\.height\)/);
   });
 });

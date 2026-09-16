@@ -218,7 +218,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""} style="${posStyle}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""} style="${posStyle}">\n` +
       `    ${boundHtml}\n` +
       `  </div>`
     );
@@ -382,7 +382,7 @@ ${buildContentRegionWrapper(scene, componentBlocks)}
   }
 
 ${componentScripts.join("\n\n")}
-${wrapperChoreoScript(scene.components, scene.duration_seconds)}
+${wrapperChoreoScript(scene.components, scene.duration_seconds, "", canvas.width, canvas.height)}
   // Fold any orphan animations the components created (loose gsap.to/from not
   // added to the master) ONTO the master, so the renderer -- which seeks the
   // master deterministically -- captures them frame-accurately instead of
@@ -650,6 +650,9 @@ export function wrapperChoreoScript(
   sceneDuration: number,
   /** Composite namespaces wrapper ids ("sceneId__compId"); pass the prefix. */
   cidPrefix = "",
+  /** The frame, for framing a cutaway on its region. */
+  canvasW = 1920,
+  canvasH = 1080,
 ): string {
   const moves = components
     .filter((c) => c.pose || c.enter || c.exit)
@@ -658,6 +661,7 @@ export function wrapperChoreoScript(
       pose: c.pose || null,
       enter: c.enter || null,
       exit: c.exit || null,
+      frame: (c as any).frame_anchor || null,
     }));
   if (!moves.length) return "";
   return `
@@ -665,10 +669,51 @@ export function wrapperChoreoScript(
   (function() {
     var CHOREO = ${JSON.stringify(moves)};
     var DUR = ${sceneDuration};
+    var CW = ${canvasW}, CH = ${canvasH};
+    // FRAME A CUTAWAY ON ITS REGION (SPEC-creator-cut.md). A cut-in wrapper
+    // with a frame anchor is scaled and shifted so the region it performs
+    // in fills the width, the way the reference films crop a desktop screen
+    // to the part being talked about (a desktop mock at full frame on a
+    // phone fills the top quarter and leaves the rest empty -- measured).
+    // Computed at the cut's FIRST RENDER, not at mount: the region may be a
+    // pane the mock's own script only switches to later (measured: the
+    // tasks tab was 0x0 at t=0). Layout boxes, not client rects -- the
+    // camera rig may be mid-zoom at that moment. The camera's anchored zoom
+    // cannot do this: it fits a region, never crops one. Clamped so the
+    // wrapper always covers the frame.
+    function layoutBox(node, upTo) {
+      var x = 0, y = 0, n = node;
+      while (n && n !== upTo) { x += n.offsetLeft || 0; y += n.offsetTop || 0; n = n.offsetParent; }
+      return { x: x, y: y, w: node.offsetWidth || 0, h: node.offsetHeight || 0 };
+    }
+    function frameOf(el, name) {
+      var a = null;
+      try { a = el.querySelector('[data-anchor="' + name + '"]'); } catch (e) {}
+      var W = el.offsetWidth || CW, H = el.offsetHeight || CH;
+      if (!a || !a.offsetWidth || !a.offsetHeight) return { scale: 1, x: 0, y: 0 };
+      var r = layoutBox(a, el);
+      // About two columns' worth of zoom: the rows and labels read, not the
+      // whole pane. A region that then still overflows the frame is shown
+      // from its LEFT edge and its TOP (where a screen's content starts --
+      // measured: centring cropped the task names off the left); one that
+      // fits is centred.
+      var sc = Math.max(1.5, Math.min(2.8, (CW * 0.94 / r.w) * 2.2));
+      var pad = 24;
+      var tx = r.w * sc <= CW ? CW / 2 - (r.x + r.w / 2) * sc : pad - r.x * sc;
+      var ty = r.h * sc <= CH * 0.8 ? CH * 0.42 - (r.y + r.h / 2) * sc : CH * 0.12 - r.y * sc;
+      tx = Math.max(CW - W * sc, Math.min(0, tx));
+      ty = Math.max(CH - H * sc, Math.min(0, ty));
+      return { scale: sc, x: tx, y: ty };
+    }
     var OFF = { 'slide-left': { x: '-115%' }, 'slide-right': { x: '115%' },
                 'slide-up': { y: '-115%' }, 'slide-down': { y: '115%' },
                 'rise': { y: 60, autoAlpha: 0 }, 'pop': { scale: 0.72, autoAlpha: 0 },
-                'fade': { autoAlpha: 0 } };
+                'fade': { autoAlpha: 0 },
+                // A HARD cut (SPEC-creator-cut.md): the same pose as a fade,
+                // played in under one frame -- the wrapper is simply there,
+                // then simply gone. A set() would render on creation.
+                'cut': { autoAlpha: 0 } };
+    var CUT = 0.02;
     // A TRAVERSAL is an enter and an exit that CONTINUE each other: arriving
     // from the left and leaving to the right is one crossing described in two
     // halves, and playing it as enter -> park -> exit inserts a dead middle
@@ -719,18 +764,31 @@ export function wrapperChoreoScript(
           .to(el, mk(toV, pOut, 'power2.in'), pIn + pMid);
       }
       if (c.enter && !traverses) {
+        var eCut = c.enter.effect === 'cut';
         var eFrom = OFF[c.enter.effect] || OFF['fade'];
         var eAt = c.enter.at || 0;
-        var eDur = c.enter.duration || 0.8;
-        master.fromTo(el, eFrom,
-          { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: eDur,
-            ease: c.enter.ease || 'power3.out', immediateRender: true }, eAt);
+        var eDur = eCut ? CUT : (c.enter.duration || 0.8);
+        if (eCut && c.frame) {
+          // The cut only shows the wrapper; the framing tween (function
+          // values, first render at the cut) places it.
+          master.fromTo(el, eFrom, { autoAlpha: 1, duration: eDur, ease: 'none', immediateRender: true }, eAt);
+          var fr = (function(node, name) { return function() { return frameOf(node, name); }; })(el, c.frame);
+          master.to(el, { transformOrigin: '0 0',
+            scale: function() { return fr().scale; }, x: function() { return fr().x; }, y: function() { return fr().y; },
+            duration: 0.001, ease: 'none', immediateRender: false,
+            onStart: function() { try { el.setAttribute('data-mp-framed', fr().scale.toFixed(2)); } catch (e) {} } }, eAt);
+        } else {
+          master.fromTo(el, eFrom,
+            { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: eDur,
+              ease: eCut ? 'none' : (c.enter.ease || 'power3.out'), immediateRender: true }, eAt);
+        }
       }
       if (c.exit && !traverses) {
+        var xCut = c.exit.effect === 'cut';
         var xTo = OFF[c.exit.effect] || OFF['fade'];
-        var xDur = c.exit.duration || 0.8;
+        var xDur = xCut ? CUT : (c.exit.duration || 0.8);
         var xAt = c.exit.at != null ? c.exit.at : Math.max(0, DUR - xDur - 0.1);
-        master.to(el, Object.assign({ duration: xDur, ease: c.exit.ease || 'power3.in' }, xTo), xAt);
+        master.to(el, Object.assign({ duration: xDur, ease: xCut ? 'none' : (c.exit.ease || 'power3.in') }, xTo), xAt);
       }
     });
   })();
