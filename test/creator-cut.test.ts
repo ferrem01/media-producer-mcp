@@ -280,7 +280,18 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(creatorCutCameraMoves(comps, { grammar: "speaker", duration: 6, takeover: false })).toBeNull();
     expect(creatorCutCameraMoves(comps, { grammar: "creator-cut", duration: 6, takeover: true })).toBeNull();
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/var cameraMoves: any\[\] \| undefined = \(draft as any\)\.camera_moves\?\.length \? \(draft as any\)\.camera_moves : undefined;\s*if \(!cameraMoves\) \{/);
+    expect(gen).toMatch(/var cameraMoves: any\[\] \| undefined = \(draft as any\)\.camera_moves\?\.length \? \(draft as any\)\.camera_moves : undefined;/);
+    // A storyboard that wrote nothing but resets wrote no camera (measured: four scenes of "@3.3s reset").
+    expect(gen).toMatch(/if \(cameraMoves && cameraMoves\.every\(\(m: any\) => !m \|\| m\.type === "reset"\)\) cameraMoves = undefined;/);
+    // A cut window shorter than CUT_MIN is held open at build.
+    expect(gen).toMatch(/var CUT_MIN = 1\.2;/);
+    expect(gen).toMatch(/cut window .* is too short to read -- held to/);
+    // The person is the base of every scene on a person grammar, take or no take.
+    const pipeline2 = await read("../src/llm/pipeline.ts");
+    expect(pipeline2).toMatch(/const personBase = !!opts\.speaker_source \|\| pipelineHasNarration \|\| personCarries\(filmGrammar\);/);
+    expect(pipeline2.match(/hasSpeakerTrack: personBase,/g)?.length).toBe(4);
+    expect(pipeline2).not.toMatch(/hasSpeakerTrack: !!opts\.speaker_source \|\| pipelineHasNarration/);
+    expect(pipeline2.match(/overCamera: personBase &&/g)?.length).toBe(2);
   });
 
   it("a cutaway mock on a tall frame is FRAMED on the region it performs in (a desktop mock at full frame fills the top quarter of a phone)", async () => {
@@ -292,6 +303,9 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     // The region the script performs in wins; else the first content region; chrome never.
     const anchorsOf = (t: string) => t === "quotient-campaign" ? ["tabs", "brief", "tasks", "calendar"] : t === "quotient-social" ? ["toolbar", "post", "status"] : [];
     expect(frameAnchorFor("quotient-campaign", { script: [{ action: "switch-tab", tab: "tasks" }] }, anchorsOf)).toBe("tasks");
+    // ...or the region its actions work on (measured: move-event on a calendar was framed on the brief), or the tab it opens on.
+    expect(frameAnchorFor("quotient-campaign", { script: [{ action: "move-event" }, { action: "set-event-status" }] }, anchorsOf)).toBe("calendar");
+    expect(frameAnchorFor("quotient-campaign", { active_tab: "tasks" }, anchorsOf)).toBe("tasks");
     expect(frameAnchorFor("quotient-campaign", {}, anchorsOf)).toBe("brief");
     expect(frameAnchorFor("quotient-social", {}, anchorsOf)).toBe("post");
     expect(frameAnchorFor("image", {}, anchorsOf)).toBeNull();

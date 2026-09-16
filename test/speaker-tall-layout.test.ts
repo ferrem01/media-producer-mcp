@@ -160,7 +160,7 @@ describe("type over the camera", () => {
     const fs = await import("node:fs/promises");
     const p = await fs.readFile(new URL("../src/llm/pipeline.ts", import.meta.url), "utf8");
     expect(p).toMatch(/if \(type === "illegible" && opts\.overCamera\)/);
-    expect(p.match(/overCamera: \(!!opts\.speaker_source \|\| pipelineHasNarration\)/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(p.match(/overCamera: personBase &&/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });
 
