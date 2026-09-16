@@ -17,6 +17,7 @@ import { getStorytellingGuide } from "./design-skills.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat, AssetRequirement } from "../core/types.js";
 import { normalizeBeats, beatsVoiceover } from "../core/beats.js";
 import { normalizeAssetNeeds } from "../core/asset-needs.js";
+import { emphasisFromLines } from "../core/captions.js";
 import { liftWrapperAnims } from "../core/word-anchors.js";
 import {
   buildReferenceImageParts,
@@ -99,7 +100,7 @@ const SCENE_TOOL_SCHEMA = {
       properties: { type: { type: "string" }, duration_seconds: { type: "number" } },
       description: "How this scene transitions in from the previous one",
     },
-    voiceover_text: { type: "string", description: "Scene narration (concatenation of beat narration when the scene has beats)" },
+    voiceover_text: { type: "string", description: "Scene narration (concatenation of beat narration when the scene has beats). CREATOR-CUT FILMS: wrap the ONE word each line turns on in *stars* (\"One *brief*. Every surface.\") -- the captions tint it; the prompter never shows the stars." },
     transparent_background: { type: "boolean", description: "SPEAKER and CREATOR-CUT FILMS ONLY. false = this scene is a TAKEOVER: it covers the camera and the product surface owns the whole frame. Omit (or true) = the speaker stays visible and content docks beside her." },
     assets: {
       type: "array",
@@ -188,6 +189,18 @@ export function normalizeSceneShape(scene: any, validTypes?: Set<string>): strin
   if (Array.isArray(scene.beats)) {
     for (const b of scene.beats) {
       if (b && typeof b.voiceover_text === "string" && /\\n|\\"/.test(b.voiceover_text)) b.voiceover_text = unescapeLines(b.voiceover_text);
+    }
+  }
+  // The writer's emphasis marks (`One *brief*.`) come off the line here, so
+  // the prompter, the needs and the spine read the clean sentence and the
+  // captions get the words (core/captions.ts).
+  if (typeof scene.voiceover_text === "string" && scene.voiceover_text.includes("*")) {
+    const lifted = emphasisFromLines(scene.voiceover_text);
+    if (lifted.emphasis.length) {
+      scene.voiceover_text = lifted.text;
+      const prior = Array.isArray(scene.emphasis) ? scene.emphasis.map(String) : [];
+      scene.emphasis = Array.from(new Set(prior.concat(lifted.emphasis)));
+      notes.push(`emphasis lifted off the lines: ${lifted.emphasis.join(", ")}`);
     }
   }
   // Camera moves from the LLM. Extracted so the rules are testable without
@@ -290,6 +303,9 @@ export interface DraftScene {
   film_start?: number;
   label: string;
   duration_seconds: number;
+  /** The words the writer marked for emphasis in voiceover_text (`*brief*`),
+   *  lifted off the line at normalize time; the captions tint them. */
+  emphasis?: string[];
   purpose: string;         // what this scene communicates -- its job in the story
   visual_notes: string;    // visual direction (what the viewer experiences, motion verbs, depth layers)
   /** Library components to embed. Plain string = type only (codegen fills the
@@ -601,7 +617,8 @@ A person explains and the SCREEN PROVES IT. The camera is the base layer of ever
 - NO DUPLICATE TEXT: on-screen type never repeats what is being said; it ADDS (a number, a name, a step).
 The edit:
 - ONE CLAIM PER SCENE: each scene is one thing the person asserts; its beats are what the screen shows WHILE it is said. The film cuts back to the person between every piece of proof -- never a beat with nothing on screen but the person for more than one sentence.
-- EVERY SCENE IS CAST, THE FIRST ONE TOO, with three objects in "components": the chapter label (a plated word or two on the claim, gone when the claim moves on), the icon sticker beside the head naming the thing, and the cutaway that proves the claim. A scene with an empty cast is a slide, never allowed here; the hook is a claim like any other.
+- THE WORDS ARE ON SCREEN THE WHOLE TIME: the build captions every scene from the take's words -- two to four at a time, on a plate over the chest, keyed to the voice, running through the cutaways too. You never cast captions and never repeat the line as type. MARK THE EMPHASIS: wrap the ONE word each line turns on in *stars* inside voiceover_text ("One *brief*. Every surface.") -- it is tinted in the brand color; the prompter never shows the stars. Unmarked lines stay plain (numbers tint by rule).
+- EVERY SCENE IS CAST, THE FIRST ONE TOO, with two objects in "components": the icon sticker beside the head naming the thing, and the cutaway that proves the claim. A chapter label (a plated word or two on the claim, gone when the claim moves on) ONLY when the claim wants a name -- never as a habit, the captions already carry the words. A scene with an empty cast is a slide, never allowed here; the hook is a claim like any other.
 - THE SCREEN PROVES EVERY CLAIM, AND YOU CAST THE PROOF: for each claim, stage the library mock that PERFORMS it (the product surface where the claim happens, with its data.script) in the scene's "components" as a CUTAWAY -- enter: {effect: "cut", at: "@word"} on the word the claim lands, exit: {effect: "cut", at: "@word"} on the word the person moves on -- so the proof takes the whole frame for that beat, HARD cut in and out, and the person is back. The cut is part of the rhythm and breaks up the voice; the voice never stops. Motion graphics are the DEFAULT proof: the film has its cuts on the first build, with nothing supplied. A REAL screen is optional: only where the real thing matters (a real customer's screen, a real number), add a need in "assets" -- {type: screenshot | screen_recording, description: what it must show, at: the same "@word", until: the same "@word", focus: where the eye should go} -- and a provided file replaces the mock in that window. Never ask for a recording where a still would do. A CARD (the proof floating over the person on a plate, the person still visible) ONLY when the brief asks for it.
 - NO STANDING HEADER: a chapter label on a claim ("Plugins", "Computer use") is a graphic like any other -- cast when that claim wants one, gone when the claim moves on. A title that holds for the whole film only when the brief asks for it.
 - THE CAMERA MOVES ON THE PERSON: a punch-in on the claim, a pull-back on the turn -- camera_moves aimed at the face, at the cadence the film's motion sets (punchy: several per scene; calm: one).

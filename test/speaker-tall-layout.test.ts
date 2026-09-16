@@ -29,16 +29,19 @@ describe("a speaker scene on a TALL frame", () => {
   const comps = build({ width: 1080, height: 1920 }, AUTHORED);
   const by = (t: string) => comps.find((c) => c.type === t);
 
-  it("puts ONE surface full-width below the chin and the rest under the platform strip, never a side column", () => {
+  it("puts the captions full-width below the chin and the surfaces under the platform strip, never a side column", () => {
     for (const t of ["composer", "reel-caption-lane", "auto-tagged-link"]) {
       const p = by(t).position;
       expect(pctNum(p.x)).toBe(5);
       expect(pctNum(p.width)).toBe(90);
     }
-    // The first surface owns the lower band (68%-82%: below a chest-up chin)...
-    expect(by("composer").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "14%" });
-    // ...the next two stack under the platform strip (13%-30%).
-    for (const t of ["reel-caption-lane", "auto-tagged-link"]) {
+    // THE WORDS RIDE OVER EVERYTHING: the caption lane owns the lower band
+    // (68%-82%: below a chest-up chin), above a cut-in proof (36) and a
+    // label (39), so it runs through the cutaways (core/captions.ts)...
+    expect(by("reel-caption-lane").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "14%" });
+    expect(by("reel-caption-lane").z_index).toBe(41);
+    // ...and the surfaces stack under the platform strip (13%-30%).
+    for (const t of ["composer", "auto-tagged-link"]) {
       const p = by(t).position;
       expect(pctNum(p.y)).toBeGreaterThanOrEqual(13);
       expect(pctNum(p.y) + pctNum(p.height)).toBeLessThanOrEqual(30.1);
@@ -112,11 +115,21 @@ describe("a speaker scene on a WIDE frame", () => {
 
 describe("a speaker scene laid out around a MEASURED face", () => {
   const BED = { cx: 0.569, cy: 0.61, size: 0.406 };
-  it("with the face low in the frame, every surface goes above the hairline and nothing sits under the chin", () => {
+  it("with the face low in the frame, the captions take the band above the hairline and nothing sits under the chin", () => {
     const comps = build({ width: 1080, height: 1920 }, AUTHORED, undefined, BED);
     const by = (t: string) => comps.find((c) => c.type === t);
-    for (const t of ["composer", "reel-caption-lane", "auto-tagged-link"]) {
-      const p = by(t).position;
+    // No room under the chin: the words win the one band there is; the
+    // surfaces that wanted it have no band left and are dropped (the
+    // captions are the film's text layer, a composer is furniture).
+    const lane = by("reel-caption-lane").position;
+    expect(pctNum(lane.y)).toBeGreaterThanOrEqual(13);
+    expect(pctNum(lane.y) + pctNum(lane.height)).toBeLessThanOrEqual(32.1);
+    expect(by("composer")).toBeUndefined();
+    expect(by("auto-tagged-link")).toBeUndefined();
+    // Without the lane, every surface goes above the hairline as before.
+    const plain = build({ width: 1080, height: 1920 }, AUTHORED.filter((c) => c.type !== "reel-caption-lane"), undefined, BED);
+    for (const t of ["composer", "auto-tagged-link"]) {
+      const p = plain.find((c) => c.type === t).position;
       expect(pctNum(p.y)).toBeGreaterThanOrEqual(13);
       expect(pctNum(p.y) + pctNum(p.height)).toBeLessThanOrEqual(32.1);
     }

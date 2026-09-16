@@ -520,6 +520,9 @@ export interface StoryboardScene {
   camera_moves?: CameraMove[];
   /** Voiceover script */
   voiceover_text?: string;
+  /** Words the writer marked for emphasis in the line (creator-cut): the
+   *  captions tint them. Lifted off voiceover_text at normalize time. */
+  emphasis?: string[];
   /** Duration */
   duration_seconds: number;
   /** What this scene needs to look great: the take, and on a creator-cut
