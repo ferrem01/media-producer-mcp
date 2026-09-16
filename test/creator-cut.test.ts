@@ -53,7 +53,7 @@ describe("creator-cut is a film grammar a person carries", () => {
       const src = await read(rel);
       expect(src, `${rel} still gates on the literal speaker grammar`).not.toMatch(/filmGrammar (?:!==|===) "speaker"/);
     }
-    const boardPage = await read("../src/board-page.ts");
+    const boardPage = await read("../src/studio-phone.ts");
     expect(boardPage).toMatch(/g === 'speaker' \|\| g === 'creator-cut'/);
   });
 

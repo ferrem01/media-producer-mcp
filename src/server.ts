@@ -1495,7 +1495,7 @@ export function createMcpServer(): McpServer {
 
   tool(
     "take",
-    "Ask the human for a camera take of a SPEAKER or CREATOR-CUT film (SPEC-take-flow.md). Returns the Studio link to hand them (on a phone it opens the board with Record on each scene; add scene_index to point the booth at one scene), the open needs, and a job that completes when the take lands -- poll job(action='status'). On arrival the file is sanitized (orientation, frame, dialogue loudness), attached as that scene's base, and the scene's need flips to provided. Then build with generate(mode='full') and render.",
+    "Ask the human for a camera take of a SPEAKER or CREATOR-CUT film (SPEC-take-flow.md). Returns the Studio link to hand them (on a phone it is the phone Studio: what is still needed, Record on each scene, Upload; add scene_index to point the booth at one scene), the open needs, and a job that completes when the take lands -- poll job(action='status'). On arrival the file is sanitized (orientation, frame, dialogue loudness), attached as that scene's base, and the scene's need flips to provided. Then build with generate(mode='full') and render.",
     {
       tenant_id: z.string(),
       project_id: z.string(),

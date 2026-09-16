@@ -1,10 +1,10 @@
 /**
- * Proof on the board (SPEC-creator-cut.md).
+ * Proof on the storyboard (SPEC-creator-cut.md).
  *
  * A creator-cut board declares, per claim, the PROOF the screen should show
  * while the claim is said: a screenshot, a screen recording, b-roll, or a
  * product mock. It is written on the scene's existing `assets[]` needs --
- * the same record the take flow uses, so the board lists it beside the
+ * the same record the take flow uses, so Studio lists it beside the
  * take with Upload -- with the four fields a proof adds to a plain need:
  * how it is used (cutaway or card), the words it enters and leaves on, and
  * where the eye should go. A provided file becomes a full-bleed `image` or
@@ -16,7 +16,7 @@ import type { Project, StoryboardScene, AssetRequirement, AssetRequirementType }
 /** The kinds of proof a writer may ask for. */
 export const PROOF_TYPES: AssetRequirementType[] = ["screenshot", "screen_recording", "stock_footage", "mockup"];
 
-/** What each kind is called on the board. */
+/** What each kind is called in Studio. */
 export const NEED_LABELS: Partial<Record<AssetRequirementType, string>> = {
   screenshot: "Screenshot",
   screen_recording: "Screen recording",
@@ -90,7 +90,7 @@ export function openAssetNeeds(project: Project): OpenAssetNeed[] {
 }
 
 /** A file fills one need: it flips to provided and carries the file.
- *  Throws on an index that is not on the board. */
+ *  Throws on an index that is not on the storyboard. */
 export function provideAsset(project: Project, sceneIndex: number, assetIndex: number, url: string): AssetRequirement {
   const scene = project.storyboard?.scenes?.[sceneIndex];
   if (!scene) throw new Error(`Storyboard scene ${sceneIndex + 1} not found`);

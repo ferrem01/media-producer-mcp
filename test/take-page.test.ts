@@ -92,11 +92,13 @@ describe("what the booth does", () => {
     expect(html).toMatch(/function withToken/);
   });
 
-  it("gets the human back to the board from the ready and done screens, and offers the soft look", () => {
+  it("gets the human back to Studio from the ready and done screens, and offers the soft look", () => {
     const html = getTakeHtml();
-    expect(html).toMatch(/id="boardLinkTop"/);
-    expect(html).toMatch(/id="boardLink"/);
-    expect(html).toMatch(/var boardHref = '\/board\?tenant='/);
+    expect(html).toMatch(/id="studioLinkTop"/);
+    expect(html).toMatch(/id="studioLink"/);
+    // ONE Studio: the link is the Studio link, which serves the phone view to a phone.
+    expect(html).toMatch(/var studioHref = '\/studio\?tenant='/);
+    expect(html).not.toMatch(/\/board\?/);
     expect(html).toMatch(/id="softLook" checked/);
     expect(html).toMatch(/look: \(\$\('softLook'\) && \$\('softLook'\)\.checked\) \? 'soft' : 'natural'/);
   });

@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { getBoardHtml } from "../src/board-page.js";
+import { getPhoneStudioHtml } from "../src/studio-phone.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFile(path.join(here, rel), "utf8");
 
-describe("the board page (SPEC-take-flow.md, phase 3)", () => {
-  const html = getBoardHtml();
+describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
+  const html = getPhoneStudioHtml();
   const js = html.slice(html.indexOf("<script>") + 8, html.lastIndexOf("</script>"));
 
   it("parses as JavaScript and carries no template-literal hazards", () => {
@@ -77,12 +77,27 @@ describe("the board page (SPEC-take-flow.md, phase 3)", () => {
     expect(js).toMatch(/link\('\/studio', '&desktop=1'\)/);
   });
 
-  it("is where the Studio link lands on a phone", async () => {
+  it("IS the Studio link on a phone: served at /studio, no separate page (Marc: one Studio)", async () => {
     const src = await read("../src/index.ts");
-    expect(src).toMatch(/urlPath === "\/board"/);
-    expect(src).toMatch(/getBoardHtml\(\)/);
     expect(src).toMatch(/iPhone\|iPad\|iPod\|Android\.\*Mobile\|Mobile Safari/);
-    expect(src).toMatch(/Location: "\/board" \+ q/);
+    expect(src).toMatch(/res\.end\(getPhoneStudioHtml\(\)\)/);
     expect(src).toMatch(/desktop=1/);
+    // The old address goes to Studio; nothing is served as "the board".
+    expect(src).toMatch(/Location: "\/studio" \+ q/);
+    expect(src).not.toMatch(/getBoardHtml/);
+    expect(html).toMatch(/<title>Studio<\/title>/);
+    expect(html).not.toMatch(/<title>Board/);
+  });
+
+  it("says what the film still needs from you before a single card, and the desktop Studio says the same", async () => {
+    expect(js).toMatch(/'Needed from you'/);
+    expect(js).toMatch(/' to go'/);
+    const desktop = await read("../src/preview-app/preview-app.ts");
+    expect(desktop).toMatch(/function renderNeedsPanel\(project\)/);
+    expect(desktop).toMatch(/Needed from you/);
+    // Same routes as the phone: the take, and provide-asset for proof.
+    expect(desktop).toMatch(/'\/provide-asset\/' \+ encodeURIComponent\(state\.tenantId\)/);
+    expect(desktop).toMatch(/'\/take\/' \+ encodeURIComponent\(state\.tenantId\)/);
+    expect(desktop).toMatch(/renderNeedsPanel\(project\);/);
   });
 });

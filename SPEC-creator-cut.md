@@ -1,9 +1,9 @@
 # SPEC: creator-cut -- a person explains, the screen proves it
 
 Status: AGREED (2026-09-16, Marc + Claude); phase 1 BUILT (the grammar
-value, the contract, evidence needs on the board, provided proof cast as a
+value, the contract, proof needs in Studio, provided proof cast as a
 cutaway). Ninth film grammar. Builds on
-`SPEC-take-flow.md` (needs, takes, word anchors, the board), the speaker
+`SPEC-take-flow.md` (needs, takes, word anchors, Studio in your hand), the speaker
 recipe in `SPEC-motion-architecture.md`, and `SPEC-creative-axes.md`.
 
 ## The references
@@ -88,17 +88,17 @@ Exists (reused as is):
 - Takeover cutaways (the takeover recipe: opaque, full-frame, hard cut).
 - Caption components; sticker-prop; kinetic-text with a plate; image and
   screenshot components; b-roll generation (`generate_clip`).
-- Needs on the board (`assets[]`, `status: needed`, Upload).
+- Needs in Studio (`assets[]`, `status: needed`, Upload).
 
 Missing (the build list):
 - **The grammar's contract** in the creative director and storyboard
   writer, with the ad/tutorial split on `motion` + length.
 - **Evidence needs.** The writer declares per beat what proof it wants:
   `screenshot` / `screen_recording` / `stock_footage` (b-roll) / `mockup`
-  with a description and how it is used (card or cutaway). The board lists
+  with a description and how it is used (card or cutaway). Studio lists
   them beside the take with Upload; b-roll needs are generated in-house and
   flip to provided by themselves. `AssetRequirementType` already has every
-  kind; what is new is the writer asking, per beat, and the board showing
+  kind; what is new is the writer asking, per beat, and Studio showing
   it.
 - **Captions from the take**, wired: after attach, the scene's caption
   component gets the take's words. (Today captions are authored phrases.)
@@ -112,12 +112,12 @@ Missing (the build list):
   lane and a sticker at once, around the face. The bands exist; the rule
   for what yields when they collide does not.
 
-## The board and the build (how it flows)
+## Studio and the build (how it flows)
 
 1. `generate(film_grammar: "creator-cut", frame: "9x16")` -> a board where
    every scene is a claim with the lines and, per beat, the evidence it
    wants. The cards show the outline and an evidence placeholder per beat.
-2. The board lists the needs: the take(s), and each screenshot / recording
+2. Studio lists the needs first: the take(s), and each screenshot / recording
    / b-roll with its description. Upload fills one; b-roll fills itself.
    Record all or per scene, as today.
 3. Build: captions from the take words; inserts on their words; punch-ins on
@@ -126,7 +126,7 @@ Missing (the build list):
 
 ## Phases
 
-1. Contract + evidence needs on the board (writer, director, board UI).
+1. Contract + proof needs in Studio (writer, director, Studio UI).
    **Built.** `creator-cut` is a `film_grammar` value; every gate that read
    `speaker` reads `personCarries()` (`core/take-needs.ts`), so the grammar
    inherits the take flow whole. The writer's contract inherits speaker's
@@ -134,7 +134,8 @@ Missing (the build list):
    EXISTING needs record, `assets[]` -- no new field: a need gains four
    optional fields (`use` cutaway | card, `at` / `until` word anchors,
    `focus`). `core/asset-needs.ts` normalizes what the writer wrote, the
-   board lists every non-take need under its claim with Upload, and
+   phone Studio lists every non-take need under its claim with Upload, the
+   desktop Studio lists them at the top of the sidebar, and
    `POST /api/provide-asset/{t}/{p}` (the HTTP twin of the update tool's
    `provide_asset`) fills one. The build casts every provided file as the
    EXISTING `image` or `video` component, full-bleed, with `at` / `exit_at`
@@ -152,7 +153,7 @@ Missing (the build list):
 
 Two films from the two references' shapes, Marc on camera, Quotient as the
 product: a 30s ad (punchy) and a 75s tutorial (calm), each with real
-screenshots supplied through the board and one generated b-roll. Judged
+screenshots supplied through Studio and one generated b-roll. Judged
 side by side with the references.
 
 ## Decisions (2026-09-16)

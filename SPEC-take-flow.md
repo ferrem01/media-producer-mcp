@@ -1,4 +1,4 @@
-# SPEC: The take flow -- needs, takes, word anchors, the board in your hand
+# SPEC: The take flow -- needs, takes, word anchors, Studio in your hand
 
 Status: AGREED (2026-09-15, Marc + Claude). Builds on `SPEC-format-and-spine.md`
 (asserted vs measured spine) and the `/take` page (PR #755, #758).
@@ -58,14 +58,19 @@ and arrival swaps the base and re-times. Create after: the same code path,
 different order. Replacing a take after build is the same again: the scene's
 clip swaps, its times re-resolve, the render cache sees a changed scene.
 
-**The board in your hand.** `/studio` opened on a phone shows the BOARD VIEW:
-one card per scene -- script, status, Record / Upload where a need is open,
-the current preview to play. Record opens the booth for that scene. "Record
+**Studio in your hand.** ONE Studio, two views. `/studio` opened on a phone
+serves the PHONE VIEW (`studio-phone.ts`; `?desktop=1` forces the desktop
+app): what you do on a phone and nothing else. At the top, "Needed from
+you" -- the takes and the proof, counted across the film; then one card per
+scene -- script, status, Record / Upload where a need is open, the proof the
+claim asked for with Upload. Record opens the booth for that scene. "Record
 all" runs the prompter through every scene with breaks; the transcript cuts
-the take per scene by each scene's first word. The desktop Studio is
-untouched. One link goes around: the Studio link.
+the take per scene by each scene's first word. The desktop Studio is the
+editing surface and carries the same "Needed from you" list, since
+screenshots are made there. One link goes around: the Studio link. (It was
+briefly a separate page called "the board"; Marc: one Studio.)
 
-**The lines are edited where they are read.** The board card carries the
+**The lines are edited where they are read.** The phone Studio card carries the
 scene's lines with an Edit control: `PATCH /api/storyboard/{t}/{p}/scenes/{i}`
 `{voiceover_text}` updates the storyboard record (before or after a build),
 re-points the need's `recording_instructions`, and resolves the scene's
@@ -98,8 +103,9 @@ loudness.
 2. **Word anchors + measured spine.** Anchor model + resolver; speaker recipe
    and caption lane author anchors; transcribe-and-retime on attach; need ->
    provided; scene duration from the take.
-3. **The board view.** `/studio` on a phone -> board; per-scene Record /
-   Upload; Record all with per-scene cuts; slate base for create-before-take.
+3. **The phone view.** `/studio` on a phone -> the phone Studio; per-scene
+   Record / Upload; Record all with per-scene cuts; slate base for
+   create-before-take.
 
 ## Exit test
 

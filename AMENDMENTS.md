@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — One Studio: the phone view is Studio, and it says what it needs
+
+Marc ran the first creator-cut board and did not know the proof had been
+asked for. The requests were there, one block per scene under the take's
+Record and Upload, reading like notes; nothing at the top said "I need six
+takes and seven screen recordings from you". And the page was a separate
+thing called "the board" with its own URL, which he had taken for Studio on
+a phone the whole time. His call: one Studio, and the phone version shows
+only what you do on a phone.
+
+- **`/board` is gone.** `/studio` serves the phone view (`studio-phone.ts`,
+  was `board-page.ts`) when the user agent is a phone; `?desktop=1` forces
+  the desktop app; the old `/board` address 301s to `/studio`. The take
+  page links back to Studio. The word "board" for the page is retired
+  ("storyboard" stays what it was).
+- **Needed from you, first.** Both views open with the list: the camera
+  takes and each kind of proof, counted across the film, with how many are
+  still to go. The phone view keeps Record / Upload per scene under it; the
+  desktop Studio (`renderNeedsPanel`, top of the sidebar, before AND after
+  a build) lists every need with Record (the booth, webcam) and Upload,
+  through the same routes the phone uses (`upload-asset`, then `take` or
+  `provide-asset`). Screenshots are made at the desk; that is where the
+  Upload has to be.
+
+---
+
 ## 2026-09-16 — creator-cut, phase 1: the ninth grammar, its contract, the proof on the board
 
 `SPEC-creator-cut.md` (AGREED with Marc from two Instagram references: a
