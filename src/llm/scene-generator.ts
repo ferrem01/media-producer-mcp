@@ -10,6 +10,8 @@ import type { LLMConfig } from "./client.js";
 import { generateSceneAgentic, type CodegenSession } from "./agentic-codegen.js";
 import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { config } from "../config.js";
+import fs from "node:fs";
+import path from "node:path";
 import type { DraftScene } from "./storyboard-builder.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { formatBeatSheet } from "../core/beats.js";
@@ -312,6 +314,9 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
 /** The house entrance/exit effects wrapperChoreoScript knows how to run. */
 const CHOREO_EFFECTS = new Set([
   "slide-left", "slide-right", "slide-up", "slide-down", "rise", "pop", "fade",
+  // A HARD cut: on screen at `at`, gone at exit `at`, no motion either side
+  // (SPEC-creator-cut.md -- the proof takes the frame for a beat).
+  "cut",
 ]);
 
 /**
@@ -372,11 +377,111 @@ var PHONE_REEL_MOCK_RE = /^(quotient-|claude-|slack-|chat-simulator|browser-fram
 var PHONE_MIN_FONT_PX = 72;
 /** Full-stage overlays: performers that cover the whole composition. */
 var STAGE_OVERLAY_TYPES = ["cursor-performer"];
-/** A full-bleed image or clip authored at 0/0/100%/100% is the proof taking
- *  the frame for a beat (SPEC-creator-cut.md): it rides over the person and
- *  every graphic on them, under the stage overlays, and the band layout
- *  never re-slots it. */
-function isFullBleedMedia(c: { type: string; position?: any }): boolean {
+/** The camera anchors a library component publishes (its [data-anchor]
+ *  regions), read once from its source. The build frames a cutaway on one
+ *  of these; the storyboard may name them in camera_moves. */
+var ANCHOR_CACHE = new Map<string, string[]>();
+export function componentAnchors(type: string, libDir: string = config.componentLibDir): string[] {
+  var key = libDir + "::" + type;
+  if (ANCHOR_CACHE.has(key)) return ANCHOR_CACHE.get(key)!;
+  var out: string[] = [];
+  try {
+    for (var cat of fs.readdirSync(libDir, { withFileTypes: true })) {
+      if (!cat.isDirectory()) continue;
+      var f = path.join(libDir, cat.name, `${type}.component.html`);
+      if (!fs.existsSync(f)) continue;
+      var src = fs.readFileSync(f, "utf-8");
+      out = Array.from(new Set(Array.from(src.matchAll(/data-anchor="([a-z0-9-]+)"/g)).map((m) => m[1])));
+      break;
+    }
+  } catch { /* no library: no anchors */ }
+  ANCHOR_CACHE.set(key, out);
+  return out;
+}
+
+/** Chrome anchors frame nothing worth reading; the camera goes to the
+ *  region that performs. A region the component's script names wins. */
+var CHROME_ANCHORS = new Set(["tabs", "nav", "header", "sidebar", "toolbar", "status"]);
+function pickAnchor(anchors: string[], data: Record<string, unknown> | undefined): string | null {
+  if (!anchors.length) return null;
+  var script = Array.isArray((data as any)?.script) ? ((data as any).script as any[]) : [];
+  for (var step of script) {
+    for (var k of ["tab", "target", "region", "anchor"]) {
+      var v = String(step?.[k] || "").toLowerCase();
+      if (v && anchors.indexOf(v) !== -1) return v;
+    }
+  }
+  var content = anchors.filter((a) => !CHROME_ANCHORS.has(a));
+  return content[0] || anchors[0];
+}
+
+export interface CreatorCutCameraOpts {
+  grammar?: string;
+  /** The film's motion axis: punchy (default) | calm. */
+  motion?: string;
+  face?: TakeFace;
+  duration: number;
+  takeover: boolean;
+}
+
+/** The region a cutaway mock is framed on (SPEC-creator-cut.md): the one its
+ *  script performs in, else the first content region. Null when the
+ *  component publishes no anchors (a provided still or clip). */
+export function frameAnchorFor(type: string, data: Record<string, unknown> | undefined, anchorsOf: (t: string) => string[] = (t) => componentAnchors(t)): string | null {
+  return pickAnchor(anchorsOf(type), data);
+}
+
+/**
+ * THE CAMERA MOVES ON THE PERSON (SPEC-creator-cut.md), by rule. A claim
+ * with no authored moves gets a punch-in on the claim aimed at the face
+ * (calm: a slow push); every cutaway gets an anchored zoom on the mock's
+ * performing region while it is up (a desktop mock at full frame on a
+ * phone fills the top quarter and leaves the rest empty -- measured in
+ * the assembler probe) and the camera comes back to the person on its
+ * exit; a long punchy claim pulls back on the turn. The storyboard may
+ * still author its own moves, which win. Measured live on proj_6b42ee1c:
+ * six scenes, none with a move, while the contract asked for them.
+ */
+export function creatorCutCameraMoves(
+  components: Array<{ id?: string; type: string; data?: Record<string, unknown>; enter?: any; exit?: any; position?: any }>,
+  o: CreatorCutCameraOpts,
+): Array<Record<string, unknown>> | null {
+  if (o.grammar !== "creator-cut" || o.takeover) return null;
+  var dur = Number(o.duration) || 0;
+  if (dur <= 0) return null;
+  var punchy = String(o.motion || "") !== "calm";
+  var fx = o.face ? Math.round(o.face.cx * 100) : 50, fy = o.face ? Math.round(o.face.cy * 100) : 42;
+  var person = (at: number, d: number) => ({ at: Math.round(at * 100) / 100, type: "zoom", x: fx, y: fy, scale: punchy ? 1.22 : 1.1, duration: d });
+  var moves: Array<Record<string, unknown>> = [punchy ? person(0.2, 0.45) : person(0.3, Math.max(2, Math.min(4, dur - 0.6)))];
+  var cuts = components
+    .filter((c) => isCutaway(c as any))
+    .map((c) => ({ c, at: Number(c.enter && typeof c.enter === "object" ? c.enter.at : NaN), until: Number(c.exit && typeof c.exit === "object" ? c.exit.at : NaN) }))
+    .filter((x) => Number.isFinite(x.at) && x.at < dur)
+    .sort((a, b) => a.at - b.at);
+  var lastEnd = 0;
+  for (var cut of cuts) {
+    // The camera comes to rest on the proof: a mock is framed on its own
+    // region by the wrapper (frame_anchor), a provided image or clip is
+    // already the picture. The rig zooming as well would compound the two.
+    moves.push({ at: cut.at, type: "reset", duration: 0.45 });
+    var end = Number.isFinite(cut.until) && cut.until > cut.at ? cut.until : dur;
+    if (end < dur - 0.3) moves.push(person(end, 0.45));
+    lastEnd = Math.max(lastEnd, end);
+  }
+  if (punchy && dur >= 3.5 && lastEnd < dur - 1.6) moves.push({ at: Math.round((dur - 1.1) * 10) / 10, type: "reset", duration: 0.5 });
+  return moves.sort((a, b) => Number(a.at) - Number(b.at));
+}
+
+/** A CUTAWAY (SPEC-creator-cut.md): the proof taking the frame for a beat.
+ *  Either a library mock the storyboard cut in with enter {effect:"cut"}
+ *  (the default -- motion graphics performing the claim) or a provided
+ *  image/clip laid full-bleed. It rides over the person and every graphic
+ *  on them, under the stage overlays; the band layout never re-slots it,
+ *  the phone-reel rules never drop it as furniture, and it is not zoomed. */
+function isCutaway(c: { type: string; position?: any; enter?: any }): boolean {
+  var e = c.enter;
+  var eff = typeof e === "string" ? e : (e && typeof e === "object" ? String(e.effect || "") : "");
+  if (eff === "cut") return true;
   if (c.type !== "image" && c.type !== "video") return false;
   var p = c.position;
   return !!p && typeof p === "object" && String(p.x) === "0%" && String(p.y) === "0%" && String(p.width) === "100%" && String(p.height) === "100%";
@@ -493,7 +598,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     var t = c.type;
     if (STAGE_OVERLAY_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: { ...FULL_STAGE }, z_index: 45 };
-    } else if (isFullBleedMedia(c as any)) {
+    } else if (isCutaway(c as any)) {
       slots[i] = { position: { ...FULL_STAGE }, z_index: 36 };
     } else if (ACCENT_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: ACCENT_SPOTS[Math.min(accentCount, ACCENT_SPOTS.length - 1)], z_index: 40 + accentCount };
@@ -783,7 +888,7 @@ export function buildAuthoredCompositionScene(
         console.log(`    progress-bar: no phone form on a speaker reel -- dropped`);
         return [];
       }
-      if (PHONE_REEL_MOCK_RE.test(c.type)) {
+      if (PHONE_REEL_MOCK_RE.test(c.type) && !isCutaway(c as any)) {
         console.log(`    ${c.type}: an app mock has no phone form on a speaker reel (the person carries it) -- dropped`);
         return [];
       }
@@ -882,7 +987,7 @@ export function buildAuthoredCompositionScene(
     // 390px phone). The wrapper is zoomed 1.8x -- every mock, stamp and
     // pill alike -- unless the board set the component's own scale.
     if (speakerBase && tallFrame && !isTakeover) {
-      if (phoneZoomable(c.type) && data.scale === undefined) zoom = PHONE_ZOOM;
+      if (phoneZoomable(c.type) && data.scale === undefined && !isCutaway(c as any)) zoom = PHONE_ZOOM;
       // A text-list is a desktop slide block (100px padding, 44px title,
       // unplated). Over a phone selfie its items become ONE plated caption
       // phrase (measured: "Running now / Email Social Web" was tiny dark
@@ -961,16 +1066,20 @@ export function buildAuthoredCompositionScene(
     // desktop guesses and the bands are the only thing keeping content off
     // the face (measured: the board's composer grew to 26% and sat on the
     // list under it). A takeover's full-bleed position still stands.
-    if (hasAuthoredPos && speakerBase && tallFrame && !isTakeover && lay && STAGE_OVERLAY_TYPES.indexOf(c.type) === -1 && !isFullBleedMedia(c as any)) {
+    if (hasAuthoredPos && speakerBase && tallFrame && !isTakeover && lay && STAGE_OVERLAY_TYPES.indexOf(c.type) === -1 && !isCutaway(c as any)) {
       console.log(`    ${c.type}: tall speaker frame -- the band layout wins over the board's position (${JSON.stringify(authoredPos)})`);
       hasAuthoredPos = false;
     }
     if (hasAuthoredPos && JSON.stringify(authoredPos) !== JSON.stringify(lay.position)) {
       console.log(`    ${c.type}: honoring the board's own position (${JSON.stringify(authoredPos)}) over the ${c.type} layout slot`);
     }
+    // A cutaway on a tall frame is framed on the region it performs in.
+    var frameAnchor = tallFrame && isCutaway(c as any) ? frameAnchorFor(c.type, data) : null;
+    if (frameAnchor) console.log(`    ${c.type}: a cutaway on a tall frame -- framed on its "${frameAnchor}" region`);
     components.push({
       id, type: c.type, data, position: hasAuthoredPos ? authoredPos : lay.position, z_index: lay.z_index,
       ...(zoom ? { zoom } : {}),
+      ...(frameAnchor ? { frame_anchor: frameAnchor } : {}),
       // Word anchors ride along: the numbers in data are their resolved
       // values, and a take arriving later re-resolves them in place.
       ...((c as any).anchors ? { anchors: (c as any).anchors } : {}),
@@ -985,6 +1094,21 @@ export function buildAuthoredCompositionScene(
       duration_seconds: draft.transition_in.duration_seconds || 0.5,
     };
   }
+  // The camera: the storyboard's own moves, else creator-cut's rule.
+  var cameraMoves: any[] | undefined = (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined;
+  if (!cameraMoves) {
+    var autoCam = creatorCutCameraMoves(components as any, {
+      grammar: (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar,
+      motion: (opts.treatment as any)?.visualSystem?.motion,
+      face: (draft as any).take_face,
+      duration: draft.duration_seconds || 8,
+      takeover: isTakeover,
+    });
+    if (autoCam && autoCam.length) {
+      cameraMoves = autoCam;
+      console.log(`    camera by rule (creator-cut): ${autoCam.map((m: any) => `${m.type}${m.anchor ? "->" + m.anchor : m.scale ? " x" + m.scale : ""}@${m.at}s`).join(", ")}`);
+    }
+  }
   var scene: Scene = {
     ...((draft as any).spine ? { spine: (draft as any).spine } : {}),
     id: sceneId,
@@ -993,7 +1117,7 @@ export function buildAuthoredCompositionScene(
     transition_in: acTransition,
     background: w ? worldBackground(w) : "#0c0d12",
     beats: Array.isArray(draft.beats) && draft.beats.length >= 2 ? (draft.beats as any) : undefined,
-    camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
+    camera_moves: cameraMoves,
     components,
     audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
   } as any;

@@ -137,6 +137,29 @@ export function proofComponents(scene: StoryboardScene): Array<Record<string, un
   return out;
 }
 
+function anchorWord(v: unknown): string | null {
+  if (typeof v === "string") { const m = v.trim().match(/^@(\S+)/); return m ? m[1].toLowerCase() : null; }
+  if (v && typeof v === "object" && typeof (v as any).word === "string") return String((v as any).word).toLowerCase();
+  return null;
+}
+
+/** The mock the storyboard cut in on the same word as a provided proof
+ *  (the default proof, motion graphics performing the claim) gives way to
+ *  the real screen: returns the components with that cut window removed.
+ *  A proof with no word replaces nothing -- it is added on top. */
+export function replaceCutWindow(components: unknown[], at: unknown): unknown[] {
+  const word = anchorWord(at);
+  if (!word) return components;
+  return (components || []).filter((c: any) => {
+    if (!c || typeof c !== "object") return true;
+    const e = c.enter;
+    const eff = typeof e === "string" ? e : (e && typeof e === "object" ? e.effect : "");
+    if (eff !== "cut") return true;
+    const w = anchorWord(e && typeof e === "object" ? e.at : undefined) || anchorWord(c.anchors?.["enter.at"]);
+    return w !== word;
+  });
+}
+
 /** Does the scene already show this file? (A rebuild must not stack a
  *  second copy.) */
 export function hasProofFor(components: unknown[], src: string): boolean {

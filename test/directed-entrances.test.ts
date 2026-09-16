@@ -123,8 +123,9 @@ describe("the storyboard can reach the choreography", () => {
     const src = await read("../src/llm/storyboard-builder.ts");
     const at = src.indexOf("components: {");
     const schema = src.slice(at, at + 2600);
-    expect(schema).toMatch(/enter: \{ type: "string"/);
-    expect(schema).toMatch(/exit: \{ type: "string"/);
+    // A bare effect string, or {effect, at} so the entrance can land on a word.
+    expect(schema).toMatch(/enter: \{ anyOf: \[\{ type: "string" \}, \{ type: "object"/);
+    expect(schema).toMatch(/exit: \{ anyOf: \[\{ type: "string" \}, \{ type: "object"/);
     expect(schema).toMatch(/slide-left \| slide-right \| slide-up \| slide-down/);
   });
 

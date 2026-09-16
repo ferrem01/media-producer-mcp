@@ -158,6 +158,27 @@ side by side with the references.
 
 ## Decisions (2026-09-16)
 
+- **Motion graphics are the default proof** (after the first live board,
+  which asked for seven screen recordings and cut to nothing): the writer
+  casts the library mock that performs the claim as the cutaway, cut in
+  on a word and out on a word (`enter: {effect: "cut", at: "@word"}` on the
+  component -- the wrapper's own clock takes word anchors now). The film
+  has its cuts on the first build with nothing supplied. A real screenshot
+  or recording is an optional need on `assets[]`; a provided file replaces
+  the mock in that window. Never a recording where a still would do.
+- **The camera moves by rule.** A creator-cut claim with no authored moves
+  gets a punch-in on the claim aimed at the face, the camera rests on each
+  cutaway and returns to the person on its exit (and a pull-back on the
+  turn when the claim is long enough); calm motion gets a slow push. The
+  writer may still author its own.
+- **A cutaway mock on a tall frame is framed on its region** (`frame_anchor`
+  on the component; the wrapper scales and shifts at the cut so the rows
+  and labels read on a phone, the way the references crop a desktop screen
+  to the part being talked about). The camera cannot do this: it fits a
+  region, never crops one.
+- **The voice never stops.** The take is the base of every scene and its
+  audio runs first word to last; a cutaway, a card, an overlay are only
+  what is on screen for a window between two words.
 - Cutaways are the way proof comes in; cards only when the brief asks.
 - No standing header; a chapter label is a graphic on its claim.
 - A CTA or sponsor line only when the brief asks.

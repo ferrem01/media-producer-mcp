@@ -175,6 +175,11 @@ export interface SceneComponent {
   pose?: ComponentPose;
   enter?: ComponentAnimation;
   exit?: ComponentAnimation;
+  /** A cutaway on a tall frame is FRAMED on one of its own [data-anchor]
+   *  regions: the wrapper is scaled and shifted so that region fills the
+   *  width (a desktop mock at full frame on a phone fills the top quarter
+   *  and leaves the rest empty). The name of that region. */
+  frame_anchor?: string;
 }
 
 // ── Scenes ──
