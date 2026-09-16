@@ -32,7 +32,9 @@ describe("tall speaker bands around the person", () => {
   });
 
   it("chest-up kitchen face: lower band under the chin, top band above the hair, room both sides", () => {
-    const b = tallSpeakerBands(KITCHEN, 16 / 9);
+    // punchIn 1: the frame's own geometry (what the pinned caption lane uses). The default
+    // (1.3) cuts every band and slot to the window the camera's punch-in still shows -- see below.
+    const b = tallSpeakerBands(KITCHEN, 16 / 9, 1);
     const chin = KITCHEN.cy + KITCHEN.size * 0.45;          // ~0.66
     expect(b.lower).not.toBeNull();
     expect(b.lower!.top).toBeGreaterThanOrEqual(chin);
@@ -48,11 +50,27 @@ describe("tall speaker bands around the person", () => {
   });
 
   it("low camera, face at 61%: no lower band (the chin is at 79%), the top band takes everything, one side only", () => {
-    const b = tallSpeakerBands(BED, 16 / 9);
+    const b = tallSpeakerBands(BED, 16 / 9, 1);
     expect(b.lower).toBeNull();
     expect(b.top).toEqual({ top: 0.13, bottom: 0.32 });
     expect(b.sides.length).toBe(2);
     expect(b.sides.every((sp) => sp.x === 0.05)).toBe(true); // the left has room; the right does not: both rows stack there
     expect(b.sides[1].y).toBeCloseTo(b.sides[0].y + 0.13, 3);
+  });
+
+  it("under the punch-in (the default, 1.3x on the face) every band and slot stays inside the window the zoom shows", () => {
+    // Measured live (proj_f10e79cf): a slot at the frame's edge left the frame under the zoom.
+    const z = tallSpeakerBands(BED, 16 / 9);
+    const win = 1 / 1.3;
+    const vx0 = Math.max(0, Math.min(1 - win, BED.cx - win / 2)), vy0 = Math.max(0, Math.min(1 - win, BED.cy - win / 2));
+    expect(z.edges.left).toBeCloseTo(Math.max(0.05, vx0 + 0.03), 3);
+    expect(z.edges.right).toBeCloseTo(Math.min(0.95, vx0 + win - 0.03), 3);
+    expect(z.top!.top).toBeCloseTo(Math.max(0.13, vy0 + 0.02), 3);
+    for (const sp of z.sides) {
+      expect(sp.x).toBeGreaterThanOrEqual(z.edges.left - 0.001);
+      expect(sp.x + sp.width).toBeLessThanOrEqual(z.edges.right + 0.001);
+    }
+    // This face is too wide for a side slot inside the window: the corner fallback takes over in the layout.
+    expect(z.sides.length).toBe(0);
   });
 });
