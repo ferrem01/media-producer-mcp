@@ -2935,3 +2935,27 @@ source at the cut (a Record-all board is one file windowed per scene, so
 it never reloads), and every film<->source mapping goes through
 `speakerSourceTime` / `speakerFilmTime` of the ACTIVE clip, the clock
 included. Speaker-video detection matches any clip, not just the first.
+
+## Every Studio lane follows the scene
+
+After #773 the camera played per scene, but the timeline still read the
+FIRST clip for everything else: the transcript lane showed take one's
+words only, the waveform was take one's, the scene stills for scenes 2 and
+3 were blank (the still seeked take one to the scene's film start), the
+speaker lane drew no pieces (its piece editor is the single-recording
+model), and a storyboard "zoom" chip sat on a scene where the camera is
+the picture. Marc, rightly: "what a mess".
+
+`core/speaker-lane.ts` lays a per-scene track on the film clock:
+`laneClips` (each take at its scene's film start with its window),
+`laneWords` (each take's cached words, windowed and shifted -- the same
+words the spine used), `lanePeaks` (each take's peaks cut to its window,
+silence between). The transcript and waveform routes use them when the
+track is per-scene; a continuous track keeps its path. The scene-still
+route passes the scene's own clip and trim. Studio draws one piece per
+take on the speaker lane (click to jump), and reads a per-scene
+transcript as film time instead of shifting it by the first clip's trim.
+
+Over-camera scenes lose their storyboard camera moves in the takeover
+recipe: the stage camera rides the overlay only, so a zoom there moves the
+graphics and not the person -- a chip that visibly does nothing.

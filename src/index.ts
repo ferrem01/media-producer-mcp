@@ -27,6 +27,8 @@ import { detectFace } from "./core/face-band.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-track.js";
+import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
+import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
@@ -1300,13 +1302,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         }
         try {
           const components = await resolveComponentSources(scene, tenantId, projectId);
+          const thIdx = project.scenes.findIndex((s0) => s0.id === scene.id);
+          const thRef = speakerClipForScene(project.speaker_track?.clips, project.scenes, thIdx);
           const { file, etag } = await getSceneThumbnail({
             project,
             scene,
             tenantId,
             projectId,
             components,
-            speakerUrl: getSpeakerUrl(project),
+            speakerUrl: thRef ? speakerUrlFromSource(thRef.source) : (project.speaker_track?.clips?.some((c0) => c0.scene_index !== undefined) ? undefined : getSpeakerUrl(project)),
+            speakerOffset: thRef ? thRef.offset : undefined,
             dataDir: config.dataDir,
             gsapDir: config.gsapDir,
             componentLibDir: config.componentLibDir,
@@ -3154,6 +3159,25 @@ Rules:
         const [, tenantId, projectId] = waveMatch.map(decodeURIComponent);
         const project = await loadProject(tenantId, projectId);
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        // Per-scene takes: every clip's peaks, cut to its window, on the
+        // film's clock (one continuous element for the whole film was the
+        // first take only -- measured live, proj_780a33d0).
+        const lane = laneClips(project);
+        if (lane) {
+          try {
+            const total = (project.scenes || []).reduce((a, sc) => a + (sc.duration_seconds || 0), 0);
+            const bySrc: Record<string, { peaks: number[]; bucketsPerSecond: number } | null> = {};
+            for (const c of lane) {
+              if (bySrc[c.source] !== undefined) continue;
+              const cd = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs", `take-${path.basename(c.source).replace(/[^a-zA-Z0-9._-]/g, "_")}`);
+              try { bySrc[c.source] = await getWaveformPeaks(resolveVideoPath(c.source), cd); } catch { bySrc[c.source] = null; }
+            }
+            jsonResponse(res, 200, { ok: true, buckets_per_second: 6, peaks: lanePeaks(lane, bySrc, total, 6), per_scene: true });
+          } catch (err: any) {
+            jsonResponse(res, 500, { error: `Waveform extraction failed: ${err?.message || err}` });
+          }
+          return;
+        }
         // Speaker recording first; generated voiceover tracks as fallback.
         const spSrc = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
         const voTrack = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
@@ -3183,6 +3207,23 @@ Rules:
         // was maintained by older, buggier shift code).
         if (new URL(req.url || "/", "http://localhost").searchParams.get("fresh") === "1") {
           try { await fs.unlink(path.join(config.dataDir, tenantId, "projects", projectId, "thumbs", "transcript.json")); } catch { /* none */ }
+        }
+        // Per-scene takes: each take's words (cached per take, the same
+        // words the spine used), on the film's clock.
+        const lane2 = laneClips(project);
+        if (lane2) {
+          try {
+            const bySrc2: Record<string, Array<{ text: string; start: number; end: number }> | null> = {};
+            for (const c of lane2) {
+              if (bySrc2[c.source] !== undefined) continue;
+              try { bySrc2[c.source] = await wordsForTake(project, { id: "lane", scene_index: c.scene_index, source: c.source, recorded_at: "", trim_start: c.trim_start, trim_end: c.trim_end ?? undefined } as any, config.dataDir); }
+              catch { bySrc2[c.source] = null; }
+            }
+            jsonResponse(res, 200, { ok: true, available: true, segments: laneWords(lane2, bySrc2), per_scene: true });
+          } catch (err: any) {
+            jsonResponse(res, 500, { error: `Transcription failed: ${err?.message || err}` });
+          }
+          return;
         }
         const spSrc2 = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
         const voTrack2 = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
