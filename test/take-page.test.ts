@@ -34,6 +34,12 @@ describe("the take page's client script", () => {
 describe("what the booth does", () => {
   const html = getTakeHtml();
 
+  it("puts the prompter at the top of the stage, by the lens (Marc: eyes looking down in every take)", () => {
+    const html = getTakeHtml();
+    expect(html).toMatch(/#prompt \{ position:absolute; left:0; right:0; top: calc\(64px \+ env\(safe-area-inset-top\)\)/);
+    expect(html).not.toMatch(/#prompt \{[^}]*bottom:/);
+  });
+
   it("cues the prompter by line: a (pause) line is a held beat shown as •••, a line break a breath", () => {
     const js = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
     expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\[\.,!\?\]\*\$\/i/);

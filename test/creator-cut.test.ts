@@ -177,7 +177,7 @@ describe("proof on the board: the needs a claim asks for", () => {
     // as desktop furniture on a phone reel.
     const gen = await read("../src/llm/scene-generator.ts");
     expect(gen).toMatch(/function isCutaway/);
-    expect(gen).toMatch(/isCutaway\(c as any\)\) \{\s*slots\[i\] = \{ position: \{ \.\.\.FULL_STAGE \}, z_index: 36 \}/);
+    expect(gen).toMatch(/isCutaway\(c as any\)\) \{[\s\S]*?slots\[i\] = \{ position: \{ \.\.\.FULL_STAGE \}, z_index: isProofSurface\(t\) \? 36 : 39 \}/);
     expect(gen).toMatch(/PHONE_REEL_MOCK_RE\.test\(c\.type\) && !isCutaway\(c as any\)/);
     expect(gen).toMatch(/data\.scale === undefined && !isCutaway\(c as any\)\) zoom = PHONE_ZOOM/);
     expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"video", "image"\]/);
@@ -216,7 +216,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
 
   it("build defaults cover a writer miss: an un-cut mock becomes the cutaway, an empty scene gets its label", async () => {
     const pipeline = await read("../src/llm/pipeline.ts");
-    expect(pipeline).toMatch(/const CUTAWAY_MOCK_RE = /);
+    expect(pipeline).toMatch(/isProofSurface\(c\.type\) && c\.enter === undefined && c\.data\?\.enter === undefined/);
     expect(pipeline).toMatch(/c\.enter = \{ effect: "cut", at: Math\.round\(dur \* 0\.3 \* 100\) \/ 100 \};/);
     expect(pipeline).toMatch(/if \(c\.exit === undefined\) c\.exit = \{ effect: "cut", at: Math\.round\(dur \* 0\.8 \* 100\) \/ 100 \};/);
     expect(pipeline).toMatch(/the chapter label "\$\{label\}" is cast from the scene's name/);
@@ -229,6 +229,39 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     // The director says a tutorial has no bed.
     const cd = await read("../src/llm/creative-director.ts");
     expect(cd).toMatch(/audioSystem\.music_mood "none" for a tutorial/);
+  });
+
+  it("a cut-in proof is plated and framed, a cut-in label rides above it, and the film ends on the person", async () => {
+    const { isProofSurface, PROOF_SURFACE_RE } = await import("../src/core/asset-needs.js");
+    expect(isProofSurface("quotient-campaign")).toBe(true);
+    expect(isProofSurface("email-compose")).toBe(true);
+    expect(isProofSurface("image")).toBe(true);
+    expect(isProofSurface("kinetic-text")).toBe(false);
+    expect(isProofSurface("sticker-prop")).toBe(false);
+    expect(PROOF_SURFACE_RE.test("image-showcase")).toBe(false);
+    // The assembler plates a cut-in proof (the mocks draw a floating window with margins; the camera showed through).
+    const asm = await read("../src/core/scene-assembler.ts");
+    expect(asm).toMatch(/function isCutInProof\(comp/);
+    expect(asm).toMatch(/isCutInProof\(comp\) \? "background:#fff;" : ""/);
+    // ...and frames at about 1.5x, region high (Marc: 2.2x was too big for the vertical screen).
+    expect(asm).toMatch(/var sc = Math\.max\(1\.2, Math\.min\(2\.2, \(CW \* 0\.94 \/ r\.w\) \* 1\.5\)\);/);
+    // The generator lays a cut-in label above the proof and frames only proof surfaces.
+    const gen = await read("../src/llm/scene-generator.ts");
+    expect(gen).toMatch(/z_index: isProofSurface\(t\) \? 36 : 39/);
+    expect(gen).toMatch(/isCutaway\(c as any\) && isProofSurface\(c\.type\) \? frameAnchorFor/);
+    // The camera rule never emits the same move twice (a label and a mock cut in on one word did).
+    const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
+    const twice: any[] = [
+      { id: "kinetic-text", type: "kinetic-text", data: {}, enter: { effect: "cut", at: 1.2 }, exit: { effect: "cut", at: 3.4 } },
+      { id: "quotient-campaign", type: "quotient-campaign", data: {}, enter: { effect: "cut", at: 1.2 }, exit: { effect: "cut", at: 3.4 } },
+    ];
+    const moves = creatorCutCameraMoves(twice, { grammar: "creator-cut", motion: "punchy", duration: 6, takeover: false })!;
+    expect(moves.map((m) => `${m.at}|${m.type}`)).toEqual(["0.2|zoom", "1.2|reset", "3.4|zoom", "4.9|reset"]);
+    // The pipeline: the last claim's proof cuts out 1.5s before the end; a cut with no time lands at 30%.
+    const pipeline = await read("../src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/the film ends on the person: \$\{c\.type\} cuts out at \$\{back\}s/);
+    expect(pipeline).toMatch(/\(c\.enter\.at === undefined \|\| c\.enter\.at === null\)\) \{\s*c\.enter\.at = Math\.round\(dur \* 0\.3 \* 100\) \/ 100;/);
+    expect(pipeline).not.toMatch(/CUTAWAY_MOCK_RE/);
   });
 
   it("a standing header becomes chapter labels, and a cut whose word is not in the lines gets the default window", async () => {
@@ -348,7 +381,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(frameAnchorFor("image", {}, anchorsOf)).toBeNull();
     // The generator stamps it on tall-frame cutaways; the assembler frames the wrapper at mount.
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/var frameAnchor = tallFrame && isCutaway\(c as any\) \? frameAnchorFor\(c\.type, data\) : null;/);
+    expect(gen).toMatch(/var frameAnchor = tallFrame && isCutaway\(c as any\) && isProofSurface\(c\.type\) \? frameAnchorFor\(c\.type, data\) : null;/);
     expect(gen).toMatch(/\.\.\.\(frameAnchor \? \{ frame_anchor: frameAnchor \} : \{\}\)/);
     const asm = await read("../src/core/scene-assembler.ts");
     expect(asm).toMatch(/frame: \(c as any\)\.frame_anchor \|\| null,/);

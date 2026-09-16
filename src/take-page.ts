@@ -64,7 +64,7 @@ export function getTakeHtml(): string {
   #stage { position:relative; background:#000; }
   #live { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
   #cap { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
-  #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 55%, rgba(0,0,0,.75) 100%); pointer-events:none; }
+  #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 26%, rgba(0,0,0,0) 42%, rgba(0,0,0,0) 70%, rgba(0,0,0,.6) 100%); pointer-events:none; }
   #top { position:absolute; left:0; right:0; top:0; padding: calc(12px + env(safe-area-inset-top)) 16px 0; display:flex; align-items:center; gap:10px; }
   #timer { font-variant-numeric:tabular-nums; font-weight:600; font-size:15px; }
   #timer.rec::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--err); margin-right:8px; animation:blink 1s infinite; }
@@ -75,7 +75,9 @@ export function getTakeHtml(): string {
   #silent { position:absolute; left:16px; right:16px; top: calc(44px + env(safe-area-inset-top)); font-size:13px; color:#fff; background:rgba(239,68,68,.9);
     padding:8px 12px; border-radius:10px; display:none; }
   #count { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:140px; font-weight:700; color:#fff; text-shadow:0 8px 40px rgba(0,0,0,.6); }
-  #prompt { position:absolute; left:0; right:0; bottom: calc(96px + env(safe-area-inset-bottom)); padding:0 22px; text-align:center; }
+  /* The prompter sits at the TOP, under the timer, next to the lens: read
+     from the bottom, the eyes look down in every take (Marc). */
+  #prompt { position:absolute; left:0; right:0; top: calc(64px + env(safe-area-inset-top)); padding:0 22px; text-align:center; }
   #cue { font-size:30px; line-height:1.28; font-weight:600; color:#fff; text-shadow:0 2px 14px rgba(0,0,0,.7); text-wrap:balance; }
   #next { margin-top:10px; font-size:17px; line-height:1.3; color:rgba(255,255,255,.55); text-shadow:0 2px 10px rgba(0,0,0,.6); }
   #bar { position:absolute; left:0; right:0; bottom: calc(86px + env(safe-area-inset-bottom)); height:3px; background:rgba(255,255,255,.18); }

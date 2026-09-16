@@ -15,6 +15,16 @@
 
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { resolveComponentTags, transformComponentTagData, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
+import { isProofSurface } from "./asset-needs.js";
+
+/** A proof surface the storyboard cut in (SPEC-creator-cut.md): plated
+ *  opaque, so a mock drawn as a floating window with margins never shows
+ *  the camera through its corners (measured live on the first rendered ad). */
+function isCutInProof(comp: { type: string; enter?: any }): boolean {
+  const e = comp.enter;
+  const eff = typeof e === "string" ? e : (e && typeof e === "object" ? e.effect : "");
+  return eff === "cut" && isProofSurface(comp.type);
+}
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
@@ -218,7 +228,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""} style="${posStyle}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "background:#fff;" : ""}">\n` +
       `    ${boundHtml}\n` +
       `  </div>`
     );
@@ -697,10 +707,13 @@ export function wrapperChoreoScript(
       // from its LEFT edge and its TOP (where a screen's content starts --
       // measured: centring cropped the task names off the left); one that
       // fits is centred.
-      var sc = Math.max(1.5, Math.min(2.8, (CW * 0.94 / r.w) * 2.2));
+      // About one and a half columns' worth (Marc, on 2.2: "too big for the
+      // vertical screen"): the text reads on a phone and more of the screen
+      // shows. Region high in the frame when it overflows.
+      var sc = Math.max(1.2, Math.min(2.2, (CW * 0.94 / r.w) * 1.5));
       var pad = 24;
       var tx = r.w * sc <= CW ? CW / 2 - (r.x + r.w / 2) * sc : pad - r.x * sc;
-      var ty = r.h * sc <= CH * 0.8 ? CH * 0.42 - (r.y + r.h / 2) * sc : CH * 0.12 - r.y * sc;
+      var ty = r.h * sc <= CH * 0.8 ? CH * 0.4 - (r.y + r.h / 2) * sc : CH * 0.08 - r.y * sc;
       tx = Math.max(CW - W * sc, Math.min(0, tx));
       ty = Math.max(CH - H * sc, Math.min(0, ty));
       return { scale: sc, x: tx, y: ty };
