@@ -10,6 +10,7 @@ import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Project, OutputFormat, Canvas, BrandKit, Scene, Storyboard, StoryboardScene } from "../core/types.js";
 import { ensureSpeakerNeeds } from "../core/take-needs.js";
+import { ensureEvidenceNeeds } from "../core/evidence-needs.js";
 import { type Frame, FRAME_SPECS, frameFromDims } from "../core/types.js";
 import {
   projectsDir,
@@ -140,7 +141,7 @@ export function migrateProject(p: any): Project {
   }
   // A speaker board always carries its take needs (idempotent; boards saved
   // before needs existed get them on first load).
-  if (p && p.storyboard) ensureSpeakerNeeds(p as Project);
+  if (p && p.storyboard) { ensureSpeakerNeeds(p as Project); ensureEvidenceNeeds(p as Project); }
   return p as Project;
 }
 

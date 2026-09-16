@@ -14,8 +14,9 @@ import type { Treatment } from "./creative-director.js";
 import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
 import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";
 import { getStorytellingGuide } from "./design-skills.js";
-import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat, SceneEvidence, AssetRequirement } from "../core/types.js";
 import { normalizeBeats, beatsVoiceover } from "../core/beats.js";
+import { normalizeEvidence } from "../core/evidence-needs.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -98,7 +99,23 @@ const SCENE_TOOL_SCHEMA = {
       description: "How this scene transitions in from the previous one",
     },
     voiceover_text: { type: "string", description: "Scene narration (concatenation of beat narration when the scene has beats)" },
-    transparent_background: { type: "boolean", description: "SPEAKER FILMS ONLY. false = this scene is a TAKEOVER: it covers the camera and the product surface owns the whole frame. Omit (or true) = the speaker stays visible and content docks beside her." },
+    transparent_background: { type: "boolean", description: "SPEAKER and CREATOR-CUT FILMS ONLY. false = this scene is a TAKEOVER: it covers the camera and the product surface owns the whole frame. Omit (or true) = the speaker stays visible and content docks beside her." },
+    evidence: {
+      type: "array",
+      description: "CREATOR-CUT FILMS ONLY. The proof the screen shows while this claim is said, one entry per beat: {kind, description, use?, at?, until?, focus?}. kind: screenshot | screen_recording (the human supplies these through the board) | stock_footage | mockup (the build can make). description: what it shows, specific enough to go and find it. use: cutaway (default -- takes the frame, hard cut in/out) | card (floats over the person; only when the brief asks). at/until: word anchors into voiceover_text (\"@dashboard\"). focus: where the eye should go on it, in words.",
+      items: {
+        type: "object",
+        properties: {
+          kind: { type: "string", description: "screenshot | screen_recording | stock_footage | mockup" },
+          description: { type: "string" },
+          use: { type: "string", description: "cutaway | card" },
+          at: { type: "string", description: "word anchor, e.g. \"@dashboard\"" },
+          until: { type: "string", description: "word anchor the proof leaves on" },
+          focus: { type: "string", description: "where the eye should go on it, in words" },
+        },
+        required: ["kind", "description"],
+      },
+    },
     broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image/gen_video)" },
     hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query/gen_video)" },
     gen_video: { type: "string", description: "AI-generated video clip prompt -- ONLY for moving shots stock footage cannot plausibly contain (mutually exclusive with broll_query/hero_image)" },
@@ -178,6 +195,13 @@ export function normalizeSceneShape(scene: any, validTypes?: Set<string>): strin
     const cam = sanitizeCameraMoves(scene.camera_moves, Number(scene.duration_seconds) || 10);
     for (const n of cam.notes) notes.push(n);
     scene.camera_moves = cam.moves;
+  }
+  // Declared evidence (creator-cut): known kinds with a real description
+  // survive; the board turns them into needs (core/evidence-needs.ts).
+  if (scene.evidence !== undefined) {
+    const ev = normalizeEvidence(scene.evidence);
+    if (Array.isArray(scene.evidence) && ev.length < scene.evidence.length) notes.push(`dropped ${scene.evidence.length - ev.length} evidence entr${scene.evidence.length - ev.length === 1 ? "y" : "ies"} with no known kind or no description`);
+    if (ev.length) scene.evidence = ev; else delete scene.evidence;
   }
   if (!scene.components || !Array.isArray(scene.components)) scene.components = [];
   // Normalize entries to string | {type, data}. Authored data (especially
@@ -296,6 +320,10 @@ export interface DraftScene {
   /** The scene's internal beat timeline: one persistent world, several thoughts.
    *  Normalized (bars -> seconds, rescaled to fill the scene) after parsing. */
   beats?: SceneBeat[];
+  /** The proof each claim wants on screen (creator-cut, SPEC-creator-cut.md). */
+  evidence?: SceneEvidence[];
+  /** Needs on a hydrated board scene (build-from-board carries them through). */
+  assets?: AssetRequirement[];
 }
 
 export interface StoryboardResult {
@@ -368,7 +396,10 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
     !opts.filmGrammar ||
     opts.filmGrammar === g ||
     // hype-cut genuinely inherits tempo-cut's edit, and its contract says so.
-    (opts.filmGrammar === "hype-cut" && g === "tempo-cut");
+    (opts.filmGrammar === "hype-cut" && g === "tempo-cut") ||
+    // creator-cut inherits speaker's spine (the person, the voice clock, the
+    // script in voiceover_text, word anchors) and states where its edit departs.
+    (opts.filmGrammar === "creator-cut" && g === "speaker");
 
   var systemPrompt = `You are a creative director storyboarding a ${opts.format} project.
 
@@ -554,6 +585,17 @@ A person on camera carries the argument. The camera is the base layer of every s
 - NO DUPLICATE TEXT: on-screen type never repeats what is being said; it ADDS (a number, a name, a step).
 - MUSIC: absent, or a bed ducked far under the voice. The voice is always the loudest thing.
 - ON A TALL FRAME (9x16 Reel): ONE graphic per beat, BIG -- it fills a band above or below the face and is read on a phone in a glance. The graphic is a PERFORMED WORD OR NUMBER: a 2-4 word slam of what she just said (never the sentence), a stamp (a word, a number, a "?"), a few short words that drift, the sentence typing itself, ONE number, a plated phrase. NEVER a dashboard, a progress rail, a notification list, a browser window, a timeline, a grid or any app mock: desktop furniture reads as grey lines on a phone. Each graphic ENTERS on its word and LEAVES when the speaker moves on; the frame is never crowded.
+` : ""}
+${__g("creator-cut") ? `### CREATOR-CUT FILMS (${opts.filmGrammar === "creator-cut" ? "ACTIVE for this film" : 'when the director\'s treatment names "creator-cut"'})
+A person explains and the SCREEN PROVES IT. Everything in the SPEAKER contract above holds (the camera is the base, the voice is the clock, the script lives in voiceover_text, times are word anchors) -- but the edit is BUSY where speaker's is clean, and these laws replace speaker's "one graphic per beat" and "nothing covers the person":
+- ONE CLAIM PER SCENE: each scene is one thing the person asserts; its beats are what the screen shows WHILE it is said. The film cuts back to the person between every piece of proof -- never a beat with nothing on screen but the person for more than one sentence.
+- THE SCREEN PROVES EVERY CLAIM: each beat NAMES ITS EVIDENCE in the scene's "evidence" array -- {kind: screenshot | screen_recording | stock_footage | mockup, description: what it shows (specific enough to go and find it), use: cutaway (default) | card, at: "@word" it enters on, until: "@word" it leaves on, focus: where the eye should go on it}. The human supplies screenshots and recordings through the board; b-roll and mocks the build can make. A CUTAWAY takes the whole frame for the beat, HARD cut in and out, with a drawn circle or arrow where the eye should go -- the cut is part of the rhythm and breaks up the voice. A CARD (the proof floating over the person on a plate, the person still visible) ONLY when the brief asks for it.
+- NO STANDING HEADER: a chapter label on a claim ("Plugins", "Computer use") is a graphic like any other -- cast when that claim wants one, gone when the claim moves on. A title that holds for the whole film only when the brief asks for it.
+- THE CAMERA MOVES ON THE PERSON: a punch-in on the claim, a pull-back on the turn -- camera_moves aimed at the face, at the cadence the film's motion sets (punchy: several per scene; calm: one).
+- A STICKER NAMES THE THING: an icon beside the head for what is being talked about (a calendar, a cart), phone-scale, one at a time. Seasoning, never the subject.
+- A CTA OR SPONSOR LINE ONLY WHEN ASKED: not part of the grammar. When the brief asks for one, it is a graphic on the final beat and the film holds on it.
+- THE SHAPE: an AD is punchy and about 30s -- 5-8 claims, several cuts per sentence; a TUTORIAL is calm and 60-90s -- 6-10 claims, one cutaway per claim that holds long enough to read. Same grammar; the film's motion and length decide which.
+- SOUND: the voice. A bed only under an ad, ducked far.
 ` : ""}
 ### Writing Great Visual Notes
 Visual notes MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.

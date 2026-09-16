@@ -519,6 +519,10 @@ export interface StoryboardScene {
   duration_seconds: number;
   /** What this scene needs to look great */
   assets: AssetRequirement[];
+  /** The proof each claim wants on screen, per beat (creator-cut). The
+   *  board lists these as needs; `assets[]` entries with `evidence: i`
+   *  carry their status and the provided file. */
+  evidence?: SceneEvidence[];
   /** Visual description for the storyboard */
   visual_notes: string;
   /** Library components the storyboard builder suggested embedding in this
@@ -558,6 +562,33 @@ export interface AssetRequirement {
   generation_prompt?: string;
   /** For recordings: instructions for the user */
   recording_instructions?: string;
+  /** Index into the scene's `evidence[]` when this need was emitted for a
+   *  declared piece of proof (SPEC-creator-cut.md). */
+  evidence?: number;
+}
+
+/** What a scene's `evidence[]` may ask for: the kinds a human supplies
+ *  (a screenshot, a screen recording) and the kinds the build can make
+ *  itself (b-roll, a product mock the library performs). */
+export type SceneEvidenceKind = "screenshot" | "screen_recording" | "stock_footage" | "mockup";
+
+/** One piece of proof a claim wants on screen (SPEC-creator-cut.md). The
+ *  writer declares it per beat; the board turns it into a need with
+ *  Upload; a provided file becomes a cutaway (or a card) on its words. */
+export interface SceneEvidence {
+  kind: SceneEvidenceKind;
+  /** What the proof shows, specific enough to go find it ("the Quotient
+   *  campaign screen with the Metrics tab open"). */
+  description: string;
+  /** cutaway (default): takes the frame for the beat, hard cut in and out.
+   *  card: floats over the person on a plate. */
+  use?: "cutaway" | "card";
+  /** When it enters -- a word anchor ("@dashboard") or scene seconds. */
+  at?: string | number;
+  /** When it leaves -- a word anchor or scene seconds (omit = the claim's end). */
+  until?: string | number;
+  /** Where the eye should go on it, in words ("circle the Publish button"). */
+  focus?: string;
 }
 
 // ── Project ──
