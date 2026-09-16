@@ -263,9 +263,16 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
           position: { x: 0, y: 0, width: "100%", height: "100%" },
           enter: { effect: "cut", at: 1.2 }, exit: { effect: "cut", at: 3.2 },
           data: { to: "sam@acme.com", subject: "Free trial", body: "Two lines." },
+        }, {
+          id: "captions", type: "reel-caption-lane", z_index: 41,
+          position: { x: "5%", y: "70%", width: "90%", height: "12%" },
+          data: { phrases: [{ text: "One *brief*", start: 0, end: 2 }], scrim: "plate" },
         }],
       } as any,
-      components: [{ type: "email-compose", source: mockSrc || '<div class="ec">{{subject}}</div>' }],
+      components: [
+        { type: "email-compose", source: mockSrc || '<div class="ec">{{subject}}</div>' },
+        { type: "reel-caption-lane", source: await read("../src/components/captions/reel-caption-lane.component.html") },
+      ],
       brandKit: { fonts: [] } as any,
       canvas: { width: 1080, height: 1920 } as any,
       gsapDir: path.resolve(__dirname, "../vendor/gsap"),
@@ -274,6 +281,18 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(wrapper).toMatch(/data-mp-cutaway="1"/);
     expect(wrapper).toMatch(/style="[^"]*z-index:36;\s*background:#fff"/);
     expect(wrapper).not.toMatch(/z-index:36background/);
+    // THE WORDS HOLD STILL: the caption lane is pinned to the frame and parked outside the camera rig
+    // (inside it a 1.3x punch-in pushed the chest band to 87%-103% -- measured live, the captions in the platform strip).
+    const laneWrap = html.match(/<div class="mp-component" data-cid="captions"[^>]*>/)?.[0] || "";
+    expect(laneWrap).toMatch(/data-mp-fixed="1"/);
+    expect(laneWrap).not.toMatch(/data-mp-cutaway/);
+    expect(asm).toMatch(/if \(n\.hasAttribute && n\.hasAttribute\('data-mp-fixed'\)\) return;/);
+    // ...hoisted out of the full-frame .mp-camera container first, which the rig adopts whole (measured: the attribute
+    // alone left the lane inside, at 87%-103% under the punch-in).
+    expect(asm).toMatch(/root\.querySelectorAll\('\[data-mp-fixed\]'\)\)\.forEach\(function\(f\) \{\s*if \(f\.parentNode !== root\) root\.appendChild\(f\);/);
+    const composite = await read("../src/core/composite-assembler.ts");
+    expect(composite).toMatch(/isFixedToFrame\(comp\.type\) \? ' data-mp-fixed="1"' : ""/);
+    expect(composite).toMatch(/isCutInProof\(comp\) \? ' data-mp-cutaway="1"' : ""/);
     // ...and frames at about 1.5x, region high (Marc: 2.2x was too big for the vertical screen).
     expect(asm).toMatch(/var sc = Math\.max\(1\.2, Math\.min\(2\.2, \(CW \* 0\.94 \/ r\.w\) \* 1\.5\)\);/);
     // The generator lays a cut-in label above the proof and frames only proof surfaces.
