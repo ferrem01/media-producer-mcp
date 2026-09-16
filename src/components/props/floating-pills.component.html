@@ -58,7 +58,10 @@
       // "Calendar" 51px beyond the box, "Mail" 54px past the frame).
       try {
         var hostW = host.clientWidth, hostH = host.clientHeight;
-        var z = Number(host.style.zoom) || 1;
+        // The zoom may be the host's own (data.scale) or the wrapper's
+        // (the phone zoom): real px over layout units gives either.
+        var hr0 = host.getBoundingClientRect();
+        var z = (hr0.width > 0 && host.offsetWidth > 0) ? hr0.width / host.offsetWidth : (Number(host.style.zoom) || 1);
         // The host's edges are not the frame's: the camera rig bleeds 20px
         // past the canvas on every side, so a full-width box starts at -20
         // (measured: a pill clamped to the host edge still ran 8px off the

@@ -354,7 +354,15 @@ function normalizeAnim(v: unknown): import("../core/types.js").ComponentAnimatio
  *  ON the composition in a corner, small, above everything. */
 var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 /** Fixed-pixel type that needs a multiplier on a tall speaker frame. */
-var PHONE_SCALE_TYPES = ["sticker-prop", "prop-strike", "floating-pills", "composer"];
+// Components that size themselves for the frame already (a font floor, a
+// plated caption that fits its lane, the stage overlay) and must NOT be
+// zoomed on top of that. Everything else gets the phone zoom on a tall
+// speaker frame: a mock, a stamp, a pill set, a composer, a stat.
+var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "video", "image"];
+function phoneZoomable(type: string): boolean {
+  return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
+}
+var PHONE_ZOOM = 1.8;
 /** Smallest pixel font a board may set for type on a tall speaker frame. */
 var PHONE_MIN_FONT_PX = 72;
 /** Full-stage overlays: performers that cover the whole composition. */
@@ -739,7 +747,6 @@ export function buildAuthoredCompositionScene(
   opts: SceneGeneratorOpts,
 ): GeneratedScene {
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (authored composition -- deterministic, no codegen)`);
-  var types = authored.map((c) => c.type);
   // A speaker film's camera recording is the base layer: no world backdrop
   // (an opaque full-bleed component paints over the render's transparent
   // page and buries the speaker -- measured live: proj_11bcf413), and the
@@ -749,6 +756,28 @@ export function buildAuthoredCompositionScene(
   // REPLACES the speaker rather than sitting beside her.
   var isTakeover = speakerBase && (draft as any).transparent_background === false;
   var tallFrame = opts.canvas.height > opts.canvas.width;
+  // PHONE REEL: a person over the camera on a tall frame. Some desktop
+  // components have no phone form at all and the board keeps reaching for
+  // them (measured live, proj_37d090da: a notification-stack as thin grey
+  // lines under the chin, a progress-bar as a tiny percentage rail on
+  // every scene). They are rewritten before the layout sees them.
+  if (speakerBase && tallFrame && !isTakeover) {
+    authored = authored.flatMap((c) => {
+      if (c.type === "progress-bar") {
+        console.log(`    progress-bar: no phone form on a speaker reel -- dropped`);
+        return [];
+      }
+      if (c.type === "notification-stack") {
+        var notes = Array.isArray((c.data as any).notifications) ? ((c.data as any).notifications as any[]) : [];
+        var apps = Array.from(new Set(notes.map((n) => String(n?.app || n?.title || "").trim()).filter(Boolean)));
+        if (!apps.length) apps = ["Slack", "Mail", "Sheets"];
+        console.log(`    notification-stack: on a phone the apps become floating pills (${apps.join(", ")})`);
+        return [{ type: "floating-pills", data: { items: apps.slice(0, 6), ...((c.data as any).at !== undefined ? { at: (c.data as any).at } : {}) }, ...((c as any).anchors ? { anchors: (c as any).anchors } : {}) } as typeof c];
+      }
+      return [c];
+    });
+  }
+  var types = authored.map((c) => c.type);
   var slots = authoredLayout(authored, !!opts.world, tallFrame, speakerBase, isTakeover,
     (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar,
     (draft as any).take_face, opts.canvas.height / Math.max(1, opts.canvas.width));
@@ -826,12 +855,14 @@ export function buildAuthoredCompositionScene(
       return;
     }
     var data: Record<string, unknown> = { ...c.data };
-    // PHONE SCALE: these components size their type in fixed pixels for a
-    // wide frame. On a tall speaker frame the same pixels are unreadable
+    var zoom: number | undefined;
+    // PHONE SCALE: components size their type in fixed pixels for a wide
+    // frame. On a tall speaker frame the same pixels are unreadable
     // (measured: a 17px pill, a 44px strike at 1080 wide, viewed on a
-    // 390px phone). The board's own value wins; otherwise 1.8x.
+    // 390px phone). The wrapper is zoomed 1.8x -- every mock, stamp and
+    // pill alike -- unless the board set the component's own scale.
     if (speakerBase && tallFrame && !isTakeover) {
-      if (PHONE_SCALE_TYPES.indexOf(c.type) !== -1 && data.scale === undefined) data.scale = 1.8;
+      if (phoneZoomable(c.type) && data.scale === undefined) zoom = PHONE_ZOOM;
       // A text-list is a desktop slide block (100px padding, 44px title,
       // unplated). Over a phone selfie its items become ONE plated caption
       // phrase (measured: "Running now / Email Social Web" was tiny dark
@@ -915,6 +946,7 @@ export function buildAuthoredCompositionScene(
     }
     components.push({
       id, type: c.type, data, position: hasAuthoredPos ? authoredPos : lay.position, z_index: lay.z_index,
+      ...(zoom ? { zoom } : {}),
       // Word anchors ride along: the numbers in data are their resolved
       // values, and a take arriving later re-resolves them in place.
       ...((c as any).anchors ? { anchors: (c as any).anchors } : {}),

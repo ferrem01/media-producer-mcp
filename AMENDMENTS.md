@@ -2889,3 +2889,28 @@ surface scene was a takeover. The heuristic now only fires when the film
 has furniture on some scene; otherwise the board's explicit
 `transparent_background: false` is the only way to cover the camera, which
 is what the SPEAKER contract already told the storyboard writer.
+
+## Phone reel graphics: one zoom for every component, no desktop furniture
+
+Marc, on the third run: the animations are "just not very nice". What was
+on screen: a notification stack as thin grey lines under his chin, a
+progress bar as a tiny percentage rail on every scene, a browser window
+too small to read. Two causes.
+
+The phone scale reached four component types through their own
+`data.scale`; every other type rendered at desktop pixels. The scale is now
+a wrapper property (`SceneComponent.zoom`, CSS `zoom` on `.mp-component`):
+percent geometry on an absolutely positioned box resolves against the
+stage even under zoom, so the layout slot holds and only the content
+grows. Every component on a tall speaker frame gets 1.8x, except the ones
+that size themselves (font floors, the caption lane, the stage overlay).
+The pill clamp derives its zoom from real px over layout units so it works
+whichever element carries it.
+
+Some components have no phone form at all. Before the layout, a
+progress-bar on a speaker reel is dropped and a notification-stack becomes
+floating pills of its app names (anchors and `at` carried). The SPEAKER
+contract now tells the storyboard writer what a tall-frame graphic IS (a
+performed word or number, one per beat, entering on its word) and what it
+never is (a dashboard, a rail, a list, a browser, a grid), in principle
+rather than by component name, as the grammar contract requires.
