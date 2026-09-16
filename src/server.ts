@@ -359,25 +359,25 @@ THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterat
 BEFORE GENERATING
 - Ask first: audience, goal/CTA, length, which film grammar fits.
 - FILM GRAMMARS (what carries the argument; pass film_grammar to pin, omit to let the director choose):
-  * launch-film -- few long cinematic scenes, one continuous world.
+  * launch-film -- few long cinematic scenes, one world.
   * tempo-cut -- product-first montage: driving music, bar-quantized cuts, on-screen type IS the voiceover.
   * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats; premise, escalation, payoff. Hook-first ads.
-  * editorial -- typography-first: huge serif statements alternating with full-bleed evidence.
+  * editorial -- typography-first: huge serif statements alternating with full-bleed proof.
   * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene; real figures only.
   * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
   * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
   * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
   * creator-cut -- a person explains, the screen PROVES it: each claim names its evidence (screenshot, recording, b-roll), cut in full-frame and back. The board asks for every piece.
-    Real person (both): take(project_id) -> link the human records on (phone), a job that completes when the take lands.
-  Choose by what carries the argument.
-- FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else -- never changes the grammar. Instagram ad = 9x16 + any grammar.
+    Real person (both): take(project_id) -> a link the human records on (phone); the job completes when the take lands.
+  Choosing: ask what carries the argument.
+- FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else; never changes the grammar. Instagram ad = 9x16 + any grammar.
 - THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper|plain, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
 - Brand comes from the tenant's brand kit. No kit? extract_brand_from_website or upload assets first, or the film is unbranded.
-- A recorded screen demo? The Chrome recorder extension (/extension.zip) captures tab + voice, builds the film.
+- A recorded screen demo? The Chrome recorder extension (/extension.zip) captures tab + voice and builds it.
 
 REAL MEDIA (planned and fetched AUTONOMOUSLY -- steer it with the brief)
-- Per beat the director picks real footage, a generated still, or motion graphics (Pexels, AI stills, Veo: only moving shots stock can't hold; 0-1 per film, ~8s, slow).
-- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk". To FORCE a generated shot, say "generate this shot". Mood-only briefs get motion graphics on UI/data beats, real media on emotional ones.
+- Per beat the director picks real footage, a generated still, or motion graphics (Pexels, AI stills, Veo: only moving shots stock can't hold; 0-1 a film, ~8s, slow).
+- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk". To FORCE a generated shot, say "generate this shot" -- that makes it mandatory. Mood-only briefs: motion graphics on UI/data beats, real media on emotional ones.
 - TALKING HEADS are explicit by design (a synthetic presenter is the human's call). generate_clip = one Veo clip (quote the line). generate_presenter = a whole script (~60s) as consistent takes, ONE stitched clip. Feed either asset_url back as speaker_source: its voice is the soundtrack, scenes cut on its sentences. reference_image keeps the presenter consistent.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
@@ -389,11 +389,11 @@ ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
 EDITING
 - revise = a surgical natural-language change to one scene ("make the headline white"). Use it before regenerating.
 - add/update/reorder/delete = structural edits. regenerate_asset re-runs one generated image.
-- NEVER edit a project while its render runs.
+- NEVER edit a project while its render job runs.
 
 JOBS AND DELIVERY
 - generate and render are async: they return a job_id; poll job{action:'status'} (or wait). Relay progress.
-- When a render completes the job carries download_url (direct MP4) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS; never SSH or server filesystem access.
+- A completed render job carries download_url (direct MP4) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS; never SSH or server filesystem access.
 - Later, get(project_id) / list return rendered, download_url and render_stale (the MP4 predates the latest edits; offer a re-render).
 
 If a scene looks wrong, get{target:'layout'} measures real geometry (boxes, crop math, warnings) -- diagnose before writing a revise.`;
