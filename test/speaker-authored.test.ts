@@ -32,7 +32,11 @@ describe("authored compositions in speaker films", () => {
     // what gates TTS and the speaker grammar default) -- the layout must
     // read the same fact.
     const pl = await read("../src/llm/pipeline.ts");
-    const sites = pl.match(/hasSpeakerTrack: !!opts\.speaker_source \|\| pipelineHasNarration,/g) || [];
+    // ...and on a person grammar the base exists before any take at all
+    // (personBase folds the grammar in; a build before the takes used to get
+    // the generic layout with a world backdrop under every scene).
+    expect(pl).toMatch(/const personBase = !!opts\.speaker_source \|\| pipelineHasNarration \|\| personCarries\(filmGrammar\);/);
+    const sites = pl.match(/hasSpeakerTrack: personBase,/g) || [];
     expect(sites.length).toBeGreaterThanOrEqual(4);
     expect(pl).not.toMatch(/hasSpeakerTrack: !!opts\.speaker_source,/);
   });

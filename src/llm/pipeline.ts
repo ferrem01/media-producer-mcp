@@ -2444,6 +2444,13 @@ async function runUnifiedPipeline(
     ) ? "tempo-cut"
       : (opts.speaker_source || pipelineHasNarration) ? "speaker" : "launch-film");
   console.log(`  Film grammar: ${filmGrammar}`);
+  // THE PERSON IS THE BASE OF EVERY SCENE on a person grammar -- take or no
+  // take ("a recording need not exist yet"). Deciding this from the clips on
+  // file meant a build before the takes got the generic layout: a world
+  // backdrop under every scene (which buries the camera when the take
+  // lands), no bands around the face, no phone-reel rules, app mocks kept
+  // as furniture (measured live, proj_b04fb594 built over the slate).
+  const personBase = !!opts.speaker_source || pipelineHasNarration || personCarries(filmGrammar);
 
   // Assembly policy per grammar: tempo-cut's materials exist as library
   // components (composer, kinetic-text type-on, annotation, product mocks) --
@@ -2581,7 +2588,7 @@ async function runUnifiedPipeline(
       sceneCount,
       creativity,
       tenantId: opts.tenant_id,
-      hasSpeakerTrack: !!opts.speaker_source || pipelineHasNarration,
+      hasSpeakerTrack: personBase,
       referenceImages: processedRefs,
       treatment,
       beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
@@ -3173,7 +3180,7 @@ async function runUnifiedPipeline(
             referenceImages: processedRefs,
             treatment,
             brollVideoUrl: brollUrlMap.get(i),
-            hasSpeakerTrack: !!opts.speaker_source || pipelineHasNarration,
+            hasSpeakerTrack: personBase,
             world,
           });
         } catch (e: any) {
@@ -3198,7 +3205,7 @@ async function runUnifiedPipeline(
             referenceImages: processedRefs,
             treatment,
             brollVideoUrl: brollUrlMap.get(i),
-            hasSpeakerTrack: !!opts.speaker_source || pipelineHasNarration,
+            hasSpeakerTrack: personBase,
           });
         }
         trace?.endEvent({ label: draft.label }, `codegen_scene_${i}`);
@@ -3217,7 +3224,7 @@ async function runUnifiedPipeline(
         if (opts.critique !== false) {
           const critiqueResult = await critiqueAndRetryScene({
             world,
-            overCamera: (!!opts.speaker_source || pipelineHasNarration) && (generated.scene as any).transparent_background !== false,
+            overCamera: personBase && (generated.scene as any).transparent_background !== false,
             scene: generated.scene,
             draft,
             sceneIndex: i,
@@ -3452,7 +3459,7 @@ async function runUnifiedPipeline(
               llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
               tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, treatment,
               brollVideoUrl: brollUrlMap.get(idx),
-            hasSpeakerTrack: !!opts.speaker_source || pipelineHasNarration,
+            hasSpeakerTrack: personBase,
               critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its draft intent. ${fix.detail}`,
             });
             if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
@@ -3465,7 +3472,7 @@ async function runUnifiedPipeline(
             // keeps it cheap (render + gates, no aesthetic re-judging).
             const gated = await critiqueAndRetryScene({
               world: (project as any).world,
-              overCamera: (!!opts.speaker_source || pipelineHasNarration) && (re.scene as any).transparent_background !== false,
+              overCamera: personBase && (re.scene as any).transparent_background !== false,
               scene: re.scene, draft, sceneIndex: idx, totalScenes: project.scenes.length,
               prompt: richPrompt, format, llmConfig: opts.llmConfig, brandKit, canvas,
               tenantId: opts.tenant_id, projectId, compDir, maxRetries: 1,

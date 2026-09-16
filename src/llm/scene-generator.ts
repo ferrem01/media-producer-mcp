@@ -377,6 +377,9 @@ var PHONE_REEL_MOCK_RE = /^(quotient-|claude-|slack-|chat-simulator|browser-fram
 var PHONE_MIN_FONT_PX = 72;
 /** Full-stage overlays: performers that cover the whole composition. */
 var STAGE_OVERLAY_TYPES = ["cursor-performer"];
+/** The least a cutaway stays up (SPEC-creator-cut.md): under this a screen
+ *  reads as a glitch, not as proof. */
+var CUT_MIN = 1.2;
 /** The camera anchors a library component publishes (its [data-anchor]
  *  regions), read once from its source. The build frames a cutaway on one
  *  of these; the storyboard may name them in camera_moves. */
@@ -402,15 +405,41 @@ export function componentAnchors(type: string, libDir: string = config.component
 /** Chrome anchors frame nothing worth reading; the camera goes to the
  *  region that performs. A region the component's script names wins. */
 var CHROME_ANCHORS = new Set(["tabs", "nav", "header", "sidebar", "toolbar", "status"]);
+/** What a script action performs on, by its name: "move-event" and
+ *  "set-event-status" are calendar work, "complete-task" is the tasks
+ *  pane, "type-message"/"send-message" the composer. */
+var ACTION_REGIONS: Array<[RegExp, string[]]> = [
+  [/event|calendar|schedule|activation/i, ["calendar", "activation"]],
+  [/task/i, ["tasks"]],
+  [/metric|kpi|report/i, ["metrics"]],
+  [/deliverable|status/i, ["deliverables", "status"]],
+  [/message|type|send|prompt|compose/i, ["composer", "messages", "input", "transcript"]],
+  [/post|publish|scroll/i, ["post"]],
+  [/brief/i, ["brief"]],
+];
 function pickAnchor(anchors: string[], data: Record<string, unknown> | undefined): string | null {
   if (!anchors.length) return null;
   var script = Array.isArray((data as any)?.script) ? ((data as any).script as any[]) : [];
+  // A region the script names outright.
   for (var step of script) {
     for (var k of ["tab", "target", "region", "anchor"]) {
       var v = String(step?.[k] || "").toLowerCase();
       if (v && anchors.indexOf(v) !== -1) return v;
     }
   }
+  // The region the script's actions work on (the LAST action wins: the
+  // window ends where the performance ends).
+  for (var i = script.length - 1; i >= 0; i--) {
+    var action = String(script[i]?.action || "");
+    for (var [re, regions] of ACTION_REGIONS) {
+      if (!re.test(action)) continue;
+      var hit = regions.find((r) => anchors.indexOf(r) !== -1);
+      if (hit) return hit;
+    }
+  }
+  // The tab the data opens on.
+  var active = String((data as any)?.active_tab || "").toLowerCase();
+  if (active && anchors.indexOf(active) !== -1) return active;
   var content = anchors.filter((a) => !CHROME_ANCHORS.has(a));
   return content[0] || anchors[0];
 }
@@ -1073,6 +1102,18 @@ export function buildAuthoredCompositionScene(
     if (hasAuthoredPos && JSON.stringify(authoredPos) !== JSON.stringify(lay.position)) {
       console.log(`    ${c.type}: honoring the board's own position (${JSON.stringify(authoredPos)}) over the ${c.type} layout slot`);
     }
+    // A cut window too short to read is held open: the proof stays at
+    // least CUT_MIN seconds (measured live, proj_b04fb594: windows of 0.5s
+    // and 0.6s where the "until" word came right after the "at" word).
+    var enterAnim = normalizeAnim((c as any).enter), exitAnim = normalizeAnim((c as any).exit);
+    if (isCutaway(c as any) && enterAnim && enterAnim.effect === "cut" && exitAnim && exitAnim.effect === "cut"
+        && typeof exitAnim.at === "number" && exitAnim.at - (enterAnim.at || 0) < CUT_MIN) {
+      var held = Math.min(Math.max(0.5, (draft.duration_seconds || 8) - 0.2), (enterAnim.at || 0) + CUT_MIN);
+      if (held > exitAnim.at) {
+        console.log(`    ${c.type}: cut window ${(exitAnim.at - (enterAnim.at || 0)).toFixed(2)}s is too short to read -- held to ${(held - (enterAnim.at || 0)).toFixed(2)}s`);
+        (c as any).exit = { ...exitAnim, at: Math.round(held * 100) / 100 };
+      }
+    }
     // A cutaway on a tall frame is framed on the region it performs in.
     var frameAnchor = tallFrame && isCutaway(c as any) ? frameAnchorFor(c.type, data) : null;
     if (frameAnchor) console.log(`    ${c.type}: a cutaway on a tall frame -- framed on its "${frameAnchor}" region`);
@@ -1096,6 +1137,10 @@ export function buildAuthoredCompositionScene(
   }
   // The camera: the storyboard's own moves, else creator-cut's rule.
   var cameraMoves: any[] | undefined = (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined;
+  // A list of nothing but resets is a camera that never moved (measured
+  // live, proj_b04fb594: four scenes authored "@3.3s reset" and nothing
+  // else) -- the rule applies as if none were written.
+  if (cameraMoves && cameraMoves.every((m: any) => !m || m.type === "reset")) cameraMoves = undefined;
   if (!cameraMoves) {
     var autoCam = creatorCutCameraMoves(components as any, {
       grammar: (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar,

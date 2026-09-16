@@ -39,6 +39,18 @@ voice runs the whole time, a cutaway is only what is on screen.
   chapter label and the sticker on every scene and left the hook scene
   with no cast at all, so the contract now says every scene is cast with
   three objects, the first one too.
+- **The person is the base before any take** (`personBase` in the
+  pipeline: speaker_source, or clips on file, OR a person grammar). The
+  third live board (proj_b04fb594) was built over the slate before Marc
+  recorded, and because the base was decided from the clips on file it got
+  the generic layout: a world backdrop under every scene (which buries the
+  camera when the take lands), no bands around the face, the phone-reel
+  rules off, app mocks kept as furniture. SPEC-take-flow says build order
+  is free; now it is. Same build showed a storyboard that wrote nothing
+  but `reset` on four scenes (treated as no camera, so the rule applies),
+  cut windows of 0.5s (held open to `CUT_MIN` 1.2s at build), and a
+  calendar performance framed on the brief (`pickAnchor` now reads the
+  script's actions and `active_tab`).
 - **The camera moves on the person by rule** (creator-cut only,
   `creatorCutCameraMoves` in the scene generator, once the cut windows are
   seconds): a claim with no authored moves gets a punch-in aimed at the
