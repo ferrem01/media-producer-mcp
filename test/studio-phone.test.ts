@@ -89,15 +89,18 @@ describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
     expect(html).not.toMatch(/<title>Board/);
   });
 
-  it("says what the film still needs from you before a single card, and the desktop Studio says the same", async () => {
+  it("says what the film still needs from you before a single card; the desktop Studio puts each scene's needs in its own card", async () => {
     expect(js).toMatch(/'Needed from you'/);
     expect(js).toMatch(/' to go'/);
     const desktop = await read("../src/preview-app/preview-app.ts");
-    expect(desktop).toMatch(/function renderNeedsPanel\(project\)/);
-    expect(desktop).toMatch(/Needed from you/);
+    // In the scene's card (draft view) and the storyboard editor -- not a nav section (Marc).
+    expect(desktop).toMatch(/function sceneNeedsHtml\(project, si\)/);
+    expect(desktop).toMatch(/h \+= sceneNeedsHtml\(project, draftSel\);/);
+    expect(desktop).toMatch(/return si >= 0 \? sceneNeedsHtml\(p, si\) : '';/);
+    expect(desktop).not.toMatch(/id="needs-panel"/);
+    expect(desktop).not.toMatch(/renderNeedsPanel/);
     // Same routes as the phone: the take, and provide-asset for proof.
     expect(desktop).toMatch(/'\/provide-asset\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/'\/take\/' \+ encodeURIComponent\(state\.tenantId\)/);
-    expect(desktop).toMatch(/renderNeedsPanel\(project\);/);
   });
 });

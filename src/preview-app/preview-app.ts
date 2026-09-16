@@ -955,11 +955,10 @@ export function getPreviewHtml(): string {
   .scene-sb-btn:hover { background: #e3e7f5; color: #4f46e5; }
   .scene-quality-badge { cursor: pointer; }
 
-  /* ── Needed from you (SPEC-take-flow.md, SPEC-creator-cut.md) ── */
-  #needs-panel { border-bottom: 1px solid #e6e8ef; padding: 10px 12px 12px; background: #fbfbfd; }
-  .np-lead { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; color: #6b7280; text-transform: uppercase; margin-bottom: 6px; }
-  .np-sum { font-size: 12.5px; color: #111827; margin-bottom: 8px; }
-  .np-sum b { color: #4f46e5; }
+  /* ── This scene needs (SPEC-take-flow.md, SPEC-creator-cut.md): in the
+     scene's own card, draft view and storyboard editor alike. ── */
+  .np-block { margin: 10px 0 8px; padding: 8px 10px; border: 1px solid #e6e8ef; border-radius: 8px; background: #fbfbfd; }
+  .np-lead { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; color: #6b7280; text-transform: uppercase; margin-bottom: 2px; }
   .np-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid #eef0f5; }
   .np-row .np-what { flex: 1; min-width: 0; font-size: 12px; color: #374151; line-height: 1.35; }
   .np-row .np-what small { display: block; color: #6b7280; font-size: 11px; }
@@ -1124,10 +1123,8 @@ export function getPreviewHtml(): string {
   </header>
 
   <div id="sidebar">
-    <!-- Needed from you: the takes and the proof the film is waiting on,
-         counted across the film, with Record / Upload right there. The same
-         list the phone Studio shows first; screenshots are made here. -->
-    <div id="needs-panel" style="display:none"></div>
+    <!-- The needs live in each scene's card (draft view and the storyboard
+         editor), not here (Marc). One hidden picker serves every Upload. -->
     <input type="file" id="np-file" accept="image/*,video/*" style="display:none">
     <div class="sidebar-header">Scenes</div>
     <div id="scene-list"><div class="empty-state">Load a project</div></div>
@@ -2554,10 +2551,6 @@ export function getPreviewHtml(): string {
       var projDelBtnEl = document.getElementById('project-delete-btn');
       if (projDelBtnEl) projDelBtnEl.style.display = '';
 
-      // What the film still needs from the human -- before or after a build
-      // (a screenshot swapped in after the first build is the normal path).
-      renderNeedsPanel(project);
-
       // Storyboard-state project: show the SCRIPT (draft view), not an empty
       // timeline. Everything below assumes built scenes.
       hideDraftView();
@@ -3921,51 +3914,45 @@ export function getPreviewHtml(): string {
   // iterate-round-and-round loop lives HERE, not only in the MCP.
   var draftBuild = { job: null, timer: null, kind: null };
   var draftSel = 0;
-  // ── Needed from you ──
-  // Every need on the storyboard (assets[] with status needed/provided): the
-  // camera take per scene with lines, and on a creator-cut film the proof
-  // each claim asked for. Record opens the booth for that scene (webcam
+  // ── This scene needs ──
+  // A scene's needs (assets[] with status needed/provided) -- the camera
+  // take when it has lines, and on a creator-cut film the proof the claim
+  // asked for -- live in the scene's OWN card: the draft view before a
+  // build, the storyboard editor after (Marc: in the scene details, not a
+  // section in the nav). Record opens the booth for that scene (webcam
   // here, phone there); Upload pushes a file through the same routes the
   // phone view uses (upload-asset, then take or provide-asset).
   var NP_LABELS = { camera_video: 'Camera take', screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock' };
   var npPick = null;
-  function renderNeedsPanel(project) {
-    var panel = document.getElementById('needs-panel');
-    if (!panel) return;
-    var scenes = (project.storyboard && project.storyboard.scenes) || [];
+  function sceneNeedsHtml(project, si) {
+    var s = ((project.storyboard && project.storyboard.scenes) || [])[si];
+    if (!s) return '';
     var rows = [];
-    scenes.forEach(function(s, si) {
-      (s.assets || []).forEach(function(a, ai) {
-        if (!a || !a.type) return;
-        if (a.status !== 'needed' && a.status !== 'provided') return;
-        rows.push({ si: si, ai: ai, need: a, label: s.label || ('Scene ' + (si + 1)) });
-      });
+    (s.assets || []).forEach(function(a, ai) {
+      if (!a || !a.type) return;
+      if (a.status !== 'needed' && a.status !== 'provided') return;
+      rows.push({ ai: ai, need: a });
     });
-    if (!rows.length) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
-    var takes = rows.filter(function(r) { return r.need.type === 'camera_video'; });
-    var proof = rows.filter(function(r) { return r.need.type !== 'camera_video'; });
-    var openT = takes.filter(function(r) { return r.need.status === 'needed'; }).length;
-    var openP = proof.filter(function(r) { return r.need.status === 'needed'; }).length;
-    var sum = [];
-    if (takes.length) sum.push('<b>' + takes.length + '</b> camera take' + (takes.length === 1 ? '' : 's') + (openT ? ' (' + openT + ' to go)' : ' (all in)'));
-    if (proof.length) sum.push('<b>' + proof.length + '</b> piece' + (proof.length === 1 ? '' : 's') + ' of proof' + (openP ? ' (' + openP + ' to go)' : ' (all in)'));
-    var h = '<div class="np-lead">Needed from you</div><div class="np-sum">' + sum.join(' \u00b7 ') + '</div>';
+    if (!rows.length) return '';
+    var open = rows.filter(function(r) { return r.need.status === 'needed'; }).length;
+    var h = '<div class="np-block" data-np-block="' + si + '"><div class="np-lead">This scene needs' + (open ? '' : ' \u00b7 all in') + '</div>';
     rows.forEach(function(r) {
       var a = r.need, have = a.status === 'provided' && a.path;
       var kind = NP_LABELS[a.type] || a.type;
-      var what = a.type === 'camera_video' ? 'Take of the lines' : escHtml(a.description || '');
+      var what = a.type === 'camera_video' ? 'A take of the lines' : escHtml(a.description || '');
       h += '<div class="np-row"><div class="np-what">' + what +
-        '<small>Scene ' + (r.si + 1) + ' \u00b7 ' + escHtml(kind) + (a.use === 'card' ? ' \u00b7 card' : (a.type !== 'camera_video' ? ' \u00b7 cutaway' : '')) +
+        '<small>' + escHtml(kind) + (a.use === 'card' ? ' \u00b7 card' : (a.type !== 'camera_video' ? ' \u00b7 cutaway' : '')) +
         ' \u00b7 ' + (have ? '<b class="ok">provided</b>' : (a.priority === 'nice_to_have' ? 'optional' : '<b>needed</b>')) + '</small></div>' +
         '<div class="np-act">' +
-        (a.type === 'camera_video' ? '<a class="np-btn" target="_blank" href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + r.si)) + '">' + (have ? 'Re-record' : 'Record') + '</a>' : '') +
-        '<button class="np-btn" data-np-scene="' + r.si + '" data-np-asset="' + r.ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>' +
+        (a.type === 'camera_video' ? '<a class="np-btn" target="_blank" href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '">' + (have ? 'Re-record' : 'Record') + '</a>' : '') +
+        '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + r.ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>' +
         '</div></div>';
     });
-    if (proof.length) h += '<div class="np-note">Proof cuts in full-frame on its words at the next build. The film builds without it.</div>';
-    panel.innerHTML = h;
-    panel.style.display = '';
-    panel.querySelectorAll('button[data-np-scene]').forEach(function(btn) {
+    if (rows.some(function(r) { return r.need.type !== 'camera_video'; })) h += '<div class="np-note">Proof cuts in full-frame on its words at the next build. The film builds without it.</div>';
+    return h + '</div>';
+  }
+  function bindSceneNeeds(project, root) {
+    (root || document).querySelectorAll('button[data-np-scene]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         npPick = { scene: parseInt(btn.dataset.npScene, 10), asset: parseInt(btn.dataset.npAsset, 10), type: btn.dataset.npType, project: project.project_id };
         var f = document.getElementById('np-file');
@@ -4078,6 +4065,7 @@ export function getPreviewHtml(): string {
     h += '<div class="dv-vo-edit"><div class="dv-sect">LINES (what is said)</div>' +
       '<textarea id="dv-vo-text" placeholder="One sentence per line. A line that says only (pause) holds a beat.">' + escHtml(s.voiceover_text || '') + '</textarea>' +
       '<div class="dv-vo-row"><button class="dv-btn" id="dv-vo-save">Save lines</button><span class="dv-vo-hint">One sentence per line · a line that says only (pause) holds a beat</span></div></div>';
+    h += sceneNeedsHtml(project, draftSel);
     var tpl = (s.scene_template && s.scene_template.type) || s.template;
     if (tpl) h += '<div class="dv-chips"><span class="dv-chip dv-chip-tpl">' + escHtml('template: ' + tpl) + '</span></div>';
     if (s.visual_notes) h += '<div class="dv-sect">VISUAL NOTES</div><div class="dv-notes">' + escHtml(s.visual_notes) + '</div>';
@@ -4164,6 +4152,7 @@ export function getPreviewHtml(): string {
       '<button class="btn" id="dv-scene-revise">✎ Revise</button></div>';
     h += '</div></div>';
     dv.innerHTML = h;
+    bindSceneNeeds(project, dv);
     var fb = document.getElementById('dv-scene-feedback');
     var sceneBtn = document.getElementById('dv-scene-revise');
     if (sceneBtn) sceneBtn.addEventListener('click', function() {
@@ -9578,6 +9567,11 @@ export function getPreviewHtml(): string {
       '</div>' +
       '<div class="sm-field"><label>Hero image prompt</label><input id="sm-hero" type="text" placeholder="AI background image (leave blank if using b-roll)" value="' + escAttr(b.hero_image || '') + '"></div>' +
       '<div class="sm-field"><label>Components (comma-separated)</label><input id="sm-components" type="text" placeholder="e.g. cta-card, stat-grid" value="' + escAttr((b.components || []).join(', ')) + '"></div>' +
+      (function() {
+        var p = state.currentProject; if (!p || !p.scenes) return '';
+        var si = p.scenes.findIndex(function(x) { return x.id === sceneId; });
+        return si >= 0 ? sceneNeedsHtml(p, si) : '';
+      })() +
       '<div class="sm-status" id="sm-edit-status"></div>' +
       '<div class="sm-actions">' +
         '<button class="sm-btn" id="sm-cancel">Cancel</button>' +
@@ -9586,6 +9580,7 @@ export function getPreviewHtml(): string {
       '</div>';
     studioModalOpen(html);
     wireBeatEditor(b.beats || []);
+    if (state.currentProject) bindSceneNeeds(state.currentProject);
     document.getElementById('sm-cancel').addEventListener('click', studioModalClose);
     document.getElementById('sm-save').addEventListener('click', function() { saveStoryboardFromModal(sceneId); });
     document.getElementById('sm-regen').addEventListener('click', function() { studioRegenerate(); });

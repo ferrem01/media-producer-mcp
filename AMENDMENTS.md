@@ -103,6 +103,12 @@ only what you do on a phone.
   the desktop app; the old `/board` address 301s to `/studio`. The take
   page links back to Studio. The word "board" for the page is retired
   ("storyboard" stays what it was).
+- **Then moved out of the nav.** Marc, on seeing the desktop panel: "I
+  expected it to be in the scene details, not in a section on the left
+  nav." The desktop list is gone; each scene's card carries its own needs
+  (`sceneNeedsHtml`: the draft view under the lines, the storyboard editor
+  above its actions). The phone view keeps its summary at the top, since
+  there the whole page is the list of what to do.
 - **Needed from you, first.** Both views open with the list: the camera
   takes and each kind of proof, counted across the film, with how many are
   still to go. The phone view keeps Record / Upload per scene under it; the
