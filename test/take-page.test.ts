@@ -88,11 +88,37 @@ describe("what the booth does", () => {
     expect(html).toMatch(/No sound is reaching the mic/);
   });
 
-  it("paces the prompter from the board's own durations, splitting a long beat by word share", () => {
+  it("paces the prompter at speaking pace, never faster than the board's words allow, splitting a long beat by word share", () => {
     expect(html).toMatch(/voiceover_text/);
     expect(html).toMatch(/duration_seconds/);
     expect(html).toMatch(/WORDS_PER_SEC = 2\.4/);
     expect(html).toMatch(/speech \* \(it\.words \/ words\) \+ it\.gap/);
+    // The board's number is the cut, never the mouth (measured live: 24 words in a 4s scene raced the prompter).
+    expect(html).toMatch(/var dur = Math\.max\(Number\(s\.duration_seconds\) \|\| 0, Math\.max\(1\.5, words \/ WORDS_PER_SEC \+ gaps\)\);/);
+  });
+
+  it("shows one cue at a time on its own clock, and a tap on the stage jumps to the next line", () => {
+    expect(html).toMatch(/function showCue\(i\) \{/);
+    expect(html).toMatch(/cueTimer = setTimeout\(function \(\) \{ showCue\(i \+ 1\); \}, cues\[i\]\.dur \* 1000\);/);
+    expect(html).toMatch(/function advanceCue\(\) \{ if \(rec && rec\.state === 'recording' && cueIdx >= 0 && cueIdx < cues\.length\) showCue\(cueIdx \+ 1\); \}/);
+    expect(html).toMatch(/\$\('stage'\)\.addEventListener\('click'/);
+    expect(html).toMatch(/Tap the screen to jump to the next line\./);
+  });
+
+  it("never makes the human scroll: the script scrolls inside its card, the stage owns the viewport, Record stays in reach", () => {
+    expect(html).toMatch(/#ready \{ height:100dvh; overflow:hidden; \}/);
+    expect(html).toMatch(/#script \{ flex:0 1 auto; max-height:44dvh; overflow-y:auto;/);
+    expect(html).toMatch(/#stage \{ position:fixed; inset:0; z-index:5; background:#000; \}/);
+    expect(html).toMatch(/try \{ window\.scrollTo\(0, 0\); \} catch \(eS\) \{\}/);
+  });
+
+  it("asks for the camera once per visit: the stream survives review, retake and record-again, released when the page hides", () => {
+    expect(html).toMatch(/var live = stream && stream\.getTracks\(\)\.some\(function \(t\) \{ return t\.readyState === 'live'; \}\);/);
+    expect(html).toMatch(/\(live \? Promise\.resolve\(stream\) : navigator\.mediaDevices\.getUserMedia\(constraints\)\)/);
+    expect(html).toMatch(/window\.addEventListener\('pagehide', releaseCamera\);/);
+    // stopAll no longer kills the tracks.
+    const stopAll = html.slice(html.indexOf("function stopAll()"), html.indexOf("function releaseCamera()"));
+    expect(stopAll).not.toMatch(/t\.stop\(\)/);
   });
 
   it("uploads to the project's own assets and then attaches via /api/take", () => {
