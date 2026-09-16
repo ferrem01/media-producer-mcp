@@ -721,7 +721,7 @@ export async function queueStoryboardGeneration(params: {
       j.progress = { step: "storyboard-cards", percent: 90, detail: "Photographing the storyboard" };
       const outDir = projectOutputDir(params.tenant_id, project.project_id);
       const res = await renderStoryboardCards(project as any, {
-        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir,
+        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir, dataDir: config.dataDir,
         tenantComponentLibDir: tenantComponentsDir(params.tenant_id), outDir,
       });
       cardsUrl = outputUrl(params.tenant_id, project.project_id, path.basename(res.sheet));
@@ -778,7 +778,7 @@ export function queueSurgicalSceneOp(
     j.progress = { step: "storyboard-cards", percent: 75, detail: "Photographing the storyboard" };
     try {
       await renderStoryboardCards(project as any, {
-        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir,
+        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir, dataDir: config.dataDir,
         tenantComponentLibDir: tenantComponentsDir(tenantId),
         outDir: projectOutputDir(tenantId, projectId),
       });
@@ -810,7 +810,7 @@ export function reshootStoryboardCardsSoon(tenantId: string, projectId: string):
       if (project?.storyboard?.scenes?.length && project.status === "storyboard") {
         await renderStoryboardCards(project as any, {
           componentLibDir: config.componentLibDir,
-          gsapDir: config.gsapDir,
+          gsapDir: config.gsapDir, dataDir: config.dataDir,
           tenantComponentLibDir: tenantComponentsDir(tenantId),
           outDir: projectOutputDir(tenantId, projectId),
         });
