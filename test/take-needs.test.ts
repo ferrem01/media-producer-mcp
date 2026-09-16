@@ -139,3 +139,16 @@ describe("the preview's camera under a scene", () => {
     expect(speakerClipForScene(undefined, scenes, 0)).toBeNull();
   });
 });
+
+describe("the desktop Studio's camera follows the scene too", () => {
+  it("swaps the speaker element's source per scene and maps the clock through the active clip", async () => {
+    const fs = await import("node:fs/promises");
+    const app = await fs.readFile(new URL("../src/preview-app/preview-app.ts", import.meta.url), "utf8");
+    expect(app).toMatch(/function speakerClipForTime\(time\)/);
+    expect(app).toMatch(/x\.scene_index === si/);
+    expect(app).toMatch(/var want = speakerClipForTime\(time\);/);
+    expect(app).toMatch(/el\.src\.indexOf\(wantBase\) < 0/);          // the source swaps at the cut
+    expect(app).toMatch(/\? speakerFilmTime\(spkEl\.currentTime\)/);   // the one-stream clock goes through the active clip
+    expect(app).not.toMatch(/time \+ state\.speakerTrimStart/);          // no site still assumes film time 0 = clips[0]
+  });
+});

@@ -1229,9 +1229,13 @@ export function getPreviewHtml(): string {
     // Unified media clip registry for Phase 2 sync
     mediaClips: [],
     forceSync: false,
-    // Speaker track trim values (single source of truth)
+    // The ACTIVE speaker clip (single source of truth for every seek and
+    // for the one-stream clock). One continuous track: clips[0] from film
+    // time 0. Per-scene takes: the current scene's clip, whose source time
+    // trim_start is the scene's film start.
     speakerTrimStart: 0,
-    speakerTrimEnd: Infinity
+    speakerTrimEnd: Infinity,
+    speakerSceneStart: 0
   };
 
   // DOM refs
@@ -1504,6 +1508,7 @@ export function getPreviewHtml(): string {
       var spkClip = project.speaker_track.clips[0];
       state.speakerTrimStart = spkClip.trim_start != null ? spkClip.trim_start : (spkClip.start || 0);
       state.speakerTrimEnd = spkClip.trim_end != null ? spkClip.trim_end : Infinity;
+      state.speakerSceneStart = 0;
       state.mediaClips.push({
         el: speakerEl,
         kind: 'speaker',
@@ -1597,11 +1602,7 @@ export function getPreviewHtml(): string {
           });
         }
         // Detect if this video is the speaker track (PiP speaker scenes)
-        var speakerClipUrl = getSpeakerClipUrl();
-        var isSpeakerVideo = speakerClipUrl && v.src && (
-          v.src === speakerClipUrl ||
-          v.src.indexOf(speakerClipUrl.split('/').pop()) >= 0
-        );
+        var isSpeakerVideo = !!(v.src && isSpeakerVideoSrc(v.src));
         state.mediaClips.push({
           el: v,
           kind: 'scene-video',
@@ -1667,13 +1668,22 @@ export function getPreviewHtml(): string {
 
       // ── Speaker: continuous base layer, always playing when state.playing ──
       if (clip.kind === 'speaker') {
-        // Ensure src is loaded
-        if (!el.src || el.src === '' || el.src === window.location.href) {
-          var clipUrl = getSpeakerClipUrl();
-          if (!clipUrl) { el.style.display = 'none'; continue; }
-          el.src = clipUrl;
+        // The clip for THIS film time: per-scene takes swap the source at
+        // the cut (measured live, proj_780a33d0: one element playing take
+        // one for the whole film seeked past its end on scenes 2 and 3 and
+        // shuddered there). A scene with no take shows no camera.
+        var want = speakerClipForTime(time);
+        if (!want) { el.style.display = 'none'; continue; }
+        var wantBase = want.url.split('/').pop();
+        if (!el.src || el.src === '' || el.src === window.location.href || el.src.indexOf(wantBase) < 0) {
+          el.src = want.url;
           el.load();
+          clip.lastOffset = null;
+          clip.driftSamples = 0;
         }
+        state.speakerTrimStart = want.trimStart;
+        state.speakerTrimEnd = want.trimEnd;
+        state.speakerSceneStart = want.sceneStart;
         // Visibility: show on speaker scenes, hide on opaque scenes
         var speakerActive = isSpeakerScene(state.currentSceneIndex);
         if (speakerActive) {
@@ -1684,8 +1694,9 @@ export function getPreviewHtml(): string {
         }
         // Always sync time + play/pause regardless of visibility
         // Speaker plays continuously so audio is uninterrupted
-        // Apply speaker track trim: global time 0 maps to trim_start in source
-        var target = time + state.speakerTrimStart;
+        // Film time -> source time of the active clip (its trim, from the
+        // scene it belongs to).
+        var target = speakerSourceTime(time);
         if (target > state.speakerTrimEnd) target = state.speakerTrimEnd;
         var spkDrift = Math.abs(el.currentTime - target);
         if (playing && !el.paused && el.readyState >= 3 && !state.forceSync && spkDrift < 2) {
@@ -1751,7 +1762,7 @@ export function getPreviewHtml(): string {
         if (clip.isSpeaker) {
           // Speaker-sourced video: sync to speaker track timeline
           // Uses same trim values as the speaker bg -- single source of truth
-          target = time + state.speakerTrimStart;
+          target = speakerSourceTime(time);
           if (target > state.speakerTrimEnd) target = state.speakerTrimEnd;
         } else if (clip.edl) {
           // Edited media: map through the source-map; play at the active
@@ -2786,7 +2797,7 @@ export function getPreviewHtml(): string {
         if (c.kind !== 'scene-video' || c.sceneId !== sid || !c.el.paused) continue;
         var entry;
         if (c.isSpeaker) {
-          entry = c.start + (state.speakerTrimStart || 0);
+          entry = speakerSourceTime(c.start);
         } else {
           var segs2 = c.edl;
           if (segs2 === undefined) {
@@ -4757,10 +4768,7 @@ export function getPreviewHtml(): string {
   // Find which scene a global time falls in, returns { index, localTime }
 
   // ── Speaker track preview support ──
-  function getSpeakerClipUrl() {
-    var project = state.currentProject;
-    if (!project || !project.speaker_track || !project.speaker_track.clips || !project.speaker_track.clips.length) return null;
-    var source = project.speaker_track.clips[0].source;
+  function speakerClipUrlOf(source) {
     if (!source) return null;
     // Already an HTTP URL
     if (source.startsWith('http')) return source;
@@ -4772,6 +4780,42 @@ export function getPreviewHtml(): string {
     if (source.startsWith('/assets/')) return source;
     return source;
   }
+  function getSpeakerClipUrl() {
+    var project = state.currentProject;
+    if (!project || !project.speaker_track || !project.speaker_track.clips || !project.speaker_track.clips.length) return null;
+    return speakerClipUrlOf(project.speaker_track.clips[0].source);
+  }
+  // The speaker clip under a FILM time. One continuous track: clips[0] from
+  // film time 0 at its trim. Per-scene takes (clips carry scene_index): the
+  // scene's own clip, whose trim_start is that scene's film start; a scene
+  // with no take has no camera. Mirrors speakerClipForScene on the server.
+  function speakerClipForTime(time) {
+    var project = state.currentProject;
+    var clips = (project && project.speaker_track && project.speaker_track.clips) || [];
+    if (!clips.length) return null;
+    var perScene = clips.some(function(c) { return c.scene_index !== undefined && c.scene_index !== null; });
+    var c, sceneStart = 0;
+    if (!perScene) {
+      c = clips[0];
+    } else {
+      var info = compositeSceneForTime(time);
+      var si = info && info.index >= 0 ? info.index : 0;
+      c = clips.filter(function(x) { return x.scene_index === si; })[0];
+      if (!c) return null;
+      sceneStart = sceneStartFor(si);
+    }
+    var url = speakerClipUrlOf(c.source);
+    if (!url) return null;
+    return {
+      url: url,
+      trimStart: c.trim_start != null ? c.trim_start : (c.start || 0),
+      trimEnd: c.trim_end != null ? c.trim_end : Infinity,
+      sceneStart: sceneStart
+    };
+  }
+  // Film time <-> source time of the ACTIVE speaker clip.
+  function speakerSourceTime(time) { return (time - (state.speakerSceneStart || 0)) + (state.speakerTrimStart || 0); }
+  function speakerFilmTime(srcTime) { return (state.speakerSceneStart || 0) + (srcTime - (state.speakerTrimStart || 0)); }
 
   // Robust "is this video the speaker?" check. The naive /speaker/ test only
   // catches the __mp_speaker_base underlay; a PiP bound to the speaker resolves
@@ -4781,10 +4825,15 @@ export function getPreviewHtml(): string {
   function isSpeakerVideoSrc(src) {
     if (!src) return false;
     if (/speaker/i.test(src)) return true;
-    var spk = getSpeakerClipUrl();
-    if (!spk) return false;
-    var base = spk.split('/').pop();
-    return src === spk || (!!base && src.indexOf(base) >= 0);
+    var project = state.currentProject;
+    var clips = (project && project.speaker_track && project.speaker_track.clips) || [];
+    for (var i = 0; i < clips.length; i++) {
+      var spk = speakerClipUrlOf(clips[i].source);
+      if (!spk) continue;
+      var base = spk.split('/').pop();
+      if (src === spk || (!!base && src.indexOf(base) >= 0)) return true;
+    }
+    return false;
   }
 
   function isSpeakerScene(sceneIndex) {
@@ -7192,7 +7241,7 @@ export function getPreviewHtml(): string {
     // fallback (no speaker track, ended, or mid-scrub repositioning).
     var spkEl = els.speakerBg;
     var spkT = (spkEl && !spkEl.paused && spkEl.readyState >= 3 && spkEl.currentTime > 0)
-      ? spkEl.currentTime - (state.speakerTrimStart || 0)
+      ? speakerFilmTime(spkEl.currentTime)
       : null;
     if (spkT !== null && spkT > state.masterTime - 0.75 && spkT < state.masterTime + 2) {
       state.masterTime = spkT;

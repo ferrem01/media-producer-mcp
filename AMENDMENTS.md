@@ -2914,3 +2914,24 @@ contract now tells the storyboard writer what a tall-frame graphic IS (a
 performed word or number, one per beat, entering on its word) and what it
 never is (a dashboard, a rail, a list, a browser, a grid), in principle
 rather than by component name, as the grammar contract requires.
+
+## The desktop Studio's camera follows the scene
+
+Fourth run (proj_780a33d0): three per-scene takes, Build from the board,
+refresh the desktop Studio -- the first take plays, then scenes 2 and 3
+show nothing and shudder. Studio drove ONE speaker <video> from
+`clips[0]` everywhere: the source, the trim, the film-time mapping
+(`time + trimStart`) and the one-stream clock (`currentTime - trimStart`).
+With per-scene takes that seeks take one past its end and the seek-storm
+guards fight the wall clock.
+
+Two speaker models have to hold (Marc): one continuous recording as the
+spine of the whole film, and several takes strung together, one per
+scene. `speakerClipForTime(time)` picks the clip under a film time -- the
+first clip from film time 0 when no clip carries `scene_index`, the
+scene's own clip (trim_start = the scene's film start) when they do, and
+no camera for a scene with no take. The sync loop swaps the element's
+source at the cut (a Record-all board is one file windowed per scene, so
+it never reloads), and every film<->source mapping goes through
+`speakerSourceTime` / `speakerFilmTime` of the ACTIVE clip, the clock
+included. Speaker-video detection matches any clip, not just the first.
