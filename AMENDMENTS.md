@@ -3028,3 +3028,34 @@ camera_moves was empty. In the takeover recipe, an over-camera scene with
 no moves whose beat prose describes a push-in gets one: a slow 1.2x zoom
 from that beat's start, held to the cut, aimed at the face by the re-aim
 that follows.
+
+## The surgical revise holds the same shape as the whole board
+
+Re-authoring one scene of proj_4488f790 through the surgical path returned
+a sticker-prop carrying an invented "script" array and lines with literal
+"\n" -- the two things the whole-board builder's normalization catches,
+which the surgical path skipped entirely, and the writer had never seen
+the component library's data fields (its prompt named types only).
+
+`normalizeSceneShape` is now one exported function (unescape the lines,
+normalize component entries, sanitize camera moves, drop unknown types)
+used by both writers. The surgical prompt carries the library, with the
+rule that a component's data has only its type's fields, and the server
+builds the catalog for it.
+
+## Studio's draft view is the film's frame; the placeholder is a picture
+
+Marc, on the first tall board in Studio: the still sat in a landscape box
+("everything is landscape") and none of the graphics showed. The still was
+photographed tall; the draft view's CSS cropped it to 16:9 through its
+middle -- where a speaker film's graphics never sit (above the hairline,
+below the chin). And the placeholder was "brown and crappy": a schematic,
+not a picture.
+
+The draft view now sets `--mp-frame` from the project's canvas: the still
+and the rail thumbnails take the film's aspect ratio, and on a tall film
+the card lays the still beside its record in a 300px column (sticky), the
+thumbnails at half width. The placeholder is a camera-off avatar: a dim
+room with radial falloff, a soft filled bust with a faint rim, the label
+quiet in the platform zone. Light type on plates reads on it the way it
+will on a real take.

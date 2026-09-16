@@ -91,15 +91,29 @@ export function speakerPlaceholderHtml(canvas: { width: number; height: number }
   // Head centre and size follow the default face the layout assumes
   // (tallSpeakerBands without a measured face): eyes around 45% down.
   const cx = W * 0.5, cy = H * (tall ? 0.44 : 0.46), r = Math.min(W, H) * (tall ? 0.19 : 0.17);
-  const shoulderTop = cy + r * 1.15, shoulderW = r * 3.6;
+  const neckTop = cy + r * 0.92, shoulderTop = cy + r * 1.55, shoulderW = r * 4.2;
+  const sw = Math.max(2, W * 0.003);
+  // A camera-off avatar, not a schematic: a dim room (radial falloff and a
+  // vignette), a soft filled bust with a faint rim, a quiet label in the
+  // platform zone. Light type on plates reads on it the way it will on a
+  // real take.
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <circle cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" r="${r.toFixed(0)}" fill="none" stroke="#8a8374" stroke-width="${Math.max(3, W * 0.004).toFixed(0)}" stroke-dasharray="${(r * 0.18).toFixed(0)} ${(r * 0.12).toFixed(0)}"/>
-  <path d="M ${(cx - shoulderW / 2).toFixed(0)} ${H} C ${(cx - shoulderW / 2).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx - r * 1.1).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx - r * 0.9).toFixed(0)} ${(shoulderTop - r * 0.1).toFixed(0)} M ${(cx + shoulderW / 2).toFixed(0)} ${H} C ${(cx + shoulderW / 2).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx + r * 1.1).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx + r * 0.9).toFixed(0)} ${(shoulderTop - r * 0.1).toFixed(0)}" fill="none" stroke="#8a8374" stroke-width="${Math.max(3, W * 0.004).toFixed(0)}" stroke-dasharray="${(r * 0.18).toFixed(0)} ${(r * 0.12).toFixed(0)}"/>
-  <text x="${cx.toFixed(0)}" y="${(H * (tall ? 0.94 : 0.93)).toFixed(0)}" text-anchor="middle" font-family="DejaVu Sans, system-ui, sans-serif" font-size="${(Math.min(W, H) * 0.045).toFixed(0)}" font-weight="700" letter-spacing="${(Math.min(W, H) * 0.008).toFixed(0)}" fill="#8a8374">SPEAKER ON CAMERA</text>
+  <defs>
+    <radialGradient id="room" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#3b3f4a"/><stop offset="0.6" stop-color="#23262e"/><stop offset="1" stop-color="#14161b"/></radialGradient>
+    <linearGradient id="bust" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7b8190"/><stop offset="1" stop-color="#4e5361"/></linearGradient>
+    <radialGradient id="rim" cx="50%" cy="30%" r="60%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#room)"/>
+  <path d="M ${(cx - shoulderW / 2).toFixed(0)} ${H} C ${(cx - shoulderW / 2).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx - r * 1.35).toFixed(0)} ${neckTop.toFixed(0)}, ${(cx - r * 0.42).toFixed(0)} ${neckTop.toFixed(0)} L ${(cx + r * 0.42).toFixed(0)} ${neckTop.toFixed(0)} C ${(cx + r * 1.35).toFixed(0)} ${neckTop.toFixed(0)}, ${(cx + shoulderW / 2).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx + shoulderW / 2).toFixed(0)} ${H} Z" fill="url(#bust)"/>
+  <ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${(r * 0.92).toFixed(0)}" ry="${r.toFixed(0)}" fill="url(#bust)"/>
+  <ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${(r * 0.92).toFixed(0)}" ry="${r.toFixed(0)}" fill="url(#rim)"/>
+  <ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${(r * 0.92).toFixed(0)}" ry="${r.toFixed(0)}" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="${sw.toFixed(1)}"/>
+  <rect width="${W}" height="${H}" fill="url(#rim)" opacity="0"/>
+  <text x="${cx.toFixed(0)}" y="${(H * (tall ? 0.94 : 0.93)).toFixed(0)}" text-anchor="middle" font-family="DejaVu Sans, system-ui, sans-serif" font-size="${(Math.min(W, H) * 0.032).toFixed(0)}" font-weight="600" letter-spacing="${(Math.min(W, H) * 0.01).toFixed(0)}" fill="#8d93a1">SPEAKER ON CAMERA</text>
 </svg>`;
   const bg = posterDataUrl
-    ? `background:#2a2a2e url(${posterDataUrl}) center/cover no-repeat;`
-    : `background:linear-gradient(180deg,#d9d4c8 0%,#c9c2b2 100%);`;
+    ? `background:#1c1e24 url(${posterDataUrl}) center/cover no-repeat;`
+    : `background:#1c1e24;`;
   const body = posterDataUrl ? "" : `<div style="position:absolute;inset:0;background:url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}') center/100% 100% no-repeat;"></div>`;
   return `<div id="__mp_speaker_placeholder" style="position:fixed;inset:0;z-index:-10;${bg}">${body}</div>`;
 }

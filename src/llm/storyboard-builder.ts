@@ -150,6 +150,70 @@ export function unescapeLines(text: string): string {
   return String(text).replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\r\n/g, "\n");
 }
 
+/**
+ * The shape every scene the writer returns is held to -- the whole-board
+ * builder AND the surgical revise (which skipped all of this and shipped a
+ * sticker-prop carrying an invented "script" array, and lines with literal
+ * "\n"). Mutates the scene; returns the notes. With `validTypes`, unknown
+ * component types are dropped.
+ */
+export function normalizeSceneShape(scene: any, validTypes?: Set<string>): string[] {
+  const notes: string[] = [];
+  // The writer sometimes escapes its line breaks a second time, so the
+  // lines arrive as one line with literal "\n" in it (measured live,
+  // proj_4488f790: "...dozen tools.\nOne for the plan.\n..."). The
+  // prompter, the needs and the spine all read real lines.
+  if (typeof scene.voiceover_text === "string" && /\\n|\\"/.test(scene.voiceover_text)) {
+    scene.voiceover_text = unescapeLines(scene.voiceover_text);
+    notes.push("unescaped the lines' line breaks");
+  }
+  if (Array.isArray(scene.beats)) {
+    for (const b of scene.beats) {
+      if (b && typeof b.voiceover_text === "string" && /\\n|\\"/.test(b.voiceover_text)) b.voiceover_text = unescapeLines(b.voiceover_text);
+    }
+  }
+  // Camera moves from the LLM. Extracted so the rules are testable without
+  // an LLM round-trip -- see sanitizeCameraMoves.
+  if (Array.isArray(scene.camera_moves)) {
+    const cam = sanitizeCameraMoves(scene.camera_moves, Number(scene.duration_seconds) || 10);
+    for (const n of cam.notes) notes.push(n);
+    scene.camera_moves = cam.moves;
+  }
+  if (!scene.components || !Array.isArray(scene.components)) scene.components = [];
+  // Normalize entries to string | {type, data}. Authored data (especially
+  // data.script on performable surfaces) is load-bearing -- flattening
+  // objects to type strings here is how scripted performances silently
+  // died between storyboard and codegen.
+  scene.components = scene.components
+    .map((c: any) => {
+      if (typeof c === "string") return c;
+      if (c && typeof c.type === "string" && c.type.length > 0) {
+        // enter/exit ride ALONGSIDE data, not inside it -- dropping them
+        // here would have killed directed entrances at the same seam that
+        // once killed scripted performances.
+        const dir = {
+          ...(c.enter ? { enter: c.enter } : {}),
+          ...(c.exit ? { exit: c.exit } : {}),
+        };
+        return (c.data && typeof c.data === "object" && Object.keys(c.data).length > 0)
+          ? { type: c.type, data: c.data, ...dir }
+          : c.type;
+      }
+      return "";
+    })
+    .filter((c: any) => (typeof c === "string" ? c.length > 0 : true));
+  if (validTypes) {
+    const compTypeOf = (c: any): string => typeof c === "string" ? c : c.type;
+    const validated = scene.components.filter((c: any) => validTypes.has(compTypeOf(c)));
+    if (validated.length < scene.components.length) {
+      const removed = scene.components.filter((c: any) => !validTypes.has(compTypeOf(c))).map(compTypeOf);
+      notes.push(`removed unknown component type(s): ${removed.join(", ")}`);
+    }
+    scene.components = validated;
+  }
+  return notes;
+}
+
 export interface StoryboardBuilderOpts {
   prompt: string;
   /** The user's ORIGINAL prompt, before treatment/context enrichment.
@@ -841,62 +905,7 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
    * and return the correction notes so the model sees what changed.
    */
   function normalizeSceneMeta(scene: any): string[] {
-    var notes: string[] = [];
-
-    // The writer sometimes escapes its line breaks a second time, so the
-    // lines arrive as one line with literal "\n" in it (measured live,
-    // proj_4488f790: "...dozen tools.\nOne for the plan.\n..."). The
-    // prompter, the needs and the spine all read real lines.
-    if (typeof scene.voiceover_text === "string" && /\\n|\\"/.test(scene.voiceover_text)) {
-      scene.voiceover_text = unescapeLines(scene.voiceover_text);
-      notes.push("unescaped the lines' line breaks");
-    }
-    if (Array.isArray(scene.beats)) {
-      for (const b of scene.beats) {
-        if (b && typeof b.voiceover_text === "string" && /\\n|\\"/.test(b.voiceover_text)) b.voiceover_text = unescapeLines(b.voiceover_text);
-      }
-    }
-
-    // Camera moves from the LLM. Extracted so the rules are testable without
-    // an LLM round-trip -- see sanitizeCameraMoves.
-    if (Array.isArray(scene.camera_moves)) {
-      const cam = sanitizeCameraMoves(scene.camera_moves, Number(scene.duration_seconds) || 10);
-      for (const n of cam.notes) notes.push(n);
-      scene.camera_moves = cam.moves;
-    }
-
-    if (!scene.components || !Array.isArray(scene.components)) {
-      scene.components = [];
-    }
-    // Normalize entries to string | {type, data}. Authored data (especially
-    // data.script on performable surfaces) is load-bearing -- flattening
-    // objects to type strings here is how scripted performances silently
-    // died between storyboard and codegen.
-    scene.components = scene.components
-      .map((c: any) => {
-        if (typeof c === "string") return c;
-        if (c && typeof c.type === "string" && c.type.length > 0) {
-          // enter/exit ride ALONGSIDE data, not inside it -- dropping them
-          // here would have killed directed entrances at the same seam that
-          // once killed scripted performances.
-          const dir = {
-            ...(c.enter ? { enter: c.enter } : {}),
-            ...(c.exit ? { exit: c.exit } : {}),
-          };
-          return (c.data && typeof c.data === "object" && Object.keys(c.data).length > 0)
-            ? { type: c.type, data: c.data, ...dir }
-            : c.type;
-        }
-        return "";
-      })
-      .filter((c: any) => (typeof c === "string" ? c.length > 0 : true));
-    var compTypeOf = (c: any): string => typeof c === "string" ? c : c.type;
-    var validated = scene.components.filter((c: any) => validTypes.has(compTypeOf(c)));
-    if (validated.length < scene.components.length) {
-      var removed = scene.components.filter((c: any) => !validTypes.has(compTypeOf(c))).map(compTypeOf);
-      notes.push(`removed unknown component type(s): ${removed.join(", ")}`);
-    }
-    scene.components = validated;
+    var notes: string[] = normalizeSceneShape(scene, validTypes);
 
     if (!scene.visual_notes) {
       scene.visual_notes = scene.purpose || scene.label || "";

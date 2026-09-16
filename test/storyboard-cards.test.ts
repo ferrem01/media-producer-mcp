@@ -101,7 +101,8 @@ describe("the card is the film's frame, and a speaker film shows the person", ()
     const ph = speakerPlaceholderHtml({ width: 1080, height: 1920 });
     expect(ph).toMatch(/id="__mp_speaker_placeholder"/);
     expect(ph).toMatch(/SPEAKER%20ON%20CAMERA/);
-    expect(ph).toMatch(/%3Ccircle/);                                   // the head, in the svg data url
+    expect(ph).toMatch(/%3Cellipse/);                                  // the head, in the svg data url
+    expect(ph).toMatch(/radialGradient/);                               // a lit room, not a flat card
     const withTake = speakerPlaceholderHtml({ width: 1080, height: 1920 }, "data:image/jpeg;base64,AAAA");
     expect(withTake).toMatch(/url\(data:image\/jpeg;base64,AAAA\) center\/cover/);
     expect(withTake).not.toMatch(/SPEAKER%20ON%20CAMERA/);
