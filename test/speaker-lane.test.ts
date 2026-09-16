@@ -16,6 +16,7 @@ describe("the speaker lane of a per-scene take track (Studio timeline)", () => {
     expect(lane.map((c) => [c.scene_index, c.film_start, c.trim_start])).toEqual([[0, 0, 0.11], [1, 10.87, 1.63], [2, 17.49, 1.05]]);
     expect(laneClips({ scenes: project.scenes, speaker_track: { clips: [{ source: "/a/all.mp4", start: 0 }] } } as any)).toBeNull();
     expect(isPerSceneTrack(undefined)).toBe(false);
+    expect(laneClips({ scenes: [], speaker_track: project.speaker_track } as any)).toBeNull(); // markers, nothing to lay them on
   });
   it("puts every take's words on the film clock, windowed to the take (measured live: only take one's words showed)", () => {
     const lane = laneClips(project)!;
