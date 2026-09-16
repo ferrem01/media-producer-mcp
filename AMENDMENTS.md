@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — captions: one tinted word per sentence by rule; no one-word flash
+
+The first captioned rebuild of proj_9e650f1a (a board written before the
+emphasis marks existed) rendered every caption plain -- the fallback
+tinted numbers only -- and "without you even touching" / "it." flashed a
+lone word.
+
+- `fallbackEmphasis`: with no mark from the writer, ONE word per
+  sentence -- a number, then a name (a capitalized word that does not
+  open the sentence), then the brand's name, then the longest word of six
+  letters or more; a sentence with none stays plain.
+- `captionPhrases`: a lone trailing word folds back into the phrase
+  before it, or the pair rebalances 3 + 2 when that phrase is full; a
+  word ending on punctuation still stands alone ("done,").
+
 ## 2026-09-16 — creator-cut: the words are on screen the whole time
 
 Four reference films (Matt Rodin, Big Picture Club, Neil Jesani, Air) share

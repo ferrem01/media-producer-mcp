@@ -50,15 +50,36 @@ export function emphasisFromLines(script: string): { text: string; emphasis: str
   return { text, emphasis };
 }
 
-/** The rule's pick when the writer marked nothing: numbers and the
- *  brand's name. Never more than that -- an unmarked line stays plain. */
+/** The rule's pick when the writer marked nothing: ONE word per sentence,
+ *  the way the references tint one word per line -- a number first, then
+ *  a name (a capitalized word that does not open the sentence: the
+ *  product, a platform), then the brand's name anywhere, then the longest
+ *  word of six letters or more. A sentence with none of those stays plain.
+ *  (Measured live, proj_9e650f1a: a board written before the marks
+ *  existed rendered every caption plain.) */
 export function fallbackEmphasis(words: SpineWord[], brandWords: string[] = []): string[] {
   const brand = new Set(brandWords.map(normalizeToken).filter((t) => t.length > 2));
   const out: string[] = [];
+  const add = (t: string) => { if (t && !out.includes(t)) out.push(t); };
+  // Sentences: split on end punctuation.
+  const sentences: SpineWord[][] = [];
+  let cur: SpineWord[] = [];
   for (const w of words) {
-    const t = normalizeToken(w.text);
-    if (!t) continue;
-    if (/\p{N}/u.test(t) || brand.has(t)) { if (!out.includes(t)) out.push(t); }
+    if (!normalizeToken(w.text)) continue;
+    cur.push(w);
+    if (/[.!?]["')\]]*$/.test(w.text.trim())) { sentences.push(cur); cur = []; }
+  }
+  if (cur.length) sentences.push(cur);
+  for (const sent of sentences) {
+    const toks = sent.map((w) => ({ raw: w.text.trim(), t: normalizeToken(w.text) }));
+    const num = toks.find((x) => /\p{N}/u.test(x.t));
+    if (num) { add(num.t); continue; }
+    const name = toks.find((x, i) => i > 0 && /^[\p{Lu}]/u.test(x.raw) && x.t.length > 1 && x.t !== "i");
+    if (name) { add(name.t); continue; }
+    const br = toks.find((x) => brand.has(x.t));
+    if (br) { add(br.t); continue; }
+    const long = toks.filter((x) => x.t.length >= 6).sort((a, b) => b.t.length - a.t.length)[0];
+    if (long) add(long.t);
   }
   return out;
 }
@@ -85,12 +106,15 @@ export function captionPhrases(spine: Spine, emphasis: string[] = []): CaptionPh
     if (END_PUNCT.test(w.text.trim())) { groups.push(cur); cur = []; }
   }
   if (cur.length) groups.push(cur);
-  // A lone trailing word after a break reads as a stutter: fold it back
-  // when the group before it has room.
+  // A lone trailing word after a break reads as a stutter ("without you
+  // even touching" / "it."): fold it back when the group before it has
+  // room, else rebalance so the pair reads 3 + 2 instead of 4 + 1. A group
+  // that ends on punctuation is a phrase of its own and is left alone.
   for (let g = groups.length - 1; g > 0; g--) {
-    if (groups[g].length === 1 && groups[g - 1].length < MAX_WORDS && !END_PUNCT.test(groups[g - 1][groups[g - 1].length - 1].text.trim())) {
-      groups[g - 1] = groups[g - 1].concat(groups[g]); groups.splice(g, 1);
-    }
+    const prev = groups[g - 1];
+    if (groups[g].length !== 1 || END_PUNCT.test(prev[prev.length - 1].text.trim())) continue;
+    if (prev.length < MAX_WORDS) { groups[g - 1] = prev.concat(groups[g]); groups.splice(g, 1); }
+    else if (prev.length >= 3) { groups[g] = [prev[prev.length - 1]].concat(groups[g]); groups[g - 1] = prev.slice(0, -1); }
   }
   return groups.map((g, gi) => {
     const text = g.map((w) => (em.has(normalizeToken(w.text)) ? `*${w.text.trim()}*` : w.text.trim())).join(" ");
