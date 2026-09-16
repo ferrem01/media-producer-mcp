@@ -38,6 +38,8 @@ import {
   bakeDirectLogoData,
   mediaEdlScript,
   timelapseClockScript,
+  isCutInProof,
+  isFixedToFrame,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
 import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
@@ -210,7 +212,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       }
 
       componentBlocks.push(
-        `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""} style="${posStyle}">\n` +
+        `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""}${isCutInProof(comp) ? ' data-mp-cutaway="1"' : ""}${isFixedToFrame(comp.type) ? ' data-mp-fixed="1"' : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
         `      ${boundHtml}\n` +
         `    </div>`
       );

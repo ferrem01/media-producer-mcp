@@ -20,11 +20,19 @@ import { isProofSurface } from "./asset-needs.js";
 /** A proof surface the storyboard cut in (SPEC-creator-cut.md): plated
  *  opaque, so a mock drawn as a floating window with margins never shows
  *  the camera through its corners (measured live on the first rendered ad). */
-function isCutInProof(comp: { type: string; enter?: any }): boolean {
+export function isCutInProof(comp: { type: string; enter?: any }): boolean {
   const e = comp.enter;
   const eff = typeof e === "string" ? e : (e && typeof e === "object" ? e.effect : "");
   return eff === "cut" && isProofSurface(comp.type);
 }
+
+/** Components PINNED TO THE FRAME: they never ride the camera rig. The
+ *  caption lane is the film's text layer -- the reference films punch in
+ *  on the person while the words hold still. Inside the rig a 1.3x
+ *  punch-in pushed the chest band to 87%-103% of the frame (measured live,
+ *  proj_9e650f1a scenes 6-7: the captions in the platform strip). */
+const FIXED_TO_FRAME = new Set(["reel-caption-lane"]);
+export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
@@ -228,7 +236,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""}${isFixedToFrame(comp.type) ? ` data-mp-fixed="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
       `    ${boundHtml}\n` +
       `  </div>`
     );
@@ -892,11 +900,21 @@ export function cameraMovesScript(
       // so backdrops left OUTSIDE the rig (z 1) would paint OVER the whole rig.
       // Bit the Studio composite: every camera_moves scene showed backdrop only.
       cam.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;z-index:2;';
+      // Pinned to the frame (the caption lane): hoisted to the root first,
+      // because the components live inside a full-frame container
+      // (.mp-camera) that rides the rig whole -- then parked outside, above
+      // the rig by its own z-index, so a punch-in never moves the words.
+      try {
+        Array.prototype.slice.call(root.querySelectorAll('[data-mp-fixed]')).forEach(function(f) {
+          if (f.parentNode !== root) root.appendChild(f);
+        });
+      } catch (eFix) {}
       Array.prototype.slice.call(root.childNodes).forEach(function(n) {
         if (n.nodeType === 1) {
           var t = n.tagName;
           if (t === 'SCRIPT' || t === 'STYLE') return;
           if (n.id === '__mp_speaker_base') return;
+          if (n.hasAttribute && n.hasAttribute('data-mp-fixed')) return;
           // Flat-laid backdrops (the composite path): a travel-safe surface
           // now rides the rig -- Studio finally previews the same moving
           // sheet the render produces. Everything else stays parked outside,

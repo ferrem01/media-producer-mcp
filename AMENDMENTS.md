@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — captions: the words hold still under the punch-in
+
+The first captioned render (proj_9e650f1a): in scenes 6 and 7 the
+captions sat at 92%-97% of the frame, inside the platform strip. The lane
+rode the camera rig like every other component, and the 1.3x punch-in
+on the person pushed the chest band to 87%-103% (measured with the
+assembled scene). The reference films punch in on the person while the
+words hold still.
+
+- `scene-assembler.ts`: `isFixedToFrame(type)` (the caption lane); the
+  wrapper carries `data-mp-fixed="1"` and the rig's child loop parks it
+  outside, where its own z-index (41) keeps it above the rig (z 2).
+- `composite-assembler.ts` (Studio's preview): the same attribute -- and
+  the cut-in plate (`data-mp-cutaway`, white) it never had, so Studio
+  previews what the render draws.
+
 ## 2026-09-16 — captions: one tinted word per sentence by rule; no one-word flash
 
 The first captioned rebuild of proj_9e650f1a (a board written before the
