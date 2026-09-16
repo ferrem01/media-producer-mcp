@@ -20,6 +20,11 @@ describe("the take page's client script", () => {
   const html = getTakeHtml();
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 
+  it("reads the tenant from the token when the link has none (one link, any screen)", () => {
+    expect(html).toMatch(/if \(!tenant && token\) \{\s*try \{\s*var segT = token\.split\('\.'\)\[1\] \|\| '';/);
+    expect(html).toMatch(/tenant = String\(payT\.tenant_id \|\| payT\.tenant \|\| ''\);/);
+  });
+
   it("parses as JavaScript (a syntax error bricks the booth)", () => {
     expect(scripts.length).toBeGreaterThan(0);
     for (const src of scripts) expect(() => new Function(src)).not.toThrow();
