@@ -3028,3 +3028,17 @@ camera_moves was empty. In the takeover recipe, an over-camera scene with
 no moves whose beat prose describes a push-in gets one: a slow 1.2x zoom
 from that beat's start, held to the cut, aimed at the face by the re-aim
 that follows.
+
+## The surgical revise holds the same shape as the whole board
+
+Re-authoring one scene of proj_4488f790 through the surgical path returned
+a sticker-prop carrying an invented "script" array and lines with literal
+"\n" -- the two things the whole-board builder's normalization catches,
+which the surgical path skipped entirely, and the writer had never seen
+the component library's data fields (its prompt named types only).
+
+`normalizeSceneShape` is now one exported function (unescape the lines,
+normalize component entries, sanitize camera moves, drop unknown types)
+used by both writers. The surgical prompt carries the library, with the
+rule that a component's data has only its type's fields, and the server
+builds the catalog for it.

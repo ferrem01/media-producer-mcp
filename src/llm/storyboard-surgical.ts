@@ -14,6 +14,8 @@
  */
 import { callLLM, type LLMConfig } from "./client.js";
 import type { Project } from "../core/types.js";
+import { normalizeSceneShape } from "./storyboard-builder.js";
+import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 
 export interface SurgicalSceneOp {
   /** Revise the scene at this index in place... */
@@ -77,6 +79,10 @@ export async function reviseDraftSceneSurgical(
   project: Project,
   op: SurgicalSceneOp,
   llmConfig: LLMConfig,
+  /** The component library, so the writer sees each type's data fields
+   *  (without it the surgical writer invented a "script" array on a
+   *  sticker-prop) and unknown types are dropped from what it returns. */
+  catalog?: ComponentCatalogEntry[],
 ): Promise<any> {
   const sb: any = (project as any).storyboard;
   const scenes: any[] = sb?.scenes || [];
@@ -110,6 +116,9 @@ export async function reviseDraftSceneSurgical(
     `You are a film director doing a SURGICAL edit on one scene of an approved storyboard. Every other scene is LOCKED -- the caller splices your output in; you cannot touch anything else, so do not try.`,
     SCENE_SCHEMA_NOTE,
     `Component types already proven on this board (prefer these; their data shapes are shown in the scene JSON): ${neighborTypes.join(", ") || "(none)"}.`,
+    catalog && catalog.length
+      ? `THE COMPONENT LIBRARY -- a component's data carries ONLY the fields listed for its type. Never invent a "script" array on a type whose fields do not include one; a performed word is a kinetic-text with text/at/exit_at, a stamp is a sticker-prop with kind/text/at.\n\n${formatCatalogForPrompt(catalog)}`
+      : "",
     `Return EXACTLY ONE scene as a single JSON object. No prose, no markdown fences, no array.`,
     boardContext(project),
   ].join("\n\n");
@@ -122,6 +131,8 @@ export async function reviseDraftSceneSurgical(
     systemPrompt: system, maxTokens: 8000, temperature: 0.4,
   });
   const scene = parseSceneJson(text);
+  const notes = normalizeSceneShape(scene, catalog && catalog.length ? new Set(catalog.map((c) => c.type)) : undefined);
+  if (notes.length) console.log(`  storyboard-surgical: ${notes.join("; ")}`);
 
   if (isInsert) scenes.splice(idx, 0, scene);
   else scenes[idx] = scene;

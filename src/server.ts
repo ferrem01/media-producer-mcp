@@ -53,6 +53,7 @@ import { proposeSceneCompression, probeMediaDuration } from "./core/auto-compres
 import { projectDir, projectOutputDir, projectAssetsDir, tenantComponentsDir } from "./persistence/paths.js";
 import { renderStoryboardCards } from "./core/storyboard-cards.js";
 import { reviseDraftSceneSurgical } from "./llm/storyboard-surgical.js";
+import { buildComponentCatalog } from "./llm/catalog.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit, SpeakerTrack, Frame, Canvas, Project } from "./core/types.js";
@@ -772,7 +773,9 @@ export function queueSurgicalSceneOp(
     if (project.status !== "storyboard" && project.status !== "draft") {
       throw new Error(`Cannot revise storyboard: project is in '${project.status}' state`);
     }
-    const scene = await reviseDraftSceneSurgical(project, op, llmConfig);
+    let catalog: import("./llm/catalog.js").ComponentCatalogEntry[] | undefined;
+    try { catalog = await buildComponentCatalog(config.componentLibDir, tenantComponentsDir(tenantId)); } catch { catalog = undefined; }
+    const scene = await reviseDraftSceneSurgical(project, op, llmConfig, catalog);
     project.updated_at = new Date().toISOString();
     await saveProject(project);
     j.progress = { step: "storyboard-cards", percent: 75, detail: "Photographing the storyboard" };

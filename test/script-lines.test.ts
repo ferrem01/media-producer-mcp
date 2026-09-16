@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { scriptLines, scriptWords, scriptGaps, speakingEstimate, displayScript, PAUSE_GLYPH, LINE_BREATH_S, PAUSE_BEAT_S } from "../src/core/script-lines.js";
 import { assertedSpine, splitByScripts } from "../src/core/word-anchors.js";
-import { unescapeLines } from "../src/llm/storyboard-builder.js";
+import { unescapeLines, normalizeSceneShape } from "../src/llm/storyboard-builder.js";
 
 const SCRIPT = [
   "Your campaign is live.",
@@ -88,5 +88,29 @@ describe("lines the writer double-escaped", () => {
     const fixed = unescapeLines(raw);
     expect(fixed.split("\n")).toEqual(["A marketer's week disappears.", "One for the plan.", "(pause)", "\"Get more signups.\""]);
     expect(scriptLines(fixed).map((l) => l.pause)).toEqual([false, false, true, false]);
+  });
+});
+
+describe("every scene the writer returns is held to one shape (whole board and surgical revise)", () => {
+  it("unescapes the lines, normalizes component entries, drops unknown types", () => {
+    const scene: any = {
+      label: "S", duration_seconds: 8,
+      voiceover_text: String.raw`It ships it.\n(pause)\nThat's Quotient.`,
+      beats: [{ label: "b", duration_seconds: 8, action: "x", voiceover_text: String.raw`It ships it.\n(pause)` }],
+      components: [{ type: "kinetic-text", data: { text: "IT SHIPS" } }, { type: "made-up-widget", data: { a: 1 } }, "composer", { type: "sticker-prop" }],
+    };
+    const notes = normalizeSceneShape(scene, new Set(["kinetic-text", "composer", "sticker-prop"]));
+    expect(scene.voiceover_text.split("\n")).toEqual(["It ships it.", "(pause)", "That's Quotient."]);
+    expect(scene.beats[0].voiceover_text).toBe("It ships it.\n(pause)");
+    expect(scene.components).toEqual([{ type: "kinetic-text", data: { text: "IT SHIPS" } }, "composer", "sticker-prop"]);
+    expect(notes.join(" ")).toMatch(/made-up-widget/);
+  });
+  it("the surgical revise sees the library and holds the shape", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile(new URL("../src/llm/storyboard-surgical.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/formatCatalogForPrompt\(catalog\)/);
+    expect(src).toMatch(/normalizeSceneShape\(scene, catalog/);
+    const server = await fs.readFile(new URL("../src/server.ts", import.meta.url), "utf8");
+    expect(server).toMatch(/reviseDraftSceneSurgical\(project, op, llmConfig, catalog\)/);
   });
 });
