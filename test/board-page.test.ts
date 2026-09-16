@@ -28,10 +28,10 @@ describe("the board page (SPEC-take-flow.md, phase 3)", () => {
 
   it("lists the proof each claim asked for, with Upload per piece (SPEC-creator-cut.md)", () => {
     expect(js).toMatch(/g === 'speaker' \|\| g === 'creator-cut'/);   // the booth serves both person grammars
-    expect(js).toMatch(/x\.evidence === j/);                            // the need is found by its evidence index
+    expect(js).toMatch(/x\.type !== 'camera_video'/);                   // every non-take need on the scene is proof
     expect(js).toMatch(/'The proof this claim wants'/);
-    expect(js).toMatch(/\/evidence\/' \+ encodeURIComponent\(tenant\)/); // a provided file fills the need
-    expect(js).toMatch(/scene_index: i, evidence_index: j/);
+    expect(js).toMatch(/\/provide-asset\/' \+ encodeURIComponent\(tenant\)/); // a provided file fills the need
+    expect(js).toMatch(/scene_index: i, asset_index: j/);
     // Proof never blocks the build: the hint says so instead.
     expect(js).toMatch(/the build runs without/);
   });

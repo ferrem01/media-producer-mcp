@@ -42,7 +42,7 @@ import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries } from "./core/take-needs.js";
-import { ensureEvidenceNeeds, openEvidenceNeeds } from "./core/evidence-needs.js";
+import { openAssetNeeds } from "./core/asset-needs.js";
 import { sanitizeTake } from "./core/take-sanitize.js";
 import { TraceBuilder } from "./trace/index.js";
 // generateComponent / saveGeneratedComponent used by pipeline internally
@@ -367,7 +367,7 @@ BEFORE GENERATING
   * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
   * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
   * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
-  * creator-cut -- a person explains, the screen PROVES it: each claim names its evidence (screenshot, recording, b-roll), cut in full-frame and back. The board asks for every piece.
+  * creator-cut -- a person explains, the screen PROVES it: each claim names its proof (screenshot, recording, b-roll), cut in full-frame and back. The board asks for every piece.
     Real person (both): take(project_id) -> a link the human records on (phone); the job completes when the take lands.
   Choosing: ask what carries the argument.
 - FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else; never changes the grammar. Instagram ad = 9x16 + any grammar.
@@ -708,7 +708,6 @@ export async function queueStoryboardGeneration(params: {
         origProject.storyboard = project.storyboard;
         origProject.status = "storyboard";
         ensureSpeakerNeeds(origProject);
-        ensureEvidenceNeeds(origProject);
         origProject.updated_at = new Date().toISOString();
         await saveProject(origProject);
         project = origProject;
@@ -1511,7 +1510,7 @@ export function createMcpServer(): McpServer {
       if (!project.storyboard?.scenes?.length) return err("This project has no storyboard yet. Build one with generate(mode='storyboard') first.");
       if (ensureSpeakerNeeds(project)) { project.updated_at = new Date().toISOString(); await saveProject(project); }
       const open = openTakeNeeds(project);
-      const openEvidence = openEvidenceNeeds(project);
+      const openProof = openAssetNeeds(project);
       const sceneIndex = params.scene_index;
       if (sceneIndex !== undefined && !project.storyboard.scenes[sceneIndex]) return err(`scene_index ${sceneIndex} is out of range (${project.storyboard.scenes.length} scenes).`);
       const job = queueJob("take", params.tenant_id, async (j) => {
@@ -1536,7 +1535,7 @@ export function createMcpServer(): McpServer {
         studio_url: studioUrl,
         take_url: takeUrl,
         open_needs: open,
-        ...(openEvidence.length ? { open_evidence: openEvidence } : {}),
+        ...(openProof.length ? { open_proof: openProof } : {}),
         script: (sceneIndex !== undefined ? [project.storyboard.scenes[sceneIndex]] : project.storyboard.scenes)
           .map((sc, i) => ({ scene_index: sceneIndex !== undefined ? sceneIndex : i, label: sc.label, lines: sc.voiceover_text || "" })),
         message: `Hand the human studio_url (or take_url to open the booth directly). Poll job(action='status', job_id='${job.id}'); it completes when the take is attached.`,
@@ -2679,7 +2678,7 @@ export function createMcpServer(): McpServer {
         music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
       })).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc. Accepts an object or a JSON string."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its evidence (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its proof (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry, and nothing else. 16x9 (default): embeds, landing pages, YouTube. 9x16: Reels, TikTok, Shorts, Stories (top 12% / bottom 18% are platform UI). 4x5: Instagram or LinkedIn feed post (shown whole). 1x1: square. Omit to let the director infer it from where the prompt says the film ships; pass to pin. Explicit canvas_width/canvas_height override it. A frame never changes the grammar."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),

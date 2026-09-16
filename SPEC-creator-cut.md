@@ -130,16 +130,19 @@ Missing (the build list):
    **Built.** `creator-cut` is a `film_grammar` value; every gate that read
    `speaker` reads `personCarries()` (`core/take-needs.ts`), so the grammar
    inherits the take flow whole. The writer's contract inherits speaker's
-   spine and states the busy edit; each scene carries `evidence[]`
-   (`SceneEvidence`: kind, description, use, at/until word anchors,
-   focus). `core/evidence-needs.ts` turns it into needs on `assets[]`
-   (`evidence: i`), the board lists them under each claim with Upload,
-   `POST /api/evidence/{t}/{p}` fills one, and the build casts every
-   provided file as a `cutaway` component (full-bleed, hard cut in on its
-   word and out on the next; a still gets a slow push, a clip plays from
-   its start). Proof never blocks the build. Not yet: b-roll and mocks
-   generated in-house (their needs read "optional"), cards, annotations
-   drawn on the cutaway, captions from the take.
+   spine and states the busy edit. The proof is written on the scene's
+   EXISTING needs record, `assets[]` -- no new field: a need gains four
+   optional fields (`use` cutaway | card, `at` / `until` word anchors,
+   `focus`). `core/asset-needs.ts` normalizes what the writer wrote, the
+   board lists every non-take need under its claim with Upload, and
+   `POST /api/provide-asset/{t}/{p}` (the HTTP twin of the update tool's
+   `provide_asset`) fills one. The build casts every provided file as the
+   EXISTING `image` or `video` component, full-bleed, with `at` / `exit_at`
+   -- and on those two components a timed window is a HARD cut (no fade
+   either side; a still gets a slow push, a clip plays from its own start).
+   No new component type. Proof never blocks the build. Not yet: b-roll
+   and mocks generated in-house (their needs read "optional"), cards, the
+   focus drawn on the proof, captions from the take.
 2. Captions from the take; the evidence card; annotations on cutaways;
    b-roll needs filled in-house.
 3. Layout under the busy edit; the ad pass (punchy, 30s) and the tutorial

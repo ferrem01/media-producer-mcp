@@ -29,7 +29,7 @@ import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
-import { ensureEvidenceNeeds, evidenceComponents, hasCutawayFor } from "../core/evidence-needs.js";
+import { proofComponents, hasProofFor } from "../core/asset-needs.js";
 import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2191,13 +2191,10 @@ function storyboardToSaved(
       camera_moves: s.camera_moves,
       voiceover_text: s.voiceover_text,
       duration_seconds: s.duration_seconds,
-      // The needs, carried: a build-from-board hydrates the approved scenes
-      // with their provided evidence, and writing `[]` here threw every
-      // uploaded file away on the way back to disk.
+      // The needs, carried: the proof a creator-cut writer asked for, and
+      // on a build-from-board the provided files -- writing `[]` here threw
+      // every uploaded file away on the way back to disk.
       assets: Array.isArray(s.assets) ? s.assets : [],
-      // The proof each claim asked for (creator-cut) -- the board's needs
-      // are derived from it on load.
-      evidence: Array.isArray(s.evidence) && s.evidence.length ? s.evidence : undefined,
       visual_notes: s.visual_notes || "",
       components: s.components || [],
       broll_query: s.broll_query,
@@ -2702,15 +2699,15 @@ async function runUnifiedPipeline(
       // builds its bands around it (core/face-band.ts).
       const takeFace = spineProject ? activeTake(spineProject, i)?.face : undefined;
       if (takeFace) { d.take_face = takeFace; console.log(`  Face: scene ${i + 1} at ${Math.round(takeFace.cx * 100)}%/${Math.round(takeFace.cy * 100)}%, ${Math.round(takeFace.size * 100)}% tall`); }
-      // The proof that arrived (creator-cut): every provided piece of
-      // evidence becomes a full-bleed cutaway on its words -- cast BEFORE
-      // the spine pass so its anchors resolve with everyone else's.
+      // The proof that arrived (creator-cut): every provided file becomes a
+      // full-bleed image or clip cut in on its words -- cast BEFORE the
+      // spine pass so its anchors resolve with everyone else's.
       if (!Array.isArray(d.components)) d.components = [];
-      for (const cut of evidenceComponents(d)) {
-        const ei = Number((cut as any).data?.evidence);
-        if (hasCutawayFor(d.components, ei)) continue;
+      for (const cut of proofComponents(d)) {
+        const src = String((cut as any).data?.src);
+        if (hasProofFor(d.components, src)) continue;
         d.components.push(cut);
-        console.log(`  Evidence: scene ${i + 1} cutaway ${ei + 1} (${(cut as any).data?.media}) from ${String((cut as any).data?.src).split("/").pop()}`);
+        console.log(`  Proof: scene ${i + 1} ${(cut as any).type} cut in from ${src.split("/").pop()}`);
       }
       if (spine.source === "measured" && spine.duration > 0 && Math.abs(spine.duration - (Number(d.duration_seconds) || 0)) > 0.05) {
         console.log(`  Spine: scene ${i + 1} ${d.duration_seconds}s -> ${spine.duration}s (the take is the clock)`);
@@ -2901,7 +2898,6 @@ async function runUnifiedPipeline(
   // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
     project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
-    ensureEvidenceNeeds(project);
     project.prompt = opts.prompt;
     project.status = "storyboard";
     project.created_at = new Date().toISOString();
@@ -3783,7 +3779,6 @@ async function runUnifiedPipeline(
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
-  ensureEvidenceNeeds(project);
   project.prompt = opts.prompt;
   project.status = "generated";
   await saveProject(project);
