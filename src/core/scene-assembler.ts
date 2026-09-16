@@ -672,20 +672,30 @@ export function wrapperChoreoScript(
   canvasW = 1920,
   canvasH = 1080,
 ): string {
+  // The cut windows of this scene's proof (creator-cut): a pinned lane
+  // with data.cut_top drops to that band for each window and comes back.
+  const animOf = (v: unknown): { effect?: string; at?: unknown } | null => typeof v === "string" ? { effect: v } : (v && typeof v === "object" ? (v as any) : null);
+  const cuts = components
+    .filter((c) => { const e = animOf(c.enter); return !!e && e.effect === "cut" && typeof e.at === "number" && isProofSurface(c.type); })
+    .map((c) => { const x = animOf(c.exit); return { at: Number((animOf(c.enter) as any).at), until: x && x.effect === "cut" && typeof x.at === "number" ? Number(x.at) : null }; });
   const moves = components
-    .filter((c) => c.pose || c.enter || c.exit)
+    .filter((c) => c.pose || c.enter || c.exit || (c as any).data?.cut_top != null)
     .map((c) => ({
       cid: `${cidPrefix}${c.id}`,
       pose: c.pose || null,
       enter: c.enter || null,
       exit: c.exit || null,
       frame: (c as any).frame_anchor || null,
+      cutTop: (c as any).data?.cut_top != null ? Number((c as any).data.cut_top) : null,
+      top0: c.position && (c.position as any).y !== undefined ? String((c.position as any).y) : null,
+      height0: c.position && (c.position as any).height !== undefined ? String((c.position as any).height) : null,
     }));
   if (!moves.length) return "";
   return `
   // ── Stage wrapper choreography (pose / enter / exit) ──
   (function() {
     var CHOREO = ${JSON.stringify(moves)};
+    var CUTS = ${JSON.stringify(cuts)};
     var DUR = ${sceneDuration};
     var CW = ${canvasW}, CH = ${canvasH};
     // FRAME A CUTAWAY ON ITS REGION (SPEC-creator-cut.md). A cut-in wrapper
@@ -754,6 +764,16 @@ export function wrapperChoreoScript(
     CHOREO.forEach(function(c) {
       var el = document.querySelector('.mp-component[data-cid="' + c.cid + '"]');
       if (!el) return;
+      // The pinned lane over a cutaway: down to the chest band for the
+      // window, back where it was when the person returns.
+      if (c.cutTop != null && c.top0 != null && CUTS.length) {
+        // The chest band is 12% tall; a lane that came from a taller band
+        // keeps its own height back where it was.
+        CUTS.forEach(function(w) {
+          master.set(el, { top: c.cutTop + '%', height: '12%' }, w.at);
+          if (w.until != null) master.set(el, { top: c.top0, height: c.height0 || '12%' }, w.until);
+        });
+      }
       if (c.pose) {
         gsap.set(el, {
           rotationY: c.pose.rotate_y || 0,

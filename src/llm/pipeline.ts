@@ -1250,9 +1250,25 @@ async function critiqueAndRetryScene(opts: {
             htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
             atTimes: [dur * 0.35, dur * 0.6, dur * 0.85],
           });
+          // OVER THE CAMERA the page is not the ground -- but a plate is.
+          // Text that fails on a DARK page and on a LIGHT page fails on any
+          // camera, because whatever it sits on is its own (measured live,
+          // proj_f10e79cf: a light brand's dark ink on the captions' dark
+          // plate, "black on black", dropped as an over-camera finding).
+          let failsAnyCamera: Set<string> | null = null;
+          if (opts.overCamera) {
+            const variant = async (name: string, bg: string) => {
+              const vp = path.join(bootDir, name);
+              await fs.writeFile(vp, bootHtml.replace("</head>", `<style>html,body{background:${bg} !important}</style></head>`));
+              return measureTextContrast({ htmlPath: vp, width: opts.canvas.width, height: opts.canvas.height, atTimes: [dur * 0.35, dur * 0.6, dur * 0.85] });
+            };
+            const [onDark, onLight] = await Promise.all([variant("scene-dark.html", "#101014"), variant("scene-light.html", "#e9e9ef")]);
+            const dark = new Set(onDark.filter((d) => d.reason !== "clipped").map((d) => d.text));
+            failsAnyCamera = new Set(onLight.filter((d) => d.reason !== "clipped" && dark.has(d.text)).map((d) => d.text));
+          }
           for (const d of contrastDefects) {
             const type = d.reason === "clipped" ? "clipped_text" : "illegible";
-            if (type === "illegible" && opts.overCamera) {
+            if (type === "illegible" && opts.overCamera && !(failsAnyCamera && failsAnyCamera.has(d.text))) {
               console.log(`  legibility gate: "${d.text}" measured against the plain page, not the camera -- ink finding dropped (over-camera scene)`);
               continue;
             }
@@ -2796,6 +2812,25 @@ async function runUnifiedPipeline(
               c.exit = { effect: "cut", at: back };
               console.log(`  Creator-cut: scene ${i + 1} -- the film ends on the person: ${c.type} cuts out at ${back}s`);
             }
+          }
+        }
+        // A STICKER NAMES THE THING, ON THE WORD, UNTIL THE PROOF: the writer
+        // lands its pill at 0.2s and flashes it for a second ("a random
+        // little pill that keeps showing up" -- measured live, proj_f10e79cf).
+        // By rule it lands on the claim's emphasis word and stays until the
+        // cutaway cuts in (the cut is its exit); its own anchors resolve with
+        // everyone else's below.
+        {
+          const cutIns = (d.components as any[]).filter((c) => c && typeof c === "object" && isProofSurface(c.type) && c.enter && typeof c.enter === "object" && c.enter.effect === "cut" && c.enter.at !== undefined && c.enter.at !== null);
+          const firstCut = cutIns[0]?.enter?.at;
+          const emWord = Array.isArray(d.emphasis) && d.emphasis.length ? String(d.emphasis[0]) : "";
+          for (const c of d.components as any[]) {
+            if (!c || typeof c !== "object" || c.type !== "sticker-prop" || !c.data || typeof c.data !== "object") continue;
+            const kind = String(c.data.kind || "pill");
+            if (kind === "ring" || kind === "image") continue;
+            const atNum = typeof c.data.at === "number" ? c.data.at : NaN;
+            if (emWord && (c.data.at === undefined || (Number.isFinite(atNum) && atNum < 0.5))) c.data.at = `@${emWord}`;
+            if (firstCut !== undefined && c.exit === undefined) { c.exit = { effect: "cut", at: firstCut }; c.data.hold = 0; }
           }
         }
         // THE WORDS ARE ON SCREEN THE WHOLE TIME (all four reference films;

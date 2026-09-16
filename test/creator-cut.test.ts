@@ -226,6 +226,12 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(pipeline).toMatch(/c\.type === "reel-caption-lane"\);\s*if \(!hasLane && spine\.words\.length\)/);
     // ...carried from the board to the saved storyboard.
     expect(pipeline).toMatch(/emphasis: \(s as any\)\.emphasis/);
+    // A STICKER NAMES THE THING, ON THE WORD, UNTIL THE PROOF (measured live: a pill at 0.2s flashing for a second).
+    expect(pipeline).toMatch(/if \(emWord && \(c\.data\.at === undefined \|\| \(Number\.isFinite\(atNum\) && atNum < 0\.5\)\)\) c\.data\.at = `@\$\{emWord\}`;/);
+    expect(pipeline).toMatch(/if \(firstCut !== undefined && c\.exit === undefined\) \{ c\.exit = \{ effect: "cut", at: firstCut \}; c\.data\.hold = 0; \}/);
+    // OVER THE CAMERA a plate is the ground: ink that fails on a dark AND a light page is a finding, not dropped.
+    expect(pipeline).toMatch(/variant\("scene-dark\.html", "#101014"\), variant\("scene-light\.html", "#e9e9ef"\)/);
+    expect(pipeline).toMatch(/if \(type === "illegible" && opts\.overCamera && !\(failsAnyCamera && failsAnyCamera\.has\(d\.text\)\)\)/);
     // THE LINES SET THE FLOOR: a scene's duration is at least its script at speaking pace (measured live: 24 words in 4s).
     expect(pipeline).toMatch(/const floor = Math\.round\(speakingEstimate\(script\) \* 100\) \/ 100;\s*if \(\(Number\(d\.duration_seconds\) \|\| 0\) < floor\) \{[\s\S]*?d\.duration_seconds = floor;/);
     // Only creator-cut, only over the person, and before the spine pass so the proof cast after it can still replace the window.
@@ -295,6 +301,15 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     const composite = await read("../src/core/composite-assembler.ts");
     expect(composite).toMatch(/isFixedToFrame\(comp\.type\) \? ' data-mp-fixed="1"' : ""/);
     expect(composite).toMatch(/isCutInProof\(comp\) \? ' data-mp-cutaway="1"' : ""/);
+    // Over a cutaway the pinned lane drops to the chest band for the cut window and comes back (measured live: the
+    // captions "cracked out over the main part of the screen" on the mock).
+    expect(asm).toMatch(/var CUTS = \$\{JSON\.stringify\(cuts\)\};/);
+    expect(asm).toMatch(/master\.set\(el, \{ top: c\.cutTop \+ '%', height: '12%' \}, w\.at\);\s*if \(w\.until != null\) master\.set\(el, \{ top: c\.top0, height: c\.height0 \|\| '12%' \}, w\.until\);/);
+    const gen0 = await read("../src/llm/scene-generator.ts");
+    expect(gen0).toMatch(/if \(c\.type === "reel-caption-lane" && tallFrame && lay && parseFloat\(String\(lay\.position\.y\)\) < 50\) data\.cut_top = 70;/);
+    // Under a plate or a shadow the lane's ink is white whatever the brand says (measured live: "black on black").
+    const lane = await read("../src/components/captions/reel-caption-lane.component.html");
+    expect(lane).toMatch(/\.rcl-scrim-shadow \.rcl-inner,\s*\.rcl-scrim-plate \.rcl-inner \{\s*color: #ffffff;\s*\}/);
     // ...and frames at about 1.5x, region high (Marc: 2.2x was too big for the vertical screen).
     expect(asm).toMatch(/var sc = Math\.max\(1\.2, Math\.min\(2\.2, \(CW \* 0\.94 \/ r\.w\) \* 1\.5\)\);/);
     // The generator lays a cut-in label above the proof and frames only proof surfaces.
