@@ -23,7 +23,7 @@ import { assembleScene } from "./scene-assembler.js";
 import { LAUNCH_OPTS } from "./capture.js";
 import { buildAuthoredCompositionScene, buildTemplateScene } from "../llm/scene-generator.js";
 import type { Project } from "./types.js";
-import { activeTake } from "./take-needs.js";
+import { activeTake, personCarries } from "./take-needs.js";
 import { ensureTakePoster } from "./take-poster.js";
 import fsSync from "node:fs";
 
@@ -241,7 +241,7 @@ export async function renderStoryboardCards(project: Project, opts: {
   // A speaker film: the person is the base of every scene. The card lays
   // the graphics out the way the build will (bands around the face) and
   // shows the reader that a person is expected there.
-  const speakerFilm = (project as any).treatment?.filmGrammar === "speaker";
+  const speakerFilm = personCarries((project as any).treatment?.filmGrammar);
   const browser = await chromium.launch(LAUNCH_OPTS);
   const stills: Array<string | null> = [];
   try {

@@ -188,7 +188,7 @@ describe("the camera rides the rig, the cut is a swap, the lane shows the takes"
     expect(app).toMatch(/\/take-poster\//);                                       // the speaker lane wears the take's picture
     expect(app).toMatch(/'&camera=0' : ''/);                                       // the filmstrip shows the scene, not the camera
     const server = await fs.readFile(new URL("../src/index.ts", import.meta.url), "utf8");
-    expect(server).toMatch(/\|take\|take-poster\|storyboard\)/);                   // tenant-guarded
+    expect(server).toMatch(/\|take\|take-poster\|storyboard\|evidence\)/);                   // tenant-guarded
     expect(server).toMatch(/speakerRefs\[sc0\.id\] = \{ url: u0, offset: ref0!\.offset \}/);
   });
 });

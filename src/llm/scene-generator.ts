@@ -358,7 +358,7 @@ var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 // plated caption that fits its lane, the stage overlay) and must NOT be
 // zoomed on top of that. Everything else gets the phone zoom on a tall
 // speaker frame: a mock, a stamp, a pill set, a composer, a stat.
-var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "video", "image"];
+var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "video", "image", "cutaway"];
 function phoneZoomable(type: string): boolean {
   return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
 }
@@ -372,6 +372,10 @@ var PHONE_REEL_MOCK_RE = /^(quotient-|claude-|slack-|chat-simulator|browser-fram
 var PHONE_MIN_FONT_PX = 72;
 /** Full-stage overlays: performers that cover the whole composition. */
 var STAGE_OVERLAY_TYPES = ["cursor-performer"];
+/** The proof taking the frame for a beat (SPEC-creator-cut.md): full-bleed
+ *  over the person and every graphic riding on them, under the stage
+ *  overlays. Never banded, never zoomed, never dropped as furniture. */
+var CUTAWAY_TYPES = ["cutaway"];
 /** Ambient full-stage text overlays that ride ABOVE the windows (their own
  *  markup scatters; the box is the whole stage). */
 var HIGH_OVERLAY_TYPES = ["floating-pills"];
@@ -484,6 +488,8 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     var t = c.type;
     if (STAGE_OVERLAY_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: { ...FULL_STAGE }, z_index: 45 };
+    } else if (CUTAWAY_TYPES.indexOf(t) !== -1) {
+      slots[i] = { position: { ...FULL_STAGE }, z_index: 36 };
     } else if (ACCENT_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: ACCENT_SPOTS[Math.min(accentCount, ACCENT_SPOTS.length - 1)], z_index: 40 + accentCount };
       accentCount++;
@@ -950,7 +956,7 @@ export function buildAuthoredCompositionScene(
     // desktop guesses and the bands are the only thing keeping content off
     // the face (measured: the board's composer grew to 26% and sat on the
     // list under it). A takeover's full-bleed position still stands.
-    if (hasAuthoredPos && speakerBase && tallFrame && !isTakeover && lay && STAGE_OVERLAY_TYPES.indexOf(c.type) === -1) {
+    if (hasAuthoredPos && speakerBase && tallFrame && !isTakeover && lay && STAGE_OVERLAY_TYPES.indexOf(c.type) === -1 && CUTAWAY_TYPES.indexOf(c.type) === -1) {
       console.log(`    ${c.type}: tall speaker frame -- the band layout wins over the board's position (${JSON.stringify(authoredPos)})`);
       hasAuthoredPos = false;
     }

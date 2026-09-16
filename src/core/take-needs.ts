@@ -14,13 +14,23 @@ import type { Project, Take, SpeakerTrackClip, StoryboardScene } from "./types.j
 /** Marker on the auto-emitted need so it can be found and updated. */
 export const TAKE_NEED_DESCRIPTION = "Camera take of this scene's spoken lines";
 
+/** The grammars where a PERSON carries the film: the camera is the base of
+ *  every scene, the voice is the clock, and the board asks for takes. Every
+ *  gate that used to read `=== "speaker"` reads this instead, so a grammar
+ *  added here inherits the whole take flow (needs, the booth, the spine,
+ *  the face-aware layout, the takeover recipe, the cards) at once. */
+export const PERSON_GRAMMARS = ["speaker", "creator-cut"] as const;
+export function personCarries(grammar: unknown): boolean {
+  return typeof grammar === "string" && (PERSON_GRAMMARS as readonly string[]).includes(grammar);
+}
+
 /**
  * Make sure every speaker-board scene with spoken lines carries a
  * `camera_video` need, and that its status reflects the takes on file.
  * Idempotent. Returns true when anything changed.
  */
 export function ensureSpeakerNeeds(project: Project): boolean {
-  if ((project.treatment as any)?.filmGrammar !== "speaker") return false;
+  if (!personCarries((project.treatment as any)?.filmGrammar)) return false;
   const scenes = project.storyboard?.scenes || [];
   let changed = false;
   scenes.forEach((scene: StoryboardScene, i: number) => {

@@ -19,7 +19,8 @@ import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
 import { getBoardHtml } from "./board-page.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
-import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake } from "./core/take-needs.js";
+import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries } from "./core/take-needs.js";
+import { provideEvidence, openEvidenceNeeds } from "./core/evidence-needs.js";
 import type { Take, Project } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
@@ -38,7 +39,7 @@ import { normalizeBeats } from "./core/beats.js";
 import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
-import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp } from "./server.js";
+import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp, reshootStoryboardCardsSoon } from "./server.js";
 import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits } from "./core/web-capture.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
@@ -208,7 +209,7 @@ function applyStoryboardFields(ps: any, body: any): void {
  *  pace otherwise. Speaker boards only; returns the re-time when it ran. */
 async function afterLinesEdit(project: Project, idx: number): Promise<RetimeResult | null> {
   ensureSpeakerNeeds(project);
-  if ((project.treatment as any)?.filmGrammar !== "speaker") return null;
+  if (!personCarries((project.treatment as any)?.filmGrammar)) return null;
   try { return await retimeScene(project, idx, config.dataDir); }
   catch (e: any) { console.warn(`  storyboard: re-time after script edit skipped: ${e?.message || e}`); return null; }
 }
@@ -850,7 +851,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|take-poster|storyboard)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|take-poster|storyboard|evidence)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2207,6 +2208,40 @@ Rules:
         } catch (e: any) {
           jsonResponse(res, 500, { error: e?.message || String(e) });
         }
+        return;
+      }
+
+      // ── API: Provide a piece of evidence (SPEC-creator-cut.md) ──
+      // POST /api/evidence/{tenant}/{project} {scene_index, evidence_index, url}
+      // A file uploaded to this project's assets fills one declared piece
+      // of proof: the need flips to provided and the next build casts it as
+      // a cutaway on its words. Same asset-dir guard as a take.
+      const evidenceMatch = urlPath.match(/^\/api\/evidence\/([^/]+)\/([^/]+)$/);
+      if (evidenceMatch && method === "POST") {
+        const [, evTenant, evProject] = evidenceMatch.map(decodeURIComponent);
+        let evBody: Record<string, unknown> = {};
+        try { evBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
+        const evUrl = String(evBody.url || "");
+        const evPrefix = `/assets/${evTenant}/projects/${evProject}/assets/`;
+        if (!evUrl.startsWith(evPrefix) || evUrl.includes("..")) {
+          jsonResponse(res, 400, { error: `url must be an asset of this project (${evPrefix}...)` });
+          return;
+        }
+        const evScene = Number(evBody.scene_index), evIndex = Number(evBody.evidence_index);
+        if (!Number.isInteger(evScene) || !Number.isInteger(evIndex) || evScene < 0 || evIndex < 0) {
+          jsonResponse(res, 400, { error: "scene_index and evidence_index are required (0-based)" });
+          return;
+        }
+        const evProjectObj = await loadProject(evTenant, evProject);
+        if (!evProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        let evNeed;
+        try { evNeed = provideEvidence(evProjectObj, evScene, evIndex, evUrl); }
+        catch (e: any) { jsonResponse(res, 404, { error: e?.message || String(e) }); return; }
+        evProjectObj.updated_at = new Date().toISOString();
+        await saveProject(evProjectObj);
+        console.log(`  evidence: ${evTenant}/${evProject} scene ${evScene + 1} evidence ${evIndex + 1} <- ${path.basename(evUrl)}`);
+        reshootStoryboardCardsSoon(evTenant, evProject);
+        jsonResponse(res, 200, { ok: true, scene_index: evScene, evidence_index: evIndex, need: evNeed, open_evidence: openEvidenceNeeds(evProjectObj) });
         return;
       }
 

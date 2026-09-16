@@ -23,7 +23,7 @@ const read = () => fs.readFile(path.resolve(__dirname, "../src/llm/storyboard-bu
 // must live in the UNIVERSAL block, never be inherited by accident from a
 // dialect that happens to be loaded.
 
-const GRAMMARS = ["tempo-cut","hype-cut","editorial","data-story","canvas-tour","screencast","speaker"];
+const GRAMMARS = ["tempo-cut","hype-cut","editorial","data-story","canvas-tour","screencast","speaker","creator-cut"];
 
 /** Split the prompt into the universal preamble and each gated section. */
 async function sections(): Promise<{ universal: string; byGrammar: Record<string,string> }> {
@@ -53,6 +53,8 @@ describe("grammar contracts: only the active one ships", () => {
     // Unresolved grammar must still ship everything -- the safety net.
     expect(src).toMatch(/!opts\.filmGrammar \|\|/);
     expect(src).toMatch(/opts\.filmGrammar === "hype-cut" && g === "tempo-cut"/);
+    // creator-cut inherits speaker's spine the same way.
+    expect(src).toMatch(/opts\.filmGrammar === "creator-cut" && g === "speaker"/);
   });
 
   it("keeps the data-format contract UNIVERSAL, not borrowed from a dialect", async () => {

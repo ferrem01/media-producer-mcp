@@ -41,7 +41,8 @@ import {
 import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
-import { ensureSpeakerNeeds, openTakeNeeds, waitForTake } from "./core/take-needs.js";
+import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries } from "./core/take-needs.js";
+import { ensureEvidenceNeeds, openEvidenceNeeds } from "./core/evidence-needs.js";
 import { sanitizeTake } from "./core/take-sanitize.js";
 import { TraceBuilder } from "./trace/index.js";
 // generateComponent / saveGeneratedComponent used by pipeline internally
@@ -356,7 +357,7 @@ export const MCP_INSTRUCTIONS = `Media Producer turns prompts into branded films
 THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate until right -- spend revisions HERE: feedback redrafts the WHOLE board (minutes); the storyboard tool edits ONE scene. Build ONCE (mode:'full' + project_id), tweak, render. mode:'full' cold = drafts only.
 
 BEFORE GENERATING
-- Ask first: audience, goal/CTA, target length, and which film grammar fits.
+- Ask first: audience, goal/CTA, length, which film grammar fits.
 - FILM GRAMMARS (what carries the argument; pass film_grammar to pin, omit to let the director choose):
   * launch-film -- few long cinematic scenes, one continuous world.
   * tempo-cut -- product-first montage: driving music, bar-quantized cuts, on-screen type IS the voiceover.
@@ -366,35 +367,36 @@ BEFORE GENERATING
   * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
   * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
   * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
-    Real person: take(project_id) -> link the human records on (phone), a job that completes when the take lands.
-  Choosing: ask what carries the argument.
+  * creator-cut -- a person explains, the screen PROVES it: each claim names its evidence (screenshot, recording, b-roll), cut in full-frame and back. The board asks for every piece.
+    Real person (both): take(project_id) -> link the human records on (phone), a job that completes when the take lands.
+  Choose by what carries the argument.
 - FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else -- never changes the grammar. Instagram ad = 9x16 + any grammar.
 - THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper|plain, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
-- Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
-- A recorded screen demo? The Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
+- Brand comes from the tenant's brand kit. No kit? extract_brand_from_website or upload assets first, or the film is unbranded.
+- A recorded screen demo? The Chrome recorder extension (/extension.zip) captures tab + voice, builds the film.
 
 REAL MEDIA (planned and fetched AUTONOMOUSLY -- steer it with the brief)
-- Per beat the director picks real footage, a generated still, or motion graphics (Pexels, AI stills, Veo video -- Veo only for moving shots stock can't hold; 0-1 per film, ~8s, slow).
-- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk". To FORCE a generated shot, describe it and say "generate this shot" -- that makes it mandatory. Mood-only briefs get motion graphics on UI/data beats, real media on emotional ones.
-- TALKING HEADS are explicit by design (a synthetic presenter is the human's call). generate_clip = one Veo clip (quote the spoken line). generate_presenter = a whole script (~60s) split into consistent takes, ONE stitched clip. Feed either asset_url back as speaker_source: that voice becomes the soundtrack, scenes cut on its sentences. reference_image keeps the presenter consistent.
+- Per beat the director picks real footage, a generated still, or motion graphics (Pexels, AI stills, Veo: only moving shots stock can't hold; 0-1 per film, ~8s, slow).
+- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk". To FORCE a generated shot, say "generate this shot". Mood-only briefs get motion graphics on UI/data beats, real media on emotional ones.
+- TALKING HEADS are explicit by design (a synthetic presenter is the human's call). generate_clip = one Veo clip (quote the line). generate_presenter = a whole script (~60s) as consistent takes, ONE stitched clip. Feed either asset_url back as speaker_source: its voice is the soundtrack, scenes cut on its sentences. reference_image keeps the presenter consistent.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
 1. generate mode='storyboard' -> review the beats with the human, adjust, THEN build scenes.
-2. Proof a single scene as a still: render{scene_id}.
-3. Watch motion live in Studio (studio_url on every project response) -- in-browser, no render. Send the HUMAN there to review and edit.
+2. Proof one scene as a still: render{scene_id}.
+3. Watch motion live in Studio (studio_url on every project response), no render. Send the HUMAN there to review and edit.
 4. First full watch: render{quality:'preview'} (fast). Production render only to ship.
 
 EDITING
-- revise = surgical, natural-language change to a scene ("make the headline white"). Use it before regenerating.
-- add/update/reorder/delete = structural edits. regenerate_asset = re-run one generated image.
-- NEVER edit a project while its render job runs.
+- revise = a surgical natural-language change to one scene ("make the headline white"). Use it before regenerating.
+- add/update/reorder/delete = structural edits. regenerate_asset re-runs one generated image.
+- NEVER edit a project while its render runs.
 
 JOBS AND DELIVERY
-- generate and render are async: they return a job_id; poll job{action:'status'} (or wait). Progress has step + percent -- relay it.
+- generate and render are async: they return a job_id; poll job{action:'status'} (or wait). Relay progress.
 - When a render completes the job carries download_url (direct MP4) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS; never SSH or server filesystem access.
-- Later, get(project_id) / list return rendered, download_url and render_stale (true = the MP4 predates the latest edits; offer a re-render).
+- Later, get(project_id) / list return rendered, download_url and render_stale (the MP4 predates the latest edits; offer a re-render).
 
-If a scene looks wrong, get{target:'layout'} measures real geometry (element boxes, crop math, warnings) -- diagnose before writing a revise instruction.`;
+If a scene looks wrong, get{target:'layout'} measures real geometry (boxes, crop math, warnings) -- diagnose before writing a revise.`;
 
 /**
  * Queue a build-scenes-from-storyboard job (generate mode='full' on a
@@ -706,6 +708,7 @@ export async function queueStoryboardGeneration(params: {
         origProject.storyboard = project.storyboard;
         origProject.status = "storyboard";
         ensureSpeakerNeeds(origProject);
+        ensureEvidenceNeeds(origProject);
         origProject.updated_at = new Date().toISOString();
         await saveProject(origProject);
         project = origProject;
@@ -1493,7 +1496,7 @@ export function createMcpServer(): McpServer {
 
   tool(
     "take",
-    "Ask the human for a camera take of a SPEAKER film (SPEC-take-flow.md). Returns the Studio link to hand them (on a phone it opens the board with Record on each scene; add scene_index to point the booth at one scene), the open needs, and a job that completes when the take lands -- poll job(action='status'). On arrival the file is sanitized (orientation, frame, dialogue loudness), attached as that scene's base, and the scene's need flips to provided. Then build with generate(mode='full') and render.",
+    "Ask the human for a camera take of a SPEAKER or CREATOR-CUT film (SPEC-take-flow.md). Returns the Studio link to hand them (on a phone it opens the board with Record on each scene; add scene_index to point the booth at one scene), the open needs, and a job that completes when the take lands -- poll job(action='status'). On arrival the file is sanitized (orientation, frame, dialogue loudness), attached as that scene's base, and the scene's need flips to provided. Then build with generate(mode='full') and render.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
@@ -1502,12 +1505,13 @@ export function createMcpServer(): McpServer {
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
-      if ((project.treatment as any)?.filmGrammar !== "speaker") {
-        return err(`Takes are for speaker films; this project's grammar is '${(project.treatment as any)?.filmGrammar || "unset"}'.`);
+      if (!personCarries((project.treatment as any)?.filmGrammar)) {
+        return err(`Takes are for films a person carries (speaker, creator-cut); this project's grammar is '${(project.treatment as any)?.filmGrammar || "unset"}'.`);
       }
       if (!project.storyboard?.scenes?.length) return err("This project has no storyboard yet. Build one with generate(mode='storyboard') first.");
       if (ensureSpeakerNeeds(project)) { project.updated_at = new Date().toISOString(); await saveProject(project); }
       const open = openTakeNeeds(project);
+      const openEvidence = openEvidenceNeeds(project);
       const sceneIndex = params.scene_index;
       if (sceneIndex !== undefined && !project.storyboard.scenes[sceneIndex]) return err(`scene_index ${sceneIndex} is out of range (${project.storyboard.scenes.length} scenes).`);
       const job = queueJob("take", params.tenant_id, async (j) => {
@@ -1532,6 +1536,7 @@ export function createMcpServer(): McpServer {
         studio_url: studioUrl,
         take_url: takeUrl,
         open_needs: open,
+        ...(openEvidence.length ? { open_evidence: openEvidence } : {}),
         script: (sceneIndex !== undefined ? [project.storyboard.scenes[sceneIndex]] : project.storyboard.scenes)
           .map((sc, i) => ({ scene_index: sceneIndex !== undefined ? sceneIndex : i, label: sc.label, lines: sc.voiceover_text || "" })),
         message: `Hand the human studio_url (or take_url to open the booth directly). Poll job(action='status', job_id='${job.id}'); it completes when the take is attached.`,
@@ -2674,7 +2679,7 @@ export function createMcpServer(): McpServer {
         music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
       })).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc. Accepts an object or a JSON string."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "screencast", "speaker"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its evidence (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry, and nothing else. 16x9 (default): embeds, landing pages, YouTube. 9x16: Reels, TikTok, Shorts, Stories (top 12% / bottom 18% are platform UI). 4x5: Instagram or LinkedIn feed post (shown whole). 1x1: square. Omit to let the director infer it from where the prompt says the film ships; pass to pin. Explicit canvas_width/canvas_height override it. A frame never changes the grammar."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),

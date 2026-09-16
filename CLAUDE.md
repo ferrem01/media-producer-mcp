@@ -40,7 +40,7 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
    `visualStyle.{colorMood,typographyAttitude,motionPersonality,spatialStrategy}`,
    emotionalArc, directorNote). Takes the raw prompt directly (no expander step).
    Commits the film to its four axes: `filmGrammar` (what carries the argument --
-   eight values, `screencast`/`speaker` among them), `visualSystem`, `audioSystem`,
+   nine values, `screencast`/`speaker`/`creator-cut` among them), `visualSystem`, `audioSystem`,
    and `frame` (the delivery geometry: `16x9|9x16|4x5|1x1`, inferred from where
    the prompt says the film ships, pinnable). A frame is a SIZE and nothing else --
    see `SPEC-format-and-spine.md`. The tall-frame composition laws fire from the

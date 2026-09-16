@@ -1,6 +1,8 @@
 # SPEC: creator-cut -- a person explains, the screen proves it
 
-Status: AGREED (2026-09-16, Marc + Claude). Ninth film grammar. Builds on
+Status: AGREED (2026-09-16, Marc + Claude); phase 1 BUILT (the grammar
+value, the contract, evidence needs on the board, provided proof cast as a
+cutaway). Ninth film grammar. Builds on
 `SPEC-take-flow.md` (needs, takes, word anchors, the board), the speaker
 recipe in `SPEC-motion-architecture.md`, and `SPEC-creative-axes.md`.
 
@@ -125,7 +127,21 @@ Missing (the build list):
 ## Phases
 
 1. Contract + evidence needs on the board (writer, director, board UI).
-2. Captions from the take; the evidence card; annotations on cutaways.
+   **Built.** `creator-cut` is a `film_grammar` value; every gate that read
+   `speaker` reads `personCarries()` (`core/take-needs.ts`), so the grammar
+   inherits the take flow whole. The writer's contract inherits speaker's
+   spine and states the busy edit; each scene carries `evidence[]`
+   (`SceneEvidence`: kind, description, use, at/until word anchors,
+   focus). `core/evidence-needs.ts` turns it into needs on `assets[]`
+   (`evidence: i`), the board lists them under each claim with Upload,
+   `POST /api/evidence/{t}/{p}` fills one, and the build casts every
+   provided file as a `cutaway` component (full-bleed, hard cut in on its
+   word and out on the next; a still gets a slow push, a clip plays from
+   its start). Proof never blocks the build. Not yet: b-roll and mocks
+   generated in-house (their needs read "optional"), cards, annotations
+   drawn on the cutaway, captions from the take.
+2. Captions from the take; the evidence card; annotations on cutaways;
+   b-roll needs filled in-house.
 3. Layout under the busy edit; the ad pass (punchy, 30s) and the tutorial
    pass (calm, 75s) as the exit test.
 

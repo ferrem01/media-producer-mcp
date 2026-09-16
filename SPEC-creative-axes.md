@@ -15,7 +15,7 @@ phone and a landing page in the same week:
 | Axis | Field on `generate` | What it decides | Analog |
 | --- | --- | --- | --- |
 | RHYTHM | `film_grammar` | who narrates, what earns a cut, music's role, scene assembly | editing |
-| | | *values: launch-film, tempo-cut, hype-cut, editorial, data-story, canvas-tour, screencast, speaker* | |
+| | | *values: launch-film, tempo-cut, hype-cut, editorial, data-story, canvas-tour, screencast, speaker, creator-cut* | |
 | LOOK | `visual_system` | the surface, the physics, the type voice, recurring devices | art direction |
 | SOUND | `audio_system` | music personality, narration voice, (future: SFX) | sound design |
 | FRAME | `frame` | the delivery geometry -- canvas plus the bands a platform draws over; a size and nothing else | delivery format |

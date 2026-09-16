@@ -1,0 +1,74 @@
+<template>
+  <div class="cutaway">
+    <div class="cutaway-plate"></div>
+    <div class="cutaway-media"></div>
+  </div>
+</template>
+
+<style scoped>
+  .cutaway {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .cutaway-plate {
+    position: absolute;
+    inset: 0;
+    background: #0b0b0d;
+  }
+  .cutaway-media {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+    transform-origin: 50% 40%;
+  }
+  .cutaway-media video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+</style>
+
+<script>
+  // A CUTAWAY (SPEC-creator-cut.md): the proof takes the whole frame for the
+  // beat -- hard cut in on its word, hard cut out on the next -- and the
+  // person is back. No fades either side: the cut IS the rhythm.
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.cutaway');
+    var media = el.querySelector('.cutaway-media');
+    var at = Number(data.at);
+    if (!isFinite(at) || at < 0) at = 0;
+    var exitAt = Number(data.exit_at);
+    if (!isFinite(exitAt) || exitAt <= at) exitAt = ctx.duration;
+    var fit = data.fit === 'contain' ? 'contain' : 'cover';
+
+    if (data.media === 'video') {
+      // The clip starts from ITS beginning when the cutaway lands: the
+      // capture seeks every video to start-at + scene time, so a negative
+      // start-at holds it on frame 0 until `at`.
+      loadVideoForCapture(media, data.src, {
+        startAt: -at,
+        style: 'width:100%;height:100%;object-fit:' + fit + ';display:block;'
+      });
+    } else if (data.src) {
+      media.style.backgroundImage = 'url(' + data.src + ')';
+      media.style.backgroundSize = fit;
+      // A still gets a slow push so it is not a frozen frame.
+      gsap.set(media, { scale: 1 });
+      tl.to(media, { scale: 1.06, duration: Math.max(0.5, exitAt - at), ease: 'none' }, at);
+    }
+
+    // Sub-frame tweens, not set(): a set() placed later in a timeline is
+    // rendered immediately on creation, so the proof was on screen from
+    // frame 0 (measured in the assembler probe). 0.02s is under one frame
+    // at 30fps -- still a hard cut, and the playhead scrubs it correctly.
+    gsap.set(root, { autoAlpha: 0 });
+    tl.fromTo(root, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.02, ease: 'none', immediateRender: false }, at);
+    if (exitAt < ctx.duration) tl.to(root, { autoAlpha: 0, duration: 0.02, ease: 'none' }, exitAt);
+    return tl;
+  }
+</script>

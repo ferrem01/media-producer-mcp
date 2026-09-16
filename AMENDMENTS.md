@@ -6,6 +6,51 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — creator-cut, phase 1: the ninth grammar, its contract, the proof on the board
+
+`SPEC-creator-cut.md` (AGREED with Marc from two Instagram references: a
+creator tutorial and a creator ad). A person explains and the SCREEN PROVES
+it -- the person is the spine and the voice is the clock, as in `speaker`,
+but the edit is busy: every claim names its evidence and the proof cuts in
+full-frame and back.
+
+- **The value.** `creator-cut` on `film_grammar` (director, writer, tool
+  schema, MCP instructions, `SPEC-creative-axes.md`). Every gate that read
+  `filmGrammar === "speaker"` now reads `personCarries()` from
+  `core/take-needs.ts` (`PERSON_GRAMMARS = ["speaker", "creator-cut"]`), so
+  the new grammar inherits the whole take flow -- needs, the booth, the
+  measured spine, the face-aware layout, the takeover recipe, the cards, the
+  board -- without a second copy of any of it. `creator-cut` inherits
+  speaker's writer section the way hype-cut inherits tempo-cut's, and its
+  own section states where the edit departs (one claim per scene, the
+  screen proves every claim, no standing header, camera on the person, a
+  sticker names the thing, CTA only when asked, ad vs tutorial on motion
+  and length).
+- **Evidence.** The writer emits `evidence[]` per scene (`SceneEvidence`:
+  kind screenshot | screen_recording | stock_footage | mockup, description,
+  use cutaway | card, at/until word anchors, focus). `core/evidence-needs.ts`
+  turns each into a need on `assets[]` carrying `evidence: i` (human kinds
+  "recommended", the build's kinds "nice_to_have" until in-house generation
+  lands), keeps them in step with the board on load, and never blocks the
+  build. The board lists them under each claim with Upload; the file goes
+  through `/api/upload-asset` and `POST /api/evidence/{t}/{p}` fills the
+  need (same asset-dir guard as a take).
+- **The cutaway.** A provided file becomes a `cutaway` component
+  (`components/media/cutaway`): full-bleed over the person, hard cut in on
+  its word and out on the next -- no fade either side, the cut is the
+  rhythm. A still gets a slow push; a clip plays from its own start
+  (negative `data-start-at`, the capture's seek math clamps at 0). Cast in
+  the pipeline before the spine pass so its anchors resolve with everyone
+  else's; laid out full-stage at z 36 (under the stage overlays), never
+  banded, never phone-zoomed. `storyboardToSaved` now carries `assets` and
+  `evidence` -- it wrote `assets: []`, which would have thrown every
+  uploaded file away on the way back to disk after a build-from-board.
+- **Not yet (phase 2).** Captions from the take's words, the evidence card,
+  the focus drawn on the cutaway, b-roll and mocks made in-house, the
+  tall-frame layout under the busy edit.
+
+---
+
 ## 2026-09-15 — The booth, second round: back to the board, de-air, soft look
 
 From Marc's notes after the fresh two-scene run:

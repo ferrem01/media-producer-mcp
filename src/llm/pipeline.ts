@@ -28,7 +28,8 @@ import { critiqueAndReviseScene } from "./revision-critique.js";
 import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
-import { activeTake } from "../core/take-needs.js";
+import { activeTake, personCarries } from "../core/take-needs.js";
+import { ensureEvidenceNeeds, evidenceComponents, hasCutawayFor } from "../core/evidence-needs.js";
 import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2190,7 +2191,13 @@ function storyboardToSaved(
       camera_moves: s.camera_moves,
       voiceover_text: s.voiceover_text,
       duration_seconds: s.duration_seconds,
-      assets: [],
+      // The needs, carried: a build-from-board hydrates the approved scenes
+      // with their provided evidence, and writing `[]` here threw every
+      // uploaded file away on the way back to disk.
+      assets: Array.isArray(s.assets) ? s.assets : [],
+      // The proof each claim asked for (creator-cut) -- the board's needs
+      // are derived from it on load.
+      evidence: Array.isArray(s.evidence) && s.evidence.length ? s.evidence : undefined,
       visual_notes: s.visual_notes || "",
       components: s.components || [],
       broll_query: s.broll_query,
@@ -2682,7 +2689,7 @@ async function runUnifiedPipeline(
   // transcript when the scene has one (the take is then also the clock), else
   // from the script at speaking pace. A take arriving later re-resolves the
   // same anchors in place (core/measured-spine.ts).
-  if (filmGrammar === "speaker") {
+  if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
     if (opts.project_id) { try { spineProject = await loadProject(opts.tenant_id, opts.project_id); } catch { /* fresh build */ } }
     let sceneIdx = 0;
@@ -2695,6 +2702,16 @@ async function runUnifiedPipeline(
       // builds its bands around it (core/face-band.ts).
       const takeFace = spineProject ? activeTake(spineProject, i)?.face : undefined;
       if (takeFace) { d.take_face = takeFace; console.log(`  Face: scene ${i + 1} at ${Math.round(takeFace.cx * 100)}%/${Math.round(takeFace.cy * 100)}%, ${Math.round(takeFace.size * 100)}% tall`); }
+      // The proof that arrived (creator-cut): every provided piece of
+      // evidence becomes a full-bleed cutaway on its words -- cast BEFORE
+      // the spine pass so its anchors resolve with everyone else's.
+      if (!Array.isArray(d.components)) d.components = [];
+      for (const cut of evidenceComponents(d)) {
+        const ei = Number((cut as any).data?.evidence);
+        if (hasCutawayFor(d.components, ei)) continue;
+        d.components.push(cut);
+        console.log(`  Evidence: scene ${i + 1} cutaway ${ei + 1} (${(cut as any).data?.media}) from ${String((cut as any).data?.src).split("/").pop()}`);
+      }
       if (spine.source === "measured" && spine.duration > 0 && Math.abs(spine.duration - (Number(d.duration_seconds) || 0)) > 0.05) {
         console.log(`  Spine: scene ${i + 1} ${d.duration_seconds}s -> ${spine.duration}s (the take is the clock)`);
         d.duration_seconds = Math.round(spine.duration * 100) / 100;
@@ -2713,7 +2730,7 @@ async function runUnifiedPipeline(
   // (too fast to read a product screen), and both carried shader
   // transitions that blended the presenter back in mid-cut. Three rounds of
   // hand repair fixed what code can simply guarantee.
-  if (filmGrammar === "speaker" || filmGrammar === "screencast") {
+  if (personCarries(filmGrammar) || filmGrammar === "screencast") {
     const TAKEOVER_MIN = 2.5;
     const SURFACE_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|screencast-frame|product-screenshot|browser-|app-|ui-|device-showcase|metric-dashboard)/;
     for (const d of storyboard.scenes as any[]) {
@@ -2884,6 +2901,7 @@ async function runUnifiedPipeline(
   // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
     project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
+    ensureEvidenceNeeds(project);
     project.prompt = opts.prompt;
     project.status = "storyboard";
     project.created_at = new Date().toISOString();
@@ -3765,6 +3783,7 @@ async function runUnifiedPipeline(
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
+  ensureEvidenceNeeds(project);
   project.prompt = opts.prompt;
   project.status = "generated";
   await saveProject(project);

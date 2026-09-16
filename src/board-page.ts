@@ -53,6 +53,12 @@ export function getBoardHtml(): string {
   .pill.ok { background:#12331f; color:#4ade80; }
   .pill.na { background:#20202a; color:var(--muted); }
   .meta { color:var(--muted); font-size:13px; margin-top:6px; }
+  .proof { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
+  .proof .lead { color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+  .proof .ev { display:flex; gap:10px; align-items:center; padding:6px 0; }
+  .proof .ev .what { flex:1 1 auto; font-size:14px; line-height:1.35; }
+  .proof .ev .what small { display:block; color:var(--muted); font-size:12px; }
+  .proof .ev img, .proof .ev video { width:56px; height:56px; object-fit:cover; border-radius:8px; background:#0a0a10; flex:0 0 auto; }
   .status { color:var(--muted); font-size:14px; margin:10px 0; }
   .status:empty, #topActions:empty { display:none; }
   .status.err { color:var(--err); }
@@ -80,6 +86,7 @@ export function getBoardHtml(): string {
 </div>
 <p style="margin:18px 0 0"><a class="link" id="desktopLink" href="#">Open the desktop Studio</a></p>
 <input type="file" id="picker" accept="video/*">
+<input type="file" id="evPicker" accept="image/*,video/*">
 <script>
 (function () {
   var qp = new URLSearchParams(location.search);
@@ -100,7 +107,19 @@ export function getBoardHtml(): string {
   if (!tenant || !project) { say('Missing ?tenant= and ?project= in the link.', true); return; }
   $('desktopLink').href = link('/studio', '&desktop=1');
 
-  var P = null, pickingScene = -1, jobTimer = null, editing = -1;
+  var P = null, pickingScene = -1, jobTimer = null, editing = -1, pickingEvidence = null;
+  // The proof a claim asked for (SPEC-creator-cut.md): one need per entry
+  // in scene.evidence, carried on scene.assets with its index.
+  var EV_LABELS = { screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock' };
+  function evidenceNeedOf(scene, j) {
+    var a = (scene.assets || []).filter(function (x) { return x && x.evidence === j; });
+    return a.length ? a[0] : null;
+  }
+  function openEvidence(scenes) {
+    var n = 0;
+    scenes.forEach(function (s) { (s.evidence || []).forEach(function (ev, j) { var need = evidenceNeedOf(s, j); if (!need || need.status === 'needed') n++; }); });
+    return n;
+  }
 
   function needOf(scene) {
     var a = (scene.assets || []).filter(function (x) { return x && x.type === 'camera_video'; });
@@ -156,7 +175,7 @@ export function getBoardHtml(): string {
     var scenes = (P.storyboard && P.storyboard.scenes) || [];
     var g = (P.treatment && P.treatment.filmGrammar) || '';
     var frame = (P.canvas && P.canvas.frame) || '';
-    var speaker = g === 'speaker';
+    var speaker = g === 'speaker' || g === 'creator-cut';
     $('title').textContent = P.name || project;
     $('subtitle').textContent = [scenes.length + (scenes.length === 1 ? ' scene' : ' scenes'), g, frame, P.status].filter(Boolean).join(' · ');
 
@@ -224,6 +243,29 @@ export function getBoardHtml(): string {
         acts.appendChild(rec); acts.appendChild(up); card.appendChild(acts);
         if (take && take.reframed) { var m = document.createElement('div'); m.className = 'meta'; m.textContent = 'Reframed ' + take.reframed.from + ' → ' + take.reframed.to; card.appendChild(m); }
       }
+      var evs = s.evidence || [];
+      if (evs.length) {
+        var proof = document.createElement('div'); proof.className = 'proof';
+        var lead = document.createElement('div'); lead.className = 'lead'; lead.textContent = 'The proof this claim wants'; proof.appendChild(lead);
+        evs.forEach(function (ev, j) {
+          var need = evidenceNeedOf(s, j), have = need && need.status === 'provided' && need.path;
+          var row = document.createElement('div'); row.className = 'ev';
+          if (have) {
+            var th = /\\.(mp4|webm|mov|m4v)(\\?|$)/i.test(need.path) ? document.createElement('video') : document.createElement('img');
+            th.src = withToken(need.path); if (th.tagName === 'VIDEO') { th.muted = true; th.playsInline = true; th.preload = 'metadata'; }
+            row.appendChild(th);
+          }
+          var what = document.createElement('div'); what.className = 'what';
+          what.textContent = ev.description || '';
+          var kind = document.createElement('small');
+          kind.textContent = (EV_LABELS[ev.kind] || ev.kind) + (ev.use === 'card' ? ' · card' : ' · cutaway') + (have ? ' · provided' : (ev.kind === 'screenshot' || ev.kind === 'screen_recording') ? ' · needed' : ' · optional');
+          what.appendChild(kind); row.appendChild(what);
+          var evUp = document.createElement('button'); evUp.className = 'btn small ghost'; evUp.textContent = have ? 'Replace' : 'Upload';
+          evUp.onclick = function () { pickingEvidence = { scene: i, index: j }; $('evPicker').value = ''; $('evPicker').click(); };
+          row.appendChild(evUp); proof.appendChild(row);
+        });
+        card.appendChild(proof);
+      }
       cards.appendChild(card);
     });
 
@@ -238,8 +280,10 @@ export function getBoardHtml(): string {
       body.appendChild(v);
     } else {
       var hint = document.createElement('div'); hint.className = 'meta';
+      var proofOpen = openEvidence(scenes);
       hint.textContent = open.length ? (open.length + ' scene' + (open.length === 1 ? ' still needs' : 's still need') + ' a take before the film can be built.')
         : built ? 'Scenes are built. Render to watch the film.' : 'Every take is in. Build the scenes, then render.';
+      if (proofOpen && !open.length) hint.textContent += ' ' + proofOpen + ' piece' + (proofOpen === 1 ? '' : 's') + ' of proof still to upload; the build runs without ' + (proofOpen === 1 ? 'it' : 'them') + '.';
       body.appendChild(hint);
     }
     var fa = $('filmActions'); fa.innerHTML = '';
@@ -300,6 +344,28 @@ export function getBoardHtml(): string {
       say('Attaching…');
       api('POST', '/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, capture: 'upload', mime: f.type, look: 'soft' })
         .then(function () { say('Scene ' + (i + 1) + ' take attached.'); return load(); })
+        .catch(function (e) { say(e.message || String(e), true); });
+    };
+    xhr.send(f);
+  });
+
+  // ── upload a piece of evidence for one claim ──
+  $('evPicker').addEventListener('change', function () {
+    var f = $('evPicker').files && $('evPicker').files[0]; if (!f || !pickingEvidence) return;
+    var i = pickingEvidence.scene, j = pickingEvidence.index; pickingEvidence = null;
+    var ext = (f.name.split('.').pop() || 'png').toLowerCase();
+    var name = 'evidence-' + new Date().toISOString().replace(/[:.]/g, '-') + '-scene' + (i + 1) + '-' + (j + 1) + '.' + ext;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', withToken('/api/upload-asset/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + '?name=' + encodeURIComponent(name)));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.upload.onprogress = function (e) { if (e.lengthComputable) say('Uploading proof for scene ' + (i + 1) + '… ' + Math.round((e.loaded / e.total) * 100) + '%'); };
+    xhr.onerror = function () { say('Upload failed (network).', true); };
+    xhr.onload = function () {
+      var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
+      if (xhr.status < 200 || xhr.status >= 300 || !up.url) { say('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), true); return; }
+      api('POST', '/evidence/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, evidence_index: j })
+        .then(function () { say('Scene ' + (i + 1) + ' proof ' + (j + 1) + ' attached.'); return load(); })
         .catch(function (e) { say(e.message || String(e), true); });
     };
     xhr.send(f);
