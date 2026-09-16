@@ -104,6 +104,13 @@ describe("the takeover flag must be AUTHORABLE and DETECTABLE", () => {
     expect(block).toMatch(/d\.transparent_background === false \|\| \(filmHasFurniture/);
   });
 
+  it("a push-in the board only described becomes a real slow zoom on the face", async () => {
+    const p = await read("../src/llm/pipeline.ts");
+    const block = p.split("Speaker-film TAKEOVERS")[1]?.split("Beat quantization")[0] || "";
+    expect(block).toMatch(/describes a push-in; authored a slow zoom/);
+    expect(block).toMatch(/type: "zoom", scale: 1\.2/);
+  });
+
   it("the empty-canvas gate is skipped when the camera is the background", async () => {
     const p = await read("../src/llm/pipeline.ts");
     expect(p).toMatch(/cameraIsBackground = sceneCompositesOverSpeaker/);

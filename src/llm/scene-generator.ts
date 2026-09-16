@@ -363,6 +363,11 @@ function phoneZoomable(type: string): boolean {
   return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
 }
 var PHONE_ZOOM = 1.8;
+// Desktop app mocks the writer keeps casting on phone reels despite the
+// SPEAKER contract (measured: chat-simulator, quotient-chat, browser-frame
+// across three boards). A composer (the sentence typing) is the one mock
+// with a phone form and is not in this list.
+var PHONE_REEL_MOCK_RE = /^(quotient-|claude-|slack-|chat-simulator|browser-frame|metric-dashboard|dashboard-kpi|kanban-board|email-|gmail-reader|calendar-view|code-editor|terminal$|device-|timeline-steps|bento-grid|grid-layout|video-call|form-wizard|canva-editor|x-post-card|linkedin-post-card|reddit-post-card|screencast-frame|product-screenshot|app-store-card|ui-chat-thread|ui-terminal-agent|ui-video-player|st-)/;
 /** Smallest pixel font a board may set for type on a tall speaker frame. */
 var PHONE_MIN_FONT_PX = 72;
 /** Full-stage overlays: performers that cover the whole composition. */
@@ -765,6 +770,10 @@ export function buildAuthoredCompositionScene(
     authored = authored.flatMap((c) => {
       if (c.type === "progress-bar") {
         console.log(`    progress-bar: no phone form on a speaker reel -- dropped`);
+        return [];
+      }
+      if (PHONE_REEL_MOCK_RE.test(c.type)) {
+        console.log(`    ${c.type}: an app mock has no phone form on a speaker reel (the person carries it) -- dropped`);
         return [];
       }
       if (c.type === "notification-stack") {

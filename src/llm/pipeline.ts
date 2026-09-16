@@ -2784,6 +2784,23 @@ async function runUnifiedPipeline(
       // aimed at a graphic ("tpl_artifact.composer") is re-aimed at the
       // face (measured at attach), or the upper middle of the frame when no
       // take is in yet. The graphics move with the camera as a whole.
+      // A push-in the board only DESCRIBED ("camera slowly pushes in on
+      // Marc's face") becomes a real move: the beat that says it starts a
+      // slow zoom that holds to the cut (measured live, proj_4488f790: the
+      // prose promised it, camera_moves was empty).
+      if (!(Array.isArray(d.camera_moves) && d.camera_moves.length) && Array.isArray(d.beats)) {
+        let t0 = 0;
+        for (const b of d.beats as any[]) {
+          const says = /push(?:es|ing)?[- ]?in|slow(?:ly)? (?:zoom|creep|push)|zoom(?:s|ing)? in|creep(?:s)? in/i.test(String(b?.action || ""));
+          const bd = Number(b?.duration_seconds) || 0;
+          if (says) {
+            d.camera_moves = [{ at: Math.round(t0 * 10) / 10, type: "zoom", scale: 1.2, duration: Math.max(1.5, Math.min(4, bd || 3)) }];
+            console.log(`  Takeover recipe: scene "${d.label || "?"}" -- the beat "${b.label || "?"}" describes a push-in; authored a slow zoom from ${t0.toFixed(1)}s`);
+            break;
+          }
+          t0 += bd;
+        }
+      }
       if (Array.isArray(d.camera_moves) && d.camera_moves.length) {
         const sceneIdx = (storyboard.scenes as any[]).indexOf(d);
         const face = faceProject ? activeTake(faceProject, sceneIdx)?.face : undefined;

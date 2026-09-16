@@ -163,3 +163,15 @@ describe("type over the camera", () => {
     expect(p.match(/overCamera: \(!!opts\.speaker_source \|\| pipelineHasNarration\)/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("app mocks have no phone form on a speaker reel", () => {
+  it("drops quotient-chat, chat-simulator and browser-frame; keeps the composer", () => {
+    const comps = build({ width: 1080, height: 1920 }, [
+      { type: "quotient-chat", data: { script: [] } },
+      { type: "chat-simulator", data: {} },
+      { type: "browser-frame", data: { url: "x" } },
+      { type: "composer", data: { text: "hi", at: 2 } },
+    ]);
+    expect(comps.map((c) => c.type)).toEqual(["composer"]);
+  });
+});
