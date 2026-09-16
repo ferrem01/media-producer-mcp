@@ -152,3 +152,22 @@ describe("the desktop Studio's camera follows the scene too", () => {
     expect(app).not.toMatch(/time \+ state\.speakerTrimStart/);          // no site still assumes film time 0 = clips[0]
   });
 });
+
+describe("every lane follows the scene, not the first clip", () => {
+  it("Studio: per-scene pieces, transcript times taken as film times", async () => {
+    const fs = await import("node:fs/promises");
+    const app = await fs.readFile(new URL("../src/preview-app/preview-app.ts", import.meta.url), "utf8");
+    expect(app).toMatch(/function speakerTrackIsPerScene\(\)/);
+    expect(app).toMatch(/var wOff = speakerTrackIsPerScene\(\) \? 0 :/);
+    expect(app).toMatch(/Take for scene ' \+ \(si \+ 1\)/);
+  });
+  it("server: transcript, waveform and the scene still come from the scene's own take; no stage camera over the camera", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile(new URL("../src/index.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/segments: laneWords\(lane2, bySrc2\)/);
+    expect(src).toMatch(/peaks: lanePeaks\(lane, bySrc, total, 6\)/);
+    expect(src).toMatch(/speakerOffset: thRef \? thRef\.offset : undefined/);
+    const pipe = await fs.readFile(new URL("../src/llm/pipeline.ts", import.meta.url), "utf8");
+    expect(pipe).toMatch(/dropped its camera moves \(the camera is the picture\)/);
+  });
+});

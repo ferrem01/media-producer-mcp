@@ -4813,6 +4813,11 @@ export function getPreviewHtml(): string {
       sceneStart: sceneStart
     };
   }
+  function speakerTrackIsPerScene() {
+    var project = state.currentProject;
+    var clips = (project && project.speaker_track && project.speaker_track.clips) || [];
+    return clips.some(function(c) { return c.scene_index !== undefined && c.scene_index !== null; });
+  }
   // Film time <-> source time of the ACTIVE speaker clip.
   function speakerSourceTime(time) { return (time - (state.speakerSceneStart || 0)) + (state.speakerTrimStart || 0); }
   function speakerFilmTime(srcTime) { return (state.speakerSceneStart || 0) + (srcTime - (state.speakerTrimStart || 0)); }
@@ -5913,6 +5918,23 @@ export function getPreviewHtml(): string {
     applyLaneLayout(y);
     renderCompLane();
     var hasSpeaker = !!(p.speaker && p.speaker.clips && p.speaker.clips.length);
+    if (!hasSpeaker && speakerTrackIsPerScene() && total > 0) {
+      // Per-scene takes: one piece per take at its scene, the way the
+      // film plays them. Click a piece to jump to its scene.
+      p.speaker_track.clips.forEach(function(c) {
+        var si = c.scene_index; var sc0 = p.scenes[si]; if (!sc0) return;
+        var f = sceneStartFor(si), d0 = sc0.duration_seconds || 0;
+        if (!(d0 > 0.05)) return;
+        var blk = document.createElement('div');
+        blk.className = 'spk-clip';
+        blk.style.top = (y.speaker + 3) + 'px';
+        blk.style.left = ((f / total) * 100).toFixed(2) + '%';
+        blk.style.width = ((Math.min(total - f, d0) / total) * 100).toFixed(2) + '%';
+        blk.title = 'Take for scene ' + (si + 1) + ' \u2014 ' + d0.toFixed(1) + 's' + (c.trim_start ? ' (from ' + Number(c.trim_start).toFixed(1) + 's of the recording)' : '') + '. Click to jump here. Re-record it from the board.';
+        blk.addEventListener('click', function(ev) { ev.stopPropagation(); scrub(Math.round((f / total) * 1000)); els.slider.value = Math.round((f / total) * 1000); });
+        track.insertBefore(blk, document.getElementById('wave-strip'));
+      });
+    }
     if (hasSpeaker && p.speaker.clips.length === 1 && total > 0) {
       var clip = p.speaker.clips[0];
       var spkCuts = (clip.edl && clip.edl.cuts) || [];
@@ -6164,7 +6186,7 @@ export function getPreviewHtml(): string {
     }
     wcut.b = { seg: seg, el: el };
     el.classList.add('wl-sel');
-    var off = speakerFilmOffset() - (state.speakerTrimStart || 0);
+    var off = speakerTrackIsPerScene() ? 0 : speakerFilmOffset() - (state.speakerTrimStart || 0);
     var from = Math.min(wcut.a.seg.start, wcut.b.seg.start) + off - 0.06;
     var to = Math.max(wcut.a.seg.end, wcut.b.seg.end) + off + 0.06;
     var btn = document.createElement('button');
@@ -6212,7 +6234,10 @@ export function getPreviewHtml(): string {
       // staggered across two mini-rows so neighbors don't collide. Clicking
       // a word seeks there and opens the pin picker -- "pin the media to
       // this word".
-      var wOff = speakerFilmOffset() - (state.speakerTrimStart || 0);
+      // A per-scene track's transcript is already on the film clock (the
+      // server lays each take at its scene); the continuous track's is in
+      // the recording's own seconds.
+      var wOff = speakerTrackIsPerScene() ? 0 : speakerFilmOffset() - (state.speakerTrimStart || 0);
       state._transcript.forEach(function(seg2) {
         var t0 = Math.max(0, seg2.start + wOff);
         if (seg2.end + wOff <= 0 || t0 >= total) return;

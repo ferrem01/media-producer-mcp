@@ -2766,6 +2766,14 @@ async function runUnifiedPipeline(
       if (d.components.length !== before) {
         console.log(`  Takeover recipe: scene "${d.label || "?"}" -- dropped a full-bleed backdrop (the camera is the background)`);
       }
+      // The camera IS the picture on these scenes; the stage camera rides
+      // only the overlay, so a storyboard zoom moves the graphics and not
+      // the person -- a chip on the timeline that visibly does nothing
+      // (measured live: a "zoom" on proj_780a33d0's last scene).
+      if (Array.isArray(d.camera_moves) && d.camera_moves.length) {
+        delete d.camera_moves;
+        console.log(`  Takeover recipe: scene "${d.label || "?"}" -- dropped its camera moves (the camera is the picture)`);
+      }
     }
   }
 

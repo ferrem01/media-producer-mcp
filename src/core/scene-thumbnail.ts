@@ -27,6 +27,10 @@ export interface SceneThumbnailOptions {
   projectId: string;
   components: ComponentSource[];
   speakerUrl?: string;
+  /** Where the camera sits for this scene, in the speaker file's own
+   *  seconds. Per-scene takes pass the clip's trim; omitted, the scene's
+   *  film start (one continuous recording). */
+  speakerOffset?: number;
   dataDir: string;
   gsapDir: string;
   componentLibDir: string;
@@ -79,7 +83,7 @@ async function buildSceneThumbnail(
   const atTime = thumbnailTime(scene.duration_seconds);
   const spStarts = speakerSceneFilmStarts(project.scenes || []);
   const idx = (project.scenes || []).findIndex((s: any) => s.id === scene.id);
-  const spOffset = idx >= 0 ? spStarts[idx] || 0 : 0;
+  const spOffset = typeof opts.speakerOffset === "number" ? opts.speakerOffset : (idx >= 0 ? spStarts[idx] || 0 : 0);
 
   // Everything that changes what the frame looks like feeds the cache key.
   const etag = crypto
