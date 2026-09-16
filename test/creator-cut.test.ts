@@ -229,6 +229,11 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     // A STICKER NAMES THE THING, ON THE WORD, UNTIL THE PROOF (measured live: a pill at 0.2s flashing for a second).
     expect(pipeline).toMatch(/if \(emWord && \(c\.data\.at === undefined \|\| \(Number\.isFinite\(atNum\) && atNum < 0\.5\)\)\) c\.data\.at = `@\$\{emWord\}`;/);
     expect(pipeline).toMatch(/if \(firstCut !== undefined && c\.exit === undefined\) \{ c\.exit = \{ effect: "cut", at: firstCut \}; c\.data\.hold = 0; \}/);
+    // ...and when the writer cut in on that same word, the sticker needs a second before the cut or rides the cutaway.
+    expect(pipeline).toMatch(/if \(at \+ 1\.0 <= out\) continue;\s*if \(out - 1\.2 >= 0\.3\) \{ c\.data\.at = Math\.round\(\(out - 1\.2\) \* 100\) \/ 100;/);
+    expect(pipeline).toMatch(/else if \(Number\.isFinite\(cutOut\)\) \{ c\.exit = \{ effect: "cut", at: cutOut \};/);
+    // The empty-moment gate (and its enlarging repair) never runs on a scene the build knows is over the camera.
+    expect(pipeline).toMatch(/const cameraIsBackground = !!opts\.overCamera \|\| sceneCompositesOverSpeaker\(opts\.scene, !!opts\.speakerUrl\);/);
     // OVER THE CAMERA a plate is the ground: ink that fails on a dark AND a light page is a finding, not dropped.
     expect(pipeline).toMatch(/variant\("scene-dark\.html", "#101014"\), variant\("scene-light\.html", "#e9e9ef"\)/);
     expect(pipeline).toMatch(/if \(type === "illegible" && opts\.overCamera && !\(failsAnyCamera && failsAnyCamera\.has\(d\.text\)\)\)/);

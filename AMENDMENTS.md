@@ -36,6 +36,16 @@ of the screen" on a cutaway; "I thought we had rules for this".
   the chest band (`data.cut_top`, read by `wrapperChoreoScript`) and comes
   back with the person.
 
+- **Rebuilt to test the four (second render):** the ink and the lane's
+  drop held; two things the rebuild showed. (1) Every sticker landed on
+  its emphasis word and exited on the cut-in -- the same word, so none
+  showed: with the numbers resolved, a sticker needs a second before the
+  cut, else it rides the cutaway and leaves with it. (2) The empty-moment
+  gate ran on person scenes (the build-from-board path had no speaker
+  clip wired at gate time) and its repair enlarged the caption lane to
+  fill a frame the camera fills: the gate skips when the build knows the
+  scene is over the camera (`opts.overCamera`).
+
 ## 2026-09-16 — The take page, third round: the lines set the floor, tap to advance, no scrolling, one camera prompt
 
 Marc, recording the fresh creator-cut board (proj_f10e79cf) in one go:
