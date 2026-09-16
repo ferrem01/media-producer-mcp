@@ -115,7 +115,7 @@ describe("the server side", () => {
     expect(src).toMatch(/getTakeHtml\(\)/);
     // the tenant guard regex must list `take` or a tenant token could attach
     // to another tenant's project
-    expect(src).toMatch(/\|traces\|take\|storyboard\)\\\/\(\[\^\/\]\+\)\//);
+    expect(src).toMatch(/\|traces\|take\|take-poster\|storyboard\)\\\/\(\[\^\/\]\+\)\//);
   });
 
   it("refuses a take URL outside the project's own asset dir", async () => {

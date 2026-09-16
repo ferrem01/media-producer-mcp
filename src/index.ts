@@ -67,7 +67,7 @@ import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/
 import { solveMediaEdits, inferIntents, contractSceneToEdl } from "./core/media-edl.js";
 import { sceneCompositesOverSpeaker } from "./core/speaker-mode.js";
 import { repairBrandAssetPath } from "./core/scene-assembler.js";
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
 import { openSync, readFileSync } from "node:fs";
 
 /**
@@ -849,7 +849,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|storyboard)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|take-poster|storyboard)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1304,14 +1304,17 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           const components = await resolveComponentSources(scene, tenantId, projectId);
           const thIdx = project.scenes.findIndex((s0) => s0.id === scene.id);
           const thRef = speakerClipForScene(project.speaker_track?.clips, project.scenes, thIdx);
+          // ?camera=0: the scene's graphics alone (the timeline filmstrip of
+          // a speaker film -- the takes live on the speaker lane).
+          const noCamera = new URL(req.url || "/", "http://localhost").searchParams.get("camera") === "0";
           const { file, etag } = await getSceneThumbnail({
             project,
             scene,
             tenantId,
             projectId,
             components,
-            speakerUrl: thRef ? speakerUrlFromSource(thRef.source) : (project.speaker_track?.clips?.some((c0) => c0.scene_index !== undefined) ? undefined : getSpeakerUrl(project)),
-            speakerOffset: thRef ? thRef.offset : undefined,
+            speakerUrl: noCamera ? undefined : thRef ? speakerUrlFromSource(thRef.source) : (project.speaker_track?.clips?.some((c0) => c0.scene_index !== undefined) ? undefined : getSpeakerUrl(project)),
+            speakerOffset: noCamera ? undefined : thRef ? thRef.offset : undefined,
             dataDir: config.dataDir,
             gsapDir: config.gsapDir,
             componentLibDir: config.componentLibDir,
@@ -1416,12 +1419,19 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           sceneInputs.push({ scene, components });
         }
 
+        const speakerRefs: Record<string, { url: string; offset: number }> = {};
+        project.scenes.forEach((sc0, i0) => {
+          const ref0 = speakerClipForScene(project.speaker_track?.clips, project.scenes, i0);
+          const u0 = ref0 ? speakerUrlFromSource(ref0.source) : undefined;
+          if (u0) speakerRefs[sc0.id] = { url: u0, offset: ref0!.offset };
+        });
         const html = await assembleComposite({
           scenes: sceneInputs,
           brandKit: project.brand_kit,
           canvas: project.canvas,
           gsapDir: config.gsapDir,
           speakerUrl: getSpeakerUrl(project),
+          speakerRefs,
         });
 
         res.writeHead(200, {
@@ -2994,6 +3004,34 @@ Rules:
           return { ok: true, scene_id: sceneId };
         });
         jsonResponse(res, 202, { ok: true, job_id: job.id });
+        return;
+      }
+
+      // ── API: A take's poster still (the speaker lane's picture) ──
+      // GET /api/take-poster/{t}/{p}/{takeId} -- one frame at the take's
+      // trim, made on first request and cached beside the thumbnails.
+      const posterMatch = urlPath.match(/^\/api\/take-poster\/([^/]+)\/([^/]+)\/([^/]+)$/);
+      if (posterMatch && method === "GET") {
+        const [, tenantId, projectId, takeId] = posterMatch.map(decodeURIComponent);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const take = (project.takes || []).find((t) => t.id === takeId);
+        if (!take) { jsonResponse(res, 404, { error: "Take not found" }); return; }
+        const posterDir = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
+        const posterFile = path.join(posterDir, `take-poster-${take.id.replace(/[^a-zA-Z0-9_-]/g, "_")}.jpg`);
+        try { await fs.access(posterFile); }
+        catch {
+          await fs.mkdir(posterDir, { recursive: true });
+          const at = Math.max(0, (take.trim_start || 0) + Math.min(0.5, Math.max(0, (take.duration || 1) * 0.25)));
+          await new Promise<void>((resolve, reject) => {
+            execFile("ffmpeg", ["-y", "-loglevel", "error", "-ss", String(at), "-i", resolveVideoPath(take.source, config.dataDir), "-frames:v", "1", "-vf", "scale=-2:180", "-q:v", "4", posterFile], (err) => err ? reject(err) : resolve());
+          }).catch((e: any) => { console.warn(`  take poster failed: ${e?.message || e}`); });
+        }
+        try {
+          const buf = await fs.readFile(posterFile);
+          res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=3600" });
+          res.end(buf);
+        } catch { jsonResponse(res, 404, { error: "Poster not available" }); }
         return;
       }
 

@@ -1126,6 +1126,7 @@ export function getPreviewHtml(): string {
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
         <video id="speaker-bg" muted playsinline preload="metadata" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
+        <video id="speaker-bg2" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
         <iframe id="preview-iframe" allow="autoplay; fullscreen"></iframe>
         <div id="buffer-overlay" class="buffer-overlay"><div class="loading-state">Buffering media<div class="loading-dots"><span></span><span></span><span></span></div></div></div>
       </div>
@@ -1247,6 +1248,9 @@ export function getPreviewHtml(): string {
     camHint: document.getElementById('cam-hint'),
     previewIframe: document.getElementById('preview-iframe'),
     speakerBg: document.getElementById('speaker-bg'),
+    // The standby camera: preloaded with the NEXT scene's take so the cut
+    // is a swap, not a reload (a reload showed a blank frame at every cut).
+    speakerBg2: document.getElementById('speaker-bg2'),
     previewContainer: document.getElementById('preview-container'),
     playBtn: document.getElementById('play-btn'),
     playIcon: document.getElementById('play-icon'),
@@ -1676,16 +1680,34 @@ export function getPreviewHtml(): string {
         if (!want) { el.style.display = 'none'; continue; }
         var wantBase = want.url.split('/').pop();
         if (!el.src || el.src === '' || el.src === window.location.href || el.src.indexOf(wantBase) < 0) {
-          el.src = want.url;
-          el.load();
+          var sby = els.speakerBg2;
+          if (sby && sby.src && sby.src.indexOf(wantBase) >= 0) {
+            // HARD CUT: the standby already holds this take at its trim.
+            // Swap roles; the old active becomes the standby for the scene
+            // after this one.
+            sby.style.display = el.style.display;
+            sby.muted = el.muted;
+            el.style.display = 'none';
+            try { el.pause(); } catch (eP0) {}
+            el.muted = true;
+            els.speakerBg = sby; els.speakerBg2 = el;
+            el = sby; clip.el = sby;
+          } else {
+            el.src = want.url;
+            el.load();
+          }
           clip.lastOffset = null;
           clip.driftSamples = 0;
         }
+        preloadNextSpeakerClip(time);
         state.speakerTrimStart = want.trimStart;
         state.speakerTrimEnd = want.trimEnd;
         state.speakerSceneStart = want.sceneStart;
-        // Visibility: show on speaker scenes, hide on opaque scenes
-        var speakerActive = isSpeakerScene(state.currentSceneIndex);
+        // Visibility: show on speaker scenes, hide on opaque scenes -- and
+        // hide when the scene carries its own camera inside the rig (a
+        // scene with camera moves): that one zooms, this one only plays
+        // the voice underneath.
+        var speakerActive = isSpeakerScene(state.currentSceneIndex) && !sceneHasRigCamera(state.currentSceneIndex);
         if (speakerActive) {
           el.style.display = 'block';
           els.previewIframe.style.background = 'transparent';
@@ -4818,6 +4840,31 @@ export function getPreviewHtml(): string {
     var clips = (project && project.speaker_track && project.speaker_track.clips) || [];
     return clips.some(function(c) { return c.scene_index !== undefined && c.scene_index !== null; });
   }
+  // The scene's own camera inside the composite (a scene with camera moves).
+  function sceneHasRigCamera(si) {
+    try {
+      var doc = els.previewIframe.contentDocument;
+      return !!(doc && doc.querySelector('.mp-scene[data-scene-index="' + si + '"] #__mp_speaker_rig'));
+    } catch (e) { return false; }
+  }
+  // Within a few seconds of the next scene, load ITS take into the standby
+  // element and park it at the trim, so the cut swaps elements instead of
+  // reloading one (measured: a blank flash at every cut).
+  function preloadNextSpeakerClip(time) {
+    var sby = els.speakerBg2;
+    if (!sby || !speakerTrackIsPerScene()) return;
+    var info = compositeSceneForTime(time);
+    var nextStart = sceneStartFor(info.index + 1);
+    if (!(nextStart > time) || nextStart - time > 4) return;
+    var nx = speakerClipForTime(nextStart + 0.01);
+    if (!nx) return;
+    var base = nx.url.split('/').pop();
+    if (sby.src && sby.src.indexOf(base) >= 0) return;
+    sby.muted = true;
+    sby.src = nx.url;
+    sby.addEventListener('loadedmetadata', function() { try { sby.currentTime = nx.trimStart; } catch (eS) {} }, { once: true });
+    sby.load();
+  }
   // Film time <-> source time of the ACTIVE speaker clip.
   function speakerSourceTime(time) { return (time - (state.speakerSceneStart || 0)) + (state.speakerTrimStart || 0); }
   function speakerFilmTime(srcTime) { return (state.speakerSceneStart || 0) + (srcTime - (state.speakerTrimStart || 0)); }
@@ -5813,7 +5860,9 @@ export function getPreviewHtml(): string {
           img.setAttribute('loading', 'lazy');
           img.alt = '';
           img.addEventListener('error', function() { img.remove(); });
-          img.src = '/api' + withToken('/scene-thumb/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pid2) + '/' + encodeURIComponent(sc.id));
+          // On a speaker film the filmstrip shows the SCENE (its graphics);
+          // the camera is on the speaker lane, where it belongs.
+          img.src = '/api' + withToken('/scene-thumb/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pid2) + '/' + encodeURIComponent(sc.id)) + (speakerTrackIsPerScene() ? '&camera=0' : '');
           cell.appendChild(img);
           cell.addEventListener('click', function(ev) { ev.stopPropagation(); selectScene(fi2); renderCompLane(); });
           cell.addEventListener('dblclick', function(ev) { ev.stopPropagation(); selectScene(fi2); enterFocus(fi2); });
@@ -5931,6 +5980,14 @@ export function getPreviewHtml(): string {
         blk.style.left = ((f / total) * 100).toFixed(2) + '%';
         blk.style.width = ((Math.min(total - f, d0) / total) * 100).toFixed(2) + '%';
         blk.title = 'Take for scene ' + (si + 1) + ' \u2014 ' + d0.toFixed(1) + 's' + (c.trim_start ? ' (from ' + Number(c.trim_start).toFixed(1) + 's of the recording)' : '') + '. Click to jump here. Re-record it from the board.';
+        // The take's own picture, tiled along the piece: the speaker lane IS
+        // the camera on a speaker film.
+        var tk = (p.takes || []).filter(function(t) { return t.scene_index === si && t.source === c.source; }).pop();
+        if (tk) {
+          blk.style.backgroundImage = 'url(' + '/api' + withToken('/take-poster/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '/' + encodeURIComponent(tk.id)) + ')';
+          blk.style.backgroundSize = 'auto 100%';
+          blk.style.backgroundRepeat = 'repeat-x';
+        }
         blk.addEventListener('click', function(ev) { ev.stopPropagation(); scrub(Math.round((f / total) * 1000)); els.slider.value = Math.round((f / total) * 1000); });
         track.insertBefore(blk, document.getElementById('wave-strip'));
       });
