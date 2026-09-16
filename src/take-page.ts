@@ -66,8 +66,12 @@ export function getTakeHtml(): string {
   .spacer { flex:1; }
 
   /* ── stage: camera full-bleed, prompter over it ── */
-  /* The stage owns the viewport wherever the page was scrolled. */
-  #stage { position:fixed; inset:0; z-index:5; background:#000; }
+  /* The stage owns the viewport wherever the page was scrolled -- and the
+     page under it is LOCKED while it is up: a fixed body is the one lock
+     iOS Safari honours (Marc: "I can still scroll the take screen up"). */
+  #stage { position:fixed; inset:0; z-index:5; background:#000; touch-action:manipulation; }
+  html.lock, html.lock body { overflow:hidden; height:100%; overscroll-behavior:none; }
+  html.lock body { position:fixed; width:100%; top:0; left:0; }
   #live { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
   #cap { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 26%, rgba(0,0,0,0) 42%, rgba(0,0,0,0) 70%, rgba(0,0,0,.6) 100%); pointer-events:none; }
@@ -179,8 +183,12 @@ export function getTakeHtml(): string {
 
   function show(id) {
     ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
+    document.documentElement.classList.toggle('lock', id === 'stage');
     try { window.scrollTo(0, 0); } catch (eS) {}
   }
+  // While the stage is up no touch scrolls the page (the lock above stops
+  // the document; this stops the rubber band).
+  document.addEventListener('touchmove', function (ev) { if (document.documentElement.classList.contains('lock')) ev.preventDefault(); }, { passive: false });
   function fail(msg) { $('errMsg').textContent = msg; show('err'); }
   function withToken(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
   // Studio serves its phone view to a phone; on a laptop this lands in the desktop app.
