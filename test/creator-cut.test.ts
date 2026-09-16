@@ -57,11 +57,17 @@ describe("creator-cut is a film grammar a person carries", () => {
     expect(boardPage).toMatch(/g === 'speaker' \|\| g === 'creator-cut'/);
   });
 
-  it("the writer's contract inherits speaker's spine and states the busy edit", async () => {
+  it("the writer's contract is self-contained: speaker's spine laws restated, speaker's tall-frame law never shown", async () => {
     const sb = await read("../src/llm/storyboard-builder.ts");
+    // No inheritance: speaker's "never an app mock on a phone" contradicts the cutaways.
+    expect(sb).not.toMatch(/opts\.filmGrammar === "creator-cut" && g === "speaker"/);
     const at = sb.indexOf('__g("creator-cut")');
     expect(at).toBeGreaterThan(0);
     const block = sb.slice(at, sb.indexOf("` : \"\"}", at));
+    for (const law of ["THE VOICE IS THE CLOCK", "A RECORDING NEED NOT EXIST YET", "THE HUMAN NARRATES, AND THE SCRIPT LIVES IN voiceover_text", "WRITE THE SILENCES", "TIME OVERLAYS TO WORDS, NOT SECONDS", "NO DUPLICATE TEXT"]) {
+      expect(block, `creator-cut restates ${law}`).toContain(`- ${law}:`);
+    }
+    expect(block).not.toMatch(/NEVER a dashboard/);
     expect(block).toContain("ONE CLAIM PER SCENE");
     expect(block).toContain("THE SCREEN PROVES EVERY CLAIM");
     expect(block).toContain("NO STANDING HEADER");
@@ -206,6 +212,23 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(r.resolved).toBe(2);
     expect(c.enter.at).toBeGreaterThan(0);
     expect(c.exit.at).toBeGreaterThan(c.enter.at);
+  });
+
+  it("build defaults cover a writer miss: an un-cut mock becomes the cutaway, an empty scene gets its label", async () => {
+    const pipeline = await read("../src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/const CUTAWAY_MOCK_RE = /);
+    expect(pipeline).toMatch(/c\.enter = \{ effect: "cut", at: Math\.round\(dur \* 0\.3 \* 100\) \/ 100 \};/);
+    expect(pipeline).toMatch(/if \(c\.exit === undefined\) c\.exit = \{ effect: "cut", at: Math\.round\(dur \* 0\.8 \* 100\) \/ 100 \};/);
+    expect(pipeline).toMatch(/the chapter label "\$\{label\}" is cast from the scene's name/);
+    // Only creator-cut, only over the person, and before the spine pass so the proof cast after it can still replace the window.
+    expect(pipeline).toMatch(/if \(filmGrammar === "creator-cut" && d\.transparent_background !== false\) \{\s*const dur = Number\(d\.duration_seconds\)/);
+    const defaults = pipeline.indexOf("CREATOR-CUT DEFAULTS");
+    const cast = pipeline.indexOf("for (const cut of proofComponents(d))");
+    expect(defaults).toBeGreaterThan(0);
+    expect(defaults).toBeLessThan(cast);
+    // The director says a tutorial has no bed.
+    const cd = await read("../src/llm/creative-director.ts");
+    expect(cd).toMatch(/audioSystem\.music_mood "none" for a tutorial/);
   });
 
   it("enter/exit the writer nested inside data are lifted to the component (measured live: every cut-in arrived as data.enter)", async () => {
