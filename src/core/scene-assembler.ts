@@ -174,6 +174,10 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 
   // Determine if scene should use transparent background (for full-behind speaker overlay)
   const isTransparent = scene.transparent_background === true;
+  // A scene with camera moves over the camera: the camera itself rides the
+  // rig, so a zoom zooms the PERSON (Marc: "I should be able to zoom in on
+  // myself"). Without moves the camera stays a fixed underlay / the base.
+  const rigCamera = !!speakerUrl && isTransparent && !!(scene.camera_moves && scene.camera_moves.length);
 
   // Process each scene component
   const componentBlocks: string[] = [];
@@ -348,9 +352,9 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script><script>${timelapseClockScript(scene.media_edits, canvas, "document.body", "window.__MP_TIMELINE", scene.duration_seconds)}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl && isTransparent && !rigCamera ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script><script>${timelapseClockScript(scene.media_edits, canvas, "document.body", "window.__MP_TIMELINE", scene.duration_seconds)}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
-${isTransparent ? '' : '<div class="mp-ambient"></div>'}
+${rigCamera ? speakerRigVideoHtml(speakerUrl!, options.speakerOffset || 0, !!preview) : ''}${isTransparent ? '' : '<div class="mp-ambient"></div>'}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
 ${buildContentRegionWrapper(scene, componentBlocks)}
 </div>
@@ -1303,6 +1307,8 @@ export async function assembleCodegenScene(options: {
 
   const isTransparent = transparentBackground === true;
 
+  const rigCameraC = !!speakerUrl && isTransparent && !!(options.cameraMoves && options.cameraMoves.length);
+
   // 8. Assemble final HTML
   const html = `<!DOCTYPE html>
 <html data-theme="${sceneTheme}">
@@ -1372,8 +1378,9 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.mediaEdits && Object.keys(options.mediaEdits).length ? `<script>${mediaEdlScript(options.mediaEdits, "document.body")}</script><script>${timelapseClockScript(options.mediaEdits, canvas, "document.body", "window.__MP_TIMELINE", duration)}</script>` : "")}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl && isTransparent && !rigCameraC ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.mediaEdits && Object.keys(options.mediaEdits).length ? `<script>${mediaEdlScript(options.mediaEdits, "document.body")}</script><script>${timelapseClockScript(options.mediaEdits, canvas, "document.body", "window.__MP_TIMELINE", duration)}</script>` : "")}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
+${rigCameraC ? speakerRigVideoHtml(speakerUrl!, options.speakerOffset || 0, !!preview) : ''}
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
 <div class="mp-scene-content" style="position:absolute;top:20px;left:20px;width:${canvas.width}px;height:${canvas.height}px;z-index:2;">
@@ -1539,13 +1546,28 @@ export function repairBrandAssetPath(abs: string): string {
  * master timeline when one is exposed. Render-path assembly (preview=false)
  * never includes it: the real composite handles the camera there.
  */
+/** The camera as a <video> the RIG can move. Inside .mp-camera it zooms
+ *  and pans with the graphics; the render's capture swaps it for stills per
+ *  frame (data-start-at), so the moved camera is in the frames themselves.
+ *  `withSync` adds the drift-corrected seek loop for a page that plays on
+ *  its own (the single-scene preview); the Studio composite syncs it. */
+export function speakerRigVideoHtml(speakerUrl: string, offsetSeconds: number, withSync: boolean): string {
+  const tag = `<video id="__mp_speaker_rig" src="${speakerUrl}" muted playsinline preload="auto" data-start-at="${Math.max(0, offsetSeconds)}"
+  style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none;"></video>`;
+  return withSync ? tag + speakerSyncScript("__mp_speaker_rig", offsetSeconds) : tag;
+}
+
 export function speakerUnderlayHtml(speakerUrl: string, offsetSeconds: number): string {
   return `
 <video id="__mp_speaker_base" src="${speakerUrl}" muted playsinline preload="auto" data-start-at="${Math.max(0, offsetSeconds)}"
-  style="position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:-10; pointer-events:none;"></video>
+  style="position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:-10; pointer-events:none;"></video>` + speakerSyncScript("__mp_speaker_base", offsetSeconds);
+}
+
+function speakerSyncScript(id: string, offsetSeconds: number): string {
+  return `
 <script>
 (function(){
-  var v = document.getElementById('__mp_speaker_base');
+  var v = document.getElementById('${id}');
   var offset = ${Math.max(0, offsetSeconds)};
   if (!v) return;
   v.addEventListener('loadedmetadata', function(){

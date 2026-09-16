@@ -166,8 +166,26 @@ describe("every lane follows the scene, not the first clip", () => {
     const src = await fs.readFile(new URL("../src/index.ts", import.meta.url), "utf8");
     expect(src).toMatch(/segments: laneWords\(lane2, bySrc2\)/);
     expect(src).toMatch(/peaks: lanePeaks\(lane, bySrc, total, 6\)/);
-    expect(src).toMatch(/speakerOffset: thRef \? thRef\.offset : undefined/);
+    expect(src).toMatch(/speakerOffset: noCamera \? undefined : thRef \? thRef\.offset : undefined/);
     const pipe = await fs.readFile(new URL("../src/llm/pipeline.ts", import.meta.url), "utf8");
-    expect(pipe).toMatch(/dropped its camera moves \(the camera is the picture\)/);
+    // A zoom on an over-camera scene zooms the person: re-aimed at the face, never dropped.
+    expect(pipe).toMatch(/camera move\(s\) re-aimed at the/);
+    expect(pipe).toMatch(/if \(m\.anchor !== undefined \|\| m\.target !== undefined\) \{ delete m\.anchor; delete m\.target; reaimed\+\+; \}/);
+  });
+});
+
+describe("the camera rides the rig, the cut is a swap, the lane shows the takes", () => {
+  it("Studio: a standby camera is preloaded with the next take and swapped in at the cut; the rig camera hides the plain one", async () => {
+    const fs = await import("node:fs/promises");
+    const app = await fs.readFile(new URL("../src/preview-app/preview-app.ts", import.meta.url), "utf8");
+    expect(app).toMatch(/id="speaker-bg2"/);
+    expect(app).toMatch(/function preloadNextSpeakerClip\(time\)/);
+    expect(app).toMatch(/els\.speakerBg = sby; els\.speakerBg2 = el;/);
+    expect(app).toMatch(/!sceneHasRigCamera\(state\.currentSceneIndex\)/);
+    expect(app).toMatch(/\/take-poster\//);                                       // the speaker lane wears the take's picture
+    expect(app).toMatch(/'&camera=0' : ''/);                                       // the filmstrip shows the scene, not the camera
+    const server = await fs.readFile(new URL("../src/index.ts", import.meta.url), "utf8");
+    expect(server).toMatch(/\|take\|take-poster\|storyboard\)/);                   // tenant-guarded
+    expect(server).toMatch(/speakerRefs\[sc0\.id\] = \{ url: u0, offset: ref0!\.offset \}/);
   });
 });

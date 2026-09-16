@@ -32,6 +32,7 @@ import {
   resolveSpeakerVideoTags,
   stripEagerVideoLoading,
   cameraMovesScript,
+  speakerRigVideoHtml,
   wrapperChoreoScript,
   BACKDROP_TYPES,
   bakeDirectLogoData,
@@ -60,6 +61,10 @@ export interface CompositeOptions {
   canvas: Canvas;
   gsapDir: string;
   speakerUrl?: string;
+  /** Per scene: the camera clip and where it sits (per-scene takes). A
+   *  scene with camera moves gets the camera INSIDE its rig so the moves
+   *  move the person; Studio syncs and shows it in place of its own. */
+  speakerRefs?: Record<string, { url: string; offset: number }>;
 }
 
 /**
@@ -281,6 +286,9 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       `  <div class="mp-scene" data-scene-id="${scene.id}" data-scene-index="${si}" ` +
       `style="position:absolute;top:0;left:0;width:${canvas.width}px;height:${canvas.height}px;` +
       `overflow:hidden;background:${sceneBg};visibility:hidden;opacity:0;">\n` +
+      ((isTransparent && options.speakerRefs && options.speakerRefs[scene.id] && scene.camera_moves && scene.camera_moves.length)
+        ? `    ${speakerRigVideoHtml(options.speakerRefs[scene.id].url, options.speakerRefs[scene.id].offset, false)}\n`
+        : '') +
       ((!isTransparent && sceneBgCSS.hasBgImage)
         ? `    <div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>\n`
         : '') +

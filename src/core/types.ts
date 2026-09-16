@@ -714,6 +714,8 @@ export interface Take {
   /** The scene's spoken lines as they stood when this take attached, so a
    *  later script edit can be flagged against the recording. */
   lines?: string;
+  /** A still from the take (at its trim), served for the speaker lane. */
+  poster?: string;
 }
 
 export interface SpeakerTrack {

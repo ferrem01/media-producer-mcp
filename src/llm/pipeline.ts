@@ -2758,6 +2758,8 @@ async function runUnifiedPipeline(
     // full-bleed backdrop component paints over her (proj_4b4c366c had one
     // on BOTH presenter scenes).
     const BACKDROP_RE = /^(mesh-gradient|webgl-backdrop|gradient-background|particle-|aurora|light-mesh)/;
+    let faceProject: Project | null = null;
+    if (opts.project_id) { try { faceProject = await loadProject(opts.tenant_id, opts.project_id); } catch { /* fresh build */ } }
     for (const d of storyboard.scenes as any[]) {
       if (d.transparent_background === false) continue; // takeovers may own their frame
       const comps: any[] = Array.isArray(d.components) ? d.components : [];
@@ -2766,13 +2768,23 @@ async function runUnifiedPipeline(
       if (d.components.length !== before) {
         console.log(`  Takeover recipe: scene "${d.label || "?"}" -- dropped a full-bleed backdrop (the camera is the background)`);
       }
-      // The camera IS the picture on these scenes; the stage camera rides
-      // only the overlay, so a storyboard zoom moves the graphics and not
-      // the person -- a chip on the timeline that visibly does nothing
-      // (measured live: a "zoom" on proj_780a33d0's last scene).
+      // The camera IS the picture on these scenes, and now rides the rig
+      // when the scene has moves: a zoom zooms the PERSON. A move the board
+      // aimed at a graphic ("tpl_artifact.composer") is re-aimed at the
+      // face (measured at attach), or the upper middle of the frame when no
+      // take is in yet. The graphics move with the camera as a whole.
       if (Array.isArray(d.camera_moves) && d.camera_moves.length) {
-        delete d.camera_moves;
-        console.log(`  Takeover recipe: scene "${d.label || "?"}" -- dropped its camera moves (the camera is the picture)`);
+        const sceneIdx = (storyboard.scenes as any[]).indexOf(d);
+        const face = faceProject ? activeTake(faceProject, sceneIdx)?.face : undefined;
+        const fx = face ? Math.round(face.cx * 100) : 50, fy = face ? Math.round(face.cy * 100) : 42;
+        let reaimed = 0;
+        for (const m of d.camera_moves as any[]) {
+          if (!m || typeof m !== "object" || m.type === "reset") continue;
+          if (m.anchor !== undefined || m.target !== undefined) { delete m.anchor; delete m.target; reaimed++; }
+          if (typeof m.x !== "number") m.x = fx;
+          if (typeof m.y !== "number") m.y = fy;
+        }
+        if (reaimed) console.log(`  Takeover recipe: scene "${d.label || "?"}" -- ${reaimed} camera move(s) re-aimed at the ${face ? "face" : "frame"} (${fx}%, ${fy}%): the camera is the picture`);
       }
     }
   }

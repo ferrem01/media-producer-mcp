@@ -2959,3 +2959,30 @@ transcript as film time instead of shifting it by the first clip's trim.
 Over-camera scenes lose their storyboard camera moves in the takeover
 recipe: the stage camera rides the overlay only, so a zoom there moves the
 graphics and not the person -- a chip that visibly does nothing.
+
+## The speaker is the spine: the camera rides the rig, the lane wears the takes, cuts are swaps
+
+Marc, on the fourth run's Studio: the zoom chip should ZOOM HIM, the takes
+belong on the speaker row not the filmstrip, and every cut flashed blank.
+
+The camera rides the rig. On a speaker scene with camera moves the camera
+is a <video> INSIDE .mp-camera (`speakerRigVideoHtml`) instead of the fixed
+underlay behind the page: the rig transforms it with the graphics, so a
+zoom zooms the person. In the render the capture already swaps in-page
+videos for stills per frame (data-start-at), so the moved camera is in the
+frames; in the single-scene preview the video carries the drift-corrected
+seek loop; in the Studio composite it is registered like any scene video
+and synced per scene, and Studio hides its own camera element behind that
+scene. Scenes without moves are untouched. The takeover recipe no longer
+drops over-camera camera moves (#774's stopgap); it re-aims them: a move
+the board anchored on a graphic loses its anchor and gets the face as its
+focal point (the take's measured face; the upper middle before a take).
+
+The lane wears the takes. `/api/take-poster/{t}/{p}/{takeId}` makes one
+still per take at its trim (cached); the speaker-lane pieces tile it. The
+timeline filmstrip of a speaker film asks the still route for `camera=0`:
+the scene's graphics alone. The sidebar keeps the composite still.
+
+Cuts are swaps. A second camera element is preloaded with the NEXT scene's
+take, parked at its trim, four seconds ahead; at the cut the two swap roles
+(display, mute, the clock's element) instead of one reloading its source.
