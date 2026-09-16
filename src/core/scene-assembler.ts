@@ -228,7 +228,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "background:#fff;" : ""}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
       `    ${boundHtml}\n` +
       `  </div>`
     );

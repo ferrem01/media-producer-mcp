@@ -2752,6 +2752,12 @@ async function runUnifiedPipeline(
         const isLast = i === (storyboard.scenes as any[]).length - 1;
         for (const c of d.components as any[]) {
           if (!c || typeof c !== "object" || typeof c.type !== "string") continue;
+          // The writer's shorthand (enter: "cut") reads as the object form
+          // here, so the defaults below see it (measured live, proj_9e650f1a:
+          // the close's mock arrived as the string, kept no time, and cut in
+          // at frame 0 for the whole claim).
+          if (typeof c.enter === "string" && c.enter) c.enter = { effect: c.enter };
+          if (typeof c.exit === "string" && c.exit) c.exit = { effect: c.exit };
           if (isProofSurface(c.type) && c.enter === undefined && c.data?.enter === undefined) {
             c.enter = { effect: "cut", at: Math.round(dur * 0.3 * 100) / 100 };
             if (c.exit === undefined) c.exit = { effect: "cut", at: Math.round(dur * 0.8 * 100) / 100 };

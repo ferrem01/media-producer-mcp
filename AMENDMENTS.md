@@ -6,6 +6,30 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — creator-cut: the plate that hid every cutaway
+
+The second rendered ad (proj_9e650f1a, rebuilt after #789) showed NO
+cutaway at all -- label, sticker, person, and the mocks never appeared.
+The plate added in #789 (`background:#fff` on a cut-in proof wrapper)
+was glued onto the position style with no separator, so the wrapper's
+style read `z-index:36background:#fff`; the browser dropped that whole
+declaration, the wrapper fell to z auto, and the camera rig's own video
+(z 0, later in the DOM) painted over it. The source-regex test passed
+because the text was exactly what it asserted.
+
+- `scene-assembler.ts`: the plate is its own declaration (`; background:#fff`).
+- `test/creator-cut.test.ts`: assembles a real cut-in mock and asserts the
+  emitted wrapper style carries BOTH `z-index:36` and the plate.
+- `pipeline.ts`: the writer's shorthand (`enter: "cut"`) is read as the
+  object form before the creator-cut defaults, so a cut with no time still
+  lands at 30% and the last claim still ends on the person (measured: the
+  close's mock arrived as the string, kept no time, cut in at frame 0 for
+  the whole claim, and the film ended on the metrics screen).
+
+Lesson: when a fix is a string in markup, the test renders the markup.
+
+---
+
 ## 2026-09-16 — creator-cut: motion graphics are the proof by default, the camera moves by rule
 
 The first live board (proj_6b42ee1c) asked for seven screen recordings

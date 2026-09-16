@@ -242,7 +242,32 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     // The assembler plates a cut-in proof (the mocks draw a floating window with margins; the camera showed through).
     const asm = await read("../src/core/scene-assembler.ts");
     expect(asm).toMatch(/function isCutInProof\(comp/);
-    expect(asm).toMatch(/isCutInProof\(comp\) \? "background:#fff;" : ""/);
+    expect(asm).toMatch(/isCutInProof\(comp\) \? "; background:#fff" : ""/);
+    // ...and the plate is a declaration of its OWN, after a separator: glued to
+    // the position style ("z-index:36background:#fff") the browser dropped the
+    // z-index, the wrapper fell under the camera rig, and no cutaway rendered
+    // at all (measured live on the second rendered ad, every scene).
+    const { assembleScene } = await import("../src/core/scene-assembler.js");
+    const mockSrc = await read("../src/components/mockups/email-compose.component.html").catch(() => "");
+    const html = await assembleScene({
+      scene: {
+        id: "s1", label: "claim", duration_seconds: 4, transparent_background: true,
+        components: [{
+          id: "email-compose", type: "email-compose", z_index: 36, frame_anchor: "body",
+          position: { x: 0, y: 0, width: "100%", height: "100%" },
+          enter: { effect: "cut", at: 1.2 }, exit: { effect: "cut", at: 3.2 },
+          data: { to: "sam@acme.com", subject: "Free trial", body: "Two lines." },
+        }],
+      } as any,
+      components: [{ type: "email-compose", source: mockSrc || '<div class="ec">{{subject}}</div>' }],
+      brandKit: { fonts: [] } as any,
+      canvas: { width: 1080, height: 1920 } as any,
+      gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+    } as any);
+    const wrapper = html.match(/<div class="mp-component" data-cid="email-compose"[^>]*>/)?.[0] || "";
+    expect(wrapper).toMatch(/data-mp-cutaway="1"/);
+    expect(wrapper).toMatch(/style="[^"]*z-index:36;\s*background:#fff"/);
+    expect(wrapper).not.toMatch(/z-index:36background/);
     // ...and frames at about 1.5x, region high (Marc: 2.2x was too big for the vertical screen).
     expect(asm).toMatch(/var sc = Math\.max\(1\.2, Math\.min\(2\.2, \(CW \* 0\.94 \/ r\.w\) \* 1\.5\)\);/);
     // The generator lays a cut-in label above the proof and frames only proof surfaces.
@@ -262,6 +287,10 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(pipeline).toMatch(/the film ends on the person: \$\{c\.type\} cuts out at \$\{back\}s/);
     expect(pipeline).toMatch(/\(c\.enter\.at === undefined \|\| c\.enter\.at === null\)\) \{\s*c\.enter\.at = Math\.round\(dur \* 0\.3 \* 100\) \/ 100;/);
     expect(pipeline).not.toMatch(/CUTAWAY_MOCK_RE/);
+    // The writer's shorthand (enter: "cut") is read as the object form BEFORE
+    // the defaults, so a cut with no time still lands at 30% (measured live:
+    // the close's mock arrived as the string and cut in at frame 0).
+    expect(pipeline).toMatch(/if \(typeof c\.enter === "string" && c\.enter\) c\.enter = \{ effect: c\.enter \};\s*if \(typeof c\.exit === "string" && c\.exit\) c\.exit = \{ effect: c\.exit \};\s*if \(isProofSurface\(c\.type\) && c\.enter === undefined/);
   });
 
   it("a standing header becomes chapter labels, and a cut whose word is not in the lines gets the default window", async () => {
