@@ -28,6 +28,7 @@ import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-track.js";
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
+import { ensureTakePoster } from "./core/take-poster.js";
 import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
@@ -67,7 +68,7 @@ import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/
 import { solveMediaEdits, inferIntents, contractSceneToEdl } from "./core/media-edl.js";
 import { sceneCompositesOverSpeaker } from "./core/speaker-mode.js";
 import { repairBrandAssetPath } from "./core/scene-assembler.js";
-import { spawn, execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { openSync, readFileSync } from "node:fs";
 
 /**
@@ -3017,16 +3018,8 @@ Rules:
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const take = (project.takes || []).find((t) => t.id === takeId);
         if (!take) { jsonResponse(res, 404, { error: "Take not found" }); return; }
-        const posterDir = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
-        const posterFile = path.join(posterDir, `take-poster-${take.id.replace(/[^a-zA-Z0-9_-]/g, "_")}.jpg`);
-        try { await fs.access(posterFile); }
-        catch {
-          await fs.mkdir(posterDir, { recursive: true });
-          const at = Math.max(0, (take.trim_start || 0) + Math.min(0.5, Math.max(0, (take.duration || 1) * 0.25)));
-          await new Promise<void>((resolve, reject) => {
-            execFile("ffmpeg", ["-y", "-loglevel", "error", "-ss", String(at), "-i", resolveVideoPath(take.source, config.dataDir), "-frames:v", "1", "-vf", "scale=-2:180", "-q:v", "4", posterFile], (err) => err ? reject(err) : resolve());
-          }).catch((e: any) => { console.warn(`  take poster failed: ${e?.message || e}`); });
-        }
+        const posterFile = await ensureTakePoster(project, take, config.dataDir);
+        if (!posterFile) { jsonResponse(res, 404, { error: "Poster not available" }); return; }
         try {
           const buf = await fs.readFile(posterFile);
           res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=3600" });

@@ -23,6 +23,9 @@ import { assembleScene } from "./scene-assembler.js";
 import { LAUNCH_OPTS } from "./capture.js";
 import { buildAuthoredCompositionScene, buildTemplateScene } from "../llm/scene-generator.js";
 import type { Project } from "./types.js";
+import { activeTake } from "./take-needs.js";
+import { ensureTakePoster } from "./take-poster.js";
+import fsSync from "node:fs";
 
 /**
  * When to photograph the scene: after its slowest performer has landed, but
@@ -76,7 +79,33 @@ async function indexComponents(dir: string): Promise<Map<string, string>> {
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | null>, title: string): string {
+/**
+ * The card's frame, before a take exists: the reader has to know a PERSON
+ * is expected there. A head-and-shoulders outline in the chest-up framing
+ * the layout assumes, labeled, under whatever graphics the scene stages.
+ * Once a take is attached the card shows that take's still instead.
+ */
+export function speakerPlaceholderHtml(canvas: { width: number; height: number }, posterDataUrl?: string): string {
+  const W = canvas.width, H = canvas.height;
+  const tall = H > W;
+  // Head centre and size follow the default face the layout assumes
+  // (tallSpeakerBands without a measured face): eyes around 45% down.
+  const cx = W * 0.5, cy = H * (tall ? 0.44 : 0.46), r = Math.min(W, H) * (tall ? 0.19 : 0.17);
+  const shoulderTop = cy + r * 1.15, shoulderW = r * 3.6;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <circle cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" r="${r.toFixed(0)}" fill="none" stroke="#8a8374" stroke-width="${Math.max(3, W * 0.004).toFixed(0)}" stroke-dasharray="${(r * 0.18).toFixed(0)} ${(r * 0.12).toFixed(0)}"/>
+  <path d="M ${(cx - shoulderW / 2).toFixed(0)} ${H} C ${(cx - shoulderW / 2).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx - r * 1.1).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx - r * 0.9).toFixed(0)} ${(shoulderTop - r * 0.1).toFixed(0)} M ${(cx + shoulderW / 2).toFixed(0)} ${H} C ${(cx + shoulderW / 2).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx + r * 1.1).toFixed(0)} ${shoulderTop.toFixed(0)}, ${(cx + r * 0.9).toFixed(0)} ${(shoulderTop - r * 0.1).toFixed(0)}" fill="none" stroke="#8a8374" stroke-width="${Math.max(3, W * 0.004).toFixed(0)}" stroke-dasharray="${(r * 0.18).toFixed(0)} ${(r * 0.12).toFixed(0)}"/>
+  <text x="${cx.toFixed(0)}" y="${(H * (tall ? 0.94 : 0.93)).toFixed(0)}" text-anchor="middle" font-family="DejaVu Sans, system-ui, sans-serif" font-size="${(Math.min(W, H) * 0.045).toFixed(0)}" font-weight="700" letter-spacing="${(Math.min(W, H) * 0.008).toFixed(0)}" fill="#8a8374">SPEAKER ON CAMERA</text>
+</svg>`;
+  const bg = posterDataUrl
+    ? `background:#2a2a2e url(${posterDataUrl}) center/cover no-repeat;`
+    : `background:linear-gradient(180deg,#d9d4c8 0%,#c9c2b2 100%);`;
+  const body = posterDataUrl ? "" : `<div style="position:absolute;inset:0;background:url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}') center/100% 100% no-repeat;"></div>`;
+  return `<div id="__mp_speaker_placeholder" style="position:fixed;inset:0;z-index:-10;${bg}">${body}</div>`;
+}
+
+export function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | null>, title: string, canvas: { width: number; height: number } = { width: 1920, height: 1080 }): string {
+  const tall = canvas.height > canvas.width;
   const cards = scenes.map((ss, i) => {
     let t = 0;
     const beats = (ss.beats || []).map((b: any) => {
@@ -128,21 +157,26 @@ function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | nul
     const frame = stills[i]
       ? `<img class="frame" src="${path.basename(stills[i]!)}">`
       : `<div class="frame ph">codegen scene &mdash; frame appears after build</div>`;
-    return `<div class="card">${frame}
+    return `<div class="card${tall ? " tall" : ""}">${frame}<div class="body">
       <div class="head"><span class="num">${String(i + 1).padStart(2, "0")}</span> ${esc(ss.label)} <span class="dur">${esc(ss.duration_seconds)}s</span></div>
       <div class="purpose">${esc(ss.purpose)}</div>
       ${ss.voiceover_text ? `<div class="vo">VO: &ldquo;${esc(ss.voiceover_text)}&rdquo;</div>` : ""}
       <div class="sect">BEATS</div>${beats || '<div class="sc mut">(no beats)</div>'}
       ${cam ? `<div class="sect">CAMERA</div>${cam}` : ""}
       <div class="sect">COMPONENTS &amp; SCRIPTS</div>${comps || '<div class="sc mut">(none cast)</div>'}
-    </div>`;
+    </div></div>`;
   }).join("");
+  // The frame on the card IS the film's frame: a Reel's card shows a tall
+  // frame beside its record, not a wide crop of it (the cards cropped every
+  // 9x16 still to 16:9 -- "a giant screen", Marc).
   return `<!doctype html><meta charset="utf-8"><style>
   body{margin:0;background:#e8e2d4;font-family:'DejaVu Sans',system-ui,sans-serif;color:#17171c;width:2440px}
   h1{font-size:30px;margin:20px 28px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:0 24px 24px;align-items:start}
   .card{background:#f5f2ea;border:2px solid #c9c2b2;padding:22px}
-  .frame{width:100%;aspect-ratio:16/9;object-fit:cover;border:2px solid #111;display:block}
+  .card.tall{display:grid;grid-template-columns:420px 1fr;gap:22px;align-items:start}
+  .card.tall .body{min-width:0}
+  .frame{width:100%;aspect-ratio:${canvas.width}/${canvas.height};object-fit:cover;border:2px solid #111;display:block}
   .frame.ph{display:flex;align-items:center;justify-content:center;background:#dedad0;color:#8a8374;font-size:20px;border-style:dashed}
   .head{font-size:29px;font-weight:700;margin:16px 0 8px;display:flex;align-items:center;gap:10px}
   .num{color:#8a8374}.dur{margin-left:auto;background:#393bf5;color:#fff;padding:2px 12px;font-size:26px}
@@ -175,6 +209,9 @@ export async function renderStoryboardCards(project: Project, opts: {
   outDir: string;
   /** Tenant components dir -- captured components live here (SPEC-web-capture). */
   tenantComponentLibDir?: string;
+  /** Data dir: with it, a scene whose take is attached shows that take's
+   *  still under its graphics instead of the placeholder outline. */
+  dataDir?: string;
 }): Promise<StoryboardCardsResult> {
   const sb: any = (project as any).storyboard;
   const scenes: any[] = sb?.scenes || [];
@@ -187,6 +224,10 @@ export async function renderStoryboardCards(project: Project, opts: {
     for (const [k, v] of await indexComponents(opts.tenantComponentLibDir)) lib.set(k, v);
   }
   const canvas: any = (project as any).canvas || { width: 1920, height: 1080, fps: 30 };
+  // A speaker film: the person is the base of every scene. The card lays
+  // the graphics out the way the build will (bands around the face) and
+  // shows the reader that a person is expected there.
+  const speakerFilm = (project as any).treatment?.filmGrammar === "speaker";
   const browser = await chromium.launch(LAUNCH_OPTS);
   const stills: Array<string | null> = [];
   try {
@@ -204,8 +245,11 @@ export async function renderStoryboardCards(project: Project, opts: {
         // judgeable. Camera moves are film-time direction -- they appear on
         // the card as copy (the CAMERA section), never applied to the photo.
         const { camera_moves: _cm, ...staged } = draft;
+        const take = speakerFilm ? activeTake(project, i) : undefined;
+        if (speakerFilm && take?.face) (staged as any).take_face = take.face;
         const cardOpts = {
           sceneIndex: i, totalScenes: scenes.length,
+          hasSpeakerTrack: speakerFilm,
           brandKit: (project as any).brand_kit || { colors: {}, fonts: [] },
           canvas, world: (project as any).world,
           // The cards must preview the BUILD's layout doctrine (cut grammars
@@ -227,11 +271,21 @@ export async function renderStoryboardCards(project: Project, opts: {
           const p = lib.get(t);
           return p ? { type: t, source: await fs.readFile(p, "utf-8") } : null;
         }));
-        const html = await assembleScene({
+        let html = await assembleScene({
           scene, components: comps.filter(Boolean),
           brandKit: (project as any).brand_kit || { colors: {}, fonts: [] },
           canvas, gsapDir: opts.gsapDir,
         } as any);
+        if (speakerFilm && (scene as any).transparent_background !== false) {
+          let posterDataUrl: string | undefined;
+          if (take && opts.dataDir) {
+            try {
+              const pf = await ensureTakePoster(project, take, opts.dataDir);
+              if (pf) posterDataUrl = `data:image/jpeg;base64,${fsSync.readFileSync(pf).toString("base64")}`;
+            } catch { /* outline instead */ }
+          }
+          html = html.replace(/<body[^>]*>/, (m) => `${m}\n${speakerPlaceholderHtml(canvas, posterDataUrl)}`);
+        }
         const f = path.join(opts.outDir, `card_work_${i}.html`);
         await fs.writeFile(f, html);
         await page.goto(`file://${f}`, { waitUntil: "domcontentloaded", timeout: 45_000 });
@@ -256,7 +310,7 @@ export async function renderStoryboardCards(project: Project, opts: {
     // The sheet: one HTML page, full-page screenshot.
     const title = `STORYBOARD — “${sb?.narrative || (project as any).name || "Untitled"}” · ${(project as any).project_id} · ${scenes.length} scenes · ~${Math.round(sb?.estimated_duration || 0)}s`;
     const sheetHtml = path.join(opts.outDir, "storyboard-cards.html");
-    await fs.writeFile(sheetHtml, cardHtml(scenes, stills, title));
+    await fs.writeFile(sheetHtml, cardHtml(scenes, stills, title, canvas));
     const sheetPage = await browser.newPage({ viewport: { width: 2440, height: 1200 } });
     await sheetPage.goto(`file://${sheetHtml}`, { waitUntil: "load", timeout: 45_000 });
     await sheetPage.waitForTimeout(400);

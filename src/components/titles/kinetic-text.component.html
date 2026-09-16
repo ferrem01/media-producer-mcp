@@ -68,6 +68,15 @@
     var text = String(data.text || '');
 
     if (data.color) container.style.color = data.color;
+    // Over live pixels (a camera take, b-roll) no single ink is safe: the
+    // room behind the words is whatever it is. A plate carries the type.
+    if (data.plate) {
+      container.style.background = 'rgba(8, 8, 12, 0.58)';
+      container.style.padding = '0.14em 0.42em';
+      container.style.borderRadius = '0.18em';
+      container.style.textShadow = '0 2px 14px rgba(0, 0, 0, 0.45)';
+      if (!data.color) container.style.color = '#f5f6fa';
+    }
 
     // *stars* mark accent words -- color only, they move with their line.
     container.innerHTML = '';

@@ -2986,3 +2986,22 @@ the scene's graphics alone. The sidebar keeps the composite still.
 Cuts are swaps. A second camera element is preloaded with the NEXT scene's
 take, parked at its trim, four seconds ahead; at the cut the two swap roles
 (display, mute, the clock's element) instead of one reloading its source.
+
+## The storyboard card is the film's frame, and shows the person
+
+Marc: a 9x16 board's cards looked like "a giant screen", and nothing on
+a speaker board told the reader a person was expected in the frame.
+
+The stills were always photographed at the canvas size; the SHEET cropped
+every one to 16:9. The card now takes the film's aspect ratio, and a tall
+film's card lays the frame beside its record (420px column) instead of
+above it. On a speaker film every over-camera card carries a
+head-and-shoulders outline in the chest-up framing the layout assumes,
+labeled "SPEAKER ON CAMERA" down in the platform zone, under the scene's
+graphics -- and once a take is attached, that take's still instead. The
+card also lays the graphics out the way the build will (the speaker
+bands, the measured face when there is one), so the board previews the
+film's layout doctrine rather than a wide-frame guess of it.
+
+`core/take-poster.ts` makes the take still (ffmpeg, at the trim, cached
+beside the thumbnails); the speaker-lane route and the cards share it.

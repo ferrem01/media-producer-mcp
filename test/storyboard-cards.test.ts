@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { renderStoryboardCards, settledMoment } from "../src/core/storyboard-cards.js";
+import { renderStoryboardCards, settledMoment, cardHtml, speakerPlaceholderHtml } from "../src/core/storyboard-cards.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -85,4 +85,47 @@ describe("renderStoryboardCards", () => {
       await fs.rm(outDir, { recursive: true, force: true }).catch(() => {});
     }
   }, 300_000);
+});
+
+describe("the card is the film's frame, and a speaker film shows the person", () => {
+  it("a tall film's card carries a tall frame beside its record, not a wide crop", () => {
+    const html = cardHtml([{ label: "S1", purpose: "p", duration_seconds: 8, components: [], beats: [] }], ["/tmp/x.png"], "T", { width: 1080, height: 1920 });
+    expect(html).toMatch(/aspect-ratio:1080\/1920/);
+    expect(html).toMatch(/class="card tall"/);
+    expect(html).toMatch(/\.card\.tall\{display:grid;grid-template-columns:420px 1fr/);
+    const wide = cardHtml([{ label: "S1", purpose: "p", duration_seconds: 8, components: [], beats: [] }], ["/tmp/x.png"], "T", { width: 1920, height: 1080 });
+    expect(wide).toMatch(/aspect-ratio:1920\/1080/);
+    expect(wide).not.toMatch(/class="card tall"/);
+  });
+  it("before a take, the frame shows a head-and-shoulders outline labeled for the reader; after, the take's still", () => {
+    const ph = speakerPlaceholderHtml({ width: 1080, height: 1920 });
+    expect(ph).toMatch(/id="__mp_speaker_placeholder"/);
+    expect(ph).toMatch(/SPEAKER%20ON%20CAMERA/);
+    expect(ph).toMatch(/%3Ccircle/);                                   // the head, in the svg data url
+    const withTake = speakerPlaceholderHtml({ width: 1080, height: 1920 }, "data:image/jpeg;base64,AAAA");
+    expect(withTake).toMatch(/url\(data:image\/jpeg;base64,AAAA\) center\/cover/);
+    expect(withTake).not.toMatch(/SPEAKER%20ON%20CAMERA/);
+  });
+  it("photographs a tall speaker board at its own size with the person under the graphics", async () => {
+    const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "sbcards-tall-"));
+    const project: any = {
+      project_id: "p_tall", tenant_id: "t", name: "tall", status: "storyboard",
+      canvas: { width: 1080, height: 1920, fps: 30 },
+      treatment: { filmGrammar: "speaker" },
+      brand_kit: { colors: {}, fonts: [] },
+      storyboard: { narrative: "n", estimated_duration: 8, scenes: [
+        { label: "S1", purpose: "p", duration_seconds: 8, voiceover_text: "Hi.", beats: [],
+          components: [{ type: "kinetic-text", data: { text: "ONE PLACE", at: 0 } }] },
+      ] },
+      scenes: [],
+    };
+    const res = await renderStoryboardCards(project, { componentLibDir: path.resolve(__dirname, "../src/components"), gsapDir: path.resolve(__dirname, "../vendor/gsap"), outDir });
+    expect(res.stills[0]).toBeTruthy();
+    const png = await fs.readFile(res.stills[0]!);
+    // PNG IHDR: width at bytes 16-19, height at 20-23.
+    expect(png.readUInt32BE(16)).toBe(1080);
+    expect(png.readUInt32BE(20)).toBe(1920);
+    const sheet = await fs.readFile(path.join(outDir, "storyboard-cards.html"), "utf8");
+    expect(sheet).toMatch(/class="card tall"/);
+  }, 90_000);
 });

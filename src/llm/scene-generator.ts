@@ -358,7 +358,7 @@ var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 // plated caption that fits its lane, the stage overlay) and must NOT be
 // zoomed on top of that. Everything else gets the phone zoom on a tall
 // speaker frame: a mock, a stamp, a pill set, a composer, a stat.
-var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "video", "image"];
+var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "video", "image"];
 function phoneZoomable(type: string): boolean {
   return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
 }
@@ -883,6 +883,10 @@ export function buildAuthoredCompositionScene(
       // The URL's ink is text over the camera: dark ink vanishes on a dark
       // room (measured: #17171c on a charcoal wall).
       if (c.type === "auto-tagged-link" && (typeof data.ink !== "string" || !hexIsLight(data.ink as string))) data.ink = "#f5f6fa";
+      // Kinetic words over the camera ride on a plate: no ink is safe on
+      // its own against a room (measured: "ONE PLACE" in near-black on a
+      // dark shirt, the URL in near-black on a cream couch).
+      if (c.type === "kinetic-text" && data.plate === undefined) data.plate = true;
     }
     // WORLD INK CLAMP: editorial copy must contrast the world it sits on.
     // Storyboards habitually author dark-era caption colors (#f5f6fa) that
