@@ -71,8 +71,9 @@ they still want different contracts, split then, with evidence.
 6. **Stickers, not decoration.** An icon beside the head names the thing
    being talked about (a calendar, a cart). Same sticker-prop, same phone
    scale.
-7. **The CTA is the last claim.** The ask ("Comment 'work'", the URL) is a
-   graphic on the final beat, and the film holds on it.
+7. **A CTA or sponsor line only when asked.** Not part of the grammar. When
+   the brief asks for one, it is a graphic on the final beat and the film
+   holds on it.
 8. **Sound.** The voice. A bed only under an ad, ducked far.
 
 ## Machinery
@@ -139,5 +140,3 @@ side by side with the references.
 
 - Cards vs cutaways: the writer chooses per beat, with the lean above -- or
   pin it per film?
-- The sponsor/CTA line: always the last chapter, or only when the brief
-  asks?
