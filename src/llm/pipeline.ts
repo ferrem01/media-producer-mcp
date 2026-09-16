@@ -1299,7 +1299,12 @@ async function critiqueAndRetryScene(opts: {
         // what a correct scene looks like here. Measured on proj_61516d44:
         // every presenter scene shipped dead_entrance/empty_moment at 0-1%
         // coverage, burning the revision budget on unfixable phantoms.
-        const cameraIsBackground = sceneCompositesOverSpeaker(opts.scene, !!opts.speakerUrl);
+        // ...and the build-from-board path knows it is over the camera by
+        // opts.overCamera even before the clip is wired (measured live,
+        // proj_f10e79cf: "empty_moment" at 5.0s on a person scene, and the
+        // repair loop enlarged the caption lane to fill a frame the camera
+        // fills).
+        const cameraIsBackground = !!opts.overCamera || sceneCompositesOverSpeaker(opts.scene, !!opts.speakerUrl);
         if (cameraIsBackground) {
           console.log(`  Assembled-scene empty-moment gate skipped: scene ${opts.sceneIndex} composites over the camera`);
         }
@@ -2889,6 +2894,24 @@ async function runUnifiedPipeline(
       }
       if (r.resolved || r.unresolved.length) {
         console.log(`  Spine: scene ${i + 1} ${spine.source}: ${r.resolved} anchor(s) resolved${r.unresolved.length ? `, ${r.unresolved.length} not in the script: ${r.unresolved.map((u) => `${u.component}.${u.path}="${u.word}"`).join(", ")}` : ""}`);
+      }
+      // A sticker that lands on the emphasis word and exits on the cut-in
+      // never shows when the writer cut in on that same word (measured live,
+      // proj_f10e79cf: every sticker at 1.15s, gone at 1.15s). With the
+      // numbers resolved: it needs a second before the cut, else it rides
+      // the cutaway and leaves with it.
+      if (filmGrammar === "creator-cut") {
+        const proofs = (d.components as any[]).filter((c) => c && typeof c === "object" && isProofSurface(c.type) && c.enter && typeof c.enter === "object" && c.enter.effect === "cut" && typeof c.enter.at === "number");
+        const cutOut = proofs.map((c) => (c.exit && typeof c.exit === "object" && typeof c.exit.at === "number") ? Number(c.exit.at) : NaN).find((n) => Number.isFinite(n));
+        for (const c of d.components as any[]) {
+          if (!c || typeof c !== "object" || c.type !== "sticker-prop" || !c.data || typeof c.data !== "object") continue;
+          if (!c.exit || typeof c.exit !== "object" || c.exit.effect !== "cut" || typeof c.exit.at !== "number") continue;
+          const at = Number(c.data.at) || 0, out = Number(c.exit.at);
+          if (at + 1.0 <= out) continue;
+          if (out - 1.2 >= 0.3) { c.data.at = Math.round((out - 1.2) * 100) / 100; console.log(`  Creator-cut: scene ${i + 1} -- the sticker's word is the cut's word; it lands at ${c.data.at}s instead`); }
+          else if (Number.isFinite(cutOut)) { c.exit = { effect: "cut", at: cutOut }; console.log(`  Creator-cut: scene ${i + 1} -- no room before the cut; the sticker rides the cutaway and leaves with it`); }
+          else { delete c.exit; }
+        }
       }
     }
   }
