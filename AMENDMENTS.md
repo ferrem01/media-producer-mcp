@@ -6,6 +6,36 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — The first full end-to-end creator-cut film: four defects, four rules
+
+proj_f10e79cf: fresh board, one recording, built and rendered with no
+hand fix. Marc: "black on black" captions; "a random little pill ...
+half on, half off screen"; the captions "cracked out over the main part
+of the screen" on a cutaway; "I thought we had rules for this".
+
+- **Black on black.** The lane's plain words took the brand's text color
+  (#17171c on a light brand) on the dark plate. Under a plate or a shadow
+  the ink is white, whatever the brand says (`reel-caption-lane`).
+- **Why the gate let it through.** Over the camera every ink finding was
+  dropped ("measured against the plain page, not the camera"). Now the
+  scene is measured on a DARK page and a LIGHT page as well; ink that
+  fails on both fails on any camera -- the plate is its own ground -- and
+  the finding stands (`pipeline.ts`, assembled-scene gates).
+- **The sticker left the frame.** Side slots and bands were laid out on
+  the full frame; the rig's punch-in (1.22-1.3x on the face) pushed a slot
+  at the edge out of the picture. `tallSpeakerBands` now cuts the bands,
+  the side slots and the corner fallbacks to the window the punch-in still
+  shows; the lane, pinned to the frame, keeps the frame's own bands and
+  takes 12% at the band's top, leaving the rest for a sticker or the pills
+  (a close face has no side slot at all). The roomier side first.
+- **The sticker read random.** The writer landed it at 0.2s and flashed
+  it for a second. By rule it lands on the claim's emphasis word and stays
+  until the cutaway cuts in (the cut is its exit).
+- **Captions over the cutaway.** With a close face the lane sits high,
+  where a framed mock's content is. For every cut window the lane drops to
+  the chest band (`data.cut_top`, read by `wrapperChoreoScript`) and comes
+  back with the person.
+
 ## 2026-09-16 — The take page, third round: the lines set the floor, tap to advance, no scrolling, one camera prompt
 
 Marc, recording the fresh creator-cut board (proj_f10e79cf) in one go:

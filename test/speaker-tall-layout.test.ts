@@ -38,7 +38,7 @@ describe("a speaker scene on a TALL frame", () => {
     // THE WORDS RIDE OVER EVERYTHING: the caption lane owns the lower band
     // (68%-82%: below a chest-up chin), above a cut-in proof (36) and a
     // label (39), so it runs through the cutaways (core/captions.ts)...
-    expect(by("reel-caption-lane").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "14%" });
+    expect(by("reel-caption-lane").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "12%" });
     expect(by("reel-caption-lane").z_index).toBe(41);
     // ...and the surfaces stack under the platform strip (13%-30%).
     for (const t of ["composer", "auto-tagged-link"]) {
@@ -113,6 +113,26 @@ describe("a speaker scene on a WIDE frame", () => {
   });
 });
 
+describe("the bands and side slots stay inside the frame the punch-in shows", () => {
+  it("cuts the side slots and the top band to the 1/zoom window centred on the face", async () => {
+    const { tallSpeakerBands } = await import("../src/llm/scene-generator.js");
+    // Marc's close take (proj_f10e79cf): the sticker beside the head left the frame under a 1.3x punch-in.
+    const b = tallSpeakerBands({ cx: 0.565, cy: 0.566, size: 0.387 } as any, 9 / 16, 1.3);
+    const win = 1 / 1.3, vx0 = Math.max(0, Math.min(1 - win, 0.565 - win / 2));
+    for (const sd of b.sides) {
+      expect(sd.x).toBeGreaterThanOrEqual(vx0 + 0.03 - 0.001);
+      expect(sd.x + sd.width).toBeLessThanOrEqual(vx0 + win - 0.03 + 0.001);
+    }
+    expect(b.sides.length).toBeGreaterThan(0);
+    // The chin is too low for a chest band; the top band starts inside the window.
+    expect(b.lower).toBeNull();
+    expect(b.top!.top).toBeGreaterThanOrEqual(Math.max(0, Math.min(1 - win, 0.566 - win / 2)) + 0.02 - 0.001);
+    // No punch-in: the old geometry.
+    const flat = tallSpeakerBands({ cx: 0.5, cy: 0.45, size: 0.3 } as any, 9 / 16, 1);
+    expect(flat.sides.some((sd) => sd.x === 0.05)).toBe(true);
+  });
+});
+
 describe("a speaker scene laid out around a MEASURED face", () => {
   const BED = { cx: 0.569, cy: 0.61, size: 0.406 };
   it("with the face low in the frame, the captions take the band above the hairline and nothing sits under the chin", () => {
@@ -133,7 +153,10 @@ describe("a speaker scene laid out around a MEASURED face", () => {
       expect(pctNum(p.y)).toBeGreaterThanOrEqual(13);
       expect(pctNum(p.y) + pctNum(p.height)).toBeLessThanOrEqual(32.1);
     }
-    expect(pctNum(by("sticker-prop").position.x)).toBe(5);       // the one side with room
+    // The one side with room -- inside the window a 1.3x punch-in still shows (measured live: a
+    // sticker at the frame's edge left the frame under the zoom), so not at 5% any more.
+    expect(pctNum(by("sticker-prop").position.x)).toBeGreaterThanOrEqual(21);
+    expect(pctNum(by("sticker-prop").position.x)).toBeLessThan(50);
     expect(pctNum(by("floating-pills").position.y)).toBeGreaterThanOrEqual(13); // the pills share the free band, never the face
     expect(pctNum(by("floating-pills").position.y) + pctNum(by("floating-pills").position.height)).toBeLessThanOrEqual(32.1);
   });
@@ -169,10 +192,10 @@ describe("type over the camera", () => {
     expect(k.zoom).toBeUndefined();
     expect(t.zoom).toBeUndefined();
   });
-  it("the legibility gate drops ink findings for a scene that composites over the camera", async () => {
+  it("the legibility gate drops ink findings for a scene that composites over the camera -- unless the ink fails on a dark AND a light page", async () => {
     const fs = await import("node:fs/promises");
     const p = await fs.readFile(new URL("../src/llm/pipeline.ts", import.meta.url), "utf8");
-    expect(p).toMatch(/if \(type === "illegible" && opts\.overCamera\)/);
+    expect(p).toMatch(/if \(type === "illegible" && opts\.overCamera && !\(failsAnyCamera && failsAnyCamera\.has\(d\.text\)\)\)/);
     expect(p.match(/overCamera: personBase &&/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });

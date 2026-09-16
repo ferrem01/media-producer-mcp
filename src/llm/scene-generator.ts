@@ -577,10 +577,13 @@ type TakeFace = { cx: number; cy: number; size: number };
  * top band ends above the hairline, and accent slots sit beside the head
  * only where there is room. Fractions of the frame; y downward.
  */
-export function tallSpeakerBands(face: TakeFace | undefined, frameRatio = 16 / 9): {
+export function tallSpeakerBands(face: TakeFace | undefined, frameRatio = 16 / 9, punchIn = 1.3): {
   lower: { top: number; bottom: number } | null;
   top: { top: number; bottom: number } | null;
   sides: Array<{ x: number; y: number; width: number; height: number }>;
+  /** The left and right edges the punch-in still shows (a corner slot
+   *  starts here, never at the frame's edge). */
+  edges: { left: number; right: number };
 } {
   const r3 = (n: number) => Math.round(n * 1000) / 1000;
   if (!face) {
@@ -588,13 +591,30 @@ export function tallSpeakerBands(face: TakeFace | undefined, frameRatio = 16 / 9
       lower: { top: 0.68, bottom: 0.82 },
       top: { top: 0.13, bottom: 0.30 },
       sides: [{ x: 0.64, y: 0.31, width: 0.31, height: 0.12 }, { x: 0.05, y: 0.31, width: 0.31, height: 0.12 }],
+      edges: { left: 0.05, right: 0.95 },
     };
   }
+  // THE FRAME UNDER THE PUNCH-IN: the camera rig zooms on the face (1.22
+  // punchy, up to ~1.3), and everything riding the rig moves with it -- a
+  // slot at the frame's edge leaves the frame (measured live,
+  // proj_f10e79cf: the sticker beside the head "half on, half off screen").
+  // The bands and the side slots are cut to the window the zoom still
+  // shows: 1/punchIn of the frame, centred on the face, clamped to the
+  // frame.
+  const win = 1 / Math.max(1, punchIn);
+  const clampWin = (c: number) => Math.max(0, Math.min(1 - win, c - win / 2));
+  const vx0 = clampWin(face.cx), vx1 = vx0 + win;
+  const vy0 = clampWin(face.cy), vy1 = vy0 + win;
   const chin = face.cy + face.size * 0.45;
   const hair = face.cy - face.size * 0.5;
-  const lower = chin <= 0.72 ? { top: r3(Math.max(0.55, Math.min(0.70, chin + 0.01))), bottom: 0.82 } : null;
+  const lowerBottom = r3(Math.min(0.82, vy1 - 0.02));
+  const lowerTop = r3(Math.max(0.55, Math.min(0.70, chin + 0.01)));
+  const lower = chin <= 0.72 && lowerBottom - lowerTop >= 0.08 ? { top: lowerTop, bottom: lowerBottom } : null;
+  const topTop = r3(Math.max(0.13, vy0 + 0.02));
   const topBottom = r3(Math.max(0.20, Math.min(0.32, hair - 0.02)));
-  const top = topBottom - 0.13 >= 0.08 ? { top: 0.13, bottom: topBottom } : null;
+  // A band cut by the window may run a little short (7% of the frame is a
+  // link or a label at phone scale; measured: 0.245-0.32 on a low face).
+  const top = topBottom - topTop >= 0.07 ? { top: topTop, bottom: topBottom } : null;
   // The cascade's square is the face height; in width fractions it is
   // narrower than it looks on a tall frame, and the head is narrower still.
   const halfW = face.size * 0.5 * frameRatio * 0.72;
@@ -603,14 +623,17 @@ export function tallSpeakerBands(face: TakeFace | undefined, frameRatio = 16 / 9
   // it shrinks past legibility (measured live: "QUOTIENT" at 32px in an
   // 18% slot). A side that narrow is no slot; a second accent stacks under
   // the first on the side that has room instead.
-  const MIN_SIDE = 0.26;
+  const MIN_SIDE = 0.22;
   const sides: Array<{ x: number; y: number; width: number; height: number }> = [];
+  const edgeR = r3(Math.min(0.95, vx1 - 0.03)), edgeL = r3(Math.max(0.05, vx0 + 0.03));
   const rx = r3(Math.max(0.5, face.cx + halfW - 0.05));
-  if (r3(0.95 - rx) >= MIN_SIDE) sides.push({ x: rx, y, width: r3(0.95 - rx), height: 0.12 });
+  if (r3(edgeR - rx) >= MIN_SIDE) sides.push({ x: rx, y, width: r3(edgeR - rx), height: 0.12 });
   const lx = r3(Math.min(0.5, face.cx - halfW + 0.05));
-  if (r3(lx - 0.05) >= MIN_SIDE) sides.push({ x: 0.05, y, width: r3(lx - 0.05), height: 0.12 });
+  if (r3(lx - edgeL) >= MIN_SIDE) sides.push({ x: edgeL, y, width: r3(lx - edgeL), height: 0.12 });
+  // The roomier side first: the first sticker goes where there is width.
+  sides.sort((a, b) => b.width - a.width);
   if (sides.length === 1 && y + 0.25 <= 0.82) sides.push({ ...sides[0], y: r3(y + 0.13) });
-  return { lower, top, sides };
+  return { lower, top, sides, edges: { left: edgeL, right: edgeR } };
 }
 
 function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false, takeover = false, grammar?: string, face?: TakeFace, frameRatio = 16 / 9): LayoutSlot[] {
@@ -674,18 +697,26 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     // stops, so the words never stop). It is slotted here, before the dock,
     // so the band it owns is not handed to a label as well.
     var laneLower = false, laneTop = false;
+    var laneRest: { top: number; bottom: number } | null = null;
     authored.forEach((c, i) => {
       if (c.type !== "reel-caption-lane") return;
       if (vertical && !takeover) {
         // The chest band; with the face low in the frame (no room under
         // the chin) the band above the hairline. The words win the band:
-        // whatever else wanted it stacks elsewhere or is dropped.
-        const lb = tallSpeakerBands(face, frameRatio);
+        // whatever else wanted it stacks elsewhere or is dropped. The lane
+        // is PINNED to the frame (never rides the rig), so its bands are
+        // the frame's own, not the punch-in window's. It takes 12% at the
+        // band's top; what is left of the band stays free for a sticker
+        // or the pills (measured live, proj_f10e79cf: a close face left
+        // no side slot, and the sticker had nowhere to go).
+        const lb = tallSpeakerBands(face, frameRatio, 1);
         const band = lb.lower || lb.top || { top: 0.68, bottom: 0.82 };
+        const laneH = Math.min(0.12, band.bottom - band.top);
         const q = (n: number) => Math.round(n * 1000) / 10;
-        slots[i] = { position: pct(5, q(band.top), 90, q(band.bottom - band.top)), z_index: 41 };
+        slots[i] = { position: pct(5, q(band.top), 90, q(laneH)), z_index: 41 };
         laneLower = !!lb.lower;
         laneTop = !lb.lower && !!lb.top;
+        if (band.bottom - (band.top + laneH) >= 0.06) laneRest = { top: band.top + laneH, bottom: band.bottom };
       } else {
         slots[i] = { position: pct(15, 74, 70, 16), z_index: 41 };
       }
@@ -734,11 +765,14 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
         x: `${p100(sp.x)}%`, y: `${p100(sp.y)}%`, width: `${p100(sp.width)}%`, height: `${p100(sp.height)}%`,
       }));
       if (!accentSpots.length) {
-        const free = bands.top && !usedTop ? bands.top : bands.lower && !usedLower ? bands.lower : null;
-        if (free) accentSpots = [
-          { x: "62%", y: `${p100(free.top)}%`, width: "33%", height: "12%" },
-          { x: "5%", y: `${p100(free.top)}%`, width: "33%", height: "12%" },
-        ];
+        const free = bands.top && !usedTop ? bands.top : bands.lower && !usedLower ? bands.lower : laneRest;
+        if (free) {
+          const cw = Math.min(0.33, (bands.edges.right - bands.edges.left) * 0.45);
+          const right = { x: `${p100(bands.edges.right - cw)}%`, y: `${p100(free.top)}%`, width: `${p100(cw)}%`, height: "12%" };
+          const left = { x: `${p100(bands.edges.left)}%`, y: `${p100(free.top)}%`, width: `${p100(cw)}%`, height: "12%" };
+          // The corner farther from the face first.
+          accentSpots = face && face.cx > 0.5 ? [left, right] : [right, left];
+        }
       }
       var tallAccent = 0;
       authored.forEach((c, i) => {
@@ -752,7 +786,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
           }
         } else if (HIGH_OVERLAY_TYPES.indexOf(c.type) !== -1) {
           // Pills drift in the band with no surface in it, else under the chin.
-          const band = bands.lower && !usedLower ? bands.lower : bands.top && !usedTop ? bands.top : (bands.lower || bands.top);
+          const band = bands.lower && !usedLower ? bands.lower : bands.top && !usedTop ? bands.top : (laneRest || bands.lower || bands.top);
           slots[i] = band ? { position: pct(0, p100(band.top), 100, p100(band.bottom - band.top)), z_index: 38 } : null;
         }
       });
@@ -1144,6 +1178,12 @@ export function buildAuthoredCompositionScene(
         (c as any).exit = { ...exitAnim, at: Math.round(held * 100) / 100 };
       }
     }
+    // The captions sit high only because the face is close; over a cutaway
+    // there is no face, and high is where the mock's content is (measured
+    // live, proj_f10e79cf: "the text is just cracked out over the main part
+    // of the screen"). The lane drops to the chest band for every cut
+    // window (wrapperChoreoScript reads cut_top).
+    if (c.type === "reel-caption-lane" && tallFrame && lay && parseFloat(String(lay.position.y)) < 50) data.cut_top = 70;
     // A cutaway on a tall frame is framed on the region it performs in.
     var frameAnchor = tallFrame && isCutaway(c as any) && isProofSurface(c.type) ? frameAnchorFor(c.type, data) : null;
     if (frameAnchor) console.log(`    ${c.type}: a cutaway on a tall frame -- framed on its "${frameAnchor}" region`);

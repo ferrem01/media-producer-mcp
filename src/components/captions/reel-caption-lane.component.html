@@ -68,6 +68,15 @@
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.62), 0 8px 38px rgba(0, 0, 0, 0.5);
   }
 
+  /* Over live footage the plate and the shadow ARE the ground, and both are
+     dark: the ink is white whatever the brand's text color says (measured
+     live, proj_f10e79cf: a light brand's #17171c text on the dark plate --
+     "black on black"). */
+  .rcl-scrim-shadow .rcl-inner,
+  .rcl-scrim-plate .rcl-inner {
+    color: #ffffff;
+  }
+
   .rcl-scrim-plate .rcl-inner {
     width: fit-content;
     max-width: 100%;
