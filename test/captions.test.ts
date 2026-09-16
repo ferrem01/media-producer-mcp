@@ -36,10 +36,23 @@ describe("captions from the take's words", () => {
     expect(ph.map((p) => p.text).join(" | ")).toMatch(/\*brief\.\*/);
   });
 
-  it("with no mark the rule tints numbers and the brand's name, nothing else", () => {
-    const spine = assertedSpine("Quotient sent 48 posts to LinkedIn this week.", 4);
-    expect(fallbackEmphasis(spine.words, ["Quotient"])).toEqual(["quotient", "48"]);
-    expect(fallbackEmphasis(spine.words, [])).toEqual(["48"]);
+  it("with no mark the rule tints ONE word per sentence: a number, then a name, then the brand, then the longest word", () => {
+    const spine = assertedSpine("Quotient sent 48 posts to LinkedIn this week. It writes the LinkedIn post. Then it schedules everything on the calendar. We built a faster path.", 12);
+    expect(fallbackEmphasis(spine.words, [])).toEqual(["48", "linkedin", "everything", "faster"]);
+    // The brand's name wins over the longest word, a capitalized name over the brand.
+    const two = assertedSpine("Every surface runs on quotient. Quotient does it.", 4);
+    expect(fallbackEmphasis(two.words, ["Quotient"])).toEqual(["quotient"]);
+    // A sentence with nothing to tint stays plain; the sentence opener is never a "name".
+    expect(fallbackEmphasis(assertedSpine("We do it all.", 2).words, [])).toEqual([]);
+  });
+
+  it("a lone trailing word is folded back or the pair rebalanced, never a one-word flash", () => {
+    const spine = assertedSpine("Then it schedules everything on the calendar, done, without you even touching it.", 6);
+    const texts = captionPhrases(spine).map((p) => p.text);
+    expect(texts).not.toContain("it.");
+    expect(texts[texts.length - 1]).toBe("touching it.");
+    // ...but a word that ends a phrase on punctuation stands on its own ("done,").
+    expect(texts).toContain("done,");
   });
 
   it("the lane is the existing reel-caption-lane, plated, with a word anchor on every phrase edge", () => {
