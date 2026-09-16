@@ -30,8 +30,7 @@ riding over them per beat, no cuts inside a scene, the frame left clean.
 These films are another: the person is still the spine and the voice is
 still the clock, but the edit is busy. The screen answers almost every
 claim, either floating over the person or replacing them for a beat. The
-captions never stop. A header says where you are. The camera punches in
-and out on the person. `speaker` cannot produce this and would not be
+captions never stop. The camera punches in and out on the person. `speaker` cannot produce this and would not be
 asked to: its contract tells the writer to do the opposite.
 
 The test every grammar passes: could an existing grammar with a different
@@ -59,9 +58,10 @@ they still want different contracts, split then, with evidence.
      out, with an annotation where the eye should go (Big Picture Club).
    A tutorial leans on cards; an ad leans on cutaways. Never a beat with
    nothing on screen but the person for more than one sentence.
-3. **A header holds.** One label at the top of the frame: the film's title
-   for a tutorial, the current chapter for an ad. It is a kinetic-text held
-   for the scene and swapped at the claim. Not a component; a rule.
+3. **No standing header.** A chapter label on a claim ("Plugins", "Computer
+   use") is a graphic like any other: cast when that claim wants one, gone
+   when the claim moves on. A title that holds for the whole film is NOT
+   part of the grammar -- it appears only when the brief asks for it.
 4. **Captions run the whole film**, one word at a time, from the take's own
    word timings. The existing caption family (`caption-karaoke` and kin);
    the grammar picks the variant and never authors captions as copy.
@@ -71,8 +71,8 @@ they still want different contracts, split then, with evidence.
 6. **Stickers, not decoration.** An icon beside the head names the thing
    being talked about (a calendar, a cart). Same sticker-prop, same phone
    scale.
-7. **The CTA is a chapter.** The last label is the ask ("Comment 'work'",
-   the URL); the last beat holds on it.
+7. **The CTA is the last claim.** The ask ("Comment 'work'", the URL) is a
+   graphic on the final beat, and the film holds on it.
 8. **Sound.** The voice. A bed only under an ad, ducked far.
 
 ## Machinery
@@ -105,16 +105,15 @@ Missing (the build list):
 - **Annotations on cutaways**: a circle or an arrow drawn on the evidence
   at a word (`annotation` exists; the recipe has to place it on the
   cutaway).
-- **The tall-frame layout under a busy edit**: a card, a header, a caption
+- **The tall-frame layout under a busy edit**: a card, a label, a caption
   lane and a sticker at once, around the face. The bands exist; the rule
   for what yields when they collide does not.
 
 ## The board and the build (how it flows)
 
 1. `generate(film_grammar: "creator-cut", frame: "9x16")` -> a board where
-   every scene is a claim with the lines, the header, and per beat the
-   evidence it wants. The cards show the outline, the header, and an
-   evidence placeholder per beat.
+   every scene is a claim with the lines and, per beat, the evidence it
+   wants. The cards show the outline and an evidence placeholder per beat.
 2. The board lists the needs: the take(s), and each screenshot / recording
    / b-roll with its description. Upload fills one; b-roll fills itself.
    Record all or per scene, as today.
@@ -140,7 +139,5 @@ side by side with the references.
 
 - Cards vs cutaways: the writer chooses per beat, with the lean above -- or
   pin it per film?
-- The header on a tutorial: the film's title for the whole run (Matt), or
-  chapters there too?
 - The sponsor/CTA line: always the last chapter, or only when the brief
   asks?
