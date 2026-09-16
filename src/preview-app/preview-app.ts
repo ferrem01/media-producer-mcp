@@ -960,11 +960,17 @@ export function getPreviewHtml(): string {
      the photographed frame plus the record (purpose, VO, beats, camera
      copy, component scripts) and a feedback box. Footer = the board's
      duration segments + board feedback + Build. */
-  .dv-still { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px;
+  /* The still is the FILM's frame (--mp-frame, set from the project's
+     canvas): a Reel's card shows a tall frame beside its record instead of
+     a wide crop of its middle, where a speaker film's graphics never sit. */
+  .dv-still { width: 100%; aspect-ratio: var(--mp-frame, 16/9); object-fit: cover; border-radius: 10px;
     border: 1px solid #d8dbe4; margin-bottom: 14px; display: block; background: #eceef4; }
-  .dv-still-ph { width: 100%; aspect-ratio: 16/9; border-radius: 10px; border: 2px dashed #c9cede;
+  .dv-still-ph { width: 100%; aspect-ratio: var(--mp-frame, 16/9); border-radius: 10px; border: 2px dashed #c9cede;
     margin-bottom: 14px; display: flex; align-items: center; justify-content: center;
     color: #9ca3af; font-size: 13px; background: #f0f1f6; }
+  body.frame-tall .dv-card { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 22px; align-items: start; }
+  body.frame-tall .dv-card > .dv-still, body.frame-tall .dv-card > .dv-still-ph { margin-bottom: 0; position: sticky; top: 0; }
+  body.frame-tall .dv-body { min-width: 0; }
   #draft-view { position: absolute; inset: 0; overflow: auto; background: #f6f7fa; display: none;
     padding: 18px 26px 30px; z-index: 5; }
   .dv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
@@ -1012,9 +1018,10 @@ export function getPreviewHtml(): string {
     cursor: pointer; border-left: 3px solid transparent; }
   .dv-rail-item:hover { background: #f2f4fa; }
   .dv-rail-item.active { background: #eef1fb; border-left-color: #4f46e5; }
-  .dv-rail-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px;
+  .dv-rail-thumb { width: 100%; aspect-ratio: var(--mp-frame, 16/9); object-fit: cover; border-radius: 6px;
     border: 1px solid #d8dbe4; background: #eceef4; display: block; }
-  .dv-rail-thumb-ph { width: 100%; aspect-ratio: 16/9; border-radius: 6px; border: 1px dashed #c9cede;
+  body.frame-tall .dv-rail-thumb, body.frame-tall .dv-rail-thumb-ph { width: 46%; }
+  .dv-rail-thumb-ph { width: 100%; aspect-ratio: var(--mp-frame, 16/9); border-radius: 6px; border: 1px dashed #c9cede;
     background: #f0f1f6; display: flex; align-items: center; justify-content: center;
     color: #b3b9c9; font-size: 10px; }
   .dv-rail-label { font-size: 11.5px; font-weight: 600; color: #111827; }
@@ -3923,6 +3930,11 @@ export function getPreviewHtml(): string {
     if (pw) pw.style.display = 'none';
     var scenes = (project.storyboard || {}).scenes || [];
     if (draftSel >= scenes.length) draftSel = 0;
+    // The frame the film ships in drives every still on the page.
+    var cv = project.canvas || {};
+    var fw = Number(cv.width) || 1920, fh = Number(cv.height) || 1080;
+    document.documentElement.style.setProperty('--mp-frame', fw + '/' + fh);
+    document.body.classList.toggle('frame-tall', fh > fw);
     renderDraftCard(project);
     renderDraftRail(project);
     renderDraftFooter(project);
@@ -3950,6 +3962,7 @@ export function getPreviewHtml(): string {
     h += draftIsAuthored(s)
       ? '<img class="dv-still" src="' + escAttr(draftStillUrl(project, draftSel)) + '" onerror="this.remove()">'
       : '<div class="dv-still-ph">codegen scene — frame appears after build</div>';
+    h += '<div class="dv-body">';
     h += '<div class="dv-card-head"><span class="dv-num">' + String(draftSel + 1).padStart(2, '0') + '</span>' +
       '<span class="dv-label">' + escHtml(s.label || ('Scene ' + (draftSel + 1))) + '</span>' +
       (scenes.length > 1 ? '<button class="dv-del" id="dv-scene-delete" title="Delete this scene from the board">✕</button>' : '') +
@@ -4044,7 +4057,7 @@ export function getPreviewHtml(): string {
     h += '<div class="dv-feedback">' +
       '<textarea id="dv-scene-feedback" placeholder="Direct this scene… (e.g. hold the terminal longer, brighter surface)"></textarea>' +
       '<button class="btn" id="dv-scene-revise">✎ Revise</button></div>';
-    h += '</div>';
+    h += '</div></div>';
     dv.innerHTML = h;
     var fb = document.getElementById('dv-scene-feedback');
     var sceneBtn = document.getElementById('dv-scene-revise');

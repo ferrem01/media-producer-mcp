@@ -189,3 +189,16 @@ describe("the camera rides the rig, the cut is a swap, the lane shows the takes"
     expect(server).toMatch(/speakerRefs\[sc0\.id\] = \{ url: u0, offset: ref0!\.offset \}/);
   });
 });
+
+describe("the Studio draft view shows the film's frame", () => {
+  it("sets --mp-frame from the canvas, lays a tall still beside its record, and the rail thumbs follow", async () => {
+    const fs = await import("node:fs/promises");
+    const app = await fs.readFile(new URL("../src/preview-app/preview-app.ts", import.meta.url), "utf8");
+    expect(app).toMatch(/setProperty\('--mp-frame', fw \+ '\/' \+ fh\)/);
+    expect(app).toMatch(/classList\.toggle\('frame-tall', fh > fw\)/);
+    expect(app).toMatch(/\.dv-still \{ width: 100%; aspect-ratio: var\(--mp-frame, 16\/9\)/);
+    expect(app).toMatch(/body\.frame-tall \.dv-card \{ display: grid; grid-template-columns: 300px/);
+    expect(app).toMatch(/\.dv-rail-thumb \{ width: 100%; aspect-ratio: var\(--mp-frame, 16\/9\)/);
+    expect(app).toMatch(/h \+= '<div class="dv-body">';/);
+  });
+});
