@@ -18,6 +18,7 @@ import { formatBeatSheet } from "../core/beats.js";
 import type { Treatment } from "./creative-director.js";
 import { loadAssetIntel } from "../core/asset-intel.js";
 import { recoverAssetUrl, resolveVideoPath } from "../core/video-path.js";
+import { isProofSurface } from "../core/asset-needs.js";
 import { hexIsLight, worldBackground } from "./world.js";
 
 // ── Types ──
@@ -498,7 +499,10 @@ export function creatorCutCameraMoves(
     lastEnd = Math.max(lastEnd, end);
   }
   if (punchy && dur >= 3.5 && lastEnd < dur - 1.6) moves.push({ at: Math.round((dur - 1.1) * 10) / 10, type: "reset", duration: 0.5 });
-  return moves.sort((a, b) => Number(a.at) - Number(b.at));
+  var seen = new Set<string>();
+  return moves
+    .filter((m) => { var k = `${m.at}|${m.type}`; if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => Number(a.at) - Number(b.at));
 }
 
 /** A CUTAWAY (SPEC-creator-cut.md): the proof taking the frame for a beat.
@@ -628,7 +632,10 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     if (STAGE_OVERLAY_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: { ...FULL_STAGE }, z_index: 45 };
     } else if (isCutaway(c as any)) {
-      slots[i] = { position: { ...FULL_STAGE }, z_index: 36 };
+      // The proof at 36; a label or a word cut in WITH the proof rides above
+      // it at 39 (measured: "THE BRIEF" cut in with the campaign screen and
+      // painted under it -- same layer, later in the DOM).
+      slots[i] = { position: { ...FULL_STAGE }, z_index: isProofSurface(t) ? 36 : 39 };
     } else if (ACCENT_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: ACCENT_SPOTS[Math.min(accentCount, ACCENT_SPOTS.length - 1)], z_index: 40 + accentCount };
       accentCount++;
@@ -1115,7 +1122,7 @@ export function buildAuthoredCompositionScene(
       }
     }
     // A cutaway on a tall frame is framed on the region it performs in.
-    var frameAnchor = tallFrame && isCutaway(c as any) ? frameAnchorFor(c.type, data) : null;
+    var frameAnchor = tallFrame && isCutaway(c as any) && isProofSurface(c.type) ? frameAnchorFor(c.type, data) : null;
     if (frameAnchor) console.log(`    ${c.type}: a cutaway on a tall frame -- framed on its "${frameAnchor}" region`);
     components.push({
       id, type: c.type, data, position: hasAuthoredPos ? authoredPos : lay.position, z_index: lay.z_index,

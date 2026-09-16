@@ -29,7 +29,7 @@ import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
-import { proofComponents, hasProofFor, replaceCutWindow } from "../core/asset-needs.js";
+import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface } from "../core/asset-needs.js";
 import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2693,9 +2693,6 @@ async function runUnifiedPipeline(
   // transcript when the scene has one (the take is then also the clock), else
   // from the script at speaking pace. A take arriving later re-resolves the
   // same anchors in place (core/measured-spine.ts).
-  // A product surface the library performs: on a creator-cut claim it is
-  // the cutaway unless the storyboard cut it in itself.
-  const CUTAWAY_MOCK_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|email-compose|chat-simulator|ui-terminal-agent|browser-|app-|ui-|device-showcase|metric-dashboard|gmail-|calendar-view|code-editor|kanban-board)/;
   // NO STANDING HEADER (creator-cut): the same pill on every scene is a
   // title that holds for the whole film, which the grammar forbids unless
   // the brief asks. Measured live, proj_f308b321: "Weekly Newsletter ·
@@ -2752,12 +2749,31 @@ async function runUnifiedPipeline(
       //  - a scene with no cast gets its chapter label from its own name.
       if (filmGrammar === "creator-cut" && d.transparent_background !== false) {
         const dur = Number(d.duration_seconds) || 0;
+        const isLast = i === (storyboard.scenes as any[]).length - 1;
         for (const c of d.components as any[]) {
           if (!c || typeof c !== "object" || typeof c.type !== "string") continue;
-          if (!CUTAWAY_MOCK_RE.test(c.type) || c.enter !== undefined || c.data?.enter !== undefined) continue;
-          c.enter = { effect: "cut", at: Math.round(dur * 0.3 * 100) / 100 };
-          if (c.exit === undefined) c.exit = { effect: "cut", at: Math.round(dur * 0.8 * 100) / 100 };
-          console.log(`  Creator-cut: scene ${i + 1} -- ${c.type} staged with no cut window; cut in at ${c.enter.at}s, out at ${c.exit.at}s`);
+          if (isProofSurface(c.type) && c.enter === undefined && c.data?.enter === undefined) {
+            c.enter = { effect: "cut", at: Math.round(dur * 0.3 * 100) / 100 };
+            if (c.exit === undefined) c.exit = { effect: "cut", at: Math.round(dur * 0.8 * 100) / 100 };
+            console.log(`  Creator-cut: scene ${i + 1} -- ${c.type} staged with no cut window; cut in at ${c.enter.at}s, out at ${c.exit.at}s`);
+          }
+          // A cut-in with no time at all (measured: enter {effect:"cut"} and
+          // nothing else on the close) lands at 30%, not at frame 0.
+          if (c.enter && typeof c.enter === "object" && c.enter.effect === "cut" && (c.enter.at === undefined || c.enter.at === null)) {
+            c.enter.at = Math.round(dur * 0.3 * 100) / 100;
+          }
+          // THE FILM ENDS ON THE PERSON: on the last claim a proof that never
+          // cuts out (or cuts out at the very end) comes back to the person
+          // for the final 1.5s -- unless it is all the scene has.
+          if (isLast && isProofSurface(c.type) && c.enter && typeof c.enter === "object" && c.enter.effect === "cut" && dur >= 3) {
+            const back = Math.round((dur - 1.5) * 100) / 100;
+            const exitAt = c.exit && typeof c.exit === "object" ? Number(c.exit.at) : NaN;
+            const enterAt = Number(c.enter.at);
+            if ((!Number.isFinite(exitAt) || exitAt > back) && (!Number.isFinite(enterAt) || enterAt + 1.2 <= back)) {
+              c.exit = { effect: "cut", at: back };
+              console.log(`  Creator-cut: scene ${i + 1} -- the film ends on the person: ${c.type} cuts out at ${back}s`);
+            }
+          }
         }
         const cast = (d.components as any[]).some((c) => c && typeof c === "object" && typeof c.type === "string");
         const label = String(d.label || "").replace(/^\s*scene\s*\d+\s*[-:.\u2014\u2013]\s*/i, "").trim();

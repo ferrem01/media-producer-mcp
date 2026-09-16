@@ -13,6 +13,14 @@
 
 import type { Project, StoryboardScene, AssetRequirement, AssetRequirementType } from "./types.js";
 
+/** A PROOF SURFACE: a product mock the library performs, or a provided
+ *  still or clip. Cut in on a claim it is the cutaway -- laid under the
+ *  labels, plated so nothing shows through its own window's margins,
+ *  framed on its region on a tall frame. One definition, used by the
+ *  pipeline (defaults), the generator (layout) and the assembler (plate). */
+export const PROOF_SURFACE_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|email-compose|chat-simulator|ui-terminal-agent|browser-|app-|ui-|device-showcase|metric-dashboard|gmail-|calendar-view|code-editor|kanban-board|image$|video$)/;
+export function isProofSurface(type: unknown): boolean { return typeof type === "string" && PROOF_SURFACE_RE.test(type); }
+
 /** The kinds of proof a writer may ask for. */
 export const PROOF_TYPES: AssetRequirementType[] = ["screenshot", "screen_recording", "stock_footage", "mockup"];
 

@@ -39,6 +39,22 @@ voice runs the whole time, a cutaway is only what is on screen.
   chapter label and the sticker on every scene and left the hook scene
   with no cast at all, so the contract now says every scene is cast with
   three objects, the first one too.
+- **The first rendered creator-cut film** (proj_9e650f1a, one continuous
+  recording cut into seven takes by the transcript, 32.5s). Marc's notes
+  on the frames, all fixed: the camera showed through the corners of a
+  cut-in mock (the Quotient mocks draw a floating window with margins) --
+  a cut-in proof surface is now plated opaque in the assembler; the
+  screens read too big on the vertical frame -- the framing scale drops
+  from 2.2 to 1.5 columns' worth and the region sits higher; the chapter
+  labels the writer cut in WITH the proof painted under it (same layer,
+  later in the DOM) -- a cut-in that is not a proof surface lays at z 39;
+  the close stayed on the metrics screen -- the last claim's proof cuts
+  out 1.5s before the end so the film ends on the person; the camera rule
+  emitted every move twice when a label and a mock cut in on one word --
+  deduped. One definition of a proof surface (`PROOF_SURFACE_RE` in
+  `core/asset-needs.ts`) now serves the pipeline, the generator and the
+  assembler. And the take page's prompter moves to the top of the stage,
+  by the lens: "you can see my eyes looking down in every take".
 - **No standing header, by rule; unresolved cut words get the default
   window.** The rerun of the tutorial brief (proj_f308b321) obeyed the
   contract in every other way -- director calm and voice-only, every
