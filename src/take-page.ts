@@ -181,7 +181,16 @@ export function getTakeHtml(): string {
   $('studioLinkTop').href = studioHref;
   function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
 
-  if (!tenant || !project) { fail('Missing ?tenant= and ?project= in the link. Ask your agent for the take link for this film.'); return; }
+  // The token IS the tenant (a tenant-scoped JWT): a link with project +
+  // token opens the take page too, the same as Studio on any screen.
+  if (!tenant && token) {
+    try {
+      var segT = token.split('.')[1] || '';
+      var payT = JSON.parse(atob(segT.replace(/-/g, '+').replace(/_/g, '/')));
+      tenant = String(payT.tenant_id || payT.tenant || '');
+    } catch (eTok) {}
+  }
+  if (!tenant || !project) { fail((!project ? 'Missing ?project= in the link.' : 'Missing ?tenant= in the link (or a token that carries it).') + ' Ask your agent for the take link for this film.'); return; }
 
   // ── the script: the storyboard's asserted spine ───────────────────────
   // One cue per beat; a long beat is split into sentences, each given a share

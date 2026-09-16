@@ -6,6 +6,14 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — One link, any screen: the phone Studio and the take page read the tenant from the token
+
+Marc opened the Studio link on his phone: "Missing ?tenant= and
+?project= in the link." The desktop Studio's links carry project + token
+and no tenant (the token is a tenant-scoped JWT); the phone page and the
+take page demanded `?tenant=`. Both now read `tenant_id` off the token
+when the link has none, and say which part is missing.
+
 ## 2026-09-16 — captions: the words hold still under the punch-in
 
 The first captioned render (proj_9e650f1a): in scenes 6 and 7 the

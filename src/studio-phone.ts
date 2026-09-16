@@ -115,7 +115,18 @@ export function getPhoneStudioHtml(): string {
   function link(path, extra) { return path + '?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + (token ? '&token=' + encodeURIComponent(token) : '') + (extra || ''); }
   function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
   function say(msg, err) { var st = $('status'); st.textContent = msg || ''; st.className = 'status' + (err ? ' err' : ''); }
-  if (!tenant || !project) { say('Missing ?tenant= and ?project= in the link.', true); return; }
+  // The desktop Studio's links carry project + token and no tenant: the
+  // token IS the tenant (a tenant-scoped JWT). Read it the same way here,
+  // so one link opens Studio on any screen (measured live: "Missing
+  // ?tenant= and ?project= in the link" on the phone).
+  if (!tenant && token) {
+    try {
+      var seg = token.split('.')[1] || '';
+      var pay = JSON.parse(atob(seg.replace(/-/g, '+').replace(/_/g, '/')));
+      tenant = String(pay.tenant_id || pay.tenant || '');
+    } catch (eTok) {}
+  }
+  if (!tenant || !project) { say(!project ? 'Missing ?project= in the link.' : 'Missing ?tenant= in the link (or a token that carries it).', true); return; }
   $('desktopLink').href = link('/studio', '&desktop=1');
 
   var P = null, pickingScene = -1, jobTimer = null, editing = -1, pickingProof = null;

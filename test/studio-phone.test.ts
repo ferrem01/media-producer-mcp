@@ -71,6 +71,12 @@ describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
     expect(js).toMatch(/'\/job\/' \+ encodeURIComponent\(tenant\)/);
   });
 
+  it("reads the tenant from the token when the link has none, like the desktop Studio (measured: 'Missing ?tenant=' on the phone)", () => {
+    expect(html).toMatch(/if \(!tenant && token\) \{\s*try \{\s*var seg = token\.split\('\.'\)\[1\] \|\| '';/);
+    expect(html).toMatch(/tenant = String\(pay\.tenant_id \|\| pay\.tenant \|\| ''\);/);
+    expect(html).toMatch(/Missing \?project= in the link\./);
+  });
+
   it("is sized for a thumb and links back to the desktop Studio", () => {
     expect(html).toMatch(/viewport-fit=cover/);
     expect(html).toMatch(/env\(safe-area-inset-bottom\)/);
