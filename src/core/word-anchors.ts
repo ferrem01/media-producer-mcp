@@ -136,7 +136,25 @@ function parseShorthand(s: string): WordAnchor | null {
  * "script[3].at"), leaving 0 in its place until resolved. Returns how many
  * anchors the component now carries.
  */
-export function extractAnchors(component: { data?: Record<string, unknown>; anchors?: AnchorMap }): number {
+/** The wrapper's enter/exit belong BESIDE data, not inside it. The writer
+ *  puts them in data anyway (measured live, proj_55464519: every cut-in
+ *  arrived as data.enter, its anchors extracted from there, the wrapper
+ *  never cut). Lifted here, deterministically, wherever anchors are read. */
+export function liftWrapperAnims(component: { data?: Record<string, unknown>; enter?: unknown; exit?: unknown }): number {
+  let moved = 0;
+  const data = component.data;
+  if (!data || typeof data !== "object") return 0;
+  for (const k of ["enter", "exit"] as const) {
+    const v = (data as any)[k];
+    if (v === undefined) continue;
+    if ((component as any)[k] === undefined && (typeof v === "string" || (v && typeof v === "object"))) { (component as any)[k] = v; moved++; }
+    delete (data as any)[k];
+  }
+  return moved;
+}
+
+export function extractAnchors(component: { data?: Record<string, unknown>; anchors?: AnchorMap; enter?: unknown; exit?: unknown }): number {
+  liftWrapperAnims(component);
   const anchors: AnchorMap = { ...(component.anchors || {}) };
   const walk = (node: unknown, path: string): void => {
     if (Array.isArray(node)) { node.forEach((v, i) => visit(node, i, `${path}[${i}]`)); return; }

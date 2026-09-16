@@ -17,6 +17,7 @@ import { getStorytellingGuide } from "./design-skills.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat, AssetRequirement } from "../core/types.js";
 import { normalizeBeats, beatsVoiceover } from "../core/beats.js";
 import { normalizeAssetNeeds } from "../core/asset-needs.js";
+import { liftWrapperAnims } from "../core/word-anchors.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -68,7 +69,7 @@ const SCENE_TOOL_SCHEMA = {
             properties: {
               type: { type: "string", description: "Library component type from the catalog" },
               data: { type: "object", description: "The component's data payload. For a 🎬 Scriptable (performable) component this MUST include script: [{action, at, ...params}] -- the timed interaction sequence that makes the surface PERFORM the scene's beats (type-message at 0.5, tool-call at 2.1, respond at 6.0...). Use the component's documented script actions; land actions near beat boundaries." },
-              enter: { anyOf: [{ type: "string" }, { type: "object", properties: { effect: { type: "string" }, at: { type: "string", description: "word anchor (\"@word\") or scene seconds" } }, required: ["effect"] }], description: "How this component ENTERS the frame: slide-left | slide-right | slide-up | slide-down | rise | pop | fade. Use the slides to carry momentum across a cut -- a thing that left the previous scene frame-right enters this one from frame-left, so the boundary reads as one continuous move instead of a cut. As an OBJECT {effect, at} the entrance lands on a word: {effect: \"cut\", at: \"@plugins\"} is a HARD cut-in on that word (a cutaway, SPEC-creator-cut.md)." },
+              enter: { anyOf: [{ type: "string" }, { type: "object", properties: { effect: { type: "string" }, at: { type: "string", description: "word anchor (\"@word\") or scene seconds" } }, required: ["effect"] }], description: "How this component ENTERS the frame: slide-left | slide-right | slide-up | slide-down | rise | pop | fade. Use the slides to carry momentum across a cut -- a thing that left the previous scene frame-right enters this one from frame-left, so the boundary reads as one continuous move instead of a cut. As an OBJECT {effect, at} the entrance lands on a word: {effect: \"cut\", at: \"@plugins\"} is a HARD cut-in on that word (a cutaway, SPEC-creator-cut.md). A sibling of data, never inside it." },
               exit: { anyOf: [{ type: "string" }, { type: "object", properties: { effect: { type: "string" }, at: { type: "string", description: "word anchor (\"@word\") or scene seconds" } }, required: ["effect"] }], description: "How this component LEAVES the frame, same vocabulary. Give the outgoing element an exit whenever the next scene should feel like it continues this one; a scene that stops dead and fades is the slideshow tell. As an OBJECT {effect: \"cut\", at: \"@word\"} it is a HARD cut-out on that word." },
             },
             required: ["type"],
@@ -215,7 +216,9 @@ export function normalizeSceneShape(scene: any, validTypes?: Set<string>): strin
       if (c && typeof c.type === "string" && c.type.length > 0) {
         // enter/exit ride ALONGSIDE data, not inside it -- dropping them
         // here would have killed directed entrances at the same seam that
-        // once killed scripted performances.
+        // once killed scripted performances. The writer nests them in data
+        // anyway; lift them (core/word-anchors.ts).
+        if (liftWrapperAnims(c)) notes.push(`${c.type}: enter/exit lifted out of data`);
         const dir = {
           ...(c.enter ? { enter: c.enter } : {}),
           ...(c.exit ? { exit: c.exit } : {}),
@@ -589,6 +592,7 @@ A person on camera carries the argument. The camera is the base layer of every s
 ${__g("creator-cut") ? `### CREATOR-CUT FILMS (${opts.filmGrammar === "creator-cut" ? "ACTIVE for this film" : 'when the director\'s treatment names "creator-cut"'})
 A person explains and the SCREEN PROVES IT. Everything in the SPEAKER contract above holds (the camera is the base, the voice is the clock, the script lives in voiceover_text, times are word anchors) -- but the edit is BUSY where speaker's is clean, and these laws replace speaker's "one graphic per beat" and "nothing covers the person":
 - ONE CLAIM PER SCENE: each scene is one thing the person asserts; its beats are what the screen shows WHILE it is said. The film cuts back to the person between every piece of proof -- never a beat with nothing on screen but the person for more than one sentence.
+- EVERY SCENE IS CAST, THE FIRST ONE TOO, with three objects in "components": the chapter label (a plated word or two on the claim, gone when the claim moves on), the icon sticker beside the head naming the thing, and the cutaway that proves the claim. A scene with an empty cast is a slide, never allowed here; the hook is a claim like any other.
 - THE SCREEN PROVES EVERY CLAIM, AND YOU CAST THE PROOF: for each claim, stage the library mock that PERFORMS it (the product surface where the claim happens, with its data.script) in the scene's "components" as a CUTAWAY -- enter: {effect: "cut", at: "@word"} on the word the claim lands, exit: {effect: "cut", at: "@word"} on the word the person moves on -- so the proof takes the whole frame for that beat, HARD cut in and out, and the person is back. The cut is part of the rhythm and breaks up the voice; the voice never stops. Motion graphics are the DEFAULT proof: the film has its cuts on the first build, with nothing supplied. A REAL screen is optional: only where the real thing matters (a real customer's screen, a real number), add a need in "assets" -- {type: screenshot | screen_recording, description: what it must show, at: the same "@word", until: the same "@word", focus: where the eye should go} -- and a provided file replaces the mock in that window. Never ask for a recording where a still would do. A CARD (the proof floating over the person on a plate, the person still visible) ONLY when the brief asks for it.
 - NO STANDING HEADER: a chapter label on a claim ("Plugins", "Computer use") is a graphic like any other -- cast when that claim wants one, gone when the claim moves on. A title that holds for the whole film only when the brief asks for it.
 - THE CAMERA MOVES ON THE PERSON: a punch-in on the claim, a pull-back on the turn -- camera_moves aimed at the face, at the cadence the film's motion sets (punchy: several per scene; calm: one).

@@ -208,6 +208,32 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(c.exit.at).toBeGreaterThan(c.enter.at);
   });
 
+  it("enter/exit the writer nested inside data are lifted to the component (measured live: every cut-in arrived as data.enter)", async () => {
+    const { liftWrapperAnims, extractAnchors } = await import("../src/core/word-anchors.js");
+    const c: any = { type: "quotient-social", data: { post_text: "x", enter: { effect: "cut", at: "@writes" }, exit: { effect: "cut", at: "@calendar" } } };
+    expect(liftWrapperAnims(c)).toBe(2);
+    expect(c.enter).toEqual({ effect: "cut", at: "@writes" });
+    expect(c.data.enter).toBeUndefined();
+    // A component-level enter wins over a stray data.enter; the stray is dropped either way.
+    const d: any = { type: "x", data: { enter: "fade" }, enter: { effect: "cut", at: 1 } };
+    expect(liftWrapperAnims(d)).toBe(0);
+    expect(d.enter).toEqual({ effect: "cut", at: 1 });
+    expect(d.data.enter).toBeUndefined();
+    // extractAnchors lifts first, so the anchors land on the wrapper's clock.
+    const e: any = { type: "quotient-campaign", data: { script: [], enter: { effect: "cut", at: "@plans" } } };
+    expect(extractAnchors(e)).toBe(1);
+    expect(e.anchors["enter.at"]).toEqual({ word: "plans" });
+    expect(e.enter).toEqual({ effect: "cut", at: 0 });
+    // ...and the normalizer does the same for the saved storyboard, with a note.
+    const scene: any = { voiceover_text: "It plans.", components: [{ type: "quotient-campaign", data: { script: [], enter: { effect: "cut", at: "@plans" } } }] };
+    const notes = normalizeSceneShape(scene);
+    expect(scene.components[0].enter).toEqual({ effect: "cut", at: "@plans" });
+    expect(notes).toContain("quotient-campaign: enter/exit lifted out of data");
+    const sb = await read("../src/llm/storyboard-builder.ts");
+    expect(sb).toMatch(/A sibling of data, never inside it/);
+    expect(sb).toMatch(/EVERY SCENE IS CAST, THE FIRST ONE TOO/);
+  });
+
   it("the cut effect is a hard cut in the choreography: sub-frame, no ease", async () => {
     const asm = await read("../src/core/scene-assembler.ts");
     expect(asm).toMatch(/'cut': \{ autoAlpha: 0 \}/);
