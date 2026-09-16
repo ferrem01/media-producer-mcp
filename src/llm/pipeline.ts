@@ -31,6 +31,7 @@ import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface } from "../core/asset-needs.js";
 import { captionLane } from "../core/captions.js";
+import { speakingEstimate } from "../core/script-lines.js";
 import { applySpine } from "../core/word-anchors.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2738,6 +2739,19 @@ async function runUnifiedPipeline(
       const i = sceneIdx++;
       const script = String(d.voiceover_text || "");
       if (!script.trim() && !(Array.isArray(d.components) && d.components.length)) continue;
+      // THE LINES SET THE FLOOR: a scene written with more words than its
+      // seconds (measured live, proj_f10e79cf: 24 words in 4s) cannot be
+      // said in its time -- the prompter raced, the cut windows and the
+      // captions were resolved against a clock no mouth can keep. The
+      // duration is at least the script at speaking pace, silences
+      // included; a take that lands later is still the clock.
+      if (script.trim()) {
+        const floor = Math.round(speakingEstimate(script) * 100) / 100;
+        if ((Number(d.duration_seconds) || 0) < floor) {
+          console.log(`  Lines: scene ${i + 1} ${d.duration_seconds}s -> ${floor}s (the script needs it at speaking pace)`);
+          d.duration_seconds = floor;
+        }
+      }
       const spine = await spineForScene(spineProject, i, script, Number(d.duration_seconds) || 0);
       // The take's measured face rides on the draft: the tall-frame layout
       // builds its bands around it (core/face-band.ts).

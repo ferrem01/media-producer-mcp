@@ -40,6 +40,11 @@ export function getTakeHtml(): string {
   body { display:flex; flex-direction:column; min-height:100dvh; }
   section { display:none; flex:1; flex-direction:column; }
   section.on { display:flex; }
+  /* The ready screen never scrolls: a long script (record-all) scrolls
+     INSIDE its card and the Record button stays in reach (Marc: "scroll
+     all the way down, hit record, then scroll all the way back"). */
+  #ready { height:100dvh; overflow:hidden; }
+  #script { flex:0 1 auto; max-height:44dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .pad { padding: calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom)); }
   h1 { font-size:20px; font-weight:600; letter-spacing:-.02em; margin:0 0 4px; }
   .sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
@@ -61,7 +66,8 @@ export function getTakeHtml(): string {
   .spacer { flex:1; }
 
   /* ── stage: camera full-bleed, prompter over it ── */
-  #stage { position:relative; background:#000; }
+  /* The stage owns the viewport wherever the page was scrolled. */
+  #stage { position:fixed; inset:0; z-index:5; background:#000; }
   #live { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
   #cap { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 26%, rgba(0,0,0,0) 42%, rgba(0,0,0,0) 70%, rgba(0,0,0,.6) 100%); pointer-events:none; }
@@ -101,7 +107,7 @@ export function getTakeHtml(): string {
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
   <div class="spacer"></div>
-  <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script scrolls over the camera at speaking pace.</p>
+  <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
   <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(gentle skin smoothing and warmth, applied when the take is processed)</span></label>
   <button class="btn" id="recordBtn" disabled>Record</button>
 </section>
@@ -173,6 +179,7 @@ export function getTakeHtml(): string {
 
   function show(id) {
     ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
+    try { window.scrollTo(0, 0); } catch (eS) {}
   }
   function fail(msg) { $('errMsg').textContent = msg; show('err'); }
   function withToken(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
@@ -223,7 +230,12 @@ export function getTakeHtml(): string {
       for (var z = items.length - 1; z >= 0; z--) { if (items[z].words) { items[z].gap = 0; break; } }
       var words = items.reduce(function (a, it) { return a + it.words; }, 0) || 1;
       var gaps = items.reduce(function (a, it) { return a + it.gap; }, 0);
-      var dur = Number(s.duration_seconds) || Math.max(1.5, words / WORDS_PER_SEC + gaps);
+      // The board's number is the CUT, never the mouth: a scene written
+      // with more words than its seconds (measured live, proj_f10e79cf:
+      // 24 words in 4s -- "ripping through the words faster than any human
+      // could speak") prompts at speaking pace and the take re-times the
+      // scene. The pipeline floors the board the same way at build.
+      var dur = Math.max(Number(s.duration_seconds) || 0, Math.max(1.5, words / WORDS_PER_SEC + gaps));
       var speech = Math.max(0.5, dur - gaps);
       items.forEach(function (it) { out.push({ text: it.text, dur: speech * (it.words / words) + it.gap, beat: i }); });
     });
@@ -261,7 +273,7 @@ export function getTakeHtml(): string {
 
   // ── recording ──────────────────────────────────────────────────────────
   var stream = null, rec = null, chunks = [], mime = '', ext = 'webm';
-  var t0 = 0, tickTimer = null, cueTimers = [], audioCtx = null, meterRaf = null, lastLoud = 0, wake = null;
+  var t0 = 0, tickTimer = null, audioCtx = null, meterRaf = null, lastLoud = 0, wake = null;
   var blob = null, blobDuration = 0, trackW = 0, trackH = 0;
 
   var CANDS = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -302,19 +314,22 @@ export function getTakeHtml(): string {
     $('meter').style.width = '0%'; $('meterWrap').classList.remove('silent'); $('silent').style.display = 'none';
   }
 
-  function runPrompter() {
-    var at = 0;
-    $('barFill').style.width = '0%';
-    cues.forEach(function (c, i) {
-      cueTimers.push(setTimeout(function () {
-        $('cue').textContent = c.text;
-        $('next').textContent = cues[i + 1] ? cues[i + 1].text : '';
-      }, at * 1000));
-      at += c.dur;
-    });
-    cueTimers.push(setTimeout(function () { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; }, at * 1000));
+  // One cue at a time, each on its own clock; a TAP on the stage jumps to
+  // the next line and the clock restarts from there, so the prompter can
+  // never run ahead of the person reading it.
+  var cueIdx = -1, cueTimer = null;
+  function showCue(i) {
+    if (cueTimer) clearTimeout(cueTimer); cueTimer = null;
+    cueIdx = i;
+    if (i >= cues.length) { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; return; }
+    $('cue').textContent = cues[i].text;
+    $('next').textContent = cues[i + 1] ? cues[i + 1].text : '';
+    cueTimer = setTimeout(function () { showCue(i + 1); }, cues[i].dur * 1000);
   }
-  function clearPrompter() { cueTimers.forEach(clearTimeout); cueTimers = []; $('cue').textContent = ''; $('next').textContent = ''; }
+  function runPrompter() { $('barFill').style.width = '0%'; showCue(0); }
+  function advanceCue() { if (rec && rec.state === 'recording' && cueIdx >= 0 && cueIdx < cues.length) showCue(cueIdx + 1); }
+  function clearPrompter() { if (cueTimer) clearTimeout(cueTimer); cueTimer = null; cueIdx = -1; $('cue').textContent = ''; $('next').textContent = ''; }
+  $('stage').addEventListener('click', function (ev) { if (ev.target && (ev.target.id === 'stopBtn' || ev.target.closest && ev.target.closest('#stopWrap'))) return; advanceCue(); });
 
   // ── portrait canvas capture ────────────────────────────────────────────
   var capture = 'raw', drawing = false, drawReq = 0;
@@ -353,7 +368,11 @@ export function getTakeHtml(): string {
       // Mirrors the recorder extension so a take behaves the same on every device.
       audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true },
     };
-    navigator.mediaDevices.getUserMedia(constraints).then(function (s) {
+    // Ask for the camera ONCE per visit: the stream stays open across
+    // review, retake and record-again (the browser asked again on every
+    // take -- Marc: "I've already said yes"). Released when the page hides.
+    var live = stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; });
+    (live ? Promise.resolve(stream) : navigator.mediaDevices.getUserMedia(constraints)).then(function (s) {
       stream = s;
       var vt = s.getVideoTracks()[0]; var st = vt && vt.getSettings ? vt.getSettings() : {};
       trackW = st.width || 0; trackH = st.height || 0;
@@ -416,9 +435,13 @@ export function getTakeHtml(): string {
     if (tickTimer) clearInterval(tickTimer); tickTimer = null;
     clearPrompter(); stopMeter();
     if (wake) { try { wake.release(); } catch (e) {} wake = null; }
-    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
     $('live').srcObject = null;
   }
+  function releaseCamera() {
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+  }
+  window.addEventListener('pagehide', releaseCamera);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && !(rec && rec.state === 'recording')) releaseCamera(); });
 
   $('stopBtn').addEventListener('click', function () {
     if (rec && rec.state === 'recording') { blobDuration = (performance.now() - t0) / 1000; rec.stop(); }

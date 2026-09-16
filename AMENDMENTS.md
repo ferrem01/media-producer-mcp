@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-16 — The take page, third round: the lines set the floor, tap to advance, no scrolling, one camera prompt
+
+Marc, recording the fresh creator-cut board (proj_f10e79cf) in one go:
+"ripping through the words faster than any human being could actually
+speak", "a long ass page ... scroll all the way down, hit record, then
+scroll all the way back", "the browser keeps asking me if I can use the
+camera".
+
+- **The prompter raced** because the writer gave scene 1 twenty-four words
+  and four seconds (6 words/s) and the prompter paced to the board's
+  seconds. The take page now paces at speaking pace and treats the board's
+  number as a floor, never a ceiling. The pipeline floors every spoken
+  scene's duration at `speakingEstimate(script)` before the spine, so the
+  cut windows and the captions resolve against a clock a mouth can keep
+  (`core/script-lines.ts` already had the estimate). A take that lands is
+  still the clock.
+- **Tap to advance**: one cue at a time on its own clock; a tap on the
+  stage jumps to the next line and restarts the clock there. The prompter
+  can never run ahead of the person.
+- **No scrolling**: the ready screen is one viewport -- the script scrolls
+  inside its card, Record stays in reach; the stage is fixed to the
+  viewport and every screen change scrolls to the top.
+- **One camera prompt per visit**: the stream survives review, retake and
+  record-again (`stopAll` no longer kills the tracks); it is released when
+  the page hides.
+
 ## 2026-09-16 — One link, any screen: the phone Studio and the take page read the tenant from the token
 
 Marc opened the Studio link on his phone: "Missing ?tenant= and
