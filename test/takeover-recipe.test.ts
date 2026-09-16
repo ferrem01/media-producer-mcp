@@ -113,7 +113,7 @@ describe("the takeover flag must be AUTHORABLE and DETECTABLE", () => {
 
   it("the empty-canvas gate is skipped when the camera is the background", async () => {
     const p = await read("../src/llm/pipeline.ts");
-    expect(p).toMatch(/cameraIsBackground = sceneCompositesOverSpeaker/);
+    expect(p).toMatch(/cameraIsBackground = !!opts\.overCamera \|\| sceneCompositesOverSpeaker/);
   });
 
   it("the limiter cannot re-normalize the peak back to 0 dBFS", async () => {
