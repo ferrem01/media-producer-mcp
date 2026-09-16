@@ -2707,7 +2707,9 @@ async function runUnifiedPipeline(
     const SEP = /\s+[\u00b7\-\u2013\u2014|:]\s+/;
     const isPill = (c: any) => c && typeof c === "object" && c.type === "sticker-prop" && String(c.data?.kind || "") !== "stamp" && typeof c.data?.text === "string";
     const headOf = (c: any) => isPill(c) ? c.data.text.trim().split(SEP)[0].trim().toLowerCase() : "";
-    const tailOf = (c: any) => isPill(c) ? c.data.text.trim().split(SEP).slice(1).join(" ").trim() : "";
+    // A tail with no letter or digit ("—") is no label (measured: scene 1's
+    // "Weekly Newsletter · —" became a pill reading "—").
+    const tailOf = (c: any) => { const t = isPill(c) ? c.data.text.trim().split(SEP).slice(1).join(" ").trim() : ""; return /[\p{L}\p{N}]/u.test(t) ? t : ""; };
     const counts = new Map<string, number>();
     for (const sc of scenesArr) {
       const seen = new Set<string>();
