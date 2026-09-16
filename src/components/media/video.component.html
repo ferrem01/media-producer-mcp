@@ -25,8 +25,26 @@
     var fit = data.object_fit || 'cover';
     var style = 'width:100%;height:100%;object-fit:' + fit + ';display:block;';
 
-    // Use shared video-sync utility (loaded by scene assembler)
-    var video = loadVideoForCapture(container, data.src, { style: style });
+    var at = Number(data.at);
+    var exitAt = Number(data.exit_at);
+    var timed = isFinite(at) || isFinite(exitAt);
+    if (!isFinite(at) || at < 0) at = 0;
+    if (!isFinite(exitAt) || exitAt <= at) exitAt = ctx.duration;
+
+    // Use shared video-sync utility (loaded by scene assembler). A timed
+    // clip starts from ITS beginning when it lands: the capture seeks every
+    // video to start-at + scene time, so a negative start-at holds it on
+    // frame 0 until `at`.
+    var video = loadVideoForCapture(container, data.src, { style: style, startAt: timed && at > 0 ? -at : 0 });
+
+    if (timed) {
+      // A TIMED clip is a cut, not a fade (SPEC-creator-cut.md). Sub-frame
+      // tweens, not set(): a set() later in a timeline renders on creation.
+      gsap.set(container, { autoAlpha: 0 });
+      tl.fromTo(container, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.02, ease: 'none', immediateRender: false }, at);
+      if (exitAt < ctx.duration) tl.to(container, { autoAlpha: 0, duration: 0.02, ease: 'none' }, exitAt);
+      return tl;
+    }
 
     // Fade in
     gsap.set(container, { autoAlpha: 0 });

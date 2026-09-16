@@ -26,25 +26,34 @@ full-frame and back.
   screen proves every claim, no standing header, camera on the person, a
   sticker names the thing, CTA only when asked, ad vs tutorial on motion
   and length).
-- **Evidence.** The writer emits `evidence[]` per scene (`SceneEvidence`:
-  kind screenshot | screen_recording | stock_footage | mockup, description,
-  use cutaway | card, at/until word anchors, focus). `core/evidence-needs.ts`
-  turns each into a need on `assets[]` carrying `evidence: i` (human kinds
-  "recommended", the build's kinds "nice_to_have" until in-house generation
-  lands), keeps them in step with the board on load, and never blocks the
-  build. The board lists them under each claim with Upload; the file goes
-  through `/api/upload-asset` and `POST /api/evidence/{t}/{p}` fills the
-  need (same asset-dir guard as a take).
-- **The cutaway.** A provided file becomes a `cutaway` component
-  (`components/media/cutaway`): full-bleed over the person, hard cut in on
-  its word and out on the next -- no fade either side, the cut is the
-  rhythm. A still gets a slow push; a clip plays from its own start
-  (negative `data-start-at`, the capture's seek math clamps at 0). Cast in
-  the pipeline before the spine pass so its anchors resolve with everyone
-  else's; laid out full-stage at z 36 (under the stage overlays), never
-  banded, never phone-zoomed. `storyboardToSaved` now carries `assets` and
-  `evidence` -- it wrote `assets: []`, which would have thrown every
-  uploaded file away on the way back to disk after a build-from-board.
+- **The proof, on the existing needs.** The first cut of this introduced
+  a parallel `evidence[]` field mirrored into `assets[]`, and a `cutaway`
+  component type. Marc: fewer concepts unless there is overwhelming
+  evidence. Both folded. The writer emits the proof as entries on the
+  scene's existing `assets[]` needs (type screenshot | screen_recording |
+  stock_footage | mockup, description), and a need gains four optional
+  fields: `use` cutaway | card, `at` / `until` word anchors, `focus`.
+  `core/asset-needs.ts` normalizes what the writer wrote into full need
+  records (human kinds "recommended", the build's kinds "nice_to_have"
+  until in-house generation lands); a hydrated board's needs pass through
+  intact. Proof never blocks the build. The board lists every non-take
+  need under its claim with Upload; the file goes through
+  `/api/upload-asset` and `POST /api/provide-asset/{t}/{p}` (the HTTP twin
+  of the update tool's `provide_asset`) fills it, with the take's
+  asset-dir guard.
+- **The cut, on the existing image and video.** A provided file becomes
+  the existing `image` or `video` component, full-bleed, with `at` /
+  `exit_at`. On those two components a timed window is a HARD cut -- no
+  fade either side, the cut is the rhythm (sub-frame tweens, not `set()`,
+  which renders on creation when placed later in a timeline; measured in
+  an assembler probe). A still gets a slow push over its window; a clip
+  plays from its own start (negative `data-start-at`, the capture's seek
+  math clamps at 0). Cast in the pipeline before the spine pass so its
+  anchors resolve with everyone else's; a full-bleed image or video is the
+  proof layer in the layout (full stage at z 36, under the stage overlays,
+  never re-slotted into a band, never phone-zoomed). `storyboardToSaved`
+  now carries `assets` -- it wrote `assets: []`, which would have thrown
+  every uploaded file away on the way back to disk after a build-from-board.
 - **Not yet (phase 2).** Captions from the take's words, the evidence card,
   the focus drawn on the cutaway, b-roll and mocks made in-house, the
   tall-frame layout under the busy edit.

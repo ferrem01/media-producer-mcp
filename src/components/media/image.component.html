@@ -57,9 +57,19 @@
       overlay.style.opacity = overlayOpacity;
     }
 
-    // Optional ken-burns drift
+    var root = el.querySelector('.image-component');
+    var at = Number(data.at);
+    var exitAt = Number(data.exit_at);
+    var timed = isFinite(at) || isFinite(exitAt);
+    if (!isFinite(at) || at < 0) at = 0;
+    if (!isFinite(exitAt) || exitAt <= at) exitAt = ctx.duration;
+
+    // Optional ken-burns drift (a timed image pushes in over its window)
     var drift = data.drift !== false;
-    if (drift && ctx.duration > 2) {
+    if (timed) {
+      gsap.set(bgImage, { scale: 1 });
+      tl.to(bgImage, { scale: 1.06, duration: Math.max(0.5, exitAt - at), ease: 'none' }, at);
+    } else if (drift && ctx.duration > 2) {
       gsap.set(bgImage, { scale: 1.05 });
       tl.to(bgImage, {
         scale: 1,
@@ -68,10 +78,21 @@
       }, 0);
     }
 
+    if (timed) {
+      // A TIMED image is a cut, not a fade: it takes the frame on `at` and
+      // leaves on `exit_at` (SPEC-creator-cut.md, the proof on a claim).
+      // Sub-frame tweens, not set(): a set() placed later in a timeline is
+      // rendered immediately on creation. 0.02s is under one frame at 30fps.
+      gsap.set(root, { autoAlpha: 0 });
+      tl.fromTo(root, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.02, ease: 'none', immediateRender: false }, at);
+      if (exitAt < ctx.duration) tl.to(root, { autoAlpha: 0, duration: 0.02, ease: 'none' }, exitAt);
+      return tl;
+    }
+
     // Fade in
     var speed = ctx.motion === 'minimal' ? 0.3 : 0.6;
-    gsap.set(el.querySelector('.image-component'), { autoAlpha: 0 });
-    tl.to(el.querySelector('.image-component'), {
+    gsap.set(root, { autoAlpha: 0 });
+    tl.to(root, {
       autoAlpha: 1,
       duration: speed,
       ease: 'power2.out'

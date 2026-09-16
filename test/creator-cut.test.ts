@@ -4,10 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FILM_GRAMMARS } from "../src/llm/creative-director.js";
 import { personCarries, ensureSpeakerNeeds, PERSON_GRAMMARS } from "../src/core/take-needs.js";
-import {
-  normalizeEvidence, ensureEvidenceNeeds, openEvidenceNeeds, provideEvidence,
-  evidenceComponents, hasCutawayFor, evidenceNeedOf,
-} from "../src/core/evidence-needs.js";
+import { normalizeAssetNeeds, openAssetNeeds, provideAsset, proofComponents, hasProofFor } from "../src/core/asset-needs.js";
 import { normalizeSceneShape } from "../src/llm/storyboard-builder.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,8 +12,10 @@ const read = (rel: string) => fs.readFile(path.resolve(__dirname, rel), "utf-8")
 
 // SPEC-creator-cut.md, phase 1: a ninth grammar -- a person explains, the
 // screen proves it. The person is the spine (everything the take flow does
-// for `speaker` applies), the writer declares the PROOF each claim wants,
-// the board asks for it, and a provided file becomes a cutaway.
+// for `speaker` applies), the writer declares the PROOF each claim wants on
+// the scene's existing needs, the board asks for it, and a provided file is
+// cut in full-frame on its words. No new field, no new component type
+// (Marc: fewer concepts unless there is overwhelming evidence).
 
 function board(scenes: any[], grammar = "creator-cut"): any {
   return {
@@ -71,120 +70,114 @@ describe("creator-cut is a film grammar a person carries", () => {
     // Ad and tutorial are one grammar split on motion and length.
     expect(block).toMatch(/AD is punchy and about 30s/);
     expect(block).toMatch(/TUTORIAL is calm and 60-90s/);
-    // The scene schema carries the evidence field.
-    expect(sb).toMatch(/evidence: \{\s*type: "array"/);
+    // The proof is written on the scene's existing needs, not a new field.
+    expect(block).toMatch(/NAMES ITS PROOF in the scene's "assets" array/);
+    expect(sb).toMatch(/assets: \{\s*type: "array"/);
+    expect(sb).not.toMatch(/evidence: \{/);
   });
 });
 
-describe("evidence: the proof each claim wants", () => {
+describe("proof on the board: the needs a claim asks for", () => {
   const raw = [
-    { kind: "screenshot", description: "The campaign screen, Metrics tab open", at: "@metrics", until: "@next", focus: "circle the Publish button" },
-    { kind: "screen-recording", description: "Dragging a card across the calendar", use: "card" },
+    { type: "screenshot", description: "The campaign screen, Metrics tab open", at: "@metrics", until: "@next", focus: "circle the Publish button" },
+    { type: "screen-recording", description: "Dragging a card across the calendar", use: "card" },
     { kind: "stock_footage", description: "hands typing at a kitchen table" },
-    { kind: "hologram", description: "not a kind" },
-    { kind: "mockup", description: "" },
-    { type: "mockup", what: "the agent panel performing" },
+    { type: "hologram", description: "not a kind" },
+    { type: "mockup", description: "" },
+    { type: "mockup", description: "the agent panel performing" },
   ];
 
-  it("normalizes what the writer wrote: known kinds, a real description, times kept as written", () => {
-    const ev = normalizeEvidence(raw);
-    expect(ev.map((e) => e.kind)).toEqual(["screenshot", "screen_recording", "stock_footage", "mockup"]);
-    expect(ev[0]).toEqual({ kind: "screenshot", description: "The campaign screen, Metrics tab open", at: "@metrics", until: "@next", focus: "circle the Publish button" });
-    expect(ev[1].use).toBe("card");
-    expect(ev[3].description).toBe("the agent panel performing");
-    // ...and normalizeSceneShape runs it, dropping the junk with a note.
-    const scene: any = { voiceover_text: "x", components: [], evidence: raw };
+  it("normalizes what the writer wrote into full need records; junk is dropped with a note", () => {
+    const needs = normalizeAssetNeeds(raw);
+    expect(needs.map((n) => [n.type, n.status, n.priority])).toEqual([
+      ["screenshot", "needed", "recommended"],
+      ["screen_recording", "needed", "recommended"],
+      ["stock_footage", "needed", "nice_to_have"],
+      ["mockup", "needed", "nice_to_have"],
+    ]);
+    expect(needs[0]).toMatchObject({ description: "The campaign screen, Metrics tab open", at: "@metrics", until: "@next", focus: "circle the Publish button" });
+    expect(needs[1].use).toBe("card");
+    expect(needs[2].generation_prompt).toBe("hands typing at a kitchen table");
+    expect(needs[0].fallback).toMatch(/runs on the person alone/);
+    // ...and normalizeSceneShape runs it.
+    const scene: any = { voiceover_text: "x", components: [], assets: raw };
     const notes = normalizeSceneShape(scene);
-    expect(scene.evidence).toHaveLength(4);
-    expect(notes.some((n) => /dropped 2 evidence entries/.test(n))).toBe(true);
-    const none: any = { voiceover_text: "x", components: [], evidence: [{ kind: "hologram" }] };
+    expect(scene.assets).toHaveLength(4);
+    expect(notes.some((n) => /dropped 2 asset need\(s\)/.test(n))).toBe(true);
+    const none: any = { voiceover_text: "x", components: [], assets: [{ type: "hologram" }] };
     normalizeSceneShape(none);
-    expect(none.evidence).toBeUndefined();
+    expect(none.assets).toBeUndefined();
   });
 
-  it("becomes needs on the scene: human kinds needed, the build's kinds optional, all with the evidence index", () => {
-    const p = board([{ voiceover_text: "Look at the metrics.", evidence: normalizeEvidence(raw) }]);
-    expect(ensureEvidenceNeeds(p)).toBe(true);
-    const assets = p.storyboard.scenes[0].assets;
-    expect(assets.map((a: any) => [a.type, a.status, a.priority, a.evidence])).toEqual([
-      ["screenshot", "needed", "recommended", 0],
-      ["screen_recording", "needed", "recommended", 1],
-      ["stock_footage", "needed", "nice_to_have", 2],
-      ["mockup", "needed", "nice_to_have", 3],
-    ]);
-    expect(assets[0].description).toBe("Screenshot: The campaign screen, Metrics tab open");
-    expect(assets[2].generation_prompt).toBe("hands typing at a kitchen table");
-    // Idempotent; and it lives beside the take need without disturbing it.
-    expect(ensureEvidenceNeeds(p)).toBe(false);
+  it("a hydrated board's needs pass through with their status, file and take intact", () => {
+    const hydrated = [
+      { description: "Camera take of this scene's spoken lines", type: "camera_video", status: "provided", priority: "critical", fallback: "slate", path: "/x/t.mp4", recording_instructions: "Hi." },
+      { description: "Screenshot: the metrics", type: "screenshot", status: "provided", priority: "recommended", fallback: "f", path: "/x/m.png", at: "@metrics" },
+    ];
+    const needs = normalizeAssetNeeds(hydrated);
+    expect(needs).toHaveLength(2);
+    expect(needs[0]).toMatchObject({ type: "camera_video", status: "provided", path: "/x/t.mp4", recording_instructions: "Hi." });
+    expect(needs[1]).toMatchObject({ status: "provided", path: "/x/m.png", at: "@metrics" });
+  });
+
+  it("lives beside the take need; a provided file fills one; the build cuts it in on its words", () => {
+    const p = board([{ voiceover_text: "Look at the metrics. Then the next thing.", assets: normalizeAssetNeeds(raw) }]);
     ensureSpeakerNeeds(p);
-    expect(ensureEvidenceNeeds(p)).toBe(false);
-    expect(p.storyboard.scenes[0].assets.filter((a: any) => a.type === "camera_video")).toHaveLength(1);
-    expect(openEvidenceNeeds(p)).toHaveLength(4);
-  });
+    const scene = p.storyboard.scenes[0];
+    expect(scene.assets.map((a: any) => a.type)).toEqual(["screenshot", "screen_recording", "stock_footage", "mockup", "camera_video"]);
+    expect(openAssetNeeds(p).map((o) => o.asset_index)).toEqual([0, 1, 2, 3]);   // the take is not proof
 
-  it("a rewritten board drops the needs of evidence that no longer exists", () => {
-    const p = board([{ voiceover_text: "x", evidence: normalizeEvidence(raw) }]);
-    ensureEvidenceNeeds(p);
-    p.storyboard.scenes[0].evidence = p.storyboard.scenes[0].evidence.slice(0, 1);
-    expect(ensureEvidenceNeeds(p)).toBe(true);
-    expect(p.storyboard.scenes[0].assets.filter((a: any) => a.evidence !== undefined)).toHaveLength(1);
-  });
-
-  it("a provided file fills one need, and the build casts it as a cutaway on its words", () => {
-    const p = board([{ voiceover_text: "Look at the metrics. Then the next thing.", evidence: normalizeEvidence(raw) }]);
-    ensureEvidenceNeeds(p);
-    const need = provideEvidence(p, 0, 0, "/assets/t/projects/p/assets/evidence-1.png");
+    const need = provideAsset(p, 0, 0, "/assets/t/projects/p/assets/proof-1.png");
     expect(need.status).toBe("provided");
-    expect(need.path).toBe("/assets/t/projects/p/assets/evidence-1.png");
-    expect(evidenceNeedOf(p.storyboard.scenes[0], 0)).toBe(need);
-    expect(openEvidenceNeeds(p).map((o) => o.evidence_index)).toEqual([1, 2, 3]);
-    provideEvidence(p, 0, 2, "/assets/t/projects/p/assets/broll.mp4");
-    // The card (evidence 1) is not built yet; the clip and the still are.
-    provideEvidence(p, 0, 1, "/assets/t/projects/p/assets/rec.mp4");
-    const cuts = evidenceComponents(p.storyboard.scenes[0]);
-    expect(cuts.map((c: any) => [c.type, c.data.media, c.data.evidence])).toEqual([
-      ["cutaway", "image", 0],
-      ["cutaway", "video", 2],
+    expect(openAssetNeeds(p).map((o) => o.asset_index)).toEqual([1, 2, 3]);
+    provideAsset(p, 0, 2, "/assets/t/projects/p/assets/broll.mp4");
+    provideAsset(p, 0, 1, "/assets/t/projects/p/assets/rec.mp4");   // a card: not built yet
+
+    const cuts = proofComponents(scene);
+    expect(cuts.map((c: any) => [c.type, c.data.src])).toEqual([
+      ["image", "/assets/t/projects/p/assets/proof-1.png"],
+      ["video", "/assets/t/projects/p/assets/broll.mp4"],
     ]);
-    expect(cuts[0].data).toMatchObject({ src: "/assets/t/projects/p/assets/evidence-1.png", at: "@metrics", exit_at: "@next", focus: "circle the Publish button" });
+    // The existing image/video components, timed: at/exit_at from the words.
+    expect(cuts[0].data).toEqual({ src: "/assets/t/projects/p/assets/proof-1.png", at: "@metrics", exit_at: "@next", drift: false });
     expect(cuts[0].position).toEqual({ x: "0%", y: "0%", width: "100%", height: "100%" });
-    // A rebuild must not stack a second cutaway for the same proof.
-    expect(hasCutawayFor(cuts, 0)).toBe(true);
-    expect(hasCutawayFor(cuts, 1)).toBe(false);
-    // Out-of-range indexes are refused, not silently added.
-    expect(() => provideEvidence(p, 0, 9, "/assets/t/projects/p/assets/x.png")).toThrow(/declares no evidence 10/);
-    expect(() => provideEvidence(p, 3, 0, "/assets/t/projects/p/assets/x.png")).toThrow(/scene 4 not found/);
+    expect(hasProofFor(cuts, "/assets/t/projects/p/assets/proof-1.png")).toBe(true);
+    expect(hasProofFor(cuts, "/assets/t/projects/p/assets/rec.mp4")).toBe(false);
+    expect(() => provideAsset(p, 0, 9, "/assets/t/projects/p/assets/x.png")).toThrow(/no need 10/);
+    expect(() => provideAsset(p, 3, 0, "/assets/t/projects/p/assets/x.png")).toThrow(/scene 4 not found/);
   });
 
-  it("the pipeline carries evidence and needs through the saved storyboard and casts the cutaways before the spine pass", async () => {
+  it("the pipeline carries the needs through the saved storyboard and casts the proof before the spine pass", async () => {
     const pipeline = await read("../src/llm/pipeline.ts");
-    expect(pipeline).toMatch(/evidence: Array\.isArray\(s\.evidence\)/);
     expect(pipeline, "a build-from-board must not throw provided files away").toMatch(/assets: Array\.isArray\(s\.assets\) \? s\.assets : \[\]/);
     expect(pipeline).toMatch(/if \(personCarries\(filmGrammar\)\) \{/);
     expect(pipeline).toMatch(/personCarries\(filmGrammar\) \|\| filmGrammar === "screencast"/);
-    const cast = pipeline.indexOf("for (const cut of evidenceComponents(d))");
+    const cast = pipeline.indexOf("for (const cut of proofComponents(d))");
     const spine = pipeline.indexOf("const r = applySpine(d, spine);");
     expect(cast).toBeGreaterThan(0);
-    expect(cast, "cutaways are cast BEFORE anchors resolve").toBeLessThan(spine);
-    // The route the board uploads through.
+    expect(cast, "proof is cast BEFORE anchors resolve").toBeLessThan(spine);
+    // The route the board uploads through -- the HTTP twin of update.provide_asset.
     const index = await read("../src/index.ts");
-    expect(index).toMatch(/\/api\/evidence\//);
-    expect(index).toMatch(/provideEvidence\(evProjectObj, evScene, evIndex, evUrl\)/);
-    // The layout: full-bleed, never banded, never phone-zoomed.
+    expect(index).toMatch(/\/api\/provide-asset\//);
+    expect(index).toMatch(/provideAsset\(evProjectObj, evScene, evIndex, evUrl\)/);
+    // The layout: a full-bleed image/video is the proof layer -- never banded, never phone-zoomed.
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/CUTAWAY_TYPES = \["cutaway"\]/);
-    expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"cutaway"\]/);
+    expect(gen).toMatch(/function isFullBleedMedia/);
+    expect(gen).toMatch(/isFullBleedMedia\(c as any\)\) \{\s*slots\[i\] = \{ position: \{ \.\.\.FULL_STAGE \}, z_index: 36 \}/);
+    expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"video", "image"\]/);
+    // No component type was added for it.
+    const media = await fs.readdir(path.resolve(__dirname, "../src/components/media"));
+    expect(media.some((f) => /cutaway/.test(f))).toBe(false);
   });
 
-  it("the cutaway component is a hard cut: no fade either side, a clip from its own start", async () => {
-    const html = await read("../src/components/media/cutaway.component.html");
-    // Sub-frame tweens (a set() later in a timeline renders on creation).
-    expect(html).toMatch(/tl\.fromTo\(root, \{ autoAlpha: 0 \}, \{ autoAlpha: 1, duration: 0\.02, ease: 'none', immediateRender: false \}, at\)/);
-    expect(html).toMatch(/tl\.to\(root, \{ autoAlpha: 0, duration: 0\.02, ease: 'none' \}, exitAt\)/);
-    expect(html).not.toMatch(/tl\.set\(root/);
-    expect(html).toMatch(/startAt: -at/);
-    const schema = JSON.parse(await read("../src/components/media/cutaway.schema.json"));
-    expect(schema.type).toBe("cutaway");
-    expect(Object.keys(schema.data)).toEqual(expect.arrayContaining(["src", "media", "at", "exit_at"]));
+  it("a timed image or clip is a hard cut: no fade either side, a clip from its own start", async () => {
+    for (const rel of ["../src/components/media/image.component.html", "../src/components/media/video.component.html"]) {
+      const html = await read(rel);
+      expect(html, rel).toMatch(/var timed = isFinite\(at\) \|\| isFinite\(exitAt\)/);
+      expect(html, rel).toMatch(/tl\.fromTo\((root|container), \{ autoAlpha: 0 \}, \{ autoAlpha: 1, duration: 0\.02, ease: 'none', immediateRender: false \}, at\)/);
+      expect(html, rel).toMatch(/tl\.to\((root|container), \{ autoAlpha: 0, duration: 0\.02, ease: 'none' \}, exitAt\)/);
+    }
+    const video = await read("../src/components/media/video.component.html");
+    expect(video).toMatch(/startAt: timed && at > 0 \? -at : 0/);
   });
 });

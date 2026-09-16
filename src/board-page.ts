@@ -107,17 +107,18 @@ export function getBoardHtml(): string {
   if (!tenant || !project) { say('Missing ?tenant= and ?project= in the link.', true); return; }
   $('desktopLink').href = link('/studio', '&desktop=1');
 
-  var P = null, pickingScene = -1, jobTimer = null, editing = -1, pickingEvidence = null;
-  // The proof a claim asked for (SPEC-creator-cut.md): one need per entry
-  // in scene.evidence, carried on scene.assets with its index.
+  var P = null, pickingScene = -1, jobTimer = null, editing = -1, pickingProof = null;
+  // The proof a claim asked for (SPEC-creator-cut.md): every need on the
+  // scene that is not the camera take, listed with its index for Upload.
   var EV_LABELS = { screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock' };
-  function evidenceNeedOf(scene, j) {
-    var a = (scene.assets || []).filter(function (x) { return x && x.evidence === j; });
-    return a.length ? a[0] : null;
+  function proofOf(scene) {
+    var out = [];
+    (scene.assets || []).forEach(function (x, j) { if (x && x.type !== 'camera_video') out.push({ need: x, index: j }); });
+    return out;
   }
-  function openEvidence(scenes) {
+  function openProof(scenes) {
     var n = 0;
-    scenes.forEach(function (s) { (s.evidence || []).forEach(function (ev, j) { var need = evidenceNeedOf(s, j); if (!need || need.status === 'needed') n++; }); });
+    scenes.forEach(function (s) { proofOf(s).forEach(function (p) { if (p.need.status === 'needed') n++; }); });
     return n;
   }
 
@@ -243,12 +244,12 @@ export function getBoardHtml(): string {
         acts.appendChild(rec); acts.appendChild(up); card.appendChild(acts);
         if (take && take.reframed) { var m = document.createElement('div'); m.className = 'meta'; m.textContent = 'Reframed ' + take.reframed.from + ' → ' + take.reframed.to; card.appendChild(m); }
       }
-      var evs = s.evidence || [];
+      var evs = proofOf(s);
       if (evs.length) {
         var proof = document.createElement('div'); proof.className = 'proof';
         var lead = document.createElement('div'); lead.className = 'lead'; lead.textContent = 'The proof this claim wants'; proof.appendChild(lead);
-        evs.forEach(function (ev, j) {
-          var need = evidenceNeedOf(s, j), have = need && need.status === 'provided' && need.path;
+        evs.forEach(function (pf) {
+          var need = pf.need, j = pf.index, have = need.status === 'provided' && need.path;
           var row = document.createElement('div'); row.className = 'ev';
           if (have) {
             var th = /\\.(mp4|webm|mov|m4v)(\\?|$)/i.test(need.path) ? document.createElement('video') : document.createElement('img');
@@ -256,12 +257,12 @@ export function getBoardHtml(): string {
             row.appendChild(th);
           }
           var what = document.createElement('div'); what.className = 'what';
-          what.textContent = ev.description || '';
+          what.textContent = need.description || '';
           var kind = document.createElement('small');
-          kind.textContent = (EV_LABELS[ev.kind] || ev.kind) + (ev.use === 'card' ? ' · card' : ' · cutaway') + (have ? ' · provided' : (ev.kind === 'screenshot' || ev.kind === 'screen_recording') ? ' · needed' : ' · optional');
+          kind.textContent = (EV_LABELS[need.type] || need.type) + (need.use === 'card' ? ' · card' : ' · cutaway') + (have ? ' · provided' : need.priority === 'nice_to_have' ? ' · optional' : ' · needed');
           what.appendChild(kind); row.appendChild(what);
           var evUp = document.createElement('button'); evUp.className = 'btn small ghost'; evUp.textContent = have ? 'Replace' : 'Upload';
-          evUp.onclick = function () { pickingEvidence = { scene: i, index: j }; $('evPicker').value = ''; $('evPicker').click(); };
+          evUp.onclick = function () { pickingProof = { scene: i, index: j }; $('evPicker').value = ''; $('evPicker').click(); };
           row.appendChild(evUp); proof.appendChild(row);
         });
         card.appendChild(proof);
@@ -280,7 +281,7 @@ export function getBoardHtml(): string {
       body.appendChild(v);
     } else {
       var hint = document.createElement('div'); hint.className = 'meta';
-      var proofOpen = openEvidence(scenes);
+      var proofOpen = openProof(scenes);
       hint.textContent = open.length ? (open.length + ' scene' + (open.length === 1 ? ' still needs' : 's still need') + ' a take before the film can be built.')
         : built ? 'Scenes are built. Render to watch the film.' : 'Every take is in. Build the scenes, then render.';
       if (proofOpen && !open.length) hint.textContent += ' ' + proofOpen + ' piece' + (proofOpen === 1 ? '' : 's') + ' of proof still to upload; the build runs without ' + (proofOpen === 1 ? 'it' : 'them') + '.';
@@ -351,10 +352,10 @@ export function getBoardHtml(): string {
 
   // ── upload a piece of evidence for one claim ──
   $('evPicker').addEventListener('change', function () {
-    var f = $('evPicker').files && $('evPicker').files[0]; if (!f || !pickingEvidence) return;
-    var i = pickingEvidence.scene, j = pickingEvidence.index; pickingEvidence = null;
+    var f = $('evPicker').files && $('evPicker').files[0]; if (!f || !pickingProof) return;
+    var i = pickingProof.scene, j = pickingProof.index; pickingProof = null;
     var ext = (f.name.split('.').pop() || 'png').toLowerCase();
-    var name = 'evidence-' + new Date().toISOString().replace(/[:.]/g, '-') + '-scene' + (i + 1) + '-' + (j + 1) + '.' + ext;
+    var name = 'proof-' + new Date().toISOString().replace(/[:.]/g, '-') + '-scene' + (i + 1) + '-' + (j + 1) + '.' + ext;
     var xhr = new XMLHttpRequest();
     xhr.open('POST', withToken('/api/upload-asset/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + '?name=' + encodeURIComponent(name)));
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
@@ -364,7 +365,7 @@ export function getBoardHtml(): string {
     xhr.onload = function () {
       var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
       if (xhr.status < 200 || xhr.status >= 300 || !up.url) { say('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), true); return; }
-      api('POST', '/evidence/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, evidence_index: j })
+      api('POST', '/provide-asset/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, asset_index: j })
         .then(function () { say('Scene ' + (i + 1) + ' proof ' + (j + 1) + ' attached.'); return load(); })
         .catch(function (e) { say(e.message || String(e), true); });
     };
