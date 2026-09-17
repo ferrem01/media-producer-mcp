@@ -1184,9 +1184,16 @@ export function buildAuthoredCompositionScene(
     // of the screen"). The lane drops to the chest band for every cut
     // window (wrapperChoreoScript reads cut_top).
     if (c.type === "reel-caption-lane" && tallFrame && lay && parseFloat(String(lay.position.y)) < 50) data.cut_top = 70;
-    // A cutaway on a tall frame is framed on the region it performs in.
-    var frameAnchor = tallFrame && isCutaway(c as any) && isProofSurface(c.type) ? frameAnchorFor(c.type, data) : null;
-    if (frameAnchor) console.log(`    ${c.type}: a cutaway on a tall frame -- framed on its "${frameAnchor}" region`);
+    // A cutaway on a tall frame is framed on the region it performs in --
+    // and so is any desktop surface that owns the width of a tall frame
+    // with no person under it (canvas-tour, tempo-cut on 9x16: measured
+    // live, proj_91b654b5, a Slack window squeezed to the phone's width,
+    // the thread unreadable). The wrapper scales to its performing region;
+    // the camera's own moves ride on top.
+    var slotW = lay ? parseFloat(String((lay.position as any).width)) : 0;
+    var ownsWidth = !speakerBase && Number.isFinite(slotW) && slotW >= 80;
+    var frameAnchor = tallFrame && isProofSurface(c.type) && (isCutaway(c as any) || ownsWidth) ? frameAnchorFor(c.type, data) : null;
+    if (frameAnchor) console.log(`    ${c.type}: ${isCutaway(c as any) ? "a cutaway" : "a full-width surface"} on a tall frame -- framed on its "${frameAnchor}" region`);
     components.push({
       id, type: c.type, data, position: hasAuthoredPos ? authoredPos : lay.position, z_index: lay.z_index,
       ...(zoom ? { zoom } : {}),

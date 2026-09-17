@@ -354,11 +354,19 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     const lane = await read("../src/components/captions/reel-caption-lane.component.html");
     expect(lane).toMatch(/\.rcl-scrim-shadow \.rcl-inner,\s*\.rcl-scrim-plate \.rcl-inner \{\s*color: #ffffff;\s*\}/);
     // ...and frames at about 1.5x, region high (Marc: 2.2x was too big for the vertical screen).
-    expect(asm).toMatch(/var sc = Math\.max\(1\.2, Math\.min\(2\.2, \(CW \* 0\.94 \/ r\.w\) \* 1\.5\)\);/);
+    // ...in the WRAPPER's own box, so a surface owning a band of a tall frame frames like a full-frame cutaway.
+    expect(asm).toMatch(/var sc = Math\.max\(1\.2, Math\.min\(2\.2, \(W \* 0\.94 \/ r\.w\) \* 1\.5\)\);/);
+    expect(asm).toMatch(/tx = Math\.max\(W - W \* sc, Math\.min\(0, tx\)\);\s*ty = Math\.max\(H - H \* sc, Math\.min\(0, ty\)\);/);
+    // A framed surface with no cut (canvas-tour on 9x16: a Slack window squeezed to the phone's width) is framed from its first frame.
+    expect(asm).toMatch(/if \(c\.frame && !c\.enter\) \{/);
+    // ...and a framed surface's entrance lands on its framing, not the unframed pose.
+    expect(asm).toMatch(/\} else if \(c\.frame\) \{[\s\S]*?scale: function\(\) \{ return frE\(\)\.scale; \}/);
+    expect(gen0 || "").toBeDefined();
     // The generator lays a cut-in label above the proof and frames only proof surfaces.
     const gen = await read("../src/llm/scene-generator.ts");
     expect(gen).toMatch(/z_index: isProofSurface\(t\) \? 36 : 39/);
-    expect(gen).toMatch(/isCutaway\(c as any\) && isProofSurface\(c\.type\) \? frameAnchorFor/);
+    expect(gen).toMatch(/var ownsWidth = !speakerBase && Number\.isFinite\(slotW\) && slotW >= 80;/);
+    expect(gen).toMatch(/tallFrame && isProofSurface\(c\.type\) && \(isCutaway\(c as any\) \|\| ownsWidth\) \? frameAnchorFor\(c\.type, data\) : null;/);
     // The camera rule never emits the same move twice (a label and a mock cut in on one word did).
     const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
     const twice: any[] = [
@@ -510,7 +518,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(frameAnchorFor("image", {}, anchorsOf)).toBeNull();
     // The generator stamps it on tall-frame cutaways; the assembler frames the wrapper at mount.
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/var frameAnchor = tallFrame && isCutaway\(c as any\) && isProofSurface\(c\.type\) \? frameAnchorFor\(c\.type, data\) : null;/);
+    expect(gen).toMatch(/var frameAnchor = tallFrame && isProofSurface\(c\.type\) && \(isCutaway\(c as any\) \|\| ownsWidth\) \? frameAnchorFor\(c\.type, data\) : null;/);
     expect(gen).toMatch(/\.\.\.\(frameAnchor \? \{ frame_anchor: frameAnchor \} : \{\}\)/);
     const asm = await read("../src/core/scene-assembler.ts");
     expect(asm).toMatch(/frame: \(c as any\)\.frame_anchor \|\| null,/);
@@ -518,7 +526,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(asm).toMatch(/function frameOf\(el, name\)/);
     expect(asm).toMatch(/if \(eCut && c\.frame\) \{/);
     expect(asm).toMatch(/duration: 0\.001, ease: 'none', immediateRender: false,/);
-    expect(asm).toMatch(/tx = Math\.max\(CW - W \* sc, Math\.min\(0, tx\)\)/);
+    expect(asm).toMatch(/tx = Math\.max\(W - W \* sc, Math\.min\(0, tx\)\)/);
     // Both assemblers pass the frame through.
     expect(asm).toMatch(/wrapperChoreoScript\(scene\.components, scene\.duration_seconds, "", canvas\.width, canvas\.height\)/);
     const comp = await read("../src/core/composite-assembler.ts");

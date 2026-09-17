@@ -679,7 +679,7 @@ export function wrapperChoreoScript(
     .filter((c) => { const e = animOf(c.enter); return !!e && e.effect === "cut" && typeof e.at === "number" && isProofSurface(c.type); })
     .map((c) => { const x = animOf(c.exit); return { at: Number((animOf(c.enter) as any).at), until: x && x.effect === "cut" && typeof x.at === "number" ? Number(x.at) : null }; });
   const moves = components
-    .filter((c) => c.pose || c.enter || c.exit || (c as any).data?.cut_top != null)
+    .filter((c) => c.pose || c.enter || c.exit || (c as any).data?.cut_top != null || (c as any).frame_anchor)
     .map((c) => ({
       cid: `${cidPrefix}${c.id}`,
       pose: c.pose || null,
@@ -720,20 +720,21 @@ export function wrapperChoreoScript(
       var W = el.offsetWidth || CW, H = el.offsetHeight || CH;
       if (!a || !a.offsetWidth || !a.offsetHeight) return { scale: 1, x: 0, y: 0 };
       var r = layoutBox(a, el);
-      // About two columns' worth of zoom: the rows and labels read, not the
-      // whole pane. A region that then still overflows the frame is shown
-      // from its LEFT edge and its TOP (where a screen's content starts --
-      // measured: centring cropped the task names off the left); one that
-      // fits is centred.
       // About one and a half columns' worth (Marc, on 2.2: "too big for the
       // vertical screen"): the text reads on a phone and more of the screen
-      // shows. Region high in the frame when it overflows.
-      var sc = Math.max(1.2, Math.min(2.2, (CW * 0.94 / r.w) * 1.5));
+      // shows. A region that then still overflows is shown from its LEFT
+      // edge and its TOP (where a screen's content starts -- measured:
+      // centring cropped the task names off the left); one that fits is
+      // centred, high. All of it in the WRAPPER's own box (W x H): a
+      // full-frame cutaway and a surface that owns a band of a tall frame
+      // frame the same way, and the scaled wrapper always still covers the
+      // box it was given.
+      var sc = Math.max(1.2, Math.min(2.2, (W * 0.94 / r.w) * 1.5));
       var pad = 24;
-      var tx = r.w * sc <= CW ? CW / 2 - (r.x + r.w / 2) * sc : pad - r.x * sc;
-      var ty = r.h * sc <= CH * 0.8 ? CH * 0.4 - (r.y + r.h / 2) * sc : CH * 0.08 - r.y * sc;
-      tx = Math.max(CW - W * sc, Math.min(0, tx));
-      ty = Math.max(CH - H * sc, Math.min(0, ty));
+      var tx = r.w * sc <= W ? W / 2 - (r.x + r.w / 2) * sc : pad - r.x * sc;
+      var ty = r.h * sc <= H * 0.8 ? H * 0.4 - (r.y + r.h / 2) * sc : H * 0.08 - r.y * sc;
+      tx = Math.max(W - W * sc, Math.min(0, tx));
+      ty = Math.max(H - H * sc, Math.min(0, ty));
       return { scale: sc, x: tx, y: ty };
     }
     var OFF = { 'slide-left': { x: '-115%' }, 'slide-right': { x: '115%' },
@@ -773,6 +774,15 @@ export function wrapperChoreoScript(
           master.set(el, { top: c.cutTop + '%', height: '12%' }, w.at);
           if (w.until != null) master.set(el, { top: c.top0, height: c.height0 || '12%' }, w.until);
         });
+      }
+      // A framed surface with no cut (a desktop mock owning a band of a
+      // tall frame): framed from its first frame, once its layout exists.
+      if (c.frame && !c.enter) {
+        var fr0 = (function(node, name) { return function() { return frameOf(node, name); }; })(el, c.frame);
+        master.to(el, { transformOrigin: '0 0',
+          scale: function() { return fr0().scale; }, x: function() { return fr0().x; }, y: function() { return fr0().y; },
+          duration: 0.001, ease: 'none', immediateRender: false,
+          onStart: function() { try { el.setAttribute('data-mp-framed', fr0().scale.toFixed(2)); } catch (e) {} } }, 0.01);
       }
       if (c.pose) {
         gsap.set(el, {
@@ -818,6 +828,15 @@ export function wrapperChoreoScript(
             scale: function() { return fr().scale; }, x: function() { return fr().x; }, y: function() { return fr().y; },
             duration: 0.001, ease: 'none', immediateRender: false,
             onStart: function() { try { el.setAttribute('data-mp-framed', fr().scale.toFixed(2)); } catch (e) {} } }, eAt);
+        } else if (c.frame) {
+          // A framed surface's entrance lands ON its framing, not on the
+          // unframed pose (measured: a rise entrance tweened the framed
+          // Slack window back to scale 1 half a second in).
+          var frE = (function(node, name) { return function() { return frameOf(node, name); }; })(el, c.frame);
+          master.fromTo(el, eFrom,
+            { transformOrigin: '0 0', x: function() { return frE().x; }, y: function() { return frE().y; }, scale: function() { return frE().scale; },
+              autoAlpha: 1, duration: eDur, ease: eCut ? 'none' : (c.enter.ease || 'power3.out'), immediateRender: true,
+              onStart: function() { try { el.setAttribute('data-mp-framed', frE().scale.toFixed(2)); } catch (e) {} } }, eAt);
         } else {
           master.fromTo(el, eFrom,
             { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: eDur,
