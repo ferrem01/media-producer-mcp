@@ -104,7 +104,18 @@ export async function resolveTenantForLogin(email: string, name: string, picture
   ensureLoaded();
   const e = normalizeEmail(email);
   const legacy = await getTenant(e);
-  const r = resolveTenantId(e, legacy?.tenantId);
+  // FOUNDING ADOPTS THE DOMAIN'S OLDEST TENANT, whoever's it is: if a
+  // colleague signs in before the person whose tenant already holds the
+  // company's projects, the company must still land on those projects --
+  // not on a fresh empty tenant with the owner joining it later.
+  const domain = domainOf(e);
+  let inherited = legacy?.tenantId;
+  if (!inherited && domain && !isConsumerDomain(domain) && !data.orgs[domain]) {
+    const { listTenants } = await import("./tenant-store.js");
+    const same = (await listTenants()).filter((t) => domainOf(t.email) === domain && t.tenantId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (same[0]) inherited = same[0].tenantId;
+  }
+  const r = resolveTenantId(e, inherited);
   const now = new Date().toISOString();
   if (r.via === "invite") {
     const inv = data.invites[e];

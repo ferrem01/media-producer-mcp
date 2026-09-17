@@ -3626,3 +3626,6 @@ where a login lands; consumer domains stay per-email; the founder's existing
 tenant becomes the company's so nothing moves. `/api/team`, the `/team`
 page from both Studios, and the `team` MCP tool list, invite and remove.
 Everyone in a tenant sees everything; the tenant switcher is not built.
+Follow-up: founding adopts the domain's OLDEST existing tenant, whoever's it
+is -- a colleague signing in before the owner used to found a fresh empty
+tenant that the owner then joined, their projects out of view.
