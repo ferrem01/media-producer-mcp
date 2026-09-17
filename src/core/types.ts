@@ -256,7 +256,12 @@ export interface SceneQuality {
 export interface CameraMove {
   /** Scene-local start time in seconds. */
   at: number;
-  type: "zoom" | "pan" | "rotate" | "reset";
+  type: "zoom" | "pan" | "rotate" | "reset" | "slide";
+  /** type=slide only: vertical shift of the whole scene as percent of the
+   *  canvas height (positive = down), at `scale` (>= 1), with NO cover
+   *  clamp -- the split's screen band covers what the shift exposes at
+   *  the top. The rig slides the person under the screen (SPEC-creator-cut.md). */
+  dy?: number;
   /** Focal point as percent of canvas (0-100). Defaults to center. */
   x?: number;
   y?: number;

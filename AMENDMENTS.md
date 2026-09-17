@@ -3597,3 +3597,23 @@ built film is rebuilt from its board with generate mode='full' -- so editing
 the board after a build is the normal loop. `EDITABLE_BOARD_STATES` in
 `server.ts` now admits generated and rendered; only a build or render in
 flight, or a failed project, is locked. The tool text no longer says DRAFT.
+
+## The split, second pass: the slice under the screen, the band's entrance, the band's framing
+
+Measured on the first split render of proj_120bdb3d: the 34% band clipped
+Marc's head (a selfie take has the face mid-frame), and the campaign mock
+sat as three rows at the top of the band with the rest white. Three rules:
+
+- THE SLICE: never shrink the take (a 9:16 take in a shorter box
+  pillarboxes). The rig SLIDES the scene so the hairline sits just under the
+  screen's edge (`splitSlide(face)`: +7% down for Marc's take, no zoom); a
+  face that would have to move up zooms in just enough to cover the bottom.
+  New camera move `slide` (dy%, scale, no cover clamp) in the rig runtime;
+  the split band is pinned to the frame (`data-mp-fixed`, hoisted out of the
+  rig) so the rig moves the person and not the screen.
+- THE ENTRANCE: the band slides down from above the frame on the same
+  half second as the rig's slide, landing on its framing; on exit it lifts
+  out while the rig brings the person back up. The cut stays a "cut" on the
+  board; the assembler plays a split's cut as the slide.
+- THE FRAMING: a short wrapper (under 60% of the frame) fills its height
+  with the anchor region, cropped from the left, capped at 3.2x.

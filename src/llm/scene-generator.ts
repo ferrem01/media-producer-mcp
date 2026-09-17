@@ -492,7 +492,7 @@ export function creatorCutCameraMoves(
   var moves: Array<Record<string, unknown>> = [punchy ? person(0.2, 0.45) : person(0.3, Math.max(2, Math.min(4, dur - 0.6)))];
   var cuts = components
     .filter((c) => isCutaway(c as any))
-    .map((c) => ({ c, at: Number(c.enter && typeof c.enter === "object" ? c.enter.at : NaN), until: Number(c.exit && typeof c.exit === "object" ? c.exit.at : NaN) }))
+    .map((c) => ({ c, split: isSplitProof(c as any), at: Number(c.enter && typeof c.enter === "object" ? c.enter.at : NaN), until: Number(c.exit && typeof c.exit === "object" ? c.exit.at : NaN) }))
     .filter((x) => Number.isFinite(x.at) && x.at < dur)
     .sort((a, b) => a.at - b.at);
   var lastEnd = 0;
@@ -500,7 +500,15 @@ export function creatorCutCameraMoves(
     // The camera comes to rest on the proof: a mock is framed on its own
     // region by the wrapper (frame_anchor), a provided image or clip is
     // already the picture. The rig zooming as well would compound the two.
-    moves.push({ at: cut.at, type: "reset", duration: 0.45 });
+    // A SPLIT slides the person under the screen instead (the screen band
+    // is pinned to the frame, so the rig moves the person and not it), on
+    // the same half-second clock as the band's own entrance.
+    if (cut.split) {
+      var sl = splitSlide(o.face);
+      moves.push({ at: cut.at, type: "slide", dy: sl.dy, scale: sl.scale, duration: 0.55, ease: "power3.out" });
+    } else {
+      moves.push({ at: cut.at, type: "reset", duration: 0.45 });
+    }
     var end = Number.isFinite(cut.until) && cut.until > cut.at ? cut.until : dur;
     if (end < dur - 0.3) moves.push(person(end, 0.45));
     lastEnd = Math.max(lastEnd, end);
@@ -529,6 +537,21 @@ export function splitScreenHeight(face: TakeFace | undefined): number {
 }
 export function isSplitProof(c: { type: string; position?: any; enter?: any; data?: any }): boolean {
   return isCutaway(c) && !!c.data && String((c.data as any).use || "") === "split";
+}
+/** THE SLICE UNDER THE SCREEN: the take stays full width and the bottom
+ *  band shows the slice of it with the face in it. The rig slides the
+ *  whole scene so the hairline sits just under the screen's edge (positive
+ *  dy = down; a selfie take with the face mid-frame slides down a few
+ *  percent, no zoom). A face that would have to move UP would expose the
+ *  bottom, so that case zooms in just enough to cover it. Never shrink:
+ *  a 9:16 take in a shorter box pillarboxes. */
+export function splitSlide(face: TakeFace | undefined): { dy: number; scale: number } {
+  var h = splitScreenHeight(face);
+  var faceTop = face ? (face.cy - face.size / 2) * 100 : 50;
+  var dy = Math.round((h + 3) - faceTop);
+  dy = Math.max(-25, Math.min(h, dy));
+  var scale = dy < 0 ? Math.round((1 + (2 * -dy) / 100) * 100) / 100 : 1;
+  return { dy: dy, scale: scale };
 }
 
 /** A CUTAWAY (SPEC-creator-cut.md): the proof taking the frame for a beat.
