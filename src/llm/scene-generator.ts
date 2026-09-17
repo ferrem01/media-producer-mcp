@@ -203,26 +203,33 @@ if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
       var ssPipRaw = (stData as any).pip_source;
       var ssPip = ssPipRaw === undefined ? "speaker" : ssPipRaw;
       var ssPipSource = (ssPip === "none" || ssPip === null || ssPip === "") ? undefined : ssPip;
+      // THE SPLIT on a tall canvas: the recording owns the top of the frame,
+      // flush, and the speaker base shows under it -- no bubble, the person
+      // is the bottom half (splitScreenHeight). On a wide canvas the
+      // recording fills the frame and the camera rides as the corner PiP.
+      var ssTall = opts.canvas.height > opts.canvas.width;
+      var ssSplitH = ssTall ? splitScreenHeight((draft as any).take_face) : 100;
       stComponents.push({
         id: "tpl_video",
         type: "screencast-frame",
         z_index: 20,
-        position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+        position: { x: "0%", y: "0%", width: "100%", height: ssSplitH + "%" },
         data: {
           video_url: ssSrc,
           frame_style: "none",
           crop: "auto",
           shadow: false,
-          corner_radius: (stData as any).corner_radius !== undefined ? Number((stData as any).corner_radius) : 30,
-          max_width_pct: (stData as any).max_width_pct !== undefined ? Number((stData as any).max_width_pct) : 88,
-          pip_source: ssPipSource,
+          corner_radius: (stData as any).corner_radius !== undefined ? Number((stData as any).corner_radius) : (ssTall ? 0 : 30),
+          max_width_pct: (stData as any).max_width_pct !== undefined ? Number((stData as any).max_width_pct) : (ssTall ? 100 : 88),
+          pip_source: ssTall ? undefined : ssPipSource,
           pip_shape: "circle",
           pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : 15,
           pip_position: (stData as any).pip_position || "bottom-right",
           pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
         },
       });
-      stSpeakerOpaque = true; // full-frame screencast covers the speaker base
+      stSpeakerOpaque = !ssTall; // a full-frame screencast covers the speaker base; the split leaves the person under it
+      if (ssTall) console.log(`  st-speaker-screencast: tall canvas -- the split: recording in the top ${ssSplitH}%, the speaker under it`);
     } else {
       console.warn(`  st-speaker-screencast: no footage source in slots or draft assets -- shell only`);
     }
@@ -505,6 +512,25 @@ export function creatorCutCameraMoves(
     .sort((a, b) => Number(a.at) - Number(b.at));
 }
 
+/** THE SPLIT (SPEC-creator-cut.md, SPEC-format-and-spine.md): on a tall
+ *  frame the screen owns the top of the frame, flush, and the person owns
+ *  the bottom -- the talking-head-under-the-screen shape every "creator at
+ *  a laptop" ad uses, and what a screencast IS on a phone. One rule, two
+ *  callers: a creator-cut proof marked use:"split", and the speaker
+ *  screencast template on a tall canvas. The screen's bottom edge comes
+ *  from the face: it ends above the hairline, never under 34% (too small
+ *  to read) nor over 55% (the person is the point). A selfie take with the
+ *  face mid-frame gets the top of the head clipped by a few percent, which
+ *  reads as a tight crop; an over-the-shoulder shot gets the full half. */
+export function splitScreenHeight(face: TakeFace | undefined): number {
+  var faceTop = face ? face.cy - face.size / 2 : 0.5;
+  var h = Math.max(0.34, Math.min(0.55, faceTop - 0.03));
+  return Math.round(h * 1000) / 10;
+}
+export function isSplitProof(c: { type: string; position?: any; enter?: any; data?: any }): boolean {
+  return isCutaway(c) && !!c.data && String((c.data as any).use || "") === "split";
+}
+
 /** A CUTAWAY (SPEC-creator-cut.md): the proof taking the frame for a beat.
  *  Either a library mock the storyboard cut in with enter {effect:"cut"}
  *  (the default -- motion graphics performing the claim) or a provided
@@ -657,8 +683,11 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     } else if (isCutaway(c as any)) {
       // The proof at 36; a label or a word cut in WITH the proof rides above
       // it at 39 (measured: "THE BRIEF" cut in with the campaign screen and
-      // painted under it -- same layer, later in the DOM).
-      slots[i] = { position: { ...FULL_STAGE }, z_index: isProofSurface(t) ? 36 : 39 };
+      // painted under it -- same layer, later in the DOM). A split proof on
+      // a tall frame takes the top of the frame and leaves the person.
+      slots[i] = vertical && isSplitProof(c as any)
+        ? { position: pct(0, 0, 100, splitScreenHeight(face)), z_index: 36 }
+        : { position: { ...FULL_STAGE }, z_index: isProofSurface(t) ? 36 : 39 };
     } else if (ACCENT_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: ACCENT_SPOTS[Math.min(accentCount, ACCENT_SPOTS.length - 1)], z_index: 40 + accentCount };
       accentCount++;
@@ -1159,7 +1188,8 @@ export function buildAuthoredCompositionScene(
     // desktop guesses and the bands are the only thing keeping content off
     // the face (measured: the board's composer grew to 26% and sat on the
     // list under it). A takeover's full-bleed position still stands.
-    if (hasAuthoredPos && speakerBase && tallFrame && !isTakeover && lay && STAGE_OVERLAY_TYPES.indexOf(c.type) === -1 && !isCutaway(c as any)) {
+    // (A split proof's full-bleed cast is the cutaway default; the split slot wins.)
+    if (hasAuthoredPos && speakerBase && tallFrame && !isTakeover && lay && STAGE_OVERLAY_TYPES.indexOf(c.type) === -1 && (!isCutaway(c as any) || isSplitProof(c as any))) {
       console.log(`    ${c.type}: tall speaker frame -- the band layout wins over the board's position (${JSON.stringify(authoredPos)})`);
       hasAuthoredPos = false;
     }

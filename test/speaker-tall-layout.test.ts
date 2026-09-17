@@ -211,3 +211,52 @@ describe("app mocks have no phone form on a speaker reel", () => {
     expect(comps.map((c) => c.type)).toEqual(["composer"]);
   });
 });
+
+describe("THE SPLIT on a tall frame: the screen owns the top, the person the bottom", () => {
+  const face = { cx: 0.5, cy: 0.5, size: 0.39 }; // a selfie take: face top at 30.5%
+  const otsFace = { cx: 0.7, cy: 0.62, size: 0.3 }; // over the shoulder: face top at 47%
+  it("a split proof takes the top of the frame flush, ending above the hairline (min 34%, max 55%)", async () => {
+    const { splitScreenHeight } = await import("../src/llm/scene-generator.js");
+    expect(splitScreenHeight(undefined)).toBe(47);
+    expect(splitScreenHeight(face)).toBe(34);
+    expect(splitScreenHeight(otsFace)).toBe(44);
+    const c = build({ width: 1080, height: 1920 }, [
+      { type: "video", data: { src: "/assets/t/projects/p/assets/rec.mp4", at: 1, exit_at: 9, use: "split" }, position: { x: "0%", y: "0%", width: "100%", height: "100%" } },
+      { type: "reel-caption-lane", data: { phrases: [{ text: "One answer", start: 6 }] } },
+    ], undefined, otsFace);
+    const v = c.find((x) => x.type === "video");
+    expect(v.position).toEqual({ x: "0%", y: "0%", width: "100%", height: "44%" });
+    expect(v.z_index).toBe(36);
+  });
+  it("a cutaway without the mark still takes the whole frame", () => {
+    const c = build({ width: 1080, height: 1920 }, [
+      { type: "video", data: { src: "/assets/t/projects/p/assets/rec.mp4", at: 1, exit_at: 9 }, position: { x: "0%", y: "0%", width: "100%", height: "100%" } },
+    ], undefined, otsFace);
+    expect(c.find((x) => x.type === "video").position).toEqual({ x: "0%", y: "0%", width: "100%", height: "100%" });
+  });
+  it("a library mock marked use:split in its data is the split too", () => {
+    const c = build({ width: 1080, height: 1920 }, [
+      { type: "quotient-campaign", data: { use: "split" }, enter: { effect: "cut", at: 1 }, exit: { effect: "cut", at: 9 } },
+    ], undefined, face);
+    expect(c.find((x) => x.type === "quotient-campaign").position).toEqual({ x: "0%", y: "0%", width: "100%", height: "34%" });
+  });
+});
+
+describe("a speaker screencast on a tall canvas is the split, not a bubble", () => {
+  it("puts the recording in the top of the frame with no PiP and leaves the scene transparent for the person", async () => {
+    const { buildTemplateScene } = await import("../src/llm/scene-generator.js");
+    const draft: any = { label: "Walkthrough", duration_seconds: 20, scene_template: { type: "st-speaker-screencast", data: { source: "/assets/t/projects/p/assets/tab.mp4" } }, take_face: { cx: 0.7, cy: 0.62, size: 0.3 } };
+    const mk = (canvas: any) => buildTemplateScene("s1", draft, { sceneIndex: 0, totalScenes: 1, canvas, tenantId: "t", brandKit: { colors: {}, fonts: [] } } as any)!.scene as any;
+    const tall = mk({ width: 1080, height: 1920 });
+    const frame = tall.components.find((c: any) => c.type === "screencast-frame");
+    expect(frame.position).toEqual({ x: "0%", y: "0%", width: "100%", height: "44%" });
+    expect(frame.data.pip_source).toBeUndefined();
+    expect(frame.data.max_width_pct).toBe(100);
+    expect(tall.transparent_background).toBeUndefined();
+    const wide = mk({ width: 1920, height: 1080 });
+    const wf = wide.components.find((c: any) => c.type === "screencast-frame");
+    expect(wf.position.height).toBe("100%");
+    expect(wf.data.pip_source).toBe("speaker");
+    expect(wide.transparent_background).toBe(false);
+  });
+});

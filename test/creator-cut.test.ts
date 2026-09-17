@@ -177,7 +177,7 @@ describe("proof on the board: the needs a claim asks for", () => {
     // as desktop furniture on a phone reel.
     const gen = await read("../src/llm/scene-generator.ts");
     expect(gen).toMatch(/function isCutaway/);
-    expect(gen).toMatch(/isCutaway\(c as any\)\) \{[\s\S]*?slots\[i\] = \{ position: \{ \.\.\.FULL_STAGE \}, z_index: isProofSurface\(t\) \? 36 : 39 \}/);
+    expect(gen).toMatch(/isCutaway\(c as any\)\) \{[\s\S]*?: \{ position: \{ \.\.\.FULL_STAGE \}, z_index: isProofSurface\(t\) \? 36 : 39 \}/);
     expect(gen).toMatch(/PHONE_REEL_MOCK_RE\.test\(c\.type\) && !isCutaway\(c as any\)/);
     expect(gen).toMatch(/data\.scale === undefined && !isCutaway\(c as any\)\) zoom = PHONE_ZOOM/);
     expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"video", "image"\]/);
@@ -236,6 +236,12 @@ describe("the idea beat: a claim no screen can prove gets a drawn object (SPEC-c
     const sb = await read("../src/llm/storyboard-builder.ts");
     expect(sb).toMatch(/THE IDEA BEAT, WHEN NO SCREEN CAN PROVE IT: a claim about money, time, a person, a place or a feeling has no product surface/);
     expect(sb).toMatch(/THE WORLD BEAT, WHEN THE LINE IS ABOUT PEOPLE OR A PLACE:.*\{type: "stock_footage"/);
+    // THE SPLIT: a third use beside cutaway and card -- the need keeps it, the cast carries it to the layout, the writer knows when to ask.
+    const { normalizeAssetNeeds: norm2, proofComponents: cast2 } = await import("../src/core/asset-needs.js");
+    const split = norm2([{ type: "screen_recording", description: "Marc at the laptop", use: "split", at: "@open", path: "/assets/t/projects/p/assets/rec.mp4", status: "provided" }]);
+    expect(split[0].use).toBe("split");
+    expect((cast2({ assets: split } as any)[0] as any).data.use).toBe("split");
+    expect(sb).toMatch(/THE SPLIT, WHEN THE PERSON STAYS ON WHILE THE SCREEN PROVES IT:/);
     expect(sb).toMatch(/\{type: "illustration", description: the one object in one sentence/);
     expect(sb).toMatch(/with "ring": true so a hand-drawn loop circles it once it lands/);
     expect((sb.match(/THE OBJECT BEHIND THE WORDS/g) || []).length).toBe(2);
