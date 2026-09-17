@@ -16,9 +16,10 @@ this order (`resolveTenantId` in `src/auth/team-store.ts`):
 1. **An invite** for your email: you join that tenant; the invite is consumed.
 2. **An existing membership** for your email.
 3. **Your company domain**: everyone at `acme.com` shares the acme tenant.
-   The first person from a domain founds it. If they already had a
-   per-email tenant from before, THAT tenant becomes the company's: their
-   projects, brand kit and every existing link carry over untouched (no
+   The first person from a domain founds it, and founding ADOPTS the
+   domain's oldest existing per-email tenant, whoever's it is: the
+   company lands on the projects that already exist, in any sign-in order.
+   Projects, brand kit and every existing link carry over untouched (no
    file moves, no aliases -- the tenant id is opaque).
 4. **A consumer domain** (gmail and the like, `CONSUMER_DOMAINS`) stays one
    tenant per email.

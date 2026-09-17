@@ -61,6 +61,14 @@ describe("the team store on disk: login, invite, remove", () => {
     initTeamStoreFromFile(path.join(dir, "team.json"));
     expect((await listTeam("marc-getquotient-ai")).members).toHaveLength(2);
   });
+  it("a colleague signing in FIRST still lands the company on the owner's existing tenant", async () => {
+    await findOrCreateTenant("marc@getquotient.ai", "Marc"); // Marc's pre-team tenant holds the projects
+    const sam = await resolveTenantForLogin("sam@getquotient.ai", "Sam"); // Sam signs in before Marc does
+    expect(sam.tenantId).toBe("marc-getquotient-ai");
+    const marc = await resolveTenantForLogin("marc@getquotient.ai", "Marc");
+    expect(marc.tenantId).toBe("marc-getquotient-ai");
+    expect((await listTeam("marc-getquotient-ai")).domains).toEqual(["getquotient.ai"]);
+  });
   it("an invite brings an outside address in, and removal sends them to a tenant of their own", async () => {
     await resolveTenantForLogin("marc@getquotient.ai", "Marc");
     expect(await inviteMember("marc-getquotient-ai", "Pat@Gmail.com", "marc@getquotient.ai")).toEqual({ status: "invited", email: "pat@gmail.com" });
