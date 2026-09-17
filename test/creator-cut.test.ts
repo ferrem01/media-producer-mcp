@@ -220,6 +220,7 @@ describe("the idea beat: a claim no screen can prove gets a drawn object (SPEC-c
     // B-roll rides the same lane: a stock_footage need is fetched by the build (portrait on a tall frame) and cut in like any provided proof.
     expect(pipeline).toMatch(/if \(need\.type === "stock_footage" && canFetchStock\) \{/);
     expect(pipeline).toMatch(/orientation: canvas\.height > canvas\.width \? "portrait" : "landscape",/);
+    expect(pipeline).toMatch(/c\.data\.at = isFootage \? 0 : Math\.round\(dur \* 0\.3 \* 100\) \/ 100;/);
     expect(pipeline).toMatch(/needs\.some\(\(n\) => madeHere\(n\) && n\.path === src\)/);
     const stock = await read("../src/media/stock-footage.ts");
     expect(stock).toMatch(/orientation: opts\.orientation \|\| "landscape",/);

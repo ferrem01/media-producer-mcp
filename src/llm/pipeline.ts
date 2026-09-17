@@ -3214,8 +3214,11 @@ async function runUnifiedPipeline(
         if (d.spine) resolveComponent(cut as any, d.spine);
         const dur = Number(d.duration_seconds) || 0;
         const c: any = cut;
-        if (typeof c.data.at !== "number") c.data.at = Math.round(dur * 0.3 * 100) / 100;
-        if (typeof c.data.exit_at !== "number") c.data.exit_at = Math.round(dur * 0.8 * 100) / 100;
+        // A drawn object cuts in mid-claim by default; found footage is the
+        // beat's world and holds for the whole beat unless the words say otherwise.
+        const isFootage = needs.some((n) => n && n.type === "stock_footage" && n.path === src);
+        if (typeof c.data.at !== "number") c.data.at = isFootage ? 0 : Math.round(dur * 0.3 * 100) / 100;
+        if (typeof c.data.exit_at !== "number") c.data.exit_at = isFootage ? dur : Math.round(dur * 0.8 * 100) / 100;
         d.components.push(cut);
         console.log(`  Idea beat: scene ${i + 1} -- the ${String(c.type)} cuts in at ${c.data.at}s, out at ${c.data.exit_at}s`);
       }
