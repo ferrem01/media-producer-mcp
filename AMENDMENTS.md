@@ -3527,3 +3527,15 @@ A clip is per-scene only when a recorded take says so (its source matches
 a take). Every other clip stays unstamped and plays from film time 0. And
 a per-scene track with nothing to lay its markers on is not a lane; the
 routes fall back to the continuous path.
+
+## B-roll rides the idea-beat lane (creator-cut stock_footage needs are fetched by the build)
+
+Measured on the founder-story reference (a 45s LinkedIn creator-cut): two of its
+seven beats are stock-style office b-roll. Our creator-cut writer can ask for a
+`stock_footage` need, but the build never fetched it -- only codegen scenes
+with a `broll_query` reached Pexels, landscape only -- so the need sat on the
+human's list. Now the same block that draws illustrations fetches stock needs
+(Pexels, portrait on a tall frame, gated by `PEXELS_API_KEY`), marks them
+provided and cuts them in on their words. What the build cannot find stays a
+need for the human. Files: `pipeline.ts` (idea-beat block), `media/stock-footage.ts`
+(`orientation` option), `test/creator-cut.test.ts`.

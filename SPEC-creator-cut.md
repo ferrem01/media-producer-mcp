@@ -243,3 +243,11 @@ side by side with the references.
 - A CTA or sponsor line only when the brief asks.
 - Ad and tutorial are one grammar, split on `motion` and length; revisit
   with evidence after one of each is built.
+
+## B-roll rides the same lane
+
+A `stock_footage` need is the idea beat's moving twin: the build fetches it
+(portrait on a tall frame) and cuts it in on the claim's words exactly like a
+drawn illustration or a provided screenshot. The human records only what the
+build cannot find: the on-camera lines, and any shot of themselves (the
+over-the-shoulder laptop shot in the founder-story reference).

@@ -3151,15 +3151,48 @@ async function runUnifiedPipeline(
   // on the two reference ads with no product screen (Jesani's "$1.4
   // million" portrait, Gamma's clock and balloons): the writer had no way
   // to ask for an object and the film was headlines alone.
-  if (personCarries(filmGrammar) && opts.generateImages !== false && process.env.OPENAI_API_KEY) {
+  // B-ROLL rides the same lane: a stock_footage need is fetched here (Pexels,
+  // portrait on a tall frame) and cut in on its words -- the human only
+  // supplies what the build cannot find. Gated per kind by the provider key.
+  const canDraw = opts.generateImages !== false && !!process.env.OPENAI_API_KEY;
+  const canFetchStock = !!process.env.PEXELS_API_KEY;
+  if (personCarries(filmGrammar) && (canDraw || canFetchStock)) {
     const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
+    const madeHere = (n: any) => n && (n.type === "illustration" || n.type === "stock_footage");
     let drawn = 0;
+    let fetchedStock = 0;
     let sceneNo = 0;
     for (const d of storyboard.scenes as any[]) {
       const i = sceneNo++;
       const needs: any[] = Array.isArray(d.assets) ? d.assets : [];
       for (const need of needs) {
-        if (!need || need.type !== "illustration" || need.path || need.status === "provided") continue;
+        if (!need || need.path || need.status === "provided") continue;
+        if (need.type === "stock_footage" && canFetchStock) {
+          try {
+            await fs.mkdir(assetsDir, { recursive: true });
+            const filename = `broll_scene_${i + 1}_${fetchedStock + 1}.mp4`;
+            const clip = await fetchStockFootage({
+              query: String(need.description || "").trim(),
+              minDuration: Number(d.duration_seconds) || 5,
+              outputDir: assetsDir,
+              filename,
+              orientation: canvas.height > canvas.width ? "portrait" : "landscape",
+              targetWidth: canvas.height > canvas.width ? 1080 : 1920,
+            });
+            if (clip) {
+              need.path = `/assets/${opts.tenant_id}/projects/${projectId}/assets/${filename}`;
+              need.status = "provided";
+              fetchedStock++;
+              console.log(`  B-roll: scene ${i + 1} -- fetched "${String(need.description).slice(0, 60)}" -> ${filename} (${clip.width}x${clip.height}, ${clip.duration}s)`);
+            } else {
+              console.log(`  B-roll: scene ${i + 1} -- nothing found for "${String(need.description).slice(0, 60)}"; stays a need for the human`);
+            }
+          } catch (e: any) {
+            console.warn(`  B-roll: scene ${i + 1} -- could not fetch "${String(need.description).slice(0, 60)}": ${e?.message || e}`);
+          }
+          continue;
+        }
+        if (need.type !== "illustration" || !canDraw) continue;
         try {
           await fs.mkdir(assetsDir, { recursive: true });
           const prompt = `${String(need.description || "").trim()}. ${need.focus ? `The eye goes to: ${String(need.focus).trim()}. ` : ""}A single clear subject, flat illustrated art with soft depth, one palette, generous empty margin around the subject, no text, no letters, no logos.`;
@@ -3176,7 +3209,7 @@ async function runUnifiedPipeline(
       const already = new Set((d.components as any[]).map((c) => c && typeof c === "object" && c.data ? String(c.data.src || "") : ""));
       for (const cut of proofComponents(d)) {
         const src = String((cut as any).data?.src);
-        if (!src || already.has(src) || !needs.some((n) => n && n.type === "illustration" && n.path === src)) continue;
+        if (!src || already.has(src) || !needs.some((n) => madeHere(n) && n.path === src)) continue;
         extractAnchors(cut as any);
         if (d.spine) resolveComponent(cut as any, d.spine);
         const dur = Number(d.duration_seconds) || 0;
@@ -3184,10 +3217,11 @@ async function runUnifiedPipeline(
         if (typeof c.data.at !== "number") c.data.at = Math.round(dur * 0.3 * 100) / 100;
         if (typeof c.data.exit_at !== "number") c.data.exit_at = Math.round(dur * 0.8 * 100) / 100;
         d.components.push(cut);
-        console.log(`  Idea beat: scene ${i + 1} -- the illustration cuts in at ${c.data.at}s, out at ${c.data.exit_at}s`);
+        console.log(`  Idea beat: scene ${i + 1} -- the ${String(c.type)} cuts in at ${c.data.at}s, out at ${c.data.exit_at}s`);
       }
     }
     if (drawn) console.log(`  Idea beat: ${drawn} illustration(s) drawn in-house`);
+    if (fetchedStock) console.log(`  B-roll: ${fetchedStock} stock clip(s) fetched for creator-cut needs`);
   }
 
   // 3b. Stock footage / b-roll backgrounds -- storyboard builder-decided per scene.
