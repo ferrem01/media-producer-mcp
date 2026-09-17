@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-17 — Tall-frame framing for every desktop surface, not only cutaways
+
+The Cursor-style smoke film (proj_91b654b5, canvas-tour on 9x16): the
+Slack window squeezed to the phone's width, the thread unreadable. The
+framing creator-cut got (#789) applied only to cut-in proofs.
+
+- `scene-generator.ts`: a proof surface that owns the width of a tall
+  frame (slot >= 80%) with no person under it is framed on its performing
+  region too (`frame_anchor`), whatever the grammar.
+- `scene-assembler.ts`: `frameOf` works in the WRAPPER's own box (W x H),
+  so a surface owning a band of the frame frames like a full-frame
+  cutaway and always still covers its box; a framed surface with no
+  entrance is framed from its first frame; a framed surface's entrance
+  lands ON its framing (measured: the rise entrance tweened the framed
+  window back to scale 1 half a second in).
+
 ## 2026-09-17 — The idea beat: a drawn object for a claim no screen can prove
 
 Two more reference Story ads (Gamma: headlines over an illustrated clock,
