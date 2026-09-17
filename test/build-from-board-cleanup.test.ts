@@ -35,3 +35,14 @@ describe("build-from-board leaves no working copy behind", () => {
     expect(retarget(undefined)).toBeUndefined();
   });
 });
+
+describe("the board stays editable after the build", () => {
+  it("storyboard redrafts and per-scene edits are allowed on generated and rendered projects, locked only in flight or failed", async () => {
+    const fs = await import("node:fs/promises");
+    const server = await fs.readFile(new URL("../src/server.ts", import.meta.url), "utf-8");
+    expect(server).toMatch(/const EDITABLE_BOARD_STATES = new Set<string>\(\["storyboard", "draft", "generated", "rendered"\]\);/);
+    expect(server).toMatch(/if \(!EDITABLE_BOARD_STATES\.has\(existingProject\.status\)\) \{/);
+    expect(server).toMatch(/if \(!EDITABLE_BOARD_STATES\.has\(project\.status\)\) \{/);
+    expect(server).not.toMatch(/project's DRAFT storyboard \(project status 'storyboard'\/'draft'\)/);
+  });
+});
