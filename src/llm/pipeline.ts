@@ -3156,6 +3156,22 @@ async function runUnifiedPipeline(
   // supplies what the build cannot find. Gated per kind by the provider key.
   const canDraw = opts.generateImages !== false && !!process.env.OPENAI_API_KEY;
   const canFetchStock = !!process.env.PEXELS_API_KEY;
+  // ON A PERSON-CARRIED FILM, B-ROLL IS A NEED, NEVER THE CODEGEN CHANNEL:
+  // a writer's broll_query would route the scene to freeform codegen (the
+  // authored recipe refuses drafts with one), dropping the caption lane and
+  // the cut. Fold it into a stock_footage need on the same scene instead.
+  if (personCarries(filmGrammar)) {
+    for (const d of storyboard.scenes as any[]) {
+      const q = typeof d.broll_query === "string" ? d.broll_query.trim() : "";
+      if (!q) { delete d.broll_query; continue; }
+      if (!Array.isArray(d.assets)) d.assets = [];
+      if (!d.assets.some((n: any) => n && n.type === "stock_footage")) {
+        d.assets.push({ type: "stock_footage", description: q, status: "needed", priority: "recommended", use: "cutaway" });
+        console.log(`  B-roll: scene "${d.label || "?"}" -- the writer's broll_query became a stock_footage need`);
+      }
+      delete d.broll_query;
+    }
+  }
   if (personCarries(filmGrammar) && (canDraw || canFetchStock)) {
     const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
     const madeHere = (n: any) => n && (n.type === "illustration" || n.type === "stock_footage");

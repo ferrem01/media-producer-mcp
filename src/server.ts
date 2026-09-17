@@ -527,6 +527,10 @@ export async function queueBuildFromStoryboard(
             console.log(`  Build-from-storyboard: kept the project's own music bed (${priorMusic.map((t: any) => t.id).join(", ")}) over the pipeline's re-pick`);
           }
           origProject.assets = retarget(generatedProject.assets);
+          // The build fills needs on the storyboard (a fetched clip, a drawn
+          // illustration: path + status "provided"); without this the original
+          // kept its pre-build board and every need stayed open in Studio.
+          if (generatedProject.storyboard) origProject.storyboard = retarget(generatedProject.storyboard);
           origProject.canvas = generatedProject.canvas;
           // Never WIPE a speaker track the user already attached: the
           // pipeline only produces one in speaker-source mode, so an
