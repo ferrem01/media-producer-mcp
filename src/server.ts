@@ -352,6 +352,10 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
  * storyboard was ever reviewed, generates against an empty brand kit).
  * Keep it a tight page: clients carry it in context all session.
  */
+/** The board can be redrafted or edited per scene in these states; a build
+ *  or render in flight, and a failed project, are locked. */
+const EDITABLE_BOARD_STATES = new Set<string>(["storyboard", "draft", "generated", "rendered"]);
+
 export const MCP_INSTRUCTIONS = `Media Producer turns prompts into branded films (video/image/deck): code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
 THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate until right -- spend revisions HERE: feedback redrafts the WHOLE board (minutes); the storyboard tool edits ONE scene. Build ONCE (mode:'full' + project_id), tweak, render. mode:'full' cold = drafts only.
@@ -644,7 +648,12 @@ export async function queueStoryboardGeneration(params: {
   if (params.project_id && params.feedback) {
     const existingProject = await loadProject(params.tenant_id, params.project_id);
     if (!existingProject) return { error: "Project not found for storyboard revision" };
-    if (existingProject.status !== "storyboard" && existingProject.status !== "draft") {
+    // THE BOARD STAYS EDITABLE AFTER THE BUILD: a built or rendered film is
+    // rebuilt from its board (generate mode='full' + project_id), so a
+    // redraft after a build is the normal loop, not an error (measured live,
+    // proj_120bdb3d: one data-only scene edit refused on a rendered film).
+    // Only a build or render in flight, or a failed project, is locked.
+    if (!EDITABLE_BOARD_STATES.has(existingProject.status)) {
       return { error: `Cannot revise storyboard: project is in '${existingProject.status}' state` };
     }
     storyboardPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
@@ -796,7 +805,7 @@ export function queueSurgicalSceneOp(
         : op.insert_at !== undefined ? "Authoring the new scene" : "Revising the scene" };
     const project = await loadProject(tenantId, projectId);
     if (!project?.storyboard?.scenes) throw new Error("Project has no storyboard");
-    if (project.status !== "storyboard" && project.status !== "draft") {
+    if (!EDITABLE_BOARD_STATES.has(project.status)) {
       throw new Error(`Cannot revise storyboard: project is in '${project.status}' state`);
     }
     let catalog: import("./llm/catalog.js").ComponentCatalogEntry[] | undefined;
@@ -1929,7 +1938,7 @@ export function createMcpServer(): McpServer {
   // re-photographed before the job completes.
   tool(
     "storyboard",
-    "Surgically edit ONE scene of a project's DRAFT storyboard (project status 'storyboard'/'draft') -- the per-scene grain of the golden workflow's iterate loop. Exactly one of: delete_index (remove that scene -- instant, data-only, no LLM), scene_index + feedback (re-author just that scene from the feedback), insert_at + feedback (author ONE new scene and splice it in at that position). All other scenes stay byte-identical, and the storyboard cards re-photograph before the job completes. Whole-board redrafts stay generate(mode='storyboard') + feedback. Indices are 0-based positions in the current board (check with get first if unsure). Returns a job -- poll with job(action='status').",
+    "Surgically edit ONE scene of a project's storyboard (before or after a build; a built film is rebuilt from its board with generate mode='full') -- the per-scene grain of the golden workflow's iterate loop. Exactly one of: delete_index (remove that scene -- instant, data-only, no LLM), scene_index + feedback (re-author just that scene from the feedback), insert_at + feedback (author ONE new scene and splice it in at that position). All other scenes stay byte-identical, and the storyboard cards re-photograph before the job completes. Whole-board redrafts stay generate(mode='storyboard') + feedback. Indices are 0-based positions in the current board (check with get first if unsure). Returns a job -- poll with job(action='status').",
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),

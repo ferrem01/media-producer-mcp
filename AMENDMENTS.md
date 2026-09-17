@@ -3587,3 +3587,13 @@ SPLIT. `splitScreenHeight(face)` is the one rule both callers use. Tests in
 `speaker-tall-layout.test.ts` and `creator-cut.test.ts`. Not touched: the
 narrated-screencast assembler (`screencast_source` films) still places a
 corner PiP on every canvas -- the next caller of the same rule.
+
+## The board stays editable after the build
+
+Measured live on proj_120bdb3d: a data-only scene edit (mark the beat-3 mocks
+as the split) was refused because the film was "rendered". The storyboard
+tool and the feedback redraft only accepted storyboard/draft projects, yet a
+built film is rebuilt from its board with generate mode='full' -- so editing
+the board after a build is the normal loop. `EDITABLE_BOARD_STATES` in
+`server.ts` now admits generated and rendered; only a build or render in
+flight, or a failed project, is locked. The tool text no longer says DRAFT.
