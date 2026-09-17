@@ -187,10 +187,24 @@ Missing (the build list):
    everything else. The lane owns the chest band (the band above the
    hairline when the face sits low), above the proof and a label. The
    empty-cast label from the scene's name is gone.
-   Still to come: idea cutaways (an image plus type plus a drawn mark on
-   the plate, for a claim no screen can prove); the evidence card;
-   annotations on cutaways; b-roll needs filled in-house; the black-and-
-   white beat; pills that land on the word.
+   **The idea beat** (built 2026-09-17, after the Gamma and Jesani ads): a
+   claim no screen can prove -- money, time, a person, a place, a feeling
+   -- gets a DRAWN OBJECT. It is a proof KIND on the existing needs, not a
+   grammar: `assets[]` type `illustration` (description = the one object
+   in one sentence, `at`/`until` word anchors, `focus`), drawn in-house
+   after media enrichment (portrait on a tall frame), marked provided, and
+   cut in on the claim's words through the same `proofComponents` path a
+   screenshot takes. Over it the writer casts the figure as a plated label
+   with `ring: true`: kinetic-text draws a hand-drawn loop around its own
+   line once the words land (the brand's secondary color). On hype-cut and
+   tempo-cut the same object rides BEHIND a type beat as the scene's
+   `hero_image` (already honored by enrichment) -- THE OBJECT BEHIND THE
+   WORDS -- and the director knows a story ad (pain, flip, payoff) is
+   hype-cut. Why not a grammar: a grammar is rhythm; Jesani's film would
+   switch grammars three times for three seconds each. The evidence to
+   split is an all-idea film that wants a different edit.
+   Still to come: the evidence card; annotations on cutaways; b-roll needs
+   filled in-house; the black-and-white beat; pills that land on the word.
 3. Layout under the busy edit; the ad pass (punchy, 30s) and the tutorial
    pass (calm, 75s) as the exit test.
 

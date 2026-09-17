@@ -22,7 +22,10 @@ export const PROOF_SURFACE_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|ema
 export function isProofSurface(type: unknown): boolean { return typeof type === "string" && PROOF_SURFACE_RE.test(type); }
 
 /** The kinds of proof a writer may ask for. */
-export const PROOF_TYPES: AssetRequirementType[] = ["screenshot", "screen_recording", "stock_footage", "mockup"];
+/** `illustration` is the IDEA BEAT (SPEC-creator-cut.md): a claim no screen
+ *  can prove asks for a drawn object -- the build draws it in-house from the
+ *  description and cuts it in on the claim's words like any other proof. */
+export const PROOF_TYPES: AssetRequirementType[] = ["screenshot", "screen_recording", "stock_footage", "mockup", "illustration"];
 
 /** What each kind is called in Studio. */
 export const NEED_LABELS: Partial<Record<AssetRequirementType, string>> = {
@@ -30,6 +33,7 @@ export const NEED_LABELS: Partial<Record<AssetRequirementType, string>> = {
   screen_recording: "Screen recording",
   stock_footage: "B-roll",
   mockup: "Product mock",
+  illustration: "Illustration (the build draws it)",
   camera_video: "Camera take",
 };
 

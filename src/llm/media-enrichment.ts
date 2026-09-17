@@ -24,6 +24,8 @@ export interface MediaEnrichmentOpts {
   projectId: string;
   llmConfig: LLMConfig;
   generateImages?: boolean;
+  /** A tall frame (9x16, 4x5) gets portrait stills, not landscape ones cropped. */
+  portrait?: boolean;
 }
 
 export interface MediaEnrichmentResult {
@@ -136,7 +138,7 @@ Rules:
     imageRequests.map(async (item) => {
       var imgPath = path.join(assetsDir, `hero_scene_${item.index + 1}.png`);
       console.log(`    Scene ${item.index + 1}: "${item.prompt.substring(0, 60)}..."`);
-      var size = "1536x1024", quality = "high";
+      var size = opts.portrait ? "1024x1536" : "1536x1024", quality = "high";
       var result = await generateImage({
         prompt: item.prompt,
         size: size as any,
