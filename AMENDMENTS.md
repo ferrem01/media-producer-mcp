@@ -3539,3 +3539,13 @@ human's list. Now the same block that draws illustrations fetches stock needs
 provided and cuts them in on their words. What the build cannot find stays a
 need for the human. Files: `pipeline.ts` (idea-beat block), `media/stock-footage.ts`
 (`orientation` option), `test/creator-cut.test.ts`.
+
+## The world beat (creator-cut contract line for stock b-roll)
+
+Three boards in a row from the founder-story brief never asked for stock
+footage, even when the brief named it beat by beat: the creator-cut contract
+told the writer about the drawn object (illustration) and nothing about found
+footage. Added THE WORLD BEAT beside THE IDEA BEAT in `storyboard-builder.ts`:
+a line about people or a place with no product surface asks for a
+`stock_footage` need that the build fetches and cuts in on the words, captions
+still running, no sticker. Test in `test/creator-cut.test.ts`.
