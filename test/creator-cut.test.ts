@@ -216,7 +216,13 @@ describe("the idea beat: a claim no screen can prove gets a drawn object (SPEC-c
     expect((cuts[0] as any).data.at).toBe("@million");
     // The pipeline draws it after media enrichment, portrait on a tall frame, and resolves its anchors against the scene's spine.
     const pipeline = await read("../src/llm/pipeline.ts");
-    expect(pipeline).toMatch(/if \(!need \|\| need\.type !== "illustration" \|\| need\.path \|\| need\.status === "provided"\) continue;/);
+    expect(pipeline).toMatch(/if \(need\.type !== "illustration" \|\| !canDraw\) continue;/);
+    // B-roll rides the same lane: a stock_footage need is fetched by the build (portrait on a tall frame) and cut in like any provided proof.
+    expect(pipeline).toMatch(/if \(need\.type === "stock_footage" && canFetchStock\) \{/);
+    expect(pipeline).toMatch(/orientation: canvas\.height > canvas\.width \? "portrait" : "landscape",/);
+    expect(pipeline).toMatch(/needs\.some\(\(n\) => madeHere\(n\) && n\.path === src\)/);
+    const stock = await read("../src/media/stock-footage.ts");
+    expect(stock).toMatch(/orientation: opts\.orientation \|\| "landscape",/);
     expect(pipeline).toMatch(/size: canvas\.height > canvas\.width \? "1024x1536" : "1536x1024"/);
     expect(pipeline).toMatch(/extractAnchors\(cut as any\);\s*if \(d\.spine\) resolveComponent\(cut as any, d\.spine\);/);
     expect(pipeline).toMatch(/portrait: canvas\.height > canvas\.width,/);

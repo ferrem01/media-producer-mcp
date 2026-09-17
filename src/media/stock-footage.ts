@@ -36,6 +36,8 @@ export interface StockFootageOpts {
   outputDir: string;
   /** Filename for the downloaded clip */
   filename?: string;
+  /** Frame orientation to search for (default landscape; tall frames ask for portrait) */
+  orientation?: "landscape" | "portrait";
 }
 
 /**
@@ -58,7 +60,7 @@ export async function fetchStockFootage(opts: StockFootageOpts): Promise<StockFo
     const params = new URLSearchParams({
       query: opts.query,
       per_page: "5",
-      orientation: "landscape",
+      orientation: opts.orientation || "landscape",
       size: "medium",
     });
 
