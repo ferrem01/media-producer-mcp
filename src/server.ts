@@ -1552,7 +1552,7 @@ export function createMcpServer(): McpServer {
         };
       });
       const studioUrl = previewUrl(params.tenant_id, params.project_id);
-      const takeUrl = studioUrl.replace("/studio?", "/take?") + (sceneIndex !== undefined ? `&scene=${sceneIndex}` : "");
+      const takeUrl = studioUrl.replace("/studio?", "/take?") + (sceneIndex !== undefined ? `&scene=${sceneIndex}` : "&scene=all");
       return ok({
         status: "waiting",
         job_id: job.id,

@@ -3561,3 +3561,14 @@ pipeline now folds `broll_query` into a `stock_footage` need and clears it.
 project but not the storyboard, so every need the build had filled (fetched
 clip, drawn illustration) still read "needed" in Studio. `server.ts` now copies
 the filled storyboard back, retargeted.
+
+## The whole-board prompter is a whole-board take
+
+Measured live on proj_120bdb3d: Marc opened the `take` tool's direct link
+(no scene in it), the prompter ran all seven scenes, and the server pinned the
+whole 49s recording to scene 1. The page only asked for the per-scene cut when
+the link said `?scene=all` (Studio's "Record all" button); the tool's own link
+never did. Not a regression of the split -- the direct link had always been
+this way; Studio's button was the path that worked. Now the page treats a
+whole-board prompter as a whole-board take, and the tool's link says
+`scene=all`. Files: `take-page.ts`, `server.ts`, `test/take-page.test.ts`.
