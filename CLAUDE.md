@@ -13,7 +13,7 @@ the **environment gotchas** that will otherwise cost you an hour.
   enforcement), `ARCHITECTURE.md`
   (data model — note it is partly stale: it still says `plan`/`brief`; current
   vocabulary is `storyboard`/`visual_notes`), `UNIFIED-CODEGEN-SPEC.md`,
-  `ROADMAP.md`, `SPEC-studio.md`, `SPEC-brand-extraction.md`.
+  `ROADMAP.md`, `SPEC-studio.md`, `SPEC-brand-extraction.md`, `SPEC-team.md` (who shares a tenant: invite, membership, company domain).
 - Running change log + open items: `AMENDMENTS.md`.
 
 ## What this is

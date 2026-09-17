@@ -1527,6 +1527,35 @@ export function createMcpServer(): McpServer {
   // ─────────────────────────────────────────────
 
   tool(
+    "team",
+    "Who shares this tenant (SPEC-team.md). Everyone at the same company domain lands in one tenant on login; action='invite' adds an email from outside it (or pre-approves one), action='remove' takes a member out (they get a tenant of their own on their next login), action='list' shows members and pending invites. Members see every project and the brand kit; there are no per-project permissions.",
+    {
+      tenant_id: z.string(),
+      action: z.enum(["list", "invite", "remove"]).default("list"),
+      email: z.string().optional().describe("The member to invite or remove (invite/remove only)."),
+    },
+    async (params, extra) => {
+      const { listTeam, inviteMember, removeMember } = await import("./auth/team-store.js");
+      const actor = String(extra?.authInfo?.extra?.email || "mcp@media-producer");
+      try {
+        if (params.action === "invite") {
+          if (!params.email) return err("email is required to invite");
+          const r = await inviteMember(params.tenant_id, params.email, actor);
+          return ok({ ...r, team: await listTeam(params.tenant_id) });
+        }
+        if (params.action === "remove") {
+          if (!params.email) return err("email is required to remove");
+          const r = await removeMember(params.tenant_id, params.email, actor);
+          return ok({ ...r, team: await listTeam(params.tenant_id) });
+        }
+        return ok(await listTeam(params.tenant_id));
+      } catch (e: any) {
+        return err(e?.message || String(e));
+      }
+    },
+  );
+
+  tool(
     "take",
     "Ask the human for a camera take of a SPEAKER or CREATOR-CUT film (SPEC-take-flow.md). Returns the Studio link to hand them (on a phone it is the phone Studio: what is still needed, Record on each scene, Upload; add scene_index to point the booth at one scene), the open needs, and a job that completes when the take lands -- poll job(action='status'). On arrival the file is sanitized (orientation, frame, dialogue loudness), attached as that scene's base, and the scene's need flips to provided. Then build with generate(mode='full') and render.",
     {

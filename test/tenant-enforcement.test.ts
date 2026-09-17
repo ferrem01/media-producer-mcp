@@ -112,7 +112,7 @@ describe("index.ts route coverage (source guards)", () => {
   });
 
   it("/mcp stamps req.auth so tools receive the session tenant", () => {
-    expect(src).toMatch(/\(req as any\)\.auth = \{ token, clientId: "mcp", scopes: \[\], extra: \{ tenantId: authedTenant \} \}/);
+    expect(src).toMatch(/\(req as any\)\.auth = \{ token, clientId: "mcp", scopes: \[\], extra: \{ tenantId: authedTenant, \.\.\.\(mcpEmail \? \{ email: mcpEmail \} : \{\}\) \} \}/);
   });
 
   it("tenant store path follows config.dataDir", () => {

@@ -63,7 +63,10 @@ import { protectedResourceMetadata, authorizationServerMetadata, registerClient,
 import { readTraces, dailyDigest } from "./trace/index.js";
 import { generateImage } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
+import { verifyToken } from "./auth/jwt.js";
 import { initTenantStoreFromFile, listTenants } from "./auth/tenant-store.js";
+import { initTeamStoreFromFile, listTeam, inviteMember, removeMember } from "./auth/team-store.js";
+import { getTeamHtml } from "./team-page.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
 import { solveMediaEdits, inferIntents, contractSceneToEdl } from "./core/media-edl.js";
@@ -406,6 +409,7 @@ async function main() {
   // /data/media-producer here silently split the registry from the data
   // whenever MP_DATA_DIR pointed elsewhere).
   initTenantStoreFromFile(path.join(config.dataDir, "_system", "tenants.json"));
+  initTeamStoreFromFile(path.join(config.dataDir, "_system", "team.json"));
 
   // Create MCP server
   const server = createMcpServer();
@@ -501,7 +505,8 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           // The SDK transport forwards req.auth to tool handlers as
           // extra.authInfo -- this is how tools learn (and enforce) WHICH
           // tenant the session belongs to. "*" = admin ops token.
-          (req as any).auth = { token, clientId: "mcp", scopes: [], extra: { tenantId: authedTenant } };
+          const mcpEmail = (verifyToken(token) as any)?.email as string | undefined;
+          (req as any).auth = { token, clientId: "mcp", scopes: [], extra: { tenantId: authedTenant, ...(mcpEmail ? { email: mcpEmail } : {}) } };
         }
 
         if (method === "POST") {
@@ -859,7 +864,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|take-poster|storyboard|provide-asset)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -885,6 +890,38 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getTakeHtml());
         return;
+      }
+
+      // ── Team page: who shares this tenant, invite, remove (SPEC-team.md). ──
+      if (urlPath === "/team") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getTeamHtml());
+        return;
+      }
+      // GET /api/team/{tenant} -> members + invites; POST {email} invites;
+      // DELETE {email} removes a member or withdraws an invite. The caller's
+      // tenant is enforced by the choke point above; the acting email is the
+      // session's (a bare tenant token acts as "studio@media-producer").
+      const teamMatch = urlPath.match(/^\/api\/team\/([^/]+)$/);
+      if (teamMatch) {
+        const teamTenant = decodeURIComponent(teamMatch[1]);
+        const actor = String((req as any).user?.email || "studio@media-producer");
+        try {
+          if (method === "GET") { jsonResponse(res, 200, await listTeam(teamTenant)); return; }
+          if (method === "POST" || method === "DELETE") {
+            let body: Record<string, unknown> = {};
+            try { body = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
+            const email = String(body.email || "");
+            if (!email) { jsonResponse(res, 400, { error: "email is required" }); return; }
+            const r = method === "POST" ? await inviteMember(teamTenant, email, actor) : await removeMember(teamTenant, email, actor);
+            console.log(`  team: ${actor} ${method === "POST" ? "invited" : "removed"} ${email} (${teamTenant}): ${(r as any).status}`);
+            jsonResponse(res, 200, { ...r, team: await listTeam(teamTenant) });
+            return;
+          }
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+          return;
+        }
       }
 
       // ── API: Remote deploy (opt-in via MP_DEPLOY_TOKEN) ──

@@ -4,7 +4,8 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
-import { findOrCreateTenant, getTenant } from "./tenant-store.js";
+import { getTenant } from "./tenant-store.js";
+import { resolveTenantForLogin } from "./team-store.js";
 import { createRefreshToken, rotateRefreshToken } from "./refresh-tokens.js";
 import { signToken, verifyToken } from "./jwt.js";
 import { redirectUriAllowed, getRegisteredClient } from "./mcp-oauth.js";
@@ -230,7 +231,9 @@ export async function handleGoogleCallback(req: IncomingMessage, res: ServerResp
       return;
     }
 
-    const user = await findOrCreateTenant(userInfo.email, userInfo.name, userInfo.picture);
+    // THE TEAM TENANT (SPEC-team.md): an invite, a membership, or the
+    // company domain decides which tenant this login lands in.
+    const user = await resolveTenantForLogin(userInfo.email, userInfo.name, userInfo.picture);
     // A tenant exists ON DISK from its first login -- lazily-created dirs
     // made login-only tenants invisible (`ls` of the data dir showed nothing,
     // reading as "no tenant was created" when it had been).

@@ -1108,6 +1108,7 @@ export function getPreviewHtml(): string {
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <button class="btn btn-secondary" id="brand-btn" style="display:none;" title="View and edit this tenant's brand kit: colors, voice, logos, assets">&#127912; Brand</button>
+      <a class="btn btn-secondary" id="team-btn" style="display:none;text-decoration:none;" title="Who shares this tenant: invite a colleague, remove a member">&#128101; Team</a>
       <span id="render-wrap" style="display:none;align-items:center;gap:8px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
         <button class="btn btn-primary" id="render-menu-btn" title="Render options">&#9662;</button>
@@ -8186,6 +8187,13 @@ export function getPreviewHtml(): string {
   function showBrandBtn() {
     var b = document.getElementById('brand-btn');
     if (b) b.style.display = '';
+    // The Team page shares the tenant (and the link's token, when there is one).
+    var t = document.getElementById('team-btn');
+    if (t && state.tenantId) {
+      var tok = new URLSearchParams(window.location.search).get('token');
+      t.href = '/team?tenant=' + encodeURIComponent(state.tenantId) + (tok ? '&token=' + encodeURIComponent(tok) : '');
+      t.style.display = '';
+    }
   }
   var params = new URLSearchParams(window.location.search);
   var tenantParam = params.get('tenant');
