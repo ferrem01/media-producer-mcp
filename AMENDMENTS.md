@@ -3572,3 +3572,18 @@ never did. Not a regression of the split -- the direct link had always been
 this way; Studio's button was the path that worked. Now the page treats a
 whole-board prompter as a whole-board take, and the tool's link says
 `scene=all`. Files: `take-page.ts`, `server.ts`, `test/take-page.test.ts`.
+
+## The split: screen top, person bottom, on tall frames
+
+From the founder-story reference (the laptop beat: product floating over the
+over-the-shoulder shot) and Marc's second example (talking head under a
+screencast). Neither existed: a creator-cut proof was a full-frame cutaway or
+nothing, and a speaker screencast on 9x16 was the desktop picture with a corner
+bubble. Added `use: "split"` as the third placement on a proof need (types,
+normalizer, cast), the layout slot in the tall-frame recipe, the speaker
+screencast template's tall-canvas branch (recording in the top band, no PiP,
+scene transparent so the person shows), and the writer's contract line THE
+SPLIT. `splitScreenHeight(face)` is the one rule both callers use. Tests in
+`speaker-tall-layout.test.ts` and `creator-cut.test.ts`. Not touched: the
+narrated-screencast assembler (`screencast_source` films) still places a
+corner PiP on every canvas -- the next caller of the same rule.

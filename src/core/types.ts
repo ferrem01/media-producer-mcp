@@ -570,8 +570,10 @@ export interface AssetRequirement {
   // ── Proof on a claim (SPEC-creator-cut.md): the four things a proof adds
   // to a plain need. Written by the storyboard writer, read by the build.
   /** cutaway (default): takes the frame for the beat, hard cut in and out.
-   *  card: floats over the person on a plate. */
-  use?: "cutaway" | "card";
+   *  card: floats over the person on a plate.
+   *  split: on a tall frame the screen owns the top of the frame and the
+   *  person stays under it (the talking-head-under-the-screen shape). */
+  use?: "cutaway" | "card" | "split";
   /** When it enters -- a word anchor ("@dashboard") or scene seconds. */
   at?: string | number;
   /** When it leaves -- a word anchor or scene seconds (omit = the claim's end). */

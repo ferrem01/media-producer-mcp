@@ -251,3 +251,16 @@ A `stock_footage` need is the idea beat's moving twin: the build fetches it
 drawn illustration or a provided screenshot. The human records only what the
 build cannot find: the on-camera lines, and any shot of themselves (the
 over-the-shoulder laptop shot in the founder-story reference).
+
+## The split
+
+The third `use` on a proof, beside `cutaway` and `card`: on a tall frame the
+screen owns the top of the frame, flush, and the person owns the bottom,
+captions on the person. It is the talking-head-under-the-screen shape every
+"creator at a laptop" ad uses, and what a screencast IS on a phone. One rule
+(`splitScreenHeight` in `scene-generator.ts`), two callers: a creator-cut
+proof marked `use: "split"` (on the need, or in a library mock's data when the
+mock is the proof), and the speaker screencast template on a tall canvas,
+which drops the corner bubble for it. The screen's bottom edge comes from the
+face: it ends above the hairline, never under 34% nor over 55%. Short claims
+stay cutaways; the split is for the beat that lingers on the screen.

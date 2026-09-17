@@ -74,7 +74,7 @@ export function normalizeAssetNeeds(raw: unknown): AssetRequirement[] {
     if (gen) need.generation_prompt = gen;
     else if (type === "stock_footage" || type === "mockup") need.generation_prompt = description;
     const use = String((e as any).use || "").trim().toLowerCase();
-    if (use === "card" || use === "cutaway") need.use = use;
+    if (use === "card" || use === "cutaway" || use === "split") need.use = use;
     for (const k of ["at", "until"] as const) {
       const v = (e as any)[k];
       if (typeof v === "number" && Number.isFinite(v)) need[k] = v;
@@ -137,6 +137,8 @@ export function proofComponents(scene: StoryboardScene): Array<Record<string, un
     const media = assetMedia(need.path);
     if (!media) continue;
     const data: Record<string, unknown> = { src: need.path };
+    // THE SPLIT rides on the component: the tall-frame layout reads it.
+    if (need.use === "split") data.use = "split";
     if (need.at !== undefined) data.at = need.at;
     if (need.until !== undefined) data.exit_at = need.until;
     if (media === "image") data.drift = false;
