@@ -6,6 +6,38 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-17 — The idea beat: a drawn object for a claim no screen can prove
+
+Two more reference Story ads (Gamma: headlines over an illustrated clock,
+balloons, a laptop in clouds; Cursor: one Slack thread carrying the ad)
+plus Jesani's photo-and-circle cutaways. Run unpinned, the Gamma brief
+came back as tempo-cut with every type beat on a bare dark field: the
+writer had no way to ask for an object. The Cursor brief came back as a
+canvas-tour on one slack-workspace, buildable as-is (the deploy smoke
+film from here).
+
+Decided with Marc: NOT a grammar ("idea cut") -- a grammar is rhythm, and
+Jesani's film would switch grammars three times for three seconds each.
+A proof KIND on the existing needs instead:
+- `asset-needs.ts`: `illustration` joins PROOF_TYPES (the type already
+  existed on AssetRequirementType); label "Illustration (the build draws
+  it)".
+- `pipeline.ts`: after media enrichment, on a person grammar, every
+  `illustration` need with no file is drawn with `generateImage` (portrait
+  on a tall frame), saved to the project's assets, marked provided, cast
+  through `proofComponents` and its anchors resolved against the scene's
+  spine (the spine pass already ran). Enrichment gets `portrait` so the
+  writer's `hero_image` stills fit a tall frame too.
+- `kinetic-text`: `ring: true` draws a hand-drawn loop around the LINE
+  (the container that hugs the words, not the slot) once the words land,
+  stroke in the brand's secondary; `ring_at`, `ring_color`.
+- Writer: creator-cut THE IDEA BEAT (need + plated label + ring);
+  hype-cut and tempo-cut THE OBJECT BEHIND THE WORDS (`hero_image` on a
+  type beat, two or three per film); the grammar-contract test made both
+  say "the world's display type", not the component's name.
+- Director: a story ad (pain, flip, payoff in big lines over objects) is
+  hype-cut, not tempo-cut.
+
 ## 2026-09-16 — The first full end-to-end creator-cut film: four defects, four rules
 
 proj_f10e79cf: fresh board, one recording, built and rendered with no

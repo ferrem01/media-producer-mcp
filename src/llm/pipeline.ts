@@ -32,7 +32,8 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface } from "../core/asset-needs.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
-import { applySpine } from "../core/word-anchors.js";
+import { applySpine, extractAnchors, resolveComponent } from "../core/word-anchors.js";
+import { generateImage } from "../media/image-gen.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
 import { loadProject, saveProject, createProject } from "../persistence/project.js";
@@ -3134,11 +3135,60 @@ async function runUnifiedPipeline(
     projectId,
     llmConfig: opts.llmConfig,
     generateImages: opts.generateImages,
+    portrait: canvas.height > canvas.width,
   });
   if (enrichResult.project) {
     project = enrichResult.project;
   }
   trace?.endEvent({ images: enrichResult.imageUrls.size });
+
+  // THE IDEA BEAT (SPEC-creator-cut.md): a claim no screen can prove asks
+  // for an ILLUSTRATION on its needs (assets[] type "illustration"); the
+  // build draws it here, in-house, and cuts it in on the claim's words
+  // exactly as a provided screenshot would -- the same need, the same cast
+  // (proofComponents), its anchors resolved against the scene's spine
+  // (the person-grammar pass above already ran applySpine). Measured live
+  // on the two reference ads with no product screen (Jesani's "$1.4
+  // million" portrait, Gamma's clock and balloons): the writer had no way
+  // to ask for an object and the film was headlines alone.
+  if (personCarries(filmGrammar) && opts.generateImages !== false && process.env.OPENAI_API_KEY) {
+    const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
+    let drawn = 0;
+    let sceneNo = 0;
+    for (const d of storyboard.scenes as any[]) {
+      const i = sceneNo++;
+      const needs: any[] = Array.isArray(d.assets) ? d.assets : [];
+      for (const need of needs) {
+        if (!need || need.type !== "illustration" || need.path || need.status === "provided") continue;
+        try {
+          await fs.mkdir(assetsDir, { recursive: true });
+          const prompt = `${String(need.description || "").trim()}. ${need.focus ? `The eye goes to: ${String(need.focus).trim()}. ` : ""}A single clear subject, flat illustrated art with soft depth, one palette, generous empty margin around the subject, no text, no letters, no logos.`;
+          const r = await generateImage({ prompt, size: canvas.height > canvas.width ? "1024x1536" : "1536x1024", quality: "high", outputPath: path.join(assetsDir, `idea_scene_${i + 1}_${drawn + 1}.png`) });
+          need.path = `/assets/${opts.tenant_id}/projects/${projectId}/assets/${path.basename(r.path)}`;
+          need.status = "provided";
+          drawn++;
+          console.log(`  Idea beat: scene ${i + 1} -- drew "${String(need.description).slice(0, 60)}" -> ${path.basename(r.path)}`);
+        } catch (e: any) {
+          console.warn(`  Idea beat: scene ${i + 1} -- could not draw "${String(need.description).slice(0, 60)}": ${e?.message || e}`);
+        }
+      }
+      if (!Array.isArray(d.components)) d.components = [];
+      const already = new Set((d.components as any[]).map((c) => c && typeof c === "object" && c.data ? String(c.data.src || "") : ""));
+      for (const cut of proofComponents(d)) {
+        const src = String((cut as any).data?.src);
+        if (!src || already.has(src) || !needs.some((n) => n && n.type === "illustration" && n.path === src)) continue;
+        extractAnchors(cut as any);
+        if (d.spine) resolveComponent(cut as any, d.spine);
+        const dur = Number(d.duration_seconds) || 0;
+        const c: any = cut;
+        if (typeof c.data.at !== "number") c.data.at = Math.round(dur * 0.3 * 100) / 100;
+        if (typeof c.data.exit_at !== "number") c.data.exit_at = Math.round(dur * 0.8 * 100) / 100;
+        d.components.push(cut);
+        console.log(`  Idea beat: scene ${i + 1} -- the illustration cuts in at ${c.data.at}s, out at ${c.data.exit_at}s`);
+      }
+    }
+    if (drawn) console.log(`  Idea beat: ${drawn} illustration(s) drawn in-house`);
+  }
 
   // 3b. Stock footage / b-roll backgrounds -- storyboard builder-decided per scene.
   // The storyboard builder tags scenes with a broll_query when real motion footage belongs

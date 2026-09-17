@@ -200,6 +200,44 @@ describe("proof on the board: the needs a claim asks for", () => {
   });
 });
 
+describe("the idea beat: a claim no screen can prove gets a drawn object (SPEC-creator-cut.md)", () => {
+  it("is a proof KIND on the existing needs, not a grammar: illustration, drawn in-house, cut in on the words", async () => {
+    const { PROOF_TYPES, NEED_LABELS, normalizeAssetNeeds, proofComponents } = await import("../src/core/asset-needs.js");
+    expect(PROOF_TYPES).toContain("illustration");
+    expect(NEED_LABELS.illustration).toMatch(/Illustration/);
+    const needs = normalizeAssetNeeds([{ type: "illustration", description: "A stack of cash on a plain ground", at: "@million", until: "@avoidable", focus: "the stack" }]);
+    expect(needs).toHaveLength(1);
+    expect(needs[0].status).toBe("needed");
+    // Drawn: the build fills path + status, and the same cast as a provided screenshot cuts it in.
+    const drawn = { ...needs[0], path: "/assets/t/projects/p/assets/idea_scene_1_1.png", status: "provided" as const };
+    const cuts = proofComponents({ assets: [drawn] } as any);
+    expect(cuts).toHaveLength(1);
+    expect(cuts[0].type).toBe("image");
+    expect((cuts[0] as any).data.at).toBe("@million");
+    // The pipeline draws it after media enrichment, portrait on a tall frame, and resolves its anchors against the scene's spine.
+    const pipeline = await read("../src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/if \(!need \|\| need\.type !== "illustration" \|\| need\.path \|\| need\.status === "provided"\) continue;/);
+    expect(pipeline).toMatch(/size: canvas\.height > canvas\.width \? "1024x1536" : "1536x1024"/);
+    expect(pipeline).toMatch(/extractAnchors\(cut as any\);\s*if \(d\.spine\) resolveComponent\(cut as any, d\.spine\);/);
+    expect(pipeline).toMatch(/portrait: canvas\.height > canvas\.width,/);
+    // The writer's law, on creator-cut; the object behind the words on hype-cut and tempo-cut; the director knows a story ad.
+    const sb = await read("../src/llm/storyboard-builder.ts");
+    expect(sb).toMatch(/THE IDEA BEAT, WHEN NO SCREEN CAN PROVE IT: a claim about money, time, a person, a place or a feeling has no product surface/);
+    expect(sb).toMatch(/\{type: "illustration", description: the one object in one sentence/);
+    expect(sb).toMatch(/with "ring": true so a hand-drawn loop circles it once it lands/);
+    expect((sb.match(/THE OBJECT BEHIND THE WORDS/g) || []).length).toBe(2);
+    const cd = await read("../src/llm/creative-director.ts");
+    expect(cd).toMatch(/STORY ADS \(pain, flip, payoff in a few big lines over illustrated objects/);
+    // The ring is the type's own: kinetic-text draws a loop around its line once the words land.
+    const kt = await read("../src/components/titles/kinetic-text.component.html");
+    expect(kt).toMatch(/if \(data\.ring\) \{/);
+    expect(kt).toMatch(/tl\.to\(rp, \{ strokeDashoffset: 0, duration: 0\.55, ease: 'power2\.inOut' \}, ringAt\);/);
+    expect(kt).toMatch(/var host = container;/);
+    const schema = JSON.parse(await read("../src/components/titles/kinetic-text.schema.json"));
+    expect(schema.data.ring).toBeTruthy();
+  });
+});
+
 describe("the cut, the words, and the camera (Marc: motion graphics by default, the voice never stops)", () => {
   it("a directed entrance or exit lands on a word like any data time", async () => {
     const { extractAnchors, resolveComponent, assertedSpine } = await import("../src/core/word-anchors.js");
