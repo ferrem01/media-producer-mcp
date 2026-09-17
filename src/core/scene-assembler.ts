@@ -33,6 +33,13 @@ export function isCutInProof(comp: { type: string; enter?: any }): boolean {
  *  proj_9e650f1a scenes 6-7: the captions in the platform strip). */
 const FIXED_TO_FRAME = new Set(["reel-caption-lane"]);
 export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
+/** THE SPLIT (SPEC-creator-cut.md): a proof whose data says use:"split"
+ *  owns the top band of a tall frame and is PINNED to the frame like the
+ *  lane -- the rig slides the person under it, never it. */
+export function isSplitWrapper(comp: { data?: unknown }): boolean {
+  const d = comp && (comp as any).data;
+  return !!d && typeof d === "object" && String((d as any).use || "") === "split";
+}
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
@@ -236,7 +243,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""}${isFixedToFrame(comp.type) ? ` data-mp-fixed="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""}${isFixedToFrame(comp.type) || isSplitWrapper(comp) ? ` data-mp-fixed="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
       `    ${boundHtml}\n` +
       `  </div>`
     );
@@ -686,6 +693,7 @@ export function wrapperChoreoScript(
       enter: c.enter || null,
       exit: c.exit || null,
       frame: (c as any).frame_anchor || null,
+      split: isSplitWrapper(c),
       cutTop: (c as any).data?.cut_top != null ? Number((c as any).data.cut_top) : null,
       top0: c.position && (c.position as any).y !== undefined ? String((c.position as any).y) : null,
       height0: c.position && (c.position as any).height !== undefined ? String((c.position as any).height) : null,
@@ -730,6 +738,11 @@ export function wrapperChoreoScript(
       // frame the same way, and the scaled wrapper always still covers the
       // box it was given.
       var sc = Math.max(1.2, Math.min(2.2, (W * 0.94 / r.w) * 1.5));
+      // A SHORT wrapper (the split's band, under 60% of the frame) fills its
+      // HEIGHT with the region, cropped from the left like the reference
+      // films crop a desktop screen (measured: three rows of a list at the
+      // top of the band and the rest white).
+      if (H < CH * 0.6) sc = Math.max(sc, Math.min(3.2, (H * 0.88) / r.h));
       var pad = 24;
       var tx = r.w * sc <= W ? W / 2 - (r.x + r.w / 2) * sc : pad - r.x * sc;
       var ty = r.h * sc <= H * 0.8 ? H * 0.4 - (r.y + r.h / 2) * sc : H * 0.08 - r.y * sc;
@@ -819,7 +832,16 @@ export function wrapperChoreoScript(
         var eFrom = OFF[c.enter.effect] || OFF['fade'];
         var eAt = c.enter.at || 0;
         var eDur = eCut ? CUT : (c.enter.duration || 0.8);
-        if (eCut && c.frame) {
+        if (eCut && c.split) {
+          // THE SPLIT ARRIVES: the band slides down from above the frame on
+          // the same half second the rig slides the person under it, and
+          // lands on its framing (function values, first render at the cut).
+          var frS = (function(node, name) { return function() { return name ? frameOf(node, name) : { scale: 1, x: 0, y: 0 }; }; })(el, c.frame);
+          master.fromTo(el, { yPercent: -115, autoAlpha: 1 },
+            { yPercent: 0, transformOrigin: '0 0', x: function() { return frS().x; }, y: function() { return frS().y; }, scale: function() { return frS().scale; },
+              autoAlpha: 1, duration: 0.55, ease: 'power3.out', immediateRender: true,
+              onStart: function() { try { el.setAttribute('data-mp-framed', frS().scale.toFixed(2)); } catch (e) {} } }, eAt);
+        } else if (eCut && c.frame) {
           // The cut only shows the wrapper; the framing tween (function
           // values, first render at the cut) places it.
           master.fromTo(el, eFrom, { autoAlpha: 1, duration: eDur, ease: 'none', immediateRender: true }, eAt);
@@ -848,7 +870,13 @@ export function wrapperChoreoScript(
         var xTo = OFF[c.exit.effect] || OFF['fade'];
         var xDur = xCut ? CUT : (c.exit.duration || 0.8);
         var xAt = c.exit.at != null ? c.exit.at : Math.max(0, DUR - xDur - 0.1);
-        master.to(el, Object.assign({ duration: xDur, ease: xCut ? 'none' : (c.exit.ease || 'power3.in') }, xTo), xAt);
+        if (xCut && c.split) {
+          // THE SPLIT LEAVES: the band lifts out the way it came while the
+          // rig brings the person back up.
+          master.to(el, { yPercent: -115, duration: 0.45, ease: 'power3.in' }, xAt);
+        } else {
+          master.to(el, Object.assign({ duration: xDur, ease: xCut ? 'none' : (c.exit.ease || 'power3.in') }, xTo), xAt);
+        }
       }
     });
   })();
@@ -871,7 +899,7 @@ export function backdropOverscan(moves: import("./types.js").CameraMove[]): numb
   let rotated = false;
   for (const m of moves) {
     if (m.type === "reset") { held = 1; continue; }
-    if (m.type === "zoom") held = Math.max(1, Number(m.scale) || 1);
+    if (m.type === "zoom" || m.type === "slide") held = Math.max(1, Number(m.scale) || 1);
     if (m.type === "rotate" || m.angle) rotated = true;
     const s = held;
     for (const p of [Number(m.x), Number(m.y)]) {
@@ -1209,7 +1237,12 @@ export function cameraMovesScript(
         }
         var to;
         if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0, rotationX: 0, rotationY: 0 };
-        else {
+        else if (m.type === 'slide') {
+          // THE SLICE UNDER THE SCREEN (creator-cut split): shift the scene
+          // by dy% of the height at the given scale, no cover clamp -- the
+          // pinned screen band covers what the shift exposes at the top.
+          to = { scale: Math.max(1, Number(m.scale) || 1), x: 0, y: ((Number(m.dy) || 0) / 100) * CH, rotation: 0, rotationX: 0, rotationY: 0 };
+        } else {
           var sc;
           if (m.type === 'zoom' && m.w && m.h) {
             // Drawn box: zoom so the outlined region just fills the rig frame.

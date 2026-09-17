@@ -39,6 +39,7 @@ import {
   mediaEdlScript,
   timelapseClockScript,
   isCutInProof,
+  isSplitWrapper,
   isFixedToFrame,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
@@ -212,7 +213,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       }
 
       componentBlocks.push(
-        `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""}${isCutInProof(comp) ? ' data-mp-cutaway="1"' : ""}${isFixedToFrame(comp.type) ? ' data-mp-fixed="1"' : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
+        `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""}${isCutInProof(comp) ? ' data-mp-cutaway="1"' : ""}${isFixedToFrame(comp.type) || isSplitWrapper(comp) ? ' data-mp-fixed="1"' : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
         `      ${boundHtml}\n` +
         `    </div>`
       );

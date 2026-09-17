@@ -260,3 +260,41 @@ describe("a speaker screencast on a tall canvas is the split, not a bubble", () 
     expect(wide.transparent_background).toBe(false);
   });
 });
+
+describe("THE SLICE UNDER THE SCREEN: the rig slides the person under the split, the band slides in", () => {
+  it("a selfie take slides down a few percent with no zoom; a face that would move up zooms just enough to cover", async () => {
+    const { splitSlide } = await import("../src/llm/scene-generator.js");
+    expect(splitSlide({ cx: 0.5, cy: 0.5, size: 0.39 })).toEqual({ dy: 7, scale: 1 });   // hairline 30.5% -> under a 34% band
+    expect(splitSlide({ cx: 0.7, cy: 0.62, size: 0.3 })).toEqual({ dy: 0, scale: 1 });   // over the shoulder: already under a 44% band
+    expect(splitSlide({ cx: 0.5, cy: 0.75, size: 0.3 })).toEqual({ dy: -2, scale: 1.04 }); // face low: up 2%, zoom covers the bottom
+    expect(splitSlide(undefined)).toEqual({ dy: 0, scale: 1 });
+  });
+  it("the creator-cut camera slides on a split cut (instead of resetting) and comes back to the face after", async () => {
+    const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
+    const moves = creatorCutCameraMoves([
+      { type: "quotient-campaign", data: { use: "split" }, enter: { effect: "cut", at: 4 }, exit: { effect: "cut", at: 12 } },
+    ] as any, { grammar: "creator-cut", face: { cx: 0.5, cy: 0.5, size: 0.39 }, duration: 16, takeover: false })!;
+    const slide = moves.find((m) => m.type === "slide") as any;
+    expect(slide).toMatchObject({ at: 4, dy: 7, scale: 1, duration: 0.55 });
+    expect(moves.some((m) => m.type === "reset" && m.at === 4)).toBe(false);
+    expect(moves.some((m) => m.type === "zoom" && m.at === 12)).toBe(true);
+  });
+  it("the split band is pinned to the frame, slides in from above and lifts out; a short band fills its height", async () => {
+    const { wrapperChoreoScript, isSplitWrapper } = await import("../src/core/scene-assembler.js");
+    expect(isSplitWrapper({ data: { use: "split" } })).toBe(true);
+    expect(isSplitWrapper({ data: { src: "x.png" } })).toBe(false);
+    const js = wrapperChoreoScript([
+      { id: "c1", type: "video", data: { src: "/a/rec.mp4", use: "split" }, position: { x: "0%", y: "0%", width: "100%", height: "44%" }, enter: { effect: "cut", at: 2 }, exit: { effect: "cut", at: 9 } } as any,
+    ], 12, "", 1080, 1920);
+    expect(js).toMatch(/"split":true/);
+    expect(js).toMatch(/if \(eCut && c\.split\) \{[\s\S]*yPercent: -115, autoAlpha: 1/);
+    expect(js).toMatch(/if \(xCut && c\.split\) \{[\s\S]*yPercent: -115, duration: 0\.45/);
+    expect(js).toMatch(/if \(H < CH \* 0\.6\) sc = Math\.max\(sc, Math\.min\(3\.2, \(H \* 0\.88\) \/ r\.h\)\);/);
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile(new URL("../src/core/scene-assembler.ts", import.meta.url), "utf-8");
+    expect(src).toMatch(/isFixedToFrame\(comp\.type\) \|\| isSplitWrapper\(comp\) \? ` data-mp-fixed="1"`/);
+    expect(src).toMatch(/else if \(m\.type === 'slide'\) \{/);
+    const comp = await fs.readFile(new URL("../src/core/composite-assembler.ts", import.meta.url), "utf-8");
+    expect(comp).toMatch(/isFixedToFrame\(comp\.type\) \|\| isSplitWrapper\(comp\) \? ' data-mp-fixed="1"'/);
+  });
+});
