@@ -3549,3 +3549,15 @@ footage. Added THE WORLD BEAT beside THE IDEA BEAT in `storyboard-builder.ts`:
 a line about people or a place with no product surface asks for a
 `stock_footage` need that the build fetches and cuts in on the words, captions
 still running, no sticker. Test in `test/creator-cut.test.ts`.
+
+## Founder-story build: b-roll is a need on a person film; the filled board copies back
+
+Measured on proj_120bdb3d (the founder-story creator-cut). Two faults: (1) the
+writer put a `broll_query` on the two b-roll beats, which routes a scene to
+freeform codegen (the authored recipe refuses drafts with one) -- the caption
+lane vanished and the stock need was ignored. On person-carried grammars the
+pipeline now folds `broll_query` into a `stock_footage` need and clears it.
+(2) Build-from-board copied scenes, audio and assets back to the original
+project but not the storyboard, so every need the build had filled (fetched
+clip, drawn illustration) still read "needed" in Studio. `server.ts` now copies
+the filled storyboard back, retargeted.

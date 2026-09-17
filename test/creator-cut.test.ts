@@ -221,6 +221,11 @@ describe("the idea beat: a claim no screen can prove gets a drawn object (SPEC-c
     expect(pipeline).toMatch(/if \(need\.type === "stock_footage" && canFetchStock\) \{/);
     expect(pipeline).toMatch(/orientation: canvas\.height > canvas\.width \? "portrait" : "landscape",/);
     expect(pipeline).toMatch(/c\.data\.at = isFootage \? 0 : Math\.round\(dur \* 0\.3 \* 100\) \/ 100;/);
+    // A writer's broll_query on a person-carried film becomes a stock_footage need (never the codegen channel, which would drop the lane).
+    expect(pipeline).toMatch(/d\.assets\.push\(\{ type: "stock_footage", description: q, status: "needed"/);
+    // Build-from-board copies the filled storyboard back, so fetched needs read "provided" on the original project.
+    const server = await read("../src/server.ts");
+    expect(server).toMatch(/origProject\.storyboard = retarget\(generatedProject\.storyboard\)/);
     expect(pipeline).toMatch(/needs\.some\(\(n\) => madeHere\(n\) && n\.path === src\)/);
     const stock = await read("../src/media/stock-footage.ts");
     expect(stock).toMatch(/orientation: opts\.orientation \|\| "landscape",/);
