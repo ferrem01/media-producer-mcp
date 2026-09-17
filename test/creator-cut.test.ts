@@ -220,6 +220,7 @@ describe("the idea beat: a claim no screen can prove gets a drawn object (SPEC-c
     // B-roll rides the same lane: a stock_footage need is fetched by the build (portrait on a tall frame) and cut in like any provided proof.
     expect(pipeline).toMatch(/if \(need\.type === "stock_footage" && canFetchStock\) \{/);
     expect(pipeline).toMatch(/orientation: canvas\.height > canvas\.width \? "portrait" : "landscape",/);
+    expect(pipeline).toMatch(/c\.data\.at = isFootage \? 0 : Math\.round\(dur \* 0\.3 \* 100\) \/ 100;/);
     expect(pipeline).toMatch(/needs\.some\(\(n\) => madeHere\(n\) && n\.path === src\)/);
     const stock = await read("../src/media/stock-footage.ts");
     expect(stock).toMatch(/orientation: opts\.orientation \|\| "landscape",/);
@@ -229,6 +230,7 @@ describe("the idea beat: a claim no screen can prove gets a drawn object (SPEC-c
     // The writer's law, on creator-cut; the object behind the words on hype-cut and tempo-cut; the director knows a story ad.
     const sb = await read("../src/llm/storyboard-builder.ts");
     expect(sb).toMatch(/THE IDEA BEAT, WHEN NO SCREEN CAN PROVE IT: a claim about money, time, a person, a place or a feeling has no product surface/);
+    expect(sb).toMatch(/THE WORLD BEAT, WHEN THE LINE IS ABOUT PEOPLE OR A PLACE:.*\{type: "stock_footage"/);
     expect(sb).toMatch(/\{type: "illustration", description: the one object in one sentence/);
     expect(sb).toMatch(/with "ring": true so a hand-drawn loop circles it once it lands/);
     expect((sb.match(/THE OBJECT BEHIND THE WORDS/g) || []).length).toBe(2);
