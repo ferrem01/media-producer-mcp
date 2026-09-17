@@ -189,5 +189,7 @@ describe("the server side", () => {
     // every scene link prompted the whole board).
     expect(html).toMatch(/\/\^\\d\+\$\/\.test\(qp\.get\('scene'\)/);
     expect(html).toMatch(/scene_index: recordAll \? 'all' : \(sceneIndex >= 0 \? sceneIndex : undefined\)/);
+    // Whenever the prompter shows the whole board, the take covers the whole board (the server cuts it per scene).
+    expect(html).toMatch(/var recordAll = qp\.get\('scene'\) === 'all' \|\| sceneIndex < 0;/);
   });
 });

@@ -176,9 +176,12 @@ export function getTakeHtml(): string {
   // reached the browser as "d" -- measured live, every scene link showed
   // the whole board.)
   var sceneIndex = /^\\d+$/.test(qp.get('scene') || '') ? Number(qp.get('scene')) : -1, sceneLabel = '';
-  // ?scene=all: one recording through every scene; the server cuts it per
-  // scene where each scene's script begins.
-  var recordAll = qp.get('scene') === 'all';
+  // One recording through every scene; the server cuts it per scene where
+  // each scene's script begins. That is what the page IS whenever it shows
+  // the whole board (no scene in the link, or ?scene=all) -- measured live:
+  // a link without a scene prompted all seven scenes and then pinned the
+  // whole 49s take to scene 1.
+  var recordAll = qp.get('scene') === 'all' || sceneIndex < 0;
   var WORDS_PER_SEC = 2.4;
 
   function show(id) {
