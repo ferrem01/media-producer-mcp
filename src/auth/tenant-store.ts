@@ -112,3 +112,12 @@ export async function listTenants(): Promise<Tenant[]> {
   ensureLoaded();
   return [...cache.values()];
 }
+
+/** Point a person's record at another tenant (team membership, SPEC-team.md). */
+export async function setTenantIdForEmail(email: string, tenantId: string): Promise<void> {
+  ensureLoaded();
+  const t = cache.get(email);
+  if (!t || t.tenantId === tenantId) return;
+  t.tenantId = tenantId;
+  persist();
+}

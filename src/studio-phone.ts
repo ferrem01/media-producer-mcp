@@ -232,6 +232,9 @@ export function getPhoneStudioHtml(): string {
     }
 
     var top = $('topActions'); top.innerHTML = '';
+    var teamA = document.createElement('a'); teamA.className = 'btn small'; teamA.textContent = 'Team';
+    teamA.href = '/team?tenant=' + encodeURIComponent(tenant) + (token ? '&token=' + encodeURIComponent(token) : '');
+    top.appendChild(teamA);
     if (speaker) {
       var lined = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
       if (lined > 1) {

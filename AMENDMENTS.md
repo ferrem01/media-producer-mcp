@@ -3617,3 +3617,12 @@ sat as three rows at the top of the band with the rest white. Three rules:
   board; the assembler plays a split's cut as the slide.
 - THE FRAMING: a short wrapper (under 60% of the frame) fills its height
   with the anchor region, cropped from the left, capped at 3.2x.
+
+## Team access to a tenant (SPEC-team.md)
+
+Marc: "only I can see my projects" -- correct, a tenant was one email. Now a
+tenant has members: an invite, a membership, or the company domain decides
+where a login lands; consumer domains stay per-email; the founder's existing
+tenant becomes the company's so nothing moves. `/api/team`, the `/team`
+page from both Studios, and the `team` MCP tool list, invite and remove.
+Everyone in a tenant sees everything; the tenant switcher is not built.
