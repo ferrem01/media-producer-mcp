@@ -198,6 +198,8 @@ export interface MusicOption {
   license: string;
   /** What the browser can play to preview it. */
   preview_url: string;
+  /** Where the build fetches the file (Jamendo only; the others are local). */
+  download_url?: string;
   moods?: string[];
 }
 
@@ -253,7 +255,7 @@ export async function listMusicOptions(opts: { tenantId: string; brandKit?: Bran
     }
     // Jamendo ships names HTML-escaped ("Axl &amp; Arth"); Studio escapes again.
     const plain = (v: string) => String(v || "").replace(/&amp;/g, "&").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-    jamendo = found.map((t) => ({ id: `jamendo-${t.id}`, title: plain(t.name), artist: plain(t.artist_name), duration: Number(t.duration) || 0, source: "jamendo" as const, license: t.license_ccurl || "CC (Jamendo)", preview_url: t.audio || t.audiodownload }));
+    jamendo = found.map((t) => ({ id: `jamendo-${t.id}`, title: plain(t.name), artist: plain(t.artist_name), duration: Number(t.duration) || 0, source: "jamendo" as const, license: t.license_ccurl || "CC (Jamendo)", preview_url: t.audio || t.audiodownload, download_url: t.audiodownload || t.audio }));
   }
   return { brand, stock, jamendo, jamendo_configured };
 }
@@ -261,12 +263,29 @@ export async function listMusicOptions(opts: { tenantId: string; brandKit?: Bran
 /** Turn a choice into the track the build cuts against. `auto`/`none`
  *  resolve to null (the caller reads `source`). A Jamendo pick is
  *  downloaded into `downloadDir` the first time. */
-export async function resolveMusicChoice(choice: { source: string; id?: string; path?: string; title?: string; artist?: string; license?: string; duration?: number }, downloadDir: string): Promise<MusicTrack | null> {
+export async function resolveMusicChoice(choice: { source: string; id?: string; path?: string; title?: string; artist?: string; license?: string; duration?: number; download_url?: string }, downloadDir: string): Promise<MusicTrack | null> {
   if (choice.source === "auto" || choice.source === "none") return null;
   let local = choice.path ? musicLocalPath(choice.path) : "";
   if (!local && choice.source === "jamendo" && choice.id) {
     local = path.join(downloadDir, `music_${choice.id}.mp3`);
-    await downloadTrack(choice.id, local);
+    // The search result's own link first: Jamendo's lookup by id answers
+    // empty intermittently (measured live: "Track jamendo-26747 not found"
+    // for a track the same search had just listed). The id lookup is the
+    // fallback, tried twice.
+    let ok = false;
+    if (choice.download_url && /^https:\/\/[a-z0-9.-]*jamendo\.com\//i.test(choice.download_url)) {
+      try {
+        const res = await fetch(choice.download_url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await fs.mkdir(downloadDir, { recursive: true });
+        await fs.writeFile(local, Buffer.from(await res.arrayBuffer()));
+        ok = true;
+      } catch (e: any) { console.warn(`  Music: direct Jamendo fetch failed (${e?.message || e}); trying the id lookup`); }
+    }
+    if (!ok) {
+      try { await downloadTrack(choice.id, local); }
+      catch { await downloadTrack(choice.id, local); }
+    }
   }
   if (!local && choice.source === "stock" && choice.id) {
     const manifest: StockManifest = JSON.parse(await fs.readFile(path.join(STOCK_MUSIC_DIR, "manifest.json"), "utf-8"));

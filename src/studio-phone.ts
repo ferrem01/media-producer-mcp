@@ -279,7 +279,7 @@ ${QUOTIENT_CSS}
                 pl.onclick = function () { if (muAudio && muAudio.dataset.src === t.preview_url) { muStop(); pl.textContent = '\u25b6'; return; } muStop(); if (!t.preview_url) return; muAudio = new Audio(withToken(t.preview_url)); muAudio.dataset.src = t.preview_url; muAudio.volume = 0.6; muAudio.play().catch(function () {}); pl.textContent = '\u25a0'; };
                 var tt = document.createElement('div'); tt.className = 't'; tt.textContent = t.title; var ts = document.createElement('small'); ts.textContent = (t.artist || '') + (t.duration ? ' \u00b7 ' + muFmt(t.duration) : ''); tt.appendChild(ts);
                 var use = document.createElement('button'); use.className = 'btn small'; use.textContent = 'Use';
-                use.onclick = function () { use.disabled = true; muSet({ source: t.source, id: t.id, title: t.title, artist: t.artist, license: t.license, duration: t.duration }, '\u201c' + t.title + '\u201d is the bed now.'); };
+                use.onclick = function () { use.disabled = true; muSet({ source: t.source, id: t.id, title: t.title, artist: t.artist, license: t.license, duration: t.duration, download_url: t.download_url }, '\u201c' + t.title + '\u201d is the bed now.'); };
                 tr.appendChild(pl); tr.appendChild(tt); tr.appendChild(use); list.appendChild(tr);
               });
             });

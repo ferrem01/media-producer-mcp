@@ -2412,6 +2412,7 @@ Rules:
           ...(typeof mpBody.title === "string" ? { title: mpBody.title } : {}),
           ...(typeof mpBody.artist === "string" ? { artist: mpBody.artist } : {}),
           ...(typeof mpBody.license === "string" ? { license: mpBody.license } : {}),
+          ...(typeof mpBody.download_url === "string" && /^https:\/\/[a-z0-9.-]*jamendo\.com\//i.test(mpBody.download_url) ? { download_url: mpBody.download_url } : {}),
           ...(Number.isFinite(Number(mpBody.duration)) && Number(mpBody.duration) > 0 ? { duration: Number(mpBody.duration) } : {}),
           chosen_at: new Date().toISOString(),
         };

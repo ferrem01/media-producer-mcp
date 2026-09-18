@@ -4212,7 +4212,7 @@ ${QUOTIENT_CSS}
             muAudio.play().catch(function() {}); b.textContent = '\u25a0';
           });
           row.querySelector('.mu-use').addEventListener('click', function() {
-            muSet(project, { source: t.source, id: t.id, title: t.title, artist: t.artist, license: t.license, duration: t.duration }, row, 'Music: \u201c' + t.title + '\u201d is the bed now.');
+            muSet(project, { source: t.source, id: t.id, title: t.title, artist: t.artist, license: t.license, duration: t.duration, download_url: t.download_url }, row, 'Music: \u201c' + t.title + '\u201d is the bed now.');
           });
         });
         var none = document.getElementById('mu-none'); if (none) none.addEventListener('click', function() { muSet(project, { source: 'none' }, null, 'Music: the film ships without a bed.'); });
