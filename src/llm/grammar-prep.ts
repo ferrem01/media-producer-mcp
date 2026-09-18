@@ -48,6 +48,10 @@ export interface GrammarPrepCtx {
   /** The narration that owns the clock (audio, or camera+voice). */
   narrationSource?: string;
   sceneCount?: number;
+  /** THE MUSIC CHOICE (SPEC-briefs.md, the sources): a track the human
+   *  chose in the board. Given, the pick is skipped and the beat grid is
+   *  read from this file; the film is cut against the bed it will carry. */
+  chosenMusic?: MusicTrack | null;
 }
 
 /** Mood keyword heuristic for music selection (music-first + legacy fallback). */
@@ -87,13 +91,18 @@ export async function runGrammarPrep(grammar: FilmGrammar, ctx: GrammarPrepCtx):
       const { selectMusic } = await import("../audio/music.js");
       const mood = ctx.musicMood || pickMusicMood(ctx.prompt);
       const estDuration = (ctx.sceneCount || 6) * 5.5;
-      console.log(`  [prep:${grammar}] Music-first: searching for "${mood}" mood...`);
-      music = await selectMusic({
-        mood,
-        brandKit: ctx.brandKit,
-        tenantId: ctx.tenantId,
-        minDuration: Math.max(30, Math.floor(estDuration * 0.8)),
-      });
+      if (ctx.chosenMusic) {
+        music = ctx.chosenMusic;
+        console.log(`  [prep:${grammar}] Music-first: the chosen bed "${music.title}" (${music.source})`);
+      } else {
+        console.log(`  [prep:${grammar}] Music-first: searching for "${mood}" mood...`);
+        music = await selectMusic({
+          mood,
+          brandKit: ctx.brandKit,
+          tenantId: ctx.tenantId,
+          minDuration: Math.max(30, Math.floor(estDuration * 0.8)),
+        });
+      }
       if (music) {
         const { analyzeBeats } = await import("../audio/beat-map.js");
         const map = await analyzeBeats(music.path);

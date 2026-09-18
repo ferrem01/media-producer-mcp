@@ -80,6 +80,16 @@ ${QUOTIENT_CSS}
   .proof .ev .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   /* THE SOURCES: find / draw / recorder open a panel under the row. */
   .src-panel { flex-basis: 100%; padding: 10px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--core-panel-bg, var(--surface-secondary)); }
+  .music { background: var(--card); border: 1px solid var(--border-secondary); border-radius: var(--radius); box-shadow: var(--shadow-sub); padding: 14px 16px; margin: 0 0 4px; }
+  .music .now { font-size: 14px; }
+  .music .now small { display: block; color: var(--muted-foreground); font-size: 12px; }
+  .music .row { margin-top: 10px; }
+  .music .group { color: var(--muted-foreground); font: 600 11px/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; margin: 12px 0 2px; }
+  .music .tr { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border-secondary); font-size: 13px; }
+  .music .tr .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .music .tr .t small { color: var(--muted-foreground); margin-left: 6px; }
+  .music .search { display: flex; gap: 6px; margin-top: 10px; }
+  .music .search input { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 10px; font: 14px/20px var(--font-sans); border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--card); color: var(--foreground); }
   .src-panel.hint { font-size: 13px; color: var(--muted-foreground); line-height: 1.45; }
   .src-panel input, .src-panel textarea { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; padding: 8px 10px; font: 14px/20px var(--font-sans); border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--card); color: var(--foreground); }
   .src-panel textarea { min-height: 64px; resize: vertical; margin-bottom: 8px; }
@@ -121,6 +131,7 @@ ${QUOTIENT_CSS}
 <p style="margin:18px 0 0"><a class="link" id="desktopLink" href="#">Open the desktop Studio (screenshots, editing)</a></p>
 <input type="file" id="picker" accept="video/*">
 <input type="file" id="evPicker" accept="image/*,video/*">
+<input type="file" id="musicPicker" accept="audio/*">
 <script>
 (function () {
   var qp = new URLSearchParams(location.search);
@@ -220,6 +231,67 @@ ${QUOTIENT_CSS}
     return n;
   }
 
+  var muAudio = null, muOpen = false, muQ = '';
+  function muStop() { if (muAudio) { try { muAudio.pause(); } catch (e) {} muAudio = null; } }
+  function muFmt(sec) { sec = Math.round(Number(sec) || 0); return sec ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') : ''; }
+  function muSet(body, doneMsg) {
+    muStop(); say('Setting the music\u2026');
+    return api('POST', '/music/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), body)
+      .then(function () { say(doneMsg); muOpen = false; return load(); })
+      .catch(function (e) { say(e.message || String(e), true); });
+  }
+  function musicBox() {
+    var box = document.createElement('div'); box.className = 'music';
+    var lead = document.createElement('div'); lead.className = 'lead'; lead.textContent = 'Music'; box.appendChild(lead);
+    var now = document.createElement('div'); now.className = 'now';
+    var c = P.music || { source: 'auto' };
+    var bed = ((P.audio && P.audio.tracks) || []).filter(function (t) { return t.type === 'music'; })[0];
+    var what, how;
+    if (c.source === 'none') { what = 'No music'; how = 'the film ships without a bed'; }
+    else if (!c.source || c.source === 'auto') { what = bed ? 'Picked by the build' : 'The build picks a track'; how = 'by the storyboard\u2019s mood' + (bed ? ' \u00b7 ' + (bed.source || '').split('/').pop() : ''); }
+    else { what = c.title || (c.path || '').split('/').pop() || 'Chosen track'; how = 'chosen \u00b7 ' + ({ 'brand-kit': 'your brand kit', stock: 'the library', jamendo: 'Jamendo', upload: 'uploaded' }[c.source] || c.source) + (c.artist ? ' \u00b7 ' + c.artist : '') + ' \u00b7 the build keeps it'; }
+    now.textContent = what; var sm = document.createElement('small'); sm.textContent = how; now.appendChild(sm); box.appendChild(now);
+    var row = document.createElement('div'); row.className = 'row';
+    var pick = document.createElement('button'); pick.className = 'btn small'; pick.textContent = muOpen ? 'Close' : 'Pick'; pick.onclick = function () { muOpen = !muOpen; muStop(); render(); };
+    var up = document.createElement('button'); up.className = 'btn small ghost'; up.textContent = 'Upload'; up.onclick = function () { $('musicPicker').value = ''; $('musicPicker').click(); };
+    row.appendChild(pick); row.appendChild(up);
+    if (c.source !== 'none') { var none = document.createElement('button'); none.className = 'btn small ghost'; none.textContent = 'None'; none.onclick = function () { muSet({ source: 'none' }, 'No music bed.'); }; row.appendChild(none); }
+    if (c.source && c.source !== 'auto') { var auto = document.createElement('button'); auto.className = 'btn small ghost'; auto.textContent = 'Let the build pick'; auto.onclick = function () { muSet({ source: 'auto' }, 'The build picks by mood again.'); }; row.appendChild(auto); }
+    box.appendChild(row);
+    if (muOpen) {
+      var srch = document.createElement('div'); srch.className = 'search';
+      var q = document.createElement('input'); q.type = 'text'; q.placeholder = 'Search Jamendo by mood or words'; q.value = muQ;
+      var sb = document.createElement('button'); sb.className = 'btn small'; sb.textContent = 'Search';
+      srch.appendChild(q); srch.appendChild(sb); box.appendChild(srch);
+      var list = document.createElement('div'); list.textContent = 'Loading\u2026'; box.appendChild(list);
+      function loadList() {
+        muQ = q.value.trim();
+        api('GET', '/music-options/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + (muQ ? '?q=' + encodeURIComponent(muQ) : ''))
+          .then(function (r) {
+            list.innerHTML = '';
+            [['Your tracks', r.brand || []], ['Library', r.stock || []], ['Jamendo' + (r.jamendo_configured ? '' : ' (not configured)'), r.jamendo || []]].forEach(function (g) {
+              if (!g[1].length && g[0].indexOf('Jamendo') !== 0) return;
+              var gh = document.createElement('div'); gh.className = 'group'; gh.textContent = g[0]; list.appendChild(gh);
+              if (!g[1].length) { var e = document.createElement('div'); e.className = 'note'; e.textContent = 'Nothing here yet.'; list.appendChild(e); }
+              g[1].forEach(function (t) {
+                var tr = document.createElement('div'); tr.className = 'tr';
+                var pl = document.createElement('button'); pl.className = 'btn small ghost'; pl.textContent = '\u25b6';
+                pl.onclick = function () { if (muAudio && muAudio.dataset.src === t.preview_url) { muStop(); pl.textContent = '\u25b6'; return; } muStop(); if (!t.preview_url) return; muAudio = new Audio(withToken(t.preview_url)); muAudio.dataset.src = t.preview_url; muAudio.volume = 0.6; muAudio.play().catch(function () {}); pl.textContent = '\u25a0'; };
+                var tt = document.createElement('div'); tt.className = 't'; tt.textContent = t.title; var ts = document.createElement('small'); ts.textContent = (t.artist || '') + (t.duration ? ' \u00b7 ' + muFmt(t.duration) : ''); tt.appendChild(ts);
+                var use = document.createElement('button'); use.className = 'btn small'; use.textContent = 'Use';
+                use.onclick = function () { use.disabled = true; muSet({ source: t.source, id: t.id, title: t.title, artist: t.artist, license: t.license, duration: t.duration }, '\u201c' + t.title + '\u201d is the bed now.'); };
+                tr.appendChild(pl); tr.appendChild(tt); tr.appendChild(use); list.appendChild(tr);
+              });
+            });
+          })
+          .catch(function (e) { list.textContent = e.message || String(e); });
+      }
+      sb.onclick = loadList; q.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); loadList(); } };
+      loadList();
+    }
+    return box;
+  }
+
   function needOf(scene) {
     var a = (scene.assets || []).filter(function (x) { return x && x.type === 'camera_video'; });
     return a.length ? a[0] : null;
@@ -289,6 +361,9 @@ ${QUOTIENT_CSS}
       var n = needOf(s); if (n) { takesTotal++; if (n.status === 'needed') takesOpen++; }
       proofOf(s).forEach(function (p) { proofTotal++; if (p.need.status === 'needed') proofOpen++; var k = EV_LABELS[p.need.type] || p.need.type; proofKinds[k] = (proofKinds[k] || 0) + 1; });
     });
+    // THE MUSIC CHOICE (SPEC-briefs.md, the sources): the film's bed is a
+    // need like any other -- pick, upload, or none -- here at the top.
+    if ((P.format || 'video') === 'video') nd.appendChild(musicBox());
     if (takesTotal || proofTotal) {
       var box = document.createElement('div'); box.className = 'needs';
       var lead = document.createElement('div'); lead.className = 'lead'; lead.textContent = 'Needed from you'; box.appendChild(lead);
@@ -480,6 +555,25 @@ ${QUOTIENT_CSS}
       api('POST', '/take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, capture: 'upload', mime: f.type, look: 'soft' })
         .then(function () { say('Scene ' + (i + 1) + ' take attached.'); return load(); })
         .catch(function (e) { say(e.message || String(e), true); });
+    };
+    xhr.send(f);
+  });
+
+  // ── upload a music bed ──
+  $('musicPicker').addEventListener('change', function () {
+    var f = $('musicPicker').files && $('musicPicker').files[0]; if (!f) return;
+    var ext = (f.name.split('.').pop() || 'mp3').toLowerCase();
+    var name = 'music-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', withToken('/api/upload-asset/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + '?name=' + encodeURIComponent(name)));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.upload.onprogress = function (e) { if (e.lengthComputable) say('Uploading the track\u2026 ' + Math.round((e.loaded / e.total) * 100) + '%'); };
+    xhr.onerror = function () { say('Upload failed (network).', true); };
+    xhr.onload = function () {
+      var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
+      if (xhr.status < 200 || xhr.status >= 300 || !up.url) { say('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), true); return; }
+      muSet({ source: 'upload', url: up.url, title: f.name.replace(/\.[^.]+$/, '') }, '\u201c' + f.name + '\u201d is the bed now.');
     };
     xhr.send(f);
   });

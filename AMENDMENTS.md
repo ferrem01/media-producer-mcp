@@ -3723,3 +3723,21 @@ uploaded into that project and posted to `provide-asset` (no events, no
 assembly) and the popup links to Studio. Left for the next passes: music
 as a need; click-the-slot in a built scene opening the same card.
 
+## Music is a need: the bed chosen in the board, kept and cut against by the build
+
+The sources pass left music to the build. Now `project.music`
+(`MusicChoice`: auto | none | brand-kit | stock | jamendo | upload) is
+written from Studio's Music card (desktop header button -> dialog; phone
+needs area): `listMusicOptions` (`audio/music.ts`) offers the tenant's
+tracks, the library mood-first and Jamendo hits (`searchJamendoTracks`,
+split out of the pick); `resolveMusicChoice` turns the choice into the
+track (a Jamendo pick downloads into the project's assets). The pick
+route writes the `music_bed` track too, so the player carries it at once
+and the existing keep-the-prior-bed rule holds it through a rebuild; the
+inner pipeline resolves the choice and hands it to the prep as
+`chosenMusic`, which skips its own pick and reads the beat grid from that
+file, so a tempo-cut is cut against the bed it ships with. `none` sets
+`backgroundMusic` off and strips the bed after a build-from-board.
+Library previews stream from `/assets/_system/stock-music/` (audio
+extensions only).
+

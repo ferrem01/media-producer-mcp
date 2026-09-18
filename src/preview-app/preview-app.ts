@@ -1007,6 +1007,19 @@ ${QUOTIENT_CSS}
   .np-hint { font-size: 12px; color: var(--content-secondary); line-height: 1.5; }
   .np-hint b { color: var(--foreground); }
   .np-empty { font-size: 12px; color: var(--content-secondary); padding: 6px 0; }
+  /* THE MUSIC CHOICE: the film's bed, picked in the dialog. */
+  .mu-now { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border-secondary); border-radius: var(--radius); background: var(--surface-secondary, var(--core-panel-bg)); margin-bottom: 12px; font-size: 14px; }
+  .mu-now .mu-what { flex: 1; min-width: 0; }
+  .mu-now small { display: block; color: var(--content-secondary); font-size: 12px; }
+  .mu-group { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--content-secondary); margin: 12px 0 4px; }
+  .mu-row { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border-secondary); font-size: 13px; }
+  .mu-row:first-of-type { border-top: 0; }
+  .mu-row .mu-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mu-row .mu-t small { color: var(--content-secondary); margin-left: 6px; }
+  .mu-row.busy { opacity: .5; pointer-events: none; }
+  .mu-search { display: flex; gap: 6px; margin: 10px 0 4px; }
+  .mu-search input { flex: 1; min-width: 0; box-sizing: border-box; height: 32px; padding: 0 10px; font: 13px/18px inherit; border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--surface-primary); color: var(--foreground); }
+  .mu-list { max-height: 46vh; overflow-y: auto; }
 
   /* ── Storyboard draft view: THE TRUE STORYBOARD, one card at a time ──
      Rail = thumbnail strip (pick a scene). Main = that scene's full card:
@@ -1155,6 +1168,7 @@ ${QUOTIENT_CSS}
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <button class="btn btn-secondary" id="brand-btn" style="display:none;" title="View and edit this tenant's brand kit: colors, voice, logos, assets">&#127912; Brand</button>
+      <button class="btn btn-secondary" id="music-btn" style="display:none;" title="The film's music bed: pick a track, upload one, or ship without">&#127925; Music</button>
       <a class="btn btn-secondary" id="team-btn" style="display:none;text-decoration:none;" title="Who shares this tenant: invite a colleague, remove a member">&#128101; Team</a>
       <span id="render-wrap" style="display:none;align-items:center;gap:8px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
@@ -4115,6 +4129,86 @@ ${QUOTIENT_CSS}
       });
     });
   }
+  // ── THE MUSIC CHOICE (SPEC-briefs.md, the sources) ──
+  // The film's bed is a need like any other: pick it from your own tracks,
+  // the library or Jamendo (a search), upload one, or ship without. The
+  // pick writes the bed so the player carries it now and the build keeps
+  // it (and cuts against it). Lives in the dialog: film-level, any state.
+  var muAudio = null;
+  function muFmt(sec) { sec = Math.round(Number(sec) || 0); return sec ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') : ''; }
+  function muStop() { if (muAudio) { try { muAudio.pause(); } catch (e) {} muAudio = null; } document.querySelectorAll('.mu-play').forEach(function(b) { b.textContent = '\u25b6'; }); }
+  function muChoiceLine(r) {
+    var c = r.choice || { source: 'auto' };
+    if (c.source === 'none') return { what: 'No music', how: 'the film ships without a bed' };
+    if (c.source === 'auto' || !c.source) return { what: r.bed ? 'Picked by the build' : 'The build picks a track', how: 'by the storyboard\u2019s mood: ' + escHtml(r.mood || 'corporate') + (r.bed ? ' \u00b7 ' + escHtml((r.bed.source || '').split('/').pop()) : '') };
+    var src = { 'brand-kit': 'your brand kit', stock: 'the library', jamendo: 'Jamendo', upload: 'uploaded' }[c.source] || c.source;
+    return { what: escHtml(c.title || (c.path || '').split('/').pop() || 'Chosen track') + (c.artist ? ' <small style="display:inline">\u00b7 ' + escHtml(c.artist) + '</small>' : ''), how: 'chosen \u00b7 ' + src + (c.duration ? ' \u00b7 ' + muFmt(c.duration) : '') + ' \u00b7 the build keeps it' };
+  }
+  function openMusicCard(project) {
+    muStop();
+    studioModalOpen('<h3 class="sm-title">Music</h3><p class="sm-desc">The film\u2019s bed. Pick one of your tracks, one from the library, search Jamendo, or upload. The player carries it right away; the build keeps it and cuts to its bars.</p><div id="mu-body"><div class="np-empty">Loading\u2026</div></div><div class="sm-actions"><button class="sm-btn" id="mu-close">Close</button></div>');
+    document.getElementById('mu-close').addEventListener('click', function() { muStop(); studioModalClose(); });
+    muLoad(project, '');
+  }
+  function muSet(project, body, row, doneMsg) {
+    if (row) row.classList.add('busy');
+    muStop();
+    return api('POST', '/music/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), body)
+      .then(function() { studioStatus(doneMsg, 'ok'); return loadProject(project.project_id).then(function() { if (state.currentProject) muLoad(state.currentProject, ''); }); })
+      .catch(function(e) { if (row) row.classList.remove('busy'); studioStatus(e.message || String(e), 'err'); });
+  }
+  function muLoad(project, q) {
+    var body = document.getElementById('mu-body'); if (!body) return;
+    api('/music-options/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + (q ? '?q=' + encodeURIComponent(q) : ''))
+      .then(function(r) {
+        if (!document.getElementById('mu-body')) return;
+        var line = muChoiceLine(r);
+        var h = '<div class="mu-now"><div class="mu-what">' + line.what + '<small>' + line.how + '</small></div>' +
+          '<div class="np-act"><button class="np-btn" id="mu-upload">Upload</button>' +
+          ((r.choice || {}).source !== 'none' ? '<button class="np-btn" id="mu-none">No music</button>' : '') +
+          ((r.choice || {}).source && (r.choice || {}).source !== 'auto' ? '<button class="np-btn" id="mu-auto">Let the build pick</button>' : '') + '</div></div>';
+        h += '<div class="mu-search"><input id="mu-q" type="text" placeholder="Search Jamendo by mood or words (' + escAttr(r.mood || 'corporate') + ')" value="' + escAttr(q || '') + '"><button class="np-btn" id="mu-go">Search</button></div>';
+        h += '<div class="mu-list">';
+        var groups = [['Your tracks', r.brand || []], ['Library', r.stock || []], ['Jamendo' + (r.jamendo_configured ? '' : ' (not configured on this server)'), r.jamendo || []]];
+        groups.forEach(function(g) {
+          if (!g[1].length && g[0] !== 'Jamendo') return;
+          h += '<div class="mu-group">' + escHtml(g[0]) + '</div>';
+          if (!g[1].length) h += '<div class="np-empty">Nothing here yet.</div>';
+          g[1].forEach(function(t, i) {
+            h += '<div class="mu-row" data-mu="' + escAttr(t.source) + '|' + i + '"><button class="np-btn mu-play" title="Preview" data-src="' + escAttr(t.preview_url || '') + '">\u25b6</button>' +
+              '<div class="mu-t">' + escHtml(t.title) + '<small>' + escHtml(t.artist || '') + (t.duration ? ' \u00b7 ' + muFmt(t.duration) : '') + ((t.moods || []).length ? ' \u00b7 ' + escHtml(t.moods.slice(0, 3).join(', ')) : '') + '</small></div>' +
+              '<button class="np-btn mu-use">Use</button></div>';
+          });
+        });
+        h += '</div>';
+        body.innerHTML = h;
+        var all = { 'brand-kit': r.brand || [], stock: r.stock || [], jamendo: r.jamendo || [] };
+        body.querySelectorAll('.mu-row').forEach(function(row) {
+          var k = row.dataset.mu.split('|'); var t = (all[k[0]] || [])[parseInt(k[1], 10)]; if (!t) return;
+          row.querySelector('.mu-play').addEventListener('click', function() {
+            var b = this;
+            if (muAudio && muAudio.dataset.src === b.dataset.src) { muStop(); return; }
+            muStop();
+            if (!b.dataset.src) return;
+            muAudio = new Audio(withToken(b.dataset.src)); muAudio.dataset.src = b.dataset.src; muAudio.volume = 0.6;
+            muAudio.play().catch(function() {}); b.textContent = '\u25a0';
+          });
+          row.querySelector('.mu-use').addEventListener('click', function() {
+            muSet(project, { source: t.source, id: t.id, title: t.title, artist: t.artist, license: t.license, duration: t.duration }, row, 'Music: \u201c' + t.title + '\u201d is the bed now.');
+          });
+        });
+        var none = document.getElementById('mu-none'); if (none) none.addEventListener('click', function() { muSet(project, { source: 'none' }, null, 'Music: the film ships without a bed.'); });
+        var auto = document.getElementById('mu-auto'); if (auto) auto.addEventListener('click', function() { muSet(project, { source: 'auto' }, null, 'Music: the build picks by mood again.'); });
+        document.getElementById('mu-upload').addEventListener('click', function() {
+          npPick = { scene: -1, asset: -1, type: 'music', project: project.project_id };
+          var f = document.getElementById('np-file'); f.accept = 'audio/*'; f.value = ''; f.click();
+        });
+        function go() { muStop(); muLoad(project, document.getElementById('mu-q').value.trim()); }
+        document.getElementById('mu-go').addEventListener('click', go);
+        document.getElementById('mu-q').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+      })
+      .catch(function(e) { body.innerHTML = '<div class="np-empty">' + escHtml(e.message || String(e)) + '</div>'; });
+  }
   (function bindNeedsUpload() {
     var f = document.getElementById('np-file');
     if (!f) return;
@@ -4122,8 +4216,9 @@ ${QUOTIENT_CSS}
       var file = f.files && f.files[0]; if (!file || !npPick) return;
       var pick = npPick; npPick = null;
       var ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-      var isTake = pick.type === 'camera_video';
-      var name = (isTake ? 'take-' : 'proof-') + new Date().toISOString().replace(/[:.]/g, '-') + '-scene' + (pick.scene + 1) + (isTake ? '' : '-' + (pick.asset + 1)) + '.' + ext;
+      var isTake = pick.type === 'camera_video', isMusic = pick.type === 'music';
+      var name = isMusic ? ('music-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext)
+        : (isTake ? 'take-' : 'proof-') + new Date().toISOString().replace(/[:.]/g, '-') + '-scene' + (pick.scene + 1) + (isTake ? '' : '-' + (pick.asset + 1)) + '.' + ext;
       var xhr = new XMLHttpRequest();
       xhr.open('POST', withToken('/api/upload-asset/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pick.project) + '?name=' + encodeURIComponent(name)));
       xhr.setRequestHeader('Content-Type', 'application/octet-stream');
@@ -4134,6 +4229,10 @@ ${QUOTIENT_CSS}
         var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
         if (xhr.status < 200 || xhr.status >= 300 || !up.url) { studioStatus('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), 'err'); return; }
         studioStatus('Attaching\u2026', 'ok');
+        if (isMusic) {
+          muSet({ project_id: pick.project }, { source: 'upload', url: up.url, title: file.name.replace(/\.[^.]+$/, '') }, null, 'Music: \u201c' + file.name + '\u201d is the bed now.');
+          return;
+        }
         var req = isTake
           ? api('POST', '/take/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pick.project), { url: up.url, scene_index: pick.scene, capture: 'upload', mime: file.type, look: 'soft' })
           : api('POST', '/provide-asset/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pick.project), { url: up.url, scene_index: pick.scene, asset_index: pick.asset });
@@ -8320,6 +8419,8 @@ ${QUOTIENT_CSS}
   function showBrandBtn() {
     var b = document.getElementById('brand-btn');
     if (b) b.style.display = '';
+    var mb = document.getElementById('music-btn');
+    if (mb) { mb.style.display = ''; if (!mb.dataset.bound) { mb.dataset.bound = '1'; mb.addEventListener('click', function() { if (state.currentProject) openMusicCard(state.currentProject); }); } }
     // The Team page shares the tenant (and the link's token, when there is one).
     var t = document.getElementById('team-btn');
     if (t && state.tenantId) {

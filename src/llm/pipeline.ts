@@ -146,6 +146,10 @@ export interface PipelineOpts {
   storyboardOnly?: boolean;
   /** The original brief when this run is a redraft (server passes the project's). */
   brief?: string;
+  /** THE MUSIC CHOICE, resolved by the inner pipeline from the project
+   *  being built: a track the board chose (the prep cuts against it), or
+   *  null for "no bed". Undefined = the build picks by mood. */
+  chosenMusic?: import("../audio/music.js").MusicTrack | null;
 
   /** BUILD-FROM-BOARD: an approved saved storyboard to build VERBATIM.
    *  Skips the creative director AND the storyboard builder -- the board the
@@ -323,10 +327,19 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
   // double-voice the film and auto-music would fight the recording. This is
   // the pipeline-level backstop; callers apply the same rule up front.
   let pipelineHasNarration = !!opts.speaker_source;
-  if (!pipelineHasNarration && opts.project_id) {
+  // THE MUSIC CHOICE (SPEC-briefs.md, the sources): a bed chosen in the
+  // board is the bed the film is cut against; "none" ships no bed.
+  let chosenMusic: import("../audio/music.js").MusicTrack | null | undefined;
+  if (opts.project_id) {
     try {
       const existing = await loadProject(opts.tenant_id, opts.project_id);
-      pipelineHasNarration = !!(existing?.speaker_track?.clips?.length);
+      if (!pipelineHasNarration) pipelineHasNarration = !!(existing?.speaker_track?.clips?.length);
+      const choice = existing?.music;
+      if (choice?.source === "none") { chosenMusic = null; opts.backgroundMusic = false; console.log("  Music: the board says no bed"); }
+      else if (choice && choice.source !== "auto") {
+        const { resolveMusicChoice } = await import("../audio/music.js");
+        chosenMusic = await resolveMusicChoice(choice, path.join(projectDir(opts.tenant_id, opts.project_id), "assets")).catch((e: any) => { console.warn(`  Music: the chosen bed could not be read (${e?.message || e}); picking by mood`); return undefined; });
+      }
     } catch { /* no existing project -- fresh build */ }
   }
   if (pipelineHasNarration && (opts.voiceover || opts.backgroundMusic)) {
@@ -2547,6 +2560,7 @@ async function runUnifiedPipeline(
     backgroundMusic: wantsMusic && treatment?.audioSystem?.music_mood !== "none",
     musicMood: treatment?.audioSystem?.music_mood !== "none" ? treatment?.audioSystem?.music_mood : undefined,
     sceneCount,
+    chosenMusic: opts.chosenMusic || undefined,
   });
   if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && wantsMusic && !prep.beatMap) {
     console.warn("  TEMPO-CUT: music selection produced NO beat grid (JAMENDO_CLIENT_ID unset or selection failed) -- cuts will not be bar-quantized.");
