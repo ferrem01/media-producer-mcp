@@ -168,7 +168,7 @@ describe("every lane follows the scene, not the first clip", () => {
     const fs = await import("node:fs/promises");
     const app = await fs.readFile(new URL("../src/preview-app/preview-app.ts", import.meta.url), "utf8");
     expect(app).toMatch(/function speakerTrackIsPerScene\(\)/);
-    expect(app).toMatch(/var wOff = speakerTrackIsPerScene\(\) \? 0 :/);
+    expect(app).toMatch(/var wOff = \(state\._transcriptPerScene \|\| speakerTrackIsPerScene\(\)\) \? 0 :/);
     expect(app).toMatch(/Take for scene ' \+ \(si \+ 1\)/);
   });
   it("server: transcript, waveform and the scene still come from the scene's own take; no stage camera over the camera", async () => {

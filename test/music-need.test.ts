@@ -46,9 +46,14 @@ describe("the music choice: the film's bed is a need, chosen in the board", () =
     expect(index).toMatch(/\.\(mp3\|m4a\|wav\|ogg\|aac\)\$\/i\.test\(f\)/);
   });
 
-  it("Studio: a Music button opens the card in the dialog; the phone shows it in the needs area", async () => {
+  it("Studio: the music lane opens the card in the dialog; the phone shows it in the needs area", async () => {
     const desktop = await read("src/preview-app/preview-app.ts");
-    expect(desktop).toMatch(/id="music-btn"/);
+    // The bed belongs to its track (Marc): the lane, its segment and its
+    // gutter icon open the card; there is no Music button in the header.
+    expect(desktop).not.toMatch(/id="music-btn"/);
+    expect(desktop).toMatch(/if \(cls === 'music'\) \{[\s\S]*?openMusicCard\(state\.currentProject\)/);
+    expect(desktop).toMatch(/if \(audio\._trackType === 'music'\) \{[\s\S]*?openMusicCard\(state\.currentProject\)/);
+    expect(desktop).toMatch(/gut\.querySelector\('\.lg-music'\)/);
     expect(desktop).toMatch(/function openMusicCard\(project\)/);
     expect(desktop).toMatch(/'\/music-options\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/'\/music\/' \+ encodeURIComponent\(state\.tenantId\)/);
