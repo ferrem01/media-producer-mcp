@@ -20,6 +20,8 @@
  * Studio token) and forwards the token on every request. The shell itself is
  * behind the auth middleware, so a link without a valid token gets a 401.
  */
+import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
+
 export function getTakeHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -29,42 +31,50 @@ export function getTakeHtml(): string {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0e0e14">
 <link rel="icon" href="data:,">
+${QUOTIENT_FONT_LINKS}
 <title>Record a take · Media Studio</title>
 <style>
-  :root { --bg:#0e0e14; --panel:#17171f; --ink:#f4f4f8; --muted:#9a9aad; --line:#26262f;
-    --accent:#393bf5; --ok:#22c55e; --err:#ef4444; --warn:#f59e0b; }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
-    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased;
-    overscroll-behavior:none; }
-  body { display:flex; flex-direction:column; min-height:100dvh; }
-  section { display:none; flex:1; flex-direction:column; }
-  section.on { display:flex; }
+${QUOTIENT_CSS}
+  /* The take page: Quotient's page frame on a phone for the ready, review
+     and done screens; the stage itself is the camera and stays black. */
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+  section { display: none; flex: 1; flex-direction: column; }
+  section.on { display: flex; }
   /* The ready screen never scrolls: a long script (record-all) scrolls
      INSIDE its card and the Record button stays in reach (Marc: "scroll
      all the way down, hit record, then scroll all the way back"). */
   #ready { height:100dvh; overflow:hidden; }
   #script { flex:0 1 auto; max-height:44dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .pad { padding: calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom)); }
-  h1 { font-size:20px; font-weight:600; letter-spacing:-.02em; margin:0 0 4px; }
-  .sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; }
-  .beat { font-size:19px; line-height:1.45; margin:0 0 14px; white-space:pre-line; }
-  .beat b { color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; display:block; margin-bottom:4px; }
-  .note { color:var(--muted); font-size:13px; line-height:1.5; }
-  .btn { appearance:none; border:0; border-radius:14px; padding:16px 20px; font:inherit; font-size:17px; font-weight:600;
-    color:#fff; background:var(--accent); width:100%; cursor:pointer; }
-  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); }
-  a.link { color:var(--muted); font-size:14px; text-decoration:none; }
-  .toggle { display:flex; gap:10px; align-items:flex-start; color:var(--ink); font-size:15px; margin:10px 0 14px; }
-  .toggle input { width:20px; height:20px; margin-top:1px; }
-  .toggle .hint { color:var(--muted); font-size:13px; }
-  .btn.stop { background:var(--err); }
-  .btn:disabled { opacity:.45; }
-  .row { display:flex; gap:10px; margin-top:12px; }
-  .row .btn { flex:1; }
-  .spacer { flex:1; }
+  h1 { font: 500 20px/28px var(--font-sans); letter-spacing: -0.01em; margin: 0 0 4px; color: var(--foreground); }
+  .sub { color: var(--muted-foreground); font-size: 14px; margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--border-secondary); border-radius: var(--radius); box-shadow: var(--shadow-sub); padding: 18px; }
+  .beat { font-size: 18px; line-height: 1.45; margin: 0 0 14px; white-space:pre-line; color: var(--content-primary); letter-spacing: -0.01em; }
+  .beat b { color: var(--muted-foreground); font: 500 12px/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; display: block; margin-bottom: 4px; }
+  .note { color: var(--muted-foreground); font-size: 13px; line-height: 20px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border: 1px solid transparent;
+    border-radius: var(--radius); font: 500 15px/20px var(--font-sans); color: var(--primary-foreground); background: var(--primary);
+    box-shadow: var(--shadow-weak); width: 100%; cursor: pointer; text-decoration: none; transition: all 150ms cubic-bezier(.4,0,.2,1);
+    -webkit-appearance: none; appearance: none; }
+  .btn:hover { background: color-mix(in srgb, var(--primary) 90%, transparent); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
+  .btn.ghost { background: var(--surface-primary); border-color: var(--border-secondary); color: var(--content-primary); }
+  .btn.ghost:hover { background: var(--accent); }
+  .btn.stop { background: var(--destructive); color: #fff; }
+  .btn:disabled { opacity: .5; pointer-events: none; }
+  a.link { color: var(--muted-foreground); font-size: 14px; text-decoration: none; }
+  .toggle { display: flex; gap: 10px; align-items: flex-start; color: var(--content-primary); font-size: 14px; margin: 10px 0 14px; white-space: nowrap; }
+  .toggle .hint { white-space: normal; }
+  .toggle input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--primary); }
+  .toggle .hint { color: var(--muted-foreground); font-size: 13px; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .row .btn { flex: 1; }
+  .spacer { flex: 1; }
 
+  #stage { --ok: #22c55e; --err: #ef4444; color: #fff; }
   /* ── stage: camera full-bleed, prompter over it ── */
   /* The stage owns the viewport wherever the page was scrolled -- and the
      page under it is LOCKED while it is up: a fixed body is the one lock
@@ -91,16 +101,16 @@ export function getTakeHtml(): string {
   #cue { font-size:30px; line-height:1.28; font-weight:600; color:#fff; text-shadow:0 2px 14px rgba(0,0,0,.7); text-wrap:balance; }
   #next { margin-top:10px; font-size:17px; line-height:1.3; color:rgba(255,255,255,.55); text-shadow:0 2px 10px rgba(0,0,0,.6); }
   #bar { position:absolute; left:0; right:0; bottom: calc(86px + env(safe-area-inset-bottom)); height:3px; background:rgba(255,255,255,.18); }
-  #barFill { height:100%; width:0%; background:var(--accent); }
+  #barFill { height:100%; width:0%; background:#fff; }
   #stopWrap { position:absolute; left:18px; right:18px; bottom: calc(18px + env(safe-area-inset-bottom)); }
 
   /* ── review ── */
-  #play { width:100%; max-height:62dvh; border-radius:16px; background:#000; }
-  .prog { height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin:14px 0 8px; }
-  .prog i { display:block; height:100%; width:0%; background:var(--accent); transition:width .2s; }
-  .big { font-size:40px; margin:0 0 8px; }
-  a.btn { display:block; text-align:center; text-decoration:none; }
-  .meta { font-size:12px; color:var(--muted); margin-top:10px; font-variant-numeric:tabular-nums; }
+  #play { width: 100%; max-height: 62dvh; border-radius: var(--radius); background: #000; }
+  .prog { height: 4px; border-radius: 9999px; background: var(--muted); overflow: hidden; margin: 14px 0 8px; }
+  .prog i { display: block; height: 100%; width: 0%; background: var(--primary); border-radius: 9999px; transition: width .2s; }
+  .big { font-size: 40px; margin: 0 0 8px; color: #0d542b; }
+  a.btn { display: inline-flex; text-align: center; text-decoration: none; }
+  .meta { font-size: 12px; color: var(--muted-foreground); margin-top: 10px; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>

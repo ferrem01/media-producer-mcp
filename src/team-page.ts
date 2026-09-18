@@ -4,6 +4,8 @@
  * token-in-the-link (or cookie session) auth as the take page. The token
  * IS the tenant, so a link with only a token works too.
  */
+import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
+
 export function getTeamHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -11,27 +13,38 @@ export function getTeamHtml(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Team · Studio</title>
+${QUOTIENT_FONT_LINKS}
 <style>
-  :root { --bg:#0f0f12; --panel:#17171c; --line:#2a2a33; --ink:#f4f4f6; --muted:#9a9aa6; --accent:#6d5cff; --err:#ff6b6b; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; padding:20px 16px 48px; max-width:640px; margin-inline:auto; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  .sub { color:var(--muted); margin:0 0 18px; font-size:14px; }
-  .box { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px 16px; margin:0 0 14px; }
-  .lead { color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
-  .row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
-  .row:first-of-type { border-top:0; }
-  .who { min-width:0; }
-  .who .e { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .who .n { color:var(--muted); font-size:13px; }
-  button, .btn { border:1px solid var(--line); background:#22222a; color:var(--ink); border-radius:10px; padding:8px 12px; font:inherit; font-size:14px; cursor:pointer; }
-  button.primary { background:var(--accent); border-color:var(--accent); }
-  button.quiet { background:transparent; color:var(--muted); }
-  form { display:flex; gap:8px; }
-  input[type=email] { flex:1; min-width:0; border:1px solid var(--line); background:#0f0f12; color:var(--ink); border-radius:10px; padding:10px 12px; font:inherit; }
-  .status { color:var(--muted); font-size:14px; min-height:20px; margin-top:8px; }
-  .status.err { color:var(--err); }
-  a.back { color:var(--muted); font-size:14px; text-decoration:none; }
+${QUOTIENT_CSS}
+  body { padding: 20px 16px 48px; max-width: 640px; margin-inline: auto; }
+  h1 { font: 500 20px/28px var(--font-sans); letter-spacing: -0.01em; margin: 0 0 4px; }
+  .sub { color: var(--muted-foreground); margin: 0 0 18px; font-size: 14px; }
+  .box { background: var(--card); border: 1px solid var(--border-secondary); border-radius: var(--radius); box-shadow: var(--shadow-sub); padding: 16px; margin: 0 0 14px; }
+  .lead { color: var(--muted-foreground); font: 500 12px/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 8px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border-secondary); }
+  .row:first-of-type { border-top: 0; }
+  .who { min-width: 0; }
+  .who .e { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who .n { color: var(--muted-foreground); font-size: 13px; }
+  button, .btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 12px; border: 1px solid var(--border-secondary);
+    background: var(--surface-primary); color: var(--foreground); border-radius: var(--radius); font: 500 14px/20px var(--font-sans); cursor: pointer;
+    box-shadow: var(--shadow-weak); transition: all 150ms cubic-bezier(.4,0,.2,1); -webkit-appearance: none; appearance: none; }
+  button:hover { background: var(--accent); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
+  button.primary { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
+  button.primary:hover { background: color-mix(in srgb, var(--primary) 90%, transparent); }
+  button.quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted-foreground); }
+  button.quiet:hover { background: var(--accent); color: var(--foreground); }
+  form { display: flex; gap: 8px; }
+  input[type=email] { flex: 1; min-width: 0; height: 36px; border: 1px solid var(--input); background: var(--surface-primary); color: var(--foreground);
+    border-radius: var(--radius); padding: 8px 12px; font: 400 14px/20px var(--font-sans); outline: none; }
+  input[type=email]::placeholder { color: var(--muted-foreground); }
+  input[type=email]:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
+  .status { color: var(--muted-foreground); font-size: 14px; min-height: 20px; margin-top: 8px; }
+  .status.err { color: var(--destructive); }
+  a.back { color: var(--muted-foreground); font-size: 14px; text-decoration: none; }
+  a.back:hover { color: var(--foreground); }
 </style>
 </head>
 <body>
