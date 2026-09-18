@@ -23,6 +23,7 @@ import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, acti
 import { provideAsset, openAssetNeeds } from "./core/asset-needs.js";
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
+import { listMusicOptions, resolveMusicChoice, musicLocalPath, musicAssetUrl } from "./audio/music.js";
 import type { Take, Project } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
@@ -650,6 +651,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
 
+      // The bundled music library, for the picker's preview (audio files only).
+      const stockMusicMatch = urlPath.match(/^\/assets\/_system\/stock-music\/([^/]+)$/);
+      if (stockMusicMatch && (method === "GET" || method === "HEAD")) {
+        const f = decodeURIComponent(stockMusicMatch[1]);
+        if (f.includes("..") || !/\.(mp3|m4a|wav|ogg|aac)$/i.test(f)) { res.writeHead(403); res.end("Forbidden"); return; }
+        try { await streamFile(req, res, path.join(config.dataDir, "_system", "stock-music", f)); }
+        catch { res.writeHead(404); res.end("Asset not found"); }
+        return;
+      }
+
       // ── Static asset serving for tenant-level assets ──
       const tenantAssetMatch = urlPath.match(/^\/assets\/([^/]+)\/assets\/(.+)$/);
       if (tenantAssetMatch && (method === "GET" || method === "HEAD")) {
@@ -866,7 +877,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2354,6 +2365,89 @@ Rules:
         } catch (e: any) {
           jsonResponse(res, 502, { error: e?.message || String(e) });
         }
+        return;
+      }
+
+      // ── API: THE MUSIC CHOICE -- the film's bed, chosen in the board ──
+      // GET  /api/music-options/{tenant}/{project}?q=  the tenant's tracks,
+      //   the library (mood first), Jamendo hits; plus the current choice.
+      // POST /api/music/{tenant}/{project} {source: auto|none|brand-kit|stock|jamendo|upload, id?, url?, title?, artist?, license?, duration?}
+      //   Writes project.music and the music_bed track so Studio plays it now
+      //   and the build keeps it (and cuts against it). "none" strips the bed.
+      const musicOptionsMatch = urlPath.match(/^\/api\/music-options\/([^/]+)\/([^/]+)$/);
+      if (musicOptionsMatch && method === "GET") {
+        const [, moTenant, moProject] = musicOptionsMatch.map(decodeURIComponent);
+        const moProj = await loadProject(moTenant, moProject);
+        if (!moProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const q = new URL(req.url || "/", "http://localhost").searchParams;
+        const mood = String((moProj.storyboard as any)?.audio?.music_mood || (moProj.treatment as any)?.audioSystem?.music_mood || "corporate");
+        const total = (moProj.storyboard?.scenes || []).reduce((a, sc: any) => a + (Number(sc.duration_seconds) || 0), 0);
+        let brandKit = null;
+        try { brandKit = await loadBrandKit(moTenant); } catch { /* no kit */ }
+        const bed = (moProj.audio?.tracks || []).find((t) => t.type === "music");
+        try {
+          const options = await listMusicOptions({ tenantId: moTenant, brandKit, mood: mood === "none" ? "corporate" : mood, query: q.get("q") || undefined, minDuration: total || undefined });
+          jsonResponse(res, 200, { ok: true, mood, choice: moProj.music || { source: "auto" }, bed: bed ? { id: bed.id, source: bed.source, preview_url: musicAssetUrl(bed.source) } : null, ...options });
+        } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
+        return;
+      }
+      const musicPickMatch = urlPath.match(/^\/api\/music\/([^/]+)\/([^/]+)$/);
+      if (musicPickMatch && method === "POST") {
+        const [, mpTenant, mpProject] = musicPickMatch.map(decodeURIComponent);
+        let mpBody: Record<string, unknown> = {};
+        try { mpBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "Invalid JSON body" }); return; }
+        const source = String(mpBody.source || "");
+        if (!["auto", "none", "brand-kit", "stock", "jamendo", "upload"].includes(source)) { jsonResponse(res, 400, { error: "source must be auto, none, brand-kit, stock, jamendo or upload" }); return; }
+        const mpProj = await loadProject(mpTenant, mpProject);
+        if (!mpProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const url = typeof mpBody.url === "string" ? mpBody.url : "";
+        if (source === "upload") {
+          const prefix = `/assets/${mpTenant}/projects/${mpProject}/assets/`;
+          if (!url.startsWith(prefix) || url.includes("..")) { jsonResponse(res, 400, { error: `url must be an asset of this project (${prefix}...)` }); return; }
+        }
+        const choice: import("./core/types.js").MusicChoice = {
+          source: source as any,
+          ...(typeof mpBody.id === "string" ? { id: mpBody.id } : {}),
+          ...(url ? { path: url } : {}),
+          ...(typeof mpBody.title === "string" ? { title: mpBody.title } : {}),
+          ...(typeof mpBody.artist === "string" ? { artist: mpBody.artist } : {}),
+          ...(typeof mpBody.license === "string" ? { license: mpBody.license } : {}),
+          ...(Number.isFinite(Number(mpBody.duration)) && Number(mpBody.duration) > 0 ? { duration: Number(mpBody.duration) } : {}),
+          chosen_at: new Date().toISOString(),
+        };
+        if (source === "brand-kit" && !url) {
+          // The kit's own track, by id, resolved to its file.
+          let kit = null; try { kit = await loadBrandKit(mpTenant); } catch { /* no kit */ }
+          const a = (kit?.assets || []).find((x) => x.type === "music" && `brand-${x.name}` === choice.id);
+          if (!a) { jsonResponse(res, 404, { error: "That brand kit track was not found" }); return; }
+          choice.path = a.url.startsWith("/") ? a.url : path.join(config.dataDir, mpTenant, "brand-kit", "assets", a.url);
+          choice.title = choice.title || a.name; choice.duration = choice.duration || a.duration;
+        }
+        try {
+          const tracks = (mpProj.audio?.tracks || []).filter((t) => t.type !== "music");
+          if (source === "none") {
+            mpProj.audio = { ...(mpProj.audio || {}), tracks };
+            delete mpProj.audio.beat_map;
+          } else if (source !== "auto") {
+            const assetsDir = path.join(config.dataDir, mpTenant, "projects", mpProject, "assets");
+            await fs.mkdir(assetsDir, { recursive: true });
+            const track = await resolveMusicChoice(choice, assetsDir);
+            if (!track) { jsonResponse(res, 404, { error: "That track could not be read" }); return; }
+            choice.path = track.path; choice.title = track.title; choice.artist = choice.artist || track.artist;
+            const prior = (mpProj.audio?.tracks || []).find((t) => t.type === "music");
+            const hasVoice = tracks.some((t) => t.type === "voiceover") || !!(mpProj.speaker_track?.clips?.length);
+            mpProj.audio = { ...(mpProj.audio || {}), tracks: [{
+              id: "music_bed", type: "music", source: musicLocalPath(track.path),
+              volume: prior?.volume ?? (hasVoice ? 0.18 : 0.45), loop: false, fade_in: prior?.fade_in ?? 0.3, fade_out: prior?.fade_out ?? 1.8,
+            }, ...tracks] };
+            delete mpProj.audio.beat_map; // the build re-reads the grid from this bed
+          }
+          mpProj.music = choice;
+          mpProj.updated_at = new Date().toISOString();
+          await saveProject(mpProj);
+          console.log(`  music: ${mpTenant}/${mpProject} <- ${source}${choice.title ? ` "${choice.title}"` : ""}`);
+          jsonResponse(res, 200, { ok: true, music: choice, bed: (mpProj.audio?.tracks || []).find((t) => t.type === "music") || null });
+        } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
         return;
       }
 

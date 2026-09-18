@@ -188,6 +188,100 @@ async function selectStockMusic(mood: string, minDuration?: number, instrumental
 /**
  * Search and download from Jamendo (requires JAMENDO_CLIENT_ID).
  */
+/** One track a human can pick from (SPEC-briefs.md, the sources). */
+export interface MusicOption {
+  id: string;
+  title: string;
+  artist: string;
+  duration: number;
+  source: "brand-kit" | "stock" | "jamendo";
+  license: string;
+  /** What the browser can play to preview it. */
+  preview_url: string;
+  moods?: string[];
+}
+
+/** A local file under the data dir as the browser fetches it. */
+export function musicAssetUrl(localPath: string): string {
+  if (!localPath) return "";
+  if (/^https?:\/\//.test(localPath) || localPath.startsWith("/assets/")) return localPath;
+  if (localPath.startsWith(config.dataDir + "/")) return "/assets/" + localPath.slice(config.dataDir.length + 1).split("/").map(encodeURIComponent).join("/");
+  return localPath;
+}
+
+/** A track's file as the mixer reads it (an /assets URL back to the data dir). */
+export function musicLocalPath(p: string): string {
+  if (p.startsWith("/assets/")) return path.join(config.dataDir, decodeURIComponent(p.slice("/assets/".length)));
+  return p;
+}
+
+/** Everything the picker offers: the tenant's own tracks, the bundled
+ *  library (mood matches first), and Jamendo's top hits for the mood or
+ *  the words typed. Best-effort per source; an unconfigured source is an
+ *  empty list, never a failure. */
+export async function listMusicOptions(opts: { tenantId: string; brandKit?: BrandKit | null; mood?: string; query?: string; minDuration?: number; instrumental?: boolean }): Promise<{ brand: MusicOption[]; stock: MusicOption[]; jamendo: MusicOption[]; jamendo_configured: boolean }> {
+  const mood = String(opts.mood || "corporate").toLowerCase();
+  const instrumental = opts.instrumental !== false;
+  const brand: MusicOption[] = [];
+  for (const a of (opts.brandKit?.assets || []).filter((x: BrandAsset) => x.type === "music")) {
+    const local = a.url.startsWith("/") ? a.url : path.join(config.dataDir, opts.tenantId, "brand-kit", "assets", a.url);
+    brand.push({ id: `brand-${a.name}`, title: a.name, artist: "Your brand kit", duration: a.duration || 0, source: "brand-kit", license: "Brand kit asset", preview_url: musicAssetUrl(local), moods: a.tags || [] });
+  }
+  let stock: MusicOption[] = [];
+  try {
+    const manifest: StockManifest = JSON.parse(await fs.readFile(path.join(STOCK_MUSIC_DIR, "manifest.json"), "utf-8"));
+    const pool = instrumental ? manifest.tracks.filter((t) => t.vocals !== true) : manifest.tracks;
+    const score = (t: StockManifest["tracks"][number]) => (t.moods.some((m) => m.toLowerCase() === mood) ? 0 : 1);
+    stock = [...pool].sort((a, b) => score(a) - score(b)).map((t) => ({
+      id: `stock-${t.id}`, title: t.title, artist: t.artist, duration: t.duration, source: "stock" as const, license: manifest.attribution || "Royalty-free library",
+      preview_url: `/assets/_system/stock-music/${encodeURIComponent(t.file)}`, moods: t.moods,
+    }));
+  } catch { /* no bundled library on this server */ }
+  const jamendo_configured = !!process.env.JAMENDO_CLIENT_ID;
+  let jamendo: MusicOption[] = [];
+  if (jamendo_configured) {
+    const found = await searchJamendoTracks(String(opts.query || mood), { limit: 8, minDuration: opts.minDuration, instrumental }).catch(() => [] as JamendoHit[]);
+    jamendo = found.map((t) => ({ id: `jamendo-${t.id}`, title: t.name, artist: t.artist_name, duration: Number(t.duration) || 0, source: "jamendo" as const, license: t.license_ccurl || "CC (Jamendo)", preview_url: t.audio || t.audiodownload }));
+  }
+  return { brand, stock, jamendo, jamendo_configured };
+}
+
+/** Turn a choice into the track the build cuts against. `auto`/`none`
+ *  resolve to null (the caller reads `source`). A Jamendo pick is
+ *  downloaded into `downloadDir` the first time. */
+export async function resolveMusicChoice(choice: { source: string; id?: string; path?: string; title?: string; artist?: string; license?: string; duration?: number }, downloadDir: string): Promise<MusicTrack | null> {
+  if (choice.source === "auto" || choice.source === "none") return null;
+  let local = choice.path ? musicLocalPath(choice.path) : "";
+  if (!local && choice.source === "jamendo" && choice.id) {
+    local = path.join(downloadDir, `music_${choice.id}.mp3`);
+    await downloadTrack(choice.id, local);
+  }
+  if (!local && choice.source === "stock" && choice.id) {
+    const manifest: StockManifest = JSON.parse(await fs.readFile(path.join(STOCK_MUSIC_DIR, "manifest.json"), "utf-8"));
+    const t = manifest.tracks.find((x) => `stock-${x.id}` === choice.id || x.id === choice.id);
+    if (t) local = path.join(STOCK_MUSIC_DIR, t.file);
+  }
+  if (!local) return null;
+  await fs.access(local);
+  return { id: choice.id || path.basename(local), title: choice.title || path.basename(local), artist: choice.artist || "", duration: choice.duration || 0, path: local, source: choice.source === "brand-kit" ? "brand-kit" : (choice.source === "jamendo" ? "jamendo" : "stock"), license: choice.license || "" };
+}
+
+interface JamendoHit { id: string; name: string; artist_name: string; duration: number; audio: string; audiodownload: string; license_ccurl: string }
+
+/** Jamendo's commercial-safe hits for one fuzzy tag (the picker's list). */
+export async function searchJamendoTracks(tag: string, opts: { limit?: number; minDuration?: number; instrumental?: boolean } = {}): Promise<JamendoHit[]> {
+  const clientId = process.env.JAMENDO_CLIENT_ID;
+  if (!clientId) return [];
+  const params = new URLSearchParams({ client_id: clientId, format: "json", fuzzytags: tag, limit: String(opts.limit || 8), order: "popularity_total", ccnc: "false", ccnd: "false" });
+  if (opts.instrumental !== false) params.set("vocalinstrumental", "instrumental");
+  if (opts.minDuration) params.set("durationbetween", `${Math.max(30, Math.floor(opts.minDuration * 0.8))}_600`);
+  const res = await fetch(`https://api.jamendo.com/v3.0/tracks?${params.toString()}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as { headers?: { status?: string }; results?: JamendoHit[] };
+  if (data.headers?.status && data.headers.status !== "success") return [];
+  return (data.results || []).filter((t) => t.audiodownload || t.audio);
+}
+
 async function searchJamendo(mood: string, minDuration?: number, instrumental?: boolean): Promise<MusicTrack | null> {
   const clientId = process.env.JAMENDO_CLIENT_ID;
   if (!clientId) {

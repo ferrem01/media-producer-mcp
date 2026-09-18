@@ -57,7 +57,7 @@ describe("the sources: every need is collected its own way, in the board", () =>
 
   it("the server: a search route and one find/draw route that ends in provideAsset, tenant-guarded", async () => {
     const index = await read("src/index.ts");
-    expect(index).toMatch(/\|generate-image\|need-source\|stock-search\|traces\|/);
+    expect(index).toMatch(/\|generate-image\|need-source\|stock-search\|/);
     expect(index).toMatch(/\/api\\\/stock-search\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/\/api\\\/need-source\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/if \(!needSources\(nsNeed\.type\)\.includes\(source\)\)/);

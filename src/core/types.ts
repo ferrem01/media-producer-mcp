@@ -434,6 +434,22 @@ export interface AudioDucking {
   release?: number;
 }
 
+/** THE MUSIC CHOICE (SPEC-briefs.md, the sources): the film's bed, chosen
+ *  in the board. `auto` (or absent) lets the build pick by mood; `none`
+ *  ships the film without a bed; the rest name a track the build keeps and
+ *  cuts against. The bed itself lives in `audio.tracks` as `music_bed`. */
+export interface MusicChoice {
+  source: "auto" | "none" | "brand-kit" | "stock" | "jamendo" | "upload";
+  /** The track's file (a local path under the data dir, or an /assets URL). */
+  path?: string;
+  id?: string;
+  title?: string;
+  artist?: string;
+  license?: string;
+  duration?: number;
+  chosen_at: string;
+}
+
 export interface AudioConfig {
   tracks: AudioTrack[];
   ducking?: AudioDucking;
@@ -601,6 +617,8 @@ export interface Project {
   brand_kit: BrandKit;
   scenes: Scene[];
   audio?: AudioConfig;
+  /** The music the human chose in the board (SPEC-briefs.md, the sources). */
+  music?: MusicChoice;
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;

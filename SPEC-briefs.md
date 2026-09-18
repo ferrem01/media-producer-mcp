@@ -71,8 +71,19 @@ Recorder gained a For picker: with a project chosen under Save to, its
 open screen needs are listed, and a recording made for one is uploaded
 into that project and fills the need instead of becoming a new scene.
 
-Not yet: music as a need (the audio system still picks at build time),
-and opening the same card by clicking the slot in a built scene.
+**Music is a need too.** The bed is film-level, so it lives in Studio's
+Music card (a header button on the desktop, the needs area on the phone):
+the current choice, then Pick (your brand kit's tracks, the bundled
+library with the storyboard's mood first, a Jamendo search), Upload, No
+music, or Let the build pick. A pick writes `project.music`
+(`MusicChoice`) and the `music_bed` track, so the player carries it right
+away; the build honors it -- the prep skips its own pick and reads the
+beat grid from the chosen file (`chosenMusic` in `grammar-prep.ts`), and
+`none` ships no bed. Routes: `GET /api/music-options/{tenant}/{project}`
+and `POST /api/music/{tenant}/{project}`; the library previews stream
+from `/assets/_system/stock-music/`.
+
+Not yet: opening the same card by clicking the slot in a built scene.
 
 ## Columns the sheet should add
 

@@ -526,7 +526,10 @@ export async function queueBuildFromStoryboard(
               (tr as any).source = (tr as any).source.split(`/projects/${newProjectId}/`).join(`/projects/${projectId}/`);
             }
           }
-          if (wantMusic && priorMusic.length) {
+          if (origProject.music?.source === "none") {
+            origProject.audio = { ...(origProject.audio || {}), tracks: (origProject.audio?.tracks || []).filter((t: any) => t.type !== "music") };
+            console.log("  Build-from-storyboard: the board says no music bed");
+          } else if (wantMusic && priorMusic.length) {
             const rebuilt = (origProject.audio?.tracks || []).filter((t: any) => t.type !== "music");
             origProject.audio = { ...(origProject.audio || {}), tracks: [...priorMusic, ...rebuilt] };
             console.log(`  Build-from-storyboard: kept the project's own music bed (${priorMusic.map((t: any) => t.id).join(", ")}) over the pipeline's re-pick`);
