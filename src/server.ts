@@ -6,6 +6,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { extractBriefLocks, briefLockBlock, previousBoardBlock } from "./llm/brief-locks.js";
 import { z } from "zod";
 
 /** Accept an object OR a JSON string for a nested tool argument. Some MCP
@@ -645,6 +646,7 @@ export async function queueStoryboardGeneration(params: {
 
   // Build the prompt, incorporating feedback for revisions
   let storyboardPrompt = params.prompt;
+  let redraftBrief: string | undefined;
   if (params.project_id && params.feedback) {
     const existingProject = await loadProject(params.tenant_id, params.project_id);
     if (!existingProject) return { error: "Project not found for storyboard revision" };
@@ -656,10 +658,20 @@ export async function queueStoryboardGeneration(params: {
     if (!EDITABLE_BOARD_STATES.has(existingProject.status)) {
       return { error: `Cannot revise storyboard: project is in '${existingProject.status}' state` };
     }
+    // THE REDRAFT CARRIES THE BRIEF (SPEC-briefs.md). Measured live on
+    // proj_3ce292de: a redraft handed only the feedback and the previous
+    // narrative rewrote the hook and dropped the storyline's burst. Now the
+    // prompt is the original brief (or the caller's), what the brief LOCKS,
+    // the whole previous board, and then the feedback.
+    const brief = String(params.prompt || existingProject.brief || (String(existingProject.prompt || "").startsWith("undefined") ? "" : existingProject.prompt) || "");
+    redraftBrief = existingProject.brief || brief;
+    const locks = extractBriefLocks(redraftBrief);
+    storyboardPrompt = brief;
+    const lockBlock = briefLockBlock(locks);
+    if (lockBlock) storyboardPrompt += `\n\n${lockBlock}`;
+    const prev = previousBoardBlock(existingProject.storyboard);
+    if (prev) storyboardPrompt += `\n\n${prev}`;
     storyboardPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
-    if (existingProject.storyboard?.narrative) {
-      storyboardPrompt += `\n\n## Previous Storyboard Narrative\n${existingProject.storyboard.narrative}`;
-    }
   }
 
   // Narration-first storyboarding: when the project already carries a
@@ -729,6 +741,7 @@ export async function queueStoryboardGeneration(params: {
       voiceover: params.voiceover,
       voice: params.voice,
       storyboardOnly: true,
+      brief: redraftBrief,
     });
     if (pipelineResult.status === "error") throw new Error(pipelineResult.error || "Storyboard failed");
     let project = pipelineResult.project!;

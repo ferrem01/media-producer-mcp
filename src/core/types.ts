@@ -672,6 +672,9 @@ export interface Project {
     directorNote: string;
   };
   /** The original prompt that kicked off generation (the ask). */
+  /** The ORIGINAL brief (SPEC-briefs.md): set on the first storyboard and
+   *  never overwritten by a redraft, whose prompt is brief + locks + feedback. */
+  brief?: string;
   prompt?: string;
   /** The film's WORLD (SPEC-world.md): one continuous backdrop/theme
    *  contract authored at the creative-director stage and honored by every
