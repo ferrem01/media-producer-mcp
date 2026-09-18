@@ -3656,3 +3656,19 @@ header and popup-style rows, the storyboard modal is the app's dialog (white,
 28px outline buttons, the timeline sits in a 10px bordered container, and
 the draft view is a Quotient page (32px padding, 20px/500 title, cards with
 shadow-sub, chips as pills). Checked on a seeded board and a built project.
+
+## The sheet-row test: three things the system dropped (SPEC-briefs.md)
+
+Row 1 of the marketing sheet produced a board, then a single "add the end
+line and tighten" redraft rewrote the hook, dropped the burst of task cards
+the storyline was built on, and left an empty gradient scene -- the redraft
+was handed only the feedback and the previous narrative (and `params.prompt`
+was undefined, so the project's prompt became "undefined\n## Revision
+Feedback…"). Three fixes: (1) a redraft carries the original brief, what it
+LOCKS (`brief-locks.ts`), and the whole previous board; the brief is
+persisted once as `project.brief`; a board missing a locked line warns.
+(2) A `stock_footage` need is fetched on any grammar; on a film nobody
+carries it becomes the scene's ground via the media-backdrop channel. The
+writer's assets schema and launch-film guidance say so. (3) A framed desktop
+mock (data-mp-frame) crops its own edges on purpose; the off-canvas gate no
+longer reports its toolbar buttons as content below the fold.

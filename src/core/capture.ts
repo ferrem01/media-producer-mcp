@@ -1068,7 +1068,13 @@ export async function captureSingleFrame(options: {
               // Panels/plain text park off-canvas legitimately mid-animation;
               // a BUTTON or MEDIA element fully outside is the CTA-under-the-
               // fold class. (Persistence across probes filters the rest.)
-              if (kind === "button" || kind === "media") {
+              // A FRAMED wrapper (data-mp-frame: a desktop mock scaled onto
+              // its performing region on a tall frame) crops its own edges
+              // on purpose -- the toolbar buttons past the frame are the
+              // crop, not content below the fold (measured: proj_3ce292de's
+              // campaign screen on 4x5 flagged "Filters"/"Grouping").
+              const framedHere = !!(el.closest && el.closest("[data-mp-frame]"));
+              if ((kind === "button" || kind === "media") && !framedHere) {
                 const edge = r.top >= vh ? "bottom" : r.bottom <= 0 ? "top" : r.left >= vw ? "right" : "left";
                 const px = Math.round(edge === "bottom" ? r.bottom - vh : edge === "top" ? -r.top : edge === "right" ? r.right - vw : -r.left);
                 offCanvasContent.push({ label: `${kind} ${labelOf(el, dt)}`, edge, offFrac: 1, px });
@@ -1130,7 +1136,8 @@ export async function captureSingleFrame(options: {
           // layers are exempt (backdrops oversize on purpose).
           const kindHere = contentKind(el, cs, directText);
           const fullBleedIsh = r.width >= vw * 0.9 || r.height >= vh * 0.9;
-          if (kindHere && !fullBleedIsh && r.width * r.height >= 1500) {
+          const inFramed = !!(el.closest && el.closest("[data-mp-frame]"));
+          if (kindHere && !fullBleedIsh && !inFramed && r.width * r.height >= 1500) {
             const visW = Math.min(r.right, vw) - Math.max(r.left, 0);
             const visH = Math.min(r.bottom, vh) - Math.max(r.top, 0);
             const offFrac = 1 - (Math.max(0, visW) * Math.max(0, visH)) / (r.width * r.height);

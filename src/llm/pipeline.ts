@@ -30,6 +30,7 @@ import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface } from "../core/asset-needs.js";
+import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
 import { applySpine, extractAnchors, resolveComponent } from "../core/word-anchors.js";
@@ -142,6 +143,8 @@ export interface PipelineOpts {
 
   // Storyboard-only mode: run concept director + storyboard builder, save storyboard, stop before scene generation
   storyboardOnly?: boolean;
+  /** The original brief when this run is a redraft (server passes the project's). */
+  brief?: string;
 
   /** BUILD-FROM-BOARD: an approved saved storyboard to build VERBATIM.
    *  Skips the creative director AND the storyboard builder -- the board the
@@ -3099,6 +3102,17 @@ async function runUnifiedPipeline(
   if (opts.storyboardOnly) {
     project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
     project.prompt = opts.prompt;
+    // THE BRIEF SURVIVES: the first prompt is the brief; a redraft passes it
+    // through. The board is then checked against what the brief locked.
+    project.brief = opts.brief || project.brief || opts.prompt;
+    {
+      const locks = extractBriefLocks(project.brief);
+      const missing = missingLocks(project.storyboard, locks);
+      if (missing.length) {
+        (project.storyboard as any).warnings = missing.map((q) => `The brief locks this line and the board does not carry it: "${q}"`);
+        console.warn(`  Storyboard: ${missing.length} locked line(s) missing -- ${missing.map((q) => `"${q}"`).join(", ")}`);
+      }
+    }
     project.status = "storyboard";
     project.created_at = new Date().toISOString();
     project.updated_at = new Date().toISOString();
@@ -3172,7 +3186,14 @@ async function runUnifiedPipeline(
       delete d.broll_query;
     }
   }
-  if (personCarries(filmGrammar) && (canDraw || canFetchStock)) {
+  // REAL FOOTAGE ON ANY GRAMMAR (measured live, proj_3ce292de: a hero film
+  // asked for "real office + floating cards" and got a gradient -- the
+  // stock lane only existed on person films). On a film nobody carries the
+  // fetched clip is the scene's GROUND: it rides the media-backdrop channel
+  // the codegen b-roll already uses, under the type and the cards.
+  var needFootage = new Map<number, string>();
+  const personFilm = personCarries(filmGrammar);
+  if ((personFilm && (canDraw || canFetchStock)) || canFetchStock) {
     const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
     const madeHere = (n: any) => n && (n.type === "illustration" || n.type === "stock_footage");
     let drawn = 0;
@@ -3199,6 +3220,7 @@ async function runUnifiedPipeline(
               need.path = `/assets/${opts.tenant_id}/projects/${projectId}/assets/${filename}`;
               need.status = "provided";
               fetchedStock++;
+              if (!personFilm) needFootage.set(i, need.path);
               console.log(`  B-roll: scene ${i + 1} -- fetched "${String(need.description).slice(0, 60)}" -> ${filename} (${clip.width}x${clip.height}, ${clip.duration}s)`);
             } else {
               console.log(`  B-roll: scene ${i + 1} -- nothing found for "${String(need.description).slice(0, 60)}"; stays a need for the human`);
@@ -3208,7 +3230,7 @@ async function runUnifiedPipeline(
           }
           continue;
         }
-        if (need.type !== "illustration" || !canDraw) continue;
+        if (need.type !== "illustration" || !canDraw || !personFilm) continue;
         try {
           await fs.mkdir(assetsDir, { recursive: true });
           const prompt = `${String(need.description || "").trim()}. ${need.focus ? `The eye goes to: ${String(need.focus).trim()}. ` : ""}A single clear subject, flat illustrated art with soft depth, one palette, generous empty margin around the subject, no text, no letters, no logos.`;
@@ -3222,6 +3244,7 @@ async function runUnifiedPipeline(
         }
       }
       if (!Array.isArray(d.components)) d.components = [];
+      if (!personFilm) continue; // the ground is laid by the generator, not cut in
       const already = new Set((d.components as any[]).map((c) => c && typeof c === "object" && c.data ? String(c.data.src || "") : ""));
       for (const cut of proofComponents(d)) {
         const src = String((cut as any).data?.src);
@@ -3249,7 +3272,7 @@ async function runUnifiedPipeline(
   // hand its URL to the codegen, which PLACES it as the scene background itself
   // (exactly like a hero image -- the agent owns the composition, no special
   // injection). Capped so b-roll stays intentional. Gated by PEXELS_API_KEY.
-  var brollUrlMap = new Map<number, string>();
+  var brollUrlMap = new Map<number, string>(needFootage);
   if (process.env.PEXELS_API_KEY) {
     trace?.beginEvent("stock_footage");
     const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
@@ -4082,6 +4105,7 @@ async function runUnifiedPipeline(
   // not just in storyboard-only mode.
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
   project.prompt = opts.prompt;
+  project.brief = opts.brief || project.brief || opts.prompt;
   project.status = "generated";
   await saveProject(project);
 
