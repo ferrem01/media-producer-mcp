@@ -3629,3 +3629,21 @@ Everyone in a tenant sees everything; the tenant switcher is not built.
 Follow-up: founding adopts the domain's OLDEST existing tenant, whoever's it
 is -- a colleague signing in before the owner used to found a fresh empty
 tenant that the owner then joined, their projects out of view.
+
+## Studio, the take page and the team page look like Quotient
+
+Marc: make Studio and the take page look like the Quotient app, with its
+polish. The app's design system was extracted from its UI layer (tokens,
+type, component recipes, layout numbers) into `src/quotient-theme.ts`: a
+blue-violet tinted neutral scale, near-black as the accent, borders almost
+invisible with shadows doing the separating, 12px radius on controls and
+8px on small things, Inter at 14px medium for anything clickable, gray focus
+rings, 150ms motion with a 1px press dip, dark mode by system preference.
+Every page this server serves to a person includes it. The desktop Studio's
+palette was mapped onto the tokens (its indigo became Quotient's blue for
+selection and information; buttons became near-black), its chrome rewritten
+as the app's: transparent top bar and sidebar on the canvas gradient, the
+main area a white core panel rounded on its left corners, scene rows as nav
+items. The phone Studio, take page and team page were restyled outright; the
+take page's camera stage stays black. Measured on screenshots of all four
+against a seeded project.
