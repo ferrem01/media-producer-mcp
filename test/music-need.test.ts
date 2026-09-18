@@ -62,9 +62,16 @@ describe("the music choice: the film's bed is a need, chosen in the board", () =
     expect(desktop).not.toMatch(/loadProject\([^)]*\)\.then/);
     const music = await read("src/audio/music.ts");
     expect(music).toMatch(/replace\(\/&amp;\/g, "&"\)/);
+    // A Jamendo pick fetches the search result's own link; the id lookup is
+    // intermittent (measured live: "Track jamendo-26747 not found").
+    expect(music).toMatch(/download_url: t\.audiodownload \|\| t\.audio/);
+    expect(music).toMatch(/if \(choice\.download_url && \/\^https:[\s\S]*?jamendo[\s\S]*?fetch\(choice\.download_url\)/);
+    expect(await read("src/index.ts")).toMatch(/download_url: mpBody\.download_url/);
+    expect(desktop).toMatch(/download_url: t\.download_url \}, row/);
     const phone = await read("src/studio-phone.ts");
     expect(phone).toMatch(/nd\.appendChild\(musicBox\(\)\);/);
     expect(phone).toMatch(/'\/music-options\/' \+ encodeURIComponent\(tenant\)/);
     expect(phone).toMatch(/<input type="file" id="musicPicker" accept="audio\/\*">/);
+    expect(phone).toMatch(/download_url: t\.download_url \}, /);
   });
 });

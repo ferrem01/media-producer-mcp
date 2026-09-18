@@ -447,6 +447,9 @@ export interface MusicChoice {
   artist?: string;
   license?: string;
   duration?: number;
+  /** Where the file can be fetched (a Jamendo pick: the search result's own
+   *  download link -- the lookup by id is intermittent). */
+  download_url?: string;
   chosen_at: string;
 }
 
