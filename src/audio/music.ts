@@ -240,7 +240,17 @@ export async function listMusicOptions(opts: { tenantId: string; brandKit?: Bran
   const jamendo_configured = !!process.env.JAMENDO_CLIENT_ID;
   let jamendo: MusicOption[] = [];
   if (jamendo_configured) {
-    const found = await searchJamendoTracks(String(opts.query || mood), { limit: 8, minDuration: opts.minDuration, instrumental }).catch(() => [] as JamendoHit[]);
+    // The mood first, then the same reliably-populated tags the auto pick
+    // walks -- a board's mood ("driving") is often not a Jamendo tag, and an
+    // empty picker on first open reads as broken. Words typed are tried alone.
+    const words = String(opts.query || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    const moodChain = [mood, ...["electronic", "pop", "happy", "chill", "rock", "calm"].filter((t) => t !== mood)];
+    const chain = opts.query ? [words.join(" "), ...words.filter((w) => w.length > 2 && words.length > 1), ...moodChain] : moodChain;
+    let found: JamendoHit[] = [];
+    for (const tag of chain) {
+      found = await searchJamendoTracks(tag, { limit: 8, minDuration: opts.minDuration, instrumental }).catch(() => [] as JamendoHit[]);
+      if (found.length) break;
+    }
     jamendo = found.map((t) => ({ id: `jamendo-${t.id}`, title: t.name, artist: t.artist_name, duration: Number(t.duration) || 0, source: "jamendo" as const, license: t.license_ccurl || "CC (Jamendo)", preview_url: t.audio || t.audiodownload }));
   }
   return { brand, stock, jamendo, jamendo_configured };
