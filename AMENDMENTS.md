@@ -3703,3 +3703,23 @@ for recordings, the description, "Upload the real one in Studio"). The
 writer still casts the mock on the board -- it is how the build knows where
 the screen goes -- and the contract says so.
 
+## The sources: find, draw, record, upload -- each need collected in the board
+
+Marc: needs are collected each its own way (the take page for a speaker,
+the Recorder for a screencast, a b-roll library, image generation, music),
+so the board should offer each need its ways, and the built film should
+open the same card. This pass does the board. `NEED_SOURCES`
+(`core/need-sources.ts`) is the table; the desktop and phone need cards
+render it (Record / Recorder / Find b-roll / Draw it / Upload), with find
+and draw as inline panels under the row (the card also lives inside the
+storyboard dialog, so no second modal). Two routes: `stock-search`
+(Pexels candidates -- `searchStockFootage`, split out of the build's
+fetch; `downloadStockFootage` takes the pick by id) and `need-source`
+(find or draw into the project's assets, then `provideAsset`, the same
+write an upload makes). The build's idea-beat prompt moved to
+`drawPrompt` so a redraw from Studio matches. The Recorder lists the
+chosen project's open screen needs under For; a recording made for one is
+uploaded into that project and posted to `provide-asset` (no events, no
+assembly) and the popup links to Studio. Left for the next passes: music
+as a need; click-the-slot in a built scene opening the same card.
+

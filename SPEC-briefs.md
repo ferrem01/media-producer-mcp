@@ -51,6 +51,29 @@ the screen goes and when. When the recording is uploaded,
 `castProvidedScreens` gives it the slate's slot and the slate leaves.
 Studio lists the need with Upload like any other.
 
+## The sources: every need is collected its own way, in the board
+
+Marc: a storyboard that lists what it needs should let you get each thing
+where you stand. A camera take is recorded on the phone (the take page)
+or uploaded; a screen recording is recorded with the Quotient Recorder
+or uploaded; b-roll is found (Pexels, a picker of candidates) or
+uploaded; an illustration or product mock is drawn (image generation,
+the build's own prompt) or uploaded. The table is `NEED_SOURCES`
+(`core/need-sources.ts`); Studio renders it as the buttons on each need
+row, desktop and phone, with the find and draw panels inline under the
+row. Every source ends in the same write, `provideAsset`, and the build
+casts the file into the slot the board held for it (the take base, the
+screen slate's slot, the b-roll ground, the idea beat's cut). Server:
+`GET /api/stock-search/{tenant}?q=` for the candidates and
+`POST /api/need-source/{tenant}/{project}` `{scene_index, asset_index,
+source: find|draw, pick_id?|prompt?}` for the make-it sources. The
+Recorder gained a For picker: with a project chosen under Save to, its
+open screen needs are listed, and a recording made for one is uploaded
+into that project and fills the need instead of becoming a new scene.
+
+Not yet: music as a need (the audio system still picks at build time),
+and opening the same card by clicking the slot in a built scene.
+
 ## Columns the sheet should add
 
 - **Format / placement** (16x9, 4x5, 9x16; where it ships) -- the frame is a

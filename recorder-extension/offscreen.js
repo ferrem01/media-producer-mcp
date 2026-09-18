@@ -251,7 +251,10 @@ async function stop(upload) {
     report(0);
     const uploadAsset = (name, body) => new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${base}/api/upload-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(upload.project)}?${q(`&name=${encodeURIComponent(name)}`)}`);
+      // A recording made FOR a need is uploaded into that project's own
+      // assets, where its storyboard expects the file.
+      const uploadProject = (upload.destProjectId && upload.destNeed) ? upload.destProjectId : upload.project;
+      xhr.open("POST", `${base}/api/upload-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(uploadProject)}?${q(`&name=${encodeURIComponent(name)}`)}`);
       xhr.upload.onprogress = (e) => { if (e.lengthComputable) report(e.loaded); };
       xhr.onload = () => {
         let j = null;
@@ -272,6 +275,21 @@ async function stop(upload) {
     const finalName = upJson.url.split("/").pop();
     let camJson = null;
     if (camBlob && camBlob.size) camJson = await uploadAsset(upload.cameraName, camBlob);
+
+    // 1b. THE SOURCES: a recording made FOR a need fills it -- the same
+    // write an upload in Studio makes -- and takes the slot the board held.
+    // No events, no assembly: the build casts it next.
+    if (upload.destProjectId && upload.destNeed) {
+      const [sceneIndex, assetIndex] = String(upload.destNeed).split(":").map((n) => parseInt(n, 10));
+      const pvRes = await fetch(
+        `${base}/api/provide-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(upload.destProjectId)}?${q()}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: upJson.url, scene_index: sceneIndex, asset_index: assetIndex }) },
+      );
+      const pvJson = await pvRes.json().catch(() => ({}));
+      if (!pvRes.ok || !pvJson.ok) throw new Error(pvJson.error || `provide HTTP ${pvRes.status}`);
+      status("ready", null, studioUrl(upload, upload.destProjectId));
+      return;
+    }
 
     // 2. Events sidecar (recording dims from the actual track).
     const events = upload.events;

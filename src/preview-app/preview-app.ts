@@ -980,7 +980,7 @@ ${QUOTIENT_CSS}
      scene's own card, draft view and storyboard editor alike. ── */
   .np-block { margin: 12px 0 8px; padding: 12px 14px; border: 1px solid var(--border-secondary); border-radius: var(--radius); background: var(--surface-primary); box-shadow: var(--shadow-sub); }
   .np-lead { font-size: 12px; font-weight: 500; letter-spacing: 0; color: var(--content-tertiary); text-transform: none; margin-bottom: 4px; }
-  .np-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--border-secondary); }
+  .np-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--border-secondary); }
   .np-row .np-what { flex: 1; min-width: 0; font-size: 12px; color: var(--content-secondary); line-height: 1.35; }
   .np-row .np-what small { display: block; color: var(--content-secondary); font-size: 11px; }
   .np-row .np-what small b { color: var(--orange-500); font-weight: 700; }
@@ -990,6 +990,23 @@ ${QUOTIENT_CSS}
   .np-btn:hover { background: var(--accent); }
   .np-btn:active { transform: translateY(1px); }
   .np-note { font-size: 11px; color: var(--content-secondary); margin-top: 8px; }
+  /* THE SOURCES: each need collects its own way, inline under its row. */
+  .np-act { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .np-panel { flex-basis: 100%; margin: 6px 0 2px; padding: 10px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--surface-secondary, var(--core-panel-bg)); }
+  .np-panel .np-search { display: flex; gap: 6px; margin-bottom: 8px; }
+  .np-panel input, .np-panel textarea { flex: 1; min-width: 0; box-sizing: border-box; padding: 6px 10px; font: 13px/18px inherit; border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--surface-primary); color: var(--foreground); }
+  .np-panel textarea { width: 100%; min-height: 56px; resize: vertical; margin-bottom: 8px; }
+  .np-panel input:focus, .np-panel textarea:focus { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
+  .np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
+  .np-cand { position: relative; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; background: #111; aspect-ratio: 16 / 10; }
+  .np-cand.tall { aspect-ratio: 4 / 5; }
+  .np-cand img, .np-cand video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .np-cand small { position: absolute; right: 4px; bottom: 4px; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; }
+  .np-cand:hover { border-color: var(--ring); }
+  .np-cand.busy { opacity: .5; pointer-events: none; }
+  .np-hint { font-size: 12px; color: var(--content-secondary); line-height: 1.5; }
+  .np-hint b { color: var(--foreground); }
+  .np-empty { font-size: 12px; color: var(--content-secondary); padding: 6px 0; }
 
   /* ── Storyboard draft view: THE TRUE STORYBOARD, one card at a time ──
      Rail = thumbnail strip (pick a scene). Main = that scene's full card:
@@ -3975,7 +3992,13 @@ ${QUOTIENT_CSS}
   // section in the nav). Record opens the booth for that scene (webcam
   // here, phone there); Upload pushes a file through the same routes the
   // phone view uses (upload-asset, then take or provide-asset).
-  var NP_LABELS = { camera_video: 'Camera take', screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock' };
+  var NP_LABELS = { camera_video: 'Camera take', screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock', illustration: 'Illustration' };
+  // THE SOURCES (SPEC-briefs.md): how each kind of need is collected, in
+  // the board. Record and Upload have their own paths; find (Pexels) and
+  // draw (image generation) open a panel under the row and end in the
+  // same write an upload makes (need-source -> provideAsset).
+  var NP_SOURCES = { camera_video: ['record', 'upload'], screen_recording: ['recorder', 'upload'], screenshot: ['recorder', 'upload'], stock_footage: ['find', 'upload'], illustration: ['draw', 'upload'], mockup: ['draw', 'upload'] };
+  var NP_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Record with the Recorder' };
   var npPick = null;
   function sceneNeedsHtml(project, si) {
     var s = ((project.storyboard && project.storyboard.scenes) || [])[si];
@@ -3988,26 +4011,104 @@ ${QUOTIENT_CSS}
     });
     if (!rows.length) return '';
     var open = rows.filter(function(r) { return r.need.status === 'needed'; }).length;
-    var h = '<div class="np-block" data-np-block="' + si + '"><div class="np-lead">This scene needs' + (open ? '' : ' \u00b7 all in') + '</div>';
+    var h = '<div class="np-block" data-np-block="' + si + '"><div class="np-lead">This scene needs' + (open ? '' : ' · all in') + '</div>';
     rows.forEach(function(r) {
       var a = r.need, have = a.status === 'provided' && a.path;
       var kind = NP_LABELS[a.type] || a.type;
       var what = a.type === 'camera_video' ? 'A take of the lines' : escHtml(a.description || '');
+      var srcs = NP_SOURCES[a.type] || ['upload'];
+      var acts = '';
+      srcs.forEach(function(src) {
+        if (src === 'record') {
+          acts += '<a class="np-btn" target="_blank" href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '">' + (have ? 'Re-record' : 'Record') + '</a>';
+        } else if (src === 'upload') {
+          acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + r.ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
+        } else {
+          var lbl = NP_SOURCE_LABELS[src];
+          if (have && src === 'find') lbl = 'Find another';
+          if (have && src === 'draw') lbl = 'Redraw';
+          acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + r.ai + '">' + lbl + '</button>';
+        }
+      });
       h += '<div class="np-row"><div class="np-what">' + what +
-        '<small>' + escHtml(kind) + (a.use === 'card' ? ' \u00b7 card' : (a.type !== 'camera_video' ? ' \u00b7 cutaway' : '')) +
-        ' \u00b7 ' + (have ? '<b class="ok">provided</b>' : (a.priority === 'nice_to_have' ? 'optional' : '<b>needed</b>')) + '</small></div>' +
-        '<div class="np-act">' +
-        (a.type === 'camera_video' ? '<a class="np-btn" target="_blank" href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '">' + (have ? 'Re-record' : 'Record') + '</a>' : '') +
-        '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + r.ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>' +
-        '</div></div>';
+        '<small>' + escHtml(kind) + (a.use === 'card' ? ' · card' : (a.use === 'split' ? ' · split' : (a.type !== 'camera_video' ? ' · cutaway' : ''))) +
+        ' · ' + (have ? '<b class="ok">provided</b>' : (a.priority === 'nice_to_have' ? 'optional' : '<b>needed</b>')) + '</small></div>' +
+        '<div class="np-act">' + acts + '</div>' +
+        '<div class="np-panel" data-np-panel="' + si + '-' + r.ai + '" style="display:none"></div></div>';
     });
-    if (rows.some(function(r) { return r.need.type !== 'camera_video'; })) h += '<div class="np-note">Proof cuts in full-frame on its words at the next build. The film builds without it.</div>';
+    if (rows.some(function(r) { return r.need.type !== 'camera_video'; })) h += '<div class="np-note">A found, drawn or uploaded file takes its slot at the next build. The film builds without it.</div>';
     return h + '</div>';
+  }
+  function npProjectTall(project) {
+    var f = String((project.treatment && project.treatment.frame) || '16x9');
+    return f === '9x16' || f === '4x5';
+  }
+  function npProvide(project, si, ai, body, busyEl, doneMsg) {
+    if (busyEl) busyEl.classList.add('busy');
+    studioStatus(body.source === 'draw' ? 'Drawing… (about half a minute)' : 'Fetching the clip…', 'ok');
+    return api('POST', '/need-source/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), Object.assign({ scene_index: si, asset_index: ai }, body))
+      .then(function() { studioStatus(doneMsg + ' — rebuild to cut it in.', 'ok'); loadProject(project.project_id); })
+      .catch(function(e) { if (busyEl) busyEl.classList.remove('busy'); studioStatus(e.message || String(e), 'err'); });
+  }
+  function npOpenPanel(project, root, src, si, ai) {
+    var panel = (root || document).querySelector('[data-np-panel="' + si + '-' + ai + '"]');
+    if (!panel) return;
+    if (panel.style.display !== 'none' && panel.dataset.src === src) { panel.style.display = 'none'; return; }
+    panel.dataset.src = src; panel.style.display = ''; panel.innerHTML = '';
+    var scene = ((project.storyboard && project.storyboard.scenes) || [])[si] || {};
+    var need = (scene.assets || [])[ai] || {};
+    if (src === 'recorder') {
+      panel.innerHTML = '<div class="np-hint">Open the <b>Quotient Recorder</b> extension on the page to record, choose <b>' + escHtml(project.name || project.project_id) + '</b> under Save to and <b>Scene ' + (si + 1) + ' · ' + escHtml(String(need.description || '').slice(0, 60)) + '</b> under For, then Record. The recording lands here when you stop.</div>';
+      return;
+    }
+    if (src === 'draw') {
+      panel.innerHTML = '<textarea class="np-draw-prompt" placeholder="What to draw">' + escHtml(need.description || '') + '</textarea>' +
+        '<div class="np-act" style="justify-content:flex-start"><button class="np-btn np-draw-go">' + (need.status === 'provided' ? 'Redraw' : 'Draw') + '</button><span class="np-hint">One object, flat art, no words — the build’s own look.</span></div>';
+      panel.querySelector('.np-draw-go').addEventListener('click', function() {
+        var prompt = panel.querySelector('.np-draw-prompt').value.trim();
+        npProvide(project, si, ai, { source: 'draw', prompt: prompt || undefined }, panel, 'Drawn for scene ' + (si + 1));
+      });
+      return;
+    }
+    // find: search Pexels, pick one.
+    var tall = npProjectTall(project);
+    panel.innerHTML = '<div class="np-search"><input class="np-q" type="text" placeholder="Search b-roll" value="' + escAttr(need.description || '') + '"><button class="np-btn np-go">Search</button></div><div class="np-grid"></div>';
+    var grid = panel.querySelector('.np-grid');
+    function search() {
+      var q = panel.querySelector('.np-q').value.trim(); if (!q) return;
+      grid.innerHTML = '<div class="np-empty">Searching…</div>';
+      api('/stock-search/' + encodeURIComponent(state.tenantId) + '?q=' + encodeURIComponent(q) + '&orientation=' + (tall ? 'portrait' : 'landscape'))
+        .then(function(r) {
+          var hits = (r && r.results) || [];
+          grid.innerHTML = hits.length ? '' : '<div class="np-empty">Nothing found. Try other words.</div>';
+          hits.forEach(function(c) {
+            var d = document.createElement('div'); d.className = 'np-cand' + (tall ? ' tall' : ''); d.title = 'Use this clip';
+            d.innerHTML = '<img src="' + escAttr(c.image || '') + '" alt=""><small>' + Math.round(c.duration || 0) + 's</small>';
+            if (c.preview) {
+              d.addEventListener('mouseenter', function() {
+                if (d.querySelector('video')) return;
+                var v = document.createElement('video'); v.src = c.preview; v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+                d.insertBefore(v, d.firstChild); v.play().catch(function() {});
+              });
+              d.addEventListener('mouseleave', function() { var v = d.querySelector('video'); if (v) v.remove(); });
+            }
+            d.addEventListener('click', function() { npProvide(project, si, ai, { source: 'find', pick_id: c.id }, panel, 'B-roll picked for scene ' + (si + 1)); });
+            grid.appendChild(d);
+          });
+        })
+        .catch(function(e) { grid.innerHTML = '<div class="np-empty">' + escHtml(e.message || String(e)) + '</div>'; });
+    }
+    panel.querySelector('.np-go').addEventListener('click', search);
+    panel.querySelector('.np-q').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); search(); } });
+    search();
   }
   function bindSceneNeeds(project, root) {
     (root || document).querySelectorAll('button[data-np-scene]').forEach(function(btn) {
+      if (btn.dataset.npBound) return; btn.dataset.npBound = '1';
       btn.addEventListener('click', function() {
-        npPick = { scene: parseInt(btn.dataset.npScene, 10), asset: parseInt(btn.dataset.npAsset, 10), type: btn.dataset.npType, project: project.project_id };
+        var si = parseInt(btn.dataset.npScene, 10), ai = parseInt(btn.dataset.npAsset, 10);
+        if (btn.dataset.npSrc) { npOpenPanel(project, root, btn.dataset.npSrc, si, ai); return; }
+        npPick = { scene: si, asset: ai, type: btn.dataset.npType, project: project.project_id };
         var f = document.getElementById('np-file');
         f.accept = npPick.type === 'camera_video' ? 'video/*' : 'image/*,video/*';
         f.value = ''; f.click();
