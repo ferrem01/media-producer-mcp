@@ -125,6 +125,31 @@ Mostly a **Studio UI + wiring** project, not new generation infra. **TODO: write
 SPEC** (preview→Studio rename, element-pick + context-menu, revise wiring, scope of
 revise = element vs scene).
 
+### Pinned: rebuild Studio on React + the Quotient component library  *(discussed 2026-09-18, not started)*
+Studio, the phone Studio, the take page and the team page now wear Quotient's
+design system as hand-written CSS (`src/quotient-theme.ts`, PRs #812–#813): a
+translation of the app's tokens and component recipes, re-derived by hand
+whenever Quotient's design moves. The question on the table: rebuild Studio in
+React on Quotient's shadcn-style component library so the pills, dialogs,
+selects, tables and toasts are the real ones and stay in sync for free.
+
+- **Gain:** exact components, dark mode / focus / keyboard behaviour for free,
+  one design language in one codebase, and the phone Studio + take page could
+  share components with the desktop for the first time.
+- **Cost:** Studio is ~10k lines of vanilla JS with timing-heavy, tuned
+  interactions (timeline lanes + scrubbing, the live preview iframe on a master
+  clock, the speaker-video swap at cuts, the storyboard editor, the narration
+  booth). A full rewrite is multi-week and the risk sits in those interactions,
+  not the styling. It also adds a build step and a second package to a repo
+  that deliberately has neither; the Quotient repo is a different GitHub owner,
+  so the component library would have to be published or vendored.
+- **Recommended shape when we do it:** keep Studio's engine; adopt React only
+  for the form-like screens where the components matter most -- the board
+  view, the needs panel, the team page, dialogs -- one screen at a time, each
+  shippable alone. The timeline and preview stay vanilla under the Quotient
+  skin. Do it after the recipes stop changing weekly; every recipe change
+  touches Studio today.
+
 ## Second tier — widen the moat
 4. **Deepen the autonomous quality loop:** de-duplicating keyframe-snapped storyboard
    sampler for editorial (Palmier); ✅ run the correctness gate on **bookend** scenes (done);
