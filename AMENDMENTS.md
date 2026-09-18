@@ -3647,3 +3647,12 @@ main area a white core panel rounded on its left corners, scene rows as nav
 items. The phone Studio, take page and team page were restyled outright; the
 take page's camera stage stays black. Measured on screenshots of all four
 against a seeded project.
+Second pass, after Marc refreshed and saw only the buttons change: the shell
+itself. Scene rows are nav items (13px/500 label without the redundant
+"Scene N -" prefix, 12px muted meta, status as a Quotient pill reading "1
+unresolved"), the inspector is a white panel with the app's 56px compact
+header and popup-style rows, the storyboard modal is the app's dialog (white,
+12px, 20% overlay) instead of a dark card, the needs block is a card with
+28px outline buttons, the timeline sits in a 10px bordered container, and
+the draft view is a Quotient page (32px padding, 20px/500 title, cards with
+shadow-sub, chips as pills). Checked on a seeded board and a built project.
