@@ -76,7 +76,19 @@ ${QUOTIENT_CSS}
   .needs .line.done .n { color: #0d542b; }
   .needs .note { color: var(--muted-foreground); font-size: 12px; margin-top: 8px; }
   .proof { margin-top: 10px; border-top: 1px solid var(--border-secondary); padding-top: 8px; }
-  .proof .ev { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+  .proof .ev { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 6px 0; }
+  .proof .ev .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  /* THE SOURCES: find / draw / recorder open a panel under the row. */
+  .src-panel { flex-basis: 100%; padding: 10px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--core-panel-bg, var(--surface-secondary)); }
+  .src-panel.hint { font-size: 13px; color: var(--muted-foreground); line-height: 1.45; }
+  .src-panel input, .src-panel textarea { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; padding: 8px 10px; font: 14px/20px var(--font-sans); border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--card); color: var(--foreground); }
+  .src-panel textarea { min-height: 64px; resize: vertical; margin-bottom: 8px; }
+  .src-panel .row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .src-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 13px; color: var(--muted-foreground); }
+  .proof .ev .cand { position: relative; aspect-ratio: 16 / 10; border-radius: var(--radius-sm); overflow: hidden; background: #111; border: 1px solid var(--border-secondary); }
+  .proof .ev .cand.tall { aspect-ratio: 4 / 5; }
+  .proof .ev .cand img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; display: block; }
+  .proof .ev .cand small { position: absolute; right: 4px; bottom: 4px; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; }
   .proof .ev .what { flex: 1 1 auto; font-size: 14px; line-height: 1.35; }
   .proof .ev .what small { display: block; color: var(--muted-foreground); font-size: 12px; }
   .proof .ev img, .proof .ev video { width: 56px; height: 56px; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-tertiary); flex: 0 0 auto; }
@@ -143,7 +155,60 @@ ${QUOTIENT_CSS}
   var P = null, pickingScene = -1, jobTimer = null, editing = -1, pickingProof = null;
   // The proof a claim asked for (SPEC-creator-cut.md): every need on the
   // scene that is not the camera take, listed with its index for Upload.
-  var EV_LABELS = { screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock' };
+  var EV_LABELS = { screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock', illustration: 'Illustration' };
+  // THE SOURCES (SPEC-briefs.md): each kind of need is collected its own
+  // way, here on the card. Find (Pexels) and Draw (image generation) end
+  // in the same write an upload makes (need-source -> provideAsset).
+  var EV_SOURCES = { screen_recording: ['recorder'], screenshot: ['recorder'], stock_footage: ['find'], illustration: ['draw'], mockup: ['draw'] };
+  var EV_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Recorder' };
+  function tallFrame() { var f = String((P && P.treatment && P.treatment.frame) || '16x9'); return f === '9x16' || f === '4x5'; }
+  function provideFrom(i, j, body, doneMsg) {
+    say(body.source === 'draw' ? 'Drawing… (about half a minute)' : 'Fetching the clip…');
+    return api('POST', '/need-source/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), Object.assign({ scene_index: i, asset_index: j }, body))
+      .then(function () { say(doneMsg); return load(); })
+      .catch(function (e) { say(e.message || String(e), true); });
+  }
+  function sourcePanel(row, src, i, j, need) {
+    var old = row.querySelector('.src-panel');
+    if (old) { var was = old.dataset.src; old.remove(); if (was === src) return; }
+    var panel = document.createElement('div'); panel.className = 'src-panel'; panel.dataset.src = src;
+    if (src === 'recorder') {
+      panel.textContent = 'On your computer, open the Quotient Recorder on the page to record, pick this project under Save to and \u201cScene ' + (i + 1) + '\u201d under For, then Record. The recording lands here.';
+      panel.className += ' hint';
+    } else if (src === 'draw') {
+      var ta = document.createElement('textarea'); ta.value = need.description || ''; ta.placeholder = 'What to draw'; panel.appendChild(ta);
+      var go = document.createElement('button'); go.className = 'btn small'; go.textContent = need.status === 'provided' ? 'Redraw' : 'Draw';
+      go.onclick = function () { go.disabled = true; provideFrom(i, j, { source: 'draw', prompt: ta.value.trim() || undefined }, 'Drawn for scene ' + (i + 1) + '. Rebuild to cut it in.'); };
+      panel.appendChild(go);
+    } else {
+      var srch = document.createElement('div'); srch.className = 'row';
+      var q = document.createElement('input'); q.type = 'text'; q.value = need.description || ''; q.placeholder = 'Search b-roll';
+      var sb = document.createElement('button'); sb.className = 'btn small'; sb.textContent = 'Search';
+      srch.appendChild(q); srch.appendChild(sb); panel.appendChild(srch);
+      var grid = document.createElement('div'); grid.className = 'src-grid'; panel.appendChild(grid);
+      var tall = tallFrame();
+      function search() {
+        if (!q.value.trim()) return;
+        grid.textContent = 'Searching\u2026';
+        api('GET', '/stock-search/' + encodeURIComponent(tenant) + '?q=' + encodeURIComponent(q.value.trim()) + '&orientation=' + (tall ? 'portrait' : 'landscape'))
+          .then(function (r) {
+            var hits = (r && r.results) || [];
+            grid.textContent = hits.length ? '' : 'Nothing found. Try other words.';
+            hits.forEach(function (c) {
+              var d = document.createElement('div'); d.className = 'cand' + (tall ? ' tall' : '');
+              var im = document.createElement('img'); im.src = c.image || ''; im.alt = ''; d.appendChild(im);
+              var dur = document.createElement('small'); dur.textContent = Math.round(c.duration || 0) + 's'; d.appendChild(dur);
+              d.onclick = function () { d.style.opacity = '.5'; provideFrom(i, j, { source: 'find', pick_id: c.id }, 'B-roll picked for scene ' + (i + 1) + '. Rebuild to cut it in.'); };
+              grid.appendChild(d);
+            });
+          })
+          .catch(function (e) { grid.textContent = e.message || String(e); });
+      }
+      sb.onclick = search; q.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); search(); } };
+      search();
+    }
+    row.appendChild(panel);
+  }
   function proofOf(scene) {
     var out = [];
     (scene.assets || []).forEach(function (x, j) { if (x && x.type !== 'camera_video') out.push({ need: x, index: j }); });
@@ -323,9 +388,16 @@ ${QUOTIENT_CSS}
           var kind = document.createElement('small');
           kind.textContent = (EV_LABELS[need.type] || need.type) + (need.use === 'card' ? ' · card' : ' · cutaway') + (have ? ' · provided' : need.priority === 'nice_to_have' ? ' · optional' : ' · needed');
           what.appendChild(kind); row.appendChild(what);
+          var acts = document.createElement('div'); acts.className = 'acts';
+          (EV_SOURCES[need.type] || []).forEach(function (src) {
+            var b = document.createElement('button'); b.className = 'btn small';
+            b.textContent = have && src === 'find' ? 'Find another' : (have && src === 'draw' ? 'Redraw' : EV_SOURCE_LABELS[src]);
+            b.onclick = function () { sourcePanel(row, src, i, j, need); };
+            acts.appendChild(b);
+          });
           var evUp = document.createElement('button'); evUp.className = 'btn small ghost'; evUp.textContent = have ? 'Replace' : 'Upload';
           evUp.onclick = function () { pickingProof = { scene: i, index: j }; $('evPicker').value = ''; $('evPicker').click(); };
-          row.appendChild(evUp); proof.appendChild(row);
+          acts.appendChild(evUp); row.appendChild(acts); proof.appendChild(row);
         });
         card.appendChild(proof);
       }

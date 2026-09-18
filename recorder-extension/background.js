@@ -13,7 +13,7 @@ let session = null; // { tabId, phase, startedMs, pausedMs, pauseBegan, events, 
 
 // mic defaults ON: "Record my voice" is what almost every walkthrough wants,
 // and the old default of off was masked by the camera capturing audio anyway.
-const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: true, camera: false, prompter: false, destProject: "", micDeviceId: "" };
+const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: true, camera: false, prompter: false, destProject: "", destNeed: "", micDeviceId: "" };
 
 // The one server this build talks to. Users never see or enter it -- the
 // whole setup is "Sign in with Google". (Override via settings.server only
@@ -323,6 +323,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
+      if (msg.type === "qr-needs") {
+        // Popup's For picker: the screens this project's storyboard still
+        // needs (screen_recording / screenshot with status needed).
+        await refreshIfNeeded();
+        const settings = await getSettings();
+        const server = (settings.server || SERVER).replace(/\/+$/, "");
+        if (!settings.tenant || !settings.token || !msg.project) { sendResponse({ ok: false, error: "signed out" }); return; }
+        try {
+          const res = await fetch(`${server}/api/projects/${encodeURIComponent(settings.tenant)}/${encodeURIComponent(msg.project)}?token=${encodeURIComponent(settings.token)}`);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const p = await res.json();
+          const needs = [];
+          ((p && p.storyboard && p.storyboard.scenes) || []).forEach((sc, si) => {
+            (sc.assets || []).forEach((a, ai) => {
+              if (a && (a.type === "screen_recording" || a.type === "screenshot") && a.status === "needed") needs.push({ scene_index: si, asset_index: ai, type: a.type, description: a.description || "" });
+            });
+          });
+          sendResponse({ ok: true, needs });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e && e.message || e) });
+        }
+        return;
+      }
+
       if (msg.type === "qr-start") {
         await refreshIfNeeded(); // never start a take on a stale token
         const settings = await getSettings();
@@ -451,6 +475,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             // Save-to picker: append the take to this project as a new scene
             // instead of assembling a fresh walkthrough project.
             destProjectId: s.settings.destProject || "",
+            // For picker: "scene:asset" of the need this recording fills.
+            destNeed: (s.settings.destProject && s.settings.destNeed) || "",
           },
         });
         sendResponse({ ok: true });

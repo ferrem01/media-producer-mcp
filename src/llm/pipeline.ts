@@ -30,6 +30,7 @@ import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
+import { drawPrompt } from "../core/need-sources.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -3233,7 +3234,7 @@ async function runUnifiedPipeline(
         if (need.type !== "illustration" || !canDraw || !personFilm) continue;
         try {
           await fs.mkdir(assetsDir, { recursive: true });
-          const prompt = `${String(need.description || "").trim()}. ${need.focus ? `The eye goes to: ${String(need.focus).trim()}. ` : ""}A single clear subject, flat illustrated art with soft depth, one palette, generous empty margin around the subject, no text, no letters, no logos.`;
+          const prompt = drawPrompt(need);
           const r = await generateImage({ prompt, size: canvas.height > canvas.width ? "1024x1536" : "1536x1024", quality: "high", outputPath: path.join(assetsDir, `idea_scene_${i + 1}_${drawn + 1}.png`) });
           need.path = `/assets/${opts.tenant_id}/projects/${projectId}/assets/${path.basename(r.path)}`;
           need.status = "provided";

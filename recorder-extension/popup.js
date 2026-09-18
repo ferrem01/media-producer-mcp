@@ -55,10 +55,38 @@ async function loadDestinations(savedId) {
   // no longer exists (the value silently stays "New project" then).
   if (savedId) sel.value = savedId;
   if (sel.value !== savedId) sel.value = "";
+  const { destNeed } = await chrome.storage.sync.get({ destNeed: "" });
+  loadNeeds(sel.value, destNeed);
+}
+
+// "For" picker: the screens the chosen project's storyboard still needs
+// (SPEC-briefs.md, the sources). Picking one makes the recording fill that
+// need -- it takes the slot the board held for it -- instead of appending
+// a scene. Hidden when the project has no open screen need.
+async function loadNeeds(projectId, savedNeed) {
+  const wrap = $("need-wrap"), sel = $("need");
+  while (sel.options.length > 1) sel.remove(1);
+  if (!projectId) { wrap.style.display = "none"; chrome.storage.sync.set({ destNeed: "" }); return; }
+  const res = await chrome.runtime.sendMessage({ type: "qr-needs", project: projectId });
+  const needs = (res && res.ok && res.needs) || [];
+  for (const n of needs) {
+    const opt = document.createElement("option");
+    opt.value = n.scene_index + ":" + n.asset_index;
+    opt.textContent = `Scene ${n.scene_index + 1} · ${n.description}`.slice(0, 64);
+    sel.appendChild(opt);
+  }
+  wrap.style.display = needs.length ? "" : "none";
+  sel.value = savedNeed || "";
+  if (sel.value !== (savedNeed || "")) sel.value = "";
+  chrome.storage.sync.set({ destNeed: sel.value });
 }
 
 $("dest").addEventListener("change", () => {
-  chrome.storage.sync.set({ destProject: $("dest").value });
+  chrome.storage.sync.set({ destProject: $("dest").value, destNeed: "" });
+  loadNeeds($("dest").value, "");
+});
+$("need").addEventListener("change", () => {
+  chrome.storage.sync.set({ destNeed: $("need").value });
 });
 
 $("signin").addEventListener("click", async () => {

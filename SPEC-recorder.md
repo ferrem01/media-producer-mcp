@@ -21,6 +21,17 @@ Record → Stop → link to a finished film. Zero intermediate steps for the use
 The extension uploads (video + events sidecar + optional mic track) to the MCP,
 fires `generate` with `screencast_source`, and surfaces the Studio link when done.
 
+## Recording FOR a need (shipped)
+
+The popup's Save-to picker lists the tenant's projects; with one chosen, a
+For picker lists that project's open screen needs (`screen_recording` /
+`screenshot`, status needed, from `/api/projects/{tenant}/{project}`). A
+recording made for a need is uploaded into that project's assets and
+posted to `/api/provide-asset` with the need's scene and asset index: it
+fills the need and takes the slot the board held for it at the next build
+(SPEC-briefs.md, the sources). No events sidecar, no assembly; the popup
+links straight to Studio.
+
 ## The three modes
 
 ### Mode A — narrate live while demoing

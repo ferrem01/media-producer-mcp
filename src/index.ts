@@ -21,6 +21,8 @@ import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries } from "./core/take-needs.js";
 import { provideAsset, openAssetNeeds } from "./core/asset-needs.js";
+import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
+import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
 import type { Take, Project } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
@@ -864,7 +866,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2282,6 +2284,76 @@ Rules:
         console.log(`  provide-asset: ${evTenant}/${evProject} scene ${evScene + 1} need ${evIndex + 1} <- ${path.basename(evUrl)}`);
         reshootStoryboardCardsSoon(evTenant, evProject);
         jsonResponse(res, 200, { ok: true, scene_index: evScene, asset_index: evIndex, need: evNeed, open_needs: openTakeNeeds(evProjectObj), open_proof: openAssetNeeds(evProjectObj) });
+        return;
+      }
+
+      // ── API: THE SOURCES -- find or draw a need from the board ──
+      // GET  /api/stock-search/{tenant}?q=&orientation=landscape|portrait
+      //   Pexels candidates for the picker (poster, duration, small preview).
+      // POST /api/need-source/{tenant}/{project} {scene_index, asset_index, source: "find"|"draw", pick_id?, query?, prompt?}
+      //   find: download the picked Pexels clip (or the first hit for the
+      //   need's description); draw: generate the image from the need's
+      //   description (or the given prompt). Both end in provideAsset, the
+      //   same write an upload makes -- the build casts the file next.
+      const stockSearchMatch = urlPath.match(/^\/api\/stock-search\/([^/]+)$/);
+      if (stockSearchMatch && method === "GET") {
+        const q = new URL(req.url || "/", "http://localhost").searchParams;
+        const query = String(q.get("q") || "").trim();
+        if (!query) { jsonResponse(res, 400, { error: "q is required" }); return; }
+        if (!process.env.PEXELS_API_KEY) { jsonResponse(res, 503, { error: "B-roll search is not configured on this server (PEXELS_API_KEY)" }); return; }
+        try {
+          const orientation = q.get("orientation") === "portrait" ? "portrait" : "landscape";
+          const results = await searchStockFootage({ query, orientation, perPage: 12 });
+          jsonResponse(res, 200, { ok: true, query, orientation, results });
+        } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
+        return;
+      }
+      const needSourceMatch = urlPath.match(/^\/api\/need-source\/([^/]+)\/([^/]+)$/);
+      if (needSourceMatch && method === "POST") {
+        const [, nsTenant, nsProject] = needSourceMatch.map(decodeURIComponent);
+        let nsBody: Record<string, unknown> = {};
+        try { nsBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "Invalid JSON body" }); return; }
+        const nsScene = Number(nsBody.scene_index), nsIndex = Number(nsBody.asset_index);
+        const source = String(nsBody.source || "");
+        if (!Number.isInteger(nsScene) || !Number.isInteger(nsIndex) || nsScene < 0 || nsIndex < 0) { jsonResponse(res, 400, { error: "scene_index and asset_index are required (0-based)" }); return; }
+        if (source !== "find" && source !== "draw") { jsonResponse(res, 400, { error: "source must be find or draw" }); return; }
+        const nsProj = await loadProject(nsTenant, nsProject);
+        if (!nsProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const nsNeed = nsProj.storyboard?.scenes?.[nsScene]?.assets?.[nsIndex];
+        if (!nsNeed) { jsonResponse(res, 404, { error: `Scene ${nsScene + 1} has no need ${nsIndex + 1}` }); return; }
+        if (!needSources(nsNeed.type).includes(source)) { jsonResponse(res, 400, { error: `A ${nsNeed.type.replace(/_/g, " ")} is not collected by ${source}` }); return; }
+        const nsDir = path.join(config.dataDir, nsTenant, "projects", nsProject, "assets");
+        await fs.mkdir(nsDir, { recursive: true });
+        const stamp = Date.now().toString(36);
+        const tall = tallFrame(nsProj);
+        try {
+          let file: string;
+          if (source === "find") {
+            if (!process.env.PEXELS_API_KEY) { jsonResponse(res, 503, { error: "B-roll search is not configured on this server (PEXELS_API_KEY)" }); return; }
+            file = `broll_scene_${nsScene + 1}_${stamp}.mp4`;
+            const targetWidth = tall ? 1080 : 1920;
+            let pickId = Number(nsBody.pick_id);
+            if (!Number.isFinite(pickId) || pickId <= 0) {
+              const hits = await searchStockFootage({ query: String(nsBody.query || nsNeed.description || ""), orientation: tall ? "portrait" : "landscape", perPage: 5 });
+              if (!hits.length) { jsonResponse(res, 404, { error: "Nothing found for that search" }); return; }
+              pickId = hits[0].id;
+            }
+            const clip = await downloadStockFootage({ id: pickId, outputDir: nsDir, filename: file, targetWidth });
+            if (!clip) { jsonResponse(res, 502, { error: "That clip could not be downloaded" }); return; }
+          } else {
+            file = `drawn_scene_${nsScene + 1}_${stamp}.png`;
+            await generateImage({ prompt: drawPrompt(nsNeed, typeof nsBody.prompt === "string" ? nsBody.prompt : undefined), size: tall ? "1024x1536" : "1536x1024", quality: "high", outputPath: path.join(nsDir, file) });
+          }
+          const url = `/assets/${nsTenant}/projects/${nsProject}/assets/${file}`;
+          const need = provideAsset(nsProj, nsScene, nsIndex, url);
+          nsProj.updated_at = new Date().toISOString();
+          await saveProject(nsProj);
+          console.log(`  need-source: ${nsTenant}/${nsProject} scene ${nsScene + 1} need ${nsIndex + 1} <- ${source} ${file}`);
+          reshootStoryboardCardsSoon(nsTenant, nsProject);
+          jsonResponse(res, 200, { ok: true, scene_index: nsScene, asset_index: nsIndex, source, need, open_proof: openAssetNeeds(nsProj) });
+        } catch (e: any) {
+          jsonResponse(res, 502, { error: e?.message || String(e) });
+        }
         return;
       }
 
