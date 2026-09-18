@@ -6660,7 +6660,7 @@ ${QUOTIENT_CSS}
       // A per-scene track's transcript is already on the film clock (the
       // server lays each take at its scene); the continuous track's is in
       // the recording's own seconds.
-      var wOff = speakerTrackIsPerScene() ? 0 : speakerFilmOffset() - (state.speakerTrimStart || 0);
+      var wOff = (state._transcriptPerScene || speakerTrackIsPerScene()) ? 0 : speakerFilmOffset() - (state.speakerTrimStart || 0);
       state._transcript.forEach(function(seg2) {
         var t0 = Math.max(0, seg2.start + wOff);
         if (seg2.end + wOff <= 0 || t0 >= total) return;
@@ -6757,6 +6757,9 @@ ${QUOTIENT_CSS}
     api('/speaker-transcript/' + state.tenantId + '/' + p.project_id).then(function(r) {
       if (r && r.available && r.segments && r.segments.length) {
         state._transcript = r.segments;
+        // Per-scene words (takes, or one generated file per scene) are
+        // already on the film clock.
+        state._transcriptPerScene = !!r.per_scene;
         state._userZoomed = false;
         renderWordLane();
         autoFitTimelineZoom();
