@@ -20,11 +20,11 @@ import { getTakeHtml } from "./take-page.js";
 import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries } from "./core/take-needs.js";
-import { provideAsset, openAssetNeeds } from "./core/asset-needs.js";
+import { provideAsset, openAssetNeeds, recastProvidedNeed } from "./core/asset-needs.js";
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
 import { listMusicOptions, resolveMusicChoice, musicLocalPath, musicAssetUrl } from "./audio/music.js";
-import type { Take, Project } from "./core/types.js";
+import type { Take, Project, AssetRequirement } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
 import { detectFace } from "./core/face-band.js";
@@ -405,6 +405,19 @@ function speakerUrlFromSource(source: string | undefined): string | undefined {
     return source;
   }
   return source;
+}
+
+/** THE PICK APPLIES NOW: a need provided on a built film takes its slot in
+ *  the built scene (the composite is assembled from components on every
+ *  request, so Studio shows it on the next load). Null on a board with no
+ *  built scene yet -- there the build casts it. */
+function recastInBuiltScene(project: Project, sceneIndex: number, need: AssetRequirement, prevPath: string | undefined): { changed: number; how: string } | null {
+  const built = project.scenes?.[sceneIndex];
+  if (!built || need.type === "camera_video") return null;
+  const personFilm = personCarries((project.treatment as any)?.filmGrammar);
+  const r = recastProvidedNeed(built, need, prevPath, { personFilm });
+  if (r.changed) built.components = r.components as any;
+  return { changed: r.changed, how: r.how };
 }
 
 async function main() {
@@ -2288,13 +2301,15 @@ Rules:
         const evProjectObj = await loadProject(evTenant, evProject);
         if (!evProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         let evNeed;
+        const evPrev = evProjectObj.storyboard?.scenes?.[evScene]?.assets?.[evIndex]?.path;
         try { evNeed = provideAsset(evProjectObj, evScene, evIndex, evUrl); }
         catch (e: any) { jsonResponse(res, 404, { error: e?.message || String(e) }); return; }
+        const evRecast = recastInBuiltScene(evProjectObj, evScene, evNeed, evPrev);
         evProjectObj.updated_at = new Date().toISOString();
         await saveProject(evProjectObj);
-        console.log(`  provide-asset: ${evTenant}/${evProject} scene ${evScene + 1} need ${evIndex + 1} <- ${path.basename(evUrl)}`);
+        console.log(`  provide-asset: ${evTenant}/${evProject} scene ${evScene + 1} need ${evIndex + 1} <- ${path.basename(evUrl)}${evRecast ? ` (${evRecast.how})` : ""}`);
         reshootStoryboardCardsSoon(evTenant, evProject);
-        jsonResponse(res, 200, { ok: true, scene_index: evScene, asset_index: evIndex, need: evNeed, open_needs: openTakeNeeds(evProjectObj), open_proof: openAssetNeeds(evProjectObj) });
+        jsonResponse(res, 200, { ok: true, scene_index: evScene, asset_index: evIndex, need: evNeed, recast: evRecast, open_needs: openTakeNeeds(evProjectObj), open_proof: openAssetNeeds(evProjectObj) });
         return;
       }
 
@@ -2356,12 +2371,14 @@ Rules:
             await generateImage({ prompt: drawPrompt(nsNeed, typeof nsBody.prompt === "string" ? nsBody.prompt : undefined), size: tall ? "1024x1536" : "1536x1024", quality: "high", outputPath: path.join(nsDir, file) });
           }
           const url = `/assets/${nsTenant}/projects/${nsProject}/assets/${file}`;
+          const nsPrev = nsNeed.path;
           const need = provideAsset(nsProj, nsScene, nsIndex, url);
+          const nsRecast = recastInBuiltScene(nsProj, nsScene, need, nsPrev);
           nsProj.updated_at = new Date().toISOString();
           await saveProject(nsProj);
-          console.log(`  need-source: ${nsTenant}/${nsProject} scene ${nsScene + 1} need ${nsIndex + 1} <- ${source} ${file}`);
+          console.log(`  need-source: ${nsTenant}/${nsProject} scene ${nsScene + 1} need ${nsIndex + 1} <- ${source} ${file}${nsRecast ? ` (${nsRecast.how})` : ""}`);
           reshootStoryboardCardsSoon(nsTenant, nsProject);
-          jsonResponse(res, 200, { ok: true, scene_index: nsScene, asset_index: nsIndex, source, need, open_proof: openAssetNeeds(nsProj) });
+          jsonResponse(res, 200, { ok: true, scene_index: nsScene, asset_index: nsIndex, source, need, recast: nsRecast, open_proof: openAssetNeeds(nsProj) });
         } catch (e: any) {
           jsonResponse(res, 502, { error: e?.message || String(e) });
         }

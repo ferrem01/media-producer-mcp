@@ -176,7 +176,7 @@ ${QUOTIENT_CSS}
   function provideFrom(i, j, body, doneMsg) {
     say(body.source === 'draw' ? 'Drawing… (about half a minute)' : 'Fetching the clip…');
     return api('POST', '/need-source/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), Object.assign({ scene_index: i, asset_index: j }, body))
-      .then(function () { say(doneMsg); return load(); })
+      .then(function (r) { say(doneMsg.replace(/ Rebuild to cut it in\\.$/, '') + (r && r.recast && r.recast.changed ? ' In the scene now.' : (r && r.recast ? ' Rebuild the scene to cast it.' : ' The build casts it.'))); return load(); })
       .catch(function (e) { say(e.message || String(e), true); });
   }
   function sourcePanel(row, src, i, j, need) {
@@ -594,7 +594,7 @@ ${QUOTIENT_CSS}
       var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
       if (xhr.status < 200 || xhr.status >= 300 || !up.url) { say('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), true); return; }
       api('POST', '/provide-asset/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { url: up.url, scene_index: i, asset_index: j })
-        .then(function () { say('Scene ' + (i + 1) + ' proof ' + (j + 1) + ' attached.'); return load(); })
+        .then(function (r) { say('Scene ' + (i + 1) + ' proof ' + (j + 1) + ' attached.' + (r && r.recast && r.recast.changed ? ' In the scene now.' : '')); return load(); })
         .catch(function (e) { say(e.message || String(e), true); });
     };
     xhr.send(f);

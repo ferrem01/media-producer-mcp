@@ -3754,3 +3754,19 @@ storyboard dialog scrolled to that need's row with a brief highlight.
 Nothing new to persist: the row is the one the board has, the write is
 `provideAsset`, and a rebuild casts the new file into the slot.
 
+## The pick applies now: a provided need takes its slot in the built scene
+
+Marc: "you select the new video and hit save storyboard and nothing
+changes -- does that make sense?" It did not. Providing a need on a built
+film wrote the board and waited for a rebuild; music, by contrast,
+played at once. `recastProvidedNeed` (`core/asset-needs.ts`, pure) now
+patches the built scene from both provide routes: a swap replaces the
+old file wherever it was cast (the b-roll ground, a still, a cut-in, a
+provided screen); a first provision takes the slate's or mock's slot
+(`castProvidedScreens`), lays the b-roll ground on a film nobody carries
+(the generator's own `bg` shape), or cuts in on the need's seconds on a
+person film. The composite is assembled from the record on every
+request, so Studio shows it on reload; Studio's messages say "in the
+scene now" and the dialog closes. A board with no built scene keeps
+today's path: the build casts it.
+

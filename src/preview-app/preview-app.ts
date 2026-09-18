@@ -4056,7 +4056,8 @@ ${QUOTIENT_CSS}
         '<div class="np-act">' + acts + '</div>' +
         '<div class="np-panel" data-np-panel="' + si + '-' + r.ai + '" style="display:none"></div></div>';
     });
-    if (rows.some(function(r) { return r.need.type !== 'camera_video'; })) h += '<div class="np-note">A found, drawn or uploaded file takes its slot at the next build. The film builds without it.</div>';
+    var built = !!(project.scenes && project.scenes.length);
+    if (rows.some(function(r) { return r.need.type !== 'camera_video'; })) h += '<div class="np-note">' + (built ? 'A found, drawn or uploaded file takes its slot in the scene right away.' : 'A found, drawn or uploaded file takes its slot at the build. The film builds without it.') + '</div>';
     return h + '</div>';
   }
   function npProjectTall(project) {
@@ -4067,8 +4068,16 @@ ${QUOTIENT_CSS}
     if (busyEl) busyEl.classList.add('busy');
     studioStatus(body.source === 'draw' ? 'Drawing… (about half a minute)' : 'Fetching the clip…', 'ok');
     return api('POST', '/need-source/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), Object.assign({ scene_index: si, asset_index: ai }, body))
-      .then(function() { studioStatus(doneMsg + ' — rebuild to cut it in.', 'ok'); loadProject(project.project_id); })
+      .then(function(r) { studioStatus(doneMsg + npRecastNote(r), 'ok'); studioModalClose(); loadProject(project.project_id); })
       .catch(function(e) { if (busyEl) busyEl.classList.remove('busy'); studioStatus(e.message || String(e), 'err'); });
+  }
+  // What happened to the film: in a built scene the file is in its slot now
+  // (the composite re-assembles from the record); on a board, the build casts it.
+  function npRecastNote(r) {
+    var rc = r && r.recast;
+    if (rc && rc.changed) return ' — in the scene now (' + rc.how + ').';
+    if (rc) return ' — the scene has no slot for it yet; rebuild the scene to cast it.';
+    return ' — the build casts it.';
   }
   function npOpenPanel(project, root, src, si, ai) {
     var panel = (root || document).querySelector('[data-np-panel="' + si + '-' + ai + '"]');
@@ -4254,7 +4263,7 @@ ${QUOTIENT_CSS}
         var req = isTake
           ? api('POST', '/take/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pick.project), { url: up.url, scene_index: pick.scene, capture: 'upload', mime: file.type, look: 'soft' })
           : api('POST', '/provide-asset/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pick.project), { url: up.url, scene_index: pick.scene, asset_index: pick.asset });
-        req.then(function() { studioStatus(isTake ? 'Take attached to scene ' + (pick.scene + 1) + '.' : 'Proof attached to scene ' + (pick.scene + 1) + ' \u2014 rebuild to cut it in.', 'ok'); loadProject(pick.project); })
+        req.then(function(r) { studioStatus(isTake ? 'Take attached to scene ' + (pick.scene + 1) + '.' : 'File attached to scene ' + (pick.scene + 1) + npRecastNote(r), 'ok'); if (!isTake) studioModalClose(); loadProject(pick.project); })
           .catch(function(e) { studioStatus(e.message || String(e), 'err'); });
       };
       xhr.send(file);
