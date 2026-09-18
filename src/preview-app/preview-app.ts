@@ -4154,7 +4154,13 @@ ${QUOTIENT_CSS}
     if (row) row.classList.add('busy');
     muStop();
     return api('POST', '/music/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), body)
-      .then(function() { studioStatus(doneMsg, 'ok'); return loadProject(project.project_id).then(function() { if (state.currentProject) muLoad(state.currentProject, ''); }); })
+      .then(function(r) {
+        studioStatus(doneMsg, 'ok');
+        // The choice is on the record now: the card re-reads it from the
+        // server, and the player picks the new bed up on the project reload.
+        muLoad(project, '');
+        loadProject(project.project_id);
+      })
       .catch(function(e) { if (row) row.classList.remove('busy'); studioStatus(e.message || String(e), 'err'); });
   }
   function muLoad(project, q) {

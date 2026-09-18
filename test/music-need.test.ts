@@ -53,6 +53,10 @@ describe("the music choice: the film's bed is a need, chosen in the board", () =
     expect(desktop).toMatch(/'\/music-options\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/'\/music\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/npPick = \{ scene: -1, asset: -1, type: 'music', project: project\.project_id \};/);
+    // loadProject returns nothing -- a pick must not chain on it (measured live: "reading 'then'").
+    expect(desktop).not.toMatch(/loadProject\([^)]*\)\.then/);
+    const music = await read("src/audio/music.ts");
+    expect(music).toMatch(/replace\(\/&amp;\/g, "&"\)/);
     const phone = await read("src/studio-phone.ts");
     expect(phone).toMatch(/nd\.appendChild\(musicBox\(\)\);/);
     expect(phone).toMatch(/'\/music-options\/' \+ encodeURIComponent\(tenant\)/);

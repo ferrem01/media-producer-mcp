@@ -251,7 +251,9 @@ export async function listMusicOptions(opts: { tenantId: string; brandKit?: Bran
       found = await searchJamendoTracks(tag, { limit: 8, minDuration: opts.minDuration, instrumental }).catch(() => [] as JamendoHit[]);
       if (found.length) break;
     }
-    jamendo = found.map((t) => ({ id: `jamendo-${t.id}`, title: t.name, artist: t.artist_name, duration: Number(t.duration) || 0, source: "jamendo" as const, license: t.license_ccurl || "CC (Jamendo)", preview_url: t.audio || t.audiodownload }));
+    // Jamendo ships names HTML-escaped ("Axl &amp; Arth"); Studio escapes again.
+    const plain = (v: string) => String(v || "").replace(/&amp;/g, "&").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+    jamendo = found.map((t) => ({ id: `jamendo-${t.id}`, title: plain(t.name), artist: plain(t.artist_name), duration: Number(t.duration) || 0, source: "jamendo" as const, license: t.license_ccurl || "CC (Jamendo)", preview_url: t.audio || t.audiodownload }));
   }
   return { brand, stock, jamendo, jamendo_configured };
 }
