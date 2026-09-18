@@ -90,8 +90,13 @@ right-click menu say so ("This is the slot for the screen recording --
 still needed") and open the scene's storyboard dialog scrolled to that
 need's row, where the same Record / Recorder / Find / Draw / Upload
 buttons live (`needForSelection`, `openNeedInEditor` in the desktop
-Studio). Changing a need after the build is the same write as before it;
-a rebuild casts the new file into the slot.
+Studio). Changing a need after the build is the same write as before it, and it
+applies at once: `recastProvidedNeed` (`core/asset-needs.ts`) puts the
+new file in the built scene's slot -- a swap replaces the old file
+wherever it was cast; a first provision takes the slate's slot, lays the
+b-roll ground, or cuts in on the need's seconds -- and the composite,
+assembled from the record on every request, shows it on the next load.
+No rebuild; the board keeps the need for the next one.
 
 ## Columns the sheet should add
 

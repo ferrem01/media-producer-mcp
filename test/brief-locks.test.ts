@@ -147,6 +147,31 @@ describe("the mock is the placeholder: a provided screen takes its slot on any f
     expect(sb).toMatch(/the build casts a SLATE in the mock's slot/);
     expect(sb).toMatch(/REAL SCREENS -- a scene whose payoff is a product mock also lists[\s\S]*?stands a slate in the mock's slot/);
   });
+  it("the pick applies now: a need provided on a built film takes its slot in the built scene", async () => {
+    const { recastProvidedNeed } = await import("../src/core/asset-needs.js");
+    // A swap: the b-roll ground points at the new clip.
+    const built: any = { duration_seconds: 5, components: [{ id: "bg", type: "video", z_index: 1, position: { x: 0, y: 0, width: "100%", height: "100%" }, data: { src: "/a/old.mp4", object_fit: "cover" } }, { type: "kinetic-text", data: {} }] };
+    const r = recastProvidedNeed(built, { type: "stock_footage", description: "office", status: "provided", path: "/a/new.mp4" } as any, "/a/old.mp4", { personFilm: false });
+    expect(r).toMatchObject({ changed: 1, how: "swapped" });
+    expect(r.components[0].data).toMatchObject({ src: "/a/new.mp4" });
+    expect(built.components[0].data.src).toBe("/a/old.mp4"); // pure
+    // A first b-roll on a film nobody carries lays the ground.
+    const r2 = recastProvidedNeed({ components: [{ type: "kinetic-text", data: {} }] }, { type: "stock_footage", description: "x", status: "provided", path: "/a/b.mp4" } as any, undefined, { personFilm: false });
+    expect(r2.how).toBe("laid as the ground"); expect(r2.components[0]).toMatchObject({ id: "bg", type: "video", data: { src: "/a/b.mp4" } });
+    // A screen recording takes the slate's slot.
+    const r3 = recastProvidedNeed({ components: [{ id: "m", type: "asset-placeholder", data: { need: "the board" }, position: { x: "0%", y: "18%", width: "100%", height: "70%" } }] }, { type: "screen_recording", description: "the board", status: "provided", path: "/a/s.mp4" } as any, undefined, { personFilm: false });
+    expect(r3.how).toBe("took the slate's slot"); expect(r3.components[0]).toMatchObject({ id: "m", type: "video", position: { y: "18%" } });
+    // On a person film a drawn object cuts in on its seconds.
+    const r4 = recastProvidedNeed({ duration_seconds: 10, components: [] }, { type: "illustration", description: "x", status: "provided", path: "/a/d.png", at: 2, until: 6 } as any, undefined, { personFilm: true });
+    expect(r4.components[0]).toMatchObject({ type: "image", data: { src: "/a/d.png", at: 2, exit_at: 6 } });
+    // Nothing to do: already there, or not provided.
+    expect(recastProvidedNeed({ components: r2.components }, { type: "stock_footage", description: "x", status: "provided", path: "/a/b.mp4" } as any, undefined, { personFilm: false }).changed).toBe(0);
+    expect(recastProvidedNeed({ components: [] }, { type: "stock_footage", description: "x", status: "needed" } as any, undefined, { personFilm: false }).changed).toBe(0);
+    const index = await read("src/index.ts");
+    expect(index).toMatch(/const evRecast = recastInBuiltScene\(evProjectObj, evScene, evNeed, evPrev\);/);
+    expect(index).toMatch(/const nsRecast = recastInBuiltScene\(nsProj, nsScene, need, nsPrev\);/);
+    expect(await read("src/preview-app/preview-app.ts")).toMatch(/function npRecastNote\(r\)/);
+  });
   it("the pipeline casts provided screens on a film nobody carries; the writer lists the need beside every product mock", async () => {
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/if \(!personFilm\) \{[\s\S]*?const r = castProvidedScreens\(d\);/);

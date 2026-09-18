@@ -297,3 +297,59 @@ export function castScreenSlates(scene: StoryboardScene, opts: { anchors?: boole
   }
   return { components: comps, cast, cleared };
 }
+
+/**
+ * THE PICK APPLIES NOW (SPEC-briefs.md, the slot is the need): on a built
+ * film a newly provided need takes its slot in the BUILT scene without a
+ * rebuild -- Marc: "you select the new video and hit save and nothing
+ * changes". A swap replaces the file wherever the old one was cast (the
+ * b-roll ground, a drawn still, a cut-in, a provided screen); a first
+ * provision takes the slate's or mock's slot (screens), lays the ground
+ * (b-roll on a film nobody carries) or cuts in on the need's times. Pure:
+ * returns the new components and what happened.
+ */
+export function recastProvidedNeed(
+  scene: { components?: unknown[]; duration_seconds?: number },
+  need: AssetRequirement,
+  prevPath: string | undefined,
+  opts: { personFilm: boolean },
+): { components: Array<Record<string, unknown>>; changed: number; how: string } {
+  const comps: Array<Record<string, unknown>> = Array.isArray(scene.components) ? (scene.components as any[]).map((c) => (c && typeof c === "object" ? { ...c, data: { ...((c as any).data || {}) } } : c)) : [];
+  if (!need.path || need.status !== "provided") return { components: comps, changed: 0, how: "not provided" };
+  const media = assetMedia(need.path);
+  if (!media) return { components: comps, changed: 0, how: "not an image or clip" };
+  let changed = 0;
+  // 1. A swap: the old file gives way wherever it was cast.
+  if (prevPath && prevPath !== need.path) {
+    for (const c of comps) {
+      if (c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === prevPath) {
+        (c as any).data.src = need.path;
+        if ((c as any).type === "image" || (c as any).type === "video") (c as any).type = media;
+        changed++;
+      }
+    }
+    if (changed) return { components: comps, changed, how: "swapped" };
+  }
+  if (comps.some((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path)) return { components: comps, changed: 0, how: "already there" };
+  // 2. A first provision: the slot the board held for it.
+  if (need.type === "screen_recording" || need.type === "screenshot") {
+    const r = castProvidedScreens({ components: comps, assets: [need] } as any);
+    return { components: r.components, changed: r.replaced + r.added, how: r.replaced ? "took the slate's slot" : "laid full-bleed" };
+  }
+  if (need.type === "stock_footage" && !opts.personFilm) {
+    const full = (c: any) => c && c.position && String(c.position.width) === "100%" && String(c.position.height) === "100%";
+    const ground = comps.find((c: any) => c && (c.id === "bg" || full(c)) && (c.type === "video" || c.type === "image"));
+    if (ground) { (ground as any).type = media; (ground as any).data.src = need.path; (ground as any).data.object_fit = "cover"; return { components: comps, changed: 1, how: "is the ground" }; }
+    comps.unshift({ id: "bg", type: media, z_index: 1, position: { x: 0, y: 0, width: "100%", height: "100%" }, data: { src: need.path, object_fit: "cover" } });
+    return { components: comps, changed: 1, how: "laid as the ground" };
+  }
+  // A drawn object, found footage or a mock on a person film: cut in on its
+  // times (seconds; word anchors were the build's to resolve).
+  const dur = Number(scene.duration_seconds) || 0;
+  const cut: Record<string, unknown> = { type: media, data: { src: need.path, ...(media === "image" ? { drift: false } : {}) }, position: { x: "0%", y: "0%", width: "100%", height: "100%" } };
+  if (need.use === "split") (cut.data as any).use = "split";
+  (cut.data as any).at = typeof need.at === "number" ? need.at : Math.round(dur * 0.3 * 100) / 100;
+  (cut.data as any).exit_at = typeof need.until === "number" ? need.until : Math.round(dur * 0.8 * 100) / 100;
+  comps.push(cut);
+  return { components: comps, changed: 1, how: "cut in" };
+}
