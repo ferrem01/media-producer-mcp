@@ -102,4 +102,11 @@ describe("the sources: every need is collected its own way, in the board", () =>
     expect(desktop).toMatch(/slotRowHtml\(sel\) \+/);
     expect(desktop).toMatch(/item\(\(have \? 'Replace the ' : 'Provide the '\)/);
   });
+
+  it("a b-roll provided on the board is the scene's ground on the next build of a film nobody carries", async () => {
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/if \(!personFilm\) \{\s*\(storyboard\.scenes as any\[\]\)\.forEach\(\(d, i\) => \{[\s\S]*?need\.type === "stock_footage" && need\.status === "provided"[\s\S]*?needFootage\.set\(i, need\.path\); break;/);
+    // ...and it is seeded BEFORE the fetch block, so it holds without a stock key.
+    expect(pipeline.indexOf("needFootage.set(i, need.path); break;")).toBeLessThan(pipeline.indexOf("if ((personFilm && (canDraw || canFetchStock)) || canFetchStock) {"));
+  });
 });
