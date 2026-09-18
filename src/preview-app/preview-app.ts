@@ -289,7 +289,10 @@ ${QUOTIENT_CSS}
   .lane-bed.ruler { background: linear-gradient(180deg, var(--surface-tertiary), var(--gray-25)); border-bottom: 1px solid var(--border-tertiary); }
   .lane-bed.screen { background: rgb(143 143 159 / 0.07); border: 1px solid rgb(143 143 159 / 0.20); border-radius: var(--radius-sm); }
   .lane-bed.speaker { background: rgb(45 99 225 / 0.05); border: 1px solid rgb(45 99 225 / 0.18); border-radius: var(--radius-sm); }
-  .lane-bed.music { background: rgb(143 143 159 / 0.08); border: 1px solid rgb(143 143 159 / 0.16); border-radius: 5px; }
+  .lane-bed.music { background: rgb(143 143 159 / 0.08); border: 1px solid rgb(143 143 159 / 0.16); border-radius: 5px; pointer-events: auto; cursor: pointer; }
+  .lane-bed.music:hover { background: rgb(45 99 225 / 0.08); border-color: rgb(45 99 225 / 0.3); }
+  .audio-lane-seg.music { cursor: pointer; }
+  #lane-gutter .lg-ic.lg-music { cursor: pointer; }
   .lane-bed.comps { background: transparent; border: none; }
   /* Components band: every scene's cast as lane-packed micro-bars, always
      visible (no click-into-scene needed). Rows cap at 4; a "+N" chip covers
@@ -1168,7 +1171,6 @@ ${QUOTIENT_CSS}
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <button class="btn btn-secondary" id="brand-btn" style="display:none;" title="View and edit this tenant's brand kit: colors, voice, logos, assets">&#127912; Brand</button>
-      <button class="btn btn-secondary" id="music-btn" style="display:none;" title="The film's music bed: pick a track, upload one, or ship without">&#127925; Music</button>
       <a class="btn btn-secondary" id="team-btn" style="display:none;text-decoration:none;" title="Who shares this tenant: invite a colleague, remove a member">&#128101; Team</a>
       <span id="render-wrap" style="display:none;align-items:center;gap:8px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
@@ -2224,6 +2226,10 @@ ${QUOTIENT_CSS}
       seg.title = name + ': ' + start.toFixed(1) + 's \\u2192 ' + end.toFixed(1) + 's'
         + (audio._fadeIn ? ' (fade-in ' + audio._fadeIn + 's)' : '')
         + (audio.loop ? ' (loops)' : '');
+      if (audio._trackType === 'music') {
+        seg.title = musicLaneTitle();
+        seg.addEventListener('click', function(ev) { ev.stopPropagation(); if (state.currentProject) openMusicCard(state.currentProject); });
+      }
       wrap.appendChild(seg);
     });
     // The speaker clip block sizes itself from the narration element's
@@ -4143,6 +4149,12 @@ ${QUOTIENT_CSS}
     if (c.source === 'auto' || !c.source) return { what: r.bed ? 'Picked by the build' : 'The build picks a track', how: 'by the storyboard\u2019s mood: ' + escHtml(r.mood || 'corporate') + (r.bed ? ' \u00b7 ' + escHtml((r.bed.source || '').split('/').pop()) : '') };
     var src = { 'brand-kit': 'your brand kit', stock: 'the library', jamendo: 'Jamendo', upload: 'uploaded' }[c.source] || c.source;
     return { what: escHtml(c.title || (c.path || '').split('/').pop() || 'Chosen track') + (c.artist ? ' <small style="display:inline">\u00b7 ' + escHtml(c.artist) + '</small>' : ''), how: 'chosen \u00b7 ' + src + (c.duration ? ' \u00b7 ' + muFmt(c.duration) : '') + ' \u00b7 the build keeps it' };
+  }
+  function musicLaneTitle() {
+    var p = state.currentProject, c = (p && p.music) || { source: 'auto' };
+    var bed = (((p && p.audio) || {}).tracks || []).filter(function(t) { return t.type === 'music'; })[0];
+    var what = c.source === 'none' ? 'no music' : (c.source && c.source !== 'auto' ? (c.title || (c.path || '').split('/').pop()) : (bed ? 'picked by the build: ' + (bed.source || '').split('/').pop() : 'the build picks a track'));
+    return 'MUSIC \u2014 ' + what + '. Click to change it.';
   }
   function openMusicCard(project) {
     muStop();
@@ -6136,6 +6148,11 @@ ${QUOTIENT_CSS}
       b.className = 'lane-bed ' + cls;
       b.style.top = top + 'px';
       b.style.height = h + 'px';
+      if (cls === 'music') {
+        // THE MUSIC IS ITS TRACK: click the lane to see the bed and change it.
+        b.title = musicLaneTitle();
+        b.addEventListener('click', function(ev) { ev.stopPropagation(); if (state.currentProject) openMusicCard(state.currentProject); });
+      }
       track.insertBefore(b, track.firstChild);
     }
     bed('ruler', y.ruler, y.rulerH);
@@ -6153,8 +6170,10 @@ ${QUOTIENT_CSS}
       if (y.comps >= 0) html += '<span class="lg-ic" style="top:' + (y.comps + y.compsH / 2 - 8) + 'px" title="COMPONENTS \u2014 every scene\\'s cast. Click a bar to inspect it; double-click to edit its timing.">' + LG_ICONS.comps + '</span>';
       if (y.screen >= 0) html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="SCREEN \u2014 your recording. Click a block to split, speed up or remove footage.">' + LG_ICONS.screen + '</span>';
       if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="SPEAKER \u2014 your voice (and camera). Click a piece to play, split or remove talk.">' + LG_ICONS.speaker + '</span>';
-      if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="MUSIC \u2014 the bed under the film, ducked while you speak.">' + LG_ICONS.music + '</span>';
+      if (y.music >= 0) html += '<span class="lg-ic lg-music" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="MUSIC \u2014 the bed under the film, ducked while you speak. Click to change it.">' + LG_ICONS.music + '</span>';
       gut.innerHTML = html;
+      var lgm = gut.querySelector('.lg-music');
+      if (lgm) lgm.addEventListener('click', function(ev) { ev.stopPropagation(); if (state.currentProject) openMusicCard(state.currentProject); });
     }
     var ph = document.getElementById('playhead-line');
     if (ph) { ph.style.top = y.rulerH + 'px'; ph.style.display = ''; }
@@ -6660,7 +6679,7 @@ ${QUOTIENT_CSS}
       // A per-scene track's transcript is already on the film clock (the
       // server lays each take at its scene); the continuous track's is in
       // the recording's own seconds.
-      var wOff = speakerTrackIsPerScene() ? 0 : speakerFilmOffset() - (state.speakerTrimStart || 0);
+      var wOff = (state._transcriptPerScene || speakerTrackIsPerScene()) ? 0 : speakerFilmOffset() - (state.speakerTrimStart || 0);
       state._transcript.forEach(function(seg2) {
         var t0 = Math.max(0, seg2.start + wOff);
         if (seg2.end + wOff <= 0 || t0 >= total) return;
@@ -6757,6 +6776,9 @@ ${QUOTIENT_CSS}
     api('/speaker-transcript/' + state.tenantId + '/' + p.project_id).then(function(r) {
       if (r && r.available && r.segments && r.segments.length) {
         state._transcript = r.segments;
+        // Per-scene words (takes, or one generated file per scene) are
+        // already on the film clock.
+        state._transcriptPerScene = !!r.per_scene;
         state._userZoomed = false;
         renderWordLane();
         autoFitTimelineZoom();
@@ -8425,8 +8447,6 @@ ${QUOTIENT_CSS}
   function showBrandBtn() {
     var b = document.getElementById('brand-btn');
     if (b) b.style.display = '';
-    var mb = document.getElementById('music-btn');
-    if (mb) { mb.style.display = ''; if (!mb.dataset.bound) { mb.dataset.bound = '1'; mb.addEventListener('click', function() { if (state.currentProject) openMusicCard(state.currentProject); }); } }
     // The Team page shares the tenant (and the link's token, when there is one).
     var t = document.getElementById('team-btn');
     if (t && state.tenantId) {

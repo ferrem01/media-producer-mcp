@@ -3498,7 +3498,30 @@ Rules:
           return;
         }
         const spSrc2 = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
-        const voTrack2 = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
+        const voTracks2 = ((project as any).audio?.tracks || []).filter((t: any) => t.type === "voiceover" && t.source) as Array<{ source: string; start_time?: number }>;
+        // GENERATED NARRATION, one file per scene: every scene's words, each
+        // file transcribed on its own (cached per file) and laid on the film
+        // clock at its track's start. Measured live (proj_a2d3722f): only the
+        // first file was transcribed, so the lane showed scene 1's five words
+        // and nothing for the rest of the film.
+        if (!spSrc2 && voTracks2.length > 1) {
+          const segsAll: Array<{ text: string; start: number; end: number }> = [];
+          for (const t of voTracks2) {
+            const off = Number(t.start_time) || 0;
+            const cd = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs", "vo", path.basename(t.source).replace(/\.[^.]+$/, ""));
+            try {
+              await fs.mkdir(cd, { recursive: true });
+              const tr = await getTranscript(resolveVideoPath(t.source), cd);
+              for (const sg of tr.segments) segsAll.push({ ...sg, start: sg.start + off, end: sg.end + off });
+            } catch (e: any) {
+              console.warn(`  speaker-transcript: ${path.basename(t.source)} skipped (${e?.message || e})`);
+            }
+          }
+          segsAll.sort((a, b) => a.start - b.start);
+          jsonResponse(res, 200, { ok: true, available: true, segments: segsAll, per_scene: true });
+          return;
+        }
+        const voTrack2 = voTracks2[0];
         const audioSrc2 = spSrc2 || voTrack2?.source;
         if (!audioSrc2) { jsonResponse(res, 404, { error: "No speaker or voiceover audio on this project" }); return; }
         try {
