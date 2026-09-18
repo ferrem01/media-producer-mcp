@@ -80,3 +80,35 @@ describe("the wiring", () => {
     expect(capture).toMatch(/if \(kindHere && !fullBleedIsh && !inFramed && r\.width \* r\.height >= 1500\) \{/);
   });
 });
+
+describe("the mock is the placeholder: a provided screen takes its slot on any film", () => {
+  it("replaces the staged product mock with the recording at the same position, layer and timing; lays it full-bleed when there is no mock", async () => {
+    const { castProvidedScreens } = await import("../src/core/asset-needs.js");
+    const scene: any = {
+      components: [
+        { id: "bg", type: "webgl-backdrop", data: {} },
+        { id: "campaign", type: "quotient-campaign", data: { title: "Q3" }, position: { x: "0%", y: "18%", width: "100%", height: "70%" }, z_index: 10, enter: { effect: "cut", at: 1 } },
+      ],
+      assets: [
+        { type: "screen_recording", description: "the campaign board", status: "provided", path: "/assets/t/projects/p/assets/campaign.mp4" },
+        { type: "stock_footage", description: "office", status: "provided", path: "/assets/t/projects/p/assets/office.mp4" },
+      ],
+    };
+    const r = castProvidedScreens(scene);
+    expect(r.replaced).toBe(1); expect(r.added).toBe(0);
+    expect(r.components[1]).toMatchObject({ id: "campaign", type: "video", data: { src: "/assets/t/projects/p/assets/campaign.mp4", object_fit: "cover" }, position: { y: "18%", height: "70%" }, z_index: 10, enter: { effect: "cut", at: 1 } });
+    expect(r.components[0].type).toBe("webgl-backdrop");
+    // No mock: full-bleed, like any provided proof. A pending need casts nothing.
+    const r2 = castProvidedScreens({ components: [{ type: "kinetic-text", data: {} }], assets: [{ type: "screenshot", description: "x", status: "provided", path: "/a/s.png", at: 2, until: 5 }] } as any);
+    expect(r2.added).toBe(1);
+    expect(r2.components[1]).toMatchObject({ type: "image", data: { src: "/a/s.png", drift: false, at: 2, exit_at: 5 }, position: { width: "100%", height: "100%" } });
+    expect(castProvidedScreens({ components: [{ type: "quotient-home", data: {} }], assets: [{ type: "screen_recording", description: "x", status: "needed" }] } as any).replaced).toBe(0);
+  });
+  it("the pipeline casts provided screens on a film nobody carries; the writer lists the need beside every product mock", async () => {
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/if \(!personFilm\) \{[\s\S]*?const r = castProvidedScreens\(d\);/);
+    const sb = await read("src/llm/storyboard-builder.ts");
+    expect(sb).toMatch(/ANY FILM for screen_recording \/ screenshot: wherever a scene stages a product mock as its payoff/);
+    expect(sb).toMatch(/REAL SCREENS -- a scene whose payoff is a product mock also lists/);
+  });
+});

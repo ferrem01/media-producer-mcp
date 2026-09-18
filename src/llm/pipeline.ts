@@ -29,7 +29,7 @@ import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
-import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface } from "../core/asset-needs.js";
+import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens } from "../core/asset-needs.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -3272,6 +3272,24 @@ async function runUnifiedPipeline(
   // hand its URL to the codegen, which PLACES it as the scene background itself
   // (exactly like a hero image -- the agent owns the composition, no special
   // injection). Capped so b-roll stays intentional. Gated by PEXELS_API_KEY.
+  // THE MOCK IS THE PLACEHOLDER (SPEC-briefs.md): on a film nobody carries,
+  // a provided screen recording or screenshot takes the slot of the product
+  // mock the scene staged as its payoff (same position, timing and layer);
+  // until it lands the mock performs. Person films cut provided screens in
+  // on their words instead (proofComponents / replaceCutWindow above).
+  if (!personFilm) {
+    let sceneNo2 = 0;
+    for (const d of storyboard.scenes as any[]) {
+      const i = sceneNo2++;
+      if (!Array.isArray(d.assets) || !d.assets.length) continue;
+      const r = castProvidedScreens(d);
+      if (r.replaced || r.added) {
+        d.components = r.components;
+        console.log(`  Real screens: scene ${i + 1} -- ${r.replaced ? `${r.replaced} mock(s) replaced by the provided recording` : ""}${r.replaced && r.added ? ", " : ""}${r.added ? `${r.added} laid full-bleed` : ""}`);
+      }
+    }
+  }
+
   var brollUrlMap = new Map<number, string>(needFootage);
   if (process.env.PEXELS_API_KEY) {
     trace?.beginEvent("stock_footage");

@@ -31,6 +31,18 @@ it rides the media-backdrop channel the codegen b-roll uses, under the type
 and the cards. The writer is told this in the assets schema and in the
 launch-film guidance ("REAL FOOTAGE").
 
+## The mock is the placeholder
+
+Every kind of thing a film needs from a human is a need with a stand-in
+until it arrives: an image is drawn, b-roll is fetched, a speaker film
+builds on a slate until the take lands. Screen recordings were the gap:
+a need only on creator-cut, and nothing cast an uploaded one elsewhere.
+Now a scene on any grammar whose payoff is a product mock also lists a
+`screen_recording` (or `screenshot`) need; the mock performs until the
+team's real recording is uploaded, then `castProvidedScreens`
+(`core/asset-needs.ts`) gives the recording the mock's exact slot, layer
+and timing. Studio lists the need with Upload like any other.
+
 ## Columns the sheet should add
 
 - **Format / placement** (16x9, 4x5, 9x16; where it ships) -- the frame is a
