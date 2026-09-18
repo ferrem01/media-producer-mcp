@@ -3208,6 +3208,19 @@ async function runUnifiedPipeline(
   // the codegen b-roll already uses, under the type and the cards.
   var needFootage = new Map<number, string>();
   const personFilm = personCarries(filmGrammar);
+  // THE CLIP CHOSEN ON THE BOARD IS THE GROUND (SPEC-briefs.md, the
+  // sources): a b-roll need already provided -- picked, uploaded, or
+  // fetched by an earlier build -- lays the scene on a film nobody
+  // carries, whether or not this server can fetch stock. (Measured: a swap
+  // made in Studio was skipped as "already provided" and the rebuild laid
+  // the world backdrop instead.)
+  if (!personFilm) {
+    (storyboard.scenes as any[]).forEach((d, i) => {
+      for (const need of (Array.isArray(d.assets) ? d.assets : []) as any[]) {
+        if (need && need.type === "stock_footage" && need.status === "provided" && typeof need.path === "string" && need.path) { needFootage.set(i, need.path); break; }
+      }
+    });
+  }
   if ((personFilm && (canDraw || canFetchStock)) || canFetchStock) {
     const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
     const madeHere = (n: any) => n && (n.type === "illustration" || n.type === "stock_footage");
