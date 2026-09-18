@@ -3672,3 +3672,13 @@ carries it becomes the scene's ground via the media-backdrop channel. The
 writer's assets schema and launch-film guidance say so. (3) A framed desktop
 mock (data-mp-frame) crops its own edges on purpose; the off-canvas gate no
 longer reports its toolbar buttons as content below the fold.
+
+## The mock is the placeholder: screen recordings are a need on every grammar
+
+Marc, on the sheet-row test: storyboard-first opens a needs concept we had
+for images, b-roll and the speaker but not for screen recordings. A scene on
+any grammar that stages a product mock as its payoff now also lists a
+`screen_recording` need (writer contract, assets schema); the mock performs
+until the team's recording is uploaded, then `castProvidedScreens` gives the
+recording the mock's exact slot, layer and timing (full-bleed when the scene
+has no mock). Person films keep cutting provided screens in on their words.

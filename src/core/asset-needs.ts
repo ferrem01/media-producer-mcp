@@ -179,3 +179,46 @@ export function replaceCutWindow(components: unknown[], at: unknown): unknown[] 
 export function hasProofFor(components: unknown[], src: string): boolean {
   return (components || []).some((c: any) => c && typeof c === "object" && (c.type === "image" || c.type === "video") && c.data?.src === src);
 }
+
+/**
+ * THE MOCK IS THE PLACEHOLDER (SPEC-briefs.md): on a film nobody carries,
+ * a scene that stages a product mock as its payoff may list a
+ * `screen_recording` / `screenshot` need for the real screen. The film
+ * builds on the mock today; when the recording lands, it takes the mock's
+ * exact slot and timing. With no mock in the scene the recording is laid
+ * full-bleed like any provided proof. Pure: returns the new components.
+ */
+export function castProvidedScreens(scene: StoryboardScene): { components: Array<Record<string, unknown>>; replaced: number; added: number } {
+  const comps: Array<Record<string, unknown>> = Array.isArray(scene.components) ? (scene.components as any[]).map((c) => (c && typeof c === "object" ? { ...c } : c)) : [];
+  const taken = new Set<number>();
+  let replaced = 0, added = 0;
+  for (const need of scene.assets || []) {
+    if (!need || (need.type !== "screen_recording" && need.type !== "screenshot") || !need.path || need.status !== "provided") continue;
+    const media = assetMedia(need.path);
+    if (!media) continue;
+    if (comps.some((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path)) continue;
+    const idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
+      && isProofSurface((c as any).type) && (c as any).type !== "image" && (c as any).type !== "video");
+    const data: Record<string, unknown> = { src: need.path, object_fit: "cover" };
+    if (media === "image") data.drift = false;
+    if (idx >= 0) {
+      const mock: any = comps[idx];
+      comps[idx] = {
+        ...(mock.id ? { id: mock.id } : {}),
+        type: media, data,
+        ...(mock.position ? { position: mock.position } : { position: { x: "0%", y: "0%", width: "100%", height: "100%" } }),
+        ...(mock.z_index !== undefined ? { z_index: mock.z_index } : {}),
+        ...(mock.enter ? { enter: mock.enter } : {}),
+        ...(mock.exit ? { exit: mock.exit } : {}),
+      };
+      taken.add(idx);
+      replaced++;
+    } else {
+      if (typeof need.at === "number") data.at = need.at;
+      if (typeof need.until === "number") data.exit_at = need.until;
+      comps.push({ type: media, data, position: { x: "0%", y: "0%", width: "100%", height: "100%" } });
+      added++;
+    }
+  }
+  return { components: comps, replaced, added };
+}
