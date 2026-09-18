@@ -9165,6 +9165,61 @@ ${QUOTIENT_CSS}
   // media). No scope toggle -- what you clicked IS the scope: an element
   // revises that element, the scene (or a full-bleed wrapper) revises the
   // whole scene.
+  // ── THE SLOT IS THE NEED (SPEC-briefs.md, the sources) ──
+  // In a built scene, the thing you click is often a need's slot: the
+  // screen slate, the b-roll ground, a drawn object, a provided screen,
+  // the take under everything. Clicking it offers the same need card the
+  // board has -- the scene's storyboard dialog, scrolled to that row.
+  var NP_KIND = { camera_video: 'camera take', screenshot: 'screenshot', screen_recording: 'screen recording', stock_footage: 'b-roll', mockup: 'product mock', illustration: 'illustration' };
+  function needForSelection(project, sel) {
+    if (!project || !sel || !project.storyboard) return null;
+    var si = (project.scenes || []).findIndex(function(x) { return x.id === sel.sceneId; });
+    if (si < 0) return null;
+    var sb = (project.storyboard.scenes || [])[si]; if (!sb) return null;
+    var needs = sb.assets || []; if (!needs.length) return null;
+    var built = project.scenes[si];
+    var comp = null;
+    if (!sel._isScene && sel.compId) (built.components || []).forEach(function(c) { if (c.id === sel.compId) comp = c; });
+    var found = -1;
+    if (comp) {
+      var d = comp.data || {};
+      if (comp.type === 'asset-placeholder' && d.need) found = needs.findIndex(function(a) { return a && a.description === d.need; });
+      if (found < 0 && (comp.type === 'image' || comp.type === 'video') && d.src) found = needs.findIndex(function(a) { return a && a.path && a.path === d.src; });
+      if (found < 0 && comp.type === 'video' && d.src) found = needs.findIndex(function(a) { return a && a.type === 'camera_video' && a.path && a.path.split('/').pop() === String(d.src).split('/').pop(); });
+      if (found < 0 && /^(quotient-|claude-|slack-|linkedin-|x-post|email-compose|chat-simulator|ui-terminal-agent|browser-|app-|ui-|device-showcase|metric-dashboard|gmail-|calendar-view|code-editor|kanban-board)/.test(comp.type)) {
+        found = needs.findIndex(function(a) { return a && (a.type === 'screen_recording' || a.type === 'screenshot' || a.type === 'mockup'); });
+      }
+    }
+    // The scene itself (or a full-bleed ground) on a film a person carries: the take.
+    if (found < 0 && (sel._isScene || sel._fullBleed || !comp)) {
+      found = needs.findIndex(function(a) { return a && a.type === 'camera_video'; });
+      if (found < 0 && (sel._isScene || sel._fullBleed)) found = needs.findIndex(function(a) { return a && a.type === 'stock_footage'; });
+    }
+    if (found < 0) return null;
+    return { si: si, ai: found, need: needs[found] };
+  }
+  function openNeedInEditor(si, ai) {
+    openStoryboardEditor();
+    setTimeout(function() {
+      var btn = document.querySelector('#studio-modal-card [data-np-scene="' + si + '"][data-np-asset="' + ai + '"]');
+      var row = btn && btn.closest ? btn.closest('.np-row') : null;
+      if (!row) return;
+      row.scrollIntoView({ block: 'center' });
+      row.style.transition = 'background 600ms';
+      row.style.background = 'rgb(45 99 225 / 0.12)';
+      setTimeout(function() { row.style.background = ''; }, 1600);
+    }, 60);
+  }
+  function slotRowHtml(sel) {
+    var hit = needForSelection(state.currentProject, sel);
+    if (!hit) return '';
+    var a = hit.need, have = a.status === 'provided' && a.path;
+    var kind = NP_KIND[a.type] || a.type;
+    var what = a.type === 'camera_video' ? 'the take of the lines' : (a.description || '');
+    return '<div class="sp-row" style="align-items:center;gap:8px;" title="The board\u2019s need this slot holds">' +
+      '<span class="sp-status" style="flex:1;margin:0;">This is the slot for the <b>' + escHtml(kind) + '</b>' + (what ? ' \u2014 \u201c' + escHtml(String(what).slice(0, 60)) + '\u201d' : '') + ' \u00b7 ' + (have ? 'provided' : 'still needed') + '</span>' +
+      '<button class="rv-go secondary" id="rv-pop-slot" data-si="' + hit.si + '" data-ai="' + hit.ai + '" style="flex:0 0 auto;">' + (have ? 'Replace\u2026' : (a.type === 'camera_video' ? 'Record or upload\u2026' : 'Provide\u2026')) + '</button></div>';
+  }
   function rvPopBuild(pop) {
     var sel = studio.sel;
     var isScene = !!(sel && (sel._isScene || sel._fullBleed));
@@ -9235,8 +9290,11 @@ ${QUOTIENT_CSS}
       '<div class="sp-row" style="flex-wrap:wrap;">' + camRow + '</div>' +
       textRow +
       chapRow +
+      slotRowHtml(sel) +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
+    var slotBtn = document.getElementById('rv-pop-slot');
+    if (slotBtn) slotBtn.addEventListener('click', function() { rvPopClose(); openNeedInEditor(parseInt(slotBtn.dataset.si, 10), parseInt(slotBtn.dataset.ai, 10)); });
     document.getElementById('rv-pop-go').addEventListener('click', rvPopGo);
     document.getElementById('rv-pop-undo').addEventListener('click', studioUndo);
     var zb = document.getElementById('rv-pop-zoom');
@@ -9573,6 +9631,11 @@ ${QUOTIENT_CSS}
     function item(label, fn) { var b = document.createElement('button'); b.textContent = label; b.onclick = function() { m.style.display = 'none'; fn(); }; m.appendChild(b); }
     item('Revise this element\\u2026', function() { studioSetScope('element'); rvPopShow(); });
     item('Revise whole scene\\u2026', function() { studioSetScope('scene'); rvPopShow(); });
+    var hit = needForSelection(state.currentProject, studio.sel);
+    if (hit) {
+      var have = hit.need.status === 'provided' && hit.need.path;
+      item((have ? 'Replace the ' : 'Provide the ') + (NP_KIND[hit.need.type] || hit.need.type) + '\\u2026', function() { rvPopClose(); openNeedInEditor(hit.si, hit.ai); });
+    }
     var sep = document.createElement('div'); sep.className = 'ctx-sep'; m.appendChild(sep);
     item('Cancel', function() {});
     m.style.left = Math.max(4, Math.min(x, window.innerWidth - 190)) + 'px';

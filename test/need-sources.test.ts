@@ -92,4 +92,14 @@ describe("the sources: every need is collected its own way, in the board", () =>
     expect(off).toMatch(/const uploadProject = \(upload\.destProjectId && upload\.destNeed\) \? upload\.destProjectId : upload\.project;/);
     expect(off).toMatch(/\/api\/provide-asset\/\$\{encodeURIComponent\(upload\.tenant\)\}\/\$\{encodeURIComponent\(upload\.destProjectId\)\}/);
   });
+
+  it("the slot is the need: in a built scene the click offers the board's need card, scrolled to the row", async () => {
+    const desktop = await read("src/preview-app/preview-app.ts");
+    expect(desktop).toMatch(/function needForSelection\(project, sel\)/);
+    expect(desktop).toMatch(/comp\.type === 'asset-placeholder' && d\.need/);
+    expect(desktop).toMatch(/\(comp\.type === 'image' \|\| comp\.type === 'video'\) && d\.src\) found = needs\.findIndex/);
+    expect(desktop).toMatch(/function openNeedInEditor\(si, ai\) \{\s*openStoryboardEditor\(\);/);
+    expect(desktop).toMatch(/slotRowHtml\(sel\) \+/);
+    expect(desktop).toMatch(/item\(\(have \? 'Replace the ' : 'Provide the '\)/);
+  });
 });
