@@ -18,7 +18,7 @@ import type { Project, StoryboardScene, AssetRequirement, AssetRequirementType }
  *  labels, plated so nothing shows through its own window's margins,
  *  framed on its region on a tall frame. One definition, used by the
  *  pipeline (defaults), the generator (layout) and the assembler (plate). */
-export const PROOF_SURFACE_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|email-compose|chat-simulator|ui-terminal-agent|browser-|app-|ui-|device-showcase|metric-dashboard|gmail-|calendar-view|code-editor|kanban-board|image$|video$)/;
+export const PROOF_SURFACE_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|email-compose|chat-simulator|ui-terminal-agent|browser-|app-|ui-|device-showcase|metric-dashboard|gmail-|calendar-view|code-editor|kanban-board|asset-placeholder|image$|video$)/;
 export function isProofSurface(type: unknown): boolean { return typeof type === "string" && PROOF_SURFACE_RE.test(type); }
 
 /** The kinds of proof a writer may ask for. */
@@ -197,7 +197,10 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
     const media = assetMedia(need.path);
     if (!media) continue;
     if (comps.some((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path)) continue;
-    const idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
+    // Its own slate first (the honest stand-in cast while it was open), then
+    // the mock the scene staged as its payoff.
+    let idx = comps.findIndex((c, i) => !taken.has(i) && isScreenSlate(c) && (c as any).data.need === need.description);
+    if (idx < 0) idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
       && isProofSurface((c as any).type) && (c as any).type !== "image" && (c as any).type !== "video");
     const data: Record<string, unknown> = { src: need.path, object_fit: "cover" };
     if (media === "image") data.drift = false;
@@ -221,4 +224,76 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
     }
   }
   return { components: comps, replaced, added };
+}
+
+/** THE SCREEN SLATE (SPEC-briefs.md): the stand-in for a screen recording
+ *  or screenshot nobody has uploaded yet -- the library's asset-placeholder,
+ *  saying what it waits for, cast exactly where the recording will go. A
+ *  product mock is never the stand-in for a real screen: it looks finished
+ *  and is not. */
+export const SCREEN_SLATE_TYPE = "asset-placeholder";
+export function isScreenSlate(c: unknown): boolean {
+  return !!c && typeof c === "object" && (c as any).type === SCREEN_SLATE_TYPE && typeof (c as any).data?.need === "string";
+}
+function isScreenNeed(need: AssetRequirement | undefined | null): need is AssetRequirement {
+  return !!need && (need.type === "screen_recording" || need.type === "screenshot");
+}
+function screenSlate(need: AssetRequirement): Record<string, unknown> {
+  return {
+    need: need.description,
+    text: need.description,
+    asset_type: `${NEED_LABELS[need.type] || need.type} needed`,
+    hint: "Upload the real one in Studio -- it takes this slot",
+  };
+}
+
+/**
+ * Every open `screen_recording` / `screenshot` need gets a slate: in the
+ * slot of the product mock the scene staged as its payoff (same position,
+ * layer and cut window -- the mock is removed), else full-bleed, cut in
+ * and out on the need's `at` / `until` (a person film's word anchors pass
+ * through for the spine to resolve; `anchors: false` keeps seconds only).
+ * The slate of a need that has since been provided is cleared. Idempotent:
+ * a need that already has its slate casts nothing. Pure.
+ */
+export function castScreenSlates(scene: StoryboardScene, opts: { anchors?: boolean } = {}): { components: Array<Record<string, unknown>>; cast: Array<Record<string, unknown>>; cleared: number } {
+  let comps: Array<Record<string, unknown>> = Array.isArray(scene.components) ? (scene.components as any[]).map((c) => (c && typeof c === "object" ? { ...c } : c)) : [];
+  const needs = (scene.assets || []).filter(isScreenNeed);
+  const open = needs.filter((n) => n.status === "needed" && !n.path);
+  const openDesc = new Set(open.map((n) => n.description));
+  // A slate whose need is filled (or gone from the board) leaves.
+  const before = comps.length;
+  comps = comps.filter((c) => !isScreenSlate(c) || openDesc.has(String((c as any).data.need)));
+  const cleared = before - comps.length;
+  const cast: Array<Record<string, unknown>> = [];
+  const taken = new Set<number>();
+  for (const need of open) {
+    if (comps.some((c) => isScreenSlate(c) && (c as any).data.need === need.description)) continue;
+    const idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
+      && isProofSurface((c as any).type) && (c as any).type !== "image" && (c as any).type !== "video" && !isScreenSlate(c));
+    const data = screenSlate(need);
+    if (need.use === "split") data.use = "split";
+    let slate: Record<string, unknown>;
+    if (idx >= 0) {
+      const mock: any = comps[idx];
+      slate = {
+        ...(mock.id ? { id: mock.id } : {}),
+        type: SCREEN_SLATE_TYPE, data,
+        ...(mock.position ? { position: mock.position } : { position: { x: "0%", y: "0%", width: "100%", height: "100%" } }),
+        ...(mock.z_index !== undefined ? { z_index: mock.z_index } : {}),
+        ...(mock.enter ? { enter: mock.enter } : {}),
+        ...(mock.exit ? { exit: mock.exit } : {}),
+      };
+      comps[idx] = slate;
+      taken.add(idx);
+    } else {
+      const keep = (v: unknown) => (typeof v === "number" ? true : (opts.anchors === true && typeof v === "string" && v.trim() !== ""));
+      slate = { type: SCREEN_SLATE_TYPE, data, position: { x: "0%", y: "0%", width: "100%", height: "100%" } };
+      if (keep(need.at)) slate.enter = { effect: "cut", at: need.at };
+      if (keep(need.until)) slate.exit = { effect: "cut", at: need.until };
+      comps.push(slate);
+    }
+    cast.push(slate);
+  }
+  return { components: comps, cast, cleared };
 }

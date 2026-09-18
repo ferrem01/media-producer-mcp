@@ -29,7 +29,7 @@ import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
-import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens } from "../core/asset-needs.js";
+import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -3277,6 +3277,9 @@ async function runUnifiedPipeline(
   // mock the scene staged as its payoff (same position, timing and layer);
   // until it lands the mock performs. Person films cut provided screens in
   // on their words instead (proofComponents / replaceCutWindow above).
+  // THE SCREEN SLATE: an open screen need never ships as a mock pretending
+  // to be the recording -- the slate takes the mock's slot (or cuts in on
+  // the need's words) until the real screen is uploaded and takes it.
   if (!personFilm) {
     let sceneNo2 = 0;
     for (const d of storyboard.scenes as any[]) {
@@ -3287,6 +3290,30 @@ async function runUnifiedPipeline(
         d.components = r.components;
         console.log(`  Real screens: scene ${i + 1} -- ${r.replaced ? `${r.replaced} mock(s) replaced by the provided recording` : ""}${r.replaced && r.added ? ", " : ""}${r.added ? `${r.added} laid full-bleed` : ""}`);
       }
+      const sl = castScreenSlates(d);
+      if (sl.cast.length || sl.cleared) {
+        d.components = sl.components;
+        console.log(`  Screen slate: scene ${i + 1} -- ${sl.cast.length} slate(s) stand in for the screen still needed${sl.cleared ? `, ${sl.cleared} cleared` : ""}`);
+      }
+    }
+  } else {
+    let sceneNo2 = 0;
+    for (const d of storyboard.scenes as any[]) {
+      const i = sceneNo2++;
+      if (!Array.isArray(d.assets) || !d.assets.length) continue;
+      const sl = castScreenSlates(d, { anchors: true });
+      if (!sl.cast.length && !sl.cleared) continue;
+      const dur = Number(d.duration_seconds) || 0;
+      for (const c of sl.cast as any[]) {
+        // Cut in on the need's words like any proof; with no words, the
+        // creator-cut default window (30% to 80% of the claim).
+        extractAnchors(c);
+        if (d.spine) resolveComponent(c, d.spine);
+        if (!c.enter || typeof c.enter !== "object" || typeof c.enter.at !== "number") c.enter = { effect: "cut", at: Math.round(dur * 0.3 * 100) / 100 };
+        if (!c.exit || typeof c.exit !== "object" || typeof c.exit.at !== "number") c.exit = { effect: "cut", at: Math.round(dur * 0.8 * 100) / 100 };
+      }
+      d.components = sl.components;
+      console.log(`  Screen slate: scene ${i + 1} -- ${sl.cast.length} slate(s) cut in for the screen still needed${sl.cleared ? `, ${sl.cleared} cleared` : ""}`);
     }
   }
 
