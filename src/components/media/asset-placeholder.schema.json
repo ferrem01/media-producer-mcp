@@ -1,19 +1,30 @@
 {
   "category": "media",
   "label": "Asset Placeholder",
-  "description": "Gray placeholder indicating a missing asset. Shows what type of asset is needed (screenshot, screen recording, photo, etc.) with a text description.",
+  "description": "The slate for an asset nobody has supplied yet (a screen recording, a screenshot, a photo): a plain dashed card that names what it waits for. It stands exactly where the real file will go and is replaced by it, never shipped as the finished thing.",
   "data": {
     "text": {
       "type": "string",
       "required": true,
       "label": "Description of the needed asset",
-      "placeholder": "Screenshot of the analytics dashboard with real data"
+      "placeholder": "Screen recording of the campaign board filling in"
     },
     "asset_type": {
       "type": "string",
       "optional": true,
-      "label": "Asset type label",
-      "placeholder": "Screenshot"
+      "label": "What kind of asset (the small caps line)",
+      "placeholder": "Screen recording needed"
+    },
+    "hint": {
+      "type": "string",
+      "optional": true,
+      "label": "How to replace it",
+      "placeholder": "Upload the real one in Studio -- it takes this slot"
+    },
+    "need": {
+      "type": "string",
+      "optional": true,
+      "label": "The storyboard need this slate stands in for (set by the build)"
     }
   }
 }

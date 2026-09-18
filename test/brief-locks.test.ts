@@ -104,6 +104,49 @@ describe("the mock is the placeholder: a provided screen takes its slot on any f
     expect(r2.components[1]).toMatchObject({ type: "image", data: { src: "/a/s.png", drift: false, at: 2, exit_at: 5 }, position: { width: "100%", height: "100%" } });
     expect(castProvidedScreens({ components: [{ type: "quotient-home", data: {} }], assets: [{ type: "screen_recording", description: "x", status: "needed" }] } as any).replaced).toBe(0);
   });
+  it("the screen slate: an open screen need takes the mock's slot with a slate, never the mock; the recording then takes the slate's slot", async () => {
+    const { castScreenSlates, castProvidedScreens, isProofSurface } = await import("../src/core/asset-needs.js");
+    const scene: any = {
+      components: [
+        { id: "bg", type: "webgl-backdrop", data: {} },
+        { id: "campaign", type: "quotient-campaign", data: { title: "Q3" }, position: { x: "0%", y: "18%", width: "100%", height: "70%" }, z_index: 10, enter: { effect: "cut", at: 1 }, exit: { effect: "cut", at: 6 } },
+      ],
+      assets: [{ type: "screen_recording", description: "the campaign board filling in", status: "needed" }],
+    };
+    const r = castScreenSlates(scene);
+    expect(r.cast.length).toBe(1); expect(r.cleared).toBe(0);
+    expect(r.components.length).toBe(2);
+    expect(r.components[1]).toMatchObject({ id: "campaign", type: "asset-placeholder", data: { need: "the campaign board filling in", text: "the campaign board filling in", asset_type: "Screen recording needed" }, position: { y: "18%", height: "70%" }, z_index: 10, enter: { effect: "cut", at: 1 }, exit: { effect: "cut", at: 6 } });
+    expect(String(r.components[1].data.hint)).toMatch(/Studio/);
+    expect(isProofSurface("asset-placeholder")).toBe(true);
+    // Idempotent: the slate already there casts nothing more.
+    const again = castScreenSlates({ ...scene, components: r.components });
+    expect(again.cast.length).toBe(0); expect(again.components).toEqual(r.components);
+    // No mock: full-bleed, cut in on the need's seconds; a word anchor only when asked for.
+    const r2 = castScreenSlates({ components: [{ type: "kinetic-text", data: {} }], assets: [{ type: "screenshot", description: "the inbox", status: "needed", at: 2, until: 5 }] } as any);
+    expect(r2.components[1]).toMatchObject({ type: "asset-placeholder", data: { asset_type: "Screenshot needed" }, position: { width: "100%", height: "100%" }, enter: { effect: "cut", at: 2 }, exit: { effect: "cut", at: 5 } });
+    const r3 = castScreenSlates({ components: [], assets: [{ type: "screen_recording", description: "x", status: "needed", at: "@plugins", until: "@next" }] } as any);
+    expect(r3.components[0].enter).toBeUndefined();
+    const r4 = castScreenSlates({ components: [], assets: [{ type: "screen_recording", description: "x", status: "needed", at: "@plugins", until: "@next" }] } as any, { anchors: true });
+    expect(r4.components[0]).toMatchObject({ enter: { effect: "cut", at: "@plugins" }, exit: { effect: "cut", at: "@next" } });
+    // The recording lands: it takes the slate's slot (the mock's position and window), and the slate is gone.
+    const provided = { ...scene, components: r.components, assets: [{ ...scene.assets[0], status: "provided", path: "/a/campaign.mp4" }] };
+    const p = castProvidedScreens(provided);
+    expect(p.replaced).toBe(1);
+    expect(p.components[1]).toMatchObject({ id: "campaign", type: "video", data: { src: "/a/campaign.mp4" }, position: { y: "18%" }, enter: { effect: "cut", at: 1 } });
+    expect(castScreenSlates({ ...provided, components: p.components }).components.some((c: any) => c.type === "asset-placeholder")).toBe(false);
+    // A slate whose need was filled some other way is cleared.
+    const stale = castScreenSlates({ components: r.components, assets: [{ ...scene.assets[0], status: "provided", path: "/a/c.txt" }] } as any);
+    expect(stale.cleared).toBe(1); expect(stale.components.length).toBe(1);
+  });
+  it("the pipeline casts the slate on every grammar: in the mock's slot on a film nobody carries, on its words on a person film", async () => {
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/if \(!personFilm\) \{[\s\S]*?const sl = castScreenSlates\(d\);/);
+    expect(pipeline).toMatch(/\} else \{[\s\S]*?const sl = castScreenSlates\(d, \{ anchors: true \}\);[\s\S]*?extractAnchors\(c\);[\s\S]*?resolveComponent\(c, d\.spine\)/);
+    const sb = await read("src/llm/storyboard-builder.ts");
+    expect(sb).toMatch(/the build casts a SLATE in the mock's slot/);
+    expect(sb).toMatch(/REAL SCREENS -- a scene whose payoff is a product mock also lists[\s\S]*?stands a slate in the mock's slot/);
+  });
   it("the pipeline casts provided screens on a film nobody carries; the writer lists the need beside every product mock", async () => {
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/if \(!personFilm\) \{[\s\S]*?const r = castProvidedScreens\(d\);/);

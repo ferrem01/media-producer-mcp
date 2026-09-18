@@ -3682,3 +3682,24 @@ any grammar that stages a product mock as its payoff now also lists a
 until the team's recording is uploaded, then `castProvidedScreens` gives the
 recording the mock's exact slot, layer and timing (full-bleed when the scene
 has no mock). Person films keep cutting provided screens in on their words.
+
+## The screen slate: an open screen need is never shipped as a mock
+
+Marc, on scenes 4 and 5 of the sheet-row film: the Quotient mock standing in
+for a screen recording is not honest -- it is the real components and looks
+finished; he wants the speaker treatment, a placeholder that plainly says
+"this is replaced by the actual video". The mock-as-placeholder rule (#815)
+is superseded: `castScreenSlates` (`core/asset-needs.ts`) casts the
+library's `asset-placeholder` in the mock's slot (same position, layer and
+cut window; the mock leaves) for every open `screen_recording` /
+`screenshot` need, full-bleed on the need's times when there is no mock
+(word anchors pass through on person films and resolve against the spine
+in the pipeline). `asset-placeholder` is now a proof surface, so it is
+plated, cut in, framed and split like the screen it waits for, and
+`castProvidedScreens` gives the uploaded recording the slate's slot first.
+Idempotent on rebuild; a slate whose need was filled is cleared. The
+component itself was redrawn as a deliberate slate (dashed frame, REC dot
+for recordings, the description, "Upload the real one in Studio"). The
+writer still casts the mock on the board -- it is how the build knows where
+the screen goes -- and the contract says so.
+

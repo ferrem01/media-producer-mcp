@@ -31,17 +31,25 @@ it rides the media-backdrop channel the codegen b-roll uses, under the type
 and the cards. The writer is told this in the assets schema and in the
 launch-film guidance ("REAL FOOTAGE").
 
-## The mock is the placeholder
+## The screen slate: the mock is never the placeholder
 
 Every kind of thing a film needs from a human is a need with a stand-in
 until it arrives: an image is drawn, b-roll is fetched, a speaker film
 builds on a slate until the take lands. Screen recordings were the gap:
 a need only on creator-cut, and nothing cast an uploaded one elsewhere.
 Now a scene on any grammar whose payoff is a product mock also lists a
-`screen_recording` (or `screenshot`) need; the mock performs until the
-team's real recording is uploaded, then `castProvidedScreens`
-(`core/asset-needs.ts`) gives the recording the mock's exact slot, layer
-and timing. Studio lists the need with Upload like any other.
+`screen_recording` (or `screenshot`) need. The mock is NOT the stand-in
+(Marc, on the sheet-row film: a Quotient mock in a scene that asks for a
+recording looks finished and is not). While the need is open the build
+casts a SLATE -- the library's `asset-placeholder`, a plain dashed card
+saying "Screen recording needed", the need's description and how to
+replace it -- in the mock's exact slot, layer and cut window
+(`castScreenSlates`, `core/asset-needs.ts`); with no mock it cuts in
+full-bleed on the need's `at`/`until`, word anchors resolved on person
+films. The mock is still written on the board: it tells the build where
+the screen goes and when. When the recording is uploaded,
+`castProvidedScreens` gives it the slate's slot and the slate leaves.
+Studio lists the need with Upload like any other.
 
 ## Columns the sheet should add
 

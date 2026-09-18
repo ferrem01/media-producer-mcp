@@ -1,14 +1,17 @@
 <template>
   <div class="asset-placeholder">
-    <div class="placeholder-icon">
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="4" y="8" width="40" height="32" rx="4" stroke="rgba(255,255,255,0.3)" stroke-width="2" fill="none"/>
-        <circle cx="16" cy="20" r="4" stroke="rgba(255,255,255,0.3)" stroke-width="2" fill="none"/>
-        <path d="M4 32 L16 24 L24 30 L32 20 L44 28" stroke="rgba(255,255,255,0.3)" stroke-width="2" fill="none"/>
-      </svg>
+    <div class="placeholder-frame">
+      <div class="placeholder-icon">
+        <svg width="68" height="68" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="5" y="10" width="46" height="34" rx="5" stroke="currentColor" stroke-width="2.5" fill="none"/>
+          <path class="icon-play" d="M23 20 L35 27 L23 34 Z" fill="currentColor"/>
+          <circle class="icon-rec" cx="44" cy="17" r="4" fill="#ff4d4f"/>
+        </svg>
+      </div>
+      <div class="placeholder-type" data-type></div>
+      <div class="placeholder-text" data-text></div>
+      <div class="placeholder-hint" data-hint></div>
     </div>
-    <div class="placeholder-text" data-text></div>
-    <div class="placeholder-type" data-type></div>
   </div>
 </template>
 
@@ -17,37 +20,56 @@
     width: 100%;
     height: 100%;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     background: #2a2a2e;
-    border-radius: 12px;
-    gap: 16px;
-    padding: 40px;
+    background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 14px, rgba(255,255,255,0) 14px 28px);
     box-sizing: border-box;
+    padding: 4%;
+    color: rgba(255, 255, 255, 0.72);
   }
 
-  .placeholder-icon {
-    opacity: 0.5;
+  .placeholder-frame {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 6%;
+    box-sizing: border-box;
+    border: 2px dashed rgba(255, 255, 255, 0.28);
+    border-radius: 14px;
+    text-align: center;
+  }
+
+  .placeholder-icon { color: rgba(255, 255, 255, 0.55); }
+
+  .placeholder-type {
+    font-family: var(--mp-font-body, 'Inter', system-ui, sans-serif);
+    font-size: 15px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
   }
 
   .placeholder-text {
     font-family: var(--mp-font-body, 'Inter', system-ui, sans-serif);
-    font-size: 18px;
+    font-size: 26px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.7);
-    text-align: center;
-    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.4;
     max-width: 80%;
   }
 
-  .placeholder-type {
+  .placeholder-hint {
     font-family: var(--mp-font-body, 'Inter', system-ui, sans-serif);
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.3);
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
+    font-size: 15px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    line-height: 1.4;
   }
 </style>
 
@@ -55,18 +77,28 @@
   function createTimeline(el, data, ctx) {
     var textEl = el.querySelector('[data-text]');
     var typeEl = el.querySelector('[data-type]');
+    var hintEl = el.querySelector('[data-hint]');
     var iconEl = el.querySelector('.placeholder-icon');
+    var rec = el.querySelector('.icon-rec');
+    var play = el.querySelector('.icon-play');
 
     if (textEl) textEl.textContent = data.text || 'Asset needed';
-    if (typeEl) typeEl.textContent = data.asset_type || '';
+    if (typeEl) typeEl.textContent = data.asset_type || 'Asset needed';
+    if (hintEl) { hintEl.textContent = data.hint || ''; if (!data.hint) hintEl.style.display = 'none'; }
+    // A recording waits with a blinking REC dot; a still with the play glyph off.
+    var isVideo = /recording|video|clip|b-roll|footage/i.test(String(data.asset_type || ''));
+    if (rec && !isVideo) rec.style.display = 'none';
+    if (play && !isVideo) play.style.opacity = '0.55';
 
     var tl = gsap.timeline();
-    gsap.set([iconEl, textEl, typeEl], { autoAlpha: 0, y: 10 });
-
-    tl.to(iconEl, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.2)
-      .to(textEl, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.4)
-      .to(typeEl, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.6);
-
+    gsap.set([iconEl, typeEl, textEl, hintEl], { autoAlpha: 0, y: 10 });
+    tl.to(iconEl, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 0.1)
+      .to(typeEl, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.25)
+      .to(textEl, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 0.35)
+      .to(hintEl, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.5);
+    if (rec && isVideo) {
+      tl.to(rec, { opacity: 0.25, duration: 0.6, ease: 'sine.inOut', repeat: -1, yoyo: true }, 0.6);
+    }
     return tl;
   }
 </script>
