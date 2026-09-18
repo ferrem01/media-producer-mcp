@@ -83,7 +83,15 @@ beat grid from the chosen file (`chosenMusic` in `grammar-prep.ts`), and
 and `POST /api/music/{tenant}/{project}`; the library previews stream
 from `/assets/_system/stock-music/`.
 
-Not yet: opening the same card by clicking the slot in a built scene.
+**The slot is the need.** In a built scene, what you click is often a
+need's slot: the screen slate, the b-roll ground, a drawn object, a
+provided screen, the take under everything. The revise popover and the
+right-click menu say so ("This is the slot for the screen recording --
+still needed") and open the scene's storyboard dialog scrolled to that
+need's row, where the same Record / Recorder / Find / Draw / Upload
+buttons live (`needForSelection`, `openNeedInEditor` in the desktop
+Studio). Changing a need after the build is the same write as before it;
+a rebuild casts the new file into the slot.
 
 ## Columns the sheet should add
 

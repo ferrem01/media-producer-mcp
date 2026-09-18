@@ -3741,3 +3741,16 @@ file, so a tempo-cut is cut against the bed it ships with. `none` sets
 Library previews stream from `/assets/_system/stock-music/` (audio
 extensions only).
 
+## The slot is the need: click it in the built film to open the same card
+
+The last of Marc's sources arc: in a built scene, the thing you click is
+often a need's slot. `needForSelection` (desktop Studio) maps the
+selected component to the storyboard scene's need -- the slate by its
+`data.need`, a provided image/video by `data.src`, a product mock to the
+scene's screen need, the scene itself (or a full-bleed ground) to the
+take, else the b-roll -- and the revise popover and the context menu
+offer "Provide / Replace the <kind>...", which opens the scene's
+storyboard dialog scrolled to that need's row with a brief highlight.
+Nothing new to persist: the row is the one the board has, the write is
+`provideAsset`, and a rebuild casts the new file into the slot.
+
