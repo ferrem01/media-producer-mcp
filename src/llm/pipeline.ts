@@ -32,6 +32,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
+import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel } from "../core/recipes.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -142,6 +143,8 @@ export interface PipelineOpts {
   /** The FRAME axis, pinned by the caller. Omitted -> the creative director
    *  infers it from the prompt (video only). */
   frame?: import("../core/types.js").Frame;
+  /** THE RECIPE axis (SPEC-recipes.md): a library id to pin the cut to. */
+  recipe?: string;
 
   // Storyboard-only mode: run concept director + storyboard builder, save storyboard, stop before scene generation
   storyboardOnly?: boolean;
@@ -2452,6 +2455,7 @@ async function runUnifiedPipeline(
         audioSystem: opts.audio_system,
         hasSpeaker: !!opts.speaker_source || pipelineHasNarration,
         frame: opts.frame,
+        recipe: opts.recipe,
       });
       // FRAME: caller pin > director's inference > the canvas as given.
       // Explicit pixel dimensions from the caller always win over both.
@@ -2551,6 +2555,15 @@ async function runUnifiedPipeline(
   if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }
+  // THE RECIPE (SPEC-recipes.md): pinned by the caller or picked by the
+  // director; the writer fills it, the board is checked against it, and its
+  // motion is applied to the cast. None = today's generate.
+  const recipeObj = getRecipe(opts.recipe) || getRecipe((treatment as any)?.recipe);
+  if (recipeObj) {
+    if (recipeObj.grammar !== filmGrammar) console.warn(`  Recipe "${recipeObj.id}" is a ${recipeObj.grammar} cut but the film is ${filmGrammar} -- following the recipe's spine anyway`);
+    else console.log(`  Recipe: "${recipeObj.id}" (${recipeObj.name}) -- ${opts.recipe ? "pinned by the caller" : "picked by the director"}`);
+    if (treatment) (treatment as any).recipe = recipeObj.id;
+  }
   const prep = await runGrammarPrep(filmGrammar, {
     prompt: richPrompt,
     brandKit,
@@ -2639,6 +2652,7 @@ async function runUnifiedPipeline(
       beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
       filmGrammar,
       world,
+      recipe: recipeObj,
     });
   }
   trace?.endEvent({ scenes: storyboard.scenes.length });
@@ -2771,6 +2785,14 @@ async function runUnifiedPipeline(
         }
       });
     }
+  }
+  // THE RECIPE'S MOTION on the cast, any grammar: stamps, pills, lower-thirds
+  // and keywords take the recipe's enter/exit unless the writer set one; a
+  // fixed camera marks the scene so no punch-in is invented.
+  if (recipeObj) {
+    let touched = 0;
+    for (const d of storyboard.scenes as any[]) touched += applyRecipeMotion(d, recipeObj, roleOfLabel(d.label, recipeObj));
+    if (touched) console.log(`  Recipe motion: ${touched} enter/exit(s) set from "${recipeObj.id}"`);
   }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
@@ -3124,10 +3146,14 @@ async function runUnifiedPipeline(
     {
       const locks = extractBriefLocks(project.brief);
       const missing = missingLocks(project.storyboard, locks);
-      if (missing.length) {
-        (project.storyboard as any).warnings = missing.map((q) => `The brief locks this line and the board does not carry it: "${q}"`);
-        console.warn(`  Storyboard: ${missing.length} locked line(s) missing -- ${missing.map((q) => `"${q}"`).join(", ")}`);
+      const warnings = missing.map((q) => `The brief locks this line and the board does not carry it: "${q}"`);
+      if (missing.length) console.warn(`  Storyboard: ${missing.length} locked line(s) missing -- ${missing.map((q) => `"${q}"`).join(", ")}`);
+      if (recipeObj) {
+        const off = checkBoardAgainstRecipe(project.storyboard as any, recipeObj);
+        if (off.length) console.warn(`  Storyboard vs recipe "${recipeObj.id}": ${off.join(" ")}`);
+        warnings.push(...off);
       }
+      if (warnings.length) (project.storyboard as any).warnings = warnings;
     }
     project.status = "storyboard";
     // THE BOARD CARRIES ITS STAND-INS: the screen slate is on the board from

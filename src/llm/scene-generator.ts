@@ -1271,7 +1271,7 @@ export function buildAuthoredCompositionScene(
   // live, proj_b04fb594: four scenes authored "@3.3s reset" and nothing
   // else) -- the rule applies as if none were written.
   if (cameraMoves && cameraMoves.every((m: any) => !m || m.type === "reset")) cameraMoves = undefined;
-  if (!cameraMoves) {
+  if (!cameraMoves && !(draft as any).camera_fixed) {
     var autoCam = creatorCutCameraMoves(components as any, {
       grammar: (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar,
       motion: (opts.treatment as any)?.visualSystem?.motion,

@@ -1,0 +1,37 @@
+{
+  "id": "presenter-n-things",
+  "name": "Presenter: N things",
+  "grammar": "creator-cut",
+  "frames_proven": ["16x9"],
+  "suits": ["N things you might have missed", "what we shipped", "three reasons", "product update from a person"],
+  "length_s": [50, 70],
+  "spine": [
+    { "role": "hook", "shot": "person", "dur": [5, 8, 11], "enters": ["lower_third", "stamp:title"], "note": "The person says what this is and why to stay. Lower-third with name and role; the title stamp lands on the first noun." },
+    { "role": "list", "shot": "person", "dur": [2, 3, 4], "enters": ["stamp:count"], "note": "Names the count. One line." },
+    { "role": "proof", "shot": "person+cutaway", "dur": [8, 10, 12], "repeat": [2, 4], "enters": ["stamp:noun@start"], "cutaway": { "at": "claim_verb", "hold": 0.6, "exit_before": "next_line" }, "note": "Stamp on the thing's name as the beat opens; the screen cuts in on the verb of the claim and holds most of the beat; hard cut back to the person for the last line." },
+    { "role": "close", "shot": "person", "dur": [5, 7, 9], "enters": ["stamp:sentiment", "end_card@-2s"], "note": "One sentence of thanks or a nudge; the end card holds the last two seconds." }
+  ],
+  "rhythm": { "cut_cadence_s": 3.5, "max_hold_s": 8, "wpm": 165, "first_cut_by_s": 2, "end_card_s": 2 },
+  "layers": {
+    "captions": { "style": "pill", "words": 3, "pos": "bottom-center", "through_cutaways": true },
+    "stamps": { "pos": "top-center", "hold_s": 2.5 },
+    "lower_third": { "on": "hook", "hold_s": 4 },
+    "camera": "fixed",
+    "music": { "bed": true, "duck": true }
+  },
+  "motion": {
+    "elements": {
+      "stamp": { "in": "pop", "in_s": 0.35, "out": "fade", "out_s": 0.25 },
+      "cutaway": { "in": "cut", "out": "cut" },
+      "caption": { "in": "pop", "in_s": 0.12, "per": "word_group" },
+      "lower_third": { "in": "slide-up", "in_s": 0.4, "out": "fade", "out_s": 0.3 },
+      "end_card": { "in": "fade", "in_s": 0.4 }
+    },
+    "transitions": { "default": "cut" },
+    "camera": { "hook": "fixed", "list": "fixed", "proof": "fixed", "close": "fixed" },
+    "physics": "punchy"
+  },
+  "asks": { "take": "continuous", "screens": "one per proof", "broll": 0, "images": 0 },
+  "latitude": { "optional": ["list"], "fixed": ["hook", "close"], "may_double": ["proof"] },
+  "source": { "film": "linkedin_jahnshah_clay", "length_s": 65, "frame": "16x9", "cuts_s": [11.2, 13.8, 25.5, 32.3, 39.2, 42.8, 48.0, 50.3, 51.5, 55.8], "measured": "2026-09-19" }
+}

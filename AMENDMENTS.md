@@ -3822,3 +3822,23 @@ take's measured spine), with the creator-cut default window when the
 script does not carry the word. `settledMoment` photographs a cut-in
 inside its window, so the card shows the slate.
 
+## The recipe: the third axis, a measured cut the writer fills
+
+Marc: the reference films are tight because of their editing, and
+generate asks the writer to invent that rhythm from prose every time.
+`SPEC-recipes.md`. A recipe (`src/recipes/*.recipe.json`) is the
+measured cut of one film with the content removed: identity and suits,
+a spine of beats with [min, target, max] seconds and word budgets at
+the recipe's pace, repeats, what enters on each beat and how the cutaway
+lands; rhythm numbers; the layers' behavior; asks and latitude; and the
+motion vocabulary in the assembler's own effect names. `core/recipes.ts`
+loads and validates the library, feeds the director a menu (a pinned
+recipe implies its grammar), hands the writer the mandatory block and
+the scene budget, checks the finished board (warnings beside the brief
+locks), and applies the motion to stamps, pills, lower-thirds and
+keywords without overriding the writer; a fixed camera marks the scene
+so the generator invents no punch-in. `generate` takes `recipe`. Five
+recipes measured today from the films Marc sent: the Clay presenter
+(presenter-n-things), bigpictureclub's split tour, Lieberman's founder
+story with b-roll, Jesani's kinetic claims, Rodin's one-take cards.
+
