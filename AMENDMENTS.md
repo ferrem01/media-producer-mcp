@@ -3842,3 +3842,22 @@ recipes measured today from the films Marc sent: the Clay presenter
 (presenter-n-things), bigpictureclub's split tour, Lieberman's founder
 story with b-roll, Jesani's kinetic claims, Rodin's one-take cards.
 
+## After Marc's first full run of the recipe board: three fixes and a check
+
+Marc recorded the take on his phone and the three screens with the
+Recorder on proj_179c8dfa (presenter-n-things, 16:9) and built it.
+(1) A 9:16 take on a 16:9 film came through as a zoomed face: the
+sanitizer only cropped takes wider than the canvas and left taller ones
+to <video>'s object-fit: cover. `reframePad` now pillarboxes a tall take
+(scaled to the canvas height, padded on a dark field) and records
+`reframed.mode: "pillarbox"`. (2) The Recorder's recording reached the
+built scene but the card kept the slate: the provide routes now recast
+the BOARD scene too, and the card inlines provided media (a frame one
+second into a clip via `ensureMediaPoster`, a still as a data URL) since
+the card page is file:// and /assets never loads there. (3) The writer
+authored a zoom on a fixed-camera recipe beat: `applyRecipeMotion` now
+clears the writer's moves on a fixed beat. The check itself: the recipe
+was committed, the board matched its spine, every stamp and lower-third
+carried its motion; the take's measured spine stretched two beats past
+the recipe's max (the take is the clock, by design).
+

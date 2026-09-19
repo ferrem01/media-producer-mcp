@@ -24,7 +24,8 @@ import { LAUNCH_OPTS } from "./capture.js";
 import { buildAuthoredCompositionScene, buildTemplateScene } from "../llm/scene-generator.js";
 import type { Project } from "./types.js";
 import { activeTake, personCarries } from "./take-needs.js";
-import { ensureTakePoster } from "./take-poster.js";
+import { ensureTakePoster, ensureMediaPoster } from "./take-poster.js";
+import { resolveVideoPath } from "./video-path.js";
 import fsSync from "node:fs";
 
 /**
@@ -264,6 +265,30 @@ export async function renderStoryboardCards(project: Project, opts: {
         // judgeable. Camera moves are film-time direction -- they appear on
         // the card as copy (the CAMERA section), never applied to the photo.
         const { camera_moves: _cm, ...staged } = draft;
+        // PROVIDED MEDIA ON THE CARD: the page is file://, so a clip or a
+        // still under /assets never loads there. A clip wears a frame one
+        // second in; a still is inlined. (Measured live, proj_179c8dfa: the
+        // recording was on the board and the card still showed the slate.)
+        if (opts.dataDir && Array.isArray((staged as any).components)) {
+          (staged as any).components = await Promise.all(((staged as any).components as any[]).map(async (c: any) => {
+            const src = c && c.data && typeof c.data.src === "string" ? c.data.src : "";
+            if (!src || !src.startsWith("/assets/")) return c;
+            try {
+              if (c.type === "video") {
+                const pf = await ensureMediaPoster(project as any, src, opts.dataDir!);
+                if (!pf) return c;
+                return { ...c, type: "image", data: { ...c.data, src: `data:image/jpeg;base64,${fsSync.readFileSync(pf).toString("base64")}`, drift: false } };
+              }
+              if (c.type === "image") {
+                const local = resolveVideoPath(src, opts.dataDir!);
+                const ext = path.extname(local).slice(1).toLowerCase();
+                const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/png";
+                return { ...c, data: { ...c.data, src: `data:${mime};base64,${fsSync.readFileSync(local).toString("base64")}` } };
+              }
+            } catch { /* the card shows the slot empty rather than failing */ }
+            return c;
+          }));
+        }
         const take = speakerFilm ? activeTake(project, i) : undefined;
         if (speakerFilm && take?.face) (staged as any).take_face = take.face;
         const cardOpts = {
