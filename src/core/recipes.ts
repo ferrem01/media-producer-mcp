@@ -271,6 +271,13 @@ export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; as
   const made = madeOf(beat);
   const out: string[] = [];
   const isScreenNeed = (a: any) => a && typeof a === "object" && (a.type === "screen_recording" || a.type === "screenshot");
+  // No person on this beat (a screen, a type card, b-roll, an idea card):
+  // a camera take asked for it is the writer's reflex, not the recipe's
+  // (measured live, proj_2384e533: every chapter asked for a take).
+  if (!String(beat.shot).startsWith("person") && Array.isArray(scene.assets)) {
+    const takes = scene.assets.filter((a) => a && typeof a === "object" && a.type === "camera_video" && a.status !== "provided");
+    if (takes.length) { scene.assets = scene.assets.filter((a) => !takes.includes(a)); out.push("the camera take ask dropped: no person on this beat"); }
+  }
   if (made === "motion") {
     if (Array.isArray(scene.assets)) {
       const drop = scene.assets.filter((a) => isScreenNeed(a) && a.status !== "provided");
@@ -289,6 +296,70 @@ export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; as
     }
   }
   return out;
+}
+
+/** THE CHAPTER KICKER IS CAST BY THE BUILD: a beat whose `enters` names
+ *  chapter-kicker gets one when the writer left it out (measured live,
+ *  proj_2384e533: three chapters, no kicker). Its data is derivable --
+ *  the chapter's name from the label, its number from its place among
+ *  the chapter scenes, the count from how many there are -- so it needs
+ *  no writer. Returns how many were cast. */
+export function castChapterKickers(board: { scenes: Array<{ label?: unknown; components?: any[] }> }, r: Recipe): number {
+  const chapterRoles = new Set(r.spine.filter((b) => (b.enters || []).some((e) => /^chapter-kicker/.test(e))).map((b) => b.role.toLowerCase()));
+  if (!chapterRoles.size) return 0;
+  const chapters = board.scenes.filter((s) => { const role = roleOfLabel(s.label, r); return !!role && chapterRoles.has(role); });
+  let n = 0;
+  chapters.forEach((s, i) => {
+    if (!Array.isArray(s.components)) s.components = [];
+    if (s.components.some((c) => c && typeof c === "object" && c.type === "chapter-kicker")) return;
+    const text = String(s.label || "").replace(/^[^-\u2013\u2014:]*[-\u2013\u2014:]\s*/, "").trim() || `Step ${i + 1}`;
+    s.components.push({ type: "chapter-kicker", data: { text, step: i + 1, steps: chapters.length, at: 0.3 } });
+    n++;
+  });
+  return n;
+}
+
+/** NO PERSON ON THE BEAT MEANS NO TAKE UNDER IT: a chapter on white, a
+ *  type card, b-roll, an idea card are OPAQUE scenes. Without this the
+ *  build composites them over the camera (measured live, proj_2384e533:
+ *  chapter 3's flowchart and the wordmark reveal drawn over the person).
+ *  Returns true when the ground was set. */
+export function holdGroundToRecipe(scene: { label?: unknown; transparent_background?: boolean }, r: Recipe): boolean {
+  const role = roleOfLabel(scene.label, r);
+  const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+  if (!beat || String(beat.shot).startsWith("person")) return false;
+  if (scene.transparent_background === false) return false;
+  scene.transparent_background = false;
+  return true;
+}
+
+/** THE WORDMARK CARD IS CAST BY THE BUILD: a type_card beat whose `enters`
+ *  names stamp:wordmark (the reveal, the close) is the logo-close template
+ *  -- the wordmark from the brand kit, the URL when the beat also names
+ *  stamp:url and the lines say one -- unless the writer cast a logo
+ *  already. A ring the writer put there instead is dropped (measured
+ *  live, proj_2384e533: a green ring over the person for "the wordmark").
+ *  Returns how many were cast. */
+export function castWordmarkCards(board: { scenes: Array<{ label?: unknown; voiceover_text?: unknown; scene_template?: unknown; components?: any[] }> }, r: Recipe): number {
+  let n = 0;
+  const allText = board.scenes.map((s) => String(s.voiceover_text || "")).join(" ");
+  for (const s of board.scenes) {
+    const role = roleOfLabel(s.label, r);
+    const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+    if (!beat || beat.shot !== "type_card") continue;
+    const enters = beat.enters || [];
+    if (!enters.some((e) => /^stamp:wordmark/.test(e))) continue;
+    const comps = Array.isArray(s.components) ? s.components : [];
+    const hasLogo = !!s.scene_template || comps.some((c) => c && typeof c === "object" && (c.type === "st-logo-close" || (c.type === "sticker-prop" && String(c.data?.kind || "") === "image")));
+    if (hasLogo) continue;
+    const wantsUrl = enters.some((e) => /^stamp:url/.test(e));
+    const own = String(s.voiceover_text || "");
+    const m = (own.match(/\b[a-z0-9-]+\.(?:ai|com|io|co|app|dev)(?:\/[\w-]+)?/i) || allText.match(/\b[a-z0-9-]+\.(?:ai|com|io|co|app|dev)(?:\/[\w-]+)?/i));
+    s.scene_template = { type: "st-logo-close", data: { tagline: "", cta: "", url: wantsUrl && m ? m[0] : "" } };
+    s.components = comps.filter((c) => !(c && typeof c === "object" && c.type === "sticker-prop" && String(c.data?.kind || "") === "ring"));
+    n++;
+  }
+  return n;
 }
 
 /** A person beat is the PERSON: a scene template the writer reached for

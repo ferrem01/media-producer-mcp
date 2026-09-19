@@ -280,7 +280,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     // empty cast is NO LONGER filled with a label from the scene's name (Marc: "I don't like chapter labels as a default").
     expect(pipeline).not.toMatch(/is cast from the scene's name/);
     expect(pipeline).toMatch(/const lane = captionLane\(spine, Array\.isArray\(d\.emphasis\) \? d\.emphasis\.map\(String\) : \[\], \{ style: capStyle \}\);/);
-    expect(pipeline).toMatch(/c\.type === "reel-caption-lane"\);\s*if \(!hasLane && spine\.words\.length\)/);
+    expect(pipeline).toMatch(/c\.type === "reel-caption-lane"\);\s*\/\/[^\n]*\n\s*if \(!hasLane && spine\.words\.length && wantMode !== "none"\)/);
     // A cast lane whose mode disagrees with the recipe's style is recast; the writer's own lane is kept.
     expect(pipeline).toMatch(/c\.id === "captions"\);\s*if \(castLane && String\(castLane\.data\?\.mode \|\| ""\) !== wantMode\) \{/);
     // ...carried from the board to the saved storyboard.

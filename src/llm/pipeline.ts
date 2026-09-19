@@ -32,7 +32,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
-import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe } from "../core/recipes.js";
+import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards } from "../core/recipes.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2799,6 +2799,9 @@ async function runUnifiedPipeline(
     if (pruned) console.log(`  Recipe needs: ${pruned} b-roll ask(s) dropped from beats whose footage is the take or the screen`);
     for (const d of storyboard.scenes as any[]) { const t = holdShotToRecipe(d, recipeObj); if (t) console.log(`  Recipe shot: "${d.label || ""}" is a person beat -- the ${t} template is dropped, the person stays`); }
     for (const d of storyboard.scenes as any[]) { const notes = holdMadeToRecipe(d, recipeObj); for (const n of notes) console.log(`  Recipe made: "${d.label || ""}" -- ${n}`); }
+    { const k = castChapterKickers(storyboard as any, recipeObj); if (k) console.log(`  Recipe: ${k} chapter kicker(s) cast from the chapter scenes' names`); }
+    { let g = 0; for (const d of storyboard.scenes as any[]) if (holdGroundToRecipe(d, recipeObj)) g++; if (g) console.log(`  Recipe ground: ${g} scene(s) with no person are opaque (no take under them)`); }
+    { const w = castWordmarkCards(storyboard as any, recipeObj); if (w) console.log(`  Recipe: ${w} wordmark card(s) cast as st-logo-close`); }
   }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
@@ -2898,17 +2901,18 @@ async function runUnifiedPipeline(
         // "scatter" recipe (the Air cut) lands each phrase at its own
         // spot around the person; every other style is the plated lane.
         const capStyle = String((recipeObj as any)?.layers?.captions?.style || "");
-        const wantMode = capStyle === "scatter" ? "scatter" : "";
+        const wantMode = capStyle === "scatter" ? "scatter" : capStyle === "none" ? "none" : "";
         // A lane THIS pass cast earlier (id "captions": a board built before
         // the recipe's style reached the build, or the recipe changed) is
         // recast when its mode disagrees; the writer's own lane is kept.
         const castLane = (d.components as any[]).find((c) => c && typeof c === "object" && c.type === "reel-caption-lane" && c.id === "captions");
         if (castLane && String(castLane.data?.mode || "") !== wantMode) {
           d.components = (d.components as any[]).filter((c) => c !== castLane);
-          console.log(`  Creator-cut: scene ${i + 1} -- the cast lane is recast as ${wantMode || "plated"} (the recipe's style)`);
+          console.log(`  Creator-cut: scene ${i + 1} -- the cast lane is ${wantMode === "none" ? "dropped: the recipe carries no captions" : `recast as ${wantMode || "plated"} (the recipe's style)`}`);
         }
         const hasLane = (d.components as any[]).some((c) => c && typeof c === "object" && c.type === "reel-caption-lane");
-        if (!hasLane && spine.words.length) {
+        // A recipe with no captions (the Grade film) casts no lane at all.
+        if (!hasLane && spine.words.length && wantMode !== "none") {
           const lane = captionLane(spine, Array.isArray(d.emphasis) ? d.emphasis.map(String) : [], { style: capStyle });
           if (lane) {
             d.components.push(lane);

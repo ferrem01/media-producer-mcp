@@ -4060,3 +4060,32 @@ that place themselves (a new SELF_PLACING list in the scene generator, z
 
 Verified in Chromium at 16x9 and 9x16. Type sizes off the larger axis so
 a tall frame reads as big as a wide one.
+
+## First board on the Grade recipe (proj_2384e533): three things the build now owns
+
+The chapters came in as motion graphics from the library (quotient-chat,
+quotient-campaign, flowchart, each with a cursor) and asked for no
+screen; the logo band was cast on the return. Three misses, fixed in the
+recipe pass, not the prompt:
+
+- The chapter kicker was not cast. `castChapterKickers`: a beat whose
+  `enters` names chapter-kicker gets one from the chapter scenes
+  themselves -- the name from the label, the number from its place, the
+  count from how many.
+- Captions were laid on every scene though the recipe says none. The
+  build now honors `captions.style: "none"`: no lane cast, a lane it cast
+  earlier dropped.
+- Every chapter asked for a camera take. No person on the beat means no
+  take ask: `holdMadeToRecipe` drops `camera_video` on any beat whose
+  shot is not a person.
+
+Same board, two more, from the cards: chapter 3 (a flowchart, not a
+proof surface) and the wordmark reveal were drawn OVER the person, and
+the reveal and the close each got a ring where the wordmark belongs.
+`holdGroundToRecipe` makes every no-person beat opaque
+(`transparent_background: false`); `castWordmarkCards` casts the
+logo-close template on a type_card beat that names stamp:wordmark (the
+URL from the lines when it also names stamp:url) and drops the ring.
+The logo band invented customers (Framer, Linear, Nestle): the recipe
+and the component now say only customers the brief names, never
+invented ones, and no band when none are named.
