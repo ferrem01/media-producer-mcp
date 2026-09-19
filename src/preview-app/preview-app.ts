@@ -7111,7 +7111,7 @@ ${QUOTIENT_CSS}
     // timeline block, not the canvas): this footage is a need the board
     // asked for -- offer its card, the same one the canvas click opens.
     var needHit = needForVideoSrc(p, si, v.getAttribute('src') || '');
-    if (needHit) html += '<div class="sp-row" style="display:block;margin-bottom:7px;">' + needSourcesHtml(p, needHit.si, needHit.ai) + '</div>';
+    if (needHit) html += needSlotLineHtml(p, needHit.si, needHit.ai, 'mp-slot');
     if (implicit) {
       html += '<div class="sp-region" style="margin-bottom:7px;">Park the playhead where a boring bit starts, then <b>Split</b>. Speed up or remove the pieces you don\\'t need — your narration never moves.</div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -7156,7 +7156,8 @@ ${QUOTIENT_CSS}
     if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.top = py + 'px';
     document.getElementById('mp-x').addEventListener('click', camPopClose);
-    if (needHit) bindSceneNeeds(p, pop);
+    var slotBtn = document.getElementById('mp-slot');
+    if (slotBtn) slotBtn.addEventListener('click', function() { openNeedPicker(p, needHit.si, needHit.ai); });
     var compressBtn = document.getElementById('mp-compress');
     if (compressBtn) compressBtn.addEventListener('click', function() {
       camPopClose();
@@ -9267,6 +9268,34 @@ ${QUOTIENT_CSS}
       '<small>' + (have ? '<b class="ok">provided</b>' : '<b>needed</b>') + ' · a pick lands in the scene right away</small></div>' +
       '<div class="np-act">' + acts + '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div></div>';
   }
+  // The compact line a popover carries: what the slot is, one button that
+  // opens the picker in the dialog (the grid needs room the popover lacks --
+  // Marc: "you can see how the search button drops below the line").
+  function needSlotLineHtml(project, si, ai, btnId) {
+    var sb = ((project.storyboard || {}).scenes || [])[si]; var a = sb && (sb.assets || [])[ai];
+    if (!a) return '';
+    var have = a.status === 'provided' && a.path, kind = NP_KIND[a.type] || a.type;
+    return '<div class="sp-row" style="align-items:center;gap:8px;"><span class="sp-status" style="flex:1;margin:0;">The <b>' + escHtml(kind) + '</b> the board asked for · ' + (have ? 'provided' : 'still needed') + '</span>' +
+      '<button class="rv-go secondary" id="' + btnId + '" data-si="' + si + '" data-ai="' + ai + '" style="flex:0 0 auto;">' + (have ? 'Replace ' : 'Provide ') + escHtml(kind) + '…</button></div>';
+  }
+  // THE PICKER: the need's sources in the dialog, the make-it panel already
+  // open (find for b-roll, draw for a drawing), Upload beside it. A pick
+  // lands in the scene at once and the dialog closes.
+  function openNeedPicker(project, si, ai) {
+    var sb = ((project.storyboard || {}).scenes || [])[si]; var a = sb && (sb.assets || [])[ai];
+    if (!a) return;
+    rvPopClose(); camPopClose(); muStop();
+    var kind = NP_KIND[a.type] || a.type, have = a.status === 'provided' && a.path;
+    studioModalOpen('<h3 class="sm-title">' + (have ? 'Replace the ' : 'Provide the ') + escHtml(kind) + '</h3>' +
+      '<p class="sm-desc">Scene ' + (si + 1) + (a.description && a.type !== 'camera_video' ? ' — “' + escHtml(a.description) + '”' : '') + '. A pick lands in the scene right away.</p>' +
+      needSourcesHtml(project, si, ai) +
+      '<div class="sm-actions"><button class="sm-btn" id="np-picker-close">Close</button></div>');
+    var card = document.getElementById('studio-modal-card');
+    bindSceneNeeds(project, card);
+    document.getElementById('np-picker-close').addEventListener('click', function() { muStop(); studioModalClose(); });
+    var first = (NP_SOURCES[a.type] || [])[0];
+    if (first === 'find' || first === 'draw' || first === 'recorder') npOpenPanel(project, card, first, si, ai);
+  }
   function openNeedInEditor(si, ai) {
     openStoryboardEditor();
     setTimeout(function() {
@@ -9281,8 +9310,7 @@ ${QUOTIENT_CSS}
   }
   function slotRowHtml(sel) {
     var hit = needForSelection(state.currentProject, sel);
-    if (!hit) return '';
-    return '<div class="sp-row" style="display:block;" title="The board\u2019s need this slot holds">' + needSourcesHtml(state.currentProject, hit.si, hit.ai) + '</div>';
+    return hit ? needSlotLineHtml(state.currentProject, hit.si, hit.ai, 'rv-pop-slot') : '';
   }
   function rvPopBuild(pop) {
     var sel = studio.sel;
@@ -9357,7 +9385,8 @@ ${QUOTIENT_CSS}
       slotRowHtml(sel) +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
-    if (state.currentProject) bindSceneNeeds(state.currentProject, pop);
+    var slotBtn = document.getElementById('rv-pop-slot');
+    if (slotBtn) slotBtn.addEventListener('click', function() { openNeedPicker(state.currentProject, parseInt(slotBtn.dataset.si, 10), parseInt(slotBtn.dataset.ai, 10)); });
     document.getElementById('rv-pop-go').addEventListener('click', rvPopGo);
     document.getElementById('rv-pop-undo').addEventListener('click', studioUndo);
     var zb = document.getElementById('rv-pop-zoom');
@@ -9697,7 +9726,7 @@ ${QUOTIENT_CSS}
     var hit = needForSelection(state.currentProject, studio.sel);
     if (hit) {
       var have = hit.need.status === 'provided' && hit.need.path;
-      item((have ? 'Replace the ' : 'Provide the ') + (NP_KIND[hit.need.type] || hit.need.type) + '\\u2026', function() { studioSetScope('element'); rvPopShow(); });
+      item((have ? 'Replace the ' : 'Provide the ') + (NP_KIND[hit.need.type] || hit.need.type) + '\\u2026', function() { openNeedPicker(state.currentProject, hit.si, hit.ai); });
     }
     var sep = document.createElement('div'); sep.className = 'ctx-sep'; m.appendChild(sep);
     item('Cancel', function() {});
