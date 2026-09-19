@@ -1,0 +1,203 @@
+{
+  "id": "ask-work-result",
+  "name": "Agent demo: ask, work, result",
+  "grammar": "canvas-tour",
+  "frames_proven": [
+    "1x1"
+  ],
+  "suits": [
+    "an agent demo: ask, work, result",
+    "a product inside another product",
+    "show the deliverable, not the dashboard",
+    "add X to Y"
+  ],
+  "length_s": [
+    24,
+    34
+  ],
+  "spine": [
+    {
+      "role": "payoff-open",
+      "shot": "screen",
+      "dur": [
+        1,
+        1.5,
+        2.5
+      ],
+      "enters": [
+        "stamp:title"
+      ],
+      "note": "A second of the finished deliverable with the film's title over it, so the viewer knows what is about to be made."
+    },
+    {
+      "role": "ask",
+      "shot": "screen",
+      "dur": [
+        3.5,
+        4.5,
+        5.5
+      ],
+      "enters": [],
+      "note": "The product's chat surface. The ask types in, in full, with its attachment shown; held long enough to read every word. Nothing over it."
+    },
+    {
+      "role": "work",
+      "shot": "screen",
+      "dur": [
+        4,
+        5,
+        6
+      ],
+      "enters": [],
+      "note": "The agent works: a checklist ticks through its steps by name (the tools it called), then the elapsed time it took. The honesty beat. Nothing over it."
+    },
+    {
+      "role": "result",
+      "shot": "screen",
+      "dur": [
+        10,
+        12,
+        14
+      ],
+      "enters": [
+        "keyword:fade"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "use": "cutaway",
+        "kind": "screen_recording"
+      },
+      "note": "The deliverable full frame, with its own sound if it has one; two claim lines land over it one at a time, the second completing the first ('X plans it.' / 'Y ships it.'). Nearly half the film."
+    },
+    {
+      "role": "cta",
+      "shot": "screen",
+      "dur": [
+        2,
+        2.5,
+        3.5
+      ],
+      "enters": [
+        "keyword:fade"
+      ],
+      "note": "One line over the last shot of the deliverable: the ask of the viewer ('Add X to Y.')."
+    },
+    {
+      "role": "close",
+      "shot": "type_card",
+      "dur": [
+        1.5,
+        2,
+        2.5
+      ],
+      "enters": [
+        "stamp:wordmark",
+        "end_card@start"
+      ],
+      "note": "The wordmark alone on black."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 4.5,
+    "max_hold_s": 14,
+    "wpm": 150,
+    "first_cut_by_s": 2,
+    "end_card_s": 2
+  },
+  "layers": {
+    "voice": "type",
+    "type": {
+      "style": "display-sans-medium",
+      "pos": "center",
+      "max_words": 5,
+      "note": "four lines in the whole film: a title, two claims, one ask; each fades in and holds"
+    },
+    "captions": {
+      "style": "none"
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "surface": "one product surface performs the ask and the work, scripted (the composer types, the tool calls tick); the deliverable owns the frame after",
+    "camera": "fixed",
+    "music": {
+      "bed": false,
+      "note": "the deliverable may carry its own sound; no bed under the surface"
+    }
+  },
+  "motion": {
+    "elements": {
+      "keyword": {
+        "in": "fade",
+        "in_s": 0.4,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "stamp": {
+        "in": "fade",
+        "in_s": 0.4,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "cutaway": {
+        "in": "cut",
+        "out": "cut"
+      },
+      "end_card": {
+        "in": "cut"
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "payoff-open": "fixed",
+      "ask": "fixed",
+      "work": "fixed",
+      "result": "fixed",
+      "cta": "fixed",
+      "close": "fixed"
+    },
+    "physics": "calm"
+  },
+  "asks": {
+    "take": "none",
+    "screens": "the deliverable: a recording or screenshot of the real output (or a generated clip); the product surface is a library mock scripted with the ask and the tool calls",
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "payoff-open"
+    ],
+    "fixed": [
+      "ask",
+      "work",
+      "result",
+      "close"
+    ],
+    "may_double": []
+  },
+  "source": {
+    "film": "x_runwayml_2100342066228162560",
+    "length_s": 28.5,
+    "frame": "1x1",
+    "cuts_s": [
+      1.57,
+      5.93,
+      10.77,
+      14.13,
+      17.0,
+      19.0,
+      22.0,
+      23.97,
+      26.67
+    ],
+    "measured": "2026-09-19"
+  }
+}

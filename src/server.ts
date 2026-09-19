@@ -925,7 +925,7 @@ export function createMcpServer(): McpServer {
       name: z.string().describe("Project name"),
       format: z.enum(["video", "image", "slideshow", "presentation", "one-pager", "gif", "social", "email-header", "thumbnail"]).describe("Output format"),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry (default: 16x9). 9x16 for Reels/TikTok/Shorts, 4x5 for feed posts, 1x1 square."),
-      recipe: z.string().optional().describe("The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (presenter-n-things, presenter-split-tour, presenter-location-hop, founder-story-broll, speaker-kinetic-claims, speaker-one-take-cards, story-ad-idea-beats). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none."),
+      recipe: z.string().optional().describe("The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (presenter-n-things, presenter-split-tour, presenter-location-hop, founder-story-broll, speaker-kinetic-claims, speaker-one-take-cards, story-ad-idea-beats, ask-work-result). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none."),
       fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
     async (params) => {

@@ -3998,3 +3998,18 @@ playing video to its own position stalls it for a few frames -- a small
 repeat at every cut. The preview now seeks only when the jump is real
 (more than 0.12s: a de-aired gap, a scrub). The render was never affected
 (the speaker base is concatenated by ffmpeg).
+
+## The eighth recipe: ask, work, result (the Runway-in-ChatGPT ad)
+
+Marc sent Runway's ad (28.5s, 1x1, no person, no voice of its own) and
+said go. `ask-work-result` under canvas-tour: a second of the payoff with
+the title, the ask typed in full into the product's chat surface, the
+agent's checklist ticking through its tool calls and then the elapsed
+time (the honesty beat), the deliverable full frame for nearly half the
+film with two claim lines landing one at a time, one CTA line over its
+last shot, the wordmark on black. Four lines of type in the whole film;
+the lines fade rather than type on. It asks the human for one thing: the
+deliverable (a recording or screenshot of the real output, or a generated
+clip); the surface is a scripted library mock. Measured cuts at 1.57,
+5.93, 10.77, 14.13 and, inside the deliverable, 17.0, 19.0, 22.0, 23.97,
+26.67.
