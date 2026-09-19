@@ -8,7 +8,7 @@ const read = (p: string) => fs.readFile(path.join(process.cwd(), p), "utf8");
 describe("the sources: every need is collected its own way, in the board", () => {
   it("names how each kind of need is collected; the build's draw prompt is shared; the frame decides portrait", async () => {
     const { NEED_SOURCES, needSources, drawPrompt, tallFrame } = await import("../src/core/need-sources.js");
-    expect(NEED_SOURCES.camera_video).toEqual(["record", "upload"]);
+    expect(NEED_SOURCES.camera_video).toEqual(["record", "upload"]); // the server's table; Studio splits record into here / phone
     expect(NEED_SOURCES.screen_recording).toEqual(["recorder", "upload"]);
     expect(NEED_SOURCES.stock_footage).toEqual(["find", "upload"]);
     expect(NEED_SOURCES.illustration).toEqual(["draw", "upload"]);
@@ -68,7 +68,7 @@ describe("the sources: every need is collected its own way, in the board", () =>
 
   it("Studio: the desktop card and the phone card offer each need its sources, inline", async () => {
     const desktop = await read("src/preview-app/preview-app.ts");
-    expect(desktop).toMatch(/var NP_SOURCES = \{ camera_video: \['record', 'upload'\], screen_recording: \['recorder', 'upload'\], screenshot: \['recorder', 'upload'\], stock_footage: \['find', 'upload'\], illustration: \['draw', 'upload'\], mockup: \['draw', 'upload'\] \};/);
+    expect(desktop).toMatch(/var NP_SOURCES = \{ camera_video: \['booth', 'phone', 'upload'\], screen_recording: \['recorder', 'upload'\], screenshot: \['recorder', 'upload'\], stock_footage: \['find', 'upload'\], illustration: \['draw', 'upload'\], mockup: \['draw', 'upload'\] \};/);
     expect(desktop).toMatch(/'\/stock-search\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/'\/need-source\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/data-np-src="' \+ src \+ '"/);
@@ -134,7 +134,7 @@ describe("the sources: every need is collected its own way, in the board", () =>
 
   it("the armed need: Studio points the Recorder at a slot, the popup opens set to it, the landing recording disarms it", async () => {
     const index = await read("src/index.ts");
-    expect(index).toMatch(/\|music-options\|arm-need\|armed-need\|traces\|/);
+    expect(index).toMatch(/\|music-options\|arm-need\|armed-need\|/);
     expect(index).toMatch(/\/api\\\/arm-need\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/\/api\\\/armed-need\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/if \(anNeed\.type !== "screen_recording" && anNeed\.type !== "screenshot"\)/);
@@ -150,5 +150,20 @@ describe("the sources: every need is collected its own way, in the board", () =>
     const desktop = await read("src/preview-app/preview-app.ts");
     expect(desktop).toMatch(/api\('POST', '\/arm-need\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(await read("src/studio-phone.ts")).toMatch(/api\('POST', '\/arm-need\/' \+ encodeURIComponent\(tenant\)/);
+  });
+
+  it("the camera picker: record here (the take page in the dialog) or on your phone (a QR of the take link)", async () => {
+    const desktop = await read("src/preview-app/preview-app.ts");
+    expect(desktop).toMatch(/if \(src === 'booth'\) \{[\s\S]*?<iframe class="np-booth" src="' \+ escAttr\(takeUrl\) \+ '" allow="camera; microphone; autoplay"/);
+    expect(desktop).toMatch(/'&scene=' \+ si \+ '&embed=1'/);
+    expect(desktop).toMatch(/if \(src === 'phone'\) \{[\s\S]*?\/api\/take-qr\//);
+    expect(desktop).toMatch(/ev\.data\.type !== 'mp-take-attached'/);
+    const take = await read("src/take-page.ts");
+    expect(take).toMatch(/var embedded = qp\.get\('embed'\) === '1';/);
+    expect(take).toMatch(/window\.parent\.postMessage\(\{ type: 'mp-take-attached'/);
+    const index = await read("src/index.ts");
+    expect(index).toMatch(/\|arm-need\|armed-need\|take-qr\|traces\|/);
+    expect(index).toMatch(/\/api\\\/take-qr\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
+    expect(index).toMatch(/"Content-Type": "image\/svg\+xml; charset=utf-8"/);
   });
 });

@@ -1017,6 +1017,9 @@ ${QUOTIENT_CSS}
   .np-hint { font-size: 12px; color: var(--content-secondary); line-height: 1.5; }
   .np-hint b { color: var(--foreground); }
   .np-empty { font-size: 12px; color: var(--content-secondary); padding: 6px 0; }
+  .np-booth { display: block; width: 100%; height: min(70vh, 720px); border: 0; border-radius: var(--radius-sm); background: #000; }
+  .np-phone { display: flex; gap: 14px; align-items: center; }
+  .np-phone img { flex: 0 0 auto; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: #fff; }
   /* THE MUSIC CHOICE: the film's bed, picked in the dialog. */
   .mu-now { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border-secondary); border-radius: var(--radius); background: var(--surface-secondary, var(--core-panel-bg)); margin-bottom: 12px; font-size: 14px; }
   .mu-now .mu-what { flex: 1; min-width: 0; }
@@ -4024,8 +4027,8 @@ ${QUOTIENT_CSS}
   // the board. Record and Upload have their own paths; find (Pexels) and
   // draw (image generation) open a panel under the row and end in the
   // same write an upload makes (need-source -> provideAsset).
-  var NP_SOURCES = { camera_video: ['record', 'upload'], screen_recording: ['recorder', 'upload'], screenshot: ['recorder', 'upload'], stock_footage: ['find', 'upload'], illustration: ['draw', 'upload'], mockup: ['draw', 'upload'] };
-  var NP_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Record with the Recorder' };
+  var NP_SOURCES = { camera_video: ['booth', 'phone', 'upload'], screen_recording: ['recorder', 'upload'], screenshot: ['recorder', 'upload'], stock_footage: ['find', 'upload'], illustration: ['draw', 'upload'], mockup: ['draw', 'upload'] };
+  var NP_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Record with the Recorder', booth: 'Record here', phone: 'On your phone' };
   var npPick = null;
   function sceneNeedsHtml(project, si) {
     var s = ((project.storyboard && project.storyboard.scenes) || [])[si];
@@ -4046,14 +4049,13 @@ ${QUOTIENT_CSS}
       var srcs = NP_SOURCES[a.type] || ['upload'];
       var acts = '';
       srcs.forEach(function(src) {
-        if (src === 'record') {
-          acts += '<a class="np-btn" target="_blank" href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '">' + (have ? 'Re-record' : 'Record') + '</a>';
-        } else if (src === 'upload') {
+        if (src === 'upload') {
           acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + r.ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
         } else {
           var lbl = NP_SOURCE_LABELS[src];
           if (have && src === 'find') lbl = 'Find another';
           if (have && src === 'draw') lbl = 'Redraw';
+          if (have && src === 'booth') lbl = 'Re-record here';
           acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + r.ai + '">' + lbl + '</button>';
         }
       });
@@ -4093,6 +4095,21 @@ ${QUOTIENT_CSS}
     panel.dataset.src = src; panel.style.display = ''; panel.innerHTML = '';
     var scene = ((project.storyboard && project.storyboard.scenes) || [])[si] || {};
     var need = (scene.assets || [])[ai] || {};
+    if (src === 'booth') {
+      // RECORD HERE: the take page itself, in the dialog, on this scene. It
+      // tells us when the take is attached (postMessage) and the film reloads.
+      var takeUrl = withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si + '&embed=1');
+      panel.innerHTML = '<iframe class="np-booth" src="' + escAttr(takeUrl) + '" allow="camera; microphone; autoplay" title="Record the take for scene ' + (si + 1) + '"></iframe>' +
+        '<div class="np-hint" style="margin-top:6px">Your camera and mic, the lines as a prompter. Stop, and the take lands in this scene. <a href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '" target="_blank">Open it in its own tab</a> if you prefer.</div>';
+      return;
+    }
+    if (src === 'phone') {
+      // ON YOUR PHONE: the same take link as a code, drawn on this server.
+      var qrUrl = withToken('/api/take-qr/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '?scene=' + si);
+      panel.innerHTML = '<div class="np-phone"><img src="' + escAttr(qrUrl) + '" alt="Scan to record scene ' + (si + 1) + ' on your phone" width="220" height="220">' +
+        '<div class="np-hint">Scan with your phone\u2019s camera. It opens the recorder for <b>scene ' + (si + 1) + '</b>, lines on screen; stop, and the take lands here. The code carries your sign-in, so don\u2019t share it.</div></div>';
+      return;
+    }
     if (src === 'recorder') {
       // THE ARMED NEED: clicking "Record with the Recorder" points the
       // extension at this slot. Open it on the page to record; stop, and
@@ -4255,6 +4272,15 @@ ${QUOTIENT_CSS}
       })
       .catch(function(e) { body.innerHTML = '<div class="np-empty">' + escHtml(e.message || String(e)) + '</div>'; });
   }
+  // The embedded booth says the take is attached: close the picker, reload
+  // the film (the take is the scene's base now).
+  window.addEventListener('message', function(ev) {
+    if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-attached') return;
+    var p = state.currentProject; if (!p || (ev.data.project && ev.data.project !== p.project_id)) return;
+    studioStatus('Take attached' + (typeof ev.data.scene_index === 'number' ? ' to scene ' + (ev.data.scene_index + 1) : '') + '.', 'ok');
+    studioModalClose();
+    loadProject(p.project_id);
+  });
   (function bindNeedsUpload() {
     var f = document.getElementById('np-file');
     if (!f) return;
@@ -9341,9 +9367,8 @@ ${QUOTIENT_CSS}
     var have = a.status === 'provided' && a.path;
     var acts = '';
     (NP_SOURCES[a.type] || ['upload']).forEach(function(src) {
-      if (src === 'record') acts += '<a class="np-btn" target="_blank" href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '">' + (have ? 'Re-record' : 'Record') + '</a>';
-      else if (src === 'upload') acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
-      else acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + ai + '">' + (have && src === 'find' ? 'Find another' : (have && src === 'draw' ? 'Redraw' : NP_SOURCE_LABELS[src])) + '</button>';
+      if (src === 'upload') acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
+      else acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + ai + '">' + (have && src === 'find' ? 'Find another' : (have && src === 'draw' ? 'Redraw' : (have && src === 'booth' ? 'Re-record here' : NP_SOURCE_LABELS[src]))) + '</button>';
     });
     return '<div class="np-row" style="border-top:0;padding:4px 0 6px;"><div class="np-what">The <b>' + escHtml(NP_KIND[a.type] || a.type) + '</b> the board asked for' + (a.description && a.type !== 'camera_video' ? ' — “' + escHtml(String(a.description).slice(0, 70)) + '”' : '') +
       '<small>' + (have ? '<b class="ok">provided</b>' : '<b>needed</b>') + ' · a pick lands in the scene right away</small></div>' +
@@ -9375,7 +9400,7 @@ ${QUOTIENT_CSS}
     bindSceneNeeds(project, card);
     document.getElementById('np-picker-close').addEventListener('click', function() { muStop(); studioModalClose(); });
     var first = (NP_SOURCES[a.type] || [])[0];
-    if (first === 'find' || first === 'draw' || first === 'recorder') npOpenPanel(project, card, first, si, ai);
+    if (first === 'find' || first === 'draw' || first === 'recorder' || first === 'booth') npOpenPanel(project, card, first, si, ai);
   }
   function openNeedInEditor(si, ai) {
     openStoryboardEditor();
