@@ -73,11 +73,22 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const gag = { label: "AUDIENCE - the founder", assets: [{ type: "stock_footage", description: "a dog in a lanyard" }, { type: "camera_video", description: "the take" }] };
     expect(pruneNeedsByRecipe(gag, a)).toBe(0);
     const feature = { label: "FEATURE - Memory", assets: [{ type: "stock_footage", description: "x" }, { type: "screen_recording", description: "y" }] };
-    expect(pruneNeedsByRecipe(feature, a)).toBe(0);
+    expect(pruneNeedsByRecipe(feature, a)).toBe(1);   // its cutaway is the screen, not found footage
+    expect(feature.assets.map((x) => x.type)).toEqual(["screen_recording"]);
+    // A person beat keeps the person: a scene template the writer reached for is dropped.
+    const { holdShotToRecipe } = await import("../src/core/recipes.js");
+    const big: any = { label: "BIG-PICTURE - the time goes back", scene_template: { type: "st-photo-close", data: { headline: "x" } } };
+    expect(holdShotToRecipe(big, a)).toBe("st-photo-close");
+    expect(big.scene_template).toBeUndefined();
+    const gagT: any = { label: "AUDIENCE - the founder", scene_template: { type: "st-statement", data: {} } };
+    expect(holdShotToRecipe(gagT, a)).toBeUndefined();
+    expect(gagT.scene_template).toBeTruthy();
     // The pipeline runs the prune in the recipe pass and leaves the bar grid alone with a recipe pinned.
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/pruned \+= pruneNeedsByRecipe\(d, recipeObj\);/);
     expect(pipeline).toMatch(/if \(beatMap && !opts\.presetStoryboard && recipeObj\) \{/);
+    expect(pipeline).toMatch(/beatGrid: beatMap && !recipeObj \? \{ bpm: beatMap\.bpm, barSec: beatMap\.barSec \} : undefined,/);
+    expect(pipeline).toMatch(/const t = holdShotToRecipe\(d, recipeObj\);/);
     const bad = { scenes: [{ duration_seconds: 20, voiceover_text: "word ".repeat(80) }, { duration_seconds: 4, voiceover_text: "x" }] };
     const off = checkBoardAgainstRecipe(bad, r);
     expect(off.join(" ")).toMatch(/wants 4-7 scenes; the board has 2/);

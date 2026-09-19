@@ -212,10 +212,32 @@ export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: bo
 export function pruneNeedsByRecipe(scene: { label?: unknown; assets?: any[] }, r: Recipe): number {
   const role = roleOfLabel(scene.label, r);
   const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
-  if (!beat || beat.shot !== "person" || beat.cutaway || !Array.isArray(scene.assets)) return 0;
+  if (!beat || !Array.isArray(scene.assets)) return 0;
+  // A beat carries b-roll only when the recipe says its footage is found:
+  // a broll shot, or a cutaway of kind stock_footage. A feature beat's
+  // cutaway is the screen; its "location" b-roll ask is the same misread.
+  const findsFootage = beat.shot === "broll" || (beat.cutaway && String(beat.cutaway.kind || "") === "stock_footage");
+  if (findsFootage) return 0;
   const before = scene.assets.length;
   scene.assets = scene.assets.filter((a) => !(a && typeof a === "object" && a.type === "stock_footage"));
   return before - scene.assets.length;
+}
+
+/** A person beat is the PERSON: a scene template the writer reached for
+ *  (st-photo-close on the big picture, st-logo-close on the CTA -- measured
+ *  live, proj_8147620f) would cover the take with a card. Dropped on any
+ *  beat whose shot starts with "person"; the words are the captions and
+ *  the recipe's stamps carry the URL. Returns the template type dropped. */
+export function holdShotToRecipe(scene: { label?: unknown; scene_template?: unknown; template?: unknown }, r: Recipe): string | undefined {
+  const role = roleOfLabel(scene.label, r);
+  const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+  if (!beat || !String(beat.shot).startsWith("person")) return undefined;
+  const st = scene.scene_template as any;
+  const type = st && typeof st === "object" ? String(st.type || "") : (typeof scene.template === "string" && scene.template ? scene.template : "");
+  if (!type) return undefined;
+  delete scene.scene_template;
+  if (typeof scene.template === "string" && scene.template) scene.template = "";
+  return type;
 }
 
 export function roleOfLabel(label: unknown, r: Recipe): string | undefined {
