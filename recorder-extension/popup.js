@@ -56,7 +56,31 @@ async function loadDestinations(savedId) {
   if (savedId) sel.value = savedId;
   if (sel.value !== savedId) sel.value = "";
   const { destNeed } = await chrome.storage.sync.get({ destNeed: "" });
-  loadNeeds(sel.value, destNeed);
+  await loadNeeds(sel.value, destNeed);
+  await applyArmed();
+}
+
+// THE ARMED NEED (SPEC-recorder.md): Studio pointed the Recorder at a slot.
+// Open set to it -- Save to = that project, For = that need -- and say so.
+// "Not this one" disarms and leaves the pickers as they are.
+async function applyArmed() {
+  const res = await chrome.runtime.sendMessage({ type: "qr-armed" });
+  const a = res && res.ok && res.armed;
+  const box = $("armed");
+  if (!a) { box.style.display = "none"; return; }
+  const sel = $("dest");
+  if (![...sel.options].some((o) => o.value === a.project_id)) { box.style.display = "none"; return; }
+  sel.value = a.project_id;
+  const needVal = a.scene_index + ":" + a.asset_index;
+  await chrome.storage.sync.set({ destProject: a.project_id, destNeed: needVal });
+  await loadNeeds(a.project_id, needVal);
+  $("armed-what").textContent = `${a.project_name} · Scene ${a.scene_index + 1}` + (a.description ? ` · ${a.description}` : "");
+  box.style.display = "";
+  $("armed-clear").onclick = async (ev) => {
+    ev.preventDefault();
+    await chrome.runtime.sendMessage({ type: "qr-disarm", project: a.project_id });
+    box.style.display = "none";
+  };
 }
 
 // "For" picker: the screens the chosen project's storyboard still needs

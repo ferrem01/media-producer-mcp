@@ -407,6 +407,32 @@ function speakerUrlFromSource(source: string | undefined): string | undefined {
   return source;
 }
 
+/** THE ARMED NEED (SPEC-recorder.md): Studio arms the screen need the
+ *  Recorder should fill next; the extension's popup reads it and opens
+ *  already pointed at it; the recording that lands clears it. One per
+ *  tenant, on disk beside the projects, two hours at most. */
+interface ArmedNeed { project_id: string; project_name: string; scene_index: number; asset_index: number; type: string; description: string; armed_at: string }
+const ARMED_TTL_MS = 2 * 60 * 60 * 1000;
+function armedNeedPath(tenantId: string): string { return path.join(config.dataDir, tenantId, "armed-need.json"); }
+async function readArmedNeed(tenantId: string): Promise<ArmedNeed | null> {
+  try {
+    const a = JSON.parse(await fs.readFile(armedNeedPath(tenantId), "utf-8")) as ArmedNeed;
+    if (!a || !a.project_id || Date.now() - Date.parse(a.armed_at || "") > ARMED_TTL_MS) return null;
+    return a;
+  } catch { return null; }
+}
+async function writeArmedNeed(tenantId: string, a: ArmedNeed): Promise<void> {
+  await fs.mkdir(path.dirname(armedNeedPath(tenantId)), { recursive: true });
+  await fs.writeFile(armedNeedPath(tenantId), JSON.stringify(a, null, 2));
+}
+async function clearArmedNeed(tenantId: string, match?: { project_id: string; scene_index: number; asset_index: number }): Promise<boolean> {
+  const a = await readArmedNeed(tenantId);
+  if (!a) return false;
+  if (match && (a.project_id !== match.project_id || a.scene_index !== match.scene_index || a.asset_index !== match.asset_index)) return false;
+  await fs.unlink(armedNeedPath(tenantId)).catch(() => {});
+  return true;
+}
+
 /** THE PICK APPLIES NOW: a need provided on a built film takes its slot in
  *  the built scene (the composite is assembled from components on every
  *  request, so Studio shows it on the next load). Null on a board with no
@@ -890,7 +916,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|arm-need|armed-need|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2305,11 +2331,13 @@ Rules:
         try { evNeed = provideAsset(evProjectObj, evScene, evIndex, evUrl); }
         catch (e: any) { jsonResponse(res, 404, { error: e?.message || String(e) }); return; }
         const evRecast = recastInBuiltScene(evProjectObj, evScene, evNeed, evPrev);
+        // The Recorder (or anyone) filled the armed need: it is no longer armed.
+        const evDisarmed = await clearArmedNeed(evTenant, { project_id: evProject, scene_index: evScene, asset_index: evIndex });
         evProjectObj.updated_at = new Date().toISOString();
         await saveProject(evProjectObj);
         console.log(`  provide-asset: ${evTenant}/${evProject} scene ${evScene + 1} need ${evIndex + 1} <- ${path.basename(evUrl)}${evRecast ? ` (${evRecast.how})` : ""}`);
         reshootStoryboardCardsSoon(evTenant, evProject);
-        jsonResponse(res, 200, { ok: true, scene_index: evScene, asset_index: evIndex, need: evNeed, recast: evRecast, open_needs: openTakeNeeds(evProjectObj), open_proof: openAssetNeeds(evProjectObj) });
+        jsonResponse(res, 200, { ok: true, scene_index: evScene, asset_index: evIndex, need: evNeed, recast: evRecast, disarmed: evDisarmed, open_needs: openTakeNeeds(evProjectObj), open_proof: openAssetNeeds(evProjectObj) });
         return;
       }
 
@@ -2466,6 +2494,36 @@ Rules:
           console.log(`  music: ${mpTenant}/${mpProject} <- ${source}${choice.title ? ` "${choice.title}"` : ""}`);
           jsonResponse(res, 200, { ok: true, music: choice, bed: (mpProj.audio?.tracks || []).find((t) => t.type === "music") || null });
         } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
+        return;
+      }
+
+      // ── API: THE ARMED NEED -- Studio points the Recorder at a slot ──
+      // POST   /api/arm-need/{tenant}/{project} {scene_index, asset_index}
+      // DELETE /api/arm-need/{tenant}/{project}   (disarm)
+      // GET    /api/armed-need/{tenant}            (the extension asks on open)
+      const armMatch = urlPath.match(/^\/api\/arm-need\/([^/]+)\/([^/]+)$/);
+      if (armMatch && (method === "POST" || method === "DELETE")) {
+        const [, anTenant, anProject] = armMatch.map(decodeURIComponent);
+        if (method === "DELETE") { const was = await clearArmedNeed(anTenant); jsonResponse(res, 200, { ok: true, disarmed: was }); return; }
+        let anBody: Record<string, unknown> = {};
+        try { anBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "Invalid JSON body" }); return; }
+        const anScene = Number(anBody.scene_index), anIndex = Number(anBody.asset_index);
+        if (!Number.isInteger(anScene) || !Number.isInteger(anIndex) || anScene < 0 || anIndex < 0) { jsonResponse(res, 400, { error: "scene_index and asset_index are required (0-based)" }); return; }
+        const anProj = await loadProject(anTenant, anProject);
+        if (!anProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const anNeed = anProj.storyboard?.scenes?.[anScene]?.assets?.[anIndex];
+        if (!anNeed) { jsonResponse(res, 404, { error: `Scene ${anScene + 1} has no need ${anIndex + 1}` }); return; }
+        if (anNeed.type !== "screen_recording" && anNeed.type !== "screenshot") { jsonResponse(res, 400, { error: "Only a screen recording or screenshot can be armed for the Recorder" }); return; }
+        const armed: ArmedNeed = { project_id: anProject, project_name: anProj.name || anProject, scene_index: anScene, asset_index: anIndex, type: anNeed.type, description: anNeed.description || "", armed_at: new Date().toISOString() };
+        await writeArmedNeed(anTenant, armed);
+        console.log(`  arm-need: ${anTenant}/${anProject} scene ${anScene + 1} need ${anIndex + 1} armed for the Recorder`);
+        jsonResponse(res, 200, { ok: true, armed });
+        return;
+      }
+      const armedGetMatch = urlPath.match(/^\/api\/armed-need\/([^/]+)$/);
+      if (armedGetMatch && method === "GET") {
+        const armed = await readArmedNeed(decodeURIComponent(armedGetMatch[1]));
+        jsonResponse(res, 200, { ok: true, armed });
         return;
       }
 

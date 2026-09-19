@@ -36,7 +36,7 @@ describe("the music choice: the film's bed is a need, chosen in the board", () =
 
   it("the server lists the options and writes the pick as the bed; the library previews are served", async () => {
     const index = await read("src/index.ts");
-    expect(index).toMatch(/\|need-source\|stock-search\|music\|music-options\|traces\|/);
+    expect(index).toMatch(/\|need-source\|stock-search\|music\|music-options\|/);
     expect(index).toMatch(/\/api\\\/music-options\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/\/api\\\/music\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/\["auto", "none", "brand-kit", "stock", "jamendo", "upload"\]\.includes\(source\)/);

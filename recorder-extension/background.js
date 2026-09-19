@@ -323,6 +323,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
+      if (msg.type === "qr-armed") {
+        // THE ARMED NEED: the slot Studio pointed the Recorder at. The popup
+        // opens already set to it (project + For), so the take lands there.
+        await refreshIfNeeded();
+        const settings = await getSettings();
+        const server = (settings.server || SERVER).replace(/\/+$/, "");
+        if (!settings.tenant || !settings.token) { sendResponse({ ok: false, error: "signed out" }); return; }
+        try {
+          const res = await fetch(`${server}/api/armed-need/${encodeURIComponent(settings.tenant)}?token=${encodeURIComponent(settings.token)}`);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const j = await res.json();
+          sendResponse({ ok: true, armed: (j && j.armed) || null });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e && e.message || e) });
+        }
+        return;
+      }
+      if (msg.type === "qr-disarm") {
+        await refreshIfNeeded();
+        const settings = await getSettings();
+        const server = (settings.server || SERVER).replace(/\/+$/, "");
+        if (!settings.tenant || !settings.token || !msg.project) { sendResponse({ ok: false }); return; }
+        try {
+          await fetch(`${server}/api/arm-need/${encodeURIComponent(settings.tenant)}/${encodeURIComponent(msg.project)}?token=${encodeURIComponent(settings.token)}`, { method: "DELETE" });
+          sendResponse({ ok: true });
+        } catch (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); }
+        return;
+      }
       if (msg.type === "qr-needs") {
         // Popup's For picker: the screens this project's storyboard still
         // needs (screen_recording / screenshot with status needed).

@@ -108,6 +108,11 @@ canvas and the dashed block on the timeline are two faces of one need;
 when the file lands the slate leaves and the block becomes the footage
 block. The storyboard is no longer the place to go back to.
 
+**The Recorder handoff.** "Record with the Recorder" on a screen slot
+arms it (SPEC-recorder.md, the armed need): the extension opens already
+pointed at that project and need, and the recording that lands fills the
+slot; Studio's live-sync shows it without a reload by hand.
+
 ## Columns the sheet should add
 
 - **Format / placement** (16x9, 4x5, 9x16; where it ships) -- the frame is a

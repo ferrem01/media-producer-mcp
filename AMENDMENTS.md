@@ -3785,3 +3785,14 @@ popover carries one Replace button that opens THE PICKER in the dialog
 (the grid needs room), a pick lands in the built scene at once
 (`recastProvidedNeed`), and the sources live under every slot.
 
+## The armed need: Studio points the Recorder at the slot
+
+The Recorder handoff Marc described: click Record with the Recorder,
+open the extension, record, stop, and the file replaces the empty spot.
+Studio's Recorder source now arms the need (`arm-need`; one record per
+tenant, two hours); the popup reads `armed-need` on open and sets Save
+to and For to it, with a banner and a "Not this one" that disarms; the
+recording that lands through `provide-asset` clears the record and
+live-sync reloads the film. Only screen recordings and screenshots can
+be armed. Extension zip rebuilt.
+
