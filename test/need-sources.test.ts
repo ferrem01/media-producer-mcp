@@ -98,9 +98,18 @@ describe("the sources: every need is collected its own way, in the board", () =>
     expect(desktop).toMatch(/function needForSelection\(project, sel\)/);
     expect(desktop).toMatch(/comp\.type === 'asset-placeholder' && d\.need/);
     expect(desktop).toMatch(/\(comp\.type === 'image' \|\| comp\.type === 'video'\) && d\.src\) found = needs\.findIndex/);
-    expect(desktop).toMatch(/function openNeedInEditor\(si, ai\) \{\s*openStoryboardEditor\(\);/);
+    // The sources are INLINE in the popover (Marc: "why not just replace
+    // directly from the popover?"): the canvas popover and the timeline's
+    // footage popover both carry the need's buttons and its find/draw panel.
+    expect(desktop).toMatch(/function needSourcesHtml\(project, si, ai\)/);
     expect(desktop).toMatch(/slotRowHtml\(sel\) \+/);
+    expect(desktop).toMatch(/needSourcesHtml\(state\.currentProject, hit\.si, hit\.ai\)/);
+    expect(desktop).toMatch(/if \(state\.currentProject\) bindSceneNeeds\(state\.currentProject, pop\);/);
     expect(desktop).toMatch(/item\(\(have \? 'Replace the ' : 'Provide the '\)/);
+    expect(desktop).toMatch(/function needForVideoSrc\(project, si, src\)/);
+    expect(desktop).toMatch(/var needHit = needForVideoSrc\(p, si, v\.getAttribute\('src'\) \|\| ''\);/);
+    expect(desktop).toMatch(/if \(needHit\) bindSceneNeeds\(p, pop\);/);
+    expect(desktop).not.toMatch(/id="mp-slot"|id="rv-pop-slot"/);
   });
 
   it("a b-roll provided on the board is the scene's ground on the next build of a film nobody carries", async () => {

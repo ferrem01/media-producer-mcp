@@ -1000,7 +1000,9 @@ ${QUOTIENT_CSS}
   .np-panel input, .np-panel textarea { flex: 1; min-width: 0; box-sizing: border-box; padding: 6px 10px; font: 13px/18px inherit; border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--surface-primary); color: var(--foreground); }
   .np-panel textarea { width: 100%; min-height: 56px; resize: vertical; margin-bottom: 8px; }
   .np-panel input:focus, .np-panel textarea:focus { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
-  .np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
+  .np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; max-height: 40vh; overflow-y: auto; }
+  #rv-pop .np-row, #cam-pop .np-row { flex-wrap: wrap; }
+  #rv-pop .np-what, #cam-pop .np-what { color: var(--foreground); }
   .np-cand { position: relative; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; background: #111; aspect-ratio: 16 / 10; }
   .np-cand.tall { aspect-ratio: 4 / 5; }
   .np-cand img, .np-cand video { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -7105,6 +7107,11 @@ ${QUOTIENT_CSS}
     var html = '<div class="sp-head"><span class="sp-title"><b>' + escHtml(label) + '</b>' +
       (seg ? (implicit ? '' : ' — segment ' + (segIndex + 1) + ' of ' + segs.length) : ' — frozen tail') + '</span>' +
       '<button class="sp-x" id="mp-x">✕</button></div>';
+    // THE SLOT IS THE NEED, here too (Marc looked for the b-roll swap on the
+    // timeline block, not the canvas): this footage is a need the board
+    // asked for -- offer its card, the same one the canvas click opens.
+    var needHit = needForVideoSrc(p, si, v.getAttribute('src') || '');
+    if (needHit) html += '<div class="sp-row" style="display:block;margin-bottom:7px;">' + needSourcesHtml(p, needHit.si, needHit.ai) + '</div>';
     if (implicit) {
       html += '<div class="sp-region" style="margin-bottom:7px;">Park the playhead where a boring bit starts, then <b>Split</b>. Speed up or remove the pieces you don\\'t need — your narration never moves.</div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -7149,6 +7156,7 @@ ${QUOTIENT_CSS}
     if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.top = py + 'px';
     document.getElementById('mp-x').addEventListener('click', camPopClose);
+    if (needHit) bindSceneNeeds(p, pop);
     var compressBtn = document.getElementById('mp-compress');
     if (compressBtn) compressBtn.addEventListener('click', function() {
       camPopClose();
@@ -9233,6 +9241,32 @@ ${QUOTIENT_CSS}
     if (found < 0) return null;
     return { si: si, ai: found, need: needs[found] };
   }
+  // A video on the media lane, by its file: the board's need it fills.
+  function needForVideoSrc(project, si, src) {
+    if (!project || !project.storyboard || !src) return null;
+    var base = String(src).split('?')[0].split('/').pop();
+    var sb = (project.storyboard.scenes || [])[si]; if (!sb || !base) return null;
+    var ai = (sb.assets || []).findIndex(function(a) { return a && a.path && String(a.path).split('?')[0].split('/').pop() === base; });
+    return ai >= 0 ? { si: si, ai: ai, need: sb.assets[ai] } : null;
+  }
+  // The need's sources, inline wherever its slot is clicked (Marc: "why not
+  // just replace directly from the popover?"): the same buttons the card
+  // has, the find/draw panel opening right under them. Bind with
+  // bindSceneNeeds(project, root) after the html is in the document.
+  function needSourcesHtml(project, si, ai) {
+    var sb = ((project.storyboard || {}).scenes || [])[si]; var a = sb && (sb.assets || [])[ai];
+    if (!a) return '';
+    var have = a.status === 'provided' && a.path;
+    var acts = '';
+    (NP_SOURCES[a.type] || ['upload']).forEach(function(src) {
+      if (src === 'record') acts += '<a class="np-btn" target="_blank" href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '">' + (have ? 'Re-record' : 'Record') + '</a>';
+      else if (src === 'upload') acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
+      else acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + ai + '">' + (have && src === 'find' ? 'Find another' : (have && src === 'draw' ? 'Redraw' : NP_SOURCE_LABELS[src])) + '</button>';
+    });
+    return '<div class="np-row" style="border-top:0;padding:4px 0 6px;"><div class="np-what">The <b>' + escHtml(NP_KIND[a.type] || a.type) + '</b> the board asked for' + (a.description && a.type !== 'camera_video' ? ' — “' + escHtml(String(a.description).slice(0, 70)) + '”' : '') +
+      '<small>' + (have ? '<b class="ok">provided</b>' : '<b>needed</b>') + ' · a pick lands in the scene right away</small></div>' +
+      '<div class="np-act">' + acts + '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div></div>';
+  }
   function openNeedInEditor(si, ai) {
     openStoryboardEditor();
     setTimeout(function() {
@@ -9248,12 +9282,7 @@ ${QUOTIENT_CSS}
   function slotRowHtml(sel) {
     var hit = needForSelection(state.currentProject, sel);
     if (!hit) return '';
-    var a = hit.need, have = a.status === 'provided' && a.path;
-    var kind = NP_KIND[a.type] || a.type;
-    var what = a.type === 'camera_video' ? 'the take of the lines' : (a.description || '');
-    return '<div class="sp-row" style="align-items:center;gap:8px;" title="The board\u2019s need this slot holds">' +
-      '<span class="sp-status" style="flex:1;margin:0;">This is the slot for the <b>' + escHtml(kind) + '</b>' + (what ? ' \u2014 \u201c' + escHtml(String(what).slice(0, 60)) + '\u201d' : '') + ' \u00b7 ' + (have ? 'provided' : 'still needed') + '</span>' +
-      '<button class="rv-go secondary" id="rv-pop-slot" data-si="' + hit.si + '" data-ai="' + hit.ai + '" style="flex:0 0 auto;">' + (have ? 'Replace\u2026' : (a.type === 'camera_video' ? 'Record or upload\u2026' : 'Provide\u2026')) + '</button></div>';
+    return '<div class="sp-row" style="display:block;" title="The board\u2019s need this slot holds">' + needSourcesHtml(state.currentProject, hit.si, hit.ai) + '</div>';
   }
   function rvPopBuild(pop) {
     var sel = studio.sel;
@@ -9328,8 +9357,7 @@ ${QUOTIENT_CSS}
       slotRowHtml(sel) +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
-    var slotBtn = document.getElementById('rv-pop-slot');
-    if (slotBtn) slotBtn.addEventListener('click', function() { rvPopClose(); openNeedInEditor(parseInt(slotBtn.dataset.si, 10), parseInt(slotBtn.dataset.ai, 10)); });
+    if (state.currentProject) bindSceneNeeds(state.currentProject, pop);
     document.getElementById('rv-pop-go').addEventListener('click', rvPopGo);
     document.getElementById('rv-pop-undo').addEventListener('click', studioUndo);
     var zb = document.getElementById('rv-pop-zoom');
@@ -9669,7 +9697,7 @@ ${QUOTIENT_CSS}
     var hit = needForSelection(state.currentProject, studio.sel);
     if (hit) {
       var have = hit.need.status === 'provided' && hit.need.path;
-      item((have ? 'Replace the ' : 'Provide the ') + (NP_KIND[hit.need.type] || hit.need.type) + '\\u2026', function() { rvPopClose(); openNeedInEditor(hit.si, hit.ai); });
+      item((have ? 'Replace the ' : 'Provide the ') + (NP_KIND[hit.need.type] || hit.need.type) + '\\u2026', function() { studioSetScope('element'); rvPopShow(); });
     }
     var sep = document.createElement('div'); sep.className = 'ctx-sep'; m.appendChild(sep);
     item('Cancel', function() {});
