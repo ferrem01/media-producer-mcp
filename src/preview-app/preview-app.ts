@@ -2572,7 +2572,7 @@ ${QUOTIENT_CSS}
   // didn't cause, re-fetch the project and hot-reload the preview at the
   // same playhead. Skipped while playing (don't yank the film mid-watch)
   // and while a render job is followed (editing is locked anyway).
-  var liveSync = { known: null, suppressUntil: 0, inflight: false, timer: null };
+  var liveSync = { known: null, cards: null, suppressUntil: 0, inflight: false, timer: null };
   function liveSyncTick() {
     var p = state.currentProject;
     if (!p || !p.project_id || document.hidden || liveSync.inflight) return;
@@ -2584,6 +2584,15 @@ ${QUOTIENT_CSS}
       if (!v || !v.updated_at) return;
       // Still on the same project? (User may have switched mid-request.)
       if (!state.currentProject || state.currentProject.project_id !== p.project_id) return;
+      // The board cards are photographed a few seconds after a need lands,
+      // so the stills on the page can be older than the data under them:
+      // when the cards' time moves, swap every still's cache key in place
+      // (no re-render: an edit in progress is left alone).
+      if (v.cards_shot_at && v.cards_shot_at !== liveSync.cards) {
+        var first = liveSync.cards === null;
+        liveSync.cards = v.cards_shot_at;
+        if (!first) refreshDraftStills(v.cards_shot_at);
+      }
       if (liveSync.known === null) { liveSync.known = v.updated_at; return; }
       if (v.updated_at === liveSync.known) return;
       liveSync.known = v.updated_at;
@@ -2591,6 +2600,12 @@ ${QUOTIENT_CSS}
       if (Date.now() < liveSync.suppressUntil) return;
       liveSyncReload();
     }).catch(function() { liveSync.inflight = false; });
+  }
+  function refreshDraftStills(v) {
+    state.cardsV = v;
+    document.querySelectorAll('img.dv-still, img.dv-rail-thumb').forEach(function(img) {
+      img.src = img.src.split('?')[0] + '?v=' + encodeURIComponent(v);
+    });
   }
   function liveSyncReload() {
     var p = state.currentProject;
@@ -4330,7 +4345,7 @@ ${QUOTIENT_CSS}
     // replace the stale frames the moment the board reloads.
     return '/output/' + encodeURIComponent(project.tenant_id) + '/projects/' +
       encodeURIComponent(project.project_id) + '/storyboard_card_scene_' + (i + 1) + '.png' +
-      '?v=' + encodeURIComponent(project.updated_at || '');
+      '?v=' + encodeURIComponent(state.cardsV || project.updated_at || '');
   }
   function draftIsAuthored(s) {
     // Frames exist for authored component scenes AND template (st-*) scenes
