@@ -371,7 +371,7 @@ var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 // plated caption that fits its lane, the stage overlay) and must NOT be
 // zoomed on top of that. Everything else gets the phone zoom on a tall
 // speaker frame: a mock, a stamp, a pill set, a composer, a stat.
-var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "video", "image"];
+var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "chapter-kicker", "logo-band", "video", "image"];
 function phoneZoomable(type: string): boolean {
   return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
 }
@@ -571,6 +571,9 @@ function isCutaway(c: { type: string; position?: any; enter?: any }): boolean {
 /** Ambient full-stage text overlays that ride ABOVE the windows (their own
  *  markup scatters; the box is the whole stage). */
 var HIGH_OVERLAY_TYPES = ["floating-pills"];
+// Overlays that PLACE THEMSELVES inside the whole frame (safe margins of
+// their own): the chapter kicker with its step dots, the logo band.
+var SELF_PLACING_TYPES = ["chapter-kicker", "logo-band"];
 /** Ambient full-stage type BEHIND the windows, above the backdrop. */
 var GHOST_TYPES = ["ghost-type"];
 /** Backdrop-cast components: in a WORLD film these are redundant -- the
@@ -714,6 +717,8 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     } else if (ACCENT_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: ACCENT_SPOTS[Math.min(accentCount, ACCENT_SPOTS.length - 1)], z_index: 40 + accentCount };
       accentCount++;
+    } else if (SELF_PLACING_TYPES.indexOf(t) !== -1) {
+      slots[i] = { position: { ...FULL_STAGE }, z_index: 42 };
     } else if (HIGH_OVERLAY_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: { ...FULL_STAGE }, z_index: 38 };
     } else if (GHOST_TYPES.indexOf(t) !== -1) {
@@ -841,6 +846,8 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
             console.log(`    ${c.type}: no room beside the face on this frame -- dropped`);
             slots[i] = null;
           }
+        } else if (SELF_PLACING_TYPES.indexOf(c.type) !== -1) {
+          slots[i] = { position: { ...FULL_STAGE }, z_index: 42 };
         } else if (HIGH_OVERLAY_TYPES.indexOf(c.type) !== -1) {
           // Pills drift in the band with no surface in it, else under the chin.
           const band = bands.lower && !usedLower ? bands.lower : bands.top && !usedTop ? bands.top : (laneRest || bands.lower || bands.top);

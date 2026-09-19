@@ -218,6 +218,8 @@ export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: bo
     if (c.type === "sticker-prop") spec = String(c.data?.kind || "") === "stamp" ? el.stamp : (el.button || el.stamp);
     else if (c.type === "lower-third") spec = el.lower_third;
     else if (c.type === "kinetic-text" && el.keyword) spec = el.keyword;
+    else if (c.type === "chapter-kicker") spec = el.kicker;
+    else if (c.type === "logo-band") spec = el.logo_band;
     if (!spec) continue;
     const eIn = fx(spec, "in"), eOut = fx(spec, "out");
     if (eIn && c.enter === undefined) { c.enter = eIn; n++; }

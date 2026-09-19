@@ -1,0 +1,68 @@
+<template>
+  <div class="lb">
+    <div class="lb-band"><div class="lb-track"></div></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── logo-band: customer logos sliding through over the person. The band
+     is a strip at the upper third; the track inside drifts left on the
+     timeline (seek-safe), repeated to fill any width. ── */
+  .lb { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); --lb-ink: rgba(255, 255, 255, 0.92); }
+  .lb-dark { --lb-ink: rgba(20, 22, 29, 0.85); }
+  .lb-band { position: absolute; left: 0; right: 0; top: 20%; height: 9%; transform: translateY(-50%);
+    display: flex; align-items: center; overflow: hidden; }
+  .lb-plate .lb-band { background: rgba(10, 12, 18, 0.34); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .lb-plate.lb-dark .lb-band { background: rgba(255, 255, 255, 0.55); }
+  /* Sized off the larger axis so a tall frame reads as big as a wide one. */
+  .lb-track { display: flex; align-items: center; gap: max(4.5vw, 4vh); white-space: nowrap; will-change: transform; padding-left: 2vw; }
+  .lb-logo { display: inline-flex; align-items: center; height: max(3.2vw, 3vh); color: var(--lb-ink);
+    font-size: max(1.7vw, 1.6vh); font-weight: 700; letter-spacing: -0.01em; opacity: 0.92; }
+  .lb-logo img { height: max(2.6vw, 2.4vh); width: auto; max-width: max(12vw, 11vh); object-fit: contain; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.25)); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.lb');
+    var band = el.querySelector('.lb-band');
+    var track = el.querySelector('.lb-track');
+    if (!root || !band || !track) return tl;
+    var logos = Array.isArray(data && data.logos) ? data.logos.filter(function (l) { return l && (l.src || l.text); }) : [];
+    if (!logos.length) return tl;
+    var at = (data && data.at != null) ? Math.max(0, Number(data.at) || 0) : 0.4;
+    var hold = Number(data && data.hold) || 0;
+    var speed = Math.max(20, Number(data && data.speed) || 90);
+    var dur = (ctx && ctx.duration) || 8;
+    if (data && data.y != null) band.style.top = Math.max(4, Math.min(96, Number(data.y) || 20)) + '%';
+    if (!(data && data.plate === false)) root.classList.add('lb-plate');
+    if (data && data.ink === 'dark') root.classList.add('lb-dark');
+
+    function addLogo(l) {
+      var s = document.createElement('span');
+      s.className = 'lb-logo';
+      if (l.src) { var img = document.createElement('img'); img.src = l.src; img.alt = l.text || ''; s.appendChild(img); }
+      else s.textContent = String(l.text);
+      track.appendChild(s);
+    }
+    // Fill twice the band's width so the drift never shows a gap, then
+    // loop the first copy's width.
+    var bandW = band.clientWidth || el.clientWidth || 1920;
+    var copies = 0, loopW = 0;
+    while (copies < 12 && (loopW === 0 || track.scrollWidth < bandW * 2 + loopW)) {
+      logos.forEach(addLogo);
+      copies++;
+      if (copies === 1) loopW = track.scrollWidth + 4.5 * (bandW / 100);
+    }
+    gsap.set(band, { autoAlpha: 0, y: '-50%' });
+    tl.to(band, { autoAlpha: 1, duration: 0.4, ease: 'power2.out' }, at);
+    // The drift: one loop's width per (loopW / speed) seconds, repeated for
+    // the rest of the scene, on the timeline so a seek lands mid-drift.
+    var span = hold > 0 ? hold : Math.max(0.5, dur - at);
+    var loopS = Math.max(0.5, loopW / speed);
+    tl.fromTo(track, { x: 0 }, { x: -loopW, duration: loopS, ease: 'none', repeat: Math.ceil(span / loopS) }, at);
+    if (hold > 0) tl.to(band, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, at + hold);
+    return tl;
+  }
+</script>

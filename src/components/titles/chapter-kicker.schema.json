@@ -1,0 +1,51 @@
+{
+  "type": "chapter-kicker",
+  "label": "Chapter kicker with step dots",
+  "category": "titles",
+  "description": "A table of contents on screen for a chaptered walkthrough (the founder-bookends-chapters recipe): a small kicker names the current step bottom-left ('Test scenarios with users') and a row of step dots sits bottom-right, one per chapter, the current one filled. Cast ONE per chapter scene with the same `steps` and a rising `step`; it fades in at `at` and holds to the cut. Full-frame overlay -- it places itself. Ink is dark for a white ground (default) or light for a dark one. Example: {\"text\":\"Define what good means\",\"step\":2,\"steps\":3,\"at\":0.3}.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "The chapter's name, three to five words",
+      "required": true
+    },
+    "step": {
+      "type": "number",
+      "label": "This chapter's number, 1-based",
+      "required": true
+    },
+    "steps": {
+      "type": "number",
+      "label": "How many chapters in the walkthrough",
+      "required": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Entrance (s, default 0.3)",
+      "optional": true
+    },
+    "ink": {
+      "type": "string",
+      "label": "dark (default, for a white ground) | light",
+      "optional": true,
+      "enum": [
+        "dark",
+        "light"
+      ]
+    },
+    "accent": {
+      "type": "string",
+      "label": "Dot fill color (default brand primary)",
+      "optional": true
+    },
+    "side": {
+      "type": "string",
+      "label": "Kicker side; the dots take the other (default left)",
+      "optional": true,
+      "enum": [
+        "left",
+        "right"
+      ]
+    }
+  }
+}

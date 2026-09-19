@@ -4040,3 +4040,23 @@ line; wordmark and URL. No captions. The chapters ask the human for
 nothing. Two small components the recipe names and the library lacks
 (a kicker with step dots; a logo band behind the person) degrade to a
 stamp and a logo wall until built.
+
+## Two components the Grade recipe names: chapter-kicker, logo-band
+
+Marc: build the two missing components, go. Both are full-frame overlays
+that place themselves (a new SELF_PLACING list in the scene generator, z
+42 on every layout), and both take the recipe's motion table
+(`applyRecipeMotion`: kicker, logo_band).
+
+- `chapter-kicker` {text, step, steps, at, ink, side}: the walkthrough's
+  table of contents -- the kicker names the step bottom-left with its
+  number, the step dots sit bottom-right, the steps before are filled,
+  this one fills a beat after the name lands. Dark ink for a white
+  ground, light for a dark one.
+- `logo-band` {logos:[{src}|{text}], at, hold, y, speed, plate, ink}: a
+  strip of customer logos at the upper third, repeated to fill twice the
+  width, drifting left on the timeline (seek-safe), on a translucent
+  plate over footage.
+
+Verified in Chromium at 16x9 and 9x16. Type sizes off the larger axis so
+a tall frame reads as big as a wide one.

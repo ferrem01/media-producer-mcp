@@ -58,6 +58,13 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(holdMadeToRecipe(proof, getRecipe("presenter-n-things")!)).toEqual(["a screen_recording need added: the beat is a real recording"]);
     expect(proof.assets.map((x: any) => x.type)).toEqual(["camera_video", "screen_recording"]);
     expect(proof.assets[1].description).toBe("Memory remembers the brand");
+    // The two components the recipe names take the recipe's motion.
+    const { applyRecipeMotion } = await import("../src/core/recipes.js");
+    const chScene: any = { components: [{ type: "chapter-kicker", data: { text: "Memory", step: 1, steps: 3 } }, { type: "logo-band", data: { logos: [{ text: "Acme" }] } }] };
+    expect(applyRecipeMotion(chScene, gr, "chapter")).toBe(4);
+    expect(chScene.components[0].enter).toEqual({ effect: "fade", duration: 0.3 });
+    expect(chScene.components[1].enter).toEqual({ effect: "fade", duration: 0.4 });
+    expect(chScene.camera_fixed).toBe(true);
     const pipeline2 = await read("src/llm/pipeline.ts");
     expect(pipeline2).toMatch(/const notes = holdMadeToRecipe\(d, recipeObj\);/);
     const w = getRecipe("ask-work-result")!;

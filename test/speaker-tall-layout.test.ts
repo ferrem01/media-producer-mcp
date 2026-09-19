@@ -25,6 +25,22 @@ const AUTHORED = [
   { type: "floating-pills", data: { items: ["Email", "Ads"] } },
 ];
 
+describe("self-placing overlays", () => {
+  it("the chapter kicker and the logo band take the whole frame on any layout and place themselves", () => {
+    const tall = build({ width: 1080, height: 1920 }, [
+      { type: "chapter-kicker", data: { text: "Define what good means", step: 2, steps: 3 } },
+      { type: "logo-band", data: { logos: [{ text: "Nestlé" }, { text: "Gamma" }] } },
+    ]);
+    for (const t of ["chapter-kicker", "logo-band"]) {
+      const c = tall.find((x) => x.type === t);
+      expect(c.position).toEqual({ x: 0, y: 0, width: "100%", height: "100%" });
+      expect(c.z_index).toBe(42);
+    }
+    const wide = build({ width: 1920, height: 1080 }, [{ type: "chapter-kicker", data: { text: "Test scenarios", step: 1, steps: 3 } }]);
+    expect(wide.find((x) => x.type === "chapter-kicker").position).toEqual({ x: 0, y: 0, width: "100%", height: "100%" });
+  });
+});
+
 describe("the scatter lane on a tall speaker frame", () => {
   it("owns the whole frame, pinned, and is never dropped to the chest band over a cutaway", () => {
     const comps = build({ width: 1080, height: 1920 }, [
