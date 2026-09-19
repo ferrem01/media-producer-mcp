@@ -2649,6 +2649,11 @@ Rules:
         const take = takes[0];
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
+        // The board card shows the take's still in place of the silhouette
+        // (storyboard-cards.ts, activeTake): re-shoot the cards the way a
+        // provided screen does (measured live, proj_25b2858c: the take
+        // landed, the scene re-timed to 4.98s, the card kept the outline).
+        reshootStoryboardCardsSoon(tkTenant, tkProject);
         let released = 0;
         for (const t of takes) released += resolveTakeWaiters(tkTenant, tkProject, t);
         const tkNotes = [
