@@ -72,10 +72,9 @@
         3
       ],
       "enters": [
-        "kicker:chapter",
-        "steps:dots"
+        "chapter-kicker"
       ],
-      "note": "A named step on white, no person. The kicker names it bottom-left, the step dots bottom-right (a table of contents on screen). ONE surface builds while the voice continues: a list filling in, bars filling, a table, a detail card; something changes every 4-5s, nothing holds past 6."
+      "note": "A named step on white, no person. Cast ONE chapter-kicker {text, step, steps} per chapter: the kicker names it bottom-left, the step dots bottom-right (a table of contents on screen). ONE surface builds while the voice continues: a list filling in, bars filling, a table, a detail card; something changes every 4-5s, nothing holds past 6."
     },
     {
       "role": "return",
@@ -89,7 +88,7 @@
       "enters": [
         "logo-band@proof"
       ],
-      "note": "Back on the couch: the wider point. On the proof line ('hundreds of teams') a band of customer logos slides through behind the person. Then the close line."
+      "note": "Back on the couch: the wider point. On the proof line ('hundreds of teams') cast a logo-band {logos:[...]} -- customer wordmarks sliding through over the person -- entering on that word. Then the close line."
     },
     {
       "role": "close",
@@ -129,6 +128,7 @@
     },
     "kicker": {
       "on": "chapter",
+      "component": "chapter-kicker",
       "pos": "bottom-left",
       "with": "step dots bottom-right, one per chapter, the current one filled"
     },
@@ -141,6 +141,11 @@
     "music": {
       "bed": true,
       "duck": true
+    },
+    "logo_band": {
+      "on": "return",
+      "component": "logo-band",
+      "pos": "upper third, over the person"
     }
   },
   "motion": {
@@ -180,6 +185,12 @@
       "end_card": {
         "in": "fade",
         "in_s": 0.4
+      },
+      "logo_band": {
+        "in": "fade",
+        "in_s": 0.4,
+        "out": "fade",
+        "out_s": 0.3
       }
     },
     "transitions": {

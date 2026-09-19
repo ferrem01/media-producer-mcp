@@ -1,0 +1,47 @@
+{
+  "type": "logo-band",
+  "label": "Logo band (a line of customer logos sliding through)",
+  "category": "props",
+  "description": "A horizontal band of customer logos that slides steadily through the frame -- the social-proof beat over the person ('hundreds of teams'). Give it the logos as image URLs or as text wordmarks; it repeats them to fill the width and drifts them left at a steady pace from `at`, holding to the cut (or `hold` seconds). Rides over the take at the upper third (`y`, default 20% from the top); a translucent plate keeps it legible on footage. Full-frame overlay -- it places itself. Example: {\"logos\":[{\"text\":\"Nestl\u00e9\"},{\"src\":\"/assets/.../gamma.png\"},{\"text\":\"Ancestry\"}],\"at\":0.4}.",
+  "data": {
+    "logos": {
+      "type": "array",
+      "label": "[{src} image logos or {text} wordmarks], four or more",
+      "required": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Entrance (s, default 0.4)",
+      "optional": true
+    },
+    "hold": {
+      "type": "number",
+      "label": "Seconds on screen (0 = to the cut)",
+      "optional": true
+    },
+    "y": {
+      "type": "number",
+      "label": "Band centre, % from the top (default 20)",
+      "optional": true
+    },
+    "speed": {
+      "type": "number",
+      "label": "Drift in px per second (default 90)",
+      "optional": true
+    },
+    "plate": {
+      "type": "boolean",
+      "label": "Translucent plate behind the band (default true)",
+      "optional": true
+    },
+    "ink": {
+      "type": "string",
+      "label": "light (default, over footage) | dark",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    }
+  }
+}
