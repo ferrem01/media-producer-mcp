@@ -1017,6 +1017,7 @@ ${QUOTIENT_CSS}
   .np-hint { font-size: 12px; color: var(--content-secondary); line-height: 1.5; }
   .np-hint b { color: var(--foreground); }
   .np-empty { font-size: 12px; color: var(--content-secondary); padding: 6px 0; }
+  .rv-go.secondary.active { border-color: var(--accent-blue); color: var(--accent-blue); box-shadow: inset 0 0 0 1px var(--accent-blue); }
   .np-booth { display: block; width: 100%; height: min(70vh, 720px); border: 0; border-radius: var(--radius-sm); background: #000; }
   .np-phone { display: flex; gap: 14px; align-items: center; }
   .np-phone img { flex: 0 0 auto; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: #fff; }
@@ -7198,6 +7199,16 @@ ${QUOTIENT_CSS}
     // asked for -- offer its card, the same one the canvas click opens.
     var needHit = needForVideoSrc(p, si, v.getAttribute('src') || '');
     if (needHit) html += needSlotLineHtml(p, needHit.si, needHit.ai, 'mp-slot');
+    // THE FIT: fill the slot (crop the edges) or show the whole picture on
+    // its plate. Written to the component's data (object_fit); a component
+    // cast without an id is addressed by its index in the scene's cast.
+    var fitComp = compForVideoSrc(scene, v.getAttribute('src') || '');
+    if (fitComp) {
+      var curFit = (fitComp.comp.data && fitComp.comp.data.object_fit) || 'cover';
+      html += '<div class="sp-row" style="align-items:center;gap:8px;"><span class="sp-status" style="flex:0 0 auto;margin:0;">Fit</span>' +
+        '<button class="rv-go secondary mp-fit' + (curFit === 'cover' ? ' active' : '') + '" data-fit="cover" style="flex:1;" title="Fill the slot; the edges may crop">Fill</button>' +
+        '<button class="rv-go secondary mp-fit' + (curFit === 'contain' ? ' active' : '') + '" data-fit="contain" style="flex:1;" title="Show the whole picture on its plate">Whole</button></div>';
+    }
     if (implicit) {
       html += '<div class="sp-region" style="margin-bottom:7px;">Park the playhead where a boring bit starts, then <b>Split</b>. Speed up or remove the pieces you don\\'t need — your narration never moves.</div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -7244,6 +7255,15 @@ ${QUOTIENT_CSS}
     document.getElementById('mp-x').addEventListener('click', camPopClose);
     var slotBtn = document.getElementById('mp-slot');
     if (slotBtn) slotBtn.addEventListener('click', function() { openNeedPicker(p, needHit.si, needHit.ai); });
+    Array.prototype.slice.call(pop.querySelectorAll('.mp-fit')).forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var fit = btn.dataset.fit;
+        camPopClose();
+        api('PATCH', '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + encodeURIComponent(fitComp.key), { data: { object_fit: fit } })
+          .then(function() { fitComp.comp.data = fitComp.comp.data || {}; fitComp.comp.data.object_fit = fit; studioStatus(fit === 'contain' ? 'Showing the whole picture.' : 'Filling the slot.', 'ok'); startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex }); })
+          .catch(function(e) { studioStatus('Fit not saved: ' + (e.message || e), 'err'); });
+      });
+    });
     var compressBtn = document.getElementById('mp-compress');
     if (compressBtn) compressBtn.addEventListener('click', function() {
       camPopClose();
@@ -9349,6 +9369,18 @@ ${QUOTIENT_CSS}
     if (at === null) at = isMedia ? 0 : dur * 0.3;
     if (until === null || until <= at) until = isMedia ? dur : dur * 0.8;
     return { from: Math.max(0, Math.min(dur, at)), to: Math.max(0, Math.min(dur, until)) };
+  }
+  // A video on the media lane, by its file: the built scene's component that
+  // plays it, addressed by id or, cast without one, by index ("idx:<n>").
+  function compForVideoSrc(scene, src) {
+    var base = String(src || '').split('?')[0].split('/').pop();
+    if (!scene || !base) return null;
+    var comps = scene.components || [];
+    for (var i = 0; i < comps.length; i++) {
+      var c = comps[i];
+      if (c && c.type === 'video' && c.data && String(c.data.src || '').split('?')[0].split('/').pop() === base) return { comp: c, key: c.id || ('idx:' + i) };
+    }
+    return null;
   }
   function needForVideoSrc(project, si, src) {
     if (!project || !project.storyboard || !src) return null;

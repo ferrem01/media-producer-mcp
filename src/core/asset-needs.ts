@@ -210,7 +210,7 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
     if (idx >= 0) {
       const mock: any = comps[idx];
       comps[idx] = {
-        ...(mock.id ? { id: mock.id } : {}),
+        id: mock.id || `screen_${idx + 1}`,
         type: media, data,
         ...(mock.position ? { position: mock.position } : { position: { x: "0%", y: "0%", width: "100%", height: "100%" } }),
         ...(mock.z_index !== undefined ? { z_index: mock.z_index } : {}),
@@ -222,7 +222,7 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
     } else {
       if (typeof need.at === "number") data.at = need.at;
       if (typeof need.until === "number") data.exit_at = need.until;
-      comps.push({ type: media, data, position: { x: "0%", y: "0%", width: "100%", height: "100%" } });
+      comps.push({ id: `screen_${comps.length + 1}`, type: media, data, position: { x: "0%", y: "0%", width: "100%", height: "100%" } });
       added++;
     }
   }
