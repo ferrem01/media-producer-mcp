@@ -202,8 +202,11 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
     let idx = comps.findIndex((c, i) => !taken.has(i) && isScreenSlate(c) && (c as any).data.need === need.description);
     if (idx < 0) idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
       && isProofSurface((c as any).type) && (c as any).type !== "image" && (c as any).type !== "video");
-    const data: Record<string, unknown> = { src: need.path, object_fit: "cover" };
-    if (media === "image") data.drift = false;
+    // A SCREEN IS SHOWN WHOLE: contain on the slot's plate, never cover
+    // (measured live, proj_179c8dfa: a 16:10 tab recording on a 16:9 slot
+    // lost its sidebar and its right edge to the crop).
+    const data: Record<string, unknown> = { src: need.path, object_fit: "contain" };
+    if (media === "image") { data.drift = false; data.fit = "contain"; }
     if (idx >= 0) {
       const mock: any = comps[idx];
       comps[idx] = {
@@ -330,7 +333,20 @@ export function recastProvidedNeed(
     }
     if (changed) return { components: comps, changed, how: "swapped" };
   }
-  if (comps.some((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path)) return { components: comps, changed: 0, how: "already there" };
+  const already = comps.filter((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path) as any[];
+  if (already.length) {
+    // Providing the same screen again re-applies the fit: a screen is shown
+    // whole (the film built before contain was the rule keeps its crop
+    // otherwise).
+    let refit = 0;
+    if (need.type === "screen_recording" || need.type === "screenshot") {
+      for (const c of already) {
+        if (c.type === "video" && c.data.object_fit !== "contain") { c.data.object_fit = "contain"; refit++; }
+        if (c.type === "image" && c.data.fit !== "contain") { c.data.fit = "contain"; refit++; }
+      }
+    }
+    return { components: comps, changed: refit, how: refit ? "refit to show whole" : "already there" };
+  }
   // 2. A first provision: the slot the board held for it.
   if (need.type === "screen_recording" || need.type === "screenshot") {
     const r = castProvidedScreens({ components: comps, assets: [need] } as any);
