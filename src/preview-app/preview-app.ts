@@ -412,6 +412,11 @@ ${QUOTIENT_CSS}
   .ml-seg.r-turbo { background: var(--red-300); }
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, var(--border-tertiary), var(--border-tertiary) 3px, var(--surface-tertiary) 3px, var(--surface-tertiary) 6px); }
   .ml-seg.r-plain { background: #eff6ff; border: 1px dashed var(--blue-300); }
+  /* THE DASHED BLOCK IS AN OPEN SLOT: the board's need, where its file will
+     land and when. Click it for the picker; it becomes the footage block
+     when the file arrives. */
+  .ml-seg.ml-need, .spk-clip.spk-need { background: repeating-linear-gradient(135deg, #fffbeb 0 8px, #fef3c7 8px 16px); border: 1.5px dashed var(--orange-400); color: #7b3306; font: 600 10px/1 var(--font-sans, inherit); display: flex; align-items: center; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 1; box-shadow: none; }
+  .ml-seg.ml-need:hover, .spk-clip.spk-need:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
   /* Timelapse: a SEGMENT type, not an effect -- it maps 1:1 onto a span of
      footage, exactly like every other rate block in this lane. */
   .ml-seg.r-tl { background: repeating-linear-gradient(135deg, var(--accent-blue) 0 6px, var(--blue-300) 6px 12px);
@@ -5987,6 +5992,25 @@ ${QUOTIENT_CSS}
         }
         wrap.appendChild(rowEl);
       });
+      // THE OPEN SLOTS: a dashed block per need still waiting, on its own
+      // row under the footage, where the file will land. Click: the picker.
+      var open = openNeedsOf(p).filter(function(n) { return n.si === si && n.need.type !== 'camera_video'; });
+      open.forEach(function(n, k) {
+        var row = Math.min(3, vids.length + k);
+        var rowEl2 = document.createElement('div');
+        rowEl2.className = 'ml-row';
+        rowEl2.style.top = (2 + row * 26) + 'px';
+        var w = needWindow(n.need, dur);
+        var b = document.createElement('div');
+        b.className = 'ml-seg ml-need';
+        b.style.left = (((sceneStart + w.from) / total) * 100).toFixed(2) + '%';
+        b.style.width = Math.max(0.3, (((w.to - w.from) / total) * 100)).toFixed(2) + '%';
+        b.textContent = (NP_KIND[n.need.type] || n.need.type) + ' needed';
+        b.title = 'Scene ' + (si + 1) + ' still needs a ' + (NP_KIND[n.need.type] || n.need.type) + (n.need.description ? ': \u201c' + n.need.description + '\u201d' : '') + '. Click to record, find, draw or upload it \u2014 it lands here.';
+        b.addEventListener('click', function(ev) { ev.stopPropagation(); openNeedPicker(p, n.si, n.ai); });
+        rowEl2.appendChild(b);
+        wrap.appendChild(rowEl2);
+      });
     });
     renderLaneLabels();
   }
@@ -6006,6 +6030,8 @@ ${QUOTIENT_CSS}
     try {
       var p = state.currentProject;
       if (!p || !p.scenes || !state.compositeLoaded) return 1;
+      var needRows = {};
+      openNeedsOf(p).forEach(function(n) { if (n.need.type !== 'camera_video') needRows[n.si] = (needRows[n.si] || 0) + 1; });
       var doc = els.previewIframe.contentDocument;
       if (!doc) return 1;
       var spkSrcs = (((p.speaker || {}).clips) || []).map(function(c) { return (c.source || '').split('/').pop(); }).filter(Boolean);
@@ -6017,7 +6043,7 @@ ${QUOTIENT_CSS}
           if (spkSrcs.some(function(nm) { return src.indexOf(nm) !== -1; })) return false;
           if (v.closest && v.closest('.scf-callout')) return false;
           return true;
-        }).length;
+        }).length + (needRows[p.scenes.indexOf(scene)] || 0);
         if (n > max) max = n;
       });
       return Math.min(4, max);
@@ -6031,6 +6057,11 @@ ${QUOTIENT_CSS}
       (state._transcript && state._transcript.length) ||
       tracks.some(function(t) { return t.type === 'voiceover'; }));
     var hasMusic = tracks.some(function(t) { return t.type === 'music'; });
+    // Open slots keep their lane on screen: a take still needed puts the
+    // speaker lane up; a screen, b-roll or drawing still needed the media lane.
+    var openNeeds = openNeedsOf(p);
+    if (openNeeds.some(function(n) { return n.need.type === 'camera_video'; })) hasSpk = true;
+    var hasOpenMedia = openNeeds.some(function(n) { return n.need.type !== 'camera_video'; });
     // Roomy bands with real gaps between beds: squeezing speaker + music
     // against the bottom edge made them read as one smudge.
     var hasFx = ((p || {}).scenes || []).some(function(s2) {
@@ -6054,7 +6085,7 @@ ${QUOTIENT_CSS}
     ((p || {}).scenes || []).forEach(function(s3) {
       maxComps = Math.max(maxComps, (s3.components || []).length);
     });
-    var hasMedia = !!((state.mediaClips || []).length);
+    var hasMedia = !!((state.mediaClips || []).length) || hasOpenMedia;
     y.compRows = Math.min(4, maxComps);
     y.compsH = y.compRows > 0 ? y.compRows * 16 + 6 : 0;
     // Side-by-side scenes: the screen band grows one row per independent
@@ -6386,6 +6417,23 @@ ${QUOTIENT_CSS}
         }
         blk.addEventListener('click', function(ev) { ev.stopPropagation(); scrub(Math.round((f / total) * 1000)); els.slider.value = Math.round((f / total) * 1000); });
         track.insertBefore(blk, document.getElementById('wave-strip'));
+      });
+    }
+    // Takes still needed: a dashed piece at the scene, on the speaker lane.
+    if (y.speaker >= 0 && total > 0) {
+      openNeedsOf(p).filter(function(n) { return n.need.type === 'camera_video'; }).forEach(function(n) {
+        var sc1 = p.scenes[n.si]; if (!sc1) return;
+        var f1 = sceneStartFor(n.si), d1 = sc1.duration_seconds || 0;
+        if (!(d1 > 0.05)) return;
+        var nb = document.createElement('div');
+        nb.className = 'spk-clip spk-need';
+        nb.style.top = (y.speaker + 3) + 'px';
+        nb.style.left = ((f1 / total) * 100).toFixed(2) + '%';
+        nb.style.width = ((Math.min(total - f1, d1) / total) * 100).toFixed(2) + '%';
+        nb.textContent = 'take needed';
+        nb.title = 'Scene ' + (n.si + 1) + ' still needs its take. Click to record it here, on your phone, or upload one \u2014 it lands here.';
+        nb.addEventListener('click', function(ev) { ev.stopPropagation(); openNeedPicker(p, n.si, n.ai); });
+        track.insertBefore(nb, document.getElementById('wave-strip'));
       });
     }
     if (hasSpeaker && p.speaker.clips.length === 1 && total > 0) {
@@ -9243,6 +9291,27 @@ ${QUOTIENT_CSS}
     return { si: si, ai: found, need: needs[found] };
   }
   // A video on the media lane, by its file: the board's need it fills.
+  // THE OPEN SLOTS of a built film: every need still waiting, with the scene
+  // it belongs to. Camera takes go to the speaker lane, the rest to the
+  // media lane.
+  function openNeedsOf(project) {
+    var out = [];
+    if (!project || !project.scenes || !project.storyboard) return out;
+    (project.storyboard.scenes || []).forEach(function(sb, si) {
+      if (!project.scenes[si]) return;
+      (sb.assets || []).forEach(function(a, ai) {
+        if (a && a.status === 'needed' && !a.path && a.priority !== 'nice_to_have') out.push({ si: si, ai: ai, need: a });
+      });
+    });
+    return out;
+  }
+  function needWindow(need, dur) {
+    var at = typeof need.at === 'number' ? need.at : null, until = typeof need.until === 'number' ? need.until : null;
+    var isMedia = need.type === 'stock_footage' || need.type === 'screen_recording' || need.type === 'screenshot' || need.type === 'camera_video';
+    if (at === null) at = isMedia ? 0 : dur * 0.3;
+    if (until === null || until <= at) until = isMedia ? dur : dur * 0.8;
+    return { from: Math.max(0, Math.min(dur, at)), to: Math.max(0, Math.min(dur, until)) };
+  }
   function needForVideoSrc(project, si, src) {
     if (!project || !project.storyboard || !src) return null;
     var base = String(src).split('?')[0].split('/').pop();
