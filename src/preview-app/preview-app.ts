@@ -4094,7 +4094,19 @@ ${QUOTIENT_CSS}
     var scene = ((project.storyboard && project.storyboard.scenes) || [])[si] || {};
     var need = (scene.assets || [])[ai] || {};
     if (src === 'recorder') {
-      panel.innerHTML = '<div class="np-hint">Open the <b>Quotient Recorder</b> extension on the page to record, choose <b>' + escHtml(project.name || project.project_id) + '</b> under Save to and <b>Scene ' + (si + 1) + ' · ' + escHtml(String(need.description || '').slice(0, 60)) + '</b> under For, then Record. The recording lands here when you stop.</div>';
+      // THE ARMED NEED: clicking "Record with the Recorder" points the
+      // extension at this slot. Open it on the page to record; stop, and
+      // the file lands here (live-sync reloads the film).
+      var kindR = NP_KIND[need.type] || need.type;
+      panel.innerHTML = '<div class="np-hint">Pointing the Recorder at this ' + escHtml(kindR) + '\u2026</div>';
+      api('POST', '/arm-need/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { scene_index: si, asset_index: ai })
+        .then(function() {
+          panel.innerHTML = '<div class="np-hint"><b>The Recorder is set to this slot.</b> Open the <b>Quotient Recorder</b> on the page you want to record \u2014 it opens on <b>' + escHtml(project.name || project.project_id) + ' \u00b7 Scene ' + (si + 1) + '</b>. Record, stop, and the ' + escHtml(kindR) + ' lands here on its own.' +
+            ' <span class="np-empty" style="display:inline">Don\u2019t have it? <a href="/extension.zip">Get the extension</a>.</span></div>';
+        })
+        .catch(function(e) {
+          panel.innerHTML = '<div class="np-hint">Open the <b>Quotient Recorder</b> on the page to record, choose <b>' + escHtml(project.name || project.project_id) + '</b> under Save to and <b>Scene ' + (si + 1) + '</b> under For, then Record. (' + escHtml(e.message || String(e)) + ')</div>';
+        });
       return;
     }
     if (src === 'draw') {

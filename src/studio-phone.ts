@@ -184,8 +184,11 @@ ${QUOTIENT_CSS}
     if (old) { var was = old.dataset.src; old.remove(); if (was === src) return; }
     var panel = document.createElement('div'); panel.className = 'src-panel'; panel.dataset.src = src;
     if (src === 'recorder') {
-      panel.textContent = 'On your computer, open the Quotient Recorder on the page to record, pick this project under Save to and \u201cScene ' + (i + 1) + '\u201d under For, then Record. The recording lands here.';
       panel.className += ' hint';
+      panel.textContent = 'Pointing the Recorder at this slot\u2026';
+      api('POST', '/arm-need/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { scene_index: i, asset_index: j })
+        .then(function () { panel.textContent = 'The Recorder is set to this slot. On your computer, open the Quotient Recorder on the page to record \u2014 it opens on this project, scene ' + (i + 1) + '. Record, stop, and it lands here.'; })
+        .catch(function (e) { panel.textContent = 'On your computer, open the Quotient Recorder, pick this project under Save to and scene ' + (i + 1) + ' under For, then Record. (' + (e.message || e) + ')'; });
     } else if (src === 'draw') {
       var ta = document.createElement('textarea'); ta.value = need.description || ''; ta.placeholder = 'What to draw'; panel.appendChild(ta);
       var go = document.createElement('button'); go.className = 'btn small'; go.textContent = need.status === 'provided' ? 'Redraw' : 'Draw';

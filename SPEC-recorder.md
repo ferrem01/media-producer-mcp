@@ -32,6 +32,18 @@ fills the need and takes the slot the board held for it at the next build
 (SPEC-briefs.md, the sources). No events sidecar, no assembly; the popup
 links straight to Studio.
 
+**The armed need (the handoff).** Nobody should have to pick the project
+and the need in the popup. In Studio, "Record with the Recorder" on a
+screen slot (the picker, the dashed block, the slate) arms it:
+`POST /api/arm-need/{tenant}/{project}` writes one record per tenant
+(`armed-need.json`, two hours at most). The popup asks
+`GET /api/armed-need/{tenant}` on open and, when the armed project is in
+its list, sets Save to and For to it and shows "Recording for <project>
+· Scene N · <need>" with "Not this one" (`DELETE /api/arm-need/...`).
+The recording that lands through `provide-asset` clears the record, and
+Studio's live-sync reloads the film so the slate leaves and the block
+becomes footage.
+
 ## The three modes
 
 ### Mode A — narrate live while demoing

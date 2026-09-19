@@ -131,4 +131,24 @@ describe("the sources: every need is collected its own way, in the board", () =>
     expect(desktop).toMatch(/nb\.className = 'spk-clip spk-need';[\s\S]*?openNeedPicker\(p, n\.si, n\.ai\)/);
     expect(desktop).toMatch(/\.ml-seg\.ml-need, \.spk-clip\.spk-need \{/);
   });
+
+  it("the armed need: Studio points the Recorder at a slot, the popup opens set to it, the landing recording disarms it", async () => {
+    const index = await read("src/index.ts");
+    expect(index).toMatch(/\|music-options\|arm-need\|armed-need\|traces\|/);
+    expect(index).toMatch(/\/api\\\/arm-need\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
+    expect(index).toMatch(/\/api\\\/armed-need\\\/\(\[\^\/\]\+\)\$\//);
+    expect(index).toMatch(/if \(anNeed\.type !== "screen_recording" && anNeed\.type !== "screenshot"\)/);
+    expect(index).toMatch(/const evDisarmed = await clearArmedNeed\(evTenant, \{ project_id: evProject, scene_index: evScene, asset_index: evIndex \}\);/);
+    expect(index).toMatch(/const ARMED_TTL_MS = 2 \* 60 \* 60 \* 1000;/);
+    const bg = await read("recorder-extension/background.js");
+    expect(bg).toMatch(/msg\.type === "qr-armed"/);
+    expect(bg).toMatch(/\/api\/armed-need\/\$\{encodeURIComponent\(settings\.tenant\)\}/);
+    expect(bg).toMatch(/msg\.type === "qr-disarm"[\s\S]*?method: "DELETE"/);
+    const popup = await read("recorder-extension/popup.js");
+    expect(popup).toMatch(/async function applyArmed\(\)[\s\S]*?chrome\.storage\.sync\.set\(\{ destProject: a\.project_id, destNeed: needVal \}\)/);
+    expect(await read("recorder-extension/popup.html")).toMatch(/id="armed"/);
+    const desktop = await read("src/preview-app/preview-app.ts");
+    expect(desktop).toMatch(/api\('POST', '\/arm-need\/' \+ encodeURIComponent\(state\.tenantId\)/);
+    expect(await read("src/studio-phone.ts")).toMatch(/api\('POST', '\/arm-need\/' \+ encodeURIComponent\(tenant\)/);
+  });
 });

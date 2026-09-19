@@ -57,6 +57,12 @@
     <div id="prompter-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">A separate window with your script, scrolling while you talk. Never appears on film.</div>
     <!-- Destination: new project (assembled walkthrough, today's behavior) or
          append the take as a scene into an existing project. -->
+    <!-- THE ARMED NEED: Studio pointed the Recorder at a slot; the popup
+         opens set to it (Save to + For) and says so. -->
+    <div id="armed" style="display:none;margin:0 0 8px 0;padding:8px 10px;border:1px solid #c7d2fe;border-radius:8px;background:#eef2ff;font-size:12px;color:#17171c;line-height:1.4;">
+      <b>Recording for</b> <span id="armed-what"></span>
+      <div style="font-size:10px;color:#6b7280;margin-top:2px;">Stop, and it lands in that slot in Studio. <a href="#" id="armed-clear" style="color:#4f46e5;">Not this one</a></div>
+    </div>
     <label for="dest">Save to</label>
     <select id="dest">
       <option value="">&#10133; New project</option>
