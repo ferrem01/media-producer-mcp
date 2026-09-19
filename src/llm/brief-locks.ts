@@ -59,7 +59,10 @@ export function briefLockBlock(locks: BriefLocks): string {
 }
 
 // JSON.stringify writes a newline as the two characters \n; treat those as space too.
-const norm = (s: string) => s.toLowerCase().replace(/\\[nrt]/g, " ").replace(/[“”"'’‘]/g, "").replace(/\s+/g, " ").trim();
+// Words only: the writer breaks a locked sentence across lines, stars a
+// word for emphasis (*remembers*) and moves a comma -- none of that is a
+// dropped line (measured live, proj_6c7bd4ca: three false warnings).
+const norm = (s: string) => s.toLowerCase().replace(/\\[nrt]/g, " ").replace(/[“”"'’‘*_]/g, "").replace(/[.,;:!?()\-–—/]+/g, " ").replace(/\s+/g, " ").trim();
 
 /** Locked quotes the board does not carry anywhere (voiceover, template slots, component data). */
 export function missingLocks(storyboard: unknown, locks: BriefLocks): string[] {
