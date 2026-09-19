@@ -49,7 +49,7 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(recipeBlock(getRecipe("presenter-n-things")!, "16x9")).toMatch(/3\. PROOF -- person\+cutaway, 10s .* MADE AS: a REAL screen recording the human provides/);
     // The build holds the board to it: a motion beat asks for nothing, a recording beat must ask.
     const chapter: any = { label: "CHAPTER - Memory", purpose: "Memory builds", assets: [{ type: "screen_recording", status: "needed", description: "x" }, { type: "camera_video", status: "needed", description: "t" }], components: [{ type: "asset-placeholder", data: {} }, { type: "quotient-chat", data: {} }] };
-    expect(holdMadeToRecipe(chapter, gr)).toEqual(["the camera take ask dropped: no person on this beat", "1 screen need(s) dropped: the beat is motion graphics", "the slate dropped: the library performs this beat"]);
+    expect(holdMadeToRecipe(chapter, gr)).toEqual(["the camera take ask dropped: no person on this beat", "1 screen need(s) dropped: the beat is motion graphics", "the slate dropped: the beat is motion graphics"]);
     expect(chapter.assets).toEqual([]);
     expect(chapter.components.map((x: any) => x.type)).toEqual(["quotient-chat"]);
     const provided: any = { label: "CHAPTER - Flows", assets: [{ type: "screen_recording", status: "provided", path: "/x.webm", description: "x" }], components: [] };
@@ -96,7 +96,16 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(wb.scenes[2].scene_template).toEqual({ type: "st-logo-close", data: { tagline: "", cta: "", url: "getquotient.ai" } });
     expect(wb.scenes[2].components.map((c: any) => c.type)).toEqual(["reel-caption-lane"]);
     expect(wb.scenes[1].scene_template).toBeUndefined();
+    // The logo band carries only customers the brief names.
+    const { holdLogoBandToBrief } = await import("../src/core/recipes.js");
+    const ret: any = { components: [{ type: "logo-band", data: { logos: [{ text: "Fable" }, { text: "Nestlé" }, { src: "/assets/t/brand-kit/logo.png" }, { text: "Acme" }] } }, { type: "lower-third", data: {} }] };
+    expect(holdLogoBandToBrief(ret, "We work with Nestlé and Gamma.")).toEqual(["2 invented logo(s) dropped from the band (not in the brief)"]);
+    expect(ret.components[0].data.logos).toEqual([{ text: "Nestlé" }, { src: "/assets/t/brand-kit/logo.png" }]);
+    const none: any = { components: [{ type: "logo-band", data: { logos: [{ text: "Fable" }, { text: "Nova" }] } }] };
+    expect(holdLogoBandToBrief(none, "How Quotient works.")).toEqual(["2 invented logo(s) dropped from the band (not in the brief)", "the logo band dropped: the brief names no customers"]);
+    expect(none.components).toEqual([]);
     const pipeline3 = await read("src/llm/pipeline.ts");
+    expect(pipeline3).toMatch(/holdLogoBandToBrief\(d, String\(opts\.prompt \|\| ""\)\)/);
     expect(pipeline3).toMatch(/holdGroundToRecipe\(d, recipeObj\)/);
     expect(pipeline3).toMatch(/castWordmarkCards\(storyboard as any, recipeObj\)/);
     expect(pipeline3).toMatch(/castChapterKickers\(storyboard as any, recipeObj\)/);

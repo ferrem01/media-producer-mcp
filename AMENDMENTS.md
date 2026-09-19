@@ -4105,3 +4105,8 @@ mocks on the hook and the build turned them into screen_recording asks
 with slates over the person. A beat made as the person's take (or as
 type) asks for no screen either: `holdMadeToRecipe` drops its screen
 needs and slates the way it does for motion graphics.
+
+And the logo band invented customers a second time (Fable, Brightline,
+Acme, Nova) despite the instruction. `holdLogoBandToBrief`: a text logo
+not present in the brief is dropped, image logos from the tenant's
+assets are trusted, a band left with nothing goes.

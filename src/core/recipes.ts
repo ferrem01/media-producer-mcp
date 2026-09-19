@@ -367,6 +367,28 @@ export function castWordmarkCards(board: { scenes: Array<{ label?: unknown; voic
   return n;
 }
 
+/** A LOGO BAND CARRIES ONLY CUSTOMERS THE BRIEF NAMES: a text logo that
+ *  does not appear in the brief is invented (measured live, twice: Framer,
+ *  Linear, Nestle; then Fable, Brightline, Acme, Nova). Image logos from
+ *  the tenant's assets are trusted. A band left with nothing is dropped.
+ *  Returns what changed, in plain lines. */
+export function holdLogoBandToBrief(scene: { components?: any[] }, brief: string): string[] {
+  if (!Array.isArray(scene.components)) return [];
+  const text = String(brief || "").toLowerCase();
+  const out: string[] = [];
+  scene.components = scene.components.filter((c) => {
+    if (!c || typeof c !== "object" || c.type !== "logo-band") return true;
+    const logos = Array.isArray(c.data?.logos) ? c.data.logos : [];
+    const kept = logos.filter((l: any) => l && ((typeof l.src === "string" && l.src.startsWith("/assets/")) || (typeof l.text === "string" && l.text.trim() && text.includes(l.text.trim().toLowerCase()))));
+    const dropped = logos.length - kept.length;
+    if (dropped) out.push(`${dropped} invented logo(s) dropped from the band (not in the brief)`);
+    if (!kept.length) { out.push("the logo band dropped: the brief names no customers"); return false; }
+    c.data.logos = kept;
+    return true;
+  });
+  return out;
+}
+
 /** A person beat is the PERSON: a scene template the writer reached for
  *  (st-photo-close on the big picture, st-logo-close on the CTA -- measured
  *  live, proj_8147620f) would cover the take with a card. Dropped on any

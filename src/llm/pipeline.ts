@@ -32,7 +32,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
-import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards } from "../core/recipes.js";
+import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief } from "../core/recipes.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2807,6 +2807,7 @@ async function runUnifiedPipeline(
     { const k = castChapterKickers(storyboard as any, recipeObj); if (k) console.log(`  Recipe: ${k} chapter kicker(s) cast from the chapter scenes' names`); }
     { let g = 0; for (const d of storyboard.scenes as any[]) if (holdGroundToRecipe(d, recipeObj)) g++; if (g) console.log(`  Recipe ground: ${g} scene(s) with no person are opaque (no take under them)`); }
     { const w = castWordmarkCards(storyboard as any, recipeObj); if (w) console.log(`  Recipe: ${w} wordmark card(s) cast as st-logo-close`); }
+    for (const d of storyboard.scenes as any[]) { for (const n of holdLogoBandToBrief(d, String(opts.prompt || ""))) console.log(`  Recipe: "${d.label || ""}" -- ${n}`); }
   }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
