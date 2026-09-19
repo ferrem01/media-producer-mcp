@@ -243,5 +243,10 @@ export function holdShotToRecipe(scene: { label?: unknown; scene_template?: unkn
 export function roleOfLabel(label: unknown, r: Recipe): string | undefined {
   const s = String(label || "").toLowerCase();
   const roles = r.spine.map((b) => b.role.toLowerCase());
+  // The label is "<Role> - <what it says>": the role at its head wins over
+  // one mentioned later ("BREATHER - kept outtake after the promise" is
+  // the breather, not the promise -- measured live, proj_25b2858c).
+  const head = roles.find((role) => new RegExp(`^\\s*${role}([^a-z]|$)`).test(s));
+  if (head) return head;
   return roles.find((role) => new RegExp(`(^|[^a-z])${role}([^a-z]|$)`).test(s));
 }

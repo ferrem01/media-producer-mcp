@@ -65,6 +65,10 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const offRole = checkBoardAgainstRecipe(gags, a);
     expect(offRole.some((w) => /Scene 1 \(audience\) runs 2\.5s; that beat runs 0\.8-1\.5s\./.test(w))).toBe(true);
     expect(offRole.some((w) => /Scene 2 \(breather\)/.test(w))).toBe(false);
+    const { roleOfLabel } = await import("../src/core/recipes.js");
+    expect(roleOfLabel("BREATHER - kept outtake after the promise", a)).toBe("breather");
+    expect(roleOfLabel("Proof-line - live in a day", a)).toBe("proof-line");
+    expect(roleOfLabel("the big-picture beat", a)).toBe("big-picture");
     // A person beat's footage is the take: its b-roll ask is dropped; a broll beat keeps its gag clip.
     const { pruneNeedsByRecipe } = await import("../src/core/recipes.js");
     const person = { label: "PROMISE - get on Quotient", assets: [{ type: "stock_footage", description: "handheld shot of a man walking, talking to camera" }, { type: "camera_video", description: "the take" }] };

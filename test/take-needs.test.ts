@@ -226,4 +226,10 @@ describe("a continuous speaker track keeps no scene markers", () => {
       speaker_track: { clips: [{ source: "/x/t2.mp4", start: 0 }] } }) as any;
     expect(withTake.speaker_track.clips[0].scene_index).toBe(2);
   });
+
+  it("a landed take re-shoots the board cards, so the card shows the take's still instead of the silhouette", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("src/index.ts", "utf8");
+    expect(src).toMatch(/await saveProject\(tkProjectObj\);\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*reshootStoryboardCardsSoon\(tkTenant, tkProject\);/);
+  });
 });
