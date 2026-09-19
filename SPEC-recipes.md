@@ -1,6 +1,6 @@
 # SPEC-recipes.md -- the recipe: the measured cut of a film with the content removed
 
-Status: shipped 2026-09-19 (library of seven). Companion docs: `SPEC-creative-axes.md`
+Status: shipped 2026-09-19 (library of eight). Companion docs: `SPEC-creative-axes.md`
 (grammar), `SPEC-format-and-spine.md` (frame), `SPEC-creator-cut.md`, `SPEC-briefs.md`.
 
 ## Why
@@ -81,6 +81,7 @@ full-frame screen. Every other style is the plated chest-band lane.
 | speaker-one-take-cards | speaker | 9x16 | Matt Rodin, 86s | one unbroken selfie; a persistent title card; floating cards over the person per point; micro captions; no cuts |
 | presenter-location-hop | creator-cut | 9x16 | Air, 50.4s | a person with a mic in a new place on every cut; each spoken word lands where it is said and stays; animal gag clips on the audience; kept outtakes as breathers; screens full-frame on the product's name; URL and wordmark to close |
 | story-ad-idea-beats | hype-cut | 9x16 | Gamma, 16s | no person: type is the voice, one illustrated object per beat (the clock, the balloons); feeling, pain, wordmark reveal, product output fanning in, payoff, end card with a pill button |
+| ask-work-result | canvas-tour | 1x1 | Runway in ChatGPT, 28.5s | an agent demo: a second of the payoff, the ask typed in full, the agent's checklist with its elapsed time, the deliverable full frame for half the film with two claim lines, one CTA line, wordmark on black; four lines of type in all |
 
 ## Adding one
 
@@ -95,6 +96,6 @@ the system keeps the timing honest.
 
 - A measuring tool that drafts the recipe file from a film (today by hand).
 - Recipes for the other grammars (launch-film, tempo-cut, editorial,
-  data-story, canvas-tour, screencast). hype-cut has one.
+  data-story, screencast). hype-cut and canvas-tour have one each.
 - Studio: a recipe picker and the recipe's beats drawn on the ruler.
 - The critique reading the recipe's motion as a rubric.

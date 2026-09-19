@@ -5,13 +5,13 @@ import path from "node:path";
 const read = (p: string) => fs.readFile(path.join(process.cwd(), p), "utf8");
 
 describe("the recipe: the measured cut of a film with the content removed", () => {
-  it("the library loads seven valid recipes, each under one grammar with proven frames and a measured source", async () => {
+  it("the library loads eight valid recipes, each under one grammar with proven frames and a measured source", async () => {
     const { loadRecipes, validateRecipe, recipeSceneBand } = await import("../src/core/recipes.js");
     const rs = loadRecipes();
-    expect(rs.map((r) => r.id).sort()).toEqual(["founder-story-broll", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
+    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-story-broll", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
     for (const r of rs) {
       expect(validateRecipe(r)).toEqual([]);
-      expect(["creator-cut", "speaker", "hype-cut"]).toContain(r.grammar);
+      expect(["creator-cut", "speaker", "hype-cut", "canvas-tour"]).toContain(r.grammar);
       expect(r.frames_proven.length).toBeGreaterThan(0);
       expect(r.source.measured).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       const band = recipeSceneBand(r); expect(band.min).toBeGreaterThan(0); expect(band.max).toBeGreaterThanOrEqual(band.min);
@@ -30,6 +30,13 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(gb).toMatch(/1\. HOOK -- type_card, 2s \(1\.5-2\.5s\), about 6 words \(never more than 7\)\./);
     expect(gb).toMatch(/4\. PROOF -- screen, 2\.5s .* Cutaway \(card, mockup\): enters at start, holds 100% of the beat\./);
     expect(gb).toMatch(/never drop or reorder: hook, pain, reveal, cta\./);
+    const w = getRecipe("ask-work-result")!;
+    expect(w.grammar).toBe("canvas-tour");
+    expect(w.frames_proven).toEqual(["1x1"]);
+    expect(recipeSceneBand(w)).toEqual({ min: 5, max: 6 });
+    expect(w.asks.take).toBe("none");
+    expect(w.spine.find((b) => b.role === "result")!.dur).toEqual([10, 12, 14]);
+    expect(recipeBlock(w, "9x16")).toMatch(/proven at 1x1; this film ships 9x16/);
     const a = getRecipe("presenter-location-hop")!;
     expect(a.grammar).toBe("creator-cut");
     expect(recipeSceneBand(a)).toEqual({ min: 9, max: 17 });
