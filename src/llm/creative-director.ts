@@ -18,6 +18,7 @@
  *   - Key visual commitments (color mood, typography attitude, motion personality)
  */
 
+import { recipeMenu, getRecipe } from "../core/recipes.js";
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { getStorytellingGuide } from "./design-skills.js";
 import type { BrandKit, OutputFormat, ReferenceImage, Frame } from "../core/types.js";
@@ -94,6 +95,9 @@ export interface ConceptDirectorOpts {
   /** Caller-pinned FRAME (the delivery geometry). Omitted -> the director
    *  infers it from the prompt and echoes it as "frame". */
   frame?: Frame;
+  /** THE RECIPE pin (SPEC-recipes.md): an id from the library; its grammar
+   *  is then the film's grammar unless the caller pinned one. */
+  recipe?: string;
 }
 
 export interface Treatment {
@@ -135,6 +139,11 @@ export interface Treatment {
   /** The FRAME this treatment commits to -- the delivery geometry. Read as
    *  DATA by the pipeline, which sizes the canvas from it. */
   frame?: Frame;
+  /** THE RECIPE this treatment commits to (SPEC-recipes.md): the measured
+   *  cut the writer fills. Pinned by the caller or picked by the director
+   *  from the library when a recipe suits the brief; absent = the writer
+   *  invents the beats (today's generate). */
+  recipe?: string;
 }
 
 /**
@@ -240,6 +249,7 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
   "selectionReason": "Why this concept is strongest",
   "filmGrammar": "launch-film | tempo-cut | hype-cut | editorial | data-story | canvas-tour | screencast | speaker | creator-cut",
   "frame": "16x9 | 9x16 | 4x5 | 1x1 -- the DELIVERY GEOMETRY, inferred from where the prompt says the film ships: Reels / TikTok / Shorts / Stories -> 9x16; an Instagram or LinkedIn FEED post -> 4x5; 'square' -> 1x1; anything else or unstated -> 16x9. When the caller pinned it, echo it. A frame is a size and nothing more -- it never changes the grammar.",
+  "recipe": "<recipe id> | null -- THE RECIPE (the third axis): a measured cut from the library below that the writer will fill. Pick one when the brief's shape matches a recipe's suits and the recipe's grammar is the grammar you chose; null when none fits (the writer then invents the beats). When the caller pinned it, echo it.",
   "visualSystem": {
     "world": "light | dark | paper -- the film's continuous surface. paper = the print/letterpress world (painted sheet, warm ink): choose it when the prompt asks for a paper/print/zine/letterpress/illustrated-sticker feel. Otherwise omit and the brand decides.",
     "motion": "punchy | calm | cutout-physics -- the physics contract. calm = settle-never-bounce editorial restraint. cutout-physics = rigid flat pieces that drop/settle/swing like physical stickers (pairs with paper + a cutout motif). Default punchy.",
@@ -277,6 +287,20 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
       grammarDirective += `\n\nTHE CALLER HAS FIXED THE FRAME: "${opts.frame}" (${fs.width}x${fs.height}${fs.height > fs.width ? ", vertical -- compose every beat for a phone held in one hand" : ""}). Echo it as "frame" and design the concept for that geometry.`;
     } else {
       grammarDirective += `\n\nDecide the FRAME from where the prompt says the film ships and output it as "frame" (16x9 unless the prompt names a vertical or feed destination).`;
+    }
+  }
+  // THE RECIPE LIBRARY (SPEC-recipes.md): measured cuts the director may
+  // commit the film to. A pinned recipe is a constraint; its grammar is the
+  // film's grammar unless a grammar was pinned too.
+  const menu = recipeMenu();
+  if (opts.format === "video" && menu) {
+    if (opts.recipe) {
+      const r = getRecipe(opts.recipe);
+      grammarDirective += r
+        ? `\n\nTHE CALLER HAS FIXED THE RECIPE: "${r.id}" (${r.name}; grammar ${r.grammar}; ${r.length_s[0]}-${r.length_s[1]}s; suits: ${r.suits.join("; ")}). Echo it as "recipe"${opts.filmGrammar ? "" : ` and commit the grammar to "${r.grammar}"`}. Design the concept to be told in exactly this cut.`
+        : `\n\n(The caller named a recipe "${opts.recipe}" that is not in the library; ignore it and pick from the library or none.)`;
+    } else {
+      grammarDirective += `\n\nTHE RECIPE LIBRARY -- measured cuts of films that worked. Commit to one as "recipe" when the brief's shape matches its suits and its grammar is the one you chose; otherwise "recipe": null.\n${menu}`;
     }
   }
   // Pinned look/sound: the caller's commitments are constraints the concepts
@@ -346,6 +370,7 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
     directorNote: result.directorNote || `Concept: ${selected.idea}. Pattern: ${selected.pattern}. Through-line: ${selected.throughLine}.`,
     sceneCount: typeof result.sceneCount === "number" ? result.sceneCount : undefined,
     filmGrammar: resolveFilmGrammar(opts, result.filmGrammar),
+    recipe: resolveRecipe(opts, result.recipe),
     frame: resolveFrame(opts, result.frame),
     visualSystem: resolveVisualSystem(opts, result.visualSystem),
     audioSystem: resolveAudioSystem(opts, result.audioSystem),
@@ -380,8 +405,22 @@ function resolveAudioSystem(opts: ConceptDirectorOpts, fromLLM: any): AudioSyste
 
 /** The caller's grammar always wins; otherwise validate the director's pick
  *  (with a text fallback for models that echo it in motionPersonality). */
+/** THE RECIPE: the caller's pin wins; else the director's pick when it is a
+ *  library id whose grammar matches the film's; else none. */
+function resolveRecipe(opts: ConceptDirectorOpts, raw: unknown): string | undefined {
+  const pinned = opts.recipe && getRecipe(opts.recipe);
+  if (pinned) return pinned.id;
+  const picked = typeof raw === "string" ? getRecipe(raw.trim()) : undefined;
+  if (!picked) return undefined;
+  const grammar = opts.filmGrammar;
+  if (grammar && picked.grammar !== grammar) { console.log(`  Director picked recipe "${picked.id}" (${picked.grammar}) for a ${grammar} film -- ignored`); return undefined; }
+  return picked.id;
+}
+
 function resolveFilmGrammar(opts: ConceptDirectorOpts, raw: unknown): FilmGrammar {
   if (opts.filmGrammar) return opts.filmGrammar;
+  const pinnedRecipe = opts.recipe && getRecipe(opts.recipe);
+  if (pinnedRecipe) return pinnedRecipe.grammar as FilmGrammar;
   if (typeof raw === "string" && (FILM_GRAMMARS as string[]).includes(raw.trim())) {
     return raw.trim() as FilmGrammar;
   }

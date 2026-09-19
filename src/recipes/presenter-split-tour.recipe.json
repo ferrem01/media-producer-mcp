@@ -1,0 +1,37 @@
+{
+  "id": "presenter-split-tour",
+  "name": "Presenter: split tour",
+  "grammar": "creator-cut",
+  "frames_proven": ["9x16"],
+  "suits": ["feature tour", "what a product does, step by step", "explainer with many screens", "one workflow end to end"],
+  "length_s": [45, 65],
+  "spine": [
+    { "role": "hook", "shot": "person", "dur": [3, 4, 6], "enters": ["stamp:title"], "note": "The claim in one breath, the title stamped over the top third." },
+    { "role": "contrast", "shot": "person", "dur": [3, 4, 6], "enters": ["stamp:noun"], "note": "The old way in a phrase, stamped." },
+    { "role": "step", "shot": "person+split", "dur": [3, 4, 6], "repeat": [5, 9], "enters": ["stamp:noun@start"], "cutaway": { "at": "start", "hold": 1.0, "exit_before": "next_beat", "use": "split" }, "note": "Each step is a screen in the top half over the person for the whole short beat, its name stamped as it opens. Short beats, many of them." },
+    { "role": "summary", "shot": "person+cutaway", "dur": [5, 7, 9], "enters": ["stamp:summary"], "cutaway": { "at": "start", "hold": 0.8, "exit_before": "end" }, "note": "One diagram or card that ties the steps together, over the person." },
+    { "role": "close", "shot": "person", "dur": [3, 4, 6], "enters": [], "note": "The takeaway, to camera." }
+  ],
+  "rhythm": { "cut_cadence_s": 2.8, "max_hold_s": 5, "wpm": 170, "first_cut_by_s": 1.5, "end_card_s": 0 },
+  "layers": {
+    "captions": { "style": "word", "words": 1, "pos": "chest", "through_cutaways": true },
+    "stamps": { "pos": "top-third", "hold_s": 2 },
+    "lower_third": { "on": null },
+    "camera": "fixed",
+    "music": { "bed": true, "duck": true }
+  },
+  "motion": {
+    "elements": {
+      "stamp": { "in": "pop", "in_s": 0.3, "out": "cut" },
+      "cutaway": { "in": "slide-down", "in_s": 0.45, "out": "slide-up", "out_s": 0.35 },
+      "caption": { "in": "pop", "in_s": 0.1, "per": "word" },
+      "summary_card": { "in": "rise", "in_s": 0.5, "out": "fade", "out_s": 0.3 }
+    },
+    "transitions": { "default": "cut" },
+    "camera": { "hook": "fixed", "step": "fixed", "summary": "fixed", "close": "fixed" },
+    "physics": "punchy"
+  },
+  "asks": { "take": "continuous", "screens": "one per step", "broll": 0, "images": 1 },
+  "latitude": { "optional": ["contrast", "summary"], "fixed": ["hook"], "may_double": ["step"] },
+  "source": { "film": "bigpictureclub_DdRKtDAs7fT", "length_s": 56, "frame": "9x16", "cuts_s": [4.1, 6.1, 6.8, 8.2, 13.8, 15.4, 16.4, 17.9, 28.1, 30.7, 34.1, 36.6, 38.8, 39.3, 41.3], "measured": "2026-09-19" }
+}
