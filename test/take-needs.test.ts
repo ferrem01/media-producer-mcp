@@ -232,4 +232,18 @@ describe("a continuous speaker track keeps no scene markers", () => {
     const src = await fs.readFile("src/index.ts", "utf8");
     expect(src).toMatch(/await saveProject\(tkProjectObj\);\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*reshootStoryboardCardsSoon\(tkTenant, tkProject\);/);
   });
+
+  it("the page learns when the cards were re-shot: project-version carries cards_shot_at, Studio swaps the stills in place, and a built board still re-shoots", async () => {
+    const fs = await import("node:fs/promises");
+    const index = await fs.readFile("src/index.ts", "utf8");
+    expect(index).toMatch(/cards_shot_at: cardsShotAt,/);
+    expect(index).toMatch(/"storyboard-cards\.png"\)\)\)\.mtime\.toISOString\(\)/);
+    const server = await fs.readFile("src/server.ts", "utf8");
+    expect(server).toMatch(/if \(project\?\.storyboard\?\.scenes\?\.length\) \{\s*await renderStoryboardCards\(/);
+    expect(server).not.toMatch(/project\.status === "storyboard"\) \{\s*await renderStoryboardCards/);
+    const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
+    expect(studio).toMatch(/if \(v\.cards_shot_at && v\.cards_shot_at !== liveSync\.cards\) \{/);
+    expect(studio).toMatch(/function refreshDraftStills\(v\) \{[\s\S]*?img\.dv-still, img\.dv-rail-thumb/);
+    expect(studio).toMatch(/'\?v=' \+ encodeURIComponent\(state\.cardsV \|\| project\.updated_at \|\| ''\)/);
+  });
 });

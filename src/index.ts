@@ -43,6 +43,7 @@ import { normalizeBeats } from "./core/beats.js";
 import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
+import { projectOutputDir } from "./persistence/paths.js";
 import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp, reshootStoryboardCardsSoon } from "./server.js";
 import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits } from "./core/web-capture.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
@@ -1278,10 +1279,17 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const pvProj = await loadProject(pvTenant, pvProject);
         if (!pvProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         res.setHeader("Cache-Control", "no-store");
+        // When the board cards were last photographed: they are re-shot a
+        // few seconds AFTER a need lands (provide-asset, a take), so a page
+        // that refreshed on updated_at alone kept the old still (measured
+        // live, proj_25b2858c: the recording landed, the card kept the slate).
+        let cardsShotAt: string | null = null;
+        try { cardsShotAt = (await fs.stat(path.join(projectOutputDir(pvTenant, pvProject), "storyboard-cards.png"))).mtime.toISOString(); } catch { /* no cards yet */ }
         jsonResponse(res, 200, {
           updated_at: pvProj.updated_at || null,
           status: pvProj.status,
           scenes: (pvProj.scenes || []).length,
+          cards_shot_at: cardsShotAt,
         });
         return;
       }

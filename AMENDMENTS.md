@@ -3956,3 +3956,20 @@ scene template the writer reached for -- st-photo-close on the big
 picture, st-logo-close on the CTA -- since a card would cover the take);
 and the writer is no longer handed the music's bar grid when a recipe is
 pinned, so the beats are authored in the recipe's seconds.
+
+## The still follows the data: the page learns when the cards were re-shot
+
+Marc recorded a screen with the Recorder; the need flipped to provided,
+the board scene was recast (the slate replaced by the recording, cut in
+on its words), the card was re-photographed with the recording -- and
+Studio kept showing the slate. The cards are shot a few seconds AFTER the
+save, and the page's stills are keyed on `updated_at`, which moved at the
+save: Studio refreshed, fetched the old still, and never looked again.
+
+- `GET /api/project-version` now carries `cards_shot_at` (the contact
+  sheet's mtime). Studio's live sync swaps every draft still's cache key
+  in place when it moves -- no re-render, an edit in progress is left
+  alone.
+- A landed take re-shoots the cards (it never did; a provided screen
+  did), and a built board re-shoots too: the board's stills are shown
+  wherever the board is, and a need provided after the build must show.

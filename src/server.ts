@@ -865,7 +865,9 @@ export function reshootStoryboardCardsSoon(tenantId: string, projectId: string):
   setTimeout(async () => {
     try {
       const project = await loadProject(tenantId, projectId);
-      if (project?.storyboard?.scenes?.length && project.status === "storyboard") {
+      // Built or not: the board's stills are shown wherever the board is,
+      // and a need provided after the build must show on them too.
+      if (project?.storyboard?.scenes?.length) {
         await renderStoryboardCards(project as any, {
           componentLibDir: config.componentLibDir,
           gsapDir: config.gsapDir, dataDir: config.dataDir,
