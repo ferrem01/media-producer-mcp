@@ -278,15 +278,20 @@ export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; as
     const takes = scene.assets.filter((a) => a && typeof a === "object" && a.type === "camera_video" && a.status !== "provided");
     if (takes.length) { scene.assets = scene.assets.filter((a) => !takes.includes(a)); out.push("the camera take ask dropped: no person on this beat"); }
   }
-  if (made === "motion") {
+  // A beat made as motion graphics, as the person's take, or as type asks
+  // for no screen: its screen needs and the slates cast for them go
+  // (measured live, proj_7b306f5b: tool-window mocks the writer put on the
+  // hook became a screen_recording ask with a slate over the person).
+  const why = made === "motion" ? "the beat is motion graphics" : made === "take" ? "the beat is the person's take" : made === "type" ? "the beat is type alone" : "";
+  if (why) {
     if (Array.isArray(scene.assets)) {
       const drop = scene.assets.filter((a) => isScreenNeed(a) && a.status !== "provided");
-      if (drop.length) { scene.assets = scene.assets.filter((a) => !drop.includes(a)); out.push(`${drop.length} screen need(s) dropped: the beat is motion graphics`); }
+      if (drop.length) { scene.assets = scene.assets.filter((a) => !drop.includes(a)); out.push(`${drop.length} screen need(s) dropped: ${why}`); }
     }
     if (Array.isArray(scene.components)) {
       const before = scene.components.length;
       scene.components = scene.components.filter((c) => !(c && typeof c === "object" && c.type === "asset-placeholder"));
-      if (scene.components.length !== before) out.push("the slate dropped: the library performs this beat");
+      if (scene.components.length !== before) out.push(`the slate dropped: ${why}`);
     }
   } else if (made === "recording") {
     const assets = Array.isArray(scene.assets) ? scene.assets : (scene.assets = []);
@@ -360,6 +365,28 @@ export function castWordmarkCards(board: { scenes: Array<{ label?: unknown; voic
     n++;
   }
   return n;
+}
+
+/** A LOGO BAND CARRIES ONLY CUSTOMERS THE BRIEF NAMES: a text logo that
+ *  does not appear in the brief is invented (measured live, twice: Framer,
+ *  Linear, Nestle; then Fable, Brightline, Acme, Nova). Image logos from
+ *  the tenant's assets are trusted. A band left with nothing is dropped.
+ *  Returns what changed, in plain lines. */
+export function holdLogoBandToBrief(scene: { components?: any[] }, brief: string): string[] {
+  if (!Array.isArray(scene.components)) return [];
+  const text = String(brief || "").toLowerCase();
+  const out: string[] = [];
+  scene.components = scene.components.filter((c) => {
+    if (!c || typeof c !== "object" || c.type !== "logo-band") return true;
+    const logos = Array.isArray(c.data?.logos) ? c.data.logos : [];
+    const kept = logos.filter((l: any) => l && ((typeof l.src === "string" && l.src.startsWith("/assets/")) || (typeof l.text === "string" && l.text.trim() && text.includes(l.text.trim().toLowerCase()))));
+    const dropped = logos.length - kept.length;
+    if (dropped) out.push(`${dropped} invented logo(s) dropped from the band (not in the brief)`);
+    if (!kept.length) { out.push("the logo band dropped: the brief names no customers"); return false; }
+    c.data.logos = kept;
+    return true;
+  });
+  return out;
 }
 
 /** A person beat is the PERSON: a scene template the writer reached for
