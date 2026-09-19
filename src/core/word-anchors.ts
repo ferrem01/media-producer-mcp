@@ -247,9 +247,16 @@ export function splitByScripts(scripts: string[], words: SpineWord[], total: num
   let cursor = 0;
   for (let i = 1; i < n; i++) {
     const head = scriptWords(scripts[i]).map(normalizeToken).filter(Boolean).slice(0, 3);
+    // The previous scene must have been at least half said before the
+    // next one can begin: two consecutive scenes that open with the same
+    // words ("Quotient builds the full campaign" / "Quotient builds a
+    // welcome series") otherwise cut at the SAME moment, and the first
+    // gets a zero-length window (measured live, proj_25b2858c scene 9).
+    const prevWords = scriptWords(scripts[i - 1]).map(normalizeToken).filter(Boolean).length;
+    const from = Math.min(toks.length, cursor + Math.max(1, Math.floor(prevWords / 2)));
     let at: number | null = null;
     if (head.length) {
-      for (let k = cursor; k < toks.length; k++) {
+      for (let k = from; k < toks.length; k++) {
         if (toks[k] !== head[0]) continue;
         // Confirm with the next word when the script has one and the
         // transcript still has one (a single common word is a weak match).
@@ -259,6 +266,8 @@ export function splitByScripts(scripts: string[], words: SpineWord[], total: num
         break;
       }
     }
+    // A window shorter than a breath is not a scene: treat as not found.
+    if (at !== null && at - cuts[cuts.length - 1] < 0.3) at = null;
     if (at === null) {
       // Proportional fallback for the rest of the scripts from here.
       const prev = cuts[cuts.length - 1];

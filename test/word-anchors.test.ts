@@ -157,6 +157,18 @@ describe("record all: cutting one recording into scenes", () => {
     expect(splitByScripts(["Try this now.", "This year we grow."], ws, 4)).toEqual([{ start: 0, end: 1.9 }, { start: 1.9, end: 4 }]);
   });
 
+  it("two scenes that open with the same words cut at the second saying, never at the same moment", () => {
+    // Measured live (proj_25b2858c): "Quotient builds the full campaign..." then
+    // "Quotient builds a welcome series..." -- scene 9 got a zero-length window.
+    const ws = [
+      ["Quotient", 29.3], ["builds", 29.6], ["the", 29.9], ["full", 30.1], ["campaign", 30.4], ["every", 31.5], ["asset", 31.8], ["in", 32.2], ["one", 32.4], ["place.", 32.7],
+      ["Quotient", 34.2], ["builds", 34.5], ["a", 34.8], ["welcome", 35.0], ["series", 35.4], ["once", 35.9], ["then", 36.8], ["it", 37.0], ["runs.", 37.3],
+    ].map(([t, s]) => ({ text: t as string, start: s as number, end: (s as number) + 0.2 }));
+    const w = splitByScripts(["Quotient builds the full campaign -- every asset, in one place.", "Quotient builds a welcome series once -- then it just runs."], ws, 40);
+    expect(w).toEqual([{ start: 0, end: 34.1 }, { start: 34.1, end: 40 }]);
+    for (const x of w) expect(x.end - x.start).toBeGreaterThan(0.3);
+  });
+
   it("falls back to a proportional cut for a scene whose words were never heard", () => {
     const w = splitByScripts(["You're juggling tools.", "Synergy paradigm shift.", "Go to getquotient.ai."], words, 8);
     expect(w[0].start).toBe(0);

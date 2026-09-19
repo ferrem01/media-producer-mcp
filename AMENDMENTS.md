@@ -3973,3 +3973,17 @@ save: Studio refreshed, fetched the old still, and never looked again.
 - A landed take re-shoots the cards (it never did; a provided screen
   did), and a built board re-shoots too: the board's stills are shown
   wherever the board is, and a need provided after the build must show.
+
+## Record all: two scenes that open with the same words
+
+Marc's film replayed a segment around 30s. Scenes 9 and 10 both open
+with "Quotient builds"; `splitByScripts` searched for scene 10's opening
+words from the index where scene 9's had just matched, found the same
+two words at the same moment, and cut there: scene 9 got a zero-length
+window (take_8, 29.32-29.32s) and scene 10 got both lines. The composite
+then played scene 9 over an empty clip.
+
+Fix: the next scene's words are searched only after at least half the
+previous scene's words have been said, and a window shorter than a
+breath counts as not found (proportional fallback). Marc's take was
+re-split on the deployed fix.
