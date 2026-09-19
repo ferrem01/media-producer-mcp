@@ -333,7 +333,20 @@ export function recastProvidedNeed(
     }
     if (changed) return { components: comps, changed, how: "swapped" };
   }
-  if (comps.some((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path)) return { components: comps, changed: 0, how: "already there" };
+  const already = comps.filter((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path) as any[];
+  if (already.length) {
+    // Providing the same screen again re-applies the fit: a screen is shown
+    // whole (the film built before contain was the rule keeps its crop
+    // otherwise).
+    let refit = 0;
+    if (need.type === "screen_recording" || need.type === "screenshot") {
+      for (const c of already) {
+        if (c.type === "video" && c.data.object_fit !== "contain") { c.data.object_fit = "contain"; refit++; }
+        if (c.type === "image" && c.data.fit !== "contain") { c.data.fit = "contain"; refit++; }
+      }
+    }
+    return { components: comps, changed: refit, how: refit ? "refit to show whole" : "already there" };
+  }
   // 2. A first provision: the slot the board held for it.
   if (need.type === "screen_recording" || need.type === "screenshot") {
     const r = castProvidedScreens({ components: comps, assets: [need] } as any);

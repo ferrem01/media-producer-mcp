@@ -177,8 +177,11 @@ describe("the mock is the placeholder: a provided screen takes its slot on any f
     // On a person film a drawn object cuts in on its seconds.
     const r4 = recastProvidedNeed({ duration_seconds: 10, components: [] }, { type: "illustration", description: "x", status: "provided", path: "/a/d.png", at: 2, until: 6 } as any, undefined, { personFilm: true });
     expect(r4.components[0]).toMatchObject({ type: "image", data: { src: "/a/d.png", at: 2, exit_at: 6 } });
-    // Nothing to do: already there, or not provided.
+    // Nothing to do: already there, or not provided. A screen already there is refit to show whole.
     expect(recastProvidedNeed({ components: r2.components }, { type: "stock_footage", description: "x", status: "provided", path: "/a/b.mp4" } as any, undefined, { personFilm: false }).changed).toBe(0);
+    const cropped = { components: [{ type: "video", data: { src: "/a/s.mp4", object_fit: "cover" } }] };
+    const refit = recastProvidedNeed(cropped, { type: "screen_recording", description: "the board", status: "provided", path: "/a/s.mp4" } as any, undefined, { personFilm: false });
+    expect(refit).toMatchObject({ changed: 1, how: "refit to show whole" }); expect(refit.components[0].data.object_fit).toBe("contain");
     expect(recastProvidedNeed({ components: [] }, { type: "stock_footage", description: "x", status: "needed" } as any, undefined, { personFilm: false }).changed).toBe(0);
     const index = await read("src/index.ts");
     expect(index).toMatch(/const evRecast = recastInBuiltScene\(evProjectObj, evScene, evNeed, evPrev\);/);
