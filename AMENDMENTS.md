@@ -3924,3 +3924,26 @@ creator-cut film. Marc: go.
 - Verified in Chromium over an Air frame with a 2.6-5.2s cut window: the
   words accumulate around the person, the window shows one phrase low,
   everything returns when the person does. The plated lane is untouched.
+
+## The recipe's cut is the edit: no bar grid, no b-roll of the person
+
+Two things the first two Air-recipe boards (proj_421b06e9, proj_f20bd5da)
+showed, both fixed in code, not by hand:
+
+- Every person beat carried a `stock_footage` ask describing the person in
+  the place ("handheld shot of a man walking ... talking to camera"): the
+  writer sourcing "new place" as found footage. `pruneNeedsByRecipe` drops
+  a b-roll ask from a beat whose shot is `person` with no cutaway; the gag
+  clips on `broll` beats and every other need stay.
+- The music's bar grid re-snapped the recipe's cut: one-second audience
+  gags came out at 2.08s on a 115 BPM bed. With a recipe pinned the
+  storyboard pass does not quantize; the recipe is the measured cut and
+  the bed ducks under the voice.
+- `checkBoardAgainstRecipe` now holds a scene named for its beat to that
+  beat's own range, so the over-long beats are reported by name.
+
+What is NOT fixed by code: the writer over-writes the beats (14 words on a
+3.5s promise, 19 on the big picture), so the board runs 59s against a
+42-55s recipe. The take is the clock in creator-cut, so the recording
+decides; the block's word budgets are the lever, and a trim pass is the
+next step if the boards keep running long.

@@ -32,7 +32,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
-import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel } from "../core/recipes.js";
+import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe } from "../core/recipes.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2793,6 +2793,9 @@ async function runUnifiedPipeline(
     let touched = 0;
     for (const d of storyboard.scenes as any[]) touched += applyRecipeMotion(d, recipeObj, roleOfLabel(d.label, recipeObj));
     if (touched) console.log(`  Recipe motion: ${touched} enter/exit(s) set from "${recipeObj.id}"`);
+    let pruned = 0;
+    for (const d of storyboard.scenes as any[]) pruned += pruneNeedsByRecipe(d, recipeObj);
+    if (pruned) console.log(`  Recipe needs: ${pruned} b-roll ask(s) dropped from person beats (the take is the footage)`);
   }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
@@ -3096,7 +3099,13 @@ async function runUnifiedPipeline(
   // proj_efc4ae45: type cards lengthened to 2.0-3.0s so the lines finish
   // revealing and hold long enough to read came back at 1.5s, cutting mid-
   // reveal again, because the build re-snapped them to the old track's grid.
-  if (beatMap && !opts.presetStoryboard) {
+  // NOT with a recipe either: the recipe IS the measured cut (one-second
+  // gags, a 1.3s breather); snapping it to the music's bars inflated every
+  // short beat to a bar (measured live, proj_f20bd5da: the audience gags at
+  // 2.08s on a 115 BPM bed). The bed ducks under the voice; the cut leads.
+  if (beatMap && !opts.presetStoryboard && recipeObj) {
+    console.log(`  Recipe "${recipeObj.id}": beat grid available (${beatMap.bpm} BPM) but NOT quantizing -- the recipe's cut is the edit.`);
+  } else if (beatMap && !opts.presetStoryboard) {
     quantizeScenesToBars(storyboard.scenes, beatMap.barSec, grammarSceneCap);
   } else if (beatMap) {
     console.log(`  Build-from-board: beat grid available (${beatMap.bpm} BPM, bar=${beatMap.barSec.toFixed(2)}s) but NOT re-quantizing -- the approved durations are the edit.`);
