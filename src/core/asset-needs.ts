@@ -202,8 +202,11 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
     let idx = comps.findIndex((c, i) => !taken.has(i) && isScreenSlate(c) && (c as any).data.need === need.description);
     if (idx < 0) idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
       && isProofSurface((c as any).type) && (c as any).type !== "image" && (c as any).type !== "video");
-    const data: Record<string, unknown> = { src: need.path, object_fit: "cover" };
-    if (media === "image") data.drift = false;
+    // A SCREEN IS SHOWN WHOLE: contain on the slot's plate, never cover
+    // (measured live, proj_179c8dfa: a 16:10 tab recording on a 16:9 slot
+    // lost its sidebar and its right edge to the crop).
+    const data: Record<string, unknown> = { src: need.path, object_fit: "contain" };
+    if (media === "image") { data.drift = false; data.fit = "contain"; }
     if (idx >= 0) {
       const mock: any = comps[idx];
       comps[idx] = {
