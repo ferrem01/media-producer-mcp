@@ -203,6 +203,21 @@ export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: bo
 }
 
 /** The beat role a scene label carries ("Proof - Memory" -> "proof"). */
+/** A person beat's footage is the TAKE: a b-roll ask on a beat whose shot
+ *  is "person" with no cutaway is the writer sourcing the place as stock
+ *  footage (measured live, proj_421b06e9 and proj_f20bd5da: "handheld
+ *  shot of a man walking ... talking to camera" on every beat). Dropped;
+ *  the gag clips on broll beats and every other need stay. Returns what
+ *  was dropped. */
+export function pruneNeedsByRecipe(scene: { label?: unknown; assets?: any[] }, r: Recipe): number {
+  const role = roleOfLabel(scene.label, r);
+  const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+  if (!beat || beat.shot !== "person" || beat.cutaway || !Array.isArray(scene.assets)) return 0;
+  const before = scene.assets.length;
+  scene.assets = scene.assets.filter((a) => !(a && typeof a === "object" && a.type === "stock_footage"));
+  return before - scene.assets.length;
+}
+
 export function roleOfLabel(label: unknown, r: Recipe): string | undefined {
   const s = String(label || "").toLowerCase();
   const roles = r.spine.map((b) => b.role.toLowerCase());

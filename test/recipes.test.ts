@@ -65,6 +65,19 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const offRole = checkBoardAgainstRecipe(gags, a);
     expect(offRole.some((w) => /Scene 1 \(audience\) runs 2\.5s; that beat runs 0\.8-1\.5s\./.test(w))).toBe(true);
     expect(offRole.some((w) => /Scene 2 \(breather\)/.test(w))).toBe(false);
+    // A person beat's footage is the take: its b-roll ask is dropped; a broll beat keeps its gag clip.
+    const { pruneNeedsByRecipe } = await import("../src/core/recipes.js");
+    const person = { label: "PROMISE - get on Quotient", assets: [{ type: "stock_footage", description: "handheld shot of a man walking, talking to camera" }, { type: "camera_video", description: "the take" }] };
+    expect(pruneNeedsByRecipe(person, a)).toBe(1);
+    expect(person.assets.map((x) => x.type)).toEqual(["camera_video"]);
+    const gag = { label: "AUDIENCE - the founder", assets: [{ type: "stock_footage", description: "a dog in a lanyard" }, { type: "camera_video", description: "the take" }] };
+    expect(pruneNeedsByRecipe(gag, a)).toBe(0);
+    const feature = { label: "FEATURE - Memory", assets: [{ type: "stock_footage", description: "x" }, { type: "screen_recording", description: "y" }] };
+    expect(pruneNeedsByRecipe(feature, a)).toBe(0);
+    // The pipeline runs the prune in the recipe pass and leaves the bar grid alone with a recipe pinned.
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/pruned \+= pruneNeedsByRecipe\(d, recipeObj\);/);
+    expect(pipeline).toMatch(/if \(beatMap && !opts\.presetStoryboard && recipeObj\) \{/);
     const bad = { scenes: [{ duration_seconds: 20, voiceover_text: "word ".repeat(80) }, { duration_seconds: 4, voiceover_text: "x" }] };
     const off = checkBoardAgainstRecipe(bad, r);
     expect(off.join(" ")).toMatch(/wants 4-7 scenes; the board has 2/);
