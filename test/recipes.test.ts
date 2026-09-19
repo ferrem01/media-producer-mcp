@@ -61,6 +61,10 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(scene.components[2].exit).toEqual({ effect: "fade", duration: 0.25 });
     expect(scene.components[3].enter).toBeUndefined();
     expect(scene.camera_fixed).toBe(true);
+    // the recipe's fixed camera clears a move the writer authored anyway
+    const moved: any = { label: "Proof - Zoom", components: [], camera_moves: [{ at: 3, type: "zoom", scale: 1.2, duration: 4 }] };
+    expect(applyRecipeMotion(moved, r, "proof")).toBe(1);
+    expect(moved.camera_moves).toEqual([]); expect(moved.camera_fixed).toBe(true);
     const k = getRecipe("speaker-kinetic-claims")!;
     const s2: any = { components: [{ type: "kinetic-text", data: {} }] };
     applyRecipeMotion(s2, k, "claim");

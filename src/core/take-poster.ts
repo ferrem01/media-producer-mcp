@@ -23,3 +23,21 @@ export async function ensureTakePoster(project: Project, take: Take, dataDir: st
   if (!ok) { console.warn(`  take poster failed for ${take.id}`); return null; }
   return posterFile;
 }
+
+/** A still for any provided clip on the board (a screen recording, b-roll),
+ *  one second in, cached beside the thumbnails: the card is a file:// page
+ *  and cannot play the clip, so it wears this frame. */
+export async function ensureMediaPoster(project: Pick<Project, "tenant_id" | "project_id">, src: string, dataDir: string): Promise<string | null> {
+  const posterDir = path.join(dataDir, project.tenant_id, "projects", project.project_id, "thumbs");
+  const key = path.basename(src).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const posterFile = path.join(posterDir, `media-poster-${key}.jpg`);
+  try { await fs.access(posterFile); return posterFile; } catch { /* make it */ }
+  await fs.mkdir(posterDir, { recursive: true });
+  const ok = await new Promise<boolean>((resolve) => {
+    execFile("ffmpeg", ["-y", "-loglevel", "error", "-ss", "1", "-i", resolveVideoPath(src, dataDir), "-frames:v", "1", "-vf", "scale=-2:720", "-q:v", "3", posterFile],
+      (err) => resolve(!err));
+  });
+  if (!ok) { console.warn(`  media poster failed for ${path.basename(src)}`); return null; }
+  return posterFile;
+}
+

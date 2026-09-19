@@ -439,9 +439,18 @@ async function clearArmedNeed(tenantId: string, match?: { project_id: string; sc
  *  request, so Studio shows it on the next load). Null on a board with no
  *  built scene yet -- there the build casts it. */
 function recastInBuiltScene(project: Project, sceneIndex: number, need: AssetRequirement, prevPath: string | undefined): { changed: number; how: string } | null {
-  const built = project.scenes?.[sceneIndex];
-  if (!built || need.type === "camera_video") return null;
+  if (need.type === "camera_video") return null;
   const personFilm = personCarries((project.treatment as any)?.filmGrammar);
+  // The BOARD scene too: the card and the components band read the board,
+  // and the build reads it next (measured live, proj_179c8dfa: the built
+  // scene carried the recording while the card still showed the slate).
+  const board = project.storyboard?.scenes?.[sceneIndex];
+  if (board) {
+    const rb = recastProvidedNeed(board as any, need, prevPath, { personFilm });
+    if (rb.changed) (board as any).components = rb.components;
+  }
+  const built = project.scenes?.[sceneIndex];
+  if (!built) return null;
   const r = recastProvidedNeed(built, need, prevPath, { personFilm });
   if (r.changed) built.components = r.components as any;
   return { changed: r.changed, how: r.how };

@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
-  probeTake, orientedDims, reframeCrop, measureLoudness, sanitizeTake, TAKE_LOUDNESS_TARGET_LUFS, SOFT_LOOK_FILTER,
+  probeTake, orientedDims, reframeCrop, reframePad, measureLoudness, sanitizeTake, TAKE_LOUDNESS_TARGET_LUFS, SOFT_LOOK_FILTER,
 } from "../src/core/take-sanitize.js";
 
 const run = promisify(execFile);
@@ -63,6 +63,12 @@ describe("the take sanitizer", () => {
   it("reframes only a take WIDER than the canvas, to the center column at the canvas aspect", () => {
     expect(reframeCrop({ width: 1920, height: 1080 }, { width: 1080, height: 1920 })).toEqual({ w: 608, h: 1080, x: 656, y: 0 });
     expect(reframeCrop({ width: 1080, height: 1920 }, { width: 1080, height: 1920 })).toBeNull(); // fits
+    // A take TALLER than the canvas is pillarboxed, never cropped or zoomed
+    // (measured live: a phone take on a 16:9 film came through as a face).
+    expect(reframeCrop({ width: 1080, height: 1920 }, { width: 1920, height: 1080 })).toBeNull();
+    expect(reframePad({ width: 1080, height: 1920 }, { width: 1920, height: 1080 })).toEqual({ w: 608, h: 1080 });
+    expect(reframePad({ width: 1080, height: 1920 }, { width: 1080, height: 1920 })).toBeNull(); // fits
+    expect(reframePad({ width: 1920, height: 1080 }, { width: 1080, height: 1920 })).toBeNull(); // wider: the crop's job
     expect(reframeCrop({ width: 1078, height: 1920 }, { width: 1080, height: 1920 })).toBeNull(); // near enough
     expect(reframeCrop({ width: 1080, height: 1920 }, { width: 1920, height: 1080 })).toBeNull(); // taller: never crop a head off
     expect(reframeCrop({ width: 1920, height: 1080 }, { width: 1920, height: 1080 })).toBeNull();
@@ -136,3 +142,13 @@ describe("the take sanitizer", () => {
     expect([after.width, after.height]).toEqual([480, 270]); // no canvas given: upright, unreframed
   });
 });
+
+describe("the pillarbox is baked into the take", () => {
+  it("the sanitizer pads a tall take to the canvas on a dark field and records the mode", async () => {
+    const src = await import("node:fs/promises").then((f) => f.readFile("src/core/take-sanitize.ts", "utf8"));
+    expect(src).toMatch(/const pad = canvas && !crop \? reframePad\(oriented, canvas\) : null;/);
+    expect(src).toMatch(/pad=\$\{canvas\.width\}:\$\{canvas\.height\}:\(ow-iw\)\/2:\(oh-ih\)\/2:color=\$\{PILLARBOX_COLOR\}/);
+    expect(src).toMatch(/mode: "pillarbox" as const/);
+  });
+});
+

@@ -169,7 +169,7 @@ function fx(spec: { in?: string; in_s?: number; out?: string; out_s?: number } |
  *  pills (sticker-prop), lower-thirds and provided cutaways take the
  *  recipe's enter/exit unless the writer set one; a fixed camera marks the
  *  scene so no punch-in is invented. Returns how many components changed. */
-export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: boolean }, r: Recipe, role?: string): number {
+export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: boolean; camera_moves?: unknown[] }, r: Recipe, role?: string): number {
   let n = 0;
   const el = r.motion?.elements || {};
   for (const c of (scene.components || []) as any[]) {
@@ -186,7 +186,13 @@ export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: bo
   const cam = r.motion?.camera || {};
   const roleCam = role ? cam[role] : undefined;
   const fixed = roleCam ? roleCam === "fixed" : r.layers?.camera === "fixed";
-  if (fixed) scene.camera_fixed = true;
+  if (fixed) {
+    scene.camera_fixed = true;
+    // The recipe's camera wins over the writer's: a fixed beat carries no
+    // move at all (measured live, proj_179c8dfa: a zoom authored on the
+    // Zoom beat of a fixed-camera recipe).
+    if (Array.isArray((scene as any).camera_moves) && (scene as any).camera_moves.length) { (scene as any).camera_moves = []; n++; }
+  }
   return n;
 }
 

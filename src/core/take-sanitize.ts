@@ -18,8 +18,11 @@
  *     portrait request). When the upright take is WIDER than the film's
  *     canvas, the center column at the canvas aspect is cropped and scaled
  *     to the canvas -- the picture the speaker was looking at. A take
- *     taller than the canvas is left alone (cropping a head off the top is
- *     worse than a pillarbox).
+ *     TALLER than the canvas (a phone take on a 16:9 film) is PILLARBOXED:
+ *     scaled to the canvas height and padded to its width on a dark field,
+ *     so the film shows the whole portrait with side bars. Left alone it
+ *     went through <video> as object-fit: cover and zoomed into the face
+ *     (measured live, proj_179c8dfa).
  *
  *  3. A QUIET VOICE. A phone at arm's length in a room lands around -35
  *     LUFS; dialogue that will carry a film wants about -16. Two-pass linear
@@ -60,7 +63,7 @@ export interface TakeSanitizeResult {
   /** Upright dimensions of the take BEFORE any reframe. */
   oriented: { width: number; height: number };
   /** Set when the wide take was center-cropped to the canvas frame. */
-  reframed?: { from: string; to: string };
+  reframed?: { from: string; to: string; mode?: "crop" | "pillarbox" };
   /** The grade that was applied. */
   look?: TakeLook;
   /** Integrated loudness before, and the target it was normalized to (absent
@@ -111,6 +114,21 @@ export function orientedDims(p: Pick<TakeProbe, "width" | "height" | "rotation">
 /** The crop that turns an upright take WIDER than the canvas into the
  *  canvas frame: the center column at the canvas aspect. Null when the take
  *  already fits (same aspect) or is taller than the canvas. */
+/** The pad for a take taller than the canvas: its height fits the canvas,
+ *  the width is filled with the field color either side. */
+export const PILLARBOX_COLOR = "0x0c0d12";
+export function reframePad(
+  take: { width: number; height: number },
+  canvas: { width: number; height: number },
+): { w: number; h: number } | null {
+  const takeAspect = take.width / take.height;
+  const canvasAspect = canvas.width / canvas.height;
+  if (Math.abs(takeAspect - canvasAspect) / canvasAspect <= ASPECT_TOLERANCE) return null;
+  if (takeAspect >= canvasAspect) return null;
+  const w = Math.round((canvas.height * takeAspect) / 2) * 2;
+  return { w, h: canvas.height };
+}
+
 export function reframeCrop(
   take: { width: number; height: number },
   canvas: { width: number; height: number },
@@ -168,6 +186,7 @@ export async function sanitizeTake(
   const bake = rotation !== 0;
   const oriented = orientedDims(probe);
   const crop = canvas ? reframeCrop(oriented, canvas) : null;
+  const pad = canvas && !crop ? reframePad(oriented, canvas) : null;
   const grade = look === "soft";
 
   let measured: number | null = null;
@@ -183,16 +202,17 @@ export async function sanitizeTake(
     loudness: measured === null ? undefined : { measured_lufs: round1(measured) },
     probe,
   };
-  if (!bake && !crop && !normalize && !grade) return base;
+  if (!bake && !crop && !pad && !normalize && !grade) return base;
 
   const ext = path.extname(filePath) || ".mp4";
   const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
   // ffmpeg applies the rotation tag on decode (autorotate, every version),
   // so a re-encode stores the frames upright with an identity matrix.
   const args = ["-y", "-i", filePath, "-map", "0:v:0"];
-  if (bake || crop || grade) {
+  if (bake || crop || pad || grade) {
     const vf: string[] = [];
     if (crop && canvas) vf.push(`crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`, `scale=${canvas.width}:${canvas.height}`);
+    if (pad && canvas) vf.push(`scale=${pad.w}:${pad.h}`, `pad=${canvas.width}:${canvas.height}:(ow-iw)/2:(oh-ih)/2:color=${PILLARBOX_COLOR}`);
     if (grade) vf.push(SOFT_LOOK_FILTER);
     if (vf.length) args.push("-vf", vf.join(","));
     args.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p");
@@ -228,7 +248,7 @@ export async function sanitizeTake(
   return {
     ...base,
     look: grade ? "soft" : undefined,
-    reframed: crop && canvas ? { from: `${oriented.width}x${oriented.height}`, to: `${canvas.width}x${canvas.height}` } : undefined,
+    reframed: (crop || pad) && canvas ? { from: `${oriented.width}x${oriented.height}`, to: `${canvas.width}x${canvas.height}`, ...(pad ? { mode: "pillarbox" as const } : {}) } : undefined,
     loudness: measured === null ? undefined : { measured_lufs: round1(measured), normalized_to_lufs: normalizedTo },
     probe: await probeTake(filePath),
   };
