@@ -7105,6 +7105,15 @@ ${QUOTIENT_CSS}
     var html = '<div class="sp-head"><span class="sp-title"><b>' + escHtml(label) + '</b>' +
       (seg ? (implicit ? '' : ' — segment ' + (segIndex + 1) + ' of ' + segs.length) : ' — frozen tail') + '</span>' +
       '<button class="sp-x" id="mp-x">✕</button></div>';
+    // THE SLOT IS THE NEED, here too (Marc looked for the b-roll swap on the
+    // timeline block, not the canvas): this footage is a need the board
+    // asked for -- offer its card, the same one the canvas click opens.
+    var needHit = needForVideoSrc(p, si, v.getAttribute('src') || '');
+    if (needHit) {
+      var nh = needHit.need, nhHave = nh.status === 'provided' && nh.path;
+      html += '<div class="sp-row" style="align-items:center;gap:8px;margin-bottom:7px;"><span class="sp-status" style="flex:1;margin:0;">The <b>' + escHtml(NP_KIND[nh.type] || nh.type) + '</b> the board asked for' + (nh.description ? ' — “' + escHtml(String(nh.description).slice(0, 60)) + '”' : '') + '</span>' +
+        '<button class="rv-go secondary" id="mp-slot" style="flex:0 0 auto;">' + (nhHave ? 'Replace…' : 'Provide…') + '</button></div>';
+    }
     if (implicit) {
       html += '<div class="sp-region" style="margin-bottom:7px;">Park the playhead where a boring bit starts, then <b>Split</b>. Speed up or remove the pieces you don\\'t need — your narration never moves.</div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -7149,6 +7158,8 @@ ${QUOTIENT_CSS}
     if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.top = py + 'px';
     document.getElementById('mp-x').addEventListener('click', camPopClose);
+    var slotBtn = document.getElementById('mp-slot');
+    if (slotBtn) slotBtn.addEventListener('click', function() { camPopClose(); openNeedInEditor(needHit.si, needHit.ai); });
     var compressBtn = document.getElementById('mp-compress');
     if (compressBtn) compressBtn.addEventListener('click', function() {
       camPopClose();
@@ -9232,6 +9243,14 @@ ${QUOTIENT_CSS}
     }
     if (found < 0) return null;
     return { si: si, ai: found, need: needs[found] };
+  }
+  // A video on the media lane, by its file: the board's need it fills.
+  function needForVideoSrc(project, si, src) {
+    if (!project || !project.storyboard || !src) return null;
+    var base = String(src).split('?')[0].split('/').pop();
+    var sb = (project.storyboard.scenes || [])[si]; if (!sb || !base) return null;
+    var ai = (sb.assets || []).findIndex(function(a) { return a && a.path && String(a.path).split('?')[0].split('/').pop() === base; });
+    return ai >= 0 ? { si: si, ai: ai, need: sb.assets[ai] } : null;
   }
   function openNeedInEditor(si, ai) {
     openStoryboardEditor();

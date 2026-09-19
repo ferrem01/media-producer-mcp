@@ -101,6 +101,10 @@ describe("the sources: every need is collected its own way, in the board", () =>
     expect(desktop).toMatch(/function openNeedInEditor\(si, ai\) \{\s*openStoryboardEditor\(\);/);
     expect(desktop).toMatch(/slotRowHtml\(sel\) \+/);
     expect(desktop).toMatch(/item\(\(have \? 'Replace the ' : 'Provide the '\)/);
+    // ...and the footage block on the timeline (where Marc looked for it) offers the same card.
+    expect(desktop).toMatch(/function needForVideoSrc\(project, si, src\)/);
+    expect(desktop).toMatch(/var needHit = needForVideoSrc\(p, si, v\.getAttribute\('src'\) \|\| ''\);/);
+    expect(desktop).toMatch(/id="mp-slot"/);
   });
 
   it("a b-roll provided on the board is the scene's ground on the next build of a film nobody carries", async () => {
