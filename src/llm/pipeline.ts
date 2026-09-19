@@ -31,6 +31,7 @@ import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
+import { castBoardStandIns } from "../core/board-standins.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -3129,6 +3130,12 @@ async function runUnifiedPipeline(
       }
     }
     project.status = "storyboard";
+    // THE BOARD CARRIES ITS STAND-INS: the screen slate is on the board from
+    // the start (the card, the band and the film agree; the build swaps files).
+    try {
+      const st = await castBoardStandIns(project, config.dataDir);
+      if (st.cast) console.log(`  Storyboard: ${st.cast} screen slate(s) cast on the board (scenes ${st.scenes.map((i) => i + 1).join(", ")})`);
+    } catch (e: any) { console.warn(`  Storyboard: stand-ins not cast (${e?.message || e})`); }
     project.created_at = new Date().toISOString();
     project.updated_at = new Date().toISOString();
     await saveProject(project);

@@ -44,6 +44,7 @@ import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries } from "./core/take-needs.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
+import { castBoardStandIns } from "./core/board-standins.js";
 import { sanitizeTake } from "./core/take-sanitize.js";
 import { TraceBuilder } from "./trace/index.js";
 // generateComponent / saveGeneratedComponent used by pipeline internally
@@ -828,6 +829,7 @@ export function queueSurgicalSceneOp(
     try { catalog = await buildComponentCatalog(config.componentLibDir, tenantComponentsDir(tenantId)); } catch { catalog = undefined; }
     const scene = await reviseDraftSceneSurgical(project, op, llmConfig, catalog);
     project.updated_at = new Date().toISOString();
+    try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
     await saveProject(project);
     j.progress = { step: "storyboard-cards", percent: 75, detail: "Photographing the storyboard" };
     try {
@@ -1354,6 +1356,7 @@ export function createMcpServer(): McpServer {
           scene.assets[asset_index].path = path;
         }
 
+        try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         // The stills must follow the data: a direct board edit re-photographs

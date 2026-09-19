@@ -36,7 +36,7 @@ import fsSync from "node:fs";
  */
 export function settledMoment(draft: {
   duration_seconds?: number;
-  components?: Array<{ data?: Record<string, unknown> }>;
+  components?: Array<{ data?: Record<string, unknown>; enter?: unknown }>;
   scene_template?: { type?: string };
 }): number {
   const dur = Number(draft.duration_seconds) || 6;
@@ -45,6 +45,11 @@ export function settledMoment(draft: {
     const d = (c && c.data) || {};
     const at = Number((d as any).at);
     if (isFinite(at)) maxAt = Math.max(maxAt, at);
+    // A cut-in (the screen slate, a proof) is the scene's payoff: photograph
+    // inside its window, not the speaker before it.
+    const e: any = (c as any).enter;
+    const cutAt = e && typeof e === "object" && e.effect === "cut" ? Number(e.at) : NaN;
+    if (isFinite(cutAt) && cutAt > 0) maxAt = Math.max(maxAt, cutAt);
     const script = (d as any).script;
     if (Array.isArray(script)) {
       for (const a of script) {

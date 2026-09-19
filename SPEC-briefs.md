@@ -115,6 +115,14 @@ the picker closes), On your phone (the same take link as a QR code,
 drawn on this server by `core/qr.ts` because the link carries the
 token; `GET /api/take-qr/{tenant}/{project}?scene=N`), and Upload.
 
+**The board carries its stand-ins.** The screen slate is cast on the
+board the moment the board is written or edited (`castBoardStandIns`,
+`core/board-standins.ts`, from the storyboard save, the surgical revise
+and the direct board edit), on any grammar; on a person film its word
+anchors are resolved at speaking pace right away and re-resolved against
+the take's spine when it lands. The card photographs a cut-in inside its
+window. The build then only swaps files into slots.
+
 **The Recorder handoff.** "Record with the Recorder" on a screen slot
 arms it (SPEC-recorder.md, the armed need): the extension opens already
 pointed at that project and need, and the recording that lands fills the
