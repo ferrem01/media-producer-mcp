@@ -3947,3 +3947,12 @@ What is NOT fixed by code: the writer over-writes the beats (14 words on a
 42-55s recipe. The take is the clock in creator-cut, so the recording
 decides; the block's word budgets are the lever, and a trim pass is the
 next step if the boards keep running long.
+
+Third board (proj_8147620f), two more, same fix in code: a feature beat's
+"location" b-roll ask is dropped too (a beat carries b-roll only when the
+recipe says its footage is found: a broll shot or a stock_footage
+cutaway); a person beat keeps the person (`holdShotToRecipe` drops the
+scene template the writer reached for -- st-photo-close on the big
+picture, st-logo-close on the CTA -- since a card would cover the take);
+and the writer is no longer handed the music's bar grid when a recipe is
+pinned, so the beats are authored in the recipe's seconds.

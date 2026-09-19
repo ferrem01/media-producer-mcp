@@ -32,7 +32,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
-import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe } from "../core/recipes.js";
+import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe } from "../core/recipes.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2649,7 +2649,8 @@ async function runUnifiedPipeline(
       hasSpeakerTrack: personBase,
       referenceImages: processedRefs,
       treatment,
-      beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
+      // With a recipe the writer authors in the recipe's seconds, not bars.
+      beatGrid: beatMap && !recipeObj ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
       filmGrammar,
       world,
       recipe: recipeObj,
@@ -2795,7 +2796,8 @@ async function runUnifiedPipeline(
     if (touched) console.log(`  Recipe motion: ${touched} enter/exit(s) set from "${recipeObj.id}"`);
     let pruned = 0;
     for (const d of storyboard.scenes as any[]) pruned += pruneNeedsByRecipe(d, recipeObj);
-    if (pruned) console.log(`  Recipe needs: ${pruned} b-roll ask(s) dropped from person beats (the take is the footage)`);
+    if (pruned) console.log(`  Recipe needs: ${pruned} b-roll ask(s) dropped from beats whose footage is the take or the screen`);
+    for (const d of storyboard.scenes as any[]) { const t = holdShotToRecipe(d, recipeObj); if (t) console.log(`  Recipe shot: "${d.label || ""}" is a person beat -- the ${t} template is dropped, the person stays`); }
   }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
