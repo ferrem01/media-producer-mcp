@@ -81,6 +81,19 @@ describe("the wiring", () => {
   });
 });
 
+describe("a locked line survives the writer's typography", () => {
+  it("line breaks, emphasis stars and moved commas are not a dropped line", async () => {
+    const { missingLocks } = await import("../src/llm/brief-locks.js");
+    const locks = { quotes: ["One. Quotient now remembers your brand, your voice, and how you like to work, and it draws on that in every campaign, blog and email it writes with you.", "Two. Flows. A welcome series or a win-back, built as one automated flow that runs on its own once you turn it on."], sections: {} } as any;
+    const board = { scenes: [
+      { voiceover_text: "One.\nQuotient now *remembers* your brand, your voice, and how you like to work, and it draws on that in every campaign, blog and email it writes with you." },
+      { voiceover_text: "Two.\nFlows.\nA welcome series or a win-back, built as one automated flow that runs on its own, once you turn it on." },
+    ] };
+    expect(missingLocks(board, locks)).toEqual([]);
+    expect(missingLocks({ scenes: [{ voiceover_text: "Something else entirely." }] }, locks).length).toBe(2);
+  });
+});
+
 describe("the mock is the placeholder: a provided screen takes its slot on any film", () => {
   it("replaces the staged product mock with the recording at the same position, layer and timing; lays it full-bleed when there is no mock", async () => {
     const { castProvidedScreens } = await import("../src/core/asset-needs.js");
