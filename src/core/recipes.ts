@@ -150,6 +150,12 @@ export function checkBoardAgainstRecipe(board: { scenes: Array<{ label?: string;
   scenes.forEach((s, i) => {
     const dur = Number(s.duration_seconds) || 0;
     if (dur > maxHold + 1) out.push(`Scene ${i + 1} runs ${dur}s; no beat in the recipe runs past ${maxHold}s.`);
+    // A scene named for its beat is held to THAT beat's range (measured
+    // live, proj_421b06e9: the one-second audience gags written at 2.5s).
+    const role = roleOfLabel(s.label, r);
+    const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+    if (beat && dur > 0 && dur > beat.dur[2] + 0.5) out.push(`Scene ${i + 1} (${beat.role}) runs ${dur}s; that beat runs ${beat.dur[0]}-${beat.dur[2]}s.`);
+    else if (beat && dur > 0 && dur < beat.dur[0] - 0.5) out.push(`Scene ${i + 1} (${beat.role}) runs ${dur}s; that beat needs at least ${beat.dur[0]}s.`);
     const words = String(s.voiceover_text || "").trim().split(/\s+/).filter(Boolean).length;
     if (dur > 0 && words > wordBudget(dur, r.rhythm.wpm) * 1.25) out.push(`Scene ${i + 1} carries ${words} words in ${dur}s; at ${r.rhythm.wpm} wpm that is more than the beat can say.`);
   });

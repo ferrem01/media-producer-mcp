@@ -2888,13 +2888,26 @@ async function runUnifiedPipeline(
         // re-times them. The writer's *starred* words are the emphasis;
         // numbers tint by rule. A label is cast only when the writer cast
         // one; an empty cast is no longer filled from the scene's name.
+        // The recipe's caption style is read here (SPEC-recipes.md): a
+        // "scatter" recipe (the Air cut) lands each phrase at its own
+        // spot around the person; every other style is the plated lane.
+        const capStyle = String((recipeObj as any)?.layers?.captions?.style || "");
+        const wantMode = capStyle === "scatter" ? "scatter" : "";
+        // A lane THIS pass cast earlier (id "captions": a board built before
+        // the recipe's style reached the build, or the recipe changed) is
+        // recast when its mode disagrees; the writer's own lane is kept.
+        const castLane = (d.components as any[]).find((c) => c && typeof c === "object" && c.type === "reel-caption-lane" && c.id === "captions");
+        if (castLane && String(castLane.data?.mode || "") !== wantMode) {
+          d.components = (d.components as any[]).filter((c) => c !== castLane);
+          console.log(`  Creator-cut: scene ${i + 1} -- the cast lane is recast as ${wantMode || "plated"} (the recipe's style)`);
+        }
         const hasLane = (d.components as any[]).some((c) => c && typeof c === "object" && c.type === "reel-caption-lane");
         if (!hasLane && spine.words.length) {
-          const lane = captionLane(spine, Array.isArray(d.emphasis) ? d.emphasis.map(String) : []);
+          const lane = captionLane(spine, Array.isArray(d.emphasis) ? d.emphasis.map(String) : [], { style: capStyle });
           if (lane) {
             d.components.push(lane);
             const marked = (lane.data.phrases as any[]).filter((p) => /\*/.test(String(p.text))).length;
-            console.log(`  Creator-cut: scene ${i + 1} -- captions from the ${spine.source} words: ${(lane.data.phrases as any[]).length} phrases, ${marked} with an emphasis`);
+            console.log(`  Creator-cut: scene ${i + 1} -- captions from the ${spine.source} words: ${(lane.data.phrases as any[]).length} phrases, ${marked} with an emphasis${lane.data.mode ? ` (${lane.data.mode})` : ""}`);
           }
         }
       }

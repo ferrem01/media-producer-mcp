@@ -95,4 +95,41 @@ describe("captions from the take's words", () => {
     expect(ph[1].end).toBeCloseTo(3.35);
     expect(captionLane({ source: "asserted", words: [], duration: 3 })).toBeNull();
   });
+
+  // THE SCATTER LANE (the Air cut, SPEC-recipes.md presenter-location-hop):
+  // a recipe whose captions layer says "scatter" gets phrases of three
+  // words at most, no plate, that land at their own spot and stay.
+  it("a scatter recipe gets short unplated phrases in scatter mode; every other style the plated lane", () => {
+    const spine = assertedSpine("The big picture is that time once spent managing assets and collecting feedback goes back in your team's pocket.", 6);
+    const lane = captionLane(spine, [], { style: "scatter" })!;
+    expect(lane.type).toBe("reel-caption-lane");
+    expect(lane.data.mode).toBe("scatter");
+    expect(lane.data.scrim).toBe("shadow");
+    expect(lane.data.align).toBe("left");
+    expect(lane.data.max_font).toBe(72);
+    for (const p of lane.data.phrases as any[]) expect(p.text.split(/\s+/).length).toBeLessThanOrEqual(3);
+    expect((lane.data.phrases as any[]).length).toBeGreaterThanOrEqual(6);
+    // Anchored like any lane: a later take re-times every phrase edge.
+    expect(Object.keys(lane.anchors || {}).length).toBe((lane.data.phrases as any[]).length * 2);
+    const plain = captionLane(spine, [], { style: "pill" })!;
+    expect(plain.data.mode).toBeUndefined();
+    expect(plain.data.scrim).toBe("plate");
+    expect((plain.data.phrases as any[]).some((p) => p.text.split(/\s+/).length === 4)).toBe(true);
+  });
+});
+
+describe("the scatter lane's cut windows", () => {
+  it("the choreography flags each proof window with --mp-cut on a scatter lane, and moves a plated lane's top instead", async () => {
+    const { wrapperChoreoScript, isScatterLane } = await import("../src/core/scene-assembler.js");
+    const proof = { id: "screen_1", type: "video", position: { x: "0%", y: "0%", width: "100%", height: "100%" }, data: { src: "/x.mp4" }, enter: { effect: "cut", at: 2.5 }, exit: { effect: "cut", at: 5 } } as any;
+    const scatter = { id: "captions", type: "reel-caption-lane", position: { x: "0%", y: "0%", width: "100%", height: "100%" }, data: { mode: "scatter", phrases: [] } } as any;
+    expect(isScatterLane(scatter)).toBe(true);
+    const js = wrapperChoreoScript([proof, scatter], 8);
+    expect(js).toMatch(/"scatter":true/);
+    expect(js).toMatch(/master\.set\(el, \{ '--mp-cut': 1 \}, w\.at\)/);
+    expect(js).toMatch(/master\.set\(el, \{ '--mp-cut': 0 \}, w\.until\)/);
+    const plated = { id: "captions", type: "reel-caption-lane", position: { x: "5%", y: "20%", width: "90%", height: "12%" }, data: { phrases: [], cut_top: 70 } } as any;
+    expect(isScatterLane(plated)).toBe(false);
+    expect(wrapperChoreoScript([proof, plated], 8)).toMatch(/"cutTop":70/);
+  });
 });

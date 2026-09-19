@@ -33,6 +33,13 @@ export function isCutInProof(comp: { type: string; enter?: any }): boolean {
  *  proj_9e650f1a scenes 6-7: the captions in the platform strip). */
 const FIXED_TO_FRAME = new Set(["reel-caption-lane"]);
 export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
+/** The scatter caption lane (core/captions.ts, the Air cut): words around
+ *  the person that stay; over a cutaway the choreography flags the window
+ *  with --mp-cut and the lane's CSS moves the running phrase down. */
+export function isScatterLane(comp: { type?: string; data?: unknown }): boolean {
+  const d = comp && (comp as any).data;
+  return comp?.type === "reel-caption-lane" && !!d && typeof d === "object" && String((d as any).mode || "") === "scatter";
+}
 /** THE SPLIT (SPEC-creator-cut.md): a proof whose data says use:"split"
  *  owns the top band of a tall frame and is PINNED to the frame like the
  *  lane -- the rig slides the person under it, never it. */
@@ -686,7 +693,7 @@ export function wrapperChoreoScript(
     .filter((c) => { const e = animOf(c.enter); return !!e && e.effect === "cut" && typeof e.at === "number" && isProofSurface(c.type); })
     .map((c) => { const x = animOf(c.exit); return { at: Number((animOf(c.enter) as any).at), until: x && x.effect === "cut" && typeof x.at === "number" ? Number(x.at) : null }; });
   const moves = components
-    .filter((c) => c.pose || c.enter || c.exit || (c as any).data?.cut_top != null || (c as any).frame_anchor)
+    .filter((c) => c.pose || c.enter || c.exit || (c as any).data?.cut_top != null || (c as any).frame_anchor || isScatterLane(c))
     .map((c) => ({
       cid: `${cidPrefix}${c.id}`,
       pose: c.pose || null,
@@ -695,6 +702,7 @@ export function wrapperChoreoScript(
       frame: (c as any).frame_anchor || null,
       split: isSplitWrapper(c),
       cutTop: (c as any).data?.cut_top != null ? Number((c as any).data.cut_top) : null,
+      scatter: isScatterLane(c),
       top0: c.position && (c.position as any).y !== undefined ? String((c.position as any).y) : null,
       height0: c.position && (c.position as any).height !== undefined ? String((c.position as any).height) : null,
     }));
@@ -786,6 +794,15 @@ export function wrapperChoreoScript(
         CUTS.forEach(function(w) {
           master.set(el, { top: c.cutTop + '%', height: '12%' }, w.at);
           if (w.until != null) master.set(el, { top: c.top0, height: c.height0 || '12%' }, w.until);
+        });
+      }
+      // A SCATTER lane over a cutaway (the Air cut): its words leave their
+      // spots and the running phrase sits in the bottom band for the
+      // window. The lane's own CSS reads --mp-cut; nothing moves here.
+      if (c.scatter && CUTS.length) {
+        CUTS.forEach(function(w) {
+          master.set(el, { '--mp-cut': 1 }, w.at);
+          if (w.until != null) master.set(el, { '--mp-cut': 0 }, w.until);
         });
       }
       // A framed surface with no cut (a desktop mock owning a band of a

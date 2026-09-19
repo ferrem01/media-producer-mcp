@@ -27,6 +27,8 @@ export interface CaptionPhrase { text: string; start: number; end: number }
 
 /** Words per phrase and how long a phrase may run before it breaks. */
 const MAX_WORDS = 4;
+/** The scatter lane lands shorter phrases: one to three words per spot. */
+const SCATTER_MAX_WORDS = 3;
 const MAX_SPAN_S = 1.8;
 /** A silence this long between two words is a breath: the phrase breaks. */
 const BREATH_GAP_S = 0.6;
@@ -89,9 +91,10 @@ export function fallbackEmphasis(words: SpineWord[], brandWords: string[] = []):
  *  holds until the next begins (the lane never goes dark mid-claim); the
  *  last holds a beat past its word. Marked words are `*starred*` for the
  *  lane, stars OUTSIDE the token's punctuation so "brief." stays one word. */
-export function captionPhrases(spine: Spine, emphasis: string[] = []): CaptionPhrase[] {
+export function captionPhrases(spine: Spine, emphasis: string[] = [], opts: { maxWords?: number } = {}): CaptionPhrase[] {
   const words = (spine.words || []).filter((w) => normalizeToken(w.text));
   if (!words.length) return [];
+  const maxWords = opts.maxWords || MAX_WORDS;
   const em = new Set(emphasis.map(normalizeToken).filter(Boolean));
   const groups: SpineWord[][] = [];
   let cur: SpineWord[] = [];
@@ -100,7 +103,7 @@ export function captionPhrases(spine: Spine, emphasis: string[] = []): CaptionPh
     if (cur.length) {
       const first = cur[0], prev = cur[cur.length - 1];
       const breath = w.start - prev.end > BREATH_GAP_S;
-      if (cur.length >= MAX_WORDS || breath || w.end - first.start > MAX_SPAN_S) { groups.push(cur); cur = []; }
+      if (cur.length >= maxWords || breath || w.end - first.start > MAX_SPAN_S) { groups.push(cur); cur = []; }
     }
     cur.push(w);
     if (END_PUNCT.test(w.text.trim())) { groups.push(cur); cur = []; }
@@ -113,7 +116,7 @@ export function captionPhrases(spine: Spine, emphasis: string[] = []): CaptionPh
   for (let g = groups.length - 1; g > 0; g--) {
     const prev = groups[g - 1];
     if (groups[g].length !== 1 || END_PUNCT.test(prev[prev.length - 1].text.trim())) continue;
-    if (prev.length < MAX_WORDS) { groups[g - 1] = prev.concat(groups[g]); groups.splice(g, 1); }
+    if (prev.length < maxWords) { groups[g - 1] = prev.concat(groups[g]); groups.splice(g, 1); }
     else if (prev.length >= 3) { groups[g] = [prev[prev.length - 1]].concat(groups[g]); groups[g - 1] = prev.slice(0, -1); }
   }
   return groups.map((g, gi) => {
@@ -130,6 +133,12 @@ export interface CaptionLaneOpts {
   brandWords?: string[];
   /** Starting font size before the lane auto-fits (phone-scale default). */
   maxFont?: number;
+  /** The recipe's caption style (layers.captions.style). "scatter" (the Air
+   *  cut): each phrase lands at its own spot around the person and STAYS
+   *  until the cut, three words at most, no plate; over a cutaway the
+   *  running phrase sits in the bottom band. Anything else: the plated
+   *  chest-band lane, phrases replacing each other. */
+  style?: string;
 }
 
 /** The caption component for a scene: the lane, its phrases from the
@@ -139,7 +148,8 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
   const words = (spine.words || []).filter((w) => normalizeToken(w.text));
   if (!words.length) return null;
   const em = emphasis.length ? emphasis : fallbackEmphasis(words, opts.brandWords || []);
-  const phrases = captionPhrases(spine, em);
+  const scatter = opts.style === "scatter";
+  const phrases = captionPhrases(spine, em, { maxWords: scatter ? SCATTER_MAX_WORDS : MAX_WORDS });
   if (!phrases.length) return null;
   // Anchors: phrase i starts on its first word and ends where phrase i+1
   // starts (the same word), the last on its own last word's end plus the
@@ -166,7 +176,9 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
   return {
     id: "captions",
     type: "reel-caption-lane",
-    data: { phrases, scrim: "plate", align: "center", max_font: opts.maxFont || 84, min_font: 40 },
+    data: scatter
+      ? { phrases, mode: "scatter", scrim: "shadow", align: "left", max_font: opts.maxFont || 72, min_font: 34 }
+      : { phrases, scrim: "plate", align: "center", max_font: opts.maxFont || 84, min_font: 40 },
     anchors,
   };
 }

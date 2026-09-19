@@ -279,8 +279,10 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     // THE WORDS ARE ON SCREEN THE WHOLE TIME: the captions come from the scene's spine as the existing lane; an
     // empty cast is NO LONGER filled with a label from the scene's name (Marc: "I don't like chapter labels as a default").
     expect(pipeline).not.toMatch(/is cast from the scene's name/);
-    expect(pipeline).toMatch(/const lane = captionLane\(spine, Array\.isArray\(d\.emphasis\) \? d\.emphasis\.map\(String\) : \[\]\);/);
+    expect(pipeline).toMatch(/const lane = captionLane\(spine, Array\.isArray\(d\.emphasis\) \? d\.emphasis\.map\(String\) : \[\], \{ style: capStyle \}\);/);
     expect(pipeline).toMatch(/c\.type === "reel-caption-lane"\);\s*if \(!hasLane && spine\.words\.length\)/);
+    // A cast lane whose mode disagrees with the recipe's style is recast; the writer's own lane is kept.
+    expect(pipeline).toMatch(/c\.id === "captions"\);\s*if \(castLane && String\(castLane\.data\?\.mode \|\| ""\) !== wantMode\) \{/);
     // ...carried from the board to the saved storyboard.
     expect(pipeline).toMatch(/emphasis: \(s as any\)\.emphasis/);
     // A STICKER NAMES THE THING, ON THE WORD, UNTIL THE PROOF (measured live: a pill at 0.2s flashing for a second).
@@ -368,7 +370,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(asm).toMatch(/var CUTS = \$\{JSON\.stringify\(cuts\)\};/);
     expect(asm).toMatch(/master\.set\(el, \{ top: c\.cutTop \+ '%', height: '12%' \}, w\.at\);\s*if \(w\.until != null\) master\.set\(el, \{ top: c\.top0, height: c\.height0 \|\| '12%' \}, w\.until\);/);
     const gen0 = await read("../src/llm/scene-generator.ts");
-    expect(gen0).toMatch(/if \(c\.type === "reel-caption-lane" && tallFrame && lay && parseFloat\(String\(lay\.position\.y\)\) < 50\) data\.cut_top = 70;/);
+    expect(gen0).toMatch(/if \(c\.type === "reel-caption-lane" && tallFrame && lay && parseFloat\(String\(lay\.position\.y\)\) < 50 && String\(data\.mode \|\| ""\) !== "scatter"\) data\.cut_top = 70;/);
     // Under a plate or a shadow the lane's ink is white whatever the brand says (measured live: "black on black").
     const lane = await read("../src/components/captions/reel-caption-lane.component.html");
     expect(lane).toMatch(/\.rcl-scrim-shadow \.rcl-inner,\s*\.rcl-scrim-plate \.rcl-inner \{\s*color: #ffffff;\s*\}/);
@@ -456,7 +458,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(liftNotes.some((n) => /emphasis lifted off the lines: brief, quotient/.test(n))).toBe(true);
     // The layout: the lane owns the chest band above the proof and a label, and the band is not handed out twice.
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/if \(c\.type !== "reel-caption-lane"\) return;\s*if \(vertical && !takeover\) \{[\s\S]*?z_index: 41 \};\s*laneLower = !!lb\.lower;/);
+    expect(gen).toMatch(/if \(c\.type !== "reel-caption-lane"\) return;[\s\S]*?=== "scatter"\) \{ slots\[i\] = \{ position: pct\(0, 0, 100, 100\), z_index: 41 \}; return; \}\s*if \(vertical && !takeover\) \{[\s\S]*?z_index: 41 \};\s*laneLower = !!lb\.lower;/);
     expect(gen).toMatch(/var usedLower = laneLower, usedTop = laneTop;\s*if \(bands\.lower && stack\.length && !laneLower\) \{/);
   });
 

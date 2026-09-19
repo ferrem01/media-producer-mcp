@@ -3900,3 +3900,27 @@ menu grows by two, the test pins their bands (6-9 and 9-17 scenes) and
 their word budgets. The scatter caption style and the per-scene take are
 described to the writer in the block; making the assembler lay words
 where they are said is the next step if the board asks for it.
+
+## The scatter lane: the recipe's caption style reaches the build
+
+The Air recipe says `captions.style: "scatter"` and, until now, only the
+writer read it: the build cast the same plated chest-band lane for every
+creator-cut film. Marc: go.
+
+- `captionLane(spine, emphasis, { style })` -- the pipeline passes the
+  recipe's `layers.captions.style`. "scatter" groups three words at most
+  per phrase (`captionPhrases` takes `maxWords`) and casts the lane with
+  `mode: "scatter"`, a shadow instead of a plate, left-aligned, 72px.
+- `reel-caption-lane` learned the mode: each phrase gets its own spot
+  (eight spots, left and right columns stepping down the frame from 5%
+  to 64%), pops in word by word and STAYS; the ninth phrase clears the
+  board. The phrase before the running one is marked `--rcl-old`.
+- The lane owns the whole frame (scene generator: full-frame slot, no
+  `cut_top`); over a cutaway the choreography sets `--mp-cut: 1` on the
+  wrapper for the window (`isScatterLane`, scene-assembler) and the
+  lane's CSS collapses every spot to the bottom band with only the
+  running phrase visible -- the reference keeps the words at the foot of
+  a full-frame screen.
+- Verified in Chromium over an Air frame with a 2.6-5.2s cut window: the
+  words accumulate around the person, the window shows one phrase low,
+  everything returns when the person does. The plated lane is untouched.
