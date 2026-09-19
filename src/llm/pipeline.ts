@@ -2234,6 +2234,11 @@ function storyboardToSaved(
       // rebuilding an approved storyboard silently dropped every travel the
       // reviewer signed off on.
       camera_moves: s.camera_moves,
+      // The ground, carried: a scene with no person under it (a chapter on
+      // white, a wordmark card) is opaque -- the recipe pass sets it and
+      // the take-need rule reads it (measured live, proj_87b44c22: the flag
+      // set, saved away, every chapter asked for a take again).
+      ...((s as any).transparent_background === false ? { transparent_background: false } : {}),
       voiceover_text: s.voiceover_text,
       // The writer's emphasis words, carried: the captions tint them.
       ...(Array.isArray((s as any).emphasis) && (s as any).emphasis.length ? { emphasis: (s as any).emphasis } : {}),

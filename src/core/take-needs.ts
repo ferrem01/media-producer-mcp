@@ -37,6 +37,15 @@ export function ensureSpeakerNeeds(project: Project): boolean {
     const script = String(scene.voiceover_text || "").trim();
     if (!script) return;
     if (!Array.isArray(scene.assets)) { scene.assets = []; changed = true; }
+    // NO PERSON UNDER IT: an opaque scene (a recipe's chapter on white, a
+    // type card) is spoken over, not spoken on camera -- it takes no take.
+    // A need added earlier is withdrawn unless a take already landed on it.
+    if ((scene as any).transparent_background === false) {
+      const before = scene.assets.length;
+      scene.assets = scene.assets.filter((a) => !(a.type === "camera_video" && a.description === TAKE_NEED_DESCRIPTION && a.status !== "provided"));
+      if (scene.assets.length !== before) changed = true;
+      return;
+    }
     let need = scene.assets.find((a) => a.type === "camera_video" && a.description === TAKE_NEED_DESCRIPTION);
     const active = activeTake(project, i);
     if (!need) {
