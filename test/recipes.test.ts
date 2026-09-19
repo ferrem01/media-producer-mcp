@@ -59,6 +59,12 @@ describe("the recipe: the measured cut of a film with the content removed", () =
       { duration_seconds: 7, voiceover_text: "Every one of these came from you. Keep telling us." },
     ] };
     expect(checkBoardAgainstRecipe(good, r)).toEqual([]);
+    // A scene named for its beat is held to that beat's own range.
+    const a = getRecipe("presenter-location-hop")!;
+    const gags = { scenes: [{ label: "AUDIENCE - the founder", duration_seconds: 2.5, voiceover_text: "The founder doing their own marketing." }, { label: "BREATHER - outtake", duration_seconds: 1.3, voiceover_text: "(pause)" }] };
+    const offRole = checkBoardAgainstRecipe(gags, a);
+    expect(offRole.some((w) => /Scene 1 \(audience\) runs 2\.5s; that beat runs 0\.8-1\.5s\./.test(w))).toBe(true);
+    expect(offRole.some((w) => /Scene 2 \(breather\)/.test(w))).toBe(false);
     const bad = { scenes: [{ duration_seconds: 20, voiceover_text: "word ".repeat(80) }, { duration_seconds: 4, voiceover_text: "x" }] };
     const off = checkBoardAgainstRecipe(bad, r);
     expect(off.join(" ")).toMatch(/wants 4-7 scenes; the board has 2/);

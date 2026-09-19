@@ -41,7 +41,7 @@
         "keyword:scatter",
         "stamp:wordmark@end"
       ],
-      "note": "New place. The answer; the product's name lands as the wordmark on its word."
+      "note": "New place for the take. The answer; the product's name lands as the wordmark on its word."
     },
     {
       "role": "audience",
@@ -77,7 +77,7 @@
       "enters": [
         "keyword:scatter"
       ],
-      "note": "New place. What to do and what goes away; the words land one at a time where they are said and stay for the beat."
+      "note": "New place for the take. What to do and what goes away; the words land one at a time where they are said and stay for the beat."
     },
     {
       "role": "proof-line",
@@ -90,7 +90,7 @@
       "enters": [
         "keyword:scatter"
       ],
-      "note": "New place. One measurable line (live in a day)."
+      "note": "New place for the take. One measurable line (live in a day)."
     },
     {
       "role": "breather",
@@ -188,7 +188,7 @@
       "enters": [
         "keyword:scatter"
       ],
-      "note": "New place. Book a demo; the ask as the last words on screen."
+      "note": "New place for the take. Book a demo; the ask as the last words on screen."
     },
     {
       "role": "close",
@@ -228,7 +228,7 @@
       "on": null
     },
     "take": {
-      "locations": "a new place on every cut; the person is the constant",
+      "locations": "a new place on every cut; the person is the constant. The place is where the TAKE is recorded, never a b-roll ask: no stock footage of the person or of the place",
       "framing": "close, mid and wide, varied by beat",
       "mic": "handheld, to camera"
     },
@@ -291,7 +291,7 @@
   "asks": {
     "take": "one clip per beat, each in a different place (a per-scene take, not one continuous)",
     "screens": "one per feature beat",
-    "broll": "one gag clip per audience and ease beat",
+    "broll": "one gag clip per audience and ease beat (an animal, a road) and NOTHING else -- never b-roll of the person or the place",
     "images": 0
   },
   "latitude": {

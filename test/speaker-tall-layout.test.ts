@@ -25,6 +25,19 @@ const AUTHORED = [
   { type: "floating-pills", data: { items: ["Email", "Ads"] } },
 ];
 
+describe("the scatter lane on a tall speaker frame", () => {
+  it("owns the whole frame, pinned, and is never dropped to the chest band over a cutaway", () => {
+    const comps = build({ width: 1080, height: 1920 }, [
+      { type: "reel-caption-lane", data: { mode: "scatter", phrases: [{ text: "The big picture", start: 0.2 }, { text: "is that time", start: 1.1 }] } },
+      { type: "sticker-prop", data: { kind: "stamp", text: "?", at: 3 } },
+    ]);
+    const lane = comps.find((c) => c.type === "reel-caption-lane");
+    expect(lane.position).toEqual({ x: "0%", y: "0%", width: "100%", height: "100%" });
+    expect(lane.z_index).toBe(41);
+    expect(lane.data.cut_top).toBeUndefined();
+  });
+});
+
 describe("a speaker scene on a TALL frame", () => {
   const comps = build({ width: 1080, height: 1920 }, AUTHORED);
   const by = (t: string) => comps.find((c) => c.type === t);

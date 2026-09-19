@@ -94,6 +94,42 @@
     margin: 0;
   }
 
+  /* ── Scatter (the Air cut) ────────────────────────────────────────────
+     The lane owns the whole frame. Each phrase has its own spot (--rcl-x /
+     --rcl-y / --rcl-w, set by the script: left and right columns, stepping
+     down the frame) and STAYS until the cut. Over a cutaway the
+     choreography sets --mp-cut: 1 on the wrapper: every spot collapses to
+     the bottom band and only the running phrase (--rcl-old: 0) shows, the
+     way the reference keeps the words at the foot of a full-frame screen. */
+  .rcl-scatter .rcl-phrase {
+    display: block;
+    align-items: initial;
+    justify-content: initial;
+  }
+
+  .rcl-scatter .rcl-pos {
+    position: absolute;
+    left: calc(var(--rcl-x, 4%) * (1 - var(--mp-cut, 0)) + 5% * var(--mp-cut, 0));
+    top: calc(var(--rcl-y, 6%) * (1 - var(--mp-cut, 0)) + 76% * var(--mp-cut, 0));
+    width: calc(var(--rcl-w, 48%) * (1 - var(--mp-cut, 0)) + 90% * var(--mp-cut, 0));
+    opacity: calc(1 - var(--mp-cut, 0) * var(--rcl-old, 0));
+  }
+
+  .rcl-scatter .rcl-inner {
+    font-size: 72px;
+    font-weight: 500;
+    line-height: 1.0;
+    letter-spacing: -0.03em;
+    text-align: left;
+    text-wrap: pretty;
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 6px 28px rgba(0, 0, 0, 0.4);
+  }
+
+  .rcl-scatter .rcl-pos.rcl-r .rcl-inner {
+    text-align: right;
+  }
+
   .rcl-kicker {
     position: absolute;
     left: 0;
@@ -126,6 +162,13 @@
     var scrim = (data && data.scrim) || 'none';
     if (scrim === 'shadow') root.classList.add('rcl-scrim-shadow');
     else if (scrim === 'plate') root.classList.add('rcl-scrim-plate');
+    // Scatter (the Air cut): phrases accumulate at their own spots instead
+    // of replacing each other in one box.
+    var scatter = !!(data && data.mode === 'scatter');
+    if (scatter) root.classList.add('rcl-scatter');
+    // Eight spots: left / right columns, stepping down the frame. A ninth
+    // phrase clears the board and starts over at the top.
+    var SPOTS = 8;
 
     var maxFont = (data && data.max_font) || 104;
     var minFont = (data && data.min_font) || 44;
@@ -171,7 +214,20 @@
       wrap.className = 'rcl-phrase';
       var inner = document.createElement('div');
       inner.className = 'rcl-inner';
-      wrap.appendChild(inner);
+      var pos = null;
+      if (scatter) {
+        pos = document.createElement('div');
+        var k = built.length % SPOTS;
+        var right = k % 2 === 1;
+        pos.className = 'rcl-pos' + (right ? ' rcl-r' : '');
+        pos.style.setProperty('--rcl-x', right ? '48%' : '4%');
+        pos.style.setProperty('--rcl-y', (5 + k * 8.5) + '%');
+        pos.style.setProperty('--rcl-w', '48%');
+        pos.appendChild(inner);
+        wrap.appendChild(pos);
+      } else {
+        wrap.appendChild(inner);
+      }
       stack.appendChild(wrap);
 
       // *starred* spans mark emphasis. Split on the stars FIRST so a phrase
@@ -195,7 +251,7 @@
       if (!words.length) { stack.removeChild(wrap); continue; }
 
       built.push({
-        wrap: wrap, inner: inner, words: words,
+        wrap: wrap, inner: inner, words: words, pos: pos,
         start: Number(p.start) || 0,
         end: (p.end != null ? Number(p.end) : (Number(p.start) || 0) + 2.4),
       });
@@ -214,10 +270,20 @@
       var fs = maxFont;
       it.inner.style.fontSize = fs + 'px';
       var guard = 0;
-      while (guard++ < 40 && fs > minFont &&
-        (it.inner.scrollHeight > boxH || it.inner.scrollWidth > boxW + 1)) {
-        fs = Math.round(fs * 0.92);
-        it.inner.style.fontSize = fs + 'px';
+      if (scatter) {
+        // A spot is a column, two lines tall at most; a wide word shrinks.
+        var colW = it.pos ? it.pos.clientWidth : boxW * 0.48;
+        while (guard++ < 40 && fs > minFont &&
+          (it.inner.scrollHeight > fs * 2.3 || it.inner.scrollWidth > colW + 1)) {
+          fs = Math.round(fs * 0.92);
+          it.inner.style.fontSize = fs + 'px';
+        }
+      } else {
+        while (guard++ < 40 && fs > minFont &&
+          (it.inner.scrollHeight > boxH || it.inner.scrollWidth > boxW + 1)) {
+          fs = Math.round(fs * 0.92);
+          it.inner.style.fontSize = fs + 'px';
+        }
       }
       it.fontSize = fs;
     }
@@ -225,6 +291,29 @@
     // ── Timeline ───────────────────────────────────────────────────────────
     var rise = ctx.motion === 'minimal' ? 0.42 : ctx.motion === 'punchy' ? 0.3 : 0.36;
     var stepBase = ctx.motion === 'minimal' ? 0.07 : ctx.motion === 'punchy' ? 0.055 : 0.06;
+
+    if (scatter) {
+      // Each phrase pops in word by word at its spot and STAYS. The phrase
+      // before it is marked old (hidden only over a cutaway). Every SPOTS
+      // phrases the board clears and the next one starts at the top.
+      for (var q = 0; q < built.length; q++) {
+        var sp2 = built[q];
+        var span2 = Math.max(0.3, sp2.end - sp2.start);
+        var step2 = Math.min(0.22, Math.max(0.05, (span2 * 0.7) / Math.max(1, sp2.words.length)));
+        if (q > 0 && q % SPOTS === 0) {
+          for (var o = q - SPOTS; o < q; o++) tl.to(built[o].wrap, { autoAlpha: 0, duration: 0.18, ease: 'power2.in' }, Math.max(0, sp2.start - 0.2));
+        }
+        if (q > 0 && built[q - 1].pos) tl.set(built[q - 1].pos, { '--rcl-old': 1 }, sp2.start);
+        tl.set(sp2.wrap, { autoAlpha: 1, y: 0 }, sp2.start);
+        for (var v = 0; v < sp2.words.length; v++) {
+          tl.fromTo(sp2.words[v],
+            { autoAlpha: 0, y: 16, scale: 0.72 },
+            { autoAlpha: 1, y: 0, scale: 1, duration: 0.26, ease: 'back.out(2)', immediateRender: false },
+            sp2.start + v * step2);
+        }
+      }
+      return tl;
+    }
 
     for (var j = 0; j < built.length; j++) {
       var itm = built[j];

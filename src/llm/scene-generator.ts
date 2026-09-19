@@ -752,6 +752,11 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     var laneRest: { top: number; bottom: number } | null = null;
     authored.forEach((c, i) => {
       if (c.type !== "reel-caption-lane") return;
+      // THE SCATTER LANE (the Air cut, core/captions.ts): the words land
+      // around the person anywhere in the frame, so the lane owns the
+      // whole frame and places its own phrases; over a cutaway its CSS
+      // reads --mp-cut from the choreography, not cut_top.
+      if ((c as any).data && String((c as any).data.mode || "") === "scatter") { slots[i] = { position: pct(0, 0, 100, 100), z_index: 41 }; return; }
       if (vertical && !takeover) {
         // The chest band; with the face low in the frame (no room under
         // the chin) the band above the hairline. The words win the band:
@@ -1236,7 +1241,7 @@ export function buildAuthoredCompositionScene(
     // live, proj_f10e79cf: "the text is just cracked out over the main part
     // of the screen"). The lane drops to the chest band for every cut
     // window (wrapperChoreoScript reads cut_top).
-    if (c.type === "reel-caption-lane" && tallFrame && lay && parseFloat(String(lay.position.y)) < 50) data.cut_top = 70;
+    if (c.type === "reel-caption-lane" && tallFrame && lay && parseFloat(String(lay.position.y)) < 50 && String(data.mode || "") !== "scatter") data.cut_top = 70;
     // A cutaway on a tall frame is framed on the region it performs in --
     // and so is any desktop surface that owns the width of a tall frame
     // with no person under it (canvas-tour, tempo-cut on 9x16: measured

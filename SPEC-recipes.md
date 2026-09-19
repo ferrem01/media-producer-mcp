@@ -63,7 +63,14 @@ Two things the seventh and sixth taught: a recipe can have no take at all
 (`asks.take: "none"`, the on-screen type is the voice, `layers.voice:
 "type"`), and a take can be per scene rather than continuous (the Air ad:
 a new place on every cut, so the take is one clip per beat). Both are
-read by the writer from the block; nothing in the build changed.
+read by the writer from the block. The build reads ONE layer word so far:
+`layers.captions.style: "scatter"` casts the caption lane in scatter mode
+(`core/captions.ts`): three words at most per phrase, each landing at its
+own spot around the person (left and right columns stepping down the
+frame) and staying until the cut; over a cutaway the choreography flags
+the window with `--mp-cut` and the lane's CSS drops the running phrase to
+the bottom band, the way the Air ad keeps the words at the foot of a
+full-frame screen. Every other style is the plated chest-band lane.
 
 | id | grammar | frame | from | shape |
 |---|---|---|---|---|

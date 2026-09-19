@@ -31,6 +31,11 @@
       "label": "Floor the auto-fit will not shrink past (default 44)",
       "optional": true
     },
+    "mode": {
+      "type": "string",
+      "label": "Mode: stack (default: one phrase at a time, replacing) | scatter (each phrase lands at its own spot around the person and STAYS until the cut; over a cutaway the running phrase sits in the bottom band -- the lane must own the whole frame)",
+      "optional": true
+    },
     "scrim": {
       "type": "string",
       "label": "Scrim over live footage: none (default, for a flat brand field) | shadow (text-shadow only) | plate (translucent blurred card behind each phrase -- the burned-in caption look)",
