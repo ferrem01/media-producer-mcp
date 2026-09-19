@@ -3861,3 +3861,13 @@ was committed, the board matched its spine, every stamp and lower-third
 carried its motion; the take's measured spine stretched two beats past
 the recipe's max (the take is the clock, by design).
 
+## The fit is on the footage popover
+
+Marc: "is fit something we can expose on the video component?" It was
+already in the component's data (`object_fit`); what was missing was a
+switch and an address. The footage popover now carries Fill / Whole,
+written through the component PATCH route; a screen cast by the build
+gets an id (`screen_<n>`), and a component cast without one (the films
+before this) is addressed as `idx:<n>`. Provided screens default to
+Whole (#836); providing the same screen again refits an older one.
+

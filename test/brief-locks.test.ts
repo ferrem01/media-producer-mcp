@@ -110,11 +110,14 @@ describe("the mock is the placeholder: a provided screen takes its slot on any f
     const r = castProvidedScreens(scene);
     expect(r.replaced).toBe(1); expect(r.added).toBe(0);
     expect(r.components[1]).toMatchObject({ id: "campaign", type: "video", data: { src: "/assets/t/projects/p/assets/campaign.mp4", object_fit: "contain" }, position: { y: "18%", height: "70%" }, z_index: 10, enter: { effect: "cut", at: 1 } });
+    // a cast screen always has an id (Studio's fit switch addresses it)
+    const noId = castProvidedScreens({ components: [{ type: "quotient-home", data: {} }], assets: [{ type: "screen_recording", description: "x", status: "provided", path: "/a/h.mp4" }] } as any);
+    expect(noId.components[0].id).toBe("screen_1");
     expect(r.components[0].type).toBe("webgl-backdrop");
     // No mock: full-bleed, like any provided proof. A pending need casts nothing.
     const r2 = castProvidedScreens({ components: [{ type: "kinetic-text", data: {} }], assets: [{ type: "screenshot", description: "x", status: "provided", path: "/a/s.png", at: 2, until: 5 }] } as any);
     expect(r2.added).toBe(1);
-    expect(r2.components[1]).toMatchObject({ type: "image", data: { src: "/a/s.png", drift: false, fit: "contain", at: 2, exit_at: 5 }, position: { width: "100%", height: "100%" } });
+    expect(r2.components[1]).toMatchObject({ id: "screen_2", type: "image", data: { src: "/a/s.png", drift: false, fit: "contain", at: 2, exit_at: 5 }, position: { width: "100%", height: "100%" } });
     expect(castProvidedScreens({ components: [{ type: "quotient-home", data: {} }], assets: [{ type: "screen_recording", description: "x", status: "needed" }] } as any).replaced).toBe(0);
   });
   it("the screen slate: an open screen need takes the mock's slot with a slate, never the mock; the recording then takes the slate's slot", async () => {
@@ -200,4 +203,15 @@ describe("the mock is the placeholder: a provided screen takes its slot on any f
     expect(sb).toMatch(/ANY FILM for screen_recording \/ screenshot: wherever a scene stages a product mock as its payoff/);
     expect(sb).toMatch(/REAL SCREENS -- a scene whose payoff is a product mock also lists/);
   });
+
+  it("the fit is on the footage popover: Fill / Whole writes object_fit, by id or by index for an older cast", async () => {
+    const desktop = await read("src/preview-app/preview-app.ts");
+    expect(desktop).toMatch(/function compForVideoSrc\(scene, src\)/);
+    expect(desktop).toMatch(/return \{ comp: c, key: c\.id \|\| \('idx:' \+ i\) \};/);
+    expect(desktop).toMatch(/class="rv-go secondary mp-fit[\s\S]*?data-fit="cover"[\s\S]*?data-fit="contain"/);
+    expect(desktop).toMatch(/\{ data: \{ object_fit: fit \} \}/);
+    const index = await read("src/index.ts");
+    expect(index).toMatch(/const compByIdx = !comp && \/\^idx:\\d\+\$\/\.test\(compId\) \? \(scene\.components \|\| \[\]\)\[Number\(compId\.slice\(4\)\)\] : undefined;/);
+  });
 });
+

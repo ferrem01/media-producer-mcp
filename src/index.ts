@@ -3513,17 +3513,21 @@ Rules:
         const scene = project.scenes.find((s: any) => s.id === sceneId);
         if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
         const comp = (scene.components || []).find((c: any) => c.id === compId);
-        if (!comp) { jsonResponse(res, 404, { error: "Component not found" }); return; }
+        // A component cast without an id (a provided screen on an older film)
+        // is addressed as "idx:<n>", its index in the scene's cast.
+        const compByIdx = !comp && /^idx:\d+$/.test(compId) ? (scene.components || [])[Number(compId.slice(4))] : undefined;
+        const compT = comp || compByIdx;
+        if (!compT) { jsonResponse(res, 404, { error: "Component not found" }); return; }
         if (body.data && typeof body.data === "object") {
-          (comp as any).data = { ...((comp as any).data || {}), ...(body.data as Record<string, unknown>) };
+          (compT as any).data = { ...((compT as any).data || {}), ...(body.data as Record<string, unknown>) };
           // A number set by hand wins over the word it used to follow.
           clearAnchorsFor(comp as any, Object.keys(body.data as object));
         }
         // Stage-lane fields (SPEC-motion-architecture L4): pose/enter/exit/
         // position live on the wrapper, not in data. null clears a field.
         for (const k of ["pose", "enter", "exit", "position"]) {
-          if (body[k] === null) delete (comp as any)[k];
-          else if (body[k] !== undefined) (comp as any)[k] = body[k];
+          if (body[k] === null) delete (compT as any)[k];
+          else if (body[k] !== undefined) (compT as any)[k] = body[k];
         }
         project.updated_at = new Date().toISOString();
         await saveProject(project);
