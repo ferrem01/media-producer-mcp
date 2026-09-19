@@ -3807,3 +3807,18 @@ reference decoder; the link carries the tenant token so it is never sent
 out to be drawn), and Upload. The header's Record link on the board card
 became the same two buttons.
 
+## The board carries its stand-ins: the screen slate is cast when the board is written
+
+Marc, on the 16:9 creator-cut board: scene 5 asks for a speaker and a
+screencast but the card and the components show only the speaker. It
+was not a blip: on a person film the proof was a need only, cast at
+build; on a film nobody carries the writer cast a mock. Now
+`castBoardStandIns` runs at every board save (the storyboard-only save
+in the pipeline, the surgical revise, the direct board edit) and casts
+the screen slate for every open screen need on any grammar; on a person
+film `spineForScene` + `retimeSceneWith` turn the need's word anchors
+into seconds at speaking pace (the anchors stay on the component for the
+take's measured spine), with the creator-cut default window when the
+script does not carry the word. `settledMoment` photographs a cut-in
+inside its window, so the card shows the slate.
+
