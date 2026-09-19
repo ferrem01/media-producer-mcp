@@ -3987,3 +3987,14 @@ Fix: the next scene's words are searched only after at least half the
 previous scene's words have been said, and a window shorter than a
 breath counts as not found (proportional fallback). Marc's take was
 re-split on the deployed fix.
+
+## Contiguous take windows play through the cut
+
+After the re-split Marc heard a tiny hiccup at 17.9s, the cut between
+scenes 5 and 6. "Record all" cuts one file into windows that meet end to
+start, so at the cut the preview's camera element is already where the
+next window begins; the composite still seeked it there, and seeking a
+playing video to its own position stalls it for a few frames -- a small
+repeat at every cut. The preview now seeks only when the jump is real
+(more than 0.12s: a de-aired gap, a scrub). The render was never affected
+(the speaker base is concatenated by ffmpeg).

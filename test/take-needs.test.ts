@@ -246,4 +246,10 @@ describe("a continuous speaker track keeps no scene markers", () => {
     expect(studio).toMatch(/function refreshDraftStills\(v\) \{[\s\S]*?img\.dv-still, img\.dv-rail-thumb/);
     expect(studio).toMatch(/'\?v=' \+ encodeURIComponent\(state\.cardsV \|\| project\.updated_at \|\| ''\)/);
   });
+
+  it("contiguous windows of one recording play through the cut: the preview seeks only when the jump is real", async () => {
+    const fs = await import("node:fs/promises");
+    const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
+    expect(studio).toMatch(/if \(Math\.abs\(curT - cutT\) > 0\.12\) \{\s*try \{ el\.currentTime = cutT; \}/);
+  });
 });
