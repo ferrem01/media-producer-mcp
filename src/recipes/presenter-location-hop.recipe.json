@@ -1,0 +1,346 @@
+{
+  "id": "presenter-location-hop",
+  "name": "Presenter: location hop",
+  "grammar": "creator-cut",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "a product pitch with personality",
+    "who it is for and what it replaces",
+    "a founder with a mic and a day outside",
+    "book a demo"
+  ],
+  "length_s": [
+    42,
+    55
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "dur": [
+        3,
+        3.5,
+        4
+      ],
+      "enters": [
+        "stamp:logo-wall"
+      ],
+      "note": "The person walks and asks the question; the customers' logos are typed around them in a wall."
+    },
+    {
+      "role": "answer",
+      "shot": "person",
+      "dur": [
+        2,
+        2.5,
+        3
+      ],
+      "enters": [
+        "keyword:scatter",
+        "stamp:wordmark@end"
+      ],
+      "note": "New place. The answer; the product's name lands as the wordmark on its word."
+    },
+    {
+      "role": "audience",
+      "shot": "broll",
+      "dur": [
+        0.8,
+        1,
+        1.5
+      ],
+      "repeat": [
+        1,
+        2
+      ],
+      "enters": [
+        "keyword:scatter"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "kind": "stock_footage"
+      },
+      "note": "Who it is for, one role per cut, each over a gag clip (an animal looking at camera); a second each."
+    },
+    {
+      "role": "promise",
+      "shot": "person",
+      "dur": [
+        3,
+        3.5,
+        4.5
+      ],
+      "enters": [
+        "keyword:scatter"
+      ],
+      "note": "New place. What to do and what goes away; the words land one at a time where they are said and stay for the beat."
+    },
+    {
+      "role": "proof-line",
+      "shot": "person",
+      "dur": [
+        1.5,
+        2,
+        3
+      ],
+      "enters": [
+        "keyword:scatter"
+      ],
+      "note": "New place. One measurable line (live in a day)."
+    },
+    {
+      "role": "breather",
+      "shot": "person",
+      "dur": [
+        1,
+        1.3,
+        1.8
+      ],
+      "repeat": [
+        1,
+        3
+      ],
+      "enters": [],
+      "note": "A kept outtake: the person far away in a wide shot, saying something to the crew; no type. One after each section."
+    },
+    {
+      "role": "feature",
+      "shot": "person+cutaway",
+      "dur": [
+        4,
+        4.5,
+        5.5
+      ],
+      "repeat": [
+        2,
+        3
+      ],
+      "enters": [
+        "keyword:scatter"
+      ],
+      "cutaway": {
+        "at": "product_name",
+        "hold": 0.7,
+        "exit_before": "next_beat",
+        "use": "cutaway",
+        "kind": "screen_recording"
+      },
+      "note": "The person opens the line in a new place; the screen cuts in full-frame on the product's name and holds the rest; the words keep landing at the bottom over the screen."
+    },
+    {
+      "role": "prop",
+      "shot": "person",
+      "dur": [
+        3,
+        4,
+        5
+      ],
+      "enters": [
+        "keyword:scatter",
+        "sticker:props"
+      ],
+      "note": "The feature made literal on the world: its UI pieces (tags, chips, cards) stuck around the person as they say it."
+    },
+    {
+      "role": "big-picture",
+      "shot": "person",
+      "dur": [
+        4.5,
+        5.5,
+        6.5
+      ],
+      "enters": [
+        "keyword:scatter"
+      ],
+      "note": "The longest hold, one place: the payoff sentence accumulates across the frame word by word."
+    },
+    {
+      "role": "ease",
+      "shot": "broll",
+      "dur": [
+        0.8,
+        1,
+        1.5
+      ],
+      "enters": [
+        "keyword:scatter"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "kind": "stock_footage"
+      },
+      "note": "A gag clip on the easy line, then the person walking off."
+    },
+    {
+      "role": "cta",
+      "shot": "person",
+      "dur": [
+        2.5,
+        3,
+        4
+      ],
+      "enters": [
+        "keyword:scatter"
+      ],
+      "note": "New place. Book a demo; the ask as the last words on screen."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "dur": [
+        3.5,
+        4.2,
+        5
+      ],
+      "enters": [
+        "stamp:url",
+        "stamp:wordmark"
+      ],
+      "note": "A wide shot, the person small and seated; the URL and the wordmark hold to the end; an outtake line may play under it."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 2.5,
+    "max_hold_s": 6,
+    "wpm": 180,
+    "first_cut_by_s": 3.5,
+    "end_card_s": 4
+  },
+  "layers": {
+    "captions": {
+      "style": "scatter",
+      "words": 1,
+      "pos": "around-person",
+      "through_cutaways": true,
+      "note": "each spoken word lands where it is said, staggered around the person, and stays until the cut; white display sans, no plate"
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "take": {
+      "locations": "a new place on every cut; the person is the constant",
+      "framing": "close, mid and wide, varied by beat",
+      "mic": "handheld, to camera"
+    },
+    "humor": "kept outtakes and animal cutaways are part of the cut, not mistakes",
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": true
+    }
+  },
+  "motion": {
+    "elements": {
+      "keyword": {
+        "in": "pop",
+        "in_s": 0.15,
+        "per": "word",
+        "out": "cut"
+      },
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      },
+      "cutaway": {
+        "in": "cut",
+        "out": "cut"
+      },
+      "sticker": {
+        "in": "pop",
+        "in_s": 0.25,
+        "per": "item",
+        "out": "fade",
+        "out_s": 0.2
+      },
+      "end_card": {
+        "in": "fade",
+        "in_s": 0.4
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "answer": "fixed",
+      "audience": "fixed",
+      "promise": "fixed",
+      "proof-line": "fixed",
+      "breather": "fixed",
+      "feature": "fixed",
+      "prop": "fixed",
+      "big-picture": "fixed",
+      "ease": "fixed",
+      "cta": "fixed",
+      "close": "fixed"
+    },
+    "physics": "punchy"
+  },
+  "asks": {
+    "take": "one clip per beat, each in a different place (a per-scene take, not one continuous)",
+    "screens": "one per feature beat",
+    "broll": "one gag clip per audience and ease beat",
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "proof-line",
+      "breather",
+      "prop",
+      "ease"
+    ],
+    "fixed": [
+      "hook",
+      "answer",
+      "cta",
+      "close"
+    ],
+    "may_double": [
+      "audience",
+      "feature",
+      "breather"
+    ]
+  },
+  "source": {
+    "film": "air.hq_DbKSoGJAjhr",
+    "length_s": 50.4,
+    "frame": "9x16",
+    "cuts_s": [
+      3.4,
+      5.8,
+      7.3,
+      8.8,
+      9.3,
+      12.8,
+      13.3,
+      15.3,
+      17.0,
+      18.5,
+      21.9,
+      25.9,
+      27.2,
+      29.1,
+      30.3,
+      33.2,
+      33.7,
+      39.0,
+      40.0,
+      41.9,
+      44.9,
+      46.2
+    ],
+    "measured": "2026-09-19"
+  }
+}

@@ -5,18 +5,41 @@ import path from "node:path";
 const read = (p: string) => fs.readFile(path.join(process.cwd(), p), "utf8");
 
 describe("the recipe: the measured cut of a film with the content removed", () => {
-  it("the library loads five valid recipes, each under one grammar with proven frames and a measured source", async () => {
+  it("the library loads seven valid recipes, each under one grammar with proven frames and a measured source", async () => {
     const { loadRecipes, validateRecipe, recipeSceneBand } = await import("../src/core/recipes.js");
     const rs = loadRecipes();
-    expect(rs.map((r) => r.id).sort()).toEqual(["founder-story-broll", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards"]);
+    expect(rs.map((r) => r.id).sort()).toEqual(["founder-story-broll", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
     for (const r of rs) {
       expect(validateRecipe(r)).toEqual([]);
-      expect(["creator-cut", "speaker"]).toContain(r.grammar);
+      expect(["creator-cut", "speaker", "hype-cut"]).toContain(r.grammar);
       expect(r.frames_proven.length).toBeGreaterThan(0);
       expect(r.source.measured).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       const band = recipeSceneBand(r); expect(band.min).toBeGreaterThan(0); expect(band.max).toBeGreaterThanOrEqual(band.min);
     }
     expect(validateRecipe({ id: "x" })).toContain("missing spine");
+  });
+  it("the story ad and the location hop: a hype-cut recipe with no person, and a creator-cut recipe that hops places", async () => {
+    const { getRecipe, recipeBlock, recipeSceneBand, recipesForGrammar } = await import("../src/core/recipes.js");
+    const g = getRecipe("story-ad-idea-beats")!;
+    expect(g.grammar).toBe("hype-cut");
+    expect(recipesForGrammar("hype-cut").map((r) => r.id)).toEqual(["story-ad-idea-beats"]);
+    expect(recipeSceneBand(g)).toEqual({ min: 6, max: 9 });
+    expect(g.asks.take).toBe("none");
+    expect((g.layers as any).voice).toBe("type");
+    const gb = recipeBlock(g, "9x16");
+    expect(gb).toMatch(/1\. HOOK -- type_card, 2s \(1\.5-2\.5s\), about 6 words \(never more than 7\)\./);
+    expect(gb).toMatch(/4\. PROOF -- screen, 2\.5s .* Cutaway \(card, mockup\): enters at start, holds 100% of the beat\./);
+    expect(gb).toMatch(/never drop or reorder: hook, pain, reveal, cta\./);
+    const a = getRecipe("presenter-location-hop")!;
+    expect(a.grammar).toBe("creator-cut");
+    expect(recipeSceneBand(a)).toEqual({ min: 9, max: 17 });
+    expect(a.spine.filter((b) => b.shot === "broll").map((b) => b.role)).toEqual(["audience", "ease"]);
+    expect(a.spine.find((b) => b.role === "feature")!.cutaway).toEqual({ at: "product_name", hold: 0.7, exit_before: "next_beat", use: "cutaway", kind: "screen_recording" });
+    expect((a.layers as any).captions.style).toBe("scatter");
+    expect(String(a.asks.take)).toMatch(/per-scene take/);
+    const ab = recipeBlock(a, "9x16");
+    expect(ab).toMatch(/7\. FEATURE -- person\+cutaway, 4\.5s \(4-5\.5s\), about 14 words \(never more than 17\) -- REPEAT 2-3 times, one scene each\./);
+    expect(ab).toMatch(/you may drop: proof-line, breather, prop, ease\./);
   });
   it("briefs the writer with the spine's seconds and word budgets, and checks a board against them", async () => {
     const { getRecipe, recipeBlock, checkBoardAgainstRecipe, wordBudget } = await import("../src/core/recipes.js");

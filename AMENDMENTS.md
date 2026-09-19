@@ -3871,3 +3871,32 @@ gets an id (`screen_<n>`), and a component cast without one (the films
 before this) is addressed as `idx:<n>`. Provided screens default to
 Whole (#836); providing the same screen again refits an older one.
 
+
+## Two more recipes: the story ad with no person, and the location hop
+
+Marc sent two films to add to the library. The Gamma story ad (16s, 9x16,
+no person, no voice) and the Air ad (50s, 9x16, a founder with a handheld
+mic in a new place on every cut).
+
+- **story-ad-idea-beats** is the first recipe on hype-cut, and the first
+  with no take: the on-screen line IS the voice (`layers.voice: "type"`,
+  `asks.take: "none"`), typed on word by word, one illustrated object per
+  beat sliding up under it. Feeling, pain over the object, wordmark
+  reveal, product output fanning in, a wordless drift, payoff, end card
+  with a pill button. Cut every 2.3s, nothing past 5s. Measured cuts at
+  2.0, 4.5, 6.5, 8.5, 10.0, 12.0.
+- **presenter-location-hop** is creator-cut. What makes it: the person is
+  the constant and the place changes on every cut (so the take is one
+  clip per beat, not continuous); each spoken word lands where it is said,
+  staggered around the person, and stays until the cut ("scatter"
+  captions, no plate); who-it-is-for over animal gag clips, a second
+  each; kept outtakes as one-second breathers between sections; screens
+  full-frame on the product's name with the words continuing at the
+  bottom; a wide shot with URL and wordmark to close. Cut every 2.5s,
+  the longest hold 5.5s, 180 wpm.
+
+Nothing in the build changed; the loader validates both, the director's
+menu grows by two, the test pins their bands (6-9 and 9-17 scenes) and
+their word budgets. The scatter caption style and the per-scene take are
+described to the writer in the block; making the assembler lay words
+where they are said is the next step if the board asks for it.

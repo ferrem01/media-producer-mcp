@@ -1,6 +1,6 @@
 # SPEC-recipes.md -- the recipe: the measured cut of a film with the content removed
 
-Status: shipped 2026-09-19 (library of five). Companion docs: `SPEC-creative-axes.md`
+Status: shipped 2026-09-19 (library of seven). Companion docs: `SPEC-creative-axes.md`
 (grammar), `SPEC-format-and-spine.md` (frame), `SPEC-creator-cut.md`, `SPEC-briefs.md`.
 
 ## Why
@@ -59,6 +59,12 @@ scene so no punch-in is invented).
 
 ## The library (measured 2026-09-19)
 
+Two things the seventh and sixth taught: a recipe can have no take at all
+(`asks.take: "none"`, the on-screen type is the voice, `layers.voice:
+"type"`), and a take can be per scene rather than continuous (the Air ad:
+a new place on every cut, so the take is one clip per beat). Both are
+read by the writer from the block; nothing in the build changed.
+
 | id | grammar | frame | from | shape |
 |---|---|---|---|---|
 | presenter-n-things | creator-cut | 16x9 | Clay, Jahnavi Shah, 65s | hook with lower-third and title stamp; "N things"; 2-4 proofs each with a stamp on the noun and a full-frame screen on the claim's verb; close with an end card |
@@ -66,6 +72,8 @@ scene so no punch-in is invented).
 | founder-story-broll | creator-cut | 9x16 | Lieberman, 44.6s | selfie hook; found footage of the team; the product in the top half while the person works; story turn; b-roll; close with a stamp on the last words |
 | speaker-kinetic-claims | speaker | 9x16 | Neil Jesani, 31.6s | seated expert; keywords typing on at the chest per claim; full-frame drawn idea cards for the numbers; a pill button CTA |
 | speaker-one-take-cards | speaker | 9x16 | Matt Rodin, 86s | one unbroken selfie; a persistent title card; floating cards over the person per point; micro captions; no cuts |
+| presenter-location-hop | creator-cut | 9x16 | Air, 50.4s | a person with a mic in a new place on every cut; each spoken word lands where it is said and stays; animal gag clips on the audience; kept outtakes as breathers; screens full-frame on the product's name; URL and wordmark to close |
+| story-ad-idea-beats | hype-cut | 9x16 | Gamma, 16s | no person: type is the voice, one illustrated object per beat (the clock, the balloons); feeling, pain, wordmark reveal, product output fanning in, payoff, end card with a pill button |
 
 ## Adding one
 
@@ -79,7 +87,7 @@ the system keeps the timing honest.
 ## Not yet
 
 - A measuring tool that drafts the recipe file from a film (today by hand).
-- Recipes for the other grammars (launch-film, tempo-cut, hype-cut,
-  editorial, data-story, canvas-tour, screencast).
+- Recipes for the other grammars (launch-film, tempo-cut, editorial,
+  data-story, canvas-tour, screencast). hype-cut has one.
 - Studio: a recipe picker and the recipe's beats drawn on the ruler.
 - The critique reading the recipe's motion as a rubric.

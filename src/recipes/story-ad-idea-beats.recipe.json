@@ -1,0 +1,247 @@
+{
+  "id": "story-ad-idea-beats",
+  "name": "Story ad: idea beats",
+  "grammar": "hype-cut",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "a story ad with no person",
+    "a feeling the viewer knows, then the fix",
+    "pain, product, payoff in fifteen seconds",
+    "sign up or start free"
+  ],
+  "length_s": [
+    14,
+    22
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "type_card",
+      "dur": [
+        1.5,
+        2,
+        2.5
+      ],
+      "enters": [
+        "keyword:type-on"
+      ],
+      "note": "The feeling, in four words or fewer, typed word by word on the world; no product yet."
+    },
+    {
+      "role": "pain",
+      "shot": "idea_card",
+      "dur": [
+        2,
+        2.5,
+        3.5
+      ],
+      "repeat": [
+        1,
+        2
+      ],
+      "enters": [
+        "keyword:type-on",
+        "object:slide-up"
+      ],
+      "note": "The problem as one line over the one object that stands for it (a clock for the hours); the object slides up under the words and holds; the ugly artifact may sit behind it."
+    },
+    {
+      "role": "reveal",
+      "shot": "screen",
+      "dur": [
+        1.5,
+        2,
+        2.5
+      ],
+      "enters": [
+        "stamp:wordmark"
+      ],
+      "note": "The product's wordmark lands big with its device in the world; no line."
+    },
+    {
+      "role": "proof",
+      "shot": "screen",
+      "dur": [
+        2,
+        2.5,
+        3.5
+      ],
+      "repeat": [
+        1,
+        2
+      ],
+      "enters": [
+        "keyword:type-on"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "use": "card",
+        "kind": "mockup"
+      },
+      "note": "What it does, one line; the product's real output (decks, pages) fans in beneath the words, never chrome alone."
+    },
+    {
+      "role": "lift",
+      "shot": "idea_card",
+      "dur": [
+        1,
+        1.5,
+        2
+      ],
+      "enters": [
+        "object:drift"
+      ],
+      "note": "Objects of the world drift across without words: a breath between proof and payoff."
+    },
+    {
+      "role": "payoff",
+      "shot": "type_card",
+      "dur": [
+        1.5,
+        2,
+        2.5
+      ],
+      "enters": [
+        "keyword:type-on"
+      ],
+      "note": "What the viewer gets back, four words; the last word lands alone."
+    },
+    {
+      "role": "cta",
+      "shot": "idea_card",
+      "dur": [
+        3.5,
+        4.5,
+        5.5
+      ],
+      "enters": [
+        "stamp:wordmark",
+        "button:cta",
+        "end_card@start"
+      ],
+      "note": "The wordmark over the last object, a pill button naming the ask, held to the end."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 2.3,
+    "max_hold_s": 5,
+    "wpm": 170,
+    "first_cut_by_s": 2,
+    "end_card_s": 4.5
+  },
+  "layers": {
+    "voice": "type",
+    "type": {
+      "style": "display-sans-heavy",
+      "pos": "top",
+      "per": "word",
+      "max_words": 8,
+      "note": "the on-screen line IS the voice; it types on word by word and holds until the cut"
+    },
+    "captions": {
+      "style": "none"
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "world": "one illustrated palette; one object per beat; the object moves, the camera does not",
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": false,
+      "feel": "driving"
+    }
+  },
+  "motion": {
+    "elements": {
+      "keyword": {
+        "in": "type-on",
+        "in_s": 0.12,
+        "per": "word",
+        "out": "cut"
+      },
+      "object": {
+        "in": "slide-up",
+        "in_s": 0.6,
+        "out": "cut"
+      },
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.35,
+        "out": "fade",
+        "out_s": 0.25
+      },
+      "cutaway": {
+        "in": "rise",
+        "in_s": 0.5,
+        "out": "cut"
+      },
+      "button": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "end_card": {
+        "in": "fade",
+        "in_s": 0.4
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "pain": "fixed",
+      "reveal": "fixed",
+      "proof": "fixed",
+      "lift": "fixed",
+      "payoff": "fixed",
+      "cta": "fixed"
+    },
+    "physics": "playful"
+  },
+  "asks": {
+    "take": "none",
+    "screens": 0,
+    "broll": 0,
+    "images": "one object per pain, lift and cta beat (hero_image, in the film's palette)",
+    "mockups": "the product's real output for the proof beat"
+  },
+  "latitude": {
+    "optional": [
+      "lift"
+    ],
+    "fixed": [
+      "hook",
+      "pain",
+      "reveal",
+      "cta"
+    ],
+    "may_double": [
+      "pain",
+      "proof"
+    ]
+  },
+  "source": {
+    "film": "meetgamma_story_ad",
+    "length_s": 16,
+    "frame": "9x16",
+    "cuts_s": [
+      2.0,
+      4.5,
+      6.5,
+      8.5,
+      10.0,
+      12.0
+    ],
+    "measured": "2026-09-19"
+  }
+}
