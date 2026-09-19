@@ -4098,3 +4098,10 @@ and `ensureSpeakerNeeds` (run on every load) re-added a camera_video need
 to every scene with lines. The flag is now carried, and an opaque scene
 takes no take need (a needed one it carried is withdrawn; a landed take
 is kept).
+
+Third Grade board (proj_7b306f5b): the chapters came in right -- opaque,
+no asks, a kicker and a scripted mock each. The writer cast tool-window
+mocks on the hook and the build turned them into screen_recording asks
+with slates over the person. A beat made as the person's take (or as
+type) asks for no screen either: `holdMadeToRecipe` drops its screen
+needs and slates the way it does for motion graphics.

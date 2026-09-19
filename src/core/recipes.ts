@@ -278,15 +278,20 @@ export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; as
     const takes = scene.assets.filter((a) => a && typeof a === "object" && a.type === "camera_video" && a.status !== "provided");
     if (takes.length) { scene.assets = scene.assets.filter((a) => !takes.includes(a)); out.push("the camera take ask dropped: no person on this beat"); }
   }
-  if (made === "motion") {
+  // A beat made as motion graphics, as the person's take, or as type asks
+  // for no screen: its screen needs and the slates cast for them go
+  // (measured live, proj_7b306f5b: tool-window mocks the writer put on the
+  // hook became a screen_recording ask with a slate over the person).
+  const why = made === "motion" ? "the beat is motion graphics" : made === "take" ? "the beat is the person's take" : made === "type" ? "the beat is type alone" : "";
+  if (why) {
     if (Array.isArray(scene.assets)) {
       const drop = scene.assets.filter((a) => isScreenNeed(a) && a.status !== "provided");
-      if (drop.length) { scene.assets = scene.assets.filter((a) => !drop.includes(a)); out.push(`${drop.length} screen need(s) dropped: the beat is motion graphics`); }
+      if (drop.length) { scene.assets = scene.assets.filter((a) => !drop.includes(a)); out.push(`${drop.length} screen need(s) dropped: ${why}`); }
     }
     if (Array.isArray(scene.components)) {
       const before = scene.components.length;
       scene.components = scene.components.filter((c) => !(c && typeof c === "object" && c.type === "asset-placeholder"));
-      if (scene.components.length !== before) out.push("the slate dropped: the library performs this beat");
+      if (scene.components.length !== before) out.push(`the slate dropped: ${why}`);
     }
   } else if (made === "recording") {
     const assets = Array.isArray(scene.assets) ? scene.assets : (scene.assets = []);

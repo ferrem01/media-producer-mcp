@@ -54,6 +54,11 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(chapter.components.map((x: any) => x.type)).toEqual(["quotient-chat"]);
     const provided: any = { label: "CHAPTER - Flows", assets: [{ type: "screen_recording", status: "provided", path: "/x.webm", description: "x" }], components: [] };
     expect(holdMadeToRecipe(provided, gr)).toEqual([]);   // a recording that already landed is kept
+    // A person beat asks for no screen either: the tool-window mocks the writer cast become no slate.
+    const hook: any = { label: "Hook - Three tools", assets: [{ type: "screen_recording", status: "needed", description: "x" }, { type: "camera_video", status: "needed", description: "t" }], components: [{ type: "lower-third", data: {} }, { type: "asset-placeholder", data: {} }] };
+    expect(holdMadeToRecipe(hook, gr)).toEqual(["1 screen need(s) dropped: the beat is the person's take", "the slate dropped: the beat is the person's take"]);
+    expect(hook.assets.map((x: any) => x.type)).toEqual(["camera_video"]);
+    expect(hook.components.map((x: any) => x.type)).toEqual(["lower-third"]);
     const proof: any = { label: "PROOF - Memory", purpose: "Memory remembers the brand", assets: [{ type: "camera_video", status: "needed", description: "t" }], components: [] };
     expect(holdMadeToRecipe(proof, getRecipe("presenter-n-things")!)).toEqual(["a screen_recording need added: the beat is a real recording"]);
     expect(proof.assets.map((x: any) => x.type)).toEqual(["camera_video", "screen_recording"]);
