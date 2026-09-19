@@ -5,10 +5,10 @@ import path from "node:path";
 const read = (p: string) => fs.readFile(path.join(process.cwd(), p), "utf8");
 
 describe("the recipe: the measured cut of a film with the content removed", () => {
-  it("the library loads eight valid recipes, each under one grammar with proven frames and a measured source", async () => {
+  it("the library loads nine valid recipes, each under one grammar with proven frames and a measured source", async () => {
     const { loadRecipes, validateRecipe, recipeSceneBand } = await import("../src/core/recipes.js");
     const rs = loadRecipes();
-    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-story-broll", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
+    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-story-broll", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
     for (const r of rs) {
       expect(validateRecipe(r)).toEqual([]);
       expect(["creator-cut", "speaker", "hype-cut", "canvas-tour"]).toContain(r.grammar);
@@ -17,6 +17,9 @@ describe("the recipe: the measured cut of a film with the content removed", () =
       const band = recipeSceneBand(r); expect(band.min).toBeGreaterThan(0); expect(band.max).toBeGreaterThanOrEqual(band.min);
     }
     expect(validateRecipe({ id: "x" })).toContain("missing spine");
+    // Every beat says how it is made, and the word is one of the six.
+    for (const r of rs) for (const b of r.spine) expect(["take", "recording", "motion", "broll", "illustration", "type"]).toContain(b.made);
+    expect(validateRecipe({ ...rs[0], spine: [{ role: "x", shot: "screen", made: "screencast", dur: [1, 2, 3] }] })).toContain("beat 1 (x): made must be one of take|recording|motion|broll|illustration|type");
   });
   it("the story ad and the location hop: a hype-cut recipe with no person, and a creator-cut recipe that hops places", async () => {
     const { getRecipe, recipeBlock, recipeSceneBand, recipesForGrammar } = await import("../src/core/recipes.js");
@@ -30,6 +33,33 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(gb).toMatch(/1\. HOOK -- type_card, 2s \(1\.5-2\.5s\), about 6 words \(never more than 7\)\./);
     expect(gb).toMatch(/4\. PROOF -- screen, 2\.5s .* Cutaway \(card, mockup\): enters at start, holds 100% of the beat\./);
     expect(gb).toMatch(/never drop or reorder: hook, pain, reveal, cta\./);
+    // HOW A BEAT IS MADE (Marc: "when it should be motion graphics vs a screencast").
+    const { madeOf, holdMadeToRecipe } = await import("../src/core/recipes.js");
+    expect(madeOf({ role: "x", shot: "person", dur: [1, 2, 3] })).toBe("take");
+    expect(madeOf({ role: "x", shot: "person+cutaway", dur: [1, 2, 3], cutaway: { at: "start", hold: 1, kind: "screen_recording" } })).toBe("recording");
+    expect(madeOf({ role: "x", shot: "screen", dur: [1, 2, 3] })).toBe("motion");
+    expect(madeOf({ role: "x", shot: "broll", dur: [1, 2, 3] })).toBe("broll");
+    const gr = getRecipe("founder-bookends-chapters")!;
+    expect(gr.grammar).toBe("creator-cut");
+    expect(recipeSceneBand(gr)).toEqual({ min: 7, max: 8 });
+    expect(gr.spine.find((b) => b.role === "chapter")!.made).toBe("motion");
+    const gblock = recipeBlock(gr, "16x9");
+    expect(gblock).toMatch(/4\. CHAPTER -- screen, 16s .* MADE AS: MOTION GRAPHICS -- library mocks and components perform it, scripted; ask the human for NOTHING on this beat/);
+    expect(gblock).toMatch(/1\. HOOK -- person, 11s .* MADE AS: the person's own take/);
+    expect(recipeBlock(getRecipe("presenter-n-things")!, "16x9")).toMatch(/3\. PROOF -- person\+cutaway, 10s .* MADE AS: a REAL screen recording the human provides/);
+    // The build holds the board to it: a motion beat asks for nothing, a recording beat must ask.
+    const chapter: any = { label: "CHAPTER - Memory", purpose: "Memory builds", assets: [{ type: "screen_recording", status: "needed", description: "x" }, { type: "camera_video", status: "needed", description: "t" }], components: [{ type: "asset-placeholder", data: {} }, { type: "quotient-chat", data: {} }] };
+    expect(holdMadeToRecipe(chapter, gr)).toEqual(["1 screen need(s) dropped: the beat is motion graphics", "the slate dropped: the library performs this beat"]);
+    expect(chapter.assets.map((x: any) => x.type)).toEqual(["camera_video"]);
+    expect(chapter.components.map((x: any) => x.type)).toEqual(["quotient-chat"]);
+    const provided: any = { label: "CHAPTER - Flows", assets: [{ type: "screen_recording", status: "provided", path: "/x.webm", description: "x" }], components: [] };
+    expect(holdMadeToRecipe(provided, gr)).toEqual([]);   // a recording that already landed is kept
+    const proof: any = { label: "PROOF - Memory", purpose: "Memory remembers the brand", assets: [{ type: "camera_video", status: "needed", description: "t" }], components: [] };
+    expect(holdMadeToRecipe(proof, getRecipe("presenter-n-things")!)).toEqual(["a screen_recording need added: the beat is a real recording"]);
+    expect(proof.assets.map((x: any) => x.type)).toEqual(["camera_video", "screen_recording"]);
+    expect(proof.assets[1].description).toBe("Memory remembers the brand");
+    const pipeline2 = await read("src/llm/pipeline.ts");
+    expect(pipeline2).toMatch(/const notes = holdMadeToRecipe\(d, recipeObj\);/);
     const w = getRecipe("ask-work-result")!;
     expect(w.grammar).toBe("canvas-tour");
     expect(w.frames_proven).toEqual(["1x1"]);

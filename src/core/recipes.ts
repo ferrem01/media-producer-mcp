@@ -16,9 +16,19 @@ import { fileURLToPath } from "node:url";
 
 export type RecipeShot = "person" | "person+cutaway" | "person+split" | "person+card" | "broll" | "idea_card" | "type_card" | "screen";
 
+/** HOW A BEAT IS MADE (Marc: "when it should be motion graphics vs a
+ *  screencast"): take -- the person's own camera; recording -- a REAL screen
+ *  recording the human provides, a slate stands in; motion -- MOTION
+ *  GRAPHICS, library mocks and components perform it, nothing is asked of
+ *  the human; broll -- found footage; illustration -- a drawn image; type --
+ *  type alone. Inferred from the shot when absent (madeOf). */
+export type RecipeMade = "take" | "recording" | "motion" | "broll" | "illustration" | "type";
+export const RECIPE_MADE = new Set<string>(["take", "recording", "motion", "broll", "illustration", "type"]);
+
 export interface RecipeBeat {
   role: string;
   shot: RecipeShot | string;
+  made?: RecipeMade;
   /** [min, target, max] seconds. */
   dur: [number, number, number];
   repeat?: [number, number];
@@ -58,6 +68,7 @@ export function validateRecipe(r: any): string[] {
     if (!b.role) errs.push(`beat ${i + 1}: no role`);
     if (!Array.isArray(b.dur) || b.dur.length !== 3 || !(b.dur[0] <= b.dur[1] && b.dur[1] <= b.dur[2])) errs.push(`beat ${i + 1} (${b.role}): dur must be [min, target, max]`);
     if (b.repeat && !(Array.isArray(b.repeat) && b.repeat.length === 2 && b.repeat[0] >= 1 && b.repeat[0] <= b.repeat[1])) errs.push(`beat ${i + 1} (${b.role}): repeat must be [min, max]`);
+    if (b.made !== undefined && !RECIPE_MADE.has(String(b.made))) errs.push(`beat ${i + 1} (${b.role}): made must be one of ${[...RECIPE_MADE].join("|")}`);
   });
   if (!Array.isArray(r.length_s) || r.length_s.length !== 2) errs.push("length_s must be [min, max]");
   if (!r.rhythm || typeof r.rhythm.wpm !== "number") errs.push("rhythm.wpm is required");
@@ -90,6 +101,28 @@ export function recipesForGrammar(grammar: string | undefined): Recipe[] {
   return loadRecipes().filter((r) => !grammar || r.grammar === grammar);
 }
 
+/** How the beat is made: the recipe's word, else inferred from the shot. */
+export function madeOf(b: RecipeBeat): RecipeMade {
+  if (b.made) return b.made;
+  const kind = String(b.cutaway?.kind || "");
+  if (kind === "screen_recording" || kind === "screenshot") return "recording";
+  if (kind === "stock_footage" || b.shot === "broll") return "broll";
+  if (kind === "illustration" || b.shot === "idea_card") return "illustration";
+  if (kind === "mockup") return "motion";
+  if (b.shot === "type_card") return "type";
+  if (b.shot === "screen") return "motion";
+  return "take";
+}
+
+const MADE_TEXT: Record<RecipeMade, string> = {
+  take: "the person's own take (a camera_video need)",
+  recording: "a REAL screen recording the human provides -- list a screen_recording need with the words it enters and leaves on; a slate stands in until it lands; never a library mock as the proof",
+  motion: "MOTION GRAPHICS -- library mocks and components perform it, scripted; ask the human for NOTHING on this beat (no screen_recording, no stock_footage)",
+  broll: "found footage -- a stock_footage need",
+  illustration: "a drawn image -- an illustration need",
+  type: "type alone on the world",
+};
+
 /** Words a beat can carry at the recipe's pace. */
 export function wordBudget(seconds: number, wpm: number): number { return Math.max(3, Math.round((seconds * wpm) / 60)); }
 
@@ -108,7 +141,8 @@ export function recipeBlock(r: Recipe, frame?: string): string {
     const rep = b.repeat ? ` -- REPEAT ${b.repeat[0]}-${b.repeat[1]} times, one scene each` : "";
     const cut = b.cutaway ? ` Cutaway (${b.cutaway.use || "cutaway"}${b.cutaway.kind ? `, ${b.cutaway.kind}` : ""}): enters at ${b.cutaway.at}, holds ${Math.round(b.cutaway.hold * 100)}% of the beat${b.cutaway.exit_before ? `, out before ${b.cutaway.exit_before}` : ""}.` : "";
     const ent = b.enters && b.enters.length ? ` Enters: ${b.enters.join(", ")}.` : "";
-    return `${i + 1}. ${b.role.toUpperCase()} -- ${b.shot}, ${b.dur[1]}s (${b.dur[0]}-${b.dur[2]}s), about ${wordBudget(b.dur[1], wpm)} words (never more than ${wordBudget(b.dur[2], wpm)})${rep}.${ent}${cut}${b.note ? ` ${b.note}` : ""}`;
+    const made = ` MADE AS: ${MADE_TEXT[madeOf(b)]}.`;
+    return `${i + 1}. ${b.role.toUpperCase()} -- ${b.shot}, ${b.dur[1]}s (${b.dur[0]}-${b.dur[2]}s), about ${wordBudget(b.dur[1], wpm)} words (never more than ${wordBudget(b.dur[2], wpm)})${rep}.${made}${ent}${cut}${b.note ? ` ${b.note}` : ""}`;
   }).join("\n");
   const lat = r.latitude || {};
   const proven = frame && !r.frames_proven.includes(frame) ? ` (proven at ${r.frames_proven.join("/")}; this film ships ${frame} -- keep the spine, let the frame laws place things)` : "";
@@ -221,6 +255,38 @@ export function pruneNeedsByRecipe(scene: { label?: unknown; assets?: any[] }, r
   const before = scene.assets.length;
   scene.assets = scene.assets.filter((a) => !(a && typeof a === "object" && a.type === "stock_footage"));
   return before - scene.assets.length;
+}
+
+/** The beat is made the way the recipe says (madeOf): a MOTION beat asks
+ *  the human for nothing, so its screen needs and the slates cast for them
+ *  are dropped (the library performs it); a RECORDING beat must ask, so a
+ *  scene that forgot gets a screen_recording need from its purpose (the
+ *  slate follows at cast time). Returns what changed, in plain lines. */
+export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; assets?: any[]; components?: any[] }, r: Recipe): string[] {
+  const role = roleOfLabel(scene.label, r);
+  const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+  if (!beat) return [];
+  const made = madeOf(beat);
+  const out: string[] = [];
+  const isScreenNeed = (a: any) => a && typeof a === "object" && (a.type === "screen_recording" || a.type === "screenshot");
+  if (made === "motion") {
+    if (Array.isArray(scene.assets)) {
+      const drop = scene.assets.filter((a) => isScreenNeed(a) && a.status !== "provided");
+      if (drop.length) { scene.assets = scene.assets.filter((a) => !drop.includes(a)); out.push(`${drop.length} screen need(s) dropped: the beat is motion graphics`); }
+    }
+    if (Array.isArray(scene.components)) {
+      const before = scene.components.length;
+      scene.components = scene.components.filter((c) => !(c && typeof c === "object" && c.type === "asset-placeholder"));
+      if (scene.components.length !== before) out.push("the slate dropped: the library performs this beat");
+    }
+  } else if (made === "recording") {
+    const assets = Array.isArray(scene.assets) ? scene.assets : (scene.assets = []);
+    if (!assets.some(isScreenNeed)) {
+      assets.push({ type: "screen_recording", description: String(scene.purpose || scene.label || "the screen this beat proves"), status: "needed", priority: "recommended", use: "cutaway", fallback: "A slate stands in the screen's slot until the recording lands." });
+      out.push("a screen_recording need added: the beat is a real recording");
+    }
+  }
+  return out;
 }
 
 /** A person beat is the PERSON: a scene template the writer reached for

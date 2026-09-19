@@ -19,6 +19,7 @@
     {
       "role": "payoff-open",
       "shot": "screen",
+      "made": "recording",
       "dur": [
         1,
         1.5,
@@ -32,6 +33,7 @@
     {
       "role": "ask",
       "shot": "screen",
+      "made": "motion",
       "dur": [
         3.5,
         4.5,
@@ -43,6 +45,7 @@
     {
       "role": "work",
       "shot": "screen",
+      "made": "motion",
       "dur": [
         4,
         5,
@@ -54,6 +57,7 @@
     {
       "role": "result",
       "shot": "screen",
+      "made": "recording",
       "dur": [
         10,
         12,
@@ -73,6 +77,7 @@
     {
       "role": "cta",
       "shot": "screen",
+      "made": "recording",
       "dur": [
         2,
         2.5,
@@ -86,6 +91,7 @@
     {
       "role": "close",
       "shot": "type_card",
+      "made": "type",
       "dur": [
         1.5,
         2,

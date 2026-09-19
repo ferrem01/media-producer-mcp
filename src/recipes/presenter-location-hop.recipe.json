@@ -19,6 +19,7 @@
     {
       "role": "hook",
       "shot": "person",
+      "made": "take",
       "dur": [
         3,
         3.5,
@@ -32,6 +33,7 @@
     {
       "role": "answer",
       "shot": "person",
+      "made": "take",
       "dur": [
         2,
         2.5,
@@ -46,6 +48,7 @@
     {
       "role": "audience",
       "shot": "broll",
+      "made": "broll",
       "dur": [
         0.8,
         1,
@@ -69,6 +72,7 @@
     {
       "role": "promise",
       "shot": "person",
+      "made": "take",
       "dur": [
         3,
         3.5,
@@ -82,6 +86,7 @@
     {
       "role": "proof-line",
       "shot": "person",
+      "made": "take",
       "dur": [
         1.5,
         2,
@@ -95,6 +100,7 @@
     {
       "role": "breather",
       "shot": "person",
+      "made": "take",
       "dur": [
         1,
         1.3,
@@ -110,6 +116,7 @@
     {
       "role": "feature",
       "shot": "person+cutaway",
+      "made": "recording",
       "dur": [
         4,
         4.5,
@@ -134,6 +141,7 @@
     {
       "role": "prop",
       "shot": "person",
+      "made": "take",
       "dur": [
         3,
         4,
@@ -148,6 +156,7 @@
     {
       "role": "big-picture",
       "shot": "person",
+      "made": "take",
       "dur": [
         4.5,
         5.5,
@@ -161,6 +170,7 @@
     {
       "role": "ease",
       "shot": "broll",
+      "made": "broll",
       "dur": [
         0.8,
         1,
@@ -180,6 +190,7 @@
     {
       "role": "cta",
       "shot": "person",
+      "made": "take",
       "dur": [
         2.5,
         3,
@@ -193,6 +204,7 @@
     {
       "role": "close",
       "shot": "person",
+      "made": "take",
       "dur": [
         3.5,
         4.2,
