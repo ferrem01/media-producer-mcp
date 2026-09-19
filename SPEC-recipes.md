@@ -1,6 +1,6 @@
 # SPEC-recipes.md -- the recipe: the measured cut of a film with the content removed
 
-Status: shipped 2026-09-19 (library of eight). Companion docs: `SPEC-creative-axes.md`
+Status: shipped 2026-09-19 (library of nine). Companion docs: `SPEC-creative-axes.md`
 (grammar), `SPEC-format-and-spine.md` (frame), `SPEC-creator-cut.md`, `SPEC-briefs.md`.
 
 ## Why
@@ -29,6 +29,14 @@ the writer invents the beats (generate as before).
    its length and frame, the measured cut times, the date).
 2. **Spine** -- `spine[]`, ordered beats. Each: `role`, `shot` (person,
    person+cutaway, person+split, person+card, broll, idea_card, ...),
+   `made` -- HOW the beat is made: `take` (the person's camera),
+   `recording` (a REAL screen recording the human provides; a slate
+   stands in), `motion` (MOTION GRAPHICS: library mocks and components
+   perform it, nothing is asked of the human), `broll` (found footage),
+   `illustration` (drawn), `type` (type alone). Inferred from the shot
+   when absent (`madeOf`). The build holds the board to it
+   (`holdMadeToRecipe`): a motion beat's screen needs and slates are
+   dropped, a recording beat that forgot to ask gets its need,
    `dur` [min, target, max] seconds (the word budget follows from it at
    the recipe's pace), optional `repeat` [min, max], `enters` (what lands
    on the beat: `stamp:noun`, `lower_third`, `keyword:type-on`,
@@ -82,6 +90,7 @@ full-frame screen. Every other style is the plated chest-band lane.
 | presenter-location-hop | creator-cut | 9x16 | Air, 50.4s | a person with a mic in a new place on every cut; each spoken word lands where it is said and stays; animal gag clips on the audience; kept outtakes as breathers; screens full-frame on the product's name; URL and wordmark to close |
 | story-ad-idea-beats | hype-cut | 9x16 | Gamma, 16s | no person: type is the voice, one illustrated object per beat (the clock, the balloons); feeling, pain, wordmark reveal, product output fanning in, payoff, end card with a pill button |
 | ask-work-result | canvas-tour | 1x1 | Runway in ChatGPT, 28.5s | an agent demo: a second of the payoff, the ask typed in full, the agent's checklist with its elapsed time, the deliverable full frame for half the film with two claim lines, one CTA line, wordmark on black; four lines of type in all |
+| founder-bookends-chapters | creator-cut | 16x9 | Voicepanel Grade, 88.5s | a founder on a couch with props beside the head that get badged on the turn; the wordmark on white; 'let me show you how'; two or three chapters of MOTION GRAPHICS on white, each named by a kicker with step dots, one surface building per chapter; back to the founder with a logo band; wordmark and URL |
 
 ## Adding one
 

@@ -19,6 +19,7 @@
     {
       "role": "hook",
       "shot": "type_card",
+      "made": "type",
       "dur": [
         1.5,
         2,
@@ -32,6 +33,7 @@
     {
       "role": "pain",
       "shot": "idea_card",
+      "made": "illustration",
       "dur": [
         2,
         2.5,
@@ -50,6 +52,7 @@
     {
       "role": "reveal",
       "shot": "screen",
+      "made": "motion",
       "dur": [
         1.5,
         2,
@@ -63,6 +66,7 @@
     {
       "role": "proof",
       "shot": "screen",
+      "made": "motion",
       "dur": [
         2,
         2.5,
@@ -86,6 +90,7 @@
     {
       "role": "lift",
       "shot": "idea_card",
+      "made": "illustration",
       "dur": [
         1,
         1.5,
@@ -99,6 +104,7 @@
     {
       "role": "payoff",
       "shot": "type_card",
+      "made": "type",
       "dur": [
         1.5,
         2,
@@ -112,6 +118,7 @@
     {
       "role": "cta",
       "shot": "idea_card",
+      "made": "illustration",
       "dur": [
         3.5,
         4.5,

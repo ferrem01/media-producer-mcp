@@ -2,36 +2,179 @@
   "id": "speaker-one-take-cards",
   "name": "Speaker: one take with cards",
   "grammar": "speaker",
-  "frames_proven": ["9x16"],
-  "suits": ["how I do X", "a walkthrough told, not shown", "sponsored explainer", "long-form talk to camera"],
-  "length_s": [60, 100],
-  "spine": [
-    { "role": "hook", "shot": "person", "dur": [6, 8, 10], "enters": ["title_card:persistent"], "note": "One unbroken selfie shot for the whole film. A title card sits at the top from frame one and stays." },
-    { "role": "setup", "shot": "person", "dur": [8, 10, 14], "enters": [], "note": "The problem, still to camera; nothing but the micro captions." },
-    { "role": "point", "shot": "person+card", "dur": [8, 12, 16], "repeat": [3, 5], "enters": [], "cutaway": { "at": "claim_noun", "hold": 0.5, "exit_before": "next_line", "use": "card" }, "note": "Each point brings one floating card over the person -- an app icon and label, a short text card, a screenshot -- for the middle of the beat, then it leaves. The person never cuts away." },
-    { "role": "aside", "shot": "person", "dur": [6, 8, 12], "enters": ["title_card:swap"], "note": "The sponsor or an aside; the title card swaps its line." },
-    { "role": "close", "shot": "person", "dur": [6, 8, 10], "enters": [], "note": "The takeaway, still one shot." }
+  "frames_proven": [
+    "9x16"
   ],
-  "rhythm": { "cut_cadence_s": 0, "max_hold_s": 100, "wpm": 175, "first_cut_by_s": 0, "end_card_s": 0, "card_every_s": 10 },
+  "suits": [
+    "how I do X",
+    "a walkthrough told, not shown",
+    "sponsored explainer",
+    "long-form talk to camera"
+  ],
+  "length_s": [
+    60,
+    100
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        6,
+        8,
+        10
+      ],
+      "enters": [
+        "title_card:persistent"
+      ],
+      "note": "One unbroken selfie shot for the whole film. A title card sits at the top from frame one and stays."
+    },
+    {
+      "role": "setup",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        8,
+        10,
+        14
+      ],
+      "enters": [],
+      "note": "The problem, still to camera; nothing but the micro captions."
+    },
+    {
+      "role": "point",
+      "shot": "person+card",
+      "made": "take",
+      "dur": [
+        8,
+        12,
+        16
+      ],
+      "repeat": [
+        3,
+        5
+      ],
+      "enters": [],
+      "cutaway": {
+        "at": "claim_noun",
+        "hold": 0.5,
+        "exit_before": "next_line",
+        "use": "card"
+      },
+      "note": "Each point brings one floating card over the person -- an app icon and label, a short text card, a screenshot -- for the middle of the beat, then it leaves. The person never cuts away."
+    },
+    {
+      "role": "aside",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        6,
+        8,
+        12
+      ],
+      "enters": [
+        "title_card:swap"
+      ],
+      "note": "The sponsor or an aside; the title card swaps its line."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        6,
+        8,
+        10
+      ],
+      "enters": [],
+      "note": "The takeaway, still one shot."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 0,
+    "max_hold_s": 100,
+    "wpm": 175,
+    "first_cut_by_s": 0,
+    "end_card_s": 0,
+    "card_every_s": 10
+  },
   "layers": {
-    "captions": { "style": "micro", "words": 1, "pos": "bottom", "through_cutaways": true },
-    "stamps": { "pos": null },
-    "lower_third": { "on": null },
-    "title_card": { "pos": "top", "persistent": true },
+    "captions": {
+      "style": "micro",
+      "words": 1,
+      "pos": "bottom",
+      "through_cutaways": true
+    },
+    "stamps": {
+      "pos": null
+    },
+    "lower_third": {
+      "on": null
+    },
+    "title_card": {
+      "pos": "top",
+      "persistent": true
+    },
     "camera": "fixed",
-    "music": { "bed": false, "duck": false }
+    "music": {
+      "bed": false,
+      "duck": false
+    }
   },
   "motion": {
     "elements": {
-      "card": { "in": "rise", "in_s": 0.4, "out": "fade", "out_s": 0.3 },
-      "caption": { "in": "fade", "in_s": 0.08, "per": "word" },
-      "title_card": { "in": "fade", "in_s": 0.3, "out": "fade", "out_s": 0.3 }
+      "card": {
+        "in": "rise",
+        "in_s": 0.4,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "caption": {
+        "in": "fade",
+        "in_s": 0.08,
+        "per": "word"
+      },
+      "title_card": {
+        "in": "fade",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.3
+      }
     },
-    "transitions": { "default": "none" },
-    "camera": { "hook": "fixed", "point": "fixed", "close": "fixed" },
+    "transitions": {
+      "default": "none"
+    },
+    "camera": {
+      "hook": "fixed",
+      "point": "fixed",
+      "close": "fixed"
+    },
     "physics": "calm"
   },
-  "asks": { "take": "continuous", "screens": "0-2 (as cards)", "broll": 0, "images": "0-3 (as cards)" },
-  "latitude": { "optional": ["aside"], "fixed": ["hook", "close"], "may_double": ["point"] },
-  "source": { "film": "whoismattrodin_DcRxZYEgPI0", "length_s": 86, "frame": "9x16", "cuts_s": [], "measured": "2026-09-19" }
+  "asks": {
+    "take": "continuous",
+    "screens": "0-2 (as cards)",
+    "broll": 0,
+    "images": "0-3 (as cards)"
+  },
+  "latitude": {
+    "optional": [
+      "aside"
+    ],
+    "fixed": [
+      "hook",
+      "close"
+    ],
+    "may_double": [
+      "point"
+    ]
+  },
+  "source": {
+    "film": "whoismattrodin_DcRxZYEgPI0",
+    "length_s": 86,
+    "frame": "9x16",
+    "cuts_s": [],
+    "measured": "2026-09-19"
+  }
 }

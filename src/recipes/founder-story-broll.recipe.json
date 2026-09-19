@@ -2,36 +2,204 @@
   "id": "founder-story-broll",
   "name": "Founder story with b-roll",
   "grammar": "creator-cut",
-  "frames_proven": ["9x16"],
-  "suits": ["founder story", "how we work", "we built X and here is what happened", "team and culture with a product inside"],
-  "length_s": [40, 55],
-  "spine": [
-    { "role": "hook", "shot": "person", "dur": [4, 5, 6], "enters": [], "note": "Selfie, walking or standing, the claim in the first breath." },
-    { "role": "world", "shot": "broll", "dur": [5, 6, 8], "enters": [], "cutaway": { "at": "start", "hold": 1.0, "exit_before": "next_beat", "kind": "stock_footage" }, "note": "Found footage of the place or the team under the second line; the person is heard, not seen." },
-    { "role": "proof", "shot": "person+split", "dur": [8, 10, 12], "enters": [], "cutaway": { "at": "start", "hold": 1.0, "exit_before": "next_beat", "use": "split" }, "note": "The product in the top half while the person works or talks below it; the longest beat." },
-    { "role": "story", "shot": "person", "dur": [4, 5, 7], "repeat": [1, 2], "enters": [], "note": "Back to the person for the turn in the story." },
-    { "role": "world", "shot": "broll", "dur": [3, 4, 6], "enters": [], "cutaway": { "at": "start", "hold": 1.0, "exit_before": "next_beat", "kind": "stock_footage" }, "note": "The team again, or the object the line names (the money, the screen)." },
-    { "role": "close", "shot": "person", "dur": [5, 7, 9], "enters": ["stamp:sentiment@-3s"], "note": "The person, a different spot, the last line and a stamp on its last words." }
+  "frames_proven": [
+    "9x16"
   ],
-  "rhythm": { "cut_cadence_s": 4.5, "max_hold_s": 10, "wpm": 160, "first_cut_by_s": 5, "end_card_s": 0 },
+  "suits": [
+    "founder story",
+    "how we work",
+    "we built X and here is what happened",
+    "team and culture with a product inside"
+  ],
+  "length_s": [
+    40,
+    55
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        4,
+        5,
+        6
+      ],
+      "enters": [],
+      "note": "Selfie, walking or standing, the claim in the first breath."
+    },
+    {
+      "role": "world",
+      "shot": "broll",
+      "made": "broll",
+      "dur": [
+        5,
+        6,
+        8
+      ],
+      "enters": [],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "kind": "stock_footage"
+      },
+      "note": "Found footage of the place or the team under the second line; the person is heard, not seen."
+    },
+    {
+      "role": "proof",
+      "shot": "person+split",
+      "made": "recording",
+      "dur": [
+        8,
+        10,
+        12
+      ],
+      "enters": [],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "use": "split"
+      },
+      "note": "The product in the top half while the person works or talks below it; the longest beat."
+    },
+    {
+      "role": "story",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        4,
+        5,
+        7
+      ],
+      "repeat": [
+        1,
+        2
+      ],
+      "enters": [],
+      "note": "Back to the person for the turn in the story."
+    },
+    {
+      "role": "world",
+      "shot": "broll",
+      "made": "broll",
+      "dur": [
+        3,
+        4,
+        6
+      ],
+      "enters": [],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "kind": "stock_footage"
+      },
+      "note": "The team again, or the object the line names (the money, the screen)."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        5,
+        7,
+        9
+      ],
+      "enters": [
+        "stamp:sentiment@-3s"
+      ],
+      "note": "The person, a different spot, the last line and a stamp on its last words."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 4.5,
+    "max_hold_s": 10,
+    "wpm": 160,
+    "first_cut_by_s": 5,
+    "end_card_s": 0
+  },
   "layers": {
-    "captions": { "style": "plain-bold", "words": 3, "pos": "bottom-center", "through_cutaways": true },
-    "stamps": { "pos": "center", "hold_s": 2 },
-    "lower_third": { "on": null },
+    "captions": {
+      "style": "plain-bold",
+      "words": 3,
+      "pos": "bottom-center",
+      "through_cutaways": true
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
     "camera": "fixed",
-    "music": { "bed": true, "duck": true }
+    "music": {
+      "bed": true,
+      "duck": true
+    }
   },
   "motion": {
     "elements": {
-      "stamp": { "in": "pop", "in_s": 0.3, "out": "cut" },
-      "cutaway": { "in": "cut", "out": "cut" },
-      "caption": { "in": "pop", "in_s": 0.1, "per": "word_group" }
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "cut"
+      },
+      "cutaway": {
+        "in": "cut",
+        "out": "cut"
+      },
+      "caption": {
+        "in": "pop",
+        "in_s": 0.1,
+        "per": "word_group"
+      }
     },
-    "transitions": { "default": "cut" },
-    "camera": { "hook": "fixed", "proof": "fixed", "story": "fixed", "close": "fixed" },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "proof": "fixed",
+      "story": "fixed",
+      "close": "fixed"
+    },
     "physics": "punchy"
   },
-  "asks": { "take": "continuous", "screens": 1, "broll": "one per world beat", "images": 0 },
-  "latitude": { "optional": ["story"], "fixed": ["hook", "close"], "may_double": ["world"] },
-  "source": { "film": "linkedin_lieberman", "length_s": 44.6, "frame": "9x16", "cuts_s": [5.1, 11.3, 13.3, 23.1, 28.6, 32.0, 36.2, 37.0], "measured": "2026-09-19" }
+  "asks": {
+    "take": "continuous",
+    "screens": 1,
+    "broll": "one per world beat",
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "story"
+    ],
+    "fixed": [
+      "hook",
+      "close"
+    ],
+    "may_double": [
+      "world"
+    ]
+  },
+  "source": {
+    "film": "linkedin_lieberman",
+    "length_s": 44.6,
+    "frame": "9x16",
+    "cuts_s": [
+      5.1,
+      11.3,
+      13.3,
+      23.1,
+      28.6,
+      32.0,
+      36.2,
+      37.0
+    ],
+    "measured": "2026-09-19"
+  }
 }

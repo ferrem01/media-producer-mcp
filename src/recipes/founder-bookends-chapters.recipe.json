@@ -1,0 +1,229 @@
+{
+  "id": "founder-bookends-chapters",
+  "name": "Founder bookends, chaptered walkthrough",
+  "grammar": "creator-cut",
+  "frames_proven": [
+    "16x9"
+  ],
+  "suits": [
+    "how it works, in three steps",
+    "a founder explains the product",
+    "the problem, the product, the proof",
+    "a LinkedIn explainer"
+  ],
+  "length_s": [
+    70,
+    95
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        9,
+        11,
+        13
+      ],
+      "enters": [
+        "lower_third",
+        "card:prop@name",
+        "badge:?@turn"
+      ],
+      "note": "Seated, to camera, with a lower-third. As each thing the product replaces is named, a small card for it floats up beside the head; on the turn ('neither tells you'), every card gets a question badge. Props over the person, then a mark on the props."
+    },
+    {
+      "role": "reveal",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        2.5,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:wordmark"
+      ],
+      "note": "A white card; the wordmark draws itself. Nothing else, no line."
+    },
+    {
+      "role": "promise",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        5,
+        6,
+        8
+      ],
+      "enters": [],
+      "note": "Back to the person: what the product does in one sentence, then 'let me show you how'."
+    },
+    {
+      "role": "chapter",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        12,
+        16,
+        18
+      ],
+      "repeat": [
+        2,
+        3
+      ],
+      "enters": [
+        "kicker:chapter",
+        "steps:dots"
+      ],
+      "note": "A named step on white, no person. The kicker names it bottom-left, the step dots bottom-right (a table of contents on screen). ONE surface builds while the voice continues: a list filling in, bars filling, a table, a detail card; something changes every 4-5s, nothing holds past 6."
+    },
+    {
+      "role": "return",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        10,
+        14,
+        16
+      ],
+      "enters": [
+        "logo-band@proof"
+      ],
+      "note": "Back on the couch: the wider point. On the proof line ('hundreds of teams') a band of customer logos slides through behind the person. Then the close line."
+    },
+    {
+      "role": "close",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        4,
+        5,
+        6
+      ],
+      "enters": [
+        "stamp:wordmark",
+        "stamp:url",
+        "end_card@start"
+      ],
+      "note": "The wordmark and the URL on white, held."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 4.5,
+    "max_hold_s": 6,
+    "wpm": 152,
+    "first_cut_by_s": 11,
+    "end_card_s": 5
+  },
+  "layers": {
+    "captions": {
+      "style": "none"
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": "hook",
+      "hold_s": 6
+    },
+    "kicker": {
+      "on": "chapter",
+      "pos": "bottom-left",
+      "with": "step dots bottom-right, one per chapter, the current one filled"
+    },
+    "props": {
+      "on": "hook",
+      "pos": "beside the head",
+      "note": "one card per thing named; a badge on all of them on the turn"
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": true
+    }
+  },
+  "motion": {
+    "elements": {
+      "card": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "badge": {
+        "in": "pop",
+        "in_s": 0.25
+      },
+      "stamp": {
+        "in": "fade",
+        "in_s": 0.4,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "kicker": {
+        "in": "fade",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.2
+      },
+      "lower_third": {
+        "in": "slide-up",
+        "in_s": 0.4,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "cutaway": {
+        "in": "cut",
+        "out": "cut"
+      },
+      "end_card": {
+        "in": "fade",
+        "in_s": 0.4
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "reveal": "fixed",
+      "promise": "fixed",
+      "chapter": "fixed",
+      "return": "fixed",
+      "close": "fixed"
+    },
+    "physics": "calm"
+  },
+  "asks": {
+    "take": "the setup and the return (one recording split by lines, or two)",
+    "screens": "0 -- the chapters are motion graphics from the library; a real recording may replace a chapter's surface if the team has one",
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [],
+    "fixed": [
+      "hook",
+      "reveal",
+      "chapter",
+      "close"
+    ],
+    "may_double": [
+      "chapter"
+    ]
+  },
+  "source": {
+    "film": "linkedin_provine_grade",
+    "length_s": 88.5,
+    "frame": "16x9",
+    "cuts_s": [
+      10.67,
+      13.57,
+      19.43,
+      69.5,
+      83.27
+    ],
+    "measured": "2026-09-19"
+  }
+}

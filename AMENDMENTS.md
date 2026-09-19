@@ -4013,3 +4013,30 @@ deliverable (a recording or screenshot of the real output, or a generated
 clip); the surface is a scripted library mock. Measured cuts at 1.57,
 5.93, 10.77, 14.13 and, inside the deliverable, 17.0, 19.0, 22.0, 23.97,
 26.67.
+
+## The recipe says how each beat is made; the ninth recipe (Grade)
+
+Marc: "I would like as part of the recipe when it should be motion
+graphics vs a screencast." The format only implied it (a cutaway's kind).
+Now every beat carries `made`: take | recording | motion | broll |
+illustration | type, inferred from the shot when absent (`madeOf`), told
+to the writer in the block ("MADE AS: MOTION GRAPHICS -- ... ask the human
+for NOTHING on this beat" / "a REAL screen recording the human provides
+-- list a screen_recording need ..."), and held by the build
+(`holdMadeToRecipe`, in the recipe pass): a motion beat's screen needs
+and slates are dropped, a recording beat that forgot to ask gets a
+screen_recording need from its purpose. A recording that already landed
+is never dropped. All eight recipes now say it beat by beat.
+
+The ninth recipe, `founder-bookends-chapters`, measured from Voicepanel's
+Grade film (88.5s, 16x9, five outer cuts): a founder on a couch with a
+lower-third and a card beside the head per thing named, all badged on
+the turn; the wordmark drawing on white; the promise and "let me show
+you how"; two or three chapters of MOTION GRAPHICS on white, each named
+by a kicker bottom-left with step dots bottom-right, one surface
+building while the voice continues (a change every 4-5s, nothing past
+6); back to the founder with a band of customer logos on the proof
+line; wordmark and URL. No captions. The chapters ask the human for
+nothing. Two small components the recipe names and the library lacks
+(a kicker with step dots; a logo band behind the person) degrade to a
+stamp and a logo wall until built.

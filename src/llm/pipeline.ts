@@ -32,7 +32,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
-import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe } from "../core/recipes.js";
+import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe } from "../core/recipes.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2798,6 +2798,7 @@ async function runUnifiedPipeline(
     for (const d of storyboard.scenes as any[]) pruned += pruneNeedsByRecipe(d, recipeObj);
     if (pruned) console.log(`  Recipe needs: ${pruned} b-roll ask(s) dropped from beats whose footage is the take or the screen`);
     for (const d of storyboard.scenes as any[]) { const t = holdShotToRecipe(d, recipeObj); if (t) console.log(`  Recipe shot: "${d.label || ""}" is a person beat -- the ${t} template is dropped, the person stays`); }
+    for (const d of storyboard.scenes as any[]) { const notes = holdMadeToRecipe(d, recipeObj); for (const n of notes) console.log(`  Recipe made: "${d.label || ""}" -- ${n}`); }
   }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
