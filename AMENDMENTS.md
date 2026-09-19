@@ -3770,3 +3770,18 @@ request, so Studio shows it on reload; Studio's messages say "in the
 scene now" and the dialog closes. A board with no built scene keeps
 today's path: the build casts it.
 
+## The dashed block is an open slot: needs still waiting are on the timeline
+
+Marc: after the build there was no place to click for the screen
+recording the board asked for -- only the slate image, which is a
+component, not media. Rule: every lane block is a slot; dashed = open,
+solid = the file is in it; both open the picker. `openNeedsOf` lists the
+built film's needs still waiting; the media lane draws a dashed block
+per screen / b-roll / drawing in its window on a row under the footage,
+the speaker lane a dashed piece per take at its scene, and `laneLayout`
+keeps those lanes up for open slots alone. The slate on the canvas and
+the block on the lane are two faces of one need. Earlier today: the
+popover carries one Replace button that opens THE PICKER in the dialog
+(the grid needs room), a pick lands in the built scene at once
+(`recastProvidedNeed`), and the sources live under every slot.
+

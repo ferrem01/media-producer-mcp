@@ -120,4 +120,15 @@ describe("the sources: every need is collected its own way, in the board", () =>
     // ...and it is seeded BEFORE the fetch block, so it holds without a stock key.
     expect(pipeline.indexOf("needFootage.set(i, need.path); break;")).toBeLessThan(pipeline.indexOf("if ((personFilm && (canDraw || canFetchStock)) || canFetchStock) {"));
   });
+
+  it("the dashed block is an open slot: every need still waiting is a block on its lane in the built film, and the click is the picker", async () => {
+    const desktop = await read("src/preview-app/preview-app.ts");
+    expect(desktop).toMatch(/function openNeedsOf\(project\)/);
+    expect(desktop).toMatch(/a\.status === 'needed' && !a\.path && a\.priority !== 'nice_to_have'/);
+    expect(desktop).toMatch(/if \(openNeeds\.some\(function\(n\) \{ return n\.need\.type === 'camera_video'; \}\)\) hasSpk = true;/);
+    expect(desktop).toMatch(/var hasMedia = !!\(\(state\.mediaClips \|\| \[\]\)\.length\) \|\| hasOpenMedia;/);
+    expect(desktop).toMatch(/b\.className = 'ml-seg ml-need';[\s\S]*?openNeedPicker\(p, n\.si, n\.ai\)/);
+    expect(desktop).toMatch(/nb\.className = 'spk-clip spk-need';[\s\S]*?openNeedPicker\(p, n\.si, n\.ai\)/);
+    expect(desktop).toMatch(/\.ml-seg\.ml-need, \.spk-clip\.spk-need \{/);
+  });
 });

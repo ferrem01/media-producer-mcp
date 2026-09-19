@@ -98,6 +98,16 @@ b-roll ground, or cuts in on the need's seconds -- and the composite,
 assembled from the record on every request, shows it on the next load.
 No rebuild; the board keeps the need for the next one.
 
+**The dashed block is an open slot.** Every lane block is a slot: dashed
+means open, solid means the file is in it, and both open the picker. In
+a built film each need still waiting is drawn where its file will land
+-- a take on the speaker lane at its scene, a screen, b-roll or drawing
+on the media lane in its window (`openNeedsOf`, `needWindow`) -- and the
+lane stays up for it even with nothing else on it. The slate on the
+canvas and the dashed block on the timeline are two faces of one need;
+when the file lands the slate leaves and the block becomes the footage
+block. The storyboard is no longer the place to go back to.
+
 ## Columns the sheet should add
 
 - **Format / placement** (16x9, 4x5, 9x16; where it ships) -- the frame is a
