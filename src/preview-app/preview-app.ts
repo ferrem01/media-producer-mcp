@@ -1816,10 +1816,21 @@ ${QUOTIENT_CSS}
         if (clip._window !== undefined && clip._window !== winKey && !swapped) {
           var cutT = speakerSourceTime(time);
           if (cutT > want.trimEnd) cutT = want.trimEnd;
-          try { el.currentTime = cutT; } catch (eCut) {}
+          // CONTIGUOUS WINDOWS PLAY THROUGH: "record all" cuts one file into
+          // windows that meet end to start, so at the cut the element is
+          // already where the next window begins. Seeking a playing video
+          // to (almost) its own position stalls it for a few frames -- the
+          // small repeat at every cut (measured live, proj_25b2858c at
+          // 17.9s). Seek only when the jump is real (a de-aired gap, a
+          // scrub); drift correction below keeps the rest honest.
+          var curT = 0;
+          try { curT = Number(el.currentTime) || 0; } catch (eCur) {}
+          if (Math.abs(curT - cutT) > 0.12) {
+            try { el.currentTime = cutT; } catch (eCut) {}
+            clip._lastSeekTs = (window.performance && performance.now) ? performance.now() : Date.now();
+          }
           clip.lastOffset = null;
           clip.driftSamples = 0;
-          clip._lastSeekTs = (window.performance && performance.now) ? performance.now() : Date.now();
         }
         clip._window = winKey;
         // Visibility: show on speaker scenes, hide on opaque scenes -- and
