@@ -24,6 +24,7 @@ import { provideAsset, openAssetNeeds, recastProvidedNeed } from "./core/asset-n
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
 import { listMusicOptions, resolveMusicChoice, musicLocalPath, musicAssetUrl } from "./audio/music.js";
+import { qrSvg } from "./core/qr.js";
 import type { Take, Project, AssetRequirement } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
 import { clearAnchorsFor } from "./core/word-anchors.js";
@@ -916,7 +917,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|arm-need|armed-need|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2494,6 +2495,26 @@ Rules:
           console.log(`  music: ${mpTenant}/${mpProject} <- ${source}${choice.title ? ` "${choice.title}"` : ""}`);
           jsonResponse(res, 200, { ok: true, music: choice, bed: (mpProj.audio?.tracks || []).find((t) => t.type === "music") || null });
         } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
+        return;
+      }
+
+      // ── API: THE PHONE CODE -- the take link for one scene as a QR (SVG) ──
+      // GET /api/take-qr/{tenant}/{project}?scene=N  (drawn here: the link carries the token)
+      const takeQrMatch = urlPath.match(/^\/api\/take-qr\/([^/]+)\/([^/]+)$/);
+      if (takeQrMatch && method === "GET") {
+        const [, tqTenant, tqProject] = takeQrMatch.map(decodeURIComponent);
+        const q = new URL(req.url || "/", "http://localhost").searchParams;
+        const scene = q.get("scene") || "all";
+        const token = q.get("token") || "";
+        const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+        const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+        if (!host) { jsonResponse(res, 400, { error: "No host to build the link on" }); return; }
+        const link = `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+        try {
+          const svg = qrSvg(link, { size: 360 });
+          res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });
+          res.end(svg);
+        } catch (e: any) { jsonResponse(res, 500, { error: e?.message || String(e) }); }
         return;
       }
 

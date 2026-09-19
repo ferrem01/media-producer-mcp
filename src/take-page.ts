@@ -192,6 +192,11 @@ ${QUOTIENT_CSS}
   // a link without a scene prompted all seven scenes and then pinned the
   // whole 49s take to scene 1.
   var recordAll = qp.get('scene') === 'all' || sceneIndex < 0;
+  // Embedded in Studio's picker (embed=1): no "back to Studio" (we are in
+  // it), and the attached take is announced to the parent so the picker
+  // closes and the film reloads with the take in its slot.
+  var embedded = qp.get('embed') === '1';
+  if (embedded) { ['studioLinkTop'].forEach(function (id) { var el = document.getElementById(id); if (el && el.parentNode) el.parentNode.style.display = 'none'; }); document.querySelectorAll('#studioLink').forEach(function (el) { el.style.display = 'none'; }); }
   var WORDS_PER_SEC = 2.4;
 
   function show(id) {
@@ -511,6 +516,7 @@ ${QUOTIENT_CSS}
           $('studioLink').href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&token=' + encodeURIComponent(token) + '&desktop=1';
           $('studioLink').href = studioHref;
           show('done');
+          if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: recordAll ? 'all' : sceneIndex, project: project }, window.location.origin); } catch (e) {} }
         })
         .catch(function (e) { fail(e.message || String(e)); });
     };

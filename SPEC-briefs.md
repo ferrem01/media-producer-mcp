@@ -108,6 +108,13 @@ canvas and the dashed block on the timeline are two faces of one need;
 when the file lands the slate leaves and the block becomes the footage
 block. The storyboard is no longer the place to go back to.
 
+**The camera picker.** A take's picker offers Record here (the take page
+itself, embedded in the dialog with camera and mic, the lines as a
+prompter; it posts `mp-take-attached` to Studio when the take lands and
+the picker closes), On your phone (the same take link as a QR code,
+drawn on this server by `core/qr.ts` because the link carries the
+token; `GET /api/take-qr/{tenant}/{project}?scene=N`), and Upload.
+
 **The Recorder handoff.** "Record with the Recorder" on a screen slot
 arms it (SPEC-recorder.md, the armed need): the extension opens already
 pointed at that project and need, and the recording that lands fills the

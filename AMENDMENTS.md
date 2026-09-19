@@ -3796,3 +3796,14 @@ recording that lands through `provide-asset` clears the record and
 live-sync reloads the film. Only screen recordings and screenshots can
 be armed. Extension zip rebuilt.
 
+## The camera picker: record here, or on your phone
+
+A take's slot now offers the same one-door flow as a screen: Record here
+embeds the take page in the picker (`embed=1`: no back-links, and an
+`mp-take-attached` postMessage closes the picker and reloads the film),
+On your phone shows the take link as a QR drawn on this server
+(`core/qr.ts`, byte mode, ECC L, versions 1-20, verified against a
+reference decoder; the link carries the tenant token so it is never sent
+out to be drawn), and Upload. The header's Record link on the board card
+became the same two buttons.
+
