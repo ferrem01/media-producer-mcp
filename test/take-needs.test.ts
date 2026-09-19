@@ -252,4 +252,19 @@ describe("a continuous speaker track keeps no scene markers", () => {
     const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
     expect(studio).toMatch(/if \(Math\.abs\(curT - cutT\) > 0\.12\) \{\s*try \{ el\.currentTime = cutT; \}/);
   });
+
+  it("an opaque scene (no person under it) takes no take need, and a needed one it carried is withdrawn", async () => {
+    const { ensureSpeakerNeeds } = await import("../src/core/take-needs.js");
+    const project: any = { treatment: { filmGrammar: "creator-cut" }, storyboard: { scenes: [
+      { label: "Hook", voiceover_text: "Hello.", assets: [] },
+      { label: "Chapter 1", voiceover_text: "Memory learns.", transparent_background: false, assets: [{ type: "camera_video", description: "Camera take of this scene's spoken lines", status: "needed", priority: "critical", fallback: "" }] },
+    ] } };
+    expect(ensureSpeakerNeeds(project)).toBe(true);
+    expect(project.storyboard.scenes[0].assets.map((a: any) => a.type)).toEqual(["camera_video"]);
+    expect(project.storyboard.scenes[1].assets).toEqual([]);
+    expect(ensureSpeakerNeeds(project)).toBe(false);   // idempotent
+    const fs = await import("node:fs/promises");
+    const pipeline = await fs.readFile("src/llm/pipeline.ts", "utf8");
+    expect(pipeline).toMatch(/\.\.\.\(\(s as any\)\.transparent_background === false \? \{ transparent_background: false \} : \{\}\),/);
+  });
 });

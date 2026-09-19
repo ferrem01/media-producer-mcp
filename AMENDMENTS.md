@@ -4089,3 +4089,12 @@ URL from the lines when it also names stamp:url) and drops the ring.
 The logo band invented customers (Framer, Linear, Nestle): the recipe
 and the component now say only customers the brief names, never
 invented ones, and no band when none are named.
+
+Second Grade board (proj_87b44c22): the writer cast the lower-third, the
+props, the kickers and the logo-close cards itself this time -- and every
+chapter still asked for a take, and none was opaque. Two plumbing gaps:
+`storyboardToSaved` dropped `transparent_background` on the way to disk,
+and `ensureSpeakerNeeds` (run on every load) re-added a camera_video need
+to every scene with lines. The flag is now carried, and an opaque scene
+takes no take need (a needed one it carried is withdrawn; a landed take
+is kept).
