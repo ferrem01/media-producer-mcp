@@ -49,8 +49,8 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(recipeBlock(getRecipe("presenter-n-things")!, "16x9")).toMatch(/3\. PROOF -- person\+cutaway, 10s .* MADE AS: a REAL screen recording the human provides/);
     // The build holds the board to it: a motion beat asks for nothing, a recording beat must ask.
     const chapter: any = { label: "CHAPTER - Memory", purpose: "Memory builds", assets: [{ type: "screen_recording", status: "needed", description: "x" }, { type: "camera_video", status: "needed", description: "t" }], components: [{ type: "asset-placeholder", data: {} }, { type: "quotient-chat", data: {} }] };
-    expect(holdMadeToRecipe(chapter, gr)).toEqual(["1 screen need(s) dropped: the beat is motion graphics", "the slate dropped: the library performs this beat"]);
-    expect(chapter.assets.map((x: any) => x.type)).toEqual(["camera_video"]);
+    expect(holdMadeToRecipe(chapter, gr)).toEqual(["the camera take ask dropped: no person on this beat", "1 screen need(s) dropped: the beat is motion graphics", "the slate dropped: the library performs this beat"]);
+    expect(chapter.assets).toEqual([]);
     expect(chapter.components.map((x: any) => x.type)).toEqual(["quotient-chat"]);
     const provided: any = { label: "CHAPTER - Flows", assets: [{ type: "screen_recording", status: "provided", path: "/x.webm", description: "x" }], components: [] };
     expect(holdMadeToRecipe(provided, gr)).toEqual([]);   // a recording that already landed is kept
@@ -58,6 +58,44 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(holdMadeToRecipe(proof, getRecipe("presenter-n-things")!)).toEqual(["a screen_recording need added: the beat is a real recording"]);
     expect(proof.assets.map((x: any) => x.type)).toEqual(["camera_video", "screen_recording"]);
     expect(proof.assets[1].description).toBe("Memory remembers the brand");
+    // No person on a chapter: its take ask goes; the kicker is cast by the build.
+    const ch2: any = { label: "Chapter 2 - Campaigns From One Brief", assets: [{ type: "camera_video", status: "needed", description: "t" }], components: [{ type: "quotient-campaign", data: {} }] };
+    expect(holdMadeToRecipe(ch2, gr)).toEqual(["the camera take ask dropped: no person on this beat"]);
+    expect(ch2.assets).toEqual([]);
+    const { castChapterKickers } = await import("../src/core/recipes.js");
+    const board = { scenes: [
+      { label: "Hook - The Three Tools", components: [] },
+      { label: "Chapter 1 - Memory Learns Your Brand", components: [{ type: "quotient-chat", data: {} }] },
+      { label: "Chapter 2 - Campaigns From One Brief", components: [] },
+      { label: "Chapter 3 - Flows Run Forever", components: [{ type: "chapter-kicker", data: { text: "Flows", step: 3, steps: 3 } }] },
+      { label: "Return - Hundreds of Teams", components: [] },
+    ] } as any;
+    expect(castChapterKickers(board, gr)).toBe(2);
+    expect(board.scenes[1].components[1]).toEqual({ type: "chapter-kicker", data: { text: "Memory Learns Your Brand", step: 1, steps: 3, at: 0.3 } });
+    expect(board.scenes[2].components[0].data).toEqual({ text: "Campaigns From One Brief", step: 2, steps: 3, at: 0.3 });
+    expect(board.scenes[3].components.length).toBe(1);   // the writer's own kicker is kept
+    expect(board.scenes[0].components.length).toBe(0);
+    // No person on the beat: an opaque scene; the wordmark card is the logo-close template.
+    const { holdGroundToRecipe, castWordmarkCards } = await import("../src/core/recipes.js");
+    const ch3: any = { label: "Chapter 3 - Flows Run Forever" };
+    expect(holdGroundToRecipe(ch3, gr)).toBe(true); expect(ch3.transparent_background).toBe(false);
+    expect(holdGroundToRecipe({ label: "Hook - the three tools" } as any, gr)).toBe(false);
+    const wb: any = { scenes: [
+      { label: "Reveal - The Wordmark", voiceover_text: "", components: [{ type: "sticker-prop", data: { kind: "ring" } }] },
+      { label: "Return - teams", voiceover_text: "Book at getquotient.ai today.", components: [] },
+      { label: "Close - getquotient.ai", voiceover_text: "getquotient.ai", components: [{ type: "sticker-prop", data: { kind: "ring" } }, { type: "reel-caption-lane", data: {} }] },
+    ] };
+    expect(castWordmarkCards(wb, gr)).toBe(2);
+    expect(wb.scenes[0].scene_template).toEqual({ type: "st-logo-close", data: { tagline: "", cta: "", url: "" } });
+    expect(wb.scenes[0].components).toEqual([]);
+    expect(wb.scenes[2].scene_template).toEqual({ type: "st-logo-close", data: { tagline: "", cta: "", url: "getquotient.ai" } });
+    expect(wb.scenes[2].components.map((c: any) => c.type)).toEqual(["reel-caption-lane"]);
+    expect(wb.scenes[1].scene_template).toBeUndefined();
+    const pipeline3 = await read("src/llm/pipeline.ts");
+    expect(pipeline3).toMatch(/holdGroundToRecipe\(d, recipeObj\)/);
+    expect(pipeline3).toMatch(/castWordmarkCards\(storyboard as any, recipeObj\)/);
+    expect(pipeline3).toMatch(/castChapterKickers\(storyboard as any, recipeObj\)/);
+    expect(pipeline3).toMatch(/if \(!hasLane && spine\.words\.length && wantMode !== "none"\) \{/);
     // The two components the recipe names take the recipe's motion.
     const { applyRecipeMotion } = await import("../src/core/recipes.js");
     const chScene: any = { components: [{ type: "chapter-kicker", data: { text: "Memory", step: 1, steps: 3 } }, { type: "logo-band", data: { logos: [{ text: "Acme" }] } }] };
