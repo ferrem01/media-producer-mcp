@@ -4385,7 +4385,10 @@ ${QUOTIENT_CSS}
     if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-size') return;
     document.querySelectorAll('iframe.np-booth').forEach(function(f) {
       if (f.contentWindow !== ev.source) return;
-      var h = Math.max(320, Math.min(Number(ev.data.height) || 0, Math.round(window.innerHeight * 0.74)));
+      // Room for the dialog's own header, tabs, hint and Close (about 260px)
+      // inside its 86vh card, so Close stays in view.
+      var cap = Math.max(320, Math.round(window.innerHeight * 0.86) - 260);
+      var h = Math.max(240, Math.min(Number(ev.data.height) || 0, cap));
       if (h) f.style.height = h + 'px';
     });
   });
