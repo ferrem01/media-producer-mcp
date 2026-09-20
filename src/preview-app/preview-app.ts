@@ -3471,10 +3471,11 @@ ${QUOTIENT_CSS}
     // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): its token and
     // marker are internals; what a person sets is the background -- Room,
     // Blur, Alpha -- through the route that mattes a missing copy.
-    var isSpk = !!(data.speaker_layer === true || data.src === 'speaker-alpha');
+    var isSpk = comp.type === 'video' && !!(data.src === 'speaker' || data.src === 'speaker-alpha' || data.speaker_layer === true);
     if (isSpk) {
       keys = keys.filter(function(k) { return k !== 'speaker_layer' && k !== 'src' && k !== 'alpha' && k !== 'speaker_opaque' && k !== 'start_at'; });
       if (keys.indexOf('background') < 0) { data.background = 'room'; keys.unshift('background'); }
+      if (keys.indexOf('shape') < 0) { data.shape = 'rectangle'; keys.push('shape'); }
     }
 
     if (!keys.length) {
@@ -3498,7 +3499,7 @@ ${QUOTIENT_CSS}
           html += '</div>';
 
         } else if (typeof val === 'string') {
-          var enumOpts = (isSpk && key === 'background') ? ['room', 'blur', 'alpha'] : getEnumOptions(key, val);
+          var enumOpts = (isSpk && key === 'background') ? ['room', 'blur', 'alpha'] : (isSpk && key === 'shape') ? ['rectangle', 'rounded', 'circle'] : getEnumOptions(key, val);
           if (enumOpts) {
             // Enum select dropdown
             html += '<select class="prop-select" data-key="' + escAttr(key) + '">';
@@ -3592,6 +3593,15 @@ ${QUOTIENT_CSS}
       });
     }
 
+    if (isSpk) {
+      // WHERE THE PERSON SITS: full frame, or a bubble in a corner (the
+      // position lives on the wrapper; a preset writes it).
+      var pos0 = comp.position || {};
+      var curPlace = (parseFloat(pos0.width) === 100 && parseFloat(pos0.height) === 100) ? 'full' : 'custom';
+      html += '<div class="prop-row"><label class="prop-label">place</label><select class="prop-select prop-place">' +
+        ['full', 'bottom-right', 'bottom-left', 'top-right', 'top-left'].map(function(pl) { return '<option value="' + pl + '"' + (pl === curPlace ? ' selected' : '') + '>' + (pl === 'full' ? 'full frame' : pl.replace('-', ' ')) + '</option>'; }).join('') +
+        (curPlace === 'custom' ? '<option value="custom" selected>custom</option>' : '') + '</select></div>';
+    }
     html += '</div>';
     els.propEditor.innerHTML = html;
 
@@ -3626,7 +3636,27 @@ ${QUOTIENT_CSS}
     });
 
     // Select dropdowns (enum)
+    var placeSel = els.propEditor.querySelector('.prop-place');
+    if (placeSel) placeSel.addEventListener('change', function() {
+      var pl = placeSel.value; if (pl === 'custom') return;
+      var cv = (state.currentProject && state.currentProject.canvas) || { width: 1920, height: 1080 };
+      var pos;
+      if (pl === 'full') pos = { x: 0, y: 0, width: '100%', height: '100%' };
+      else {
+        // A bubble about a fifth of the frame's long side, square in pixels.
+        var wide = cv.width >= cv.height;
+        var bw = wide ? 20 : 36, bh = Math.round(bw * cv.width / cv.height * 10) / 10;
+        var mx = 4, my = Math.round(mx * cv.width / cv.height * 10) / 10;
+        pos = { x: (pl.indexOf('right') >= 0 ? 100 - bw - mx : mx) + '%', y: (pl.indexOf('bottom') >= 0 ? 100 - bh - my : my) + '%', width: bw + '%', height: bh + '%' };
+        if (!comp.data.shape || comp.data.shape === 'rectangle') { comp.data.shape = 'circle'; }
+      }
+      placeSel.disabled = true;
+      api('PATCH', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + encodeURIComponent(comp.id || ('idx:' + state.currentComponentIndex)), { position: pos, data: { shape: comp.data.shape || 'rectangle' } })
+        .then(function() { placeSel.disabled = false; comp.position = pos; studioStatus(pl === 'full' ? 'The speaker fills the frame.' : 'The speaker sits ' + pl.replace('-', ' ') + '.', 'ok'); renderProps(); startCompositePreview(state.currentProject, { time: state.masterTime, sceneIndex: state.currentSceneIndex }); })
+        .catch(function(e) { placeSel.disabled = false; studioStatus('Place: ' + (e.message || String(e)), 'err'); });
+    });
     els.propEditor.querySelectorAll('.prop-select').forEach(function(sel) {
+      if (sel.classList.contains('prop-place')) return;
       sel.addEventListener('change', function() {
         if (isSpk && sel.dataset.key === 'background') {
           // The same route as the take card: re-points the clips, mattes a
@@ -3811,7 +3841,7 @@ ${QUOTIENT_CSS}
       if (eff(c.exit)) meta.push(eff(c.exit) + ' \\u2192');
       html += '<div class="insp-node' + (i === state.currentComponentIndex ? ' active' : '') + '" data-ci="' + i + '">'
         + '<span class="in-dot" style="background:' + (isCustom ? 'var(--content-tertiary)' : compColor(c.type)) + '"></span>'
-        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : (c.data && (c.data.speaker_layer === true || c.data.src === 'speaker-alpha') ? 'speaker' : c.type)) + '</span>'
+        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : (c.type === 'video' && c.data && (c.data.src === 'speaker' || c.data.src === 'speaker-alpha' || c.data.speaker_layer === true) ? 'speaker' : c.type)) + '</span>'
         + '<span class="in-meta">' + escHtml(meta.join(' \\u00b7 ')) + '</span>'
         + '</div>';
       // DIRECTION, not just timing. Dragging a bar in the timeline only ever
@@ -9488,7 +9518,7 @@ ${QUOTIENT_CSS}
     var bgRow = '';
     if (a.type === 'camera_video') {
       var built = (project.scenes || [])[si];
-      var spk = built && (built.components || []).filter(function(c0) { return c0 && c0.data && (c0.data.speaker_layer === true || c0.data.src === 'speaker-alpha'); })[0];
+      var spk = built && (built.components || []).filter(function(c0) { return (c0 && c0.type === 'video' && c0.data && (c0.data.src === 'speaker' || c0.data.src === 'speaker-alpha' || c0.data.speaker_layer === true)); })[0];
       var cur = spk ? (spk.data.background || (spk.data.src === 'speaker-alpha' ? 'alpha' : 'room')) : 'room';
       var hasBuilt = !!built;
       bgRow = '<div class="np-act" style="align-items:center;gap:6px;margin-top:6px;"><span class="np-hint" style="margin-right:4px">Background</span>' +

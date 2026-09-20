@@ -1,38 +1,54 @@
 /**
- * THE SPEAKER IS A COMPONENT (Marc, 2026-09-20: "make speaker track be
- * something that is only shown via a video component ... if the video
- * clip is set to alpha or transparent then we get what we want").
+ * THE SPEAKER IS A VIDEO COMPONENT (Marc, 2026-09-20: "if the video
+ * component had the ability to play source speaker or a file, you
+ * wouldn't need a special speaker component ... add position and size
+ * and you have lots of control").
  *
- * Every speaker scene carries ONE `video` component on the "speaker"
- * token with a `background` setting:
+ * ONE RULE: a `video` component whose src is the "speaker" token is the
+ * person. Any position, any size, any place in the stack, any number of
+ * them. Its `background` says which copy of the take it plays:
  *
- *   room  -- the raw take. The camera stays the BASE under a transparent
- *            scene (core/speaker-mode.ts); the component draws nothing.
- *   blur  -- the blurred copy (<name>-blur.mp4) as the base, same way.
- *   alpha -- the person on a transparent frame (<name>-alpha.webm),
- *            played INSIDE the scene at the component's place in the
- *            stack; the scene renders opaque. Whatever lies under the
- *            component -- a mock, footage, a still, the brand colour --
- *            is the room behind the person.
+ *   room  -- the raw take.
+ *   blur  -- the blurred copy (<name>-blur.mp4).
+ *   alpha -- the person on a transparent frame (<name>-alpha.webm):
+ *            whatever lies under the component -- a mock, footage, a
+ *            still, the brand colour -- is the room behind the person.
+ *
+ * and `shape` rounds it (rectangle, rounded, circle) for a bubble in a
+ * corner over a screencast.
+ *
+ * THE BASE IS AN OPTIMISATION, NOT A CONCEPT. When the speaker is the
+ * usual full-frame person at the bottom of the stack on room or blur,
+ * the renderer keeps its fast path: the camera is the ffmpeg base under a
+ * transparent scene and the component draws nothing (speakerUsesBase).
+ * Anywhere else -- alpha, a ground under it, a corner bubble -- the
+ * component draws where it sits and the scene renders opaque
+ * (speakerRendersInside). Nobody sees the difference.
  *
  * The copies are made once per take by the matte (core/take-matte.ts),
- * on request: when a scene's component already asks for blur or alpha
- * as the take lands, or when the setting is flipped later in Studio. The
- * raw take is always kept; the clips of the speaker track point at the
- * copy the scene's setting wants (syncSpeakerClips).
+ * on request: the booth's choice, Studio's Background choice, or a scene
+ * that already asks for one when the take lands. The raw take is always
+ * kept; the speaker track's clips point at the copy each scene wants
+ * (syncSpeakerClips). The speaker TRACK stays what it is -- the film's
+ * clock and voice (the take's audio, trims, word timings); the component
+ * is only the picture.
  *
- * One token, one rule, one cast -- pipeline (build), take attach, the
- * background route, preview, thumbnail, cards and render all read it.
+ * Older shapes still read as the speaker: the "speaker-alpha" token and
+ * the `speaker_layer` marker of the first cut; `pip_source: "speaker"` on
+ * a screencast frame and a generated `<video src="speaker">` bubble keep
+ * their own paths (scene-assembler.ts) untouched.
  */
 
 export const SPEAKER_SRC = "speaker";
 /** The older token of the alpha layer; read as background "alpha". */
 export const SPEAKER_ALPHA_SRC = "speaker-alpha";
-/** The component's id. */
+/** The default component id. */
 export const SPEAKER_LAYER_ID = "speaker";
 
 export type SpeakerBackground = "room" | "blur" | "alpha";
 export const SPEAKER_BACKGROUNDS: readonly SpeakerBackground[] = ["room", "blur", "alpha"];
+export type SpeakerShape = "rectangle" | "rounded" | "circle";
+export const SPEAKER_SHAPES: readonly SpeakerShape[] = ["rectangle", "rounded", "circle"];
 
 type Comp = { id?: string; type?: string; z_index?: number; position?: any; data?: Record<string, any>; enter?: any; exit?: any };
 type SceneLike = { components?: Array<Comp | null> | null; duration_seconds?: number; transparent_background?: boolean };
@@ -44,10 +60,19 @@ export function asSpeakerBackground(v: unknown): SpeakerBackground | null {
   if (v === "none") return "room";
   return (SPEAKER_BACKGROUNDS as readonly string[]).includes(String(v)) ? (v as SpeakerBackground) : null;
 }
+export function asSpeakerShape(v: unknown): SpeakerShape | null {
+  return (SPEAKER_SHAPES as readonly string[]).includes(String(v)) ? (v as SpeakerShape) : null;
+}
 
-/** True when the component is the speaker: the marker, or the older alpha token. */
+/** True when the data holds the speaker token (either spelling, or the
+ *  first cut's marker). */
+export function isSpeakerData(data: Record<string, any> | null | undefined): boolean {
+  return !!data && (data.src === SPEAKER_SRC || data.src === SPEAKER_ALPHA_SRC || data.speaker_layer === true);
+}
+
+/** True when the component is the person: a video on the speaker token. */
 export function isSpeakerLayer(c: Comp | null | undefined): boolean {
-  return !!c && !!c.data && (c.data.speaker_layer === true || c.data.src === SPEAKER_ALPHA_SRC);
+  return !!c && (c.type === "video" || c.type === undefined) && isSpeakerData(c.data);
 }
 
 /** The component's background setting (room when unset). */
@@ -56,9 +81,14 @@ export function speakerBackgroundOf(c: Comp | null | undefined): SpeakerBackgrou
   return asSpeakerBackground(c.data.background) || (c.data.src === SPEAKER_ALPHA_SRC ? "alpha" : "room");
 }
 
-/** The scene's speaker component, when cast. */
+/** Every speaker component of the scene. */
+export function speakerLayersOf(scene: SceneLike | null | undefined): Comp[] {
+  return ((scene?.components || []) as Comp[]).filter((c) => isSpeakerLayer(c));
+}
+
+/** The scene's first speaker component, when cast. */
 export function speakerLayerOf(scene: SceneLike | null | undefined): Comp | undefined {
-  return ((scene?.components || []) as Comp[]).find((c) => isSpeakerLayer(c)) || undefined;
+  return speakerLayersOf(scene)[0];
 }
 
 /** The scene's background setting for the speaker (room when no component). */
@@ -66,15 +96,35 @@ export function sceneSpeakerBackground(scene: SceneLike | null | undefined): Spe
   return speakerBackgroundOf(speakerLayerOf(scene));
 }
 
-/** True when the scene plays the speaker INSIDE it, at the component's
- *  place in the stack: on alpha, and on room or blur whenever a ground
- *  lies under the component (the base would be buried under the ground;
- *  what is stacked is what shows). The scene then renders opaque over the
- *  camera base, which would otherwise double the person. */
+/**
+ * THE FAST PATH: the scene has exactly one speaker component, full-frame,
+ * on room or blur, with nothing under it in the stack (the lowest z, no
+ * ground). The camera is then the ffmpeg base under a transparent scene
+ * and the component draws nothing -- the picture is the same.
+ */
+export function speakerUsesBase(scene: SceneLike | null | undefined): boolean {
+  const layers = speakerLayersOf(scene);
+  if (layers.length !== 1) return false;
+  const c = layers[0];
+  if (speakerBackgroundOf(c) === "alpha") return false;
+  if (!fullStage(c.position)) return false;
+  if (asSpeakerShape(c.data?.shape) && c.data!.shape !== "rectangle") return false;
+  if (groundOf(scene)) return false;
+  const z = Number(c.z_index);
+  const zc = Number.isFinite(z) ? z : 0;
+  for (const o of (scene?.components || []) as Comp[]) {
+    if (!o || o === c) continue;
+    const oz = Number(o.z_index);
+    if ((Number.isFinite(oz) ? oz : 0) < zc) return false;
+  }
+  return true;
+}
+
+/** True when the scene draws the speaker INSIDE it (any speaker component
+ *  off the fast path). The scene then renders opaque over the camera
+ *  base, which would otherwise double the person. */
 export function speakerRendersInside(scene: SceneLike | null | undefined): boolean {
-  const c = speakerLayerOf(scene);
-  if (!c) return false;
-  return speakerBackgroundOf(c) === "alpha" || !!groundOf(scene);
+  return speakerLayersOf(scene).length > 0 && !speakerUsesBase(scene);
 }
 
 function fullStage(p: any): boolean {
@@ -99,7 +149,7 @@ export function groundOf(scene: SceneLike | null | undefined): Comp | undefined 
     if (d.ground === false) return false;
     if (d.ground === true) return true;
     const src = String(d.src || "");
-    if (!src || src === SPEAKER_SRC) return false;
+    if (!src || src === SPEAKER_SRC || src === SPEAKER_ALPHA_SRC) return false;
     const at = Number(d.at), exitAt = Number(d.exit_at);
     if (Number.isFinite(at) && at > 0.25) return false;
     if (Number.isFinite(exitAt) && dur > 0 && exitAt < dur - 0.25) return false;
@@ -112,8 +162,8 @@ export function groundOf(scene: SceneLike | null | undefined): Comp | undefined 
 }
 
 /**
- * Cast the speaker component on a scene. Idempotent; returns true when it
- * was added. Over a ground it sits right above it (ground z 1, speaker
+ * Cast the speaker component on a scene (the usual full-frame person).
+ * Idempotent; returns true when it was added. Over a ground it sits right above it (ground z 1, speaker
  * z 2, anything that stood at or under those rises above them, so the
  * graphics that rode over the person keep riding over them); with no
  * ground it sits at the bottom of the stack. The default background is
@@ -130,7 +180,7 @@ export function castSpeakerLayer(scene: SceneLike | null | undefined, opts: { ba
     type: "video",
     z_index: ground ? 2 : 1,
     position: { x: 0, y: 0, width: "100%", height: "100%" },
-    data: { src: SPEAKER_SRC, object_fit: "cover", speaker_layer: true, background },
+    data: { src: SPEAKER_SRC, object_fit: "cover", background },
   };
   for (const c of comps) {
     if (!c || c === ground) continue;
@@ -154,7 +204,9 @@ export function setSpeakerBackground(scene: SceneLike | null | undefined, backgr
   if (!scene || !Array.isArray(scene.components)) return null;
   castSpeakerLayer(scene, { background });
   const layer = speakerLayerOf(scene)!;
-  layer.data = { ...(layer.data || {}), src: layer.data?.src === SPEAKER_ALPHA_SRC ? SPEAKER_SRC : (layer.data?.src || SPEAKER_SRC), speaker_layer: true, background };
+  const d: Record<string, any> = { ...(layer.data || {}), src: layer.data?.src === SPEAKER_ALPHA_SRC ? SPEAKER_SRC : (layer.data?.src || SPEAKER_SRC), background };
+  delete d.speaker_layer; // the first cut's marker: the token is the rule now
+  layer.data = d;
   return layer;
 }
 
@@ -218,25 +270,30 @@ export function missingSpeakerCopies(project: ProjectLike, take: TakeLike): { bl
 }
 
 /**
- * Bind the speaker component's data for assembly (background alpha): the
- * token becomes the take's alpha copy -- or the plain take while none
- * exists -- seeked to the take's trim so it runs on the same clock as
- * the base. Returns null when there is no take at all: the caller leaves
- * the component out (a black window would bury the ground). Any other
- * component's data comes back untouched.
+ * Bind a speaker component's data for assembly, once the scene draws it
+ * inside: the token becomes the file to play -- the alpha copy on alpha
+ * (or the plain take while none exists), the clip the base plays
+ * otherwise -- seeked to where that file stands at the scene's start.
+ * Returns null when there is no take at all: the caller leaves the
+ * component out (a black window would bury the ground). Any other
+ * component's data, and a speaker already bound to a file, come back
+ * untouched.
  */
 export function bindSpeakerLayerData(
   data: Record<string, any>,
-  speaker: { alphaUrl?: string; url?: string; offset?: number } | null | undefined,
+  speaker: { alphaUrl?: string; alphaOffset?: number; url?: string; offset?: number } | null | undefined,
 ): Record<string, any> | null {
-  if (!data || !(data.speaker_layer === true || data.src === SPEAKER_ALPHA_SRC)) return data;
-  // Already a file (the render binds before the worker assembles): keep it
-  // -- binding twice swapped the alpha copy for the opaque base (measured).
+  if (!isSpeakerData(data)) return data;
   if (data.src !== SPEAKER_SRC && data.src !== SPEAKER_ALPHA_SRC) return data;
-  const src = speaker?.alphaUrl || speaker?.url;
+  const background = asSpeakerBackground(data.background) || (data.src === SPEAKER_ALPHA_SRC ? "alpha" : "room");
+  const useAlpha = background === "alpha" && !!speaker?.alphaUrl;
+  const src = useAlpha ? speaker!.alphaUrl : speaker?.url;
   if (!src) return null;
-  // `speaker_layer` keeps the component recognisable once the token is a
-  // file (the render resolves it before the compositing rule runs);
-  // `alpha` tells the video component not to paint under the clip.
-  return { ...data, src, start_at: Math.max(0, Number(speaker?.offset) || 0), speaker_layer: true, background: asSpeakerBackground(data.background) || (data.src === SPEAKER_ALPHA_SRC ? "alpha" : "room"), ...(speaker?.alphaUrl ? { alpha: true } : { speaker_opaque: true }) };
+  const offset = useAlpha ? (speaker!.alphaOffset ?? speaker!.offset) : speaker!.offset;
+  const out: Record<string, any> = { ...data, src, start_at: Math.max(0, Number(offset) || 0), background };
+  delete out.speaker_layer;
+  // `alpha` tells the video component not to paint under the clip;
+  // `speaker_opaque` says the clip is the plain take standing in.
+  if (useAlpha) out.alpha = true; else if (background === "alpha") out.speaker_opaque = true;
+  return out;
 }

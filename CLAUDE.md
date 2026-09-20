@@ -77,16 +77,19 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
     Judgment defects (`intent_mismatch`, `empty_skeleton`, `stray_ui`) and contrast
     inside a component's own chrome are deliberately left as reports — see
     `AMENDMENTS.md` for why, and for the live run that shaped the table.
-- **The speaker is a component** (`core/speaker-layer.ts`, rule in `core/speaker-mode.ts`):
-  every speaker scene carries one `video` component on the `speaker` token with
-  `data.background` = `room` | `blur` | `alpha`. Room/blur: the camera (raw or the
-  blurred copy) is the ffmpeg BASE under a transparent scene and the component draws
-  nothing. Alpha: the take's cut-out copy (`<name>-alpha.webm`) plays INSIDE the
-  scene at the component's place in the stack and the scene renders opaque -- whatever
-  lies under the component is the room. Copies are made once per take by the matte
-  (`core/take-matte.ts`), on request (booth choice, Studio's Background row,
-  `POST /api/speaker-background`); the raw take is always kept and
-  `syncSpeakerClips` points the track's clips at the copy each scene wants.
+- **The speaker is a video component** (`core/speaker-layer.ts`, rule in `core/speaker-mode.ts`):
+  ONE RULE -- a `video` component whose `src` is the `speaker` token is the person, at any
+  position, size, shape (`rectangle|rounded|circle`) and place in the stack; its
+  `data.background` = `room` | `blur` | `alpha` picks the copy of the take it plays. The
+  ffmpeg camera BASE is an optimisation only (`speakerUsesBase`: one full-frame speaker on
+  room/blur with nothing under it -> transparent scene over the base, component draws
+  nothing); anything else draws where it sits and the scene renders opaque
+  (`speakerRendersInside`). Copies are made once per take by the matte
+  (`core/take-matte.ts`), on request (booth choice, Studio Inspect/take card,
+  `POST /api/speaker-background`); the raw take is always kept and `syncSpeakerClips`
+  points the track's clips at the copy each scene wants. The speaker TRACK stays the film's
+  clock and voice; the component is only the picture. Legacy: `pip_source: "speaker"` and
+  codegen `<video src="speaker">` keep their own paths.
 - **One scene vocabulary:** `purpose` + `visual_notes` everywhere (matches
   `StoryboardScene`). The word "brief" is retired at the scene level; the assembled
   codegen bundle is "the spec". A loud guard in `storyboard-builder.ts` ensures visual

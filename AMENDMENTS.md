@@ -4305,3 +4305,41 @@ cleaner than the ground-detection shortcut, and it is now the model.
   blur draw nothing over the underlay; alpha binds the alpha copy at the
   trim and the scene is opaque); the one-scene test film still renders
   the person over the pattern; the full suite green.
+
+## 2026-09-20 -- One rule: a video component on the speaker token
+
+Marc: "if the video component had the ability to play source speaker or
+a file, you wouldn't need a special speaker component ... add position
+and size fields and you have lots of control. Does that collapse some
+concepts?" It does, and it is mostly deletion.
+
+- The marker flag (`speaker_layer`) is gone from new data (still read).
+  A `video` component whose `src` is `speaker` is the person -- any
+  position, size, shape (`rectangle|rounded|circle`), any place in the
+  stack, any number of them. `background` room|blur|alpha picks the copy.
+- The camera base is an optimisation, not a concept: `speakerUsesBase`
+  (one full-frame speaker on room or blur with nothing under it) keeps
+  the fast path; anything else -- alpha, a ground, a corner bubble, a
+  second speaker -- draws where it sits and the scene renders opaque.
+  The render no longer rewrites the component's data: the worker binds
+  the token at assembly, handed the scene's alpha copy at its trim, so
+  the compositing rule reads the same data everywhere.
+- Inspect: the cast row says "speaker"; background and shape are
+  choices; a "place" preset writes the wrapper position (full frame or a
+  circle bubble in a corner, about a fifth of the frame). The route
+  behind the background choice is unchanged.
+- Kept apart on purpose: the speaker TRACK (the take's audio, trims,
+  word timings, the base) is the film's clock and voice; the component
+  is only the picture. Legacy `pip_source: "speaker"` on screencast
+  frames and generated `<video src="speaker">` bubbles keep their paths.
+- Not yet: the pipeline still casts screencast scenes with the PiP
+  property; a screencast board arriving as two video components (the
+  recording as the ground, the speaker as a corner bubble) is the next
+  step, once the hand-laid test film proves the combinations.
+- Known limit: the copy is chosen per SCENE (the clip the speaker track
+  plays there), so two speaker components in one scene share it -- a
+  room and a blur speaker side by side both show the scene's clip.
+  Alpha is per component (its own copy). Verified here through the
+  built assembler: seven stacks (full room/blur on the base, full alpha,
+  alpha over a ground, a room and an alpha circle over a screencast, two
+  speakers) bind the file and the trim each one should.

@@ -23,6 +23,9 @@
     // A clip with alpha (the take as a layer, core/speaker-layer.ts): the
     // wrap must not paint -- its black box would bury whatever lies under.
     if (data.alpha) container.style.background = 'transparent';
+    // shape: a bubble in a corner (the speaker over a screencast).
+    if (data.shape === 'circle') { container.style.borderRadius = '50%'; container.style.overflow = 'hidden'; }
+    else if (data.shape === 'rounded') { container.style.borderRadius = '24px'; container.style.overflow = 'hidden'; }
 
     // Set object-fit from data or default to cover
     var fit = data.object_fit || 'cover';
