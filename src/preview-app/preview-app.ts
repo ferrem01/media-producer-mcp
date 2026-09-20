@@ -997,6 +997,8 @@ ${QUOTIENT_CSS}
   .np-btn { display: inline-flex; align-items: center; height: 28px; font-size: 12px; font-weight: 500; padding: 0 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-secondary); background: var(--surface-primary); color: var(--content-primary); cursor: pointer; text-decoration: none; white-space: nowrap; box-shadow: var(--shadow-weak); transition: all 150ms cubic-bezier(.4,0,.2,1); font-family: inherit; }
   .np-btn:hover { background: var(--accent); }
   .np-btn:active { transform: translateY(1px); }
+  .np-btn.active { background: var(--content-primary); color: var(--surface-primary); border-color: var(--content-primary); }
+  .np-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
   .np-note { font-size: 11px; color: var(--content-secondary); margin-top: 8px; }
   /* THE SOURCES: each need collects its own way, inline under its row. */
   .np-act { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
@@ -4270,31 +4272,11 @@ ${QUOTIENT_CSS}
     panel.querySelector('.np-q').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); search(); } });
     search();
   }
-  // Room / Blur / Alpha on one scene's speaker component. The server
-  // re-points the clips and mattes a missing copy in the background; the
-  // film reloads on the new version (live sync) when the copy lands.
-  function npSetSpeakerBackground(project, root, si, mode, btn) {
-    var row = btn.parentNode;
-    row.querySelectorAll('.mp-spkbg').forEach(function(b) { b.classList.toggle('active', b === btn); b.disabled = true; });
-    api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { scene_index: si, background: mode })
-      .then(function(r) {
-        row.querySelectorAll('.mp-spkbg').forEach(function(b) { b.disabled = false; });
-        if (r.project) { state.currentProject = r.project; project.scenes = r.project.scenes; project.speaker_track = r.project.speaker_track; project.takes = r.project.takes; }
-        var word = mode === 'room' ? 'the room' : mode === 'blur' ? 'a blurred room' : 'whatever the scene puts behind you';
-        studioStatus(r.matte === 'running' ? 'Scene ' + (si + 1) + ': ' + (mode === 'blur' ? 'blurring' : 'cutting you out') + ' \u2014 a few minutes; the scene switches when it lands.' : (r.has_take ? 'Scene ' + (si + 1) + ' plays you over ' + word + '.' : 'Scene ' + (si + 1) + ' will use ' + word + ' when a take lands.'), 'ok');
-        startCompositePreview(state.currentProject, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
-      })
-      .catch(function(e) {
-        row.querySelectorAll('.mp-spkbg').forEach(function(b) { b.disabled = false; });
-        studioStatus('Background: ' + (e.message || String(e)), 'err');
-      });
-  }
   function bindSceneNeeds(project, root) {
     (root || document).querySelectorAll('button[data-np-scene]').forEach(function(btn) {
       if (btn.dataset.npBound) return; btn.dataset.npBound = '1';
       btn.addEventListener('click', function() {
         var si = parseInt(btn.dataset.npScene, 10), ai = parseInt(btn.dataset.npAsset, 10);
-        if (btn.dataset.npBg) { npSetSpeakerBackground(project, root, si, btn.dataset.npBg, btn); return; }
         if (btn.dataset.npSrc) { npOpenPanel(project, root, btn.dataset.npSrc, si, ai); return; }
         npPick = { scene: si, asset: ai, type: btn.dataset.npType, project: project.project_id };
         var f = document.getElementById('np-file');
@@ -9529,23 +9511,9 @@ ${QUOTIENT_CSS}
       if (src === 'upload') acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
       else acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + ai + '">' + (have && src === 'find' ? 'Find another' : (have && src === 'draw' ? 'Redraw' : (have && src === 'booth' ? 'Re-record here' : NP_SOURCE_LABELS[src]))) + '</button>';
     });
-    // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): the take's
-    // background -- Room, Blur, Alpha -- on its own row. Alpha cuts the
-    // person out so whatever the scene puts under the speaker is the room.
-    var bgRow = '';
-    if (a.type === 'camera_video') {
-      var built = (project.scenes || [])[si];
-      var spk = built && (built.components || []).filter(function(c0) { return (c0 && c0.type === 'video' && c0.data && (c0.data.src === 'speaker' || c0.data.src === 'speaker-alpha' || c0.data.speaker_layer === true)); })[0];
-      var cur = spk ? (spk.data.background || (spk.data.src === 'speaker-alpha' ? 'alpha' : 'room')) : 'room';
-      var hasBuilt = !!built;
-      bgRow = '<div class="np-act" style="align-items:center;gap:6px;margin-top:6px;"><span class="np-hint" style="margin-right:4px">Background</span>' +
-        ['room', 'blur', 'alpha'].map(function(m) {
-          return '<button class="np-btn mp-spkbg' + (cur === m ? ' active' : '') + '" data-np-bg="' + m + '" data-np-scene="' + si + '" data-np-asset="' + ai + '"' + (hasBuilt ? '' : ' disabled title="Build the film first"') + ' title="' + (m === 'room' ? 'What the camera saw' : m === 'blur' ? 'The room goes soft, you stay sharp' : 'You are cut out: whatever the scene puts behind you is the room') + '">' + (m === 'room' ? 'Room' : m === 'blur' ? 'Blur' : 'Alpha') + '</button>';
-        }).join('') + '</div>';
-    }
     return '<div class="np-row" style="border-top:0;padding:4px 0 6px;"><div class="np-what">The <b>' + escHtml(NP_KIND[a.type] || a.type) + '</b> the board asked for' + (a.description && a.type !== 'camera_video' ? ' — “' + escHtml(String(a.description).slice(0, 70)) + '”' : '') +
       '<small>' + (have ? '<b class="ok">provided</b>' : '<b>needed</b>') + ' · a pick lands in the scene right away</small></div>' +
-      '<div class="np-act">' + acts + '</div>' + bgRow + '<div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div></div>';
+      '<div class="np-act">' + acts + '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div></div>';
   }
   // The compact line a popover carries: what the slot is, one button that
   // opens the picker in the dialog (the grid needs room the popover lacks --
@@ -9565,6 +9533,30 @@ ${QUOTIENT_CSS}
     if (!a) return;
     rvPopClose(); camPopClose(); muStop();
     var kind = NP_KIND[a.type] || a.type, have = a.status === 'provided' && a.path;
+    if (a.type === 'camera_video') {
+      // THE CAMERA TAKE (Marc: "why is there these buttons and there is radio
+      // buttons in the body?"): one header, one row of tabs for HOW the take
+      // arrives, the recorder open underneath. Soft look and the background
+      // are chosen in the recorder, where they apply to the take being made;
+      // a take already on the scene changes its background in Inspect.
+      var lbl = sb.label ? String(sb.label).replace(/^Scene \d+\s*[-–—:·]\s*/i, '') : '';
+      var tk = (project.takes || []).filter(function(t) { return t.scene_index === si; }).slice(-1)[0];
+      var tkDur = tk && tk.duration ? Math.round(tk.duration * 10) / 10 + ' s' : '';
+      studioModalOpen('<h3 class="sm-title">Camera take \u00b7 Scene ' + (si + 1) + (lbl ? ' \u00b7 ' + escHtml(lbl) : '') + '</h3>' +
+        '<p class="sm-desc">' + (have ? 'A take is on this scene' + (tkDur ? ' (' + tkDur + ')' : '') + '; a new one replaces it.' : 'No take on this scene yet.') + ' Soft look and the background are set in the recorder and apply to the take you make.</p>' +
+        '<div class="np-tabs">' +
+          '<button class="np-btn active" data-np-src="booth" data-np-scene="' + si + '" data-np-asset="' + ai + '">Record here</button>' +
+          '<button class="np-btn" data-np-src="phone" data-np-scene="' + si + '" data-np-asset="' + ai + '">On your phone</button>' +
+          '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="camera_video">Upload a file</button>' +
+        '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div>' +
+        '<div class="sm-actions"><button class="sm-btn" id="np-picker-close">Close</button></div>');
+      var cardC = document.getElementById('studio-modal-card');
+      bindSceneNeeds(project, cardC);
+      cardC.querySelectorAll('.np-tabs .np-btn').forEach(function(b) { b.addEventListener('click', function() { cardC.querySelectorAll('.np-tabs .np-btn').forEach(function(x) { x.classList.toggle('active', x === b); }); }); });
+      document.getElementById('np-picker-close').addEventListener('click', function() { muStop(); studioModalClose(); });
+      npOpenPanel(project, cardC, 'booth', si, ai);
+      return;
+    }
     studioModalOpen('<h3 class="sm-title">' + (have ? 'Replace the ' : 'Provide the ') + escHtml(kind) + '</h3>' +
       '<p class="sm-desc">Scene ' + (si + 1) + (a.description && a.type !== 'camera_video' ? ' — “' + escHtml(a.description) + '”' : '') + '. A pick lands in the scene right away.</p>' +
       needSourcesHtml(project, si, ai) +
