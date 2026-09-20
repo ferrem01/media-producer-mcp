@@ -241,7 +241,7 @@ describe("the alpha copy", () => {
     expect(g).toContain("[fgc][m]alphamerge,format=yuva420p[out]");
   });
   it("is VP9 with alpha in WebM (what Chromium plays), no alt-ref frames, muted", () => {
-    expect(ALPHA_ENCODE_ARGS).toEqual(expect.arrayContaining(["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-auto-alt-ref", "0", "-an"]));
+    expect(ALPHA_ENCODE_ARGS).toEqual(expect.arrayContaining(["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-auto-alt-ref", "0", "-crf", "24", "-an"]));
   });
   it("the render workers keep its alpha: WebM frames come out as WebP through the libvpx decoder", async () => {
     for (const f of ["src/core/scene-worker.ts", "src/core/capture-worker.ts"]) {

@@ -4343,3 +4343,15 @@ concepts?" It does, and it is mostly deletion.
   built assembler: seven stacks (full room/blur on the base, full alpha,
   alpha over a ground, a room and an alpha circle over a screencast, two
   speakers) bind the file and the trim each one should.
+
+## 2026-09-20 -- Sharper takes: the recorder's bitrate, the alpha copy's quality
+
+Marc: "the camera quality on the laptop camera seems to be of low
+quality. Is that normal?" Partly. The booth created its MediaRecorder
+without a bitrate, so the browser's default (near 2.5 Mbps) smeared hair
+and skin at 1080p; it now asks for 8 Mbps video and 128 kbps audio. The
+alpha copy was encoded at crf 32 / cpu-used 5 for speed and read soft on
+the cut-out scenes; crf 24 / cpu-used 4 costs no time (measured here:
+the same 17 s on a 3 s slice, the file 1.7x larger). The soft look
+(temporal denoise) stays a per-take choice, on by default -- turn it off
+for a sharper take. Light on the face beats any setting.

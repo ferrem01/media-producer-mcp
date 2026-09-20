@@ -116,8 +116,8 @@ export function matteAlphaGraph(width: number, height: number, fps: number): str
 
 /** The encoder for the alpha copy: VP9 with alpha in WebM (the one alpha
  *  video Chromium plays); no alt-ref frames (they break alpha), constant
- *  quality, row threads. */
-export const ALPHA_ENCODE_ARGS = ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-auto-alt-ref", "0", "-b:v", "0", "-crf", "32", "-deadline", "good", "-cpu-used", "5", "-row-mt", "1", "-an"];
+ *  quality (crf 24: the person is the hero, crf 32 read soft), row threads. */
+export const ALPHA_ENCODE_ARGS = ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-auto-alt-ref", "0", "-b:v", "0", "-crf", "24", "-deadline", "good", "-cpu-used", "4", "-row-mt", "1", "-an"];
 
 /** The alpha copy's name for a take file (…/take.mp4 -> …/take-alpha.webm). */
 export function alphaCopyName(file: string): string {
