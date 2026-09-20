@@ -2611,7 +2611,7 @@ Rules:
         // past the proxy's limit (measured live: dropped at 300 s).
         const tkWantBlur = tkBody.background === "blur";
         const tkBlurStrength = Number(tkBody.blur_strength) > 0 ? Number(tkBody.blur_strength) : undefined;
-        const tkBlurNote = tkWantBlur ? "background blur running -- the take swaps to the blurred copy when it is done (about a minute per 15 s)" : "";
+        const tkBlurNote = tkWantBlur ? "background blur running -- the take swaps to the blurred copy when it is done (a few minutes for a 15 s take on the server)" : "";
         await primeTakeWords(tkPeek, tkUrl, config.dataDir);
         const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
         // Where is the face? Measured once here so the layout can build its
