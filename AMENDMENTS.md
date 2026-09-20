@@ -4195,3 +4195,11 @@ take, as an option next to the soft look (`core/take-matte.ts`):
 - Install note: onnxruntime-node's install script tries to download CUDA
   binaries on Linux x64; `.npmrc` sets `onnxruntime-node-install-cuda=skip`
   so `npm ci` on CI and the droplet stays offline-safe.
+
+Live check on the droplet: the attach with the blur inline held the
+request past the proxy's 300 s limit and the connection dropped. The
+blur now runs AFTER the attach (`queueTakeBlur`): the take lands at once,
+unblurred, the matte runs in the background, and every take, clip and
+need that points at the raw file swaps to the blurred copy when it is
+done; the save bumps the version so Studio's live sync picks it up and
+the cards re-shoot.
