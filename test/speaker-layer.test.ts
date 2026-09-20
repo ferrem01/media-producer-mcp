@@ -82,9 +82,14 @@ describe("casting the speaker component", () => {
     castSpeakerLayer(scene);
     expect(speakerRendersInside(scene)).toBe(true);
     expect(sceneCompositesOverSpeaker(scene, true)).toBe(false);
+    // Blur over a ground still plays inside (what is stacked is what shows: the base would be buried under the ground).
     setSpeakerBackground(scene, "blur");
-    expect(speakerRendersInside(scene)).toBe(false);
-    expect(sceneCompositesOverSpeaker(scene, true)).toBe(true);
+    expect(speakerRendersInside(scene)).toBe(true);
+    expect(sceneCompositesOverSpeaker(scene, true)).toBe(false);
+    const bare: any = { duration_seconds: 8, components: [lower()] };
+    setSpeakerBackground(bare, "blur");
+    expect(speakerRendersInside(bare)).toBe(false);
+    expect(sceneCompositesOverSpeaker(bare, true)).toBe(true);
     expect(scene.transparent_background).toBeUndefined(); // the board's flag is untouched: the take need stays
     // ...and still after the render resolved the token to a file (the marker survives the binding).
     setSpeakerBackground(scene, "alpha");
@@ -105,6 +110,9 @@ describe("binding the component at assembly (alpha)", () => {
   it("falls back to the plain take while no alpha copy exists, and drops the component with no take at all", () => {
     expect(bindSpeakerLayerData(spk, { url: "/assets/t/take.mp4", offset: 0 }))
       .toEqual({ src: "/assets/t/take.mp4", object_fit: "cover", start_at: 0, speaker_layer: true, background: "alpha", speaker_opaque: true });
+    // Room or blur over a ground: the clip itself (raw or the blurred copy), opaque, at its place in the stack.
+    expect(bindSpeakerLayerData({ ...spk, background: "blur" }, { url: "/assets/t/take-blur.mp4", offset: 0 }))
+      .toEqual({ src: "/assets/t/take-blur.mp4", object_fit: "cover", start_at: 0, speaker_layer: true, background: "blur", speaker_opaque: true });
     expect(bindSpeakerLayerData(spk, undefined)).toBeNull();
     expect(bindSpeakerLayerData({ src: SPEAKER_ALPHA_SRC }, { alphaUrl: undefined, url: undefined })).toBeNull();
   });
@@ -115,13 +123,15 @@ describe("binding the component at assembly (alpha)", () => {
     const bound = { src: "file:///t/take-alpha.webm", speaker_layer: true, background: "alpha", alpha: true, start_at: 0 };
     expect(bindSpeakerLayerData(bound, { url: "file:///t/base.mp4", offset: 3 })).toBe(bound);
   });
-  it("room and blur draw nothing in the assemblers and the render (the base carries the person)", async () => {
+  it("the assemblers and the render draw the component only when the scene plays it inside; the alpha copy only on alpha", async () => {
     for (const f of ["src/core/scene-assembler.ts", "src/core/composite-assembler.ts"]) {
-      expect(await fsp.readFile(f, "utf8")).toMatch(/if \(isSpeakerLayer\(comp\) && speakerBackgroundOf\(comp\) !== "alpha"\) continue;/);
+      const src = await fsp.readFile(f, "utf8");
+      expect(src).toMatch(/if \(isSpeakerLayer\(comp\) && !speakerRendersInside\(scene\)\) continue;/);
+      expect(src).toMatch(/alphaUrl: speakerBackgroundOf\(comp\) === "alpha" \? /);
     }
     const render = await fsp.readFile("src/core/render.ts", "utf8");
-    expect(render).toMatch(/if \(isSpeakerLayer\(comp as any\) && speakerBackgroundOf\(comp as any\) !== "alpha"\) continue;/);
-    expect(render).toMatch(/alphaUrl: layerRef\.alpha \? asFile\(layerRef\.alpha\) : undefined, url: asFile\(layerRef\.source\), offset: layerRef\.offset/);
+    expect(render).toMatch(/if \(isSpeakerLayer\(comp as any\) && !speakerRendersInside\(scene as any\)\) continue;/);
+    expect(render).toMatch(/alphaUrl: wantAlpha && layerRef\.alpha \? asFile\(layerRef\.alpha\) : undefined, url: asFile\(layerRef\.source\), offset: layerRef\.offset/);
   });
   it("the scene's clip lookup carries the alpha copy", () => {
     const scenes = [{ duration_seconds: 5 }, { duration_seconds: 5 }];

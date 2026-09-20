@@ -47,7 +47,7 @@ import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
 import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts, speakerClipForScene } from "./speaker-track.js";
-import { isSpeakerLayer, speakerBackgroundOf, bindSpeakerLayerData } from "./speaker-layer.js";
+import { isSpeakerLayer, speakerBackgroundOf, speakerRendersInside, bindSpeakerLayerData } from "./speaker-layer.js";
 import { resolveVideoPath } from "./video-path.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
@@ -634,11 +634,12 @@ async function renderVideoWithSpeakerTrack(
       // it to the base (the assembler draws nothing for it).
       const layerRef = speakerClipForScene(speaker_track.clips, project.scenes, si2);
       for (const comp of scene.components) {
-        if (isSpeakerLayer(comp as any) && speakerBackgroundOf(comp as any) !== "alpha") continue;
+        if (isSpeakerLayer(comp as any) && !speakerRendersInside(scene as any)) continue;
         if (isSpeakerLayer(comp as any)) {
           const asFile = (u: string) => `file://${path.resolve(resolveVideoPath(u))}`;
+          const wantAlpha = speakerBackgroundOf(comp as any) === "alpha";
           const bound = layerRef
-            ? bindSpeakerLayerData(comp.data as any, { alphaUrl: layerRef.alpha ? asFile(layerRef.alpha) : undefined, url: asFile(layerRef.source), offset: layerRef.offset })
+            ? bindSpeakerLayerData(comp.data as any, { alphaUrl: wantAlpha && layerRef.alpha ? asFile(layerRef.alpha) : undefined, url: asFile(layerRef.source), offset: layerRef.offset })
             : bindSpeakerLayerData(comp.data as any, { url: speakerFileUrl, offset: filmStarts[si2] });
           if (bound) comp.data = bound as any;
           console.log(`  [speaker-track] scene ${si2 + 1}: the take rides as a layer (${layerRef?.alpha ? "alpha copy" : "plain take, no alpha copy yet"}) from ${(bound as any)?.start_at}s`);

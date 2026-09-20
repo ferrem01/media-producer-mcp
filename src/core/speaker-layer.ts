@@ -66,11 +66,15 @@ export function sceneSpeakerBackground(scene: SceneLike | null | undefined): Spe
   return speakerBackgroundOf(speakerLayerOf(scene));
 }
 
-/** True when the scene plays the speaker INSIDE it (background alpha) --
- *  it then renders opaque over the camera base, which would otherwise
- *  double the person. */
+/** True when the scene plays the speaker INSIDE it, at the component's
+ *  place in the stack: on alpha, and on room or blur whenever a ground
+ *  lies under the component (the base would be buried under the ground;
+ *  what is stacked is what shows). The scene then renders opaque over the
+ *  camera base, which would otherwise double the person. */
 export function speakerRendersInside(scene: SceneLike | null | undefined): boolean {
-  return sceneSpeakerBackground(scene) === "alpha";
+  const c = speakerLayerOf(scene);
+  if (!c) return false;
+  return speakerBackgroundOf(c) === "alpha" || !!groundOf(scene);
 }
 
 function fullStage(p: any): boolean {
@@ -234,5 +238,5 @@ export function bindSpeakerLayerData(
   // `speaker_layer` keeps the component recognisable once the token is a
   // file (the render resolves it before the compositing rule runs);
   // `alpha` tells the video component not to paint under the clip.
-  return { ...data, src, start_at: Math.max(0, Number(speaker?.offset) || 0), speaker_layer: true, background: "alpha", ...(speaker?.alphaUrl ? { alpha: true } : { speaker_opaque: true }) };
+  return { ...data, src, start_at: Math.max(0, Number(speaker?.offset) || 0), speaker_layer: true, background: asSpeakerBackground(data.background) || (data.src === SPEAKER_ALPHA_SRC ? "alpha" : "room"), ...(speaker?.alphaUrl ? { alpha: true } : { speaker_opaque: true }) };
 }
