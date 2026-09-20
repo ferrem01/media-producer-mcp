@@ -29,6 +29,12 @@ export interface RecipeBeat {
   role: string;
   shot: RecipeShot | string;
   made?: RecipeMade;
+  /** A found-footage GROUND may lie under this beat when the brief asks
+   *  for one (the sheet row: "real office + kinetic task cards"): a
+   *  stock_footage need is kept on it, the surface or the cards ride over
+   *  the clip. Absent: a beat that is not made of found footage carries no
+   *  b-roll ask. */
+  ground?: "broll";
   /** [min, target, max] seconds. */
   dur: [number, number, number];
   repeat?: [number, number];
@@ -141,7 +147,7 @@ export function recipeBlock(r: Recipe, frame?: string): string {
     const rep = b.repeat ? ` -- REPEAT ${b.repeat[0]}-${b.repeat[1]} times, one scene each` : "";
     const cut = b.cutaway ? ` Cutaway (${b.cutaway.use || "cutaway"}${b.cutaway.kind ? `, ${b.cutaway.kind}` : ""}): enters at ${b.cutaway.at}, holds ${Math.round(b.cutaway.hold * 100)}% of the beat${b.cutaway.exit_before ? `, out before ${b.cutaway.exit_before}` : ""}.` : "";
     const ent = b.enters && b.enters.length ? ` Enters: ${b.enters.join(", ")}.` : "";
-    const made = ` MADE AS: ${MADE_TEXT[madeOf(b)]}.`;
+    const made = ` MADE AS: ${MADE_TEXT[madeOf(b)]}.${b.ground === "broll" ? " A found-footage GROUND may lie under it when the brief asks for one (a stock_footage need; the surface and the cards ride over the clip)." : ""}`;
     return `${i + 1}. ${b.role.toUpperCase()} -- ${b.shot}, ${b.dur[1]}s (${b.dur[0]}-${b.dur[2]}s), about ${wordBudget(b.dur[1], wpm)} words (never more than ${wordBudget(b.dur[2], wpm)})${rep}.${made}${ent}${cut}${b.note ? ` ${b.note}` : ""}`;
   }).join("\n");
   const lat = r.latitude || {};
@@ -252,7 +258,7 @@ export function pruneNeedsByRecipe(scene: { label?: unknown; assets?: any[] }, r
   // A beat carries b-roll only when the recipe says its footage is found:
   // a broll shot, or a cutaway of kind stock_footage. A feature beat's
   // cutaway is the screen; its "location" b-roll ask is the same misread.
-  const findsFootage = beat.shot === "broll" || (beat.cutaway && String(beat.cutaway.kind || "") === "stock_footage");
+  const findsFootage = beat.shot === "broll" || (beat.cutaway && String(beat.cutaway.kind || "") === "stock_footage") || beat.ground === "broll";
   if (findsFootage) return 0;
   const before = scene.assets.length;
   scene.assets = scene.assets.filter((a) => !(a && typeof a === "object" && a.type === "stock_footage"));

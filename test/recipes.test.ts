@@ -122,9 +122,22 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const w = getRecipe("ask-work-result")!;
     expect(w.grammar).toBe("canvas-tour");
     expect(w.frames_proven).toEqual(["1x1"]);
-    expect(recipeSceneBand(w)).toEqual({ min: 5, max: 6 });
+    expect(recipeSceneBand(w)).toEqual({ min: 4, max: 5 });   // the CTA line lives in the result's last seconds, not a beat of its own
     expect(w.asks.take).toBe("none");
-    expect(w.spine.find((b) => b.role === "result")!.dur).toEqual([10, 12, 14]);
+    expect(w.spine.find((b) => b.role === "result")!.dur).toEqual([11, 13, 15]);
+    expect(w.spine.find((b) => b.role === "result")!.enters).toEqual(["keyword:fade", "cta-line:fade@-3s"]);
+    expect(w.spine.some((b) => b.role === "cta")).toBe(false);
+    // A GROUND under the work beat: found footage is kept there when the brief asks (the sheet row's real office).
+    expect(w.spine.find((b) => b.role === "work")!.ground).toBe("broll");
+    const { pruneNeedsByRecipe: prune2 } = await import("../src/core/recipes.js");
+    const work: any = { label: "Work - the pile", assets: [{ type: "stock_footage", description: "a marketer at a desk in a bright office" }] };
+    expect(prune2(work, w)).toBe(0);
+    expect(work.assets.length).toBe(1);
+    const askB: any = { label: "Ask - the sentence", assets: [{ type: "stock_footage", description: "a desk, a laptop" }] };
+    expect(prune2(askB, w)).toBe(0);            // the ask may sit on a real desk too
+    const closeB: any = { label: "Close - the wordmark", assets: [{ type: "stock_footage", description: "x" }] };
+    expect(prune2(closeB, w)).toBe(1);          // the wordmark card never carries footage
+    expect(recipeBlock(w, "1x1")).toMatch(/3\. WORK -- screen, 5s .* A found-footage GROUND may lie under it when the brief asks for one/);
     expect(recipeBlock(w, "9x16")).toMatch(/proven at 1x1; this film ships 9x16/);
     const a = getRecipe("presenter-location-hop")!;
     expect(a.grammar).toBe("creator-cut");

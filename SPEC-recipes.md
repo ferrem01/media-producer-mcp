@@ -34,7 +34,7 @@ the writer invents the beats (generate as before).
    stands in), `motion` (MOTION GRAPHICS: library mocks and components
    perform it, nothing is asked of the human), `broll` (found footage),
    `illustration` (drawn), `type` (type alone). Inferred from the shot
-   when absent (`madeOf`). The build holds the board to it
+   when absent (`madeOf`). `ground: "broll"` on a beat means found footage may lie under it when the brief asks (a stock_footage need is kept there; the surface and the cards ride over the clip). The build holds the board to it
    (`holdMadeToRecipe`): a motion beat's screen needs and slates are
    dropped, a recording beat that forgot to ask gets its need,
    `dur` [min, target, max] seconds (the word budget follows from it at

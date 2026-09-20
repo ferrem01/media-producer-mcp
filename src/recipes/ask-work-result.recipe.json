@@ -28,7 +28,8 @@
       "enters": [
         "stamp:title"
       ],
-      "note": "A second of the finished deliverable with the film's title over it, so the viewer knows what is about to be made."
+      "note": "A second of the finished deliverable with the film's title over it, so the viewer knows what is about to be made.",
+      "ground": "broll"
     },
     {
       "role": "ask",
@@ -40,7 +41,8 @@
         5.5
       ],
       "enters": [],
-      "note": "The product's chat surface. The ask types in, in full, with its attachment shown; held long enough to read every word. Nothing over it."
+      "note": "The product's chat surface. The ask types in, in full, with its attachment shown; held long enough to read every word. Nothing over it. When the brief asks for a real place (a desk, an office), found footage may lie under the surface as its ground.",
+      "ground": "broll"
     },
     {
       "role": "work",
@@ -52,19 +54,21 @@
         6
       ],
       "enters": [],
-      "note": "The agent works: a checklist ticks through its steps by name (the tools it called), then the elapsed time it took. The honesty beat. Nothing over it."
+      "note": "The agent works: a checklist ticks through its steps by name (the tools it called), then the elapsed time it took. The honesty beat. Nothing over it. When the brief asks for a real place (an office, a desk), found footage may lie under the surface as its ground.",
+      "ground": "broll"
     },
     {
       "role": "result",
       "shot": "screen",
       "made": "recording",
       "dur": [
-        10,
-        12,
-        14
+        11,
+        13,
+        15
       ],
       "enters": [
-        "keyword:fade"
+        "keyword:fade",
+        "cta-line:fade@-3s"
       ],
       "cutaway": {
         "at": "start",
@@ -72,21 +76,7 @@
         "use": "cutaway",
         "kind": "screen_recording"
       },
-      "note": "The deliverable full frame, with its own sound if it has one; two claim lines land over it one at a time, the second completing the first ('X plans it.' / 'Y ships it.'). Nearly half the film."
-    },
-    {
-      "role": "cta",
-      "shot": "screen",
-      "made": "recording",
-      "dur": [
-        2,
-        2.5,
-        3.5
-      ],
-      "enters": [
-        "keyword:fade"
-      ],
-      "note": "One line over the last shot of the deliverable: the ask of the viewer ('Add X to Y.')."
+      "note": "The deliverable full frame, with its own sound if it has one; two claim lines land over it one at a time, the second completing the first ('X plans it.' / 'Y ships it.'); the ask of the viewer ('Add X to Y.') lands over its LAST three seconds, the same footage continuing. Nearly half the film."
     },
     {
       "role": "close",
@@ -117,7 +107,7 @@
       "style": "display-sans-medium",
       "pos": "center",
       "max_words": 5,
-      "note": "four lines in the whole film: a title, two claims, one ask; each fades in and holds"
+      "note": "four lines in the whole film: a title, two claims, one ask over the result's last seconds; each fades in and holds"
     },
     "captions": {
       "style": "none"
@@ -166,7 +156,6 @@
       "ask": "fixed",
       "work": "fixed",
       "result": "fixed",
-      "cta": "fixed",
       "close": "fixed"
     },
     "physics": "calm"
