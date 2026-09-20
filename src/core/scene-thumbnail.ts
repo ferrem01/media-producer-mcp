@@ -95,7 +95,8 @@ async function buildSceneThumbnail(
         // v3: captures now also rewrite /assets/ refs inside component DATA
         // (runtime img.src) -- bumped to regenerate thumbs cached with the
         // component's broken-image fallback.
-        v: 3,
+        // v4: the take as a layer -- an alpha copy's frame keeps its alpha.
+        v: 4,
         scene,
         at: atTime,
         speakerUrl: speakerUrl || "",
