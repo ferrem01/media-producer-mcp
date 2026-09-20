@@ -4129,3 +4129,15 @@ film records 1080x1920 as before, a wide film 1920x1080 (1x1 -> 1080x1080,
 4x5 -> 1080x1350), the camera is asked for that size, and on a wide film
 the stage is the frame itself, centred, so what you see is what is
 recorded. The server's sanitizer then has nothing to reframe.
+
+## The take is the voice; the camera goes off
+
+Marc recorded on his laptop into a BUILT film: the camera stayed lit
+after "Use this take", and the scene played his take under the generated
+line. Two causes. The build had laid a generated voiceover clip per scene
+(vo_scene_<i>) because no take existed yet, and the take route never
+removed it: `dropVoiceUnderTakes` now drops every scene's generated clip
+once a take lands on it (Studio and the render both read the same
+tracks). The embedded booth kept its stream after the attach: the take
+page releases the camera the moment the take is in, and Studio unloads
+any booth iframe when a dialog closes.

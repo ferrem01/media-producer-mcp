@@ -10107,6 +10107,8 @@ ${QUOTIENT_CSS}
   function studioModalClose() {
     var back = document.getElementById('studio-modal');
     if (back) back.style.display = 'none';
+    // A booth left in a hidden dialog keeps the camera on: unload it.
+    document.querySelectorAll('#studio-modal-card iframe.np-booth').forEach(function(f) { try { f.src = 'about:blank'; } catch (e) {} f.remove(); });
   }
 
   // Enable/disable every scene-mutating control at once (popover + modal).

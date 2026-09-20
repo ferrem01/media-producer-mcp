@@ -71,6 +71,28 @@ export function ensureSpeakerNeeds(project: Project): boolean {
   return changed;
 }
 
+/** THE TAKE IS THE VOICE: a film built before its takes landed carries a
+ *  generated voiceover clip per scene (vo_scene_<i>); once a take lands on
+ *  scene i, that clip must go or both voices play (measured live,
+ *  proj_7b306f5b: the generated line under Marc's own). Idempotent; returns
+ *  how many tracks were dropped. */
+export function dropVoiceUnderTakes(project: Project): number {
+  const tracks = project.audio?.tracks;
+  if (!Array.isArray(tracks) || !tracks.length) return 0;
+  const withTake = new Set<number>();
+  (project.storyboard?.scenes || []).forEach((_s, i) => { if (activeTake(project, i)) withTake.add(i); });
+  (project.scenes || []).forEach((_s, i) => { if (activeTake(project, i)) withTake.add(i); });
+  if (!withTake.size) return 0;
+  const keep = tracks.filter((t) => {
+    if (t.type !== "voiceover") return true;
+    const m = /^vo_scene_(\d+)$/.exec(String(t.id || ""));
+    return !(m && withTake.has(Number(m[1])));
+  });
+  const dropped = tracks.length - keep.length;
+  if (dropped) project.audio!.tracks = keep;
+  return dropped;
+}
+
 /** The take speaker_track currently carries for a scene, if any. */
 export function activeTake(project: Project, sceneIndex: number): Take | undefined {
   const clip = (project.speaker_track?.clips || []).find((c) => c.scene_index === sceneIndex);
