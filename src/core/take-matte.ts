@@ -197,3 +197,52 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   }
   return { output, frames, ms: Date.now() - t0, model_size: ms };
 }
+
+/**
+ * THE BLUR RUNS AFTER THE ATTACH. Minutes of matting inside the attach
+ * request held the connection past the proxy's limit (measured live: the
+ * call dropped at 300 s). The take lands at once, unblurred; this job
+ * mattes the file in the background and swaps every take and clip that
+ * points at the raw file to the blurred copy, then saves. Studio's live
+ * sync picks up the new version. One job per file at a time.
+ */
+const blurJobs = new Set<string>();
+export function queueTakeBlur(opts: {
+  tenantId: string;
+  projectId: string;
+  /** The take's url as stored (/assets/...). */
+  rawUrl: string;
+  dataDir: string;
+  strength?: number;
+  resolvePath: (url: string) => string;
+  loadProject: (t: string, p: string) => Promise<any>;
+  saveProject: (project: any) => Promise<void>;
+  afterSave?: (tenantId: string, projectId: string) => void;
+}): boolean {
+  const key = `${opts.tenantId}/${opts.projectId}/${opts.rawUrl}`;
+  if (blurJobs.has(key)) return false;
+  blurJobs.add(key);
+  setTimeout(async () => {
+    try {
+      const m = await matteTake(opts.resolvePath(opts.rawUrl), { dataDir: opts.dataDir, strength: opts.strength, onProgress: (n) => console.log(`  take blur: ${n} frames...`) });
+      const blurUrl = opts.rawUrl.replace(/[^/]+$/, path.basename(m.output));
+      const project = await opts.loadProject(opts.tenantId, opts.projectId);
+      if (!project) return;
+      let swapped = 0;
+      for (const t of project.takes || []) {
+        if (t.source === opts.rawUrl) { t.source = blurUrl; t.background = { mode: "blur", source_raw: opts.rawUrl, strength: opts.strength, ms: m.ms }; swapped++; }
+      }
+      for (const c of project.speaker_track?.clips || []) if (c.source === opts.rawUrl) c.source = blurUrl;
+      for (const sc of project.storyboard?.scenes || []) for (const a of sc.assets || []) if (a && a.type === "camera_video" && a.path === opts.rawUrl) a.path = blurUrl;
+      project.updated_at = new Date().toISOString();
+      await opts.saveProject(project);
+      console.log(`  take blur: ${path.basename(m.output)} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${swapped} take(s) swapped`);
+      if (opts.afterSave) opts.afterSave(opts.tenantId, opts.projectId);
+    } catch (e: any) {
+      console.warn(`  take blur failed for ${path.basename(opts.rawUrl)}: ${e?.message || e}`);
+    } finally {
+      blurJobs.delete(key);
+    }
+  }, 50);
+  return true;
+}

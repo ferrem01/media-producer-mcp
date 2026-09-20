@@ -42,9 +42,13 @@ describe("background blur at attach", () => {
     expect(take).toMatch(/<input type="checkbox" id="blurBg"> Blur the background/);
     expect(take).toMatch(/background: \(\$\('blurBg'\) && \$\('blurBg'\)\.checked\) \? 'blur' : 'none',/);
     const index = await fs.readFile("src/index.ts", "utf8");
-    expect(index).toMatch(/if \(tkBody\.background === "blur"\) \{\s*try \{\s*const m = await matteTake\(/);
-    expect(index).toMatch(/tkBackground = \{ mode: "blur", source_raw: tkRawUrl, ms: m\.ms \};/);
-    expect(index).toMatch(/tkBlurNote = `background blur skipped: /);
+    // The attach lands at once; the matte runs after it and swaps the take (the request dropped at 300s when it ran inline).
+    expect(index).toMatch(/const tkWantBlur = tkBody\.background === "blur";/);
+    expect(index).toMatch(/reshootStoryboardCardsSoon\(tkTenant, tkProject\);\s*if \(tkWantBlur\) \{\s*queueTakeBlur\(\{/);
+    expect(index).not.toMatch(/await matteTake\(/);
+    const matte = await fs.readFile("src/core/take-matte.ts", "utf8");
+    expect(matte).toMatch(/if \(t\.source === opts\.rawUrl\) \{ t\.source = blurUrl; t\.background = \{ mode: "blur", source_raw: opts\.rawUrl/);
+    expect(matte).toMatch(/for \(const c of project\.speaker_track\?\.clips \|\| \[\]\) if \(c\.source === opts\.rawUrl\) c\.source = blurUrl;/);
     const types = await fs.readFile("src/core/types.ts", "utf8");
     expect(types).toMatch(/background\?: \{ mode: "blur"; source_raw: string; strength\?: number; ms\?: number \};/);
     const pkg = JSON.parse(await fs.readFile("package.json", "utf8"));
