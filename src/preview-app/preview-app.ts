@@ -998,6 +998,11 @@ ${QUOTIENT_CSS}
   .np-btn:hover { background: var(--accent); }
   .np-btn:active { transform: translateY(1px); }
   .np-btn.active { background: var(--content-primary); color: var(--surface-primary); border-color: var(--content-primary); }
+  .np-btn.armed { background: var(--content-primary); color: var(--surface-primary); border-color: var(--content-primary); animation: np-armed-pulse 900ms ease-out 1; }
+  @keyframes np-armed-pulse { 0% { box-shadow: 0 0 0 0 rgb(45 99 225 / 0.55); } 100% { box-shadow: 0 0 0 14px rgb(45 99 225 / 0); } }
+  .np-armed { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; padding: 2px 8px; border-radius: 999px; background: rgb(45 99 225 / 0.10); color: var(--accent-blue); font-weight: 600; font-size: 12px; }
+  .np-armed i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-blue); animation: np-wait-blink 1.2s ease-in-out infinite; }
+  @keyframes np-wait-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
   .np-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
   .np-note { font-size: 11px; color: var(--content-secondary); margin-top: 8px; }
   /* THE SOURCES: each need collects its own way, inline under its row. */
@@ -4218,16 +4223,25 @@ ${QUOTIENT_CSS}
     if (src === 'recorder') {
       // THE ARMED NEED: clicking "Record with the Recorder" points the
       // extension at this slot. Open it on the page to record; stop, and
-      // the file lands here (live-sync reloads the film).
+      // the file lands here (live-sync reloads the film). The BUTTON
+      // answers too (Marc: "you hit it and nothing happens, when in fact
+      // it worked"): arming, then armed with a pulse; the panel keeps a
+      // live "waiting" mark until the recording lands.
       var kindR = NP_KIND[need.type] || need.type;
+      var armBtn = (root || document).querySelector('button[data-np-src="recorder"][data-np-scene="' + si + '"][data-np-asset="' + ai + '"]');
+      if (armBtn) { armBtn.disabled = true; armBtn.classList.remove('armed'); armBtn.textContent = 'Arming\u2026'; }
       panel.innerHTML = '<div class="np-hint">Pointing the Recorder at this ' + escHtml(kindR) + '\u2026</div>';
       api('POST', '/arm-need/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { scene_index: si, asset_index: ai })
         .then(function() {
-          panel.innerHTML = '<div class="np-hint"><b>The Recorder is set to this slot.</b> Open the <b>Quotient Recorder</b> on the page you want to record \u2014 it opens on <b>' + escHtml(project.name || project.project_id) + ' \u00b7 Scene ' + (si + 1) + '</b>. Record, stop, and the ' + escHtml(kindR) + ' lands here on its own.' +
+          if (armBtn) { armBtn.disabled = false; armBtn.textContent = '\u2713 Recorder armed'; armBtn.classList.remove('armed'); void armBtn.offsetWidth; armBtn.classList.add('armed'); }
+          panel.innerHTML = '<div class="np-hint"><span class="np-armed"><i></i>Armed \u00b7 waiting for the recording</span> Open the <b>Quotient Recorder</b> on the page you want to record \u2014 it opens on <b>' + escHtml(project.name || project.project_id) + ' \u00b7 Scene ' + (si + 1) + '</b>. Record, stop, and the ' + escHtml(kindR) + ' lands here on its own.' +
             ' <span class="np-empty" style="display:inline">Don\u2019t have it? <a href="/extension.zip">Get the extension</a>.</span></div>';
+          studioStatus('Recorder armed for scene ' + (si + 1) + ' \u2014 record on the page; the ' + kindR + ' lands here.', 'ok');
         })
         .catch(function(e) {
+          if (armBtn) { armBtn.disabled = false; armBtn.textContent = NP_SOURCE_LABELS.recorder; }
           panel.innerHTML = '<div class="np-hint">Open the <b>Quotient Recorder</b> on the page to record, choose <b>' + escHtml(project.name || project.project_id) + '</b> under Save to and <b>Scene ' + (si + 1) + '</b> under For, then Record. (' + escHtml(e.message || String(e)) + ')</div>';
+          studioStatus('Could not arm the Recorder: ' + (e.message || String(e)), 'err');
         });
       return;
     }
