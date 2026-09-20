@@ -470,11 +470,16 @@ ${QUOTIENT_CSS}
             startDraw();
           } catch (e) { src = s; capture = 'raw'; }
         }
-        try { rec = mime ? new MediaRecorder(src, { mimeType: mime }) : new MediaRecorder(src); }
+        // The bitrate is asked for: left to the browser it lands near 2.5 Mbps,
+        // which smears hair and skin at 1080p (Marc: "the camera quality on
+        // the laptop seems low"). 8 Mbps video, 128 kbps audio.
+        var recOpts = { videoBitsPerSecond: 8000000, audioBitsPerSecond: 128000 };
+        if (mime) recOpts.mimeType = mime;
+        try { rec = new MediaRecorder(src, recOpts); }
         catch (e1) {
           // A browser that cannot record a canvas stream still records the camera.
           stopDraw(); src = s; capture = 'raw';
-          try { rec = mime ? new MediaRecorder(src, { mimeType: mime }) : new MediaRecorder(src); }
+          try { rec = new MediaRecorder(src, recOpts); }
           catch (e) { stopAll(); fail('This browser cannot record video here (' + (e.message || e) + ').'); return; }
         }
         rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };

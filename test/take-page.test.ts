@@ -167,6 +167,13 @@ describe("the server side", () => {
     expect(src).toMatch(/\|traces\|take\|take-poster\|storyboard\|provide-asset\|team\)\\\/\(\[\^\/\]\+\)\//);
   });
 
+  it("asks the recorder for 8 Mbps video (the browser's default near 2.5 Mbps smeared a 1080p take)", async () => {
+    const src = await read("../src/take-page.ts");
+    expect(src).toMatch(/var recOpts = \{ videoBitsPerSecond: 8000000, audioBitsPerSecond: 128000 \};/);
+    expect(src).toMatch(/rec = new MediaRecorder\(src, recOpts\);/);
+    expect(src).not.toMatch(/new MediaRecorder\(src, \{ mimeType: mime \}\)/);
+  });
+
   it("refuses a take URL outside the project's own asset dir", async () => {
     const src = await read("../src/index.ts");
     const at = src.indexOf("const takeMatch = urlPath.match");
