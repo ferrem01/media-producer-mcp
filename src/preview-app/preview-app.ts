@@ -4118,7 +4118,11 @@ ${QUOTIENT_CSS}
   function npOpenPanel(project, root, src, si, ai) {
     var panel = (root || document).querySelector('[data-np-panel="' + si + '-' + ai + '"]');
     if (!panel) return;
-    if (panel.style.display !== 'none' && panel.dataset.src === src) { panel.style.display = 'none'; return; }
+    // A second click on the source already open is not "close it": the
+    // picker opens the booth on its own, so the first "Record here" a
+    // person pressed toggled the booth AWAY and the button read as dead
+    // (Marc, on the speaker lane). Keep it, bring it into view.
+    if (panel.style.display !== 'none' && panel.dataset.src === src) { try { panel.scrollIntoView({ block: 'nearest' }); } catch (e0) {} return; }
     panel.dataset.src = src; panel.style.display = ''; panel.innerHTML = '';
     var scene = ((project.storyboard && project.storyboard.scenes) || [])[si] || {};
     var need = (scene.assets || [])[ai] || {};

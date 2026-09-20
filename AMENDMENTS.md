@@ -4110,3 +4110,12 @@ And the logo band invented customers a second time (Fable, Brightline,
 Acme, Nova) despite the instruction. `holdLogoBandToBrief`: a text logo
 not present in the brief is dropped, image logos from the tenant's
 assets are trusted, a band left with nothing goes.
+
+## "Record here" read as dead on the speaker lane
+
+The need picker opens the booth panel on its own for a camera take, and a
+click on a source already open toggled its panel closed -- so the first
+"Record here" a person pressed closed the booth (Marc: "the record here
+button does not work"). Reproduced locally in Chromium on the built
+board. A second click on the open source now keeps it and scrolls it
+into view; nothing toggles away.
