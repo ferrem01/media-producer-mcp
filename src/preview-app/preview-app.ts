@@ -5347,6 +5347,11 @@ ${QUOTIENT_CSS}
       if (!spk) continue;
       var base = spk.split('/').pop();
       if (src === spk || (!!base && src.indexOf(base) >= 0)) return true;
+      // The take as a layer: its alpha copy plays INSIDE the scene and is
+      // the same take -- synced to the speaker clock, never a media file.
+      var alp = clips[i].alpha ? speakerClipUrlOf(clips[i].alpha) : null;
+      var abase = alp ? alp.split('/').pop() : null;
+      if (alp && (src === alp || (!!abase && src.indexOf(abase) >= 0))) return true;
     }
     return false;
   }

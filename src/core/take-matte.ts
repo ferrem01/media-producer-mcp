@@ -14,6 +14,14 @@
  * cores), so a 15 s take costs about 40 s; the recurrent states carry
  * frame to frame, so no flicker. The model file (15 MB) is fetched once
  * into <dataDir>/_system/models and checked by hash.
+ *
+ * THE TAKE AS A LAYER (Marc, 2026-09-20: "have the background just be
+ * alpha"): the same matte also writes <name>-alpha.webm -- the person on
+ * a transparent frame (VP9 with alpha, which Chromium plays and the render
+ * decodes). A scene that carries a ground under the person (footage, a
+ * still, a mock) places that file INSIDE the scene as a video layer
+ * (core/speaker-layer.ts) instead of sitting on the opaque camera base,
+ * so whatever lies under the speaker becomes the room behind them.
  */
 
 import fs from "node:fs";
@@ -42,10 +50,17 @@ export interface MatteOptions {
   strength?: number;
   /** Progress, every ~100 frames. */
   onProgress?: (done: number, total: number) => void;
+  /** Write the blurred-room copy (<name>-blur.mp4). Default true. */
+  blur?: boolean;
+  /** Write the person-on-transparent copy (<name>-alpha.webm). Default false. */
+  alpha?: boolean;
 }
 
 export interface MatteResult {
-  output: string;
+  /** The blurred copy (when asked). */
+  output?: string;
+  /** The alpha copy (when asked). */
+  alpha?: string;
   frames: number;
   ms: number;
   model_size: { width: number; height: number };
@@ -82,6 +97,35 @@ export function matteFilterGraph(width: number, height: number, strength = 0.6):
     `[fgc][m]alphamerge[fg]`,
     `[bg][fg]overlay=shortest=1:format=auto,format=yuv420p[out]`,
   ].join(";");
+}
+
+/** The ffmpeg graph for the alpha copy: the frame under the upscaled alpha,
+ *  the edge eroded a pixel (the model's soft fringe carries the room's
+ *  colour; on a bright ground it reads as a halo) and softened again. */
+export function matteAlphaGraph(width: number, height: number, fps: number): string {
+  return [
+    `[1:v]scale=${width}:${height}:flags=bicubic,format=gray,erosion,gblur=sigma=1.2[m]`,
+    // The frame rate is pinned to the matte's: the alpha stream was
+    // written at `fps`, and the layer is seeked by time, not by frame.
+    `[0:v]fps=${fps},format=rgba[fgc]`,
+    `[fgc][m]alphamerge,format=yuva420p[out]`,
+  ].join(";");
+}
+
+/** The encoder for the alpha copy: VP9 with alpha in WebM (the one alpha
+ *  video Chromium plays); no alt-ref frames (they break alpha), constant
+ *  quality, row threads. */
+export const ALPHA_ENCODE_ARGS = ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-auto-alt-ref", "0", "-b:v", "0", "-crf", "32", "-deadline", "good", "-cpu-used", "5", "-row-mt", "1", "-an"];
+
+/** The alpha copy's name for a take file (…/take.mp4 -> …/take-alpha.webm). */
+export function alphaCopyName(file: string): string {
+  const ext = path.extname(file);
+  return `${file.slice(0, file.length - ext.length)}-alpha.webm`;
+}
+
+/** True for a source that is an alpha copy of a take (VP9 alpha WebM). */
+export function isAlphaVideoSrc(src: string): boolean {
+  return /-alpha\.webm(\?|#|$)/i.test(String(src || ""));
 }
 
 /** The model, fetched once and checked. Throws when it cannot be had. */
@@ -124,8 +168,10 @@ async function probeVideo(file: string): Promise<{ width: number; height: number
 }
 
 /**
- * Blur the room behind the person. Writes <name>-blur<ext> beside the
- * input and returns its path; the input is untouched.
+ * Matte the person. Writes <name>-blur.mp4 (the room blurred) and/or
+ * <name>-alpha.webm (the person on a transparent frame) beside the input
+ * and returns their paths; the input is untouched. One matte pass feeds
+ * both encodes.
  */
 export async function matteTake(input: string, opts: MatteOptions): Promise<MatteResult> {
   // The runtime's async run does not hold Node's event loop on its own
@@ -152,7 +198,10 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   const ext = path.extname(input) || ".mp4";
   const base = path.join(path.dirname(input), path.basename(input, ext));
   const alphaRaw = `${base}.alpha.raw`;
+  const wantBlur = opts.blur !== false;
+  const wantAlpha = opts.alpha === true;
   const output = `${base}-blur.mp4`;
+  const alphaOut = alphaCopyName(input);
 
   // ── Pass 1: decode small, matte, write the alpha ─────────────────────
   const dec = spawn("ffmpeg", ["-hide_banner", "-v", "error", "-i", input, "-vf", `fps=${fps},scale=${mw}:${mh}:flags=area`, "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], { stdio: ["ignore", "pipe", "pipe"] });
@@ -162,7 +211,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   // long before the last frame is matted, and a listener attached after
   // the loop waits forever (measured: a 3 s slice never returned).
   const decDone = new Promise<number>((r) => dec.on("close", (c) => r(c ?? 0)));
-  const alphaOut = fs.createWriteStream(alphaRaw);
+  const alphaSink = fs.createWriteStream(alphaRaw);
   const zero = new ort.Tensor("float32", new Float32Array([0]), [1, 1, 1, 1]);
   let r1 = zero, r2 = zero, r3 = zero, r4 = zero;
   const dsr = new ort.Tensor("float32", new Float32Array([1]), [1]);
@@ -177,7 +226,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
     const pha: Float32Array = out.pha.data;
     const a = Buffer.allocUnsafe(plane);
     for (let i = 0; i < plane; i++) { const v = pha[i]; a[i] = v <= 0 ? 0 : v >= 1 ? 255 : Math.round(v * 255); }
-    if (!alphaOut.write(a)) await new Promise<void>((r) => alphaOut.once("drain", () => r()));
+    if (!alphaSink.write(a)) await new Promise<void>((r) => alphaSink.once("drain", () => r()));
     frames++;
     if (opts.onProgress && frames % 100 === 0) opts.onProgress(frames, 0);
   };
@@ -187,73 +236,103 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
     while (buf.length - off >= frameBytes) { await runFrame(buf.subarray(off, off + frameBytes)); off += frameBytes; }
     carry = off < buf.length ? Buffer.from(buf.subarray(off)) : Buffer.alloc(0);
   }
-  await new Promise<void>((resolve, reject) => { alphaOut.end(() => resolve()); alphaOut.on("error", reject); });
+  await new Promise<void>((resolve, reject) => { alphaSink.end(() => resolve()); alphaSink.on("error", reject); });
   const decCode = await decDone;
   if (decCode !== 0 || !frames) { await fsp.unlink(alphaRaw).catch(() => {}); throw new Error(`matte decode failed: ${decErr.slice(-300) || "no frames"}`); }
 
-  // ── Pass 2: blur the room, the person over it, the sound carried ─────
-  const args = ["-hide_banner", "-y", "-v", "error",
-    "-i", input,
-    "-f", "rawvideo", "-pix_fmt", "gray", "-video_size", `${mw}x${mh}`, "-framerate", String(fps), "-i", alphaRaw,
-    "-filter_complex", matteFilterGraph(probe.width, probe.height, opts.strength),
-    "-map", "[out]"];
-  if (probe.hasAudio) args.push("-map", "0:a:0", "-c:a", "copy");
-  args.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", output);
+  // ── Pass 2: the copies. The blur: the room out of focus, the person
+  // over it, the sound carried. The alpha: the person alone on a
+  // transparent frame (muted -- the layer never owns the voice).
+  const alphaIn = ["-f", "rawvideo", "-pix_fmt", "gray", "-video_size", `${mw}x${mh}`, "-framerate", String(fps), "-i", alphaRaw];
   try {
-    await execFileAsync("ffmpeg", args, { maxBuffer: 16 * 1024 * 1024 });
-  } catch (e: any) {
-    await fsp.unlink(output).catch(() => {});
-    throw new Error(`matte composite failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
+    if (wantBlur) {
+      const args = ["-hide_banner", "-y", "-v", "error", "-i", input, ...alphaIn,
+        "-filter_complex", matteFilterGraph(probe.width, probe.height, opts.strength),
+        "-map", "[out]"];
+      if (probe.hasAudio) args.push("-map", "0:a:0", "-c:a", "copy");
+      args.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", output);
+      try {
+        await execFileAsync("ffmpeg", args, { maxBuffer: 16 * 1024 * 1024 });
+      } catch (e: any) {
+        await fsp.unlink(output).catch(() => {});
+        throw new Error(`matte composite failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
+      }
+    }
+    if (wantAlpha) {
+      const args = ["-hide_banner", "-y", "-v", "error", "-i", input, ...alphaIn,
+        "-filter_complex", matteAlphaGraph(probe.width, probe.height, fps),
+        "-map", "[out]", ...ALPHA_ENCODE_ARGS, "-threads", "4", alphaOut];
+      try {
+        await execFileAsync("ffmpeg", args, { maxBuffer: 16 * 1024 * 1024 });
+      } catch (e: any) {
+        await fsp.unlink(alphaOut).catch(() => {});
+        throw new Error(`matte alpha failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
+      }
+    }
   } finally {
     await fsp.unlink(alphaRaw).catch(() => {});
   }
-  return { output, frames, ms: Date.now() - t0, model_size: ms, fps };
+  return { ...(wantBlur ? { output } : {}), ...(wantAlpha ? { alpha: alphaOut } : {}), frames, ms: Date.now() - t0, model_size: ms, fps };
 }
 
 /**
- * THE BLUR RUNS AFTER THE ATTACH. Minutes of matting inside the attach
+ * THE MATTE RUNS AFTER THE ATTACH. Minutes of matting inside the attach
  * request held the connection past the proxy's limit (measured live: the
- * call dropped at 300 s). The take lands at once, unblurred; this job
- * mattes the file in the background and swaps every take and clip that
- * points at the raw file to the blurred copy, then saves. Studio's live
- * sync picks up the new version. One job per file at a time.
+ * call dropped at 300 s). The take lands at once, raw; this job mattes the
+ * file in the background and, when done, swaps every take and clip that
+ * points at the raw file to the blurred copy (when the blur was asked)
+ * and records the alpha copy on them (when a scene carries the take as a
+ * layer), then saves. Studio's live sync picks up the new version. One
+ * job per file at a time.
  */
-const blurJobs = new Set<string>();
-export function queueTakeBlur(opts: {
+const matteJobs = new Set<string>();
+export function queueTakeMatte(opts: {
   tenantId: string;
   projectId: string;
   /** The take's url as stored (/assets/...). */
   rawUrl: string;
   dataDir: string;
+  /** The room blurred; the take swaps to the blurred copy. */
+  blur?: boolean;
+  /** The person on a transparent frame; takes and clips get `alpha`. */
+  alpha?: boolean;
   strength?: number;
   resolvePath: (url: string) => string;
   loadProject: (t: string, p: string) => Promise<any>;
   saveProject: (project: any) => Promise<void>;
   afterSave?: (tenantId: string, projectId: string) => void;
 }): boolean {
+  if (!opts.blur && !opts.alpha) return false;
   const key = `${opts.tenantId}/${opts.projectId}/${opts.rawUrl}`;
-  if (blurJobs.has(key)) return false;
-  blurJobs.add(key);
+  if (matteJobs.has(key)) return false;
+  matteJobs.add(key);
   setTimeout(async () => {
     try {
-      const m = await matteTake(opts.resolvePath(opts.rawUrl), { dataDir: opts.dataDir, strength: opts.strength, onProgress: (n) => console.log(`  take blur: ${n} frames...`) });
-      const blurUrl = opts.rawUrl.replace(/[^/]+$/, path.basename(m.output));
+      const m = await matteTake(opts.resolvePath(opts.rawUrl), { dataDir: opts.dataDir, strength: opts.strength, blur: !!opts.blur, alpha: !!opts.alpha, onProgress: (n) => console.log(`  take matte: ${n} frames...`) });
+      const blurUrl = m.output ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.output)) : undefined;
+      const alphaUrl = m.alpha ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.alpha)) : undefined;
       const project = await opts.loadProject(opts.tenantId, opts.projectId);
       if (!project) return;
-      let swapped = 0;
+      let swapped = 0, layered = 0;
       for (const t of project.takes || []) {
-        if (t.source === opts.rawUrl) { t.source = blurUrl; t.background = { mode: "blur", source_raw: opts.rawUrl, strength: opts.strength, ms: m.ms }; swapped++; }
+        if (t.source !== opts.rawUrl) continue;
+        if (alphaUrl) { t.alpha = alphaUrl; layered++; }
+        if (blurUrl) { t.source = blurUrl; t.background = { mode: "blur", source_raw: opts.rawUrl, strength: opts.strength, ms: m.ms }; swapped++; }
       }
-      for (const c of project.speaker_track?.clips || []) if (c.source === opts.rawUrl) c.source = blurUrl;
-      for (const sc of project.storyboard?.scenes || []) for (const a of sc.assets || []) if (a && a.type === "camera_video" && a.path === opts.rawUrl) a.path = blurUrl;
+      for (const c of project.speaker_track?.clips || []) {
+        if (c.source !== opts.rawUrl) continue;
+        if (alphaUrl) c.alpha = alphaUrl;
+        if (blurUrl) c.source = blurUrl;
+      }
+      if (blurUrl) for (const sc of project.storyboard?.scenes || []) for (const a of sc.assets || []) if (a && a.type === "camera_video" && a.path === opts.rawUrl) a.path = blurUrl;
       project.updated_at = new Date().toISOString();
       await opts.saveProject(project);
-      console.log(`  take blur: ${path.basename(m.output)} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${swapped} take(s) swapped`);
+      console.log(`  take matte: ${[m.output, m.alpha].filter(Boolean).map((f) => path.basename(f!)).join(" + ")} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${swapped} take(s) blurred, ${layered} take(s) with an alpha copy`);
       if (opts.afterSave) opts.afterSave(opts.tenantId, opts.projectId);
     } catch (e: any) {
-      console.warn(`  take blur failed for ${path.basename(opts.rawUrl)}: ${e?.message || e}`);
+      console.warn(`  take matte failed for ${path.basename(opts.rawUrl)}: ${e?.message || e}`);
     } finally {
-      blurJobs.delete(key);
+      matteJobs.delete(key);
     }
   }, 50);
   return true;

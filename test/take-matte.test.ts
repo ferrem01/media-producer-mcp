@@ -53,11 +53,12 @@ describe("background blur at attach", () => {
     const index = await fs.readFile("src/index.ts", "utf8");
     // The attach lands at once; the matte runs after it and swaps the take (the request dropped at 300s when it ran inline).
     expect(index).toMatch(/const tkWantBlur = tkBody\.background === "blur";/);
-    expect(index).toMatch(/reshootStoryboardCardsSoon\(tkTenant, tkProject\);\s*if \(tkWantBlur\) \{\s*queueTakeBlur\(\{/);
+    expect(index).toMatch(/reshootStoryboardCardsSoon\(tkTenant, tkProject\);\s*if \(tkWantBlur \|\| tkWantAlpha\) \{\s*queueTakeMatte\(\{/);
     expect(index).not.toMatch(/await matteTake\(/);
     const matte = await fs.readFile("src/core/take-matte.ts", "utf8");
-    expect(matte).toMatch(/if \(t\.source === opts\.rawUrl\) \{ t\.source = blurUrl; t\.background = \{ mode: "blur", source_raw: opts\.rawUrl/);
-    expect(matte).toMatch(/for \(const c of project\.speaker_track\?\.clips \|\| \[\]\) if \(c\.source === opts\.rawUrl\) c\.source = blurUrl;/);
+    expect(matte).toMatch(/if \(blurUrl\) \{ t\.source = blurUrl; t\.background = \{ mode: "blur", source_raw: opts\.rawUrl/);
+    expect(matte).toMatch(/if \(alphaUrl\) \{ t\.alpha = alphaUrl; layered\+\+; \}/);
+    expect(matte).toMatch(/if \(alphaUrl\) c\.alpha = alphaUrl;\s*if \(blurUrl\) c\.source = blurUrl;/);
     const types = await fs.readFile("src/core/types.ts", "utf8");
     expect(types).toMatch(/background\?: \{ mode: "blur"; source_raw: string; strength\?: number; ms\?: number \};/);
     const pkg = JSON.parse(await fs.readFile("package.json", "utf8"));

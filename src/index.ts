@@ -34,7 +34,8 @@ import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-track.js";
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
-import { queueTakeBlur } from "./core/take-matte.js";
+import { queueTakeMatte } from "./core/take-matte.js";
+import { castSpeakerLayer, sceneCarriesSpeakerLayer } from "./core/speaker-layer.js";
 import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
@@ -1427,6 +1428,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
             components,
             speakerUrl: noCamera ? undefined : thRef ? speakerUrlFromSource(thRef.source) : (project.speaker_track?.clips?.some((c0) => c0.scene_index !== undefined) ? undefined : getSpeakerUrl(project)),
             speakerOffset: noCamera ? undefined : thRef ? thRef.offset : undefined,
+            speakerAlphaUrl: noCamera ? undefined : thRef?.alpha ? speakerUrlFromSource(thRef.alpha) : undefined,
             dataDir: config.dataDir,
             gsapDir: config.gsapDir,
             componentLibDir: config.componentLibDir,
@@ -1498,6 +1500,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           preview: true,
           speakerUrl: spUrl,
           speakerOffset: spOffset,
+          speakerAlphaUrl: spRef?.alpha ? speakerUrlFromSource(spRef.alpha) : undefined,
         });
 
         res.writeHead(200, {
@@ -1531,11 +1534,12 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           sceneInputs.push({ scene, components });
         }
 
-        const speakerRefs: Record<string, { url: string; offset: number }> = {};
+        const speakerRefs: Record<string, { url: string; offset: number; alpha?: string }> = {};
         project.scenes.forEach((sc0, i0) => {
           const ref0 = speakerClipForScene(project.speaker_track?.clips, project.scenes, i0);
           const u0 = ref0 ? speakerUrlFromSource(ref0.source) : undefined;
-          if (u0) speakerRefs[sc0.id] = { url: u0, offset: ref0!.offset };
+          const a0 = ref0?.alpha ? speakerUrlFromSource(ref0.alpha) : undefined;
+          if (u0) speakerRefs[sc0.id] = { url: u0, offset: ref0!.offset, ...(a0 ? { alpha: a0 } : {}) };
         });
         const html = await assembleComposite({
           scenes: sceneInputs,
@@ -2611,7 +2615,6 @@ Rules:
         // past the proxy's limit (measured live: dropped at 300 s).
         const tkWantBlur = tkBody.background === "blur";
         const tkBlurStrength = Number(tkBody.blur_strength) > 0 ? Number(tkBody.blur_strength) : undefined;
-        const tkBlurNote = tkWantBlur ? "background blur running -- the take swaps to the blurred copy when it is done (a few minutes for a 15 s take on the server)" : "";
         await primeTakeWords(tkPeek, tkUrl, config.dataDir);
         const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
         // Where is the face? Measured once here so the layout can build its
@@ -2670,6 +2673,18 @@ Rules:
         // The take is the voice: the generated voiceover clip of every scene
         // that now has a take is dropped (else both play, measured live).
         { const dv = dropVoiceUnderTakes(tkProjectObj); if (dv) console.log(`  take: ${dv} generated voiceover clip(s) dropped under the take(s)`); }
+        // THE TAKE AS A LAYER (core/speaker-layer.ts): a built scene with a
+        // ground under the person carries the take inside it. Cast here for
+        // boards built before the rule; the matte then writes the alpha copy.
+        let tkWantAlpha = false;
+        for (const t of takes) {
+          const built = (tkProjectObj.scenes || [])[t.scene_index];
+          if (built && castSpeakerLayer(built)) console.log(`  take: scene ${t.scene_index + 1} carries the take as a layer over its ground`);
+          if (sceneCarriesSpeakerLayer(built)) tkWantAlpha = true;
+        }
+        const tkBlurNote = tkWantBlur && tkWantAlpha ? "background blur and alpha copy running -- the take swaps to the blurred copy, and the scene with a ground gets the person as a layer, when the matte is done (a few minutes for a 15 s take on the server)"
+          : tkWantBlur ? "background blur running -- the take swaps to the blurred copy when it is done (a few minutes for a 15 s take on the server)"
+          : tkWantAlpha ? "alpha copy running -- the scene with a ground gets the person as a layer over it when the matte is done (a few minutes for a 15 s take on the server)" : "";
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
         // The board card shows the take's still in place of the silhouette
@@ -2677,9 +2692,10 @@ Rules:
         // provided screen does (measured live, proj_25b2858c: the take
         // landed, the scene re-timed to 4.98s, the card kept the outline).
         reshootStoryboardCardsSoon(tkTenant, tkProject);
-        if (tkWantBlur) {
-          queueTakeBlur({
+        if (tkWantBlur || tkWantAlpha) {
+          queueTakeMatte({
             tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, dataDir: config.dataDir, strength: tkBlurStrength,
+            blur: tkWantBlur, alpha: tkWantAlpha,
             resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
             afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
           });

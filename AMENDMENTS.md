@@ -4215,3 +4215,51 @@ with variable frames, and decoding it as-is duplicated every frame four
 times for the model. The matte now runs at most 30 frames a second
 (`MATTE_MAX_FPS`), the alpha muxed at the same rate against the original
 timeline. Same picture, a quarter of the work.
+
+## 2026-09-20 -- The take as a layer: alpha, and a ground under the person
+
+Marc: "Couldn't you simplify this a little bit and have the background
+just be alpha, meaning that it's transparent? ... if the component that's
+underneath the speaker video is a video of the product or an image, it
+would make the speaker look like it had that as the background." Yes --
+and it is one model for blur, footage and stills alike.
+
+- The camera was only ever the BASE: every speaker scene renders
+  transparent over it (core/speaker-mode.ts), so nothing could lie under
+  the person. The matte (core/take-matte.ts) now also writes
+  `<name>-alpha.webm` -- the person on a transparent frame (VP9 with
+  alpha, the one alpha video Chromium plays; ffmpeg decodes it through
+  libvpx). One matte pass feeds both copies; the blur stays the default
+  room when nothing lies under the person.
+- `core/speaker-layer.ts`: a built person-film scene with a GROUND -- a
+  full-stage clip, still or mock that holds the whole beat -- carries the
+  take INSIDE the scene: a `video` component on the `speaker-alpha` token,
+  cast right over the ground (z 1 / z 2) and under every graphic. The
+  compositing rule reads it: such a scene renders OPAQUE, so the base is
+  not doubled underneath. The board's `transparent_background` is never
+  touched, so the take need stays open on it.
+- Cast in two places: the pipeline after the build (a person film's scenes
+  with a ground) and the take route at attach (boards built before the
+  rule). The attach then asks the matte for the alpha copy whenever a
+  scene carries the layer; the blur toggle keeps asking for the blur.
+- Resolution everywhere the token can be seen: preview, composite,
+  thumbnail and cards bind the token to this scene's alpha copy at the
+  take's trim (`speakerClipForScene` now carries `alpha`); the render
+  resolves it to the file before the worker; with no alpha copy yet the
+  token falls back to the plain take (the person shows, the ground waits),
+  and with no take at all the layer is left out (a black window would
+  bury the ground). The `video` component honours `start_at`.
+- The render workers keep the alpha: a `.webm` source is extracted as
+  WebP (alpha kept, ~40 KB a frame at 1080x1920) through the libvpx
+  decoder -- the native vp9 decoder drops the alpha plane; the frame
+  cache key carries the format. Studio treats the alpha copy as the
+  speaker (synced to the speaker clock, never listed as a media file).
+- Verified here: Chromium composites a VP9 alpha WebM over a page
+  background (a red page showed through the transparent corner); a 3 s
+  slice matted to an alpha copy in 27 s on four cores; a one-scene film
+  with a test-pattern ground, the alpha take and a lower third rendered
+  through the speaker pipeline with the person over the pattern.
+- Not done: Safari cannot play VP9 alpha (it wants HEVC with alpha); the
+  Studio preview there shows the plain take over the ground. A light
+  wrap on the matte's edge is the next lever if the halo shows on bright
+  grounds.

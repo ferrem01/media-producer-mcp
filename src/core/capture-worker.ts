@@ -39,6 +39,8 @@ interface WorkerArgs {
 interface ExtractedVideo {
   framesDir: string;
   totalFrames: number;
+  /** "jpg" for footage; "webp" (with alpha) for a take's alpha copy. */
+  ext: "jpg" | "webp";
 }
 
 /** Info collected from a <video> element in the DOM */
@@ -61,17 +63,21 @@ async function extractVideoFrames(
 ): Promise<ExtractedVideo> {
   // Same cache and format as scene-worker's extractVideoFrames (shared dirs):
   // JPEG q:v 2 -- full-res PNGs for a 60s+ clip run ~5GB and fill /tmp.
-  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}|jpg`).digest("hex").slice(0, 12);
+  // A take's alpha copy (VP9 alpha WebM) keeps its alpha as WebP, decoded
+  // through libvpx (the native vp9 decoder drops the alpha plane).
+  const alpha = /\.webm(\?|#|$)/i.test(videoPath);
+  const ext: "jpg" | "webp" = alpha ? "webp" : "jpg";
+  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}|${ext}`).digest("hex").slice(0, 12);
   const framesDir = `/tmp/vframes_${hash}`;
 
   // If already extracted (shared src), just count frames. Reuse requires the
   // .complete sentinel -- a dir without it is a partial extraction.
   try {
     const existing = await fs.readdir(framesDir);
-    const frameFiles = existing.filter((f) => f.endsWith(".jpg"));
+    const frameFiles = existing.filter((f) => f.endsWith(`.${ext}`));
     if (frameFiles.length > 0 && existing.includes(".complete")) {
       console.log(`  Reusing ${frameFiles.length} pre-extracted frames for ${path.basename(videoPath)}`);
-      return { framesDir, totalFrames: frameFiles.length };
+      return { framesDir, totalFrames: frameFiles.length, ext };
     }
   } catch {
     // Dir doesn't exist, will create
@@ -79,15 +85,16 @@ async function extractVideoFrames(
 
   await fs.mkdir(framesDir, { recursive: true });
 
-  console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps, max ${width}x${height}...`);
+  console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps, max ${width}x${height}${alpha ? ", with alpha" : ""}...`);
   try {
     await execFileAsync("ffmpeg", [
       "-loglevel", "error", "-nostats", "-y",
+      ...(alpha ? ["-c:v", "libvpx-vp9"] : []),
       "-i", videoPath,
-      "-vf", `fps=${fps},scale='min(${width},iw)':-2`,
-      "-q:v", "2",
+      "-vf", `fps=${fps},scale='min(${width},iw)':-2${alpha ? ",format=rgba" : ""}`,
+      ...(alpha ? ["-c:v", "libwebp", "-lossless", "0", "-q:v", "88", "-compression_level", "1"] : ["-q:v", "2"]),
       "-start_number", "0",
-      `${framesDir}/frame-%06d.jpg`,
+      `${framesDir}/frame-%06d.${ext}`,
     ], { timeout: 600_000, maxBuffer: 1 << 20 });
   } catch (e: any) {
     let diskNote = "";
@@ -100,11 +107,11 @@ async function extractVideoFrames(
   }
 
   const files = await fs.readdir(framesDir);
-  const totalFrames = files.filter((f) => f.endsWith(".jpg")).length;
+  const totalFrames = files.filter((f) => f.endsWith(`.${ext}`)).length;
   await fs.writeFile(path.join(framesDir, ".complete"), "").catch(() => {});
   console.log(`  Extracted ${totalFrames} frames from ${path.basename(videoPath)}`);
 
-  return { framesDir, totalFrames };
+  return { framesDir, totalFrames, ext };
 }
 
 /**
@@ -273,7 +280,7 @@ async function main() {
             ? mapSourceTime(edlSegs, time)
             : Math.max(0, vInfo.startAt + time);
           const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
-          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.jpg`);
+          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.${extracted.ext}`);
           frameUpdates.push({ imgId: `__render_frame_${vInfo.index}__`, src: `file://${framePath}` });
         }
 

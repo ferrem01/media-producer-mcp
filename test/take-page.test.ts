@@ -171,7 +171,7 @@ describe("the server side", () => {
     const src = await read("../src/index.ts");
     const at = src.indexOf("const takeMatch = urlPath.match");
     expect(at).toBeGreaterThan(0);
-    const block = src.slice(at, at + 8000);
+    const block = src.slice(at, at + 10000);
     expect(block).toMatch(/expectedPrefix = `\/assets\/\$\{tkTenant\}\/projects\/\$\{tkProject\}\/assets\/`/);
     expect(block).toMatch(/tkUrl\.includes\("\.\."\)/);
     // the take is attached per scene through the needs module, not by hand

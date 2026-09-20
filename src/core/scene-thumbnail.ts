@@ -31,6 +31,8 @@ export interface SceneThumbnailOptions {
    *  seconds. Per-scene takes pass the clip's trim; omitted, the scene's
    *  film start (one continuous recording). */
   speakerOffset?: number;
+  /** The take's alpha copy for a scene that carries the take as a layer. */
+  speakerAlphaUrl?: string;
   dataDir: string;
   gsapDir: string;
   componentLibDir: string;
@@ -97,6 +99,7 @@ async function buildSceneThumbnail(
         scene,
         at: atTime,
         speakerUrl: speakerUrl || "",
+        speakerAlphaUrl: opts.speakerAlphaUrl || "",
         spOffset,
         brand: project.brand_kit || null,
         canvas: project.canvas || null,
@@ -146,6 +149,7 @@ async function buildSceneThumbnail(
       preview: true,
       speakerUrl,
       speakerOffset: spOffset,
+      speakerAlphaUrl: opts.speakerAlphaUrl,
     });
 
     const tmpHtml = path.join(os.tmpdir(), `mp_thumb_${etag.slice(0, 12)}.html`);
