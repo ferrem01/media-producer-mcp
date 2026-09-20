@@ -32,6 +32,15 @@ describe("background blur at attach", () => {
     expect(g).toContain("[bg][fg]overlay=shortest=1:format=auto,format=yuv420p[out]");
   });
 
+  it("mattes at most 30 frames a second: a canvas take's 120 fps timebase must not quadruple the work", async () => {
+    const { MATTE_MAX_FPS } = await import("../src/core/take-matte.js");
+    expect(MATTE_MAX_FPS).toBe(30);
+    const src = await fs.readFile("src/core/take-matte.ts", "utf8");
+    expect(src).toMatch(/const fps = Math\.min\(MATTE_MAX_FPS, probe\.fps > 0 \? probe\.fps : MATTE_MAX_FPS\);/);
+    expect(src).toMatch(/`fps=\$\{fps\},scale=\$\{mw\}:\$\{mh\}:flags=area`/);
+    expect(src).toMatch(/"-framerate", String\(fps\), "-i", alphaRaw/);
+  });
+
   it("the model is pinned by URL and hash", () => {
     expect(MATTE_MODEL_URL).toMatch(/^https:\/\/github\.com\/PeterL1n\/RobustVideoMatting\/releases\/download\/v1\.0\.0\/rvm_mobilenetv3_fp32\.onnx$/);
     expect(MATTE_MODEL_SHA256).toMatch(/^[0-9a-f]{64}$/);

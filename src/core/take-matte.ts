@@ -30,6 +30,11 @@ export const MATTE_MODEL_URL = "https://github.com/PeterL1n/RobustVideoMatting/r
 export const MATTE_MODEL_SHA256 = "88d4531297118f595bf2fd60f6f566aec2e559393802d1f436c380f0cbbd2828";
 /** The model sees the frame at this short side; the alpha is scaled back up. */
 export const MATTE_SHORT_SIDE = 288;
+/** The alpha is matted at most this many frames a second. A canvas take
+ *  arrives with a 120 fps timebase and variable frames; decoding it as-is
+ *  duplicated frames four times over (measured live: a 15 s take took five
+ *  minutes on the server). Thirty is more than the mask needs. */
+export const MATTE_MAX_FPS = 30;
 
 export interface MatteOptions {
   dataDir: string;
@@ -44,6 +49,8 @@ export interface MatteResult {
   frames: number;
   ms: number;
   model_size: { width: number; height: number };
+  /** Frames a second the alpha was matted at. */
+  fps: number;
 }
 
 /** The frame the model sees: short side MATTE_SHORT_SIDE, both sides
@@ -139,6 +146,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   const session = await ort.InferenceSession.create(modelPath, { executionProviders: ["cpu"], intraOpNumThreads: 4, graphOptimizationLevel: "all" });
 
   const probe = await probeVideo(input);
+  const fps = Math.min(MATTE_MAX_FPS, probe.fps > 0 ? probe.fps : MATTE_MAX_FPS);
   const ms = matteSize(probe.width, probe.height);
   const mw = ms.width, mh = ms.height, frameBytes = mw * mh * 3;
   const ext = path.extname(input) || ".mp4";
@@ -147,9 +155,13 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   const output = `${base}-blur.mp4`;
 
   // ── Pass 1: decode small, matte, write the alpha ─────────────────────
-  const dec = spawn("ffmpeg", ["-hide_banner", "-v", "error", "-i", input, "-vf", `scale=${mw}:${mh}:flags=area`, "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], { stdio: ["ignore", "pipe", "pipe"] });
+  const dec = spawn("ffmpeg", ["-hide_banner", "-v", "error", "-i", input, "-vf", `fps=${fps},scale=${mw}:${mh}:flags=area`, "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], { stdio: ["ignore", "pipe", "pipe"] });
   let decErr = "";
   dec.stderr.on("data", (d) => { decErr += String(d); });
+  // Registered NOW: with the matte slower than the decode, ffmpeg closes
+  // long before the last frame is matted, and a listener attached after
+  // the loop waits forever (measured: a 3 s slice never returned).
+  const decDone = new Promise<number>((r) => dec.on("close", (c) => r(c ?? 0)));
   const alphaOut = fs.createWriteStream(alphaRaw);
   const zero = new ort.Tensor("float32", new Float32Array([0]), [1, 1, 1, 1]);
   let r1 = zero, r2 = zero, r3 = zero, r4 = zero;
@@ -176,13 +188,13 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
     carry = off < buf.length ? Buffer.from(buf.subarray(off)) : Buffer.alloc(0);
   }
   await new Promise<void>((resolve, reject) => { alphaOut.end(() => resolve()); alphaOut.on("error", reject); });
-  const decCode = await new Promise<number>((r) => dec.on("close", (c) => r(c ?? 0)));
+  const decCode = await decDone;
   if (decCode !== 0 || !frames) { await fsp.unlink(alphaRaw).catch(() => {}); throw new Error(`matte decode failed: ${decErr.slice(-300) || "no frames"}`); }
 
   // ── Pass 2: blur the room, the person over it, the sound carried ─────
   const args = ["-hide_banner", "-y", "-v", "error",
     "-i", input,
-    "-f", "rawvideo", "-pix_fmt", "gray", "-video_size", `${mw}x${mh}`, "-framerate", String(probe.fps), "-i", alphaRaw,
+    "-f", "rawvideo", "-pix_fmt", "gray", "-video_size", `${mw}x${mh}`, "-framerate", String(fps), "-i", alphaRaw,
     "-filter_complex", matteFilterGraph(probe.width, probe.height, opts.strength),
     "-map", "[out]"];
   if (probe.hasAudio) args.push("-map", "0:a:0", "-c:a", "copy");
@@ -195,7 +207,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   } finally {
     await fsp.unlink(alphaRaw).catch(() => {});
   }
-  return { output, frames, ms: Date.now() - t0, model_size: ms };
+  return { output, frames, ms: Date.now() - t0, model_size: ms, fps };
 }
 
 /**
