@@ -122,6 +122,10 @@ describe("the alpha copy", () => {
     }
     const sw = await fsp.readFile("src/core/scene-worker.ts", "utf8");
     expect(sw).toMatch(/data:image\/\$\{extracted\.ext === "webp" \? "webp" : "jpeg"\};base64,/);
+    // The single-frame capture (thumbnails, critique stills) too: a PNG through libvpx as RGBA.
+    const cap = await fsp.readFile("src/core/capture.ts", "utf8");
+    expect(cap).toMatch(/const alpha = \/\\\.webm\(\\\?\|#\|\$\)\/i\.test\(videoPath\);\s*await execFileAsync\("ffmpeg", \[\s*"-ss", String\(time\),\s*\.\.\.\(alpha \? \["-c:v", "libvpx-vp9"\] : \[\]\),/);
+    expect(cap).toMatch(/\.\.\.\(alpha \? \["-pix_fmt", "rgba"\] : \[\]\),/);
   });
   it("the render resolves the token to this scene's alpha copy at its trim; the take route casts the layer and asks for the copy; Studio treats the copy as the speaker", async () => {
     const render = await fsp.readFile("src/core/render.ts", "utf8");

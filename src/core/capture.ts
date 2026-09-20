@@ -234,10 +234,17 @@ async function extractSingleVideoFrame(
   time: number,
   outputPath: string
 ): Promise<void> {
+  // A take's alpha copy (VP9 alpha WebM, core/take-matte.ts) keeps its
+  // alpha only through the libvpx decoder (the native vp9 decoder drops
+  // the plane) and as RGBA -- the thumbnail of a scene carrying the take
+  // as a layer showed the room instead of the ground (measured live).
+  const alpha = /\.webm(\?|#|$)/i.test(videoPath);
   await execFileAsync("ffmpeg", [
     "-ss", String(time),
+    ...(alpha ? ["-c:v", "libvpx-vp9"] : []),
     "-i", videoPath,
     "-frames:v", "1",
+    ...(alpha ? ["-pix_fmt", "rgba"] : []),
     "-y",
     outputPath,
   ], { timeout: 30_000 });
