@@ -725,6 +725,10 @@ export interface SpeakerTrackClip {
   trim_start?: number;
   /** Trim: stop using video at this timestamp */
   trim_end?: number;
+  /** The person on a transparent frame (<name>-alpha.webm, core/take-matte.ts):
+   *  a scene that carries the take as a layer over its own ground plays this
+   *  copy inside the scene instead of the opaque camera base. */
+  alpha?: string;
   /** Time-fit: remap this clip (or its trimmed window) to EXACTLY the film's
    *  total duration. For a screen recording whose narration was de-silenced
    *  separately (so the raw recording runs longer than the voiceover), this
@@ -762,6 +766,9 @@ export interface Take {
    *  (core/take-matte.ts). `source` is then the blurred copy; the raw
    *  take is kept at `source_raw` so the blur can be undone or re-run. */
   background?: { mode: "blur"; source_raw: string; strength?: number; ms?: number };
+  /** The person on a transparent frame (core/take-matte.ts), for a scene
+   *  that carries the take as a layer over its own ground. */
+  alpha?: string;
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };

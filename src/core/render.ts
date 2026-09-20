@@ -46,7 +46,8 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
-import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts } from "./speaker-track.js";
+import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts, speakerClipForScene } from "./speaker-track.js";
+import { SPEAKER_ALPHA_SRC, isSpeakerLayer, bindSpeakerLayerData } from "./speaker-layer.js";
 import { resolveVideoPath } from "./video-path.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
@@ -627,7 +628,19 @@ async function renderVideoWithSpeakerTrack(
   {
     for (let si2 = 0; si2 < project.scenes.length; si2++) {
       const scene = project.scenes[si2];
+      // THE TAKE AS A LAYER (core/speaker-layer.ts): this scene's own take,
+      // its alpha copy at its trim -- or the plain clip while none exists.
+      const layerRef = speakerClipForScene(speaker_track.clips, project.scenes, si2);
       for (const comp of scene.components) {
+        if (isSpeakerLayer(comp as any) && (comp.data as any).src === SPEAKER_ALPHA_SRC) {
+          const asFile = (u: string) => `file://${path.resolve(resolveVideoPath(u))}`;
+          const bound = layerRef
+            ? bindSpeakerLayerData(comp.data as any, { alphaUrl: layerRef.alpha ? asFile(layerRef.alpha) : undefined, url: asFile(layerRef.source), offset: layerRef.offset })
+            : bindSpeakerLayerData(comp.data as any, { url: speakerFileUrl, offset: filmStarts[si2] });
+          if (bound) comp.data = bound as any;
+          console.log(`  [speaker-track] scene ${si2 + 1}: the take rides as a layer (${layerRef?.alpha ? "alpha copy" : "plain take, no alpha copy yet"}) from ${(bound as any)?.start_at}s`);
+          continue;
+        }
         const dataCopy = comp.data as Record<string, unknown>;
         for (const [key, val] of Object.entries(dataCopy)) {
           if (val === "speaker") {

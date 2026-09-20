@@ -147,7 +147,7 @@ export function recipeBlock(r: Recipe, frame?: string): string {
     const rep = b.repeat ? ` -- REPEAT ${b.repeat[0]}-${b.repeat[1]} times, one scene each` : "";
     const cut = b.cutaway ? ` Cutaway (${b.cutaway.use || "cutaway"}${b.cutaway.kind ? `, ${b.cutaway.kind}` : ""}): enters at ${b.cutaway.at}, holds ${Math.round(b.cutaway.hold * 100)}% of the beat${b.cutaway.exit_before ? `, out before ${b.cutaway.exit_before}` : ""}.` : "";
     const ent = b.enters && b.enters.length ? ` Enters: ${b.enters.join(", ")}.` : "";
-    const made = ` MADE AS: ${MADE_TEXT[madeOf(b)]}.${b.ground === "broll" ? " A found-footage GROUND may lie under it when the brief asks for one (a stock_footage need; the surface and the cards ride over the clip)." : ""}`;
+    const made = ` MADE AS: ${MADE_TEXT[madeOf(b)]}.${b.ground === "broll" ? " A found-footage GROUND may lie under it when the brief asks for one (a stock_footage need; the surface and the cards ride over the clip, and on a person beat the person rides over it too -- the take as a layer)." : ""}`;
     return `${i + 1}. ${b.role.toUpperCase()} -- ${b.shot}, ${b.dur[1]}s (${b.dur[0]}-${b.dur[2]}s), about ${wordBudget(b.dur[1], wpm)} words (never more than ${wordBudget(b.dur[2], wpm)})${rep}.${made}${ent}${cut}${b.note ? ` ${b.note}` : ""}`;
   }).join("\n");
   const lat = r.latitude || {};

@@ -12,6 +12,7 @@
  * - Transport clock driven playback (GSAP as puppet)
  */
 
+import { bindSpeakerLayerData } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
@@ -67,7 +68,7 @@ export interface CompositeOptions {
   /** Per scene: the camera clip and where it sits (per-scene takes). A
    *  scene with camera moves gets the camera INSIDE its rig so the moves
    *  move the person; Studio syncs and shows it in place of its own. */
-  speakerRefs?: Record<string, { url: string; offset: number }>;
+  speakerRefs?: Record<string, { url: string; offset: number; alpha?: string }>;
 }
 
 /**
@@ -159,7 +160,12 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       const parsed = sourceMap.get(comp.type);
       if (!parsed) continue;
 
-      const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData(comp);
+      // THE TAKE AS A LAYER (core/speaker-layer.ts): the token becomes this
+      // scene's alpha copy at its trim; with no take the layer is left out.
+      const ref = options.speakerRefs && options.speakerRefs[scene.id];
+      const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: ref?.alpha, url: ref?.url || speakerUrl, offset: ref ? ref.offset : sceneStarts[si] });
+      if (!layerData) continue;
+      const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData({ ...comp, data: layerData });
       // Same assembly-time hook as the render path: the accent's animation
       // JSON is inlined into its data (no fetch at play time).
       const preData = comp.type === "lottie-accent" ? await inlineLottieAnimation(preData0) : preData0;

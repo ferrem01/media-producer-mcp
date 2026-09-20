@@ -410,14 +410,14 @@ export function speakerSceneFilmStarts(scenes: Array<{ duration_seconds: number;
  * as the first take seeked to 9.99s and 16.66s -- its last frame, twice).
  */
 export function speakerClipForScene(
-  clips: Array<{ source: string; start?: number; trim_start?: number; scene_index?: number }> | undefined,
+  clips: Array<{ source: string; start?: number; trim_start?: number; scene_index?: number; alpha?: string }> | undefined,
   scenes: Array<{ duration_seconds: number; transition_in?: { type: string; duration_seconds?: number } }>,
   sceneIndex: number,
-): { source: string; offset: number } | null {
+): { source: string; offset: number; alpha?: string } | null {
   if (!clips || !clips.length) return null;
   const own = clips.find((c) => c.scene_index === sceneIndex);
-  if (own) return { source: own.source, offset: own.trim_start ?? own.start ?? 0 };
+  if (own) return { source: own.source, offset: own.trim_start ?? own.start ?? 0, ...(own.alpha ? { alpha: own.alpha } : {}) };
   if (clips.some((c) => c.scene_index !== undefined)) return null; // per-scene track, this scene has no take
   const starts = speakerSceneFilmStarts(scenes);
-  return { source: clips[0].source, offset: (clips[0].trim_start ?? clips[0].start ?? 0) + (starts[sceneIndex] || 0) };
+  return { source: clips[0].source, offset: (clips[0].trim_start ?? clips[0].start ?? 0) + (starts[sceneIndex] || 0), ...(clips[0].alpha ? { alpha: clips[0].alpha } : {}) };
 }

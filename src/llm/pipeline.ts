@@ -40,6 +40,7 @@ import { applySpine, extractAnchors, resolveComponent } from "../core/word-ancho
 import { generateImage } from "../media/image-gen.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
+import { castSpeakerLayer } from "../core/speaker-layer.js";
 import { loadProject, saveProject, createProject } from "../persistence/project.js";
 import { runGrammarPrep, pickMusicMood } from "./grammar-prep.js";
 import { deriveWorld, deriveMotionPhysics, worldPromptBlock, type WorldSpec } from "./world.js";
@@ -3981,6 +3982,17 @@ async function runUnifiedPipeline(
       console.warn(`  Dropped ${project.scenes.length - deduped.length} duplicate scene(s) by id`);
       project.scenes = deduped;
     }
+  }
+
+  // THE TAKE AS A LAYER (core/speaker-layer.ts): on a person film, a built
+  // scene with a ground under the person (found footage, a still, a mock
+  // holding the whole beat) carries the take inside it, over the ground,
+  // under the graphics. The scene renders opaque; the take's alpha copy
+  // fills the layer when it lands.
+  if (personCarries((project.treatment as any)?.filmGrammar)) {
+    let layered = 0;
+    for (const sc of project.scenes) if (castSpeakerLayer(sc as any)) layered++;
+    if (layered) console.log(`  Take as a layer: ${layered} scene(s) with a ground carry the person over it`);
   }
 
   // ── Auto-compress the waiting (screen recordings) ──

@@ -20,6 +20,9 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var container = el.querySelector('#video-container');
+    // A clip with alpha (the take as a layer, core/speaker-layer.ts): the
+    // wrap must not paint -- its black box would bury whatever lies under.
+    if (data.alpha) container.style.background = 'transparent';
 
     // Set object-fit from data or default to cover
     var fit = data.object_fit || 'cover';
@@ -35,7 +38,11 @@
     // clip starts from ITS beginning when it lands: the capture seeks every
     // video to start-at + scene time, so a negative start-at holds it on
     // frame 0 until `at`.
-    var video = loadVideoForCapture(container, data.src, { style: style, startAt: timed && at > 0 ? -at : 0 });
+    // start_at: seconds into the source where the clip stands at scene
+    // time 0 (the take as a layer plays from its trim, on the base's clock).
+    var startAt = Number(data.start_at);
+    if (!isFinite(startAt) || startAt < 0) startAt = 0;
+    var video = loadVideoForCapture(container, data.src, { style: style, startAt: timed && at > 0 ? -at : startAt });
 
     if (timed) {
       // A TIMED clip is a cut, not a fade (SPEC-creator-cut.md). Sub-frame
