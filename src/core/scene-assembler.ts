@@ -13,7 +13,7 @@
  * - window.__MP_TIMELINE and window.__MP_READY for the capture loop
  */
 
-import { bindSpeakerLayerData, isSpeakerLayer, speakerBackgroundOf } from "./speaker-layer.js";
+import { bindSpeakerLayerData, isSpeakerLayer, speakerBackgroundOf, speakerRendersInside } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { resolveComponentTags, transformComponentTagData, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
 import { isProofSurface } from "./asset-needs.js";
@@ -231,8 +231,8 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     // the base carries the person and the component draws nothing; on
     // alpha its token becomes the take's alpha copy at the take's trim;
     // with no take at all it is left out (a black window would bury the ground).
-    if (isSpeakerLayer(comp) && speakerBackgroundOf(comp) !== "alpha") continue;
-    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: options.speakerAlphaUrl, url: speakerUrl, offset: options.speakerOffset });
+    if (isSpeakerLayer(comp) && !speakerRendersInside(scene)) continue;
+    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: speakerBackgroundOf(comp) === "alpha" ? options.speakerAlphaUrl : undefined, url: speakerUrl, offset: options.speakerOffset });
     if (!layerData) continue;
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
