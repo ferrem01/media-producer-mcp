@@ -127,6 +127,7 @@ ${QUOTIENT_CSS}
   <div class="spacer"></div>
   <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
   <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(gentle skin smoothing and warmth, applied when the take is processed)</span></label>
+  <label class="toggle"><input type="checkbox" id="blurBg"> Blur the background <span class="hint">(the room goes soft behind you, you stay sharp -- done when the take is processed, about a minute per 15 seconds; the raw take is kept)</span></label>
   <button class="btn" id="recordBtn" disabled>Record</button>
 </section>
 
@@ -527,6 +528,7 @@ ${QUOTIENT_CSS}
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
           look: ($('softLook') && $('softLook').checked) ? 'soft' : 'natural',
+          background: ($('blurBg') && $('blurBg').checked) ? 'blur' : 'none',
           scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
           width: capture === 'canvas' ? capW : trackW, height: capture === 'canvas' ? capH : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })

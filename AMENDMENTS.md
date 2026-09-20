@@ -4170,3 +4170,28 @@ the mock image?" They were not: the notes described a wooden desk and a
 lamp and the scene cast only the composer on the brand world. On a
 library-built scene the notes are prose; a ground has to be cast. The
 ask beat (and the payoff open) now allow the footage ground too.
+
+## Background blur at attach (the real one)
+
+Marc, 2026-09-15: "how easy is it to add a blurry background to the take";
+2026-09-20: "let's do the real one." Person matting on the server, per
+take, as an option next to the soft look (`core/take-matte.ts`):
+
+- Robust Video Matting (rvm_mobilenetv3, ONNX, CPU through
+  onnxruntime-node) sees the sanitized take at a 288px short side and
+  gives a soft per-frame alpha; its recurrent states carry frame to frame,
+  so no flicker. ffmpeg then blurs the whole frame (boxblur, 8-32px at
+  1080 wide by strength) and lays the sharp person back over it through
+  the alpha, scaled up with a soft edge; the sound is carried.
+- The raw take is KEPT. The blur is a copy beside it (<name>-blur.mp4);
+  the take's `source` is the copy, `background.source_raw` the raw, so it
+  can be undone or re-run. A failure never blocks the attach: the take
+  lands unblurred and the note says why.
+- Cost, measured here on four cores: about 85 ms a frame, a 15 s take in
+  under a minute. The model (15 MB) is fetched once into
+  <dataDir>/_system/models and checked by hash.
+- The booth offers it as "Blur the background" (off by default, next to
+  Soft look); the attach body carries `background: "blur"`.
+- Install note: onnxruntime-node's install script tries to download CUDA
+  binaries on Linux x64; `.npmrc` sets `onnxruntime-node-install-cuda=skip`
+  so `npm ci` on CI and the droplet stays offline-safe.
