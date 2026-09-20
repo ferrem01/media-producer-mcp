@@ -4149,3 +4149,18 @@ cards popping out of the typed line, and the card showed two -- eleven
 were stacked on the second of the two accent spots a plain scene had.
 Props past the second now walk a ring of twelve spots around the frame
 (sides alternating, the middle band left to the line they orbit).
+
+## ask-work-result: the CTA line rides the result; a ground under the work
+
+The sheet-row board on this recipe asked for a second screen recording
+for its CTA beat, and the recipe pass stripped the office footage the row
+asked for under the chaos. Two recipe edits, one format word:
+
+- The CTA is not a beat: in the reference the ask of the viewer lands
+  over the LAST shot of the deliverable, the same footage continuing. The
+  beat is gone; the result beat runs 11-15s and its `enters` carry the
+  CTA line at -3s. Band 4-5.
+- `ground: "broll"` (new on the format): a beat that is motion graphics
+  may still have found footage under it when the brief asks. The work
+  beat has it; `pruneNeedsByRecipe` keeps a stock_footage need there and
+  the block tells the writer.
