@@ -4379,6 +4379,16 @@ ${QUOTIENT_CSS}
   }
   // The embedded booth says the take is attached: close the picker, reload
   // the film (the take is the scene's base now).
+  // ...and how tall it is: the dialog's frame follows, so the whole ready
+  // screen fits (capped to the viewport; the card scrolls past that).
+  window.addEventListener('message', function(ev) {
+    if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-size') return;
+    document.querySelectorAll('iframe.np-booth').forEach(function(f) {
+      if (f.contentWindow !== ev.source) return;
+      var h = Math.max(320, Math.min(Number(ev.data.height) || 0, Math.round(window.innerHeight * 0.74)));
+      if (h) f.style.height = h + 'px';
+    });
+  });
   window.addEventListener('message', function(ev) {
     if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-attached') return;
     var p = state.currentProject; if (!p || (ev.data.project && ev.data.project !== p.project_id)) return;
@@ -9539,7 +9549,7 @@ ${QUOTIENT_CSS}
       // arrives, the recorder open underneath. Soft look and the background
       // are chosen in the recorder, where they apply to the take being made;
       // a take already on the scene changes its background in Inspect.
-      var lbl = sb.label ? String(sb.label).replace(/^Scene \d+\s*[-–—:·]\s*/i, '') : '';
+      var lbl = sb.label ? String(sb.label).replace(/^Scene \\d+\\s*[-–—:·]\\s*/i, '') : '';
       var tk = (project.takes || []).filter(function(t) { return t.scene_index === si; }).slice(-1)[0];
       var tkDur = tk && tk.duration ? Math.round(tk.duration * 10) / 10 + ' s' : '';
       studioModalOpen('<h3 class="sm-title">Camera take \u00b7 Scene ' + (si + 1) + (lbl ? ' \u00b7 ' + escHtml(lbl) : '') + '</h3>' +

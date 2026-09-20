@@ -46,6 +46,15 @@ ${QUOTIENT_CSS}
      INSIDE its card and the Record button stays in reach (Marc: "scroll
      all the way down, hit record, then scroll all the way back"). */
   #ready { height:100dvh; overflow:hidden; }
+  /* Studio's dialog: the ready screen is as tall as its content, no more. */
+  body.embed { min-height: 0; }
+  body.embed #ready { height: auto; overflow: visible; }
+  body.embed .spacer { display: none; }
+  body.embed .pad { padding: 8px 16px 14px; }
+  body.embed #script { max-height: 32vh; }
+  body.embed h1 { font-size: 17px; line-height: 24px; }
+  body.embed .sub { margin-bottom: 10px; }
+  body.embed #readyNote { margin: 10px 0 8px; }
   #script { flex:0 1 auto; max-height:44dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .pad { padding: calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom)); }
   h1 { font: 500 20px/28px var(--font-sans); letter-spacing: -0.01em; margin: 0 0 4px; color: var(--foreground); }
@@ -206,11 +215,24 @@ ${QUOTIENT_CSS}
   // it), and the attached take is announced to the parent so the picker
   // closes and the film reloads with the take in its slot.
   var embedded = qp.get('embed') === '1';
+  // In Studio's dialog the page sizes to its content and says how tall it
+  // is, so the whole ready screen (lines, choices, Record) fits without a
+  // scroll inside a scroll (Marc: "make this entire screen fit").
+  function postSize() {
+    if (!embedded) return;
+    try { window.parent.postMessage({ type: 'mp-take-size', height: document.documentElement.scrollHeight }, window.location.origin); } catch (e) {}
+  }
+  if (embedded) {
+    document.body.classList.add('embed');
+    try { new ResizeObserver(function () { postSize(); }).observe(document.body); } catch (e) { setInterval(postSize, 600); }
+    window.addEventListener('load', postSize);
+  }
   if (embedded) { ['studioLinkTop'].forEach(function (id) { var el = document.getElementById(id); if (el && el.parentNode) el.parentNode.style.display = 'none'; }); document.querySelectorAll('#studioLink').forEach(function (el) { el.style.display = 'none'; }); }
   var WORDS_PER_SEC = 2.4;
 
   function show(id) {
     ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
+    setTimeout(postSize, 50);
     document.documentElement.classList.toggle('lock', id === 'stage');
     try { window.scrollTo(0, 0); } catch (eS) {}
   }
@@ -314,7 +336,8 @@ ${QUOTIENT_CSS}
       total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
       // In Studio's dialog the header already names the project and the
       // scene; here only the scene's own label. Alone in a tab, both.
-      $('title').textContent = embedded ? ((sceneLabel ? sceneLabel.replace(/^Scene \d+ · /, '') : projectName)) : (projectName + (sceneLabel ? ' — ' + sceneLabel : ''));
+      $('title').textContent = embedded ? ((sceneLabel ? sceneLabel.replace(/^Scene \\d+ · /, '').replace(/^Scene \\d+\\s*[-–—:·]\\s*/i, '') : projectName)) : (projectName + (sceneLabel ? ' — ' + sceneLabel : ''));
+      if (embedded) postSize();
       // The copy speaks to the device: a laptop is not held upright.
       var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
       if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Click Record: a 3-second count-in, then your lines one at a time at speaking pace. Click anywhere to jump to the next line.';
