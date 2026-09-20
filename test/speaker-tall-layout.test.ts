@@ -25,6 +25,23 @@ const AUTHORED = [
   { type: "floating-pills", data: { items: ["Email", "Ads"] } },
 ];
 
+describe("a pile of props on a plain scene", () => {
+  it("spreads around the frame instead of stacking on the second spot, keeping the middle band clear", () => {
+    const draft: any = { label: "Beat", duration_seconds: 5, purpose: "", visual_notes: "", components: [], beats: [] };
+    const authored = [{ type: "kinetic-text", data: { text: "Launch our product update next Tuesday." } }]
+      .concat(Array.from({ length: 13 }, (_, i) => ({ type: "sticker-prop", data: { kind: "pill", text: "TASK " + i, at: 0.3 * (i + 1) } })));
+    const res = buildAuthoredCompositionScene("s1", draft, authored, { sceneIndex: 1, totalScenes: 7, brandKit: { colors: {}, fonts: [] }, canvas: { width: 1080, height: 1080 }, hasSpeakerTrack: false } as any);
+    const props = (res.scene.components as any[]).filter((c) => c.type === "sticker-prop");
+    expect(props.length).toBe(13);
+    const spots = new Set(props.map((c) => c.position.x + "," + c.position.y));
+    expect(spots.size).toBeGreaterThanOrEqual(12);          // no stacking
+    for (const c of props.slice(2)) {                       // the ring (the first two are the house spots)
+      const y = Number(String(c.position.y).replace("%", "")), h = Number(String(c.position.height).replace("%", ""));
+      expect(y + h <= 41 || y >= 40).toBe(true);           // the middle band stays the line's
+    }
+  });
+});
+
 describe("self-placing overlays", () => {
   it("the chapter kicker and the logo band take the whole frame on any layout and place themselves", () => {
     const tall = build({ width: 1080, height: 1920 }, [
