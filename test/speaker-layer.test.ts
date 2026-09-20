@@ -289,6 +289,9 @@ describe("the choice, wherever it is made", () => {
     expect(studio).toMatch(/<div class="np-tabs">/);
     expect(studio).toMatch(/Camera take \\u00b7 Scene ' \+ \(si \+ 1\)/);
     expect(studio).toMatch(/npOpenPanel\(project, cardC, 'booth', si, ai\);/);
+    // The Recorder button answers the click: arming, then armed with a pulse; the panel keeps a live waiting mark.
+    expect(studio).toMatch(/armBtn\.textContent = '\\u2713 Recorder armed'/);
+    expect(studio).toMatch(/<span class="np-armed"><i><\/i>Armed \\u00b7 waiting for the recording<\/span>/);
     expect(studio).toMatch(/api\('POST', '\/speaker-background\/'/); // Inspect's background choice
     // The Inspect card: the speaker's internals stay hidden, background is a Room/Blur/Alpha choice on the same route.
     expect(studio).toMatch(/var isSpk = comp\.type === 'video' && !!\(data\.src === 'speaker' \|\| data\.src === 'speaker-alpha' \|\| data\.speaker_layer === true\);/);
