@@ -267,4 +267,11 @@ describe("a continuous speaker track keeps no scene markers", () => {
     const pipeline = await fs.readFile("src/llm/pipeline.ts", "utf8");
     expect(pipeline).toMatch(/\.\.\.\(\(s as any\)\.transparent_background === false \? \{ transparent_background: false \} : \{\}\),/);
   });
+
+  it("a second click on the source already open keeps it (the picker opens the booth itself; the button must not toggle it away)", async () => {
+    const fs = await import("node:fs/promises");
+    const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
+    expect(studio).toMatch(/if \(panel\.style\.display !== 'none' && panel\.dataset\.src === src\) \{ try \{ panel\.scrollIntoView/);
+    expect(studio).not.toMatch(/panel\.dataset\.src === src\) \{ panel\.style\.display = 'none'; return; \}/);
+  });
 });
