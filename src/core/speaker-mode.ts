@@ -10,22 +10,22 @@
  *   - opaque screencast + camera PiP   -> transparent_background:false -> OPAQUE
  *       (the screencast covers the camera; the camera shows only in its PiP)
  *
- * A fourth: a scene carrying the take as a LAYER over its own ground
+ * A fourth: a scene whose speaker component is set to ALPHA
  * (core/speaker-layer.ts) -> OPAQUE, the person plays inside the scene.
  *
  * Kept in one tiny module so preview, render, thumbnail,
  * critique, and composite never disagree — and so the rule is unit-testable.
  */
-import { sceneCarriesSpeakerLayer } from "./speaker-layer.js";
+import { speakerRendersInside } from "./speaker-layer.js";
 
 export function sceneCompositesOverSpeaker(
   scene: { transparent_background?: boolean; components?: Array<{ data?: Record<string, any> } | null> | null } | null | undefined,
   hasSpeakerTrack: boolean,
 ): boolean {
   if (!hasSpeakerTrack || !scene) return false;
-  // THE TAKE AS A LAYER (core/speaker-layer.ts): a scene that carries the
-  // take inside it, over its own ground, is opaque -- the base under it
-  // would double the person.
-  if (sceneCarriesSpeakerLayer(scene)) return false;
+  // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): a scene whose
+  // speaker component is set to alpha plays the person INSIDE it and is
+  // opaque -- the base under it would double the person.
+  if (speakerRendersInside(scene)) return false;
   return scene.transparent_background !== false;
 }

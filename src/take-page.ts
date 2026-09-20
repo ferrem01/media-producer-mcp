@@ -68,6 +68,7 @@ ${QUOTIENT_CSS}
   a.link { color: var(--muted-foreground); font-size: 14px; text-decoration: none; }
   .toggle { display: flex; gap: 10px; align-items: flex-start; color: var(--content-primary); font-size: 14px; margin: 10px 0 14px; white-space: nowrap; }
   .toggle .hint { white-space: normal; }
+  #bgChoice label { margin: 0 6px 0 2px; }
   .toggle input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--primary); }
   .toggle .hint { color: var(--muted-foreground); font-size: 13px; }
   .row { display: flex; gap: 8px; margin-top: 12px; }
@@ -127,7 +128,11 @@ ${QUOTIENT_CSS}
   <div class="spacer"></div>
   <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
   <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(gentle skin smoothing and warmth, applied when the take is processed)</span></label>
-  <label class="toggle"><input type="checkbox" id="blurBg"> Blur the background <span class="hint">(the room goes soft behind you, you stay sharp. The take lands right away and swaps to the blurred copy a few minutes later; the raw take is kept)</span></label>
+  <div class="toggle" id="bgChoice" role="radiogroup" aria-label="Background">Background:
+    <label><input type="radio" name="bg" value="room" checked> Room</label>
+    <label><input type="radio" name="bg" value="blur"> Blur</label>
+    <label><input type="radio" name="bg" value="alpha"> Alpha</label>
+    <span class="hint">(Room keeps what the camera sees. Blur softens it, you stay sharp. Alpha cuts you out so whatever the scene puts behind you is the room. Blur and alpha are made a few minutes after the take lands; the raw take is kept.)</span></div>
   <button class="btn" id="recordBtn" disabled>Record</button>
 </section>
 
@@ -292,6 +297,15 @@ ${QUOTIENT_CSS}
     .then(function (p) {
       projectName = p.name || project;
       setFrame(p.canvas);
+      // The scene's own setting is the default (the speaker component,
+      // core/speaker-layer.ts); a film built without one reads as room.
+      try {
+        var builtScenes = p.scenes || [];
+        var bScene = sceneIndex >= 0 ? builtScenes[sceneIndex] : builtScenes.filter(function (s0) { return (s0.components || []).some(function (c0) { return c0 && c0.data && c0.data.speaker_layer === true; }); })[0];
+        var spk = bScene && (bScene.components || []).filter(function (c1) { return c1 && c1.data && (c1.data.speaker_layer === true || c1.data.src === 'speaker-alpha'); })[0];
+        var mode = spk ? (spk.data.background || (spk.data.src === 'speaker-alpha' ? 'alpha' : 'room')) : 'room';
+        var r0 = document.querySelector('input[name="bg"][value="' + mode + '"]'); if (r0) r0.checked = true;
+      } catch (eBg) {}
       var allScenes = (p.storyboard && p.storyboard.scenes) || [];
       var scenes = sceneIndex >= 0 && allScenes[sceneIndex] ? [allScenes[sceneIndex]] : allScenes;
       sceneLabel = sceneIndex >= 0 && allScenes[sceneIndex] ? ('Scene ' + (sceneIndex + 1) + (allScenes[sceneIndex].label ? ' · ' + allScenes[sceneIndex].label : '')) : '';
@@ -528,7 +542,7 @@ ${QUOTIENT_CSS}
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
           look: ($('softLook') && $('softLook').checked) ? 'soft' : 'natural',
-          background: ($('blurBg') && $('blurBg').checked) ? 'blur' : 'none',
+          background: (document.querySelector('input[name="bg"]:checked') || {}).value || 'room',
           scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
           width: capture === 'canvas' ? capW : trackW, height: capture === 'canvas' ? capH : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })

@@ -9,6 +9,7 @@
  * arrival).
  */
 
+import { takeOwns } from "./speaker-layer.js";
 import type { Project, Take, SpeakerTrackClip, StoryboardScene } from "./types.js";
 
 /** Marker on the auto-emitted need so it can be found and updated. */
@@ -98,7 +99,8 @@ export function activeTake(project: Project, sceneIndex: number): Take | undefin
   const clip = (project.speaker_track?.clips || []).find((c) => c.scene_index === sceneIndex);
   if (!clip) return undefined;
   // Newest record wins when the same source was attached more than once.
-  return [...(project.takes || [])].reverse().find((t) => t.source === clip.source && t.scene_index === sceneIndex);
+  // The clip may play a copy of the take (blurred), so match any of its files.
+  return [...(project.takes || [])].reverse().find((t) => t.scene_index === sceneIndex && takeOwns(t, clip.source));
 }
 
 /** Scenes (0-based) whose take need is still open. */

@@ -35,7 +35,7 @@ import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-trac
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
 import { queueTakeMatte } from "./core/take-matte.js";
-import { castSpeakerLayer, sceneCarriesSpeakerLayer } from "./core/speaker-layer.js";
+import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies } from "./core/speaker-layer.js";
 import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
@@ -929,7 +929,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2571,6 +2571,46 @@ Rules:
       }
 
       // ── API: Attach a take ──
+      // POST /api/speaker-background/{tenant}/{project} {scene_index, background}
+      // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): room, blur or
+      // alpha on one scene's speaker component. The clips re-point at the
+      // copy the scene now wants; a copy that does not exist yet is made by
+      // the matte in the background (the scene shows the raw take until it
+      // lands), never re-recorded.
+      const spkBgMatch = urlPath.match(/^\/api\/speaker-background\/([^/]+)\/([^/]+)$/);
+      if (spkBgMatch && method === "POST") {
+        const [, sbTenant, sbProject] = spkBgMatch.map(decodeURIComponent);
+        let sbBody: Record<string, unknown> = {};
+        try { sbBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
+        const sbMode = asSpeakerBackground(sbBody.background);
+        const sbIndex = Number(sbBody.scene_index);
+        if (!sbMode) { jsonResponse(res, 400, { error: "background must be room, blur or alpha" }); return; }
+        const sbProj = await loadProject(sbTenant, sbProject);
+        if (!sbProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const sbScene = Number.isInteger(sbIndex) ? (sbProj.scenes || [])[sbIndex] : undefined;
+        if (!sbScene) { jsonResponse(res, 404, { error: "Scene not found (the film must be built)" }); return; }
+        if (!setSpeakerBackground(sbScene as any, sbMode)) { jsonResponse(res, 400, { error: "the scene cannot carry a speaker component" }); return; }
+        syncSpeakerClips(sbProj);
+        ensureSpeakerNeeds(sbProj);
+        const sbTake = activeTake(sbProj, sbIndex);
+        const sbMissing = sbTake ? missingSpeakerCopies(sbProj, sbTake) : { blur: false, alpha: false };
+        sbProj.updated_at = new Date().toISOString();
+        await saveProject(sbProj);
+        let sbQueued = false;
+        if (sbTake && (sbMissing.blur || sbMissing.alpha)) {
+          sbQueued = queueTakeMatte({
+            tenantId: sbTenant, projectId: sbProject, rawUrl: takeCopies(sbTake).raw, dataDir: config.dataDir,
+            blur: sbMissing.blur, alpha: sbMissing.alpha,
+            resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
+            afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
+          });
+        }
+        reshootStoryboardCardsSoon(sbTenant, sbProject);
+        console.log(`  speaker background: ${sbProject} scene ${sbIndex + 1} -> ${sbMode}${sbQueued ? " (matte queued)" : sbTake ? "" : " (no take yet)"}`);
+        jsonResponse(res, 200, { ok: true, scene_index: sbIndex, background: sbMode, matte: sbQueued ? "running" : null, has_take: !!sbTake, project: sbProj });
+        return;
+      }
+
       // POST /api/take/{tenant}/{project} {url, scene_index?, duration?, mime?, width?, height?, capture?}
       // Attach a recorded take (already uploaded to this project's assets) as
       // the speaker base for ONE scene (default: the first scene whose take
@@ -2613,7 +2653,11 @@ Rules:
         // now, unblurred, and swaps to the blurred copy when the matte is
         // done -- minutes of matting inside this request held the connection
         // past the proxy's limit (measured live: dropped at 300 s).
-        const tkWantBlur = tkBody.background === "blur";
+        // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): the booth's
+        // choice -- room, blur or alpha -- is written on the scene's speaker
+        // component; the matte makes the copy the choice needs, after the
+        // attach. No choice keeps the scene's setting.
+        const tkBackground = asSpeakerBackground(tkBody.background);
         const tkBlurStrength = Number(tkBody.blur_strength) > 0 ? Number(tkBody.blur_strength) : undefined;
         await primeTakeWords(tkPeek, tkUrl, config.dataDir);
         const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
@@ -2673,18 +2717,24 @@ Rules:
         // The take is the voice: the generated voiceover clip of every scene
         // that now has a take is dropped (else both play, measured live).
         { const dv = dropVoiceUnderTakes(tkProjectObj); if (dv) console.log(`  take: ${dv} generated voiceover clip(s) dropped under the take(s)`); }
-        // THE TAKE AS A LAYER (core/speaker-layer.ts): a built scene with a
-        // ground under the person carries the take inside it. Cast here for
-        // boards built before the rule; the matte then writes the alpha copy.
-        let tkWantAlpha = false;
+        // The scene's speaker component: cast on a built scene that has none
+        // (a film built before the rule), set to the booth's choice when one
+        // was made; the clips then point at the copy each scene wants.
+        const tkModes: string[] = [];
         for (const t of takes) {
           const built = (tkProjectObj.scenes || [])[t.scene_index];
-          if (built && castSpeakerLayer(built)) console.log(`  take: scene ${t.scene_index + 1} carries the take as a layer over its ground`);
-          if (sceneCarriesSpeakerLayer(built)) tkWantAlpha = true;
+          if (!built) continue;
+          if (tkBackground) setSpeakerBackground(built, tkBackground);
+          else castSpeakerLayer(built);
+          tkModes.push(sceneSpeakerBackground(built));
         }
-        const tkBlurNote = tkWantBlur && tkWantAlpha ? "background blur and alpha copy running -- the take swaps to the blurred copy, and the scene with a ground gets the person as a layer, when the matte is done (a few minutes for a 15 s take on the server)"
-          : tkWantBlur ? "background blur running -- the take swaps to the blurred copy when it is done (a few minutes for a 15 s take on the server)"
-          : tkWantAlpha ? "alpha copy running -- the scene with a ground gets the person as a layer over it when the matte is done (a few minutes for a 15 s take on the server)" : "";
+        syncSpeakerClips(tkProjectObj);
+        ensureSpeakerNeeds(tkProjectObj);
+        const tkMissing = takes.map((t) => missingSpeakerCopies(tkProjectObj, t)).reduce((a, m) => ({ blur: a.blur || m.blur, alpha: a.alpha || m.alpha }), { blur: false, alpha: false });
+        const tkBlurNote = tkMissing.blur && tkMissing.alpha ? "blurred and alpha copies running -- the scenes switch to them when the matte is done (a few minutes for a 15 s take on the server)"
+          : tkMissing.blur ? "blurred copy running -- the scene switches to it when the matte is done (a few minutes for a 15 s take on the server)"
+          : tkMissing.alpha ? "alpha copy running -- the scene plays the person over its background when the matte is done (a few minutes for a 15 s take on the server)"
+          : tkModes.length ? `background ${tkModes.join("/")}` : "";
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
         // The board card shows the take's still in place of the silhouette
@@ -2692,10 +2742,10 @@ Rules:
         // provided screen does (measured live, proj_25b2858c: the take
         // landed, the scene re-timed to 4.98s, the card kept the outline).
         reshootStoryboardCardsSoon(tkTenant, tkProject);
-        if (tkWantBlur || tkWantAlpha) {
+        if (tkMissing.blur || tkMissing.alpha) {
           queueTakeMatte({
             tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, dataDir: config.dataDir, strength: tkBlurStrength,
-            blur: tkWantBlur, alpha: tkWantAlpha,
+            blur: tkMissing.blur, alpha: tkMissing.alpha,
             resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
             afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
           });

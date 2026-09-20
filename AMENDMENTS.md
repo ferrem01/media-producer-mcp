@@ -4263,3 +4263,45 @@ and it is one model for blur, footage and stills alike.
   Studio preview there shows the plain take over the ground. A light
   wrap on the matte's edge is the next lever if the halo shows on bright
   grounds.
+
+## 2026-09-20 -- The speaker is a component: room, blur or alpha
+
+Marc, on the alpha layer shipped this morning: "I thought we were going
+to be able to choose background of blur or alpha ... make speaker track
+be something that is only shown via a video component. By moving it to
+the component it means we can put anything behind it, so we never have
+to have an explicit replace-with-clip for the background." His model is
+cleaner than the ground-detection shortcut, and it is now the model.
+
+- Every speaker scene carries ONE `video` component on the `speaker`
+  token (`speaker_layer: true`) with `data.background`: `room` (the raw
+  take), `blur` (the blurred copy), `alpha` (the person cut out). Room
+  and blur keep the fast path: the camera is the ffmpeg base under a
+  transparent scene and the component draws nothing. Alpha plays the
+  take's alpha copy INSIDE the scene at the component's place in the
+  stack and the scene renders opaque -- whatever lies under it (a mock,
+  footage, a still, the brand colour) is the room behind the person.
+- The pipeline casts the component on every built scene over the camera
+  of a person film: alpha over a ground (found footage, a still, a mock
+  holding the whole beat), room otherwise. The take attach casts it on a
+  film built before the rule and writes the booth's choice on it.
+- The copies are made on request, never during recording, and once per
+  take: the booth's choice (Room / Blur / Alpha, defaulting to the
+  scene's setting) or Studio's Background row on the take's card
+  (`POST /api/speaker-background {scene_index, background}`) queues the
+  matte for the copy the setting lacks; the scene shows the raw take
+  until it lands, a few minutes for a 15 s take on the server. Flipping
+  a setting whose copy exists is instant. Takes recorded before today
+  get their copies the same way -- no re-recording.
+- The take record keeps `source` as the RAW take and carries `blur` and
+  `alpha` urls (older takes stored the blurred copy as the source with
+  the raw at `background.source_raw`; `takeCopies` reads both shapes).
+  `syncSpeakerClips` points each clip of the speaker track at the copy
+  its scene wants (the blurred copy as the base under a blur scene, the
+  raw take otherwise, the alpha copy carried on the clip); `activeTake`
+  matches a clip through any of the take's files. One matte job per file
+  at a time; a copy asked for while it ran is queued when it ends.
+- Verified here: the three settings through the built assembler (room and
+  blur draw nothing over the underlay; alpha binds the alpha copy at the
+  trim and the scene is opaque); the one-scene test film still renders
+  the person over the pattern; the full suite green.

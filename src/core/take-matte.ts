@@ -32,6 +32,8 @@ import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
+import { takeCopies, syncSpeakerClips, missingSpeakerCopies } from "./speaker-layer.js";
+import { ensureSpeakerNeeds } from "./take-needs.js";
 
 export const MATTE_MODEL_FILE = "rvm_mobilenetv3_fp32.onnx";
 export const MATTE_MODEL_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx";
@@ -279,22 +281,23 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
  * THE MATTE RUNS AFTER THE ATTACH. Minutes of matting inside the attach
  * request held the connection past the proxy's limit (measured live: the
  * call dropped at 300 s). The take lands at once, raw; this job mattes the
- * file in the background and, when done, swaps every take and clip that
- * points at the raw file to the blurred copy (when the blur was asked)
- * and records the alpha copy on them (when a scene carries the take as a
- * layer), then saves. Studio's live sync picks up the new version. One
- * job per file at a time.
+ * file in the background and, when done, records the copies on every
+ * take that owns the raw file, points the speaker track's clips at the
+ * copy each scene's setting wants (syncSpeakerClips), and saves. Studio's
+ * live sync picks up the new version. One job per file at a time; when it
+ * ends and a scene's setting still lacks a copy (asked for while it ran),
+ * it queues again.
  */
 const matteJobs = new Set<string>();
 export function queueTakeMatte(opts: {
   tenantId: string;
   projectId: string;
-  /** The take's url as stored (/assets/...). */
+  /** The take's raw url as stored (/assets/...). */
   rawUrl: string;
   dataDir: string;
-  /** The room blurred; the take swaps to the blurred copy. */
+  /** The room blurred (<name>-blur.mp4). */
   blur?: boolean;
-  /** The person on a transparent frame; takes and clips get `alpha`. */
+  /** The person on a transparent frame (<name>-alpha.webm). */
   alpha?: boolean;
   strength?: number;
   resolvePath: (url: string) => string;
@@ -307,32 +310,33 @@ export function queueTakeMatte(opts: {
   if (matteJobs.has(key)) return false;
   matteJobs.add(key);
   setTimeout(async () => {
+    const again = { blur: false, alpha: false };
     try {
       const m = await matteTake(opts.resolvePath(opts.rawUrl), { dataDir: opts.dataDir, strength: opts.strength, blur: !!opts.blur, alpha: !!opts.alpha, onProgress: (n) => console.log(`  take matte: ${n} frames...`) });
       const blurUrl = m.output ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.output)) : undefined;
       const alphaUrl = m.alpha ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.alpha)) : undefined;
       const project = await opts.loadProject(opts.tenantId, opts.projectId);
       if (!project) return;
-      let swapped = 0, layered = 0;
+      let owned = 0;
       for (const t of project.takes || []) {
-        if (t.source !== opts.rawUrl) continue;
-        if (alphaUrl) { t.alpha = alphaUrl; layered++; }
-        if (blurUrl) { t.source = blurUrl; t.background = { mode: "blur", source_raw: opts.rawUrl, strength: opts.strength, ms: m.ms }; swapped++; }
+        if (takeCopies(t).raw !== opts.rawUrl) continue;
+        if (blurUrl) t.blur = blurUrl;
+        if (alphaUrl) t.alpha = alphaUrl;
+        owned++;
+        const miss = missingSpeakerCopies(project, t);
+        again.blur = again.blur || miss.blur; again.alpha = again.alpha || miss.alpha;
       }
-      for (const c of project.speaker_track?.clips || []) {
-        if (c.source !== opts.rawUrl) continue;
-        if (alphaUrl) c.alpha = alphaUrl;
-        if (blurUrl) c.source = blurUrl;
-      }
-      if (blurUrl) for (const sc of project.storyboard?.scenes || []) for (const a of sc.assets || []) if (a && a.type === "camera_video" && a.path === opts.rawUrl) a.path = blurUrl;
+      const synced = syncSpeakerClips(project);
+      ensureSpeakerNeeds(project);
       project.updated_at = new Date().toISOString();
       await opts.saveProject(project);
-      console.log(`  take matte: ${[m.output, m.alpha].filter(Boolean).map((f) => path.basename(f!)).join(" + ")} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${swapped} take(s) blurred, ${layered} take(s) with an alpha copy`);
+      console.log(`  take matte: ${[m.output, m.alpha].filter(Boolean).map((f) => path.basename(f!)).join(" + ")} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${owned} take(s) updated, ${synced} clip field(s) re-pointed`);
       if (opts.afterSave) opts.afterSave(opts.tenantId, opts.projectId);
     } catch (e: any) {
       console.warn(`  take matte failed for ${path.basename(opts.rawUrl)}: ${e?.message || e}`);
     } finally {
       matteJobs.delete(key);
+      if (again.blur || again.alpha) queueTakeMatte({ ...opts, ...again });
     }
   }, 50);
   return true;

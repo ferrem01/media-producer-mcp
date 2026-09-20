@@ -47,7 +47,7 @@ import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
 import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts, speakerClipForScene } from "./speaker-track.js";
-import { SPEAKER_ALPHA_SRC, isSpeakerLayer, bindSpeakerLayerData } from "./speaker-layer.js";
+import { isSpeakerLayer, speakerBackgroundOf, bindSpeakerLayerData } from "./speaker-layer.js";
 import { resolveVideoPath } from "./video-path.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
@@ -628,11 +628,14 @@ async function renderVideoWithSpeakerTrack(
   {
     for (let si2 = 0; si2 < project.scenes.length; si2++) {
       const scene = project.scenes[si2];
-      // THE TAKE AS A LAYER (core/speaker-layer.ts): this scene's own take,
-      // its alpha copy at its trim -- or the plain clip while none exists.
+      // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): set to alpha it
+      // plays this scene's own take inside the scene -- the alpha copy at
+      // its trim, or the plain clip while none exists. Room and blur leave
+      // it to the base (the assembler draws nothing for it).
       const layerRef = speakerClipForScene(speaker_track.clips, project.scenes, si2);
       for (const comp of scene.components) {
-        if (isSpeakerLayer(comp as any) && (comp.data as any).src === SPEAKER_ALPHA_SRC) {
+        if (isSpeakerLayer(comp as any) && speakerBackgroundOf(comp as any) !== "alpha") continue;
+        if (isSpeakerLayer(comp as any)) {
           const asFile = (u: string) => `file://${path.resolve(resolveVideoPath(u))}`;
           const bound = layerRef
             ? bindSpeakerLayerData(comp.data as any, { alphaUrl: layerRef.alpha ? asFile(layerRef.alpha) : undefined, url: asFile(layerRef.source), offset: layerRef.offset })
