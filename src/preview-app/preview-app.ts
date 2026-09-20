@@ -9592,7 +9592,14 @@ ${QUOTIENT_CSS}
     bindSceneNeeds(project, card);
     document.getElementById('np-picker-close').addEventListener('click', function() { muStop(); studioModalClose(); });
     var first = (NP_SOURCES[a.type] || [])[0];
-    if (first === 'find' || first === 'draw' || first === 'recorder' || first === 'booth') npOpenPanel(project, card, first, si, ai);
+    // The make-it panel opens on its own for a search or a drawing; the
+    // Recorder does NOT arm on open (Marc: "it seems to be arming itself the
+    // second the dialog opens") -- the button arms, the panel just says so.
+    if (first === 'find' || first === 'draw' || first === 'booth') npOpenPanel(project, card, first, si, ai);
+    else if (first === 'recorder') {
+      var panelR = card.querySelector('[data-np-panel="' + si + '-' + ai + '"]');
+      if (panelR) { panelR.style.display = ''; panelR.dataset.src = ''; panelR.innerHTML = '<div class="np-hint">Press <b>Record with the Recorder</b> to point the Quotient Recorder at this slot, then record on the page; the file lands here on its own.</div>'; }
+    }
   }
   function openNeedInEditor(si, ai) {
     openStoryboardEditor();

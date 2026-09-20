@@ -291,6 +291,9 @@ describe("the choice, wherever it is made", () => {
     expect(studio).toMatch(/npOpenPanel\(project, cardC, 'booth', si, ai\);/);
     // The Recorder button answers the click: arming, then armed with a pulse; the panel keeps a live waiting mark.
     expect(studio).toMatch(/armBtn\.textContent = '\\u2713 Recorder armed'/);
+    // ...and only the button arms: opening the dialog does not.
+    expect(studio).toMatch(/if \(first === 'find' \|\| first === 'draw' \|\| first === 'booth'\) npOpenPanel\(project, card, first, si, ai\);/);
+    expect(studio).not.toMatch(/first === 'recorder' \|\| first === 'booth'\) npOpenPanel/);
     expect(studio).toMatch(/<span class="np-armed"><i><\/i>Armed \\u00b7 waiting for the recording<\/span>/);
     expect(studio).toMatch(/api\('POST', '\/speaker-background\/'/); // Inspect's background choice
     // The Inspect card: the speaker's internals stay hidden, background is a Room/Blur/Alpha choice on the same route.
