@@ -46,21 +46,18 @@ describe("background blur at attach", () => {
     expect(MATTE_MODEL_SHA256).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("is a per-take option: the booth offers it, the attach route runs it on a copy and never lets it block the take", async () => {
+  it("is a per-take option made after the attach: the booth offers it, the attach queues the matte on a copy and never lets it block the take", async () => {
     const take = await fs.readFile("src/take-page.ts", "utf8");
-    expect(take).toMatch(/<input type="checkbox" id="blurBg"> Blur the background/);
-    expect(take).toMatch(/background: \(\$\('blurBg'\) && \$\('blurBg'\)\.checked\) \? 'blur' : 'none',/);
+    expect(take).toMatch(/<input type="radio" name="bg" value="blur"> Blur/);
     const index = await fs.readFile("src/index.ts", "utf8");
-    // The attach lands at once; the matte runs after it and swaps the take (the request dropped at 300s when it ran inline).
-    expect(index).toMatch(/const tkWantBlur = tkBody\.background === "blur";/);
-    expect(index).toMatch(/reshootStoryboardCardsSoon\(tkTenant, tkProject\);\s*if \(tkWantBlur \|\| tkWantAlpha\) \{\s*queueTakeMatte\(\{/);
+    // The attach lands at once; the matte runs after it (the request dropped at 300s when it ran inline).
+    expect(index).toMatch(/reshootStoryboardCardsSoon\(tkTenant, tkProject\);\s*if \(tkMissing\.blur \|\| tkMissing\.alpha\) \{\s*queueTakeMatte\(\{/);
     expect(index).not.toMatch(/await matteTake\(/);
     const matte = await fs.readFile("src/core/take-matte.ts", "utf8");
-    expect(matte).toMatch(/if \(blurUrl\) \{ t\.source = blurUrl; t\.background = \{ mode: "blur", source_raw: opts\.rawUrl/);
-    expect(matte).toMatch(/if \(alphaUrl\) \{ t\.alpha = alphaUrl; layered\+\+; \}/);
-    expect(matte).toMatch(/if \(alphaUrl\) c\.alpha = alphaUrl;\s*if \(blurUrl\) c\.source = blurUrl;/);
+    expect(matte).toMatch(/if \(blurUrl\) t\.blur = blurUrl;/);
     const types = await fs.readFile("src/core/types.ts", "utf8");
-    expect(types).toMatch(/background\?: \{ mode: "blur"; source_raw: string; strength\?: number; ms\?: number \};/);
+    expect(types).toMatch(/blur\?: string;/);
+    expect(types).toMatch(/alpha\?: string;/);
     const pkg = JSON.parse(await fs.readFile("package.json", "utf8"));
     expect(pkg.dependencies["onnxruntime-node"]).toBeTruthy();
   });

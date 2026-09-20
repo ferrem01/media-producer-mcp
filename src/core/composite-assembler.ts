@@ -12,7 +12,7 @@
  * - Transport clock driven playback (GSAP as puppet)
  */
 
-import { bindSpeakerLayerData } from "./speaker-layer.js";
+import { bindSpeakerLayerData, isSpeakerLayer, speakerBackgroundOf } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
@@ -160,8 +160,10 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       const parsed = sourceMap.get(comp.type);
       if (!parsed) continue;
 
-      // THE TAKE AS A LAYER (core/speaker-layer.ts): the token becomes this
+      // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): room and blur
+      // draw nothing (the underlay carries the person); alpha becomes this
       // scene's alpha copy at its trim; with no take the layer is left out.
+      if (isSpeakerLayer(comp) && speakerBackgroundOf(comp) !== "alpha") continue;
       const ref = options.speakerRefs && options.speakerRefs[scene.id];
       const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: ref?.alpha, url: ref?.url || speakerUrl, offset: ref ? ref.offset : sceneStarts[si] });
       if (!layerData) continue;

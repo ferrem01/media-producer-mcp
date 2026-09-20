@@ -726,8 +726,8 @@ export interface SpeakerTrackClip {
   /** Trim: stop using video at this timestamp */
   trim_end?: number;
   /** The person on a transparent frame (<name>-alpha.webm, core/take-matte.ts):
-   *  a scene that carries the take as a layer over its own ground plays this
-   *  copy inside the scene instead of the opaque camera base. */
+   *  a scene whose speaker component is set to alpha plays this copy inside
+   *  the scene instead of the opaque camera base. */
   alpha?: string;
   /** Time-fit: remap this clip (or its trimmed window) to EXACTLY the film's
    *  total duration. For a screen recording whose narration was de-silenced
@@ -762,12 +762,15 @@ export interface Take {
   reframed?: { from: string; to: string };
   /** The grade applied at ingest ("soft": gentle skin smoothing and warmth). */
   look?: "natural" | "soft";
-  /** The room behind the person, blurred at ingest by person matting
-   *  (core/take-matte.ts). `source` is then the blurred copy; the raw
-   *  take is kept at `source_raw` so the blur can be undone or re-run. */
+  /** Older shape (before the copies below): `source` was swapped to the
+   *  blurred copy and the raw take kept here. Read through takeCopies. */
   background?: { mode: "blur"; source_raw: string; strength?: number; ms?: number };
-  /** The person on a transparent frame (core/take-matte.ts), for a scene
-   *  that carries the take as a layer over its own ground. */
+  /** The room blurred behind the person (<name>-blur.mp4), written by the
+   *  matte (core/take-matte.ts) when a scene asks for it. `source` stays
+   *  the raw take. */
+  blur?: string;
+  /** The person on a transparent frame (<name>-alpha.webm), written by the
+   *  matte when a scene's speaker component is set to alpha. */
   alpha?: string;
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */

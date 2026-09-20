@@ -40,7 +40,7 @@ import { applySpine, extractAnchors, resolveComponent } from "../core/word-ancho
 import { generateImage } from "../media/image-gen.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
-import { castSpeakerLayer } from "../core/speaker-layer.js";
+import { castSpeakerLayer, sceneSpeakerBackground } from "../core/speaker-layer.js";
 import { loadProject, saveProject, createProject } from "../persistence/project.js";
 import { runGrammarPrep, pickMusicMood } from "./grammar-prep.js";
 import { deriveWorld, deriveMotionPhysics, worldPromptBlock, type WorldSpec } from "./world.js";
@@ -3984,15 +3984,18 @@ async function runUnifiedPipeline(
     }
   }
 
-  // THE TAKE AS A LAYER (core/speaker-layer.ts): on a person film, a built
-  // scene with a ground under the person (found footage, a still, a mock
-  // holding the whole beat) carries the take inside it, over the ground,
-  // under the graphics. The scene renders opaque; the take's alpha copy
-  // fills the layer when it lands.
+  // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): on a person film,
+  // every built scene over the camera carries the speaker component with
+  // its background setting -- alpha over a ground (found footage, a still,
+  // a mock holding the whole beat: the person plays inside the scene over
+  // it), room otherwise (the camera stays the base). Studio flips it.
   if (personCarries((project.treatment as any)?.filmGrammar)) {
-    let layered = 0;
-    for (const sc of project.scenes) if (castSpeakerLayer(sc as any)) layered++;
-    if (layered) console.log(`  Take as a layer: ${layered} scene(s) with a ground carry the person over it`);
+    let cast = 0, alpha = 0;
+    for (const sc of project.scenes) {
+      if ((sc as any).transparent_background === false) continue;
+      if (castSpeakerLayer(sc as any)) { cast++; if (sceneSpeakerBackground(sc as any) === "alpha") alpha++; }
+    }
+    if (cast) console.log(`  Speaker component: cast on ${cast} scene(s), ${alpha} over a ground (alpha)`);
   }
 
   // ── Auto-compress the waiting (screen recordings) ──

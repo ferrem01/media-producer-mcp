@@ -34,7 +34,7 @@ the writer invents the beats (generate as before).
    stands in), `motion` (MOTION GRAPHICS: library mocks and components
    perform it, nothing is asked of the human), `broll` (found footage),
    `illustration` (drawn), `type` (type alone). Inferred from the shot
-   when absent (`madeOf`). `ground: "broll"` on a beat means found footage may lie under it when the brief asks (a stock_footage need is kept there; the surface and the cards ride over the clip). On a person beat the person rides over it too: a built scene with a ground under the person carries the take INSIDE the scene as a layer on the `speaker-alpha` token (`core/speaker-layer.ts`), resolved to the take's alpha copy (`<name>-alpha.webm`, written by the matte), and renders opaque over the camera base. The build holds the board to it
+   when absent (`madeOf`). `ground: "broll"` on a beat means found footage may lie under it when the brief asks (a stock_footage need is kept there; the surface and the cards ride over the clip). On a person beat the person rides over it too: every speaker scene carries a speaker component (`core/speaker-layer.ts`) whose `background` is room, blur or alpha; a built scene with a ground under the person defaults to alpha, so the take's cut-out copy (`<name>-alpha.webm`, written by the matte) plays inside the scene over the ground and the scene renders opaque over the camera base. The build holds the board to it
    (`holdMadeToRecipe`): a motion beat's screen needs and slates are
    dropped, a recording beat that forgot to ask gets its need,
    `dur` [min, target, max] seconds (the word budget follows from it at

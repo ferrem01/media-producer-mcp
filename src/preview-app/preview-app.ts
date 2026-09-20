@@ -4198,11 +4198,31 @@ ${QUOTIENT_CSS}
     panel.querySelector('.np-q').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); search(); } });
     search();
   }
+  // Room / Blur / Alpha on one scene's speaker component. The server
+  // re-points the clips and mattes a missing copy in the background; the
+  // film reloads on the new version (live sync) when the copy lands.
+  function npSetSpeakerBackground(project, root, si, mode, btn) {
+    var row = btn.parentNode;
+    row.querySelectorAll('.mp-spkbg').forEach(function(b) { b.classList.toggle('active', b === btn); b.disabled = true; });
+    api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { scene_index: si, background: mode })
+      .then(function(r) {
+        row.querySelectorAll('.mp-spkbg').forEach(function(b) { b.disabled = false; });
+        if (r.project) { state.currentProject = r.project; project.scenes = r.project.scenes; project.speaker_track = r.project.speaker_track; project.takes = r.project.takes; }
+        var word = mode === 'room' ? 'the room' : mode === 'blur' ? 'a blurred room' : 'whatever the scene puts behind you';
+        studioStatus(r.matte === 'running' ? 'Scene ' + (si + 1) + ': ' + (mode === 'blur' ? 'blurring' : 'cutting you out') + ' \u2014 a few minutes; the scene switches when it lands.' : (r.has_take ? 'Scene ' + (si + 1) + ' plays you over ' + word + '.' : 'Scene ' + (si + 1) + ' will use ' + word + ' when a take lands.'), 'ok');
+        startCompositePreview(state.currentProject, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+      })
+      .catch(function(e) {
+        row.querySelectorAll('.mp-spkbg').forEach(function(b) { b.disabled = false; });
+        studioStatus('Background: ' + (e.message || String(e)), 'err');
+      });
+  }
   function bindSceneNeeds(project, root) {
     (root || document).querySelectorAll('button[data-np-scene]').forEach(function(btn) {
       if (btn.dataset.npBound) return; btn.dataset.npBound = '1';
       btn.addEventListener('click', function() {
         var si = parseInt(btn.dataset.npScene, 10), ai = parseInt(btn.dataset.npAsset, 10);
+        if (btn.dataset.npBg) { npSetSpeakerBackground(project, root, si, btn.dataset.npBg, btn); return; }
         if (btn.dataset.npSrc) { npOpenPanel(project, root, btn.dataset.npSrc, si, ai); return; }
         npPick = { scene: si, asset: ai, type: btn.dataset.npType, project: project.project_id };
         var f = document.getElementById('np-file');
@@ -9437,9 +9457,23 @@ ${QUOTIENT_CSS}
       if (src === 'upload') acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
       else acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + ai + '">' + (have && src === 'find' ? 'Find another' : (have && src === 'draw' ? 'Redraw' : (have && src === 'booth' ? 'Re-record here' : NP_SOURCE_LABELS[src]))) + '</button>';
     });
+    // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): the take's
+    // background -- Room, Blur, Alpha -- on its own row. Alpha cuts the
+    // person out so whatever the scene puts under the speaker is the room.
+    var bgRow = '';
+    if (a.type === 'camera_video') {
+      var built = (project.scenes || [])[si];
+      var spk = built && (built.components || []).filter(function(c0) { return c0 && c0.data && (c0.data.speaker_layer === true || c0.data.src === 'speaker-alpha'); })[0];
+      var cur = spk ? (spk.data.background || (spk.data.src === 'speaker-alpha' ? 'alpha' : 'room')) : 'room';
+      var hasBuilt = !!built;
+      bgRow = '<div class="np-act" style="align-items:center;gap:6px;margin-top:6px;"><span class="np-hint" style="margin-right:4px">Background</span>' +
+        ['room', 'blur', 'alpha'].map(function(m) {
+          return '<button class="np-btn mp-spkbg' + (cur === m ? ' active' : '') + '" data-np-bg="' + m + '" data-np-scene="' + si + '" data-np-asset="' + ai + '"' + (hasBuilt ? '' : ' disabled title="Build the film first"') + ' title="' + (m === 'room' ? 'What the camera saw' : m === 'blur' ? 'The room goes soft, you stay sharp' : 'You are cut out: whatever the scene puts behind you is the room') + '">' + (m === 'room' ? 'Room' : m === 'blur' ? 'Blur' : 'Alpha') + '</button>';
+        }).join('') + '</div>';
+    }
     return '<div class="np-row" style="border-top:0;padding:4px 0 6px;"><div class="np-what">The <b>' + escHtml(NP_KIND[a.type] || a.type) + '</b> the board asked for' + (a.description && a.type !== 'camera_video' ? ' — “' + escHtml(String(a.description).slice(0, 70)) + '”' : '') +
       '<small>' + (have ? '<b class="ok">provided</b>' : '<b>needed</b>') + ' · a pick lands in the scene right away</small></div>' +
-      '<div class="np-act">' + acts + '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div></div>';
+      '<div class="np-act">' + acts + '</div>' + bgRow + '<div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div></div>';
   }
   // The compact line a popover carries: what the slot is, one button that
   // opens the picker in the dialog (the grid needs room the popover lacks --
