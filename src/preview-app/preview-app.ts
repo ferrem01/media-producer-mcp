@@ -3423,22 +3423,20 @@ ${QUOTIENT_CSS}
   // THE LIBRARY'S OWN CHOICES: a schema that declares an enum for a field
   // (a lower third's eight styles, its side) makes that field a dropdown
   // (Marc: "what is style? should it be a dropdown?"). Loaded once.
-  var schemaEnums = null;
+  var schemaDefs = null;
   function loadSchemaEnums() {
-    if (schemaEnums) return;
-    schemaEnums = {};
+    if (schemaDefs) return;
+    schemaDefs = {};
     var o = { headers: {} }; if (_token) o.headers['Authorization'] = 'Bearer ' + _token;
     fetch(withToken('/playground/api/components/catalog'), o).then(function(r) { return r.ok ? r.json() : []; }).then(function(cat) {
-      (cat || []).forEach(function(c) {
-        var m = {}; var d = c.data || {};
-        Object.keys(d).forEach(function(k) { if (d[k] && Array.isArray(d[k].enum) && d[k].enum.length) m[k] = d[k].enum.map(String); });
-        if (Object.keys(m).length) schemaEnums[c.type] = m;
-      });
+      (cat || []).forEach(function(c) { if (c && c.type && c.data && typeof c.data === 'object') schemaDefs[c.type] = c.data; });
       if (els.propEditor && els.propEditor.innerHTML) renderProps();
     }).catch(function() {});
   }
+  function schemaDefsOf(type) { return (schemaDefs && schemaDefs[type]) || null; }
   function schemaEnum(type, key) {
-    return schemaEnums && schemaEnums[type] && schemaEnums[type][key] ? schemaEnums[type][key] : null;
+    var d = schemaDefsOf(type); var f = d && d[key];
+    return f && Array.isArray(f.enum) && f.enum.length ? f.enum.map(String) : null;
   }
   function getEnumOptions(key, currentVal) {
     // Check exact key match
@@ -3496,6 +3494,15 @@ ${QUOTIENT_CSS}
 
     var data = comp.data || {};
     var keys = Object.keys(data);
+    // EVERY FIELD THE COMPONENT DECLARES (Marc: "the inspector does not
+    // show all the fields"): the schema's fields first, in its order --
+    // an empty optional one (a lower third's title, its vertical) shows
+    // as an empty input with its default as the placeholder -- then any
+    // key the data carries beyond the schema.
+    var sdef = schemaDefsOf(comp.type) || {};
+    var SKIP_TYPES = { array: 1, object: 1 };
+    var declared = Object.keys(sdef).filter(function(k) { return data[k] !== undefined || !SKIP_TYPES[String(sdef[k] && sdef[k].type)]; });
+    keys = declared.concat(keys.filter(function(k) { return !(k in sdef); }));
     // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): its token and
     // marker are internals; what a person sets is the background -- Room,
     // Blur, Alpha -- through the route that mattes a missing copy.
@@ -3511,8 +3518,29 @@ ${QUOTIENT_CSS}
     } else {
       keys.forEach(function(key) {
         var val = data[key];
+        var def = sdef[key] || null;
         html += '<div class="prop-row">';
-        html += '<label class="prop-label">' + escHtml(key) + '</label>';
+        html += '<label class="prop-label"' + (def && def.description ? ' title="' + escAttr(String(def.description)) + '"' : '') + '>' + escHtml(key) + (def && def.optional === false ? '' : '') + '</label>';
+
+        if (val === undefined && def) {
+          // A declared field the data does not carry yet.
+          var dflt = def.default !== undefined ? def.default : def.placeholder;
+          var dtype = String(def.type || 'string');
+          var enumD = Array.isArray(def.enum) && def.enum.length ? def.enum.map(String) : null;
+          if (dtype === 'boolean') {
+            html += '<label class="prop-toggle"><input type="checkbox" class="prop-toggle-input" data-key="' + escAttr(key) + '"' + (dflt === true ? ' checked' : '') + '><span class="prop-toggle-slider"></span></label>';
+          } else if (dtype === 'number') {
+            html += '<input type="number" class="prop-input prop-num-input" data-key="' + escAttr(key) + '" value="" placeholder="' + escAttr(dflt !== undefined ? String(dflt) : '') + '">';
+          } else if (enumD) {
+            html += '<select class="prop-select" data-key="' + escAttr(key) + '"><option value="" selected>' + escHtml(dflt !== undefined ? '\u2014 default: ' + String(dflt) + ' \u2014' : '\u2014 not set \u2014') + '</option>';
+            enumD.forEach(function(opt) { html += '<option value="' + escAttr(opt) + '">' + escHtml(opt) + '</option>'; });
+            html += '</select>';
+          } else {
+            html += '<input type="text" class="prop-input" data-schema-empty="1" data-key="' + escAttr(key) + '" value="" placeholder="' + escAttr(dflt !== undefined ? String(dflt) : (def.label || '')) + '">';
+          }
+          html += '</div>';
+          return;
+        }
 
         if (typeof val === 'boolean') {
           // Toggle switch
@@ -3801,7 +3829,7 @@ ${QUOTIENT_CSS}
 
     // Generic text/textarea inputs (short strings, long strings)
     els.propEditor.querySelectorAll('.prop-input:not(.prop-num-input):not(.prop-json-input):not(.prop-url-input)').forEach(function(input) {
-      if (input.dataset.key && comp.data.hasOwnProperty(input.dataset.key) && typeof comp.data[input.dataset.key] === 'string') {
+      if (input.dataset.key && ((comp.data.hasOwnProperty(input.dataset.key) && typeof comp.data[input.dataset.key] === 'string') || input.dataset.schemaEmpty)) {
         var handler = function() { comp.data[input.dataset.key] = input.value; savePropDebounced(); };
         input.addEventListener('input', handler);
       }
