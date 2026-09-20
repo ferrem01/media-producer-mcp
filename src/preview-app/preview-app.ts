@@ -3420,6 +3420,26 @@ ${QUOTIENT_CSS}
     return typeof val === 'string' && /^https?:\\/\\//i.test(val.trim());
   }
 
+  // THE LIBRARY'S OWN CHOICES: a schema that declares an enum for a field
+  // (a lower third's eight styles, its side) makes that field a dropdown
+  // (Marc: "what is style? should it be a dropdown?"). Loaded once.
+  var schemaEnums = null;
+  function loadSchemaEnums() {
+    if (schemaEnums) return;
+    schemaEnums = {};
+    var o = { headers: {} }; if (_token) o.headers['Authorization'] = 'Bearer ' + _token;
+    fetch(withToken('/playground/api/components/catalog'), o).then(function(r) { return r.ok ? r.json() : []; }).then(function(cat) {
+      (cat || []).forEach(function(c) {
+        var m = {}; var d = c.data || {};
+        Object.keys(d).forEach(function(k) { if (d[k] && Array.isArray(d[k].enum) && d[k].enum.length) m[k] = d[k].enum.map(String); });
+        if (Object.keys(m).length) schemaEnums[c.type] = m;
+      });
+      if (els.propEditor && els.propEditor.innerHTML) renderProps();
+    }).catch(function() {});
+  }
+  function schemaEnum(type, key) {
+    return schemaEnums && schemaEnums[type] && schemaEnums[type][key] ? schemaEnums[type][key] : null;
+  }
   function getEnumOptions(key, currentVal) {
     // Check exact key match
     var k = key.toLowerCase().replace(/[-_]/g, '');
@@ -3465,6 +3485,7 @@ ${QUOTIENT_CSS}
 
   function renderProps() {
     if (!els.propEditor) return; // obsolete prop editor removed; Revise panel handles edits
+    loadSchemaEnums();
     var project = state.currentProject;
     var scene = project && project.scenes[state.currentSceneIndex];
     var comp = scene && scene.components && scene.components[state.currentComponentIndex];
@@ -3523,7 +3544,7 @@ ${QUOTIENT_CSS}
           }
           html += '<input type="text" class="prop-input prop-url-input prop-media-path" data-key="src" value="' + escAttr(val) + '">';
         } else if (typeof val === 'string') {
-          var enumOpts = (isSpk && key === 'background') ? ['room', 'blur', 'alpha'] : (isSpk && key === 'shape') ? ['rectangle', 'rounded', 'circle'] : getEnumOptions(key, val);
+          var enumOpts = (isSpk && key === 'background') ? ['room', 'blur', 'alpha'] : (isSpk && key === 'shape') ? ['rectangle', 'rounded', 'circle'] : (schemaEnum(comp.type, key) || getEnumOptions(key, val));
           if (enumOpts) {
             // Enum select dropdown
             html += '<select class="prop-select" data-key="' + escAttr(key) + '">';

@@ -296,6 +296,9 @@ describe("the choice, wherever it is made", () => {
     expect(studio).not.toMatch(/first === 'recorder' \|\| first === 'booth'\) npOpenPanel/);
     expect(studio).toMatch(/<span class="np-armed"><i><\/i>Armed \\u00b7 waiting for the recording<\/span>/);
     expect(studio).toMatch(/api\('POST', '\/speaker-background\/'/); // Inspect's background choice
+    // A schema's enum makes the field a dropdown (a lower third's styles and sides); the library's catalog is read once.
+    expect(studio).toMatch(/fetch\(withToken\('\/playground\/api\/components\/catalog'\), o\)/);
+    expect(studio).toMatch(/\(schemaEnum\(comp\.type, key\) \|\| getEnumOptions\(key, val\)\)/);
     // The Inspect card: the speaker's internals stay hidden, background is a Room/Blur/Alpha choice on the same route.
     expect(studio).toMatch(/var isSpk = comp\.type === 'video' && !!\(data\.src === 'speaker' \|\| data\.src === 'speaker-alpha' \|\| data\.speaker_layer === true\);/);
     // The component is a video and says so; src stays, with the take it stands for previewed (Marc: "it should say video").

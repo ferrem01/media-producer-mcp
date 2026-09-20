@@ -56,6 +56,14 @@ describe("self-placing overlays", () => {
     const wide = build({ width: 1920, height: 1080 }, [{ type: "chapter-kicker", data: { text: "Test scenarios", step: 1, steps: 3 } }]);
     expect(wide.find((x) => x.type === "chapter-kicker").position).toEqual({ x: 0, y: 0, width: "100%", height: "100%" });
   });
+  it("the lower third places itself too: the whole frame, never a side slot (it hung off the edge in a 35% slot)", () => {
+    for (const canvas of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }]) {
+      const out = build(canvas, [{ type: "lower-third", data: { name: "Marc Ferrentino", title: "Founder", style: "clean-bar", at: 0.3 } }]);
+      const c = out.find((x) => x.type === "lower-third");
+      expect(c.position).toEqual({ x: 0, y: 0, width: "100%", height: "100%" });
+      expect(c.z_index).toBe(42);
+    }
+  });
 });
 
 describe("the scatter lane on a tall speaker frame", () => {
