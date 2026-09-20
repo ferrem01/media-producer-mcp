@@ -34,6 +34,7 @@ import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-track.js";
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
+import { matteTake } from "./core/take-matte.js";
 import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
@@ -2579,7 +2580,7 @@ Rules:
         const [, tkTenant, tkProject] = takeMatch.map(decodeURIComponent);
         let tkBody: Record<string, unknown> = {};
         try { tkBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
-        const tkUrl = String(tkBody.url || "");
+        let tkUrl = String(tkBody.url || "");
         const expectedPrefix = `/assets/${tkTenant}/projects/${tkProject}/assets/`;
         if (!tkUrl.startsWith(expectedPrefix) || tkUrl.includes("..")) {
           jsonResponse(res, 400, { error: `url must be an asset of this project (${expectedPrefix}...)` });
@@ -2599,6 +2600,25 @@ Rules:
           sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas, tkBody.look === "soft" ? "soft" : "natural");
         } catch (e: any) {
           console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
+        }
+        // BACKGROUND BLUR (core/take-matte.ts): person matting on a copy of
+        // the sanitized take; the copy becomes the take, the raw stays. A
+        // failure never blocks the attach -- the take lands unblurred and
+        // the note says so.
+        const tkRawUrl = tkUrl;
+        let tkBackground: Take["background"];
+        let tkBlurNote = "";
+        if (tkBody.background === "blur") {
+          try {
+            const m = await matteTake(resolveVideoPath(tkUrl, config.dataDir), { dataDir: config.dataDir, strength: Number(tkBody.blur_strength) > 0 ? Number(tkBody.blur_strength) : undefined, onProgress: (n) => console.log(`  take: matting ${n} frames...`) });
+            tkUrl = tkUrl.replace(/[^/]+$/, path.basename(m.output));
+            tkBackground = { mode: "blur", source_raw: tkRawUrl, ms: m.ms };
+            tkBlurNote = `background blurred (${m.frames} frames, ${Math.round(m.ms / 1000)}s)`;
+            console.log(`  take: ${tkBlurNote} -> ${path.basename(m.output)}`);
+          } catch (e: any) {
+            tkBlurNote = `background blur skipped: ${String(e?.message || e).slice(0, 160)}`;
+            console.warn(`  take: ${tkBlurNote}`);
+          }
         }
         await primeTakeWords(tkPeek, tkUrl, config.dataDir);
         const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
@@ -2630,6 +2650,7 @@ Rules:
           rotation_baked: sanitized?.rotation_baked || undefined,
           reframed: sanitized?.reframed,
           look: sanitized?.look,
+          background: tkBackground,
           face: tkFace,
           loudness: sanitized?.loudness,
         };
@@ -2673,6 +2694,7 @@ Rules:
           sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
           sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
           sanitized?.look ? `${sanitized.look} look` : "",
+          tkBlurNote,
           tkFace ? `face at ${Math.round(tkFace.cx * 100)}%/${Math.round(tkFace.cy * 100)}% (${Math.round(tkFace.size * 100)}% tall)` : "no face found",
           deair && (deair.head > 0 || deair.tail > 0) ? `de-aired -${deair.head}s head / -${deair.tail}s tail` : "",
           sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",

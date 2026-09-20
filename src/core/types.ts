@@ -758,6 +758,10 @@ export interface Take {
   reframed?: { from: string; to: string };
   /** The grade applied at ingest ("soft": gentle skin smoothing and warmth). */
   look?: "natural" | "soft";
+  /** The room behind the person, blurred at ingest by person matting
+   *  (core/take-matte.ts). `source` is then the blurred copy; the raw
+   *  take is kept at `source_raw` so the blur can be undone or re-run. */
+  background?: { mode: "blur"; source_raw: string; strength?: number; ms?: number };
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };

@@ -95,6 +95,9 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
   **`MP_WORKER_DIR=<repo>/dist/core`** and the render/showcase suites pass. CI
   (`.github/workflows/ci.yml`) does exactly this; run the full suite locally as:
   `PATH=/tmp/binshim:$PATH MP_CHROMIUM_PATH=/opt/pw-browsers/chromium MP_WORKER_DIR=$PWD/dist/core npx vitest run`
+- **Background blur** (`core/take-matte.ts`) needs `onnxruntime-node` (its install script
+  skips the CUDA download via `.npmrc`) and fetches the 15 MB matting model on first use
+  into `<dataDir>/_system/models`; a sandbox without egress gets "background blur skipped".
 - **ffmpeg not on PATH**, and the Playwright-bundled ffmpeg can't decode PNG. Get a full
   static build: `pip install imageio-ffmpeg`, then symlink it to `/tmp/binshim/ffmpeg`
   and prepend `/tmp/binshim` to PATH.
