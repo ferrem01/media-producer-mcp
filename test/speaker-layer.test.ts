@@ -283,9 +283,13 @@ describe("the choice, wherever it is made", () => {
     expect(index).toMatch(/const sbMissing = sbTake \? missingSpeakerCopies\(sbProj, sbTake\) : \{ blur: false, alpha: false \};/);
     expect(index).toMatch(/rawUrl: takeCopies\(sbTake\)\.raw/);
     const studio = await fsp.readFile("src/preview-app/preview-app.ts", "utf8");
-    expect(studio).toMatch(/data-np-bg="' \+ m \+ '"/);
-    expect(studio).toMatch(/if \(btn\.dataset\.npBg\) \{ npSetSpeakerBackground\(project, root, si, btn\.dataset\.npBg, btn\); return; \}/);
-    expect(studio).toMatch(/api\('POST', '\/speaker-background\/'/);
+    // The take dialog: one header, one row of tabs (record here / phone / upload), the recorder open;
+    // the background is chosen in the recorder or in Inspect, not on the card (Marc: "why is there these buttons and radio buttons?").
+    expect(studio).not.toMatch(/data-np-bg=/);
+    expect(studio).toMatch(/<div class="np-tabs">/);
+    expect(studio).toMatch(/Camera take \\u00b7 Scene ' \+ \(si \+ 1\)/);
+    expect(studio).toMatch(/npOpenPanel\(project, cardC, 'booth', si, ai\);/);
+    expect(studio).toMatch(/api\('POST', '\/speaker-background\/'/); // Inspect's background choice
     // The Inspect card: the speaker's internals stay hidden, background is a Room/Blur/Alpha choice on the same route.
     expect(studio).toMatch(/var isSpk = comp\.type === 'video' && !!\(data\.src === 'speaker' \|\| data\.src === 'speaker-alpha' \|\| data\.speaker_layer === true\);/);
     // The component is a video and says so; src stays, with the take it stands for previewed (Marc: "it should say video").

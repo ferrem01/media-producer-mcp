@@ -312,7 +312,12 @@ ${QUOTIENT_CSS}
       sceneLabel = sceneIndex >= 0 && allScenes[sceneIndex] ? ('Scene ' + (sceneIndex + 1) + (allScenes[sceneIndex].label ? ' · ' + allScenes[sceneIndex].label : '')) : '';
       cues = buildCues(scenes);
       total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
-      $('title').textContent = projectName + (sceneLabel ? ' — ' + sceneLabel : '');
+      // In Studio's dialog the header already names the project and the
+      // scene; here only the scene's own label. Alone in a tab, both.
+      $('title').textContent = embedded ? ((sceneLabel ? sceneLabel.replace(/^Scene \d+ · /, '') : projectName)) : (projectName + (sceneLabel ? ' — ' + sceneLabel : ''));
+      // The copy speaks to the device: a laptop is not held upright.
+      var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+      if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Click Record: a 3-second count-in, then your lines one at a time at speaking pace. Click anywhere to jump to the next line.';
       var g = (p.treatment && p.treatment.filmGrammar) || '';
       var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
       $('subtitle').textContent = beats
