@@ -9,7 +9,7 @@ import fs from "node:fs/promises";
 import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Project, OutputFormat, Canvas, BrandKit, Scene, Storyboard, StoryboardScene } from "../core/types.js";
-import { ensureSpeakerNeeds } from "../core/take-needs.js";
+import { ensureSpeakerNeeds, dropVoiceUnderTakes } from "../core/take-needs.js";
 import { type Frame, FRAME_SPECS, frameFromDims } from "../core/types.js";
 import {
   projectsDir,
@@ -141,6 +141,9 @@ export function migrateProject(p: any): Project {
   // A speaker board always carries its take needs (idempotent; boards saved
   // before needs existed get them on first load).
   if (p && p.storyboard) ensureSpeakerNeeds(p as Project);
+  // The take is the voice: a film whose takes landed after the build sheds
+  // the generated clips under them on load (self-healing for saved films).
+  if (p && p.storyboard) dropVoiceUnderTakes(p as Project);
   return p as Project;
 }
 

@@ -535,6 +535,9 @@ ${QUOTIENT_CSS}
           $('studioLink').href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&token=' + encodeURIComponent(token) + '&desktop=1';
           $('studioLink').href = studioHref;
           show('done');
+          // The take is in: the camera goes off (it stayed lit in the dialog
+          // after "Use this take" -- measured live on a laptop).
+          releaseCamera();
           if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: recordAll ? 'all' : sceneIndex, project: project }, window.location.origin); } catch (e) {} }
         })
         .catch(function (e) { fail(e.message || String(e)); });

@@ -19,7 +19,7 @@ import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
 import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
-import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries } from "./core/take-needs.js";
+import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries, dropVoiceUnderTakes } from "./core/take-needs.js";
 import { provideAsset, openAssetNeeds, recastProvidedNeed } from "./core/asset-needs.js";
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
@@ -2655,6 +2655,9 @@ Rules:
         }
         const retime = retimes[0];
         const take = takes[0];
+        // The take is the voice: the generated voiceover clip of every scene
+        // that now has a take is dropped (else both play, measured live).
+        { const dv = dropVoiceUnderTakes(tkProjectObj); if (dv) console.log(`  take: ${dv} generated voiceover clip(s) dropped under the take(s)`); }
         tkProjectObj.updated_at = new Date().toISOString();
         await saveProject(tkProjectObj);
         // The board card shows the take's still in place of the silhouette

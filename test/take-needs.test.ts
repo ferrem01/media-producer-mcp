@@ -274,4 +274,28 @@ describe("a continuous speaker track keeps no scene markers", () => {
     expect(studio).toMatch(/if \(panel\.style\.display !== 'none' && panel\.dataset\.src === src\) \{ try \{ panel\.scrollIntoView/);
     expect(studio).not.toMatch(/panel\.dataset\.src === src\) \{ panel\.style\.display = 'none'; return; \}/);
   });
+
+  it("the take is the voice: a landed take drops the scene's generated voiceover clip; the camera is released", async () => {
+    const { dropVoiceUnderTakes } = await import("../src/core/take-needs.js");
+    const src = "/assets/t/projects/p/assets/take.mp4";
+    const project: any = {
+      storyboard: { scenes: [{ voiceover_text: "a" }, { voiceover_text: "b" }, { voiceover_text: "c" }] },
+      scenes: [{}, {}, {}],
+      speaker_track: { clips: [{ source: src, scene_index: 1, trim_start: 0, trim_end: 3 }] },
+      takes: [{ id: "take_0", source: src, scene_index: 1, duration: 3 }],
+      audio: { tracks: [{ id: "vo_scene_0", type: "voiceover", source: "/v0.mp3", volume: 1 }, { id: "vo_scene_1", type: "voiceover", source: "/v1.mp3", volume: 1 }, { id: "vo_scene_2", type: "voiceover", source: "/v2.mp3", volume: 1 }, { id: "music_bed", type: "music", source: "/m.mp3", volume: 0.3 }] },
+    };
+    expect(dropVoiceUnderTakes(project)).toBe(1);
+    expect(project.audio.tracks.map((t: any) => t.id)).toEqual(["vo_scene_0", "vo_scene_2", "music_bed"]);
+    expect(dropVoiceUnderTakes(project)).toBe(0);   // idempotent
+    const fs = await import("node:fs/promises");
+    const index = await fs.readFile("src/index.ts", "utf8");
+    expect(index).toMatch(/const dv = dropVoiceUnderTakes\(tkProjectObj\);/);
+    const persist = await fs.readFile("src/persistence/project.ts", "utf8");
+    expect(persist).toMatch(/if \(p && p\.storyboard\) dropVoiceUnderTakes\(p as Project\);/);
+    const take = await fs.readFile("src/take-page.ts", "utf8");
+    expect(take).toMatch(/show\('done'\);\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*releaseCamera\(\);/);
+    const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
+    expect(studio).toMatch(/#studio-modal-card iframe\.np-booth'\)\.forEach\(function\(f\) \{ try \{ f\.src = 'about:blank'; \}/);
+  });
 });
