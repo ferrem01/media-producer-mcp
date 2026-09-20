@@ -288,7 +288,11 @@ describe("the choice, wherever it is made", () => {
     expect(studio).toMatch(/api\('POST', '\/speaker-background\/'/);
     // The Inspect card: the speaker's internals stay hidden, background is a Room/Blur/Alpha choice on the same route.
     expect(studio).toMatch(/var isSpk = comp\.type === 'video' && !!\(data\.src === 'speaker' \|\| data\.src === 'speaker-alpha' \|\| data\.speaker_layer === true\);/);
-    expect(studio).toMatch(/keys = keys\.filter\(function\(k\) \{ return k !== 'speaker_layer' && k !== 'src'/);
+    // The component is a video and says so; src stays, with the take it stands for previewed (Marc: "it should say video").
+    expect(studio).toMatch(/keys = keys\.filter\(function\(k\) \{ return k !== 'speaker_layer' && k !== 'alpha'/);
+    expect(studio).toMatch(/\} else if \(isSpk && key === 'src'\) \{/);
+    expect(studio).toMatch(/speakerClipUrlOf\(\(data\.background === 'alpha' && own\.alpha\) \? own\.alpha : own\.source\)/);
+    expect(studio).not.toMatch(/\? 'speaker' : c\.type\)/);
     expect(studio).toMatch(/\(isSpk && key === 'shape'\) \? \['rectangle', 'rounded', 'circle'\]/);
     expect(studio).toMatch(/\['full', 'bottom-right', 'bottom-left', 'top-right', 'top-left'\]/);
     expect(studio).toMatch(/\{ position: pos, data: \{ shape: comp\.data\.shape \|\| 'rectangle' \} \}/);

@@ -3473,7 +3473,7 @@ ${QUOTIENT_CSS}
     // Blur, Alpha -- through the route that mattes a missing copy.
     var isSpk = comp.type === 'video' && !!(data.src === 'speaker' || data.src === 'speaker-alpha' || data.speaker_layer === true);
     if (isSpk) {
-      keys = keys.filter(function(k) { return k !== 'speaker_layer' && k !== 'src' && k !== 'alpha' && k !== 'speaker_opaque' && k !== 'start_at'; });
+      keys = keys.filter(function(k) { return k !== 'speaker_layer' && k !== 'alpha' && k !== 'speaker_opaque' && k !== 'start_at'; });
       if (keys.indexOf('background') < 0) { data.background = 'room'; keys.unshift('background'); }
       if (keys.indexOf('shape') < 0) { data.shape = 'rectangle'; keys.push('shape'); }
     }
@@ -3498,6 +3498,23 @@ ${QUOTIENT_CSS}
           html += '<input type="range" class="prop-range" data-key="' + escAttr(key) + '" min="' + range.min + '" max="' + range.max + '" step="' + range.step + '" value="' + val + '">';
           html += '</div>';
 
+        } else if (isSpk && key === 'src') {
+          // The token, with the take it stands for (this scene's clip; the
+          // alpha copy when the scene is on alpha) -- the same preview any
+          // other clip gets.
+          var spkUrl = null;
+          try {
+            var clipsS = (project.speaker_track && project.speaker_track.clips) || [];
+            var own = clipsS.filter(function(cl) { return cl.scene_index === state.currentSceneIndex; })[0] || clipsS[0];
+            if (own) spkUrl = speakerClipUrlOf((data.background === 'alpha' && own.alpha) ? own.alpha : own.source);
+          } catch (eS) {}
+          if (spkUrl) {
+            var spkSrc = spkUrl.charAt(0) === '/' && _token ? spkUrl + (spkUrl.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(_token) : spkUrl;
+            html += '<div class="prop-media"><video class="prop-media-el" src="' + escAttr(spkSrc) + '" controls muted preload="metadata"></video></div>';
+          } else {
+            html += '<div class="prop-media" style="padding:6px 0;color:var(--content-tertiary);font-size:12px;">No take yet for this scene</div>';
+          }
+          html += '<input type="text" class="prop-input prop-url-input prop-media-path" data-key="src" value="' + escAttr(val) + '">';
         } else if (typeof val === 'string') {
           var enumOpts = (isSpk && key === 'background') ? ['room', 'blur', 'alpha'] : (isSpk && key === 'shape') ? ['rectangle', 'rounded', 'circle'] : getEnumOptions(key, val);
           if (enumOpts) {
@@ -3841,7 +3858,7 @@ ${QUOTIENT_CSS}
       if (eff(c.exit)) meta.push(eff(c.exit) + ' \\u2192');
       html += '<div class="insp-node' + (i === state.currentComponentIndex ? ' active' : '') + '" data-ci="' + i + '">'
         + '<span class="in-dot" style="background:' + (isCustom ? 'var(--content-tertiary)' : compColor(c.type)) + '"></span>'
-        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : (c.type === 'video' && c.data && (c.data.src === 'speaker' || c.data.src === 'speaker-alpha' || c.data.speaker_layer === true) ? 'speaker' : c.type)) + '</span>'
+        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : c.type) + '</span>'
         + '<span class="in-meta">' + escHtml(meta.join(' \\u00b7 ')) + '</span>'
         + '</div>';
       // DIRECTION, not just timing. Dragging a bar in the timeline only ever
