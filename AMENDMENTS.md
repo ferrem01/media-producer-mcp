@@ -4141,3 +4141,11 @@ once a take lands on it (Studio and the render both read the same
 tracks). The embedded booth kept its stream after the attach: the take
 page releases the camera the moment the take is in, and Studio unloads
 any booth iframe when a dialog closes.
+
+## A pile of props spreads
+
+The sheet-row board's scene 2 ("the sentence splits"): thirteen task
+cards popping out of the typed line, and the card showed two -- eleven
+were stacked on the second of the two accent spots a plain scene had.
+Props past the second now walk a ring of twelve spots around the frame
+(sides alternating, the middle band left to the line they orbit).

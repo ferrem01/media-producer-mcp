@@ -590,6 +590,29 @@ var ACCENT_SPOTS: Array<Record<string, string | number>> = [
   { x: "71%", y: "7%", width: "21%", height: "36%" },   // top-right
   { x: "7%", y: "56%", width: "19%", height: "34%" },   // bottom-left
 ];
+// A PILE OF PROPS spreads around the frame instead of stacking on the
+// second spot (measured live, proj_ab639e73: thirteen task cards popping
+// out of a sentence, eleven of them on top of each other bottom-left). A
+// ring of spots that keeps the middle band clear for the line they orbit,
+// walked in an order that alternates sides so the pile grows evenly.
+var ACCENT_RING: Array<Record<string, string | number>> = [
+  { x: "6%", y: "6%", width: "21%", height: "13%" },     // top-left
+  { x: "74%", y: "58%", width: "21%", height: "13%" },   // right, low
+  { x: "38%", y: "4%", width: "22%", height: "13%" },    // top-centre
+  { x: "36%", y: "80%", width: "22%", height: "13%" },   // bottom-centre
+  { x: "5%", y: "28%", width: "21%", height: "13%" },    // left, upper
+  { x: "74%", y: "76%", width: "21%", height: "13%" },   // right, bottom
+  { x: "60%", y: "22%", width: "21%", height: "13%" },   // centre-right, upper
+  { x: "18%", y: "70%", width: "21%", height: "13%" },   // centre-left, lower
+  { x: "74%", y: "40%", width: "21%", height: "13%" },   // right, mid
+  { x: "5%", y: "44%", width: "21%", height: "13%" },    // left, mid
+  { x: "20%", y: "18%", width: "21%", height: "13%" },   // upper-left inner
+  { x: "56%", y: "66%", width: "21%", height: "13%" },   // lower-right inner
+];
+function accentSpotFor(k: number): Record<string, string | number> {
+  if (k < ACCENT_SPOTS.length) return ACCENT_SPOTS[k];
+  return ACCENT_RING[(k - ACCENT_SPOTS.length) % ACCENT_RING.length];
+}
 var FULL_STAGE: Record<string, string | number> = { x: 0, y: 0, width: "100%", height: "100%" };
 
 function isCaptionRole(t: string): boolean {
@@ -715,7 +738,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
         ? { position: pct(0, 0, 100, splitScreenHeight(face)), z_index: 36 }
         : { position: { ...FULL_STAGE }, z_index: isProofSurface(t) ? 36 : 39 };
     } else if (ACCENT_TYPES.indexOf(t) !== -1) {
-      slots[i] = { position: ACCENT_SPOTS[Math.min(accentCount, ACCENT_SPOTS.length - 1)], z_index: 40 + accentCount };
+      slots[i] = { position: accentSpotFor(accentCount), z_index: 40 + accentCount };
       accentCount++;
     } else if (SELF_PLACING_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: { ...FULL_STAGE }, z_index: 42 };
