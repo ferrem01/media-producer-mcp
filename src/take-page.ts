@@ -47,7 +47,8 @@ ${QUOTIENT_CSS}
      all the way down, hit record, then scroll all the way back"). */
   #ready { height:100dvh; overflow:hidden; }
   /* Studio's dialog: the ready screen is as tall as its content, no more. */
-  body.embed { min-height: 0; }
+  body.embed { min-height: 0; height: auto; }
+  body.embed section.on { flex: 0 0 auto; }
   body.embed #ready { height: auto; overflow: visible; }
   body.embed .spacer { display: none; }
   body.embed .pad { padding: 8px 16px 14px; }
@@ -220,7 +221,12 @@ ${QUOTIENT_CSS}
   // scroll inside a scroll (Marc: "make this entire screen fit").
   function postSize() {
     if (!embedded) return;
-    try { window.parent.postMessage({ type: 'mp-take-size', height: document.documentElement.scrollHeight }, window.location.origin); } catch (e) {}
+    // The VISIBLE section's own height, not the document's: the document
+    // fills whatever frame it is given, which read as "never shrink". The
+    // live camera view is fixed-position and gets a 16:9 preview's worth.
+    var active = document.querySelector('section.on');
+    var h = (!active || active.id === 'stage') ? Math.round(Math.min(window.innerWidth * 9 / 16, 560)) : active.scrollHeight + 4;
+    try { window.parent.postMessage({ type: 'mp-take-size', height: h }, window.location.origin); } catch (e) {}
   }
   if (embedded) {
     document.body.classList.add('embed');
