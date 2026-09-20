@@ -28,7 +28,8 @@
       "enters": [
         "stamp:title"
       ],
-      "note": "A second of the finished deliverable with the film's title over it, so the viewer knows what is about to be made."
+      "note": "A second of the finished deliverable with the film's title over it, so the viewer knows what is about to be made.",
+      "ground": "broll"
     },
     {
       "role": "ask",
@@ -40,7 +41,8 @@
         5.5
       ],
       "enters": [],
-      "note": "The product's chat surface. The ask types in, in full, with its attachment shown; held long enough to read every word. Nothing over it."
+      "note": "The product's chat surface. The ask types in, in full, with its attachment shown; held long enough to read every word. Nothing over it. When the brief asks for a real place (a desk, an office), found footage may lie under the surface as its ground.",
+      "ground": "broll"
     },
     {
       "role": "work",

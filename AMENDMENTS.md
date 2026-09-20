@@ -4164,3 +4164,9 @@ asked for under the chaos. Two recipe edits, one format word:
   may still have found footage under it when the brief asks. The work
   beat has it; `pruneNeedsByRecipe` keeps a stock_footage need there and
   the block tells the writer.
+
+Marc, on the row's scene 1: "do the visual notes seem to be connected to
+the mock image?" They were not: the notes described a wooden desk and a
+lamp and the scene cast only the composer on the brand world. On a
+library-built scene the notes are prose; a ground has to be cast. The
+ask beat (and the payoff open) now allow the footage ground too.
