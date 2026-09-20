@@ -573,7 +573,10 @@ function isCutaway(c: { type: string; position?: any; enter?: any }): boolean {
 var HIGH_OVERLAY_TYPES = ["floating-pills"];
 // Overlays that PLACE THEMSELVES inside the whole frame (safe margins of
 // their own): the chapter kicker with its step dots, the logo band.
-var SELF_PLACING_TYPES = ["chapter-kicker", "logo-band"];
+// ...and the lower third, which anchors itself bottom-left/right with its
+// own safe margins: in a 35%-wide side slot it hung off the frame edge
+// (measured live, proj_438fa7db: "TEST 01 -- PL", clipped).
+var SELF_PLACING_TYPES = ["chapter-kicker", "logo-band", "lower-third"];
 /** Ambient full-stage type BEHIND the windows, above the backdrop. */
 var GHOST_TYPES = ["ghost-type"];
 /** Backdrop-cast components: in a WORLD film these are redundant -- the

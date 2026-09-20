@@ -14,6 +14,7 @@
     --lt3-accent: var(--mp-color-primary, #4f6df5); }
   .lt3-anchor { position: absolute; left: 6%; bottom: 8%; max-width: 64%; will-change: transform; }
   .lt3-right .lt3-anchor { left: auto; right: 6%; text-align: right; }
+  .lt3-top .lt3-anchor { bottom: auto; top: 8%; }
 
   .lt3-name { font-size: 2.2vw; font-weight: 800; letter-spacing: -0.01em; line-height: 1.14; color: #fff; }
   .lt3-title { font-size: 1.2vw; font-weight: 500; line-height: 1.35; color: rgba(255,255,255,0.75); }
@@ -88,6 +89,7 @@
     var dur = (ctx && ctx.duration) || 6;
     if (data && data.accent) root.style.setProperty('--lt3-accent', data.accent);
     if (side === 'right') root.classList.add('lt3-right');
+    if ((data && data.vertical) === 'top') root.classList.add('lt3-top');
 
     // Entrance travel direction: enter from the anchored side.
     var dir = side === 'right' ? 1 : -1;
