@@ -4119,3 +4119,13 @@ click on a source already open toggled its panel closed -- so the first
 button does not work"). Reproduced locally in Chromium on the built
 board. A second click on the open source now keeps it and scrolls it
 into view; nothing toggles away.
+
+## The take follows the film's frame
+
+Marc recorded on his laptop for a 16x9 film and got a 1080x1920 take:
+the take page's capture canvas was the phone's, fixed portrait, whatever
+the film. It now reads the project's canvas once the page loads: a tall
+film records 1080x1920 as before, a wide film 1920x1080 (1x1 -> 1080x1080,
+4x5 -> 1080x1350), the camera is asked for that size, and on a wide film
+the stage is the frame itself, centred, so what you see is what is
+recorded. The server's sanitizer then has nothing to reframe.
