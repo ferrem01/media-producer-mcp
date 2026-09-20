@@ -12,7 +12,7 @@
  * - Transport clock driven playback (GSAP as puppet)
  */
 
-import { bindSpeakerLayerData, isSpeakerLayer, speakerBackgroundOf, speakerRendersInside } from "./speaker-layer.js";
+import { bindSpeakerLayerData, isSpeakerLayer, speakerRendersInside } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
@@ -165,7 +165,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       // scene's alpha copy at its trim; with no take the layer is left out.
       if (isSpeakerLayer(comp) && !speakerRendersInside(scene)) continue;
       const ref = options.speakerRefs && options.speakerRefs[scene.id];
-      const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: speakerBackgroundOf(comp) === "alpha" ? ref?.alpha : undefined, url: ref?.url || speakerUrl, offset: ref ? ref.offset : sceneStarts[si] });
+      const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: ref?.alpha, url: ref?.url || speakerUrl, offset: ref ? ref.offset : sceneStarts[si] });
       if (!layerData) continue;
       const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData({ ...comp, data: layerData });
       // Same assembly-time hook as the render path: the accent's animation

@@ -13,7 +13,7 @@
  * - window.__MP_TIMELINE and window.__MP_READY for the capture loop
  */
 
-import { bindSpeakerLayerData, isSpeakerLayer, speakerBackgroundOf, speakerRendersInside } from "./speaker-layer.js";
+import { bindSpeakerLayerData, isSpeakerLayer, speakerRendersInside } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { resolveComponentTags, transformComponentTagData, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
 import { isProofSurface } from "./asset-needs.js";
@@ -104,9 +104,11 @@ export interface AssembleOptions {
   speakerUrl?: string;
   /** Seconds into the speaker video where this scene starts (preview underlay sync). */
   speakerOffset?: number;
-  /** The take's alpha copy (core/speaker-layer.ts): the "speaker-alpha"
-   *  token of a scene that carries the take as a layer resolves to it. */
+  /** The take's alpha copy (core/speaker-layer.ts): a speaker component on
+   *  background alpha plays it, seeked to `speakerAlphaOffset` (the clip's
+   *  own trim; defaults to speakerOffset). */
   speakerAlphaUrl?: string;
+  speakerAlphaOffset?: number;
 }
 
 /** Component type prefixes that indicate an LLM-generated (codegen) scene. */
@@ -187,7 +189,7 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
     });
   }
 
-  return assembleScene({ scene, components, brandKit, canvas, gsapDir: options.gsapDir, preview, speakerUrl, speakerOffset: options.speakerOffset, speakerAlphaUrl: options.speakerAlphaUrl });
+  return assembleScene({ scene, components, brandKit, canvas, gsapDir: options.gsapDir, preview, speakerUrl, speakerOffset: options.speakerOffset, speakerAlphaUrl: options.speakerAlphaUrl, speakerAlphaOffset: options.speakerAlphaOffset });
 }
 
 /**
@@ -227,12 +229,13 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
       continue;
     }
 
-    // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): on room or blur
-    // the base carries the person and the component draws nothing; on
-    // alpha its token becomes the take's alpha copy at the take's trim;
-    // with no take at all it is left out (a black window would bury the ground).
+    // THE SPEAKER IS A VIDEO COMPONENT (core/speaker-layer.ts): on the fast
+    // path the base carries the person and the component draws nothing;
+    // anywhere else its token becomes the file to play (the alpha copy on
+    // alpha) at the take's trim; with no take at all it is left out (a
+    // black window would bury the ground).
     if (isSpeakerLayer(comp) && !speakerRendersInside(scene)) continue;
-    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: speakerBackgroundOf(comp) === "alpha" ? options.speakerAlphaUrl : undefined, url: speakerUrl, offset: options.speakerOffset });
+    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: options.speakerAlphaUrl, alphaOffset: options.speakerAlphaOffset, url: speakerUrl, offset: options.speakerOffset });
     if (!layerData) continue;
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol

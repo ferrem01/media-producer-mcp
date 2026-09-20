@@ -170,6 +170,9 @@ interface WorkerArgs {
   speakerUrl?: string;
   /** Seconds into the speaker track at this scene's start (for data-start-at sync) */
   speakerOffset?: number;
+  /** The scene's take as an alpha copy (file://), and where it stands at the scene's start. */
+  speakerAlphaUrl?: string;
+  speakerAlphaOffset?: number;
 }
 
 async function main() {
@@ -225,6 +228,8 @@ async function main() {
     componentLibDir,
     speakerUrl: args.speakerUrl,
     speakerOffset: args.speakerOffset,
+    speakerAlphaUrl: args.speakerAlphaUrl,
+    speakerAlphaOffset: args.speakerAlphaOffset,
   });
 
   // Download any remote media (e.g. a directly-embedded Pexels clip) to local

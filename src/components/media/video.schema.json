@@ -2,12 +2,12 @@
   "type": "video",
   "label": "Video",
   "category": "media",
-  "description": "Plays a video file. Used for brand intros, outros, or any pre-rendered video clip.",
+  "description": "Plays a video file -- or the person: src \"speaker\" is the film's speaker take (any position, size, shape, place in the stack; `background` room|blur|alpha picks the copy). Used for brand intros, outros, b-roll, a screencast, or the speaker.",
   "data": {
     "src": {
       "type": "string",
       "label": "Video Source",
-      "description": "URL or path to the video file"
+      "description": "URL or path to the video file, or \"speaker\" for the film's speaker take"
     },
     "object_fit": {
       "type": "string",
@@ -15,6 +15,20 @@
       "optional": true,
       "description": "CSS object-fit: cover, contain, fill",
       "placeholder": "cover"
+    },
+    "background": {
+      "type": "string",
+      "label": "Background (speaker only)",
+      "optional": true,
+      "description": "For src \"speaker\": room (the raw take), blur (the room blurred), alpha (the person cut out; whatever lies under this component is the room)",
+      "placeholder": "room"
+    },
+    "shape": {
+      "type": "string",
+      "label": "Shape",
+      "optional": true,
+      "description": "rectangle (default), rounded, circle -- a bubble in a corner",
+      "placeholder": "rectangle"
     }
   }
 }

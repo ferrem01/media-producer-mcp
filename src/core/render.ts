@@ -47,7 +47,7 @@ import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
 import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts, speakerClipForScene } from "./speaker-track.js";
-import { isSpeakerLayer, speakerBackgroundOf, speakerRendersInside, bindSpeakerLayerData } from "./speaker-layer.js";
+import { isSpeakerLayer } from "./speaker-layer.js";
 import { resolveVideoPath } from "./video-path.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
@@ -628,23 +628,11 @@ async function renderVideoWithSpeakerTrack(
   {
     for (let si2 = 0; si2 < project.scenes.length; si2++) {
       const scene = project.scenes[si2];
-      // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): set to alpha it
-      // plays this scene's own take inside the scene -- the alpha copy at
-      // its trim, or the plain clip while none exists. Room and blur leave
-      // it to the base (the assembler draws nothing for it).
-      const layerRef = speakerClipForScene(speaker_track.clips, project.scenes, si2);
+      // THE SPEAKER IS A VIDEO COMPONENT (core/speaker-layer.ts): the worker
+      // binds its token at assembly (base clip or alpha copy at the trim);
+      // the data is left as the token so the compositing rule still reads it.
       for (const comp of scene.components) {
-        if (isSpeakerLayer(comp as any) && !speakerRendersInside(scene as any)) continue;
-        if (isSpeakerLayer(comp as any)) {
-          const asFile = (u: string) => `file://${path.resolve(resolveVideoPath(u))}`;
-          const wantAlpha = speakerBackgroundOf(comp as any) === "alpha";
-          const bound = layerRef
-            ? bindSpeakerLayerData(comp.data as any, { alphaUrl: wantAlpha && layerRef.alpha ? asFile(layerRef.alpha) : undefined, url: asFile(layerRef.source), offset: layerRef.offset })
-            : bindSpeakerLayerData(comp.data as any, { url: speakerFileUrl, offset: filmStarts[si2] });
-          if (bound) comp.data = bound as any;
-          console.log(`  [speaker-track] scene ${si2 + 1}: the take rides as a layer (${layerRef?.alpha ? "alpha copy" : "plain take, no alpha copy yet"}) from ${(bound as any)?.start_at}s`);
-          continue;
-        }
+        if (isSpeakerLayer(comp as any)) continue;
         const dataCopy = comp.data as Record<string, unknown>;
         for (const [key, val] of Object.entries(dataCopy)) {
           if (val === "speaker") {
@@ -686,9 +674,14 @@ async function renderVideoWithSpeakerTrack(
     const promises: Promise<{ framesDir: string; frameCount: number }>[] = [];
 
     for (let idx = batch; idx < batchEnd; idx++) {
+      // The scene's own clip for a speaker drawn inside: its alpha copy at
+      // its trim (the base at the scene's film start shows the same frames
+      // for room and blur, so the base serves those).
+      const ownRef = speakerClipForScene(speaker_track.clips, project.scenes, idx);
       promises.push(renderSceneTransparentFrames(project, idx, workDir, critiqueOpts, extraComponentDirs, speakerWorkers, {
         speakerUrl: speakerFileUrl,
         speakerOffset: sceneStartTimes[idx],
+        ...(ownRef?.alpha ? { speakerAlphaUrl: `file://${path.resolve(resolveVideoPath(ownRef.alpha))}`, speakerAlphaOffset: ownRef.offset } : {}),
       }));
     }
 
@@ -861,7 +854,7 @@ async function renderSceneTransparentFrames(
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
   workerRegistry?: Set<ChildProcess>,
-  speakerRef?: { speakerUrl: string; speakerOffset: number },
+  speakerRef?: { speakerUrl: string; speakerOffset: number; speakerAlphaUrl?: string; speakerAlphaOffset?: number },
 ): Promise<{ framesDir: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `speaker_scene_${sceneIndex}`);
@@ -898,6 +891,7 @@ async function renderSceneTransparentFrames(
   if (speakerRef) {
     workerArgs.speakerUrl = speakerRef.speakerUrl;
     workerArgs.speakerOffset = speakerRef.speakerOffset;
+    if (speakerRef.speakerAlphaUrl) { workerArgs.speakerAlphaUrl = speakerRef.speakerAlphaUrl; workerArgs.speakerAlphaOffset = speakerRef.speakerAlphaOffset; }
   }
 
   if (critiqueOpts?.critique && critiqueOpts.llmConfig) {

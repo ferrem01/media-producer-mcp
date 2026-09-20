@@ -301,8 +301,9 @@ ${QUOTIENT_CSS}
       // core/speaker-layer.ts); a film built without one reads as room.
       try {
         var builtScenes = p.scenes || [];
-        var bScene = sceneIndex >= 0 ? builtScenes[sceneIndex] : builtScenes.filter(function (s0) { return (s0.components || []).some(function (c0) { return c0 && c0.data && c0.data.speaker_layer === true; }); })[0];
-        var spk = bScene && (bScene.components || []).filter(function (c1) { return c1 && c1.data && (c1.data.speaker_layer === true || c1.data.src === 'speaker-alpha'); })[0];
+        var isSpkC = function (c0) { return (c0 && c0.type === 'video' && c0.data && (c0.data.src === 'speaker' || c0.data.src === 'speaker-alpha' || c0.data.speaker_layer === true)); };
+        var bScene = sceneIndex >= 0 ? builtScenes[sceneIndex] : builtScenes.filter(function (s0) { return (s0.components || []).some(isSpkC); })[0];
+        var spk = bScene && (bScene.components || []).filter(isSpkC)[0];
         var mode = spk ? (spk.data.background || (spk.data.src === 'speaker-alpha' ? 'alpha' : 'room')) : 'room';
         var r0 = document.querySelector('input[name="bg"][value="' + mode + '"]'); if (r0) r0.checked = true;
       } catch (eBg) {}
