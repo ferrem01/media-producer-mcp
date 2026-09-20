@@ -4209,3 +4209,9 @@ matte (two cores, ~600 ms a frame), against under a minute on four
 cores here. The take is usable at once; the booth's hint and the attach
 note now say "a few minutes". Halving it (every other frame, or a 224px
 short side) is the next lever if it matters.
+
+The five minutes had a cause: a canvas take carries a 120 fps timebase
+with variable frames, and decoding it as-is duplicated every frame four
+times for the model. The matte now runs at most 30 frames a second
+(`MATTE_MAX_FPS`), the alpha muxed at the same rate against the original
+timeline. Same picture, a quarter of the work.
