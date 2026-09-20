@@ -245,6 +245,10 @@ describe("the choice, wherever it is made", () => {
     expect(studio).toMatch(/data-np-bg="' \+ m \+ '"/);
     expect(studio).toMatch(/if \(btn\.dataset\.npBg\) \{ npSetSpeakerBackground\(project, root, si, btn\.dataset\.npBg, btn\); return; \}/);
     expect(studio).toMatch(/api\('POST', '\/speaker-background\/'/);
+    // The Inspect card: the speaker's internals stay hidden, background is a Room/Blur/Alpha choice on the same route.
+    expect(studio).toMatch(/keys = keys\.filter\(function\(k\) \{ return k !== 'speaker_layer' && k !== 'src'/);
+    expect(studio).toMatch(/var enumOpts = \(isSpk && key === 'background'\) \? \['room', 'blur', 'alpha'\] : getEnumOptions\(key, val\);/);
+    expect(studio).toMatch(/if \(isSpk && sel\.dataset\.key === 'background'\) \{/);
     expect(studio).toMatch(/var alp = clips\[i\]\.alpha \? speakerClipUrlOf\(clips\[i\]\.alpha\) : null;/);
     const video = await fsp.readFile("src/components/media/video.component.html", "utf8");
     expect(video).toMatch(/var startAt = Number\(data\.start_at\);/);

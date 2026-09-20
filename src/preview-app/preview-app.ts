@@ -3468,6 +3468,14 @@ ${QUOTIENT_CSS}
 
     var data = comp.data || {};
     var keys = Object.keys(data);
+    // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): its token and
+    // marker are internals; what a person sets is the background -- Room,
+    // Blur, Alpha -- through the route that mattes a missing copy.
+    var isSpk = !!(data.speaker_layer === true || data.src === 'speaker-alpha');
+    if (isSpk) {
+      keys = keys.filter(function(k) { return k !== 'speaker_layer' && k !== 'src' && k !== 'alpha' && k !== 'speaker_opaque' && k !== 'start_at'; });
+      if (keys.indexOf('background') < 0) { data.background = 'room'; keys.unshift('background'); }
+    }
 
     if (!keys.length) {
       html += '<div class="empty-state" style="height:auto;padding:8px 0;">No properties</div>';
@@ -3490,7 +3498,7 @@ ${QUOTIENT_CSS}
           html += '</div>';
 
         } else if (typeof val === 'string') {
-          var enumOpts = getEnumOptions(key, val);
+          var enumOpts = (isSpk && key === 'background') ? ['room', 'blur', 'alpha'] : getEnumOptions(key, val);
           if (enumOpts) {
             // Enum select dropdown
             html += '<select class="prop-select" data-key="' + escAttr(key) + '">';
@@ -3620,6 +3628,23 @@ ${QUOTIENT_CSS}
     // Select dropdowns (enum)
     els.propEditor.querySelectorAll('.prop-select').forEach(function(sel) {
       sel.addEventListener('change', function() {
+        if (isSpk && sel.dataset.key === 'background') {
+          // The same route as the take card: re-points the clips, mattes a
+          // missing copy in the background; a plain data write would not.
+          var siB = state.currentSceneIndex, modeB = sel.value;
+          sel.disabled = true;
+          api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { scene_index: siB, background: modeB })
+            .then(function(r) {
+              sel.disabled = false;
+              comp.data.background = modeB;
+              if (r.project) { state.currentProject = r.project; }
+              var wordB = modeB === 'room' ? 'the room' : modeB === 'blur' ? 'a blurred room' : 'whatever the scene puts behind you';
+              studioStatus(r.matte === 'running' ? 'Scene ' + (siB + 1) + ': ' + (modeB === 'blur' ? 'blurring' : 'cutting you out') + ' \u2014 a few minutes; the scene switches when it lands.' : (r.has_take ? 'Scene ' + (siB + 1) + ' plays you over ' + wordB + '.' : 'Scene ' + (siB + 1) + ' will use ' + wordB + ' when a take lands.'), 'ok');
+              startCompositePreview(state.currentProject, { time: state.masterTime, sceneIndex: siB });
+            })
+            .catch(function(e) { sel.disabled = false; studioStatus('Background: ' + (e.message || String(e)), 'err'); });
+          return;
+        }
         comp.data[sel.dataset.key] = sel.value;
         savePropDebounced();
       });
@@ -3786,7 +3811,7 @@ ${QUOTIENT_CSS}
       if (eff(c.exit)) meta.push(eff(c.exit) + ' \\u2192');
       html += '<div class="insp-node' + (i === state.currentComponentIndex ? ' active' : '') + '" data-ci="' + i + '">'
         + '<span class="in-dot" style="background:' + (isCustom ? 'var(--content-tertiary)' : compColor(c.type)) + '"></span>'
-        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : c.type) + '</span>'
+        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : (c.data && (c.data.speaker_layer === true || c.data.src === 'speaker-alpha') ? 'speaker' : c.type)) + '</span>'
         + '<span class="in-meta">' + escHtml(meta.join(' \\u00b7 ')) + '</span>'
         + '</div>';
       // DIRECTION, not just timing. Dragging a bar in the timeline only ever
