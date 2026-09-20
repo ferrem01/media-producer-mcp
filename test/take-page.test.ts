@@ -54,9 +54,15 @@ describe("what the booth does", () => {
     expect(html).toMatch(/\.beat \{[^}]*white-space:pre-line/);
   });
 
-  it("records the front camera in portrait with the recorder extension's audio constraints", () => {
+  it("records the front camera at the FILM'S frame with the recorder extension's audio constraints", () => {
     expect(html).toMatch(/facingMode: 'user'/);
-    expect(html).toMatch(/width: \{ ideal: 1080 \}, height: \{ ideal: 1920 \}/);
+    expect(html).toMatch(/width: \{ ideal: capW \}, height: \{ ideal: capH \}/);
+    // The take follows the film's frame (Marc, on a laptop: "why did it record
+    // it as if it was an iPhone?"): 9x16 -> 1080x1920, 16x9 -> 1920x1080.
+    expect(html).toMatch(/if \(w >= h\) \{ capH = 1080; capW = Math\.round\(1080 \* w \/ h \/ 2\) \* 2; \}/);
+    expect(html).toMatch(/setFrame\(p\.canvas\);/);
+    expect(html).toMatch(/width: capture === 'canvas' \? capW : trackW, height: capture === 'canvas' \? capH : trackH/);
+    expect(html).toMatch(/#stage\.wide #live \{[^}]*aspect-ratio: var\(--frame-w, 16\) \/ var\(--frame-h, 9\)/);
     // Echo cancellation OFF: the same choice the extension made after the
     // combined-I/O device nulled the mic. Consistent behaviour on every device.
     expect(html).toMatch(/echoCancellation: false, noiseSuppression: true, autoGainControl: true/);

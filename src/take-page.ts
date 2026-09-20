@@ -83,6 +83,10 @@ ${QUOTIENT_CSS}
   html.lock, html.lock body { overflow:hidden; height:100%; overscroll-behavior:none; }
   html.lock body { position:fixed; width:100%; top:0; left:0; }
   #live { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  /* A WIDE film (16x9, 1x1) on any screen: the stage is the frame itself,
+     centred, so what you see is what the canvas records. A tall film keeps
+     the phone's full-bleed stage. */
+  #stage.wide #live { inset:auto; left:50%; top:50%; width:100%; height:auto; max-height:100%; aspect-ratio: var(--frame-w, 16) / var(--frame-h, 9); transform: translate(-50%, -50%) scaleX(-1); }
   #cap { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 26%, rgba(0,0,0,0) 42%, rgba(0,0,0,0) 70%, rgba(0,0,0,.6) 100%); pointer-events:none; }
   #top { position:absolute; left:0; right:0; top:0; padding: calc(12px + env(safe-area-inset-top)) 16px 0; display:flex; align-items:center; gap:10px; }
@@ -231,6 +235,20 @@ ${QUOTIENT_CSS}
   var cues = [];
   var total = 0;
   var projectName = '';
+  // THE TAKE FOLLOWS THE FILM'S FRAME (Marc, on a laptop: "why did it record
+  // it as if it was an iPhone?"): a 9x16 film records 1080x1920, a 16x9 film
+  // 1920x1080, 1x1 1080x1080, 4x5 1080x1350. Set from the project's canvas
+  // once it loads; portrait until then.
+  var capW = 1080, capH = 1920;
+  function setFrame(canvas) {
+    var w = Number(canvas && canvas.width) || 1080, h = Number(canvas && canvas.height) || 1920;
+    if (w >= h) { capH = 1080; capW = Math.round(1080 * w / h / 2) * 2; }
+    else { capW = 1080; capH = Math.round(1080 * h / w / 2) * 2; }
+    var cv = $('cap'); cv.width = capW; cv.height = capH;
+    var st = $('stage');
+    st.style.setProperty('--frame-w', String(w)); st.style.setProperty('--frame-h', String(h));
+    if (w >= h) st.classList.add('wide'); else st.classList.remove('wide');
+  }
 
   // Cues follow the script's own notation: one sentence per line (a line
   // break is a breath, ~0.3s) and a line that says only (pause) is a held
@@ -272,6 +290,7 @@ ${QUOTIENT_CSS}
     .then(function (r) { if (!r.ok) throw new Error('Could not load the project (' + r.status + '). Is the link still valid?'); return r.json(); })
     .then(function (p) {
       projectName = p.name || project;
+      setFrame(p.canvas);
       var allScenes = (p.storyboard && p.storyboard.scenes) || [];
       var scenes = sceneIndex >= 0 && allScenes[sceneIndex] ? [allScenes[sceneIndex]] : allScenes;
       sceneLabel = sceneIndex >= 0 && allScenes[sceneIndex] ? ('Scene ' + (sceneIndex + 1) + (allScenes[sceneIndex].label ? ' · ' + allScenes[sceneIndex].label : '')) : '';
@@ -390,7 +409,7 @@ ${QUOTIENT_CSS}
   $('recordBtn').addEventListener('click', function () {
     $('recordBtn').disabled = true;
     var constraints = {
-      video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 }, frameRate: { ideal: 30 } },
+      video: { facingMode: 'user', width: { ideal: capW }, height: { ideal: capH }, frameRate: { ideal: 30 } },
       // Mirrors the recorder extension so a take behaves the same on every device.
       audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true },
     };
@@ -481,7 +500,7 @@ ${QUOTIENT_CSS}
     var url = URL.createObjectURL(blob);
     var v = $('play'); v.src = url; v.load();
     $('reviewMeta').textContent = fmt(blobDuration) + (total ? ' recorded · script is ' + fmt(total) : '') + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB'
-      + (capture === 'canvas' ? ' · 1080×1920' : (trackW && trackH ? ' · ' + trackW + '×' + trackH : '')) + ' · ' + ext;
+      + (capture === 'canvas' ? ' · ' + capW + '×' + capH : (trackW && trackH ? ' · ' + trackW + '×' + trackH : '')) + ' · ' + ext;
     show('review');
   }
 
@@ -509,7 +528,7 @@ ${QUOTIENT_CSS}
         body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
           look: ($('softLook') && $('softLook').checked) ? 'soft' : 'natural',
           scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
-          width: capture === 'canvas' ? 1080 : trackW, height: capture === 'canvas' ? 1920 : trackH }),
+          width: capture === 'canvas' ? capW : trackW, height: capture === 'canvas' ? capH : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
         .then(function (j) {
           $('doneMeta').textContent = projectName + ' · ' + fmt(blobDuration) + ' take';
