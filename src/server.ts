@@ -1249,10 +1249,20 @@ export function createMcpServer(): McpServer {
           voiceover_text: z.string().optional(),
           duration_seconds: z.number().optional(),
           visual_notes: z.string().optional(),
+          components: z.array(z.object({
+            type: z.string().describe("A library component type (see the catalog), e.g. kinetic-text, card-fan, checklist-toggles"),
+            data: z.record(z.unknown()).optional(),
+            position: positionSchema,
+            z_index: z.number().optional(),
+            enter: animationSchema,
+            exit: animationSchema,
+            anchors: z.record(z.unknown()).optional(),
+          })).optional().describe("Replace this scene's CAST on the board, deterministically: the full list of components in stack order (type + data; a position is honored by the build, an unplaced component is laid out by it). Omit to keep the cast; pass [] to clear it. Works before any build -- a built film is rebuilt from the board with generate mode='full'. A scene template on the scene is dropped unless scene_template is passed too."),
+          scene_template: z.object({ type: z.string(), data: z.record(z.unknown()).optional() }).nullable().optional().describe("Set the scene's template (a full-frame card such as st-logo-close) or pass null to drop it."),
         })).optional(),
         remove_scenes: z.array(z.number()).optional().describe("Indices of storyboard scenes to remove"),
         reorder_scenes: z.array(z.number()).optional().describe("Current indices in desired order"),
-      }).optional().describe("Direct storyboard edits. Partial updates -- only fields you pass get changed. Works in the storyboard state."),
+      }).optional().describe("Direct storyboard edits. Partial updates -- only fields you pass get changed. Works in the storyboard state. scenes[].components sets a scene's cast deterministically (no writer)."),
 
       // Asset provision
       provide_asset: z.object({
@@ -1324,6 +1334,17 @@ export function createMcpServer(): McpServer {
                 if (sceneUpdate.voiceover_text !== undefined) existing.voiceover_text = sceneUpdate.voiceover_text;
                 if (sceneUpdate.duration_seconds !== undefined) existing.duration_seconds = sceneUpdate.duration_seconds;
                 if (sceneUpdate.visual_notes !== undefined) existing.visual_notes = sceneUpdate.visual_notes;
+                // The cast, set directly: the whole list replaces what the
+                // writer put there; a template would cover it, so it goes
+                // unless the caller sets one in the same edit.
+                if (sceneUpdate.components !== undefined) {
+                  existing.components = sceneUpdate.components as any;
+                  if (sceneUpdate.scene_template === undefined) delete existing.scene_template;
+                }
+                if (sceneUpdate.scene_template !== undefined) {
+                  if (sceneUpdate.scene_template === null) delete existing.scene_template;
+                  else existing.scene_template = { type: sceneUpdate.scene_template.type, data: sceneUpdate.scene_template.data || {} };
+                }
               } else {
                 // Append new scene
                 project.storyboard.scenes.push({
@@ -1334,6 +1355,8 @@ export function createMcpServer(): McpServer {
                   duration_seconds: sceneUpdate.duration_seconds || 5,
                   assets: [],
                   visual_notes: sceneUpdate.visual_notes || "",
+                  ...(sceneUpdate.components !== undefined ? { components: sceneUpdate.components as any } : {}),
+                  ...(sceneUpdate.scene_template ? { scene_template: { type: sceneUpdate.scene_template.type, data: sceneUpdate.scene_template.data || {} } } : {}),
                 });
               }
             }

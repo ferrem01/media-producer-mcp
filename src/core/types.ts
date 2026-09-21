@@ -520,6 +520,20 @@ export interface StoryboardAudioDirection {
   pacing: "slow" | "moderate" | "fast";
 }
 
+/** A component on the BOARD, before any build: the type and its data; a
+ *  position when the author placed it (the build honors it, else lays it
+ *  out); the animation fields the assembler reads. The update tool's
+ *  scene edit sets a scene's cast in this shape. */
+export interface StoryboardComponent {
+  type: string;
+  data?: Record<string, unknown>;
+  position?: ComponentPosition;
+  z_index?: number;
+  enter?: ComponentAnimation;
+  exit?: ComponentAnimation;
+  anchors?: SceneComponent["anchors"];
+}
+
 export interface StoryboardScene {
   /** Scene label */
   label: string;
@@ -557,7 +571,7 @@ export interface StoryboardScene {
   /** Library components the storyboard builder suggested embedding in this
    *  scene. Plain string = type only. Object = storyboard-authored data; for
    *  performable surfaces data.script is the timed on-screen performance. */
-  components?: Array<string | { type: string; data?: Record<string, unknown> }>;
+  components?: Array<string | StoryboardComponent>;
   /** Cinematic stock-footage search phrase; when set, b-roll plays behind the scene */
   broll_query?: string;
   /** AI-generated still image prompt; when set, a generated image is the scene background (mutually exclusive with broll_query) */
