@@ -52,7 +52,7 @@ export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-c
  * component family) -- values without machinery are lies. */
 export interface VisualSystem {
   /** The film's continuous surface. Backed by WorldSpec derivation. */
-  world?: "light" | "dark" | "paper" | "plain";
+  world?: "light" | "dark" | "paper" | "plain" | "sky";
   /** The physics contract: how things move (and what moves are banned). */
   motion?: "punchy" | "calm" | "cutout-physics";
   /** The type voice for display text (brand kit fonts stay the base). */
@@ -384,7 +384,7 @@ function resolveVisualSystem(opts: ConceptDirectorOpts, fromLLM: any): VisualSys
   const pick = <T extends string>(pin: T | undefined, raw: unknown, valid: readonly T[]): T | undefined =>
     pin ?? (typeof raw === "string" && (valid as readonly string[]).includes(raw) ? (raw as T) : undefined);
   const vs: VisualSystem = {
-    world: pick(opts.visualSystem?.world, fromLLM?.world, ["light", "dark", "paper"] as const),
+    world: pick(opts.visualSystem?.world, fromLLM?.world, ["light", "dark", "paper", "sky"] as const),
     motion: pick(opts.visualSystem?.motion, fromLLM?.motion, ["punchy", "calm", "cutout-physics"] as const),
     type: pick(opts.visualSystem?.type, fromLLM?.type, ["grotesk", "editorial-serif", "typewriter", "script"] as const),
     // Motif is PIN-ONLY for now: the director must not invent a motif the

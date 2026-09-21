@@ -582,7 +582,7 @@ var GHOST_TYPES = ["ghost-type"];
 /** Backdrop-cast components: in a WORLD film these are redundant -- the
  *  world's one backdrop is already injected, and a second per-scene backdrop
  *  is exactly the deck-of-posters bug. Dropped when a world exists. */
-var BACKDROP_CAST_TYPES = ["mesh-gradient", "webgl-backdrop", "gradient-background", "liquid-background", "paper-ground"];
+var BACKDROP_CAST_TYPES = ["mesh-gradient", "webgl-backdrop", "gradient-background", "liquid-background", "paper-ground", "sky-backdrop"];
 /** Editorial text roles: captions/annotations must never be stretched into
  *  84% "windows" stacked on a surface (the scene-6 collision bug). They dock
  *  beside or below the surfaces instead. */
@@ -1112,8 +1112,10 @@ export function buildAuthoredCompositionScene(
           theme: w.theme,
           time_offset: (draft as any).film_start || 0,
           // Paper world: the surface dial rides into paper-ground (ignored by
-          // the gradient backdrops).
+          // the gradient backdrops). Sky world: tone is the sky, intensity
+          // the cloud density.
           ...(w.surface ? { tone: w.surface.tone, intensity: w.surface.intensity,
+            ...(w.backdrop.component === "sky-backdrop" ? { density: w.surface.intensity } : {}),
             ...(w.surface.texture ? { texture_url: w.surface.texture } : {}) } : {}),
         },
       };

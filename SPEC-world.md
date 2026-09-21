@@ -93,6 +93,20 @@ What does NOT fit today (net-new work): the continuous-clock backdrop offset
 backdrop with seeded drift (new component work), and film-level performers
 (below).
 
+## The worlds
+
+Five, all derived by `deriveWorld` on the caller > director > inference
+ladder: **light** (airy mesh, the default for a light brand), **dark**
+(cinematic webgl, the default for a dark brand), **paper** (the painted
+print sheet with the ink channel; pin or prose), **plain** (a flat brand
+canvas, no backdrop; pin only) and **sky** (cumulus clouds drifting slowly
+on a sky in the brand color -- the launch-film world from the naano cut;
+pin or prose: "sky", "clouds"). The sky is a dark-theme world: the type is
+white on the color, the product sits on white cards inside it, and the
+clouds keep the corners and drift on film time so a cut never resets them
+(`sky-backdrop`; cloud sprites from the brand kit replace the drawn
+clouds when given).
+
 ## The light default world
 
 The flagship deliverable of P1: a **light mesh-gradient world family**

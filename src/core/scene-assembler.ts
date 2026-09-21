@@ -79,7 +79,7 @@ export function bakeDirectLogoData(comp: { type: string; data: Record<string, un
  *  wrapper choreography defaults. */
 export const BACKDROP_TYPES = new Set([
   "webgl-backdrop", "gradient-background", "mesh-gradient", "liquid-background",
-  "depth-blur", "particle-field", "paper-ground",
+  "depth-blur", "particle-field", "paper-ground", "sky-backdrop",
 ]);
 
 export interface ComponentSource {
@@ -975,7 +975,7 @@ export function cameraMovesScript(
   // the cap) so its edge never enters frame. Non-travel-safe backdrops keep
   // their current behaviour on each path.
   var OVERSCAN = ${overscan === null ? "null" : overscan};
-  var TRAVEL_SAFE = { 'paper-ground': 1 };
+  var TRAVEL_SAFE = { 'paper-ground': 1, 'sky-backdrop': 1 };
   function stretchWorld(cam) {
     if (OVERSCAN === null) return;
     Array.prototype.slice.call(cam.querySelectorAll('[data-mp-backdrop]')).forEach(function (bd) {

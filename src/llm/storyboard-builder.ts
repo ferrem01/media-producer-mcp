@@ -1395,7 +1395,7 @@ export function enforceFilmDirection(scenes: DraftScene[]): void {
   // rescue it, because a storyboard that authored components is built as an
   // authored composition. Report it; the repair is a casting decision, not
   // something code can invent.
-  const BACKDROPS = new Set(["paper-ground", "webgl-backdrop", "mesh-gradient", "gradient-background", "liquid-background", "animated-gradient-text"]);
+  const BACKDROPS = new Set(["paper-ground", "sky-backdrop", "webgl-backdrop", "mesh-gradient", "gradient-background", "liquid-background", "animated-gradient-text"]);
   for (const s of scenes) {
     if (tpl(s) || (s as any).broll_query || (s as any).hero_image) continue;
     const types = (s.components || []).map((c) => (typeof c === "object" && c ? c.type : c));

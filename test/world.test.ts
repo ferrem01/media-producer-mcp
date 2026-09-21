@@ -20,6 +20,27 @@ describe("deriveWorld", () => {
     expect(w.backdrop.component).toBe("webgl-backdrop");
   });
 
+  it("sky world: the pin or the prose keyword; the brand primary is the sky; a dark-theme world with the materials block naming white cards", () => {
+    const w = deriveWorld({ brandKit: LIGHT_KIT, visualSystem: { world: "sky" }, seedSource: "t:sky" });
+    expect(w.backdrop.component).toBe("sky-backdrop");
+    expect(w.theme).toBe("dark"); // white type on the color
+    expect(w.surface).toEqual({ tone: "#393bf5", intensity: 0.35 });
+    expect(worldBackground(w)).toBe("#393bf5");
+    const block = worldPromptBlock(w);
+    expect(block).toMatch(/ONE SKY across the whole film/);
+    expect(block).toMatch(/WHITE CARDS inside the sky/);
+    expect(block).toMatch(/THE SKY IS THE GROUND/);
+    // Prose: a treatment that says clouds lands in the sky without a pin.
+    const prose = deriveWorld({ brandKit: LIGHT_KIT, treatment: { concept: "words floating among clouds on a bright blue sky", visualStyle: { colorMood: "overcast noon" } } as any, seedSource: "t:sky2" });
+    expect(prose.backdrop.component).toBe("sky-backdrop");
+    expect(prose.surface?.intensity).toBe(0.6);
+    // A pin to another world wins over the prose.
+    const pinned = deriveWorld({ brandKit: LIGHT_KIT, treatment: { concept: "clouds" } as any, visualSystem: { world: "light" }, seedSource: "t:sky3" });
+    expect(pinned.backdrop.component).toBe("mesh-gradient");
+    // A light world stays light and a plain stays plain: the sky is never inferred from nothing.
+    expect(deriveWorld({ brandKit: LIGHT_KIT, seedSource: "t:x" }).backdrop.component).toBe("mesh-gradient");
+  });
+
   it("seed is stable for the same film and differs across films", () => {
     const a = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "tenant:film-one" });
     const b = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "tenant:film-one" });
