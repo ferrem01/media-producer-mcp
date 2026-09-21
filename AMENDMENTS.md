@@ -4371,3 +4371,6 @@ component's background (alpha over the page), the matte. The extension
 (0.33.1) sends `camera_url`; older installs are covered by the sibling
 lookup. Record the tab with the mic and camera on, and the scene gets
 the page and you, cut out in front of it, in one go.
+- The Recorder's camera now records like the booth: 1080p at 30 fps,
+  8 Mbps video, 128 kbps audio (was 720p at 2.5 Mbps -- soft and dark
+  as a take next to a booth take, measured on scene 7). Extension 0.33.2.
