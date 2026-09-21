@@ -533,19 +533,30 @@ export async function processClipToCutout(clipPath: string, outPng: string): Pro
   const run = promisify(execFile);
   const tmpFrame = outPng.replace(/\.png$/, ".frame.png");
   await run(FFMPEG(), ["-y", "-ss", "2", "-i", clipPath, "-frames:v", "1", tmpFrame]);
+  await keyStillToCutout(tmpFrame, outPng);
+  await fs.rm(tmpFrame, { force: true });
+}
+
+/** Key a still's flat background (sampled from a corner patch) to alpha:
+ *  the cutout step of generate_clip mode='cutout', shared with the sky
+ *  world's illustrations (a generated object on a plain green ground
+ *  becomes an object ON the sky). */
+export async function keyStillToCutout(framePng: string, outPng: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
   // Sample the background from a corner patch (12,12).
   const { stdout } = await run(FFMPEG(), [
-    "-i", tmpFrame, "-vf", "crop=1:1:12:12", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
+    "-i", framePng, "-vf", "crop=1:1:12:12", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
   ], { encoding: "buffer" as never }) as never as { stdout: Buffer };
   const [r, g, b] = [stdout[stdout.length - 3], stdout[stdout.length - 2], stdout[stdout.length - 1]];
   const hex = [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
   const despill = g >= r && g >= b ? "green" : "blue";
   await run(FFMPEG(), [
-    "-y", "-i", tmpFrame,
+    "-y", "-i", framePng,
     "-vf", `colorkey=0x${hex}:0.17:0.10,despill=type=${despill}`,
     "-pix_fmt", "rgba", outPng,
   ]);
-  await fs.rm(tmpFrame, { force: true });
 }
 
 export async function processClipToTexture(clipPath: string, outPng: string): Promise<void> {

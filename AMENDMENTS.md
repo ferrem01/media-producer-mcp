@@ -4578,3 +4578,29 @@ number-counter-row on the test board, and the mock is a follow-up. Also
 seen: the two wish beats carry generated illustrations as full-frame
 grounds from before the world switch, which cover the sky -- on a sky
 world an illustration should be an object on the sky, not a ground.
+
+## 2026-09-21 -- The recipe's voice, objects on the sky, the mock fills its box, templates on the sky
+
+Four follow-ups from the rendered naano test film, Marc's "voice: 1, and
+2-4":
+- **The recipe's voice wins over the grammar's.** A recipe measured from a
+  voiced film (`layers.voice: "voiceover"`) puts a narrator on a grammar
+  whose contract says "text is the voiceover" (hype-cut inherits it from
+  tempo-cut). `recipeWantsVoice` (storyboard-builder.ts): the writer gets
+  a narrator block after the recipe block -- every scene carries
+  voiceover_text, the type shows the key words -- and the pipeline's
+  voiceover strip skips the film and turns TTS on unless the caller said
+  otherwise. Measured: the launch recipe on hype-cut came back silent.
+- **On the sky world a still is an object, not a ground.** The hero-image
+  enrichment asks for ONE object on a plain green field (`cutout`), keys
+  it to alpha with the generate_clip cutout keyer (`keyStillToCutout`,
+  factored out of `processClipToCutout`), and the generator sets it in the
+  middle band over the sky at 46% with no darkening overlay, the sky
+  staying. Measured: two wish beats went black under generated stills.
+- **dashboard-kpi fills its box.** Designed at 1100 px with fixed-pixel
+  type, it sat at 75% of a 1460 px slot; it now zooms to the box it was
+  given, up to 1.8x, never past its height.
+- **Template scenes on the sky sit on the sky.** The reveal and the close
+  (st-logo-close) dropped to dark webgl ribbons in a sky film; on the sky
+  world the injected z0 backdrop is the sky-backdrop with the world's
+  data, the wordmark in white on the brand color.

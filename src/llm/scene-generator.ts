@@ -111,7 +111,19 @@ if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
   if (stWantsWebgl) (stData as any).backdrop_active = true;
   var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
   if (stWantsWebgl) {
-    stComponents.unshift({
+    // ON THE SKY WORLD the template sits on the sky: one world, the
+    // wordmark in white on the brand color, the clouds carrying across the
+    // cut (measured on the rendered test film: the reveal and the close
+    // dropped to dark webgl ribbons in a sky film -- the theme jump the
+    // world exists to prevent).
+    var onSky = !!opts.world && opts.world.backdrop.component === "sky-backdrop";
+    stComponents.unshift(onSky ? {
+      id: "tpl_bg",
+      type: "sky-backdrop",
+      z_index: 0,
+      data: { seed: opts.world!.backdrop.seed, colors: opts.world!.backdrop.palette, time_offset: (draft as any).film_start || 0,
+        ...(opts.world!.surface ? { tone: opts.world!.surface.tone, density: opts.world!.surface.intensity, ...(opts.world!.surface.sprites?.length ? { clouds: opts.world!.surface.sprites } : {}) } : {}) },
+    } : {
       id: "tpl_bg",
       type: "webgl-backdrop",
       z_index: 0,
@@ -1138,7 +1150,24 @@ export function buildAuthoredCompositionScene(
   // still replaces the world backdrop for THIS scene; authored content
   // stacks above it and caption scrims keep the type legible.
   var mediaBackdrop = false;
-  if (!speakerBase && (opts.brollVideoUrl || opts.imageUrl)) {
+  // ON THE SKY WORLD a still is an OBJECT on the sky (the launch film's
+  // silhouette, the clock, the balloons), never a ground: the sky stays,
+  // the still sits centered in the middle band, fit inside its box, with
+  // no darkening overlay (it is keyed to a cutout upstream). Measured on
+  // the rendered test film: two wish beats went black under generated
+  // stills while every other beat was sky.
+  var skyObject = !speakerBase && !opts.brollVideoUrl && !!opts.imageUrl && !!w && w.backdrop.component === "sky-backdrop";
+  if (skyObject) {
+    components.push({
+      id: "obj",
+      type: "image",
+      z_index: 8,
+      position: { x: "27%", y: "22%", width: "46%", height: "56%" },
+      data: { src: opts.imageUrl, fit: "contain", overlay_opacity: 0, drift: false, at: 0.25 },
+    });
+    console.log(`    sky world: the hero still is an object on the sky (46% of the frame, centred), the sky stays`);
+  }
+  if (!speakerBase && !skyObject && (opts.brollVideoUrl || opts.imageUrl)) {
     mediaBackdrop = true;
     components[0] = opts.brollVideoUrl ? {
       id: "bg",
