@@ -4682,3 +4682,18 @@ itself -- a clip or recording as a video with controls and sound, a still
 as an image -- with its file name, folding away on a second click or
 Close. The path is the need's own; the token rides along for the asset
 route. Replace, Re-record and the rest stay beside it.
+
+## 2026-09-21 -- The clip's sound: a cameo's line reaches the mix
+
+The rendered sketch (proj_09b6d0cb, three AI cameos on scenes 1, 2 and 9)
+had music and no "So, what worked?": the mixer only knew the project's
+tracks, and a clip on a scene is a component. Each `video` component with
+`data.clip` is now a voice-level track in the final mix -- at its scene's
+film start (transitions included) plus its cut-in, from its own
+`start_at`, cut to the scene so it never spills into the next -- and the
+bed ducks under it exactly as under narration (`clipAudioTracks`,
+`duckUnderClips`, core/render.ts, on both render paths). The mixer takes a
+per-track `duration` (the cut, and the ducking window without a probe).
+The mix runs when clips alone exist, with no project tracks. Verified on
+the mixer directly: the CMO's line at 4.1 s with the clip placed at 1 s,
+gone when the cut lands before it.
