@@ -283,7 +283,9 @@ async function stop(upload) {
       const [sceneIndex, assetIndex] = String(upload.destNeed).split(":").map((n) => parseInt(n, 10));
       const pvRes = await fetch(
         `${base}/api/provide-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(upload.destProjectId)}?${q()}`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: upJson.url, scene_index: sceneIndex, asset_index: assetIndex }) },
+        // The camera file rides along: on a person film the server makes it
+        // the scene's take (the voice and the face), the tab video the page.
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: upJson.url, scene_index: sceneIndex, asset_index: assetIndex, camera_url: camJson ? camJson.url : undefined }) },
       );
       const pvJson = await pvRes.json().catch(() => ({}));
       if (!pvRes.ok || !pvJson.ok) throw new Error(pvJson.error || `provide HTTP ${pvRes.status}`);

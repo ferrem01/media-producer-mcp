@@ -176,7 +176,8 @@ describe("the server side", () => {
 
   it("refuses a take URL outside the project's own asset dir", async () => {
     const src = await read("../src/index.ts");
-    const at = src.indexOf("const takeMatch = urlPath.match");
+    // The route's body lives in attachTakeToScene (shared with the Recorder's camera file).
+    const at = src.indexOf("async function attachTakeToScene(");
     expect(at).toBeGreaterThan(0);
     const block = src.slice(at, at + 10000);
     expect(block).toMatch(/expectedPrefix = `\/assets\/\$\{tkTenant\}\/projects\/\$\{tkProject\}\/assets\/`/);

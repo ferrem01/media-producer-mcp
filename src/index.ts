@@ -417,6 +417,169 @@ function speakerUrlFromSource(source: string | undefined): string | undefined {
  *  tenant, on disk beside the projects, two hours at most. */
 interface ArmedNeed { project_id: string; project_name: string; scene_index: number; asset_index: number; type: string; description: string; armed_at: string }
 const ARMED_TTL_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * ATTACH A TAKE (the body of POST /api/take, shared): a recorded take
+ * already uploaded to this project's assets becomes the speaker base for
+ * ONE scene (default: the first scene whose take need is open, else scene
+ * 0). The file is sanitized in place first (orientation baked, reframed to
+ * the canvas, dialogue loudness); the scene's need flips to provided; any
+ * `take` job waiting on the project completes; the scene's speaker
+ * component takes the booth's choice and the matte makes the copy it
+ * needs. Also called when the Recorder fills a screen-recording slot with
+ * a camera file beside it. Returns the HTTP status and body to send.
+ */
+async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
+    const tkUrl = String(tkBody.url || "");
+    const expectedPrefix = `/assets/${tkTenant}/projects/${tkProject}/assets/`;
+    if (!tkUrl.startsWith(expectedPrefix) || tkUrl.includes("..")) {
+      return { status: 400, body: { error: `url must be an asset of this project (${expectedPrefix}...)` } };
+    }
+    const tkPeek = await loadProject(tkTenant, tkProject);
+    if (!tkPeek) { return { status: 404, body: { error: "Project not found" } }; }
+    const recordAll = tkBody.scene_index === "all";
+    // THE SLOW WORK FIRST, ON THE FILE ONLY. Sanitizing and transcribing
+    // take tens of seconds; holding a loaded project across them and
+    // saving at the end let a build's copy-back land in between and get
+    // wiped (measured live: proj_234d8a01's built scenes vanished under a
+    // stale attach). The project is loaded for mutation only after the
+    // file work is done, and saved within milliseconds.
+    let sanitized: TakeSanitizeResult | undefined;
+    try {
+      sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas, tkBody.look === "soft" ? "soft" : "natural");
+    } catch (e: any) {
+      console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
+    }
+    // BACKGROUND BLUR (core/take-matte.ts): person matting on a copy of
+    // the sanitized take; the copy becomes the take, the raw stays. A
+    // failure never blocks the attach -- the take lands unblurred and
+    // the note says so.
+    // The blur is queued AFTER the attach (queueTakeBlur): the take lands
+    // now, unblurred, and swaps to the blurred copy when the matte is
+    // done -- minutes of matting inside this request held the connection
+    // past the proxy's limit (measured live: dropped at 300 s).
+    // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): the booth's
+    // choice -- room, blur or alpha -- is written on the scene's speaker
+    // component; the matte makes the copy the choice needs, after the
+    // attach. No choice keeps the scene's setting.
+    const tkBackground = asSpeakerBackground(tkBody.background);
+    const tkBlurStrength = Number(tkBody.blur_strength) > 0 ? Number(tkBody.blur_strength) : undefined;
+    await primeTakeWords(tkPeek, tkUrl, config.dataDir);
+    const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
+    // Where is the face? Measured once here so the layout can build its
+    // bands around the person instead of assuming a chest-up selfie.
+    let tkFace: Take["face"];
+    try { tkFace = (await detectFace(resolveVideoPath(tkUrl, config.dataDir), tkDurationHint)) || undefined; }
+    catch (e: any) { console.warn(`  take: face detection skipped: ${e?.message || e}`); }
+    // The breath before the first word and the reach for the stop button
+    // after the last are not part of the take: trim to the speech.
+    const deair = tkBody.scene_index === "all" ? null : await deAirTake(tkPeek, tkUrl, tkDurationHint, config.dataDir);
+    const tkProjectObj = await loadProject(tkTenant, tkProject);
+    if (!tkProjectObj) { return { status: 404, body: { error: "Project not found" } }; }
+    ensureSpeakerNeeds(tkProjectObj);
+    const open = openTakeNeeds(tkProjectObj);
+    const sceneIndex = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0
+      ? Number(tkBody.scene_index) : (open[0] ?? 0);
+    const duration = Number(tkBody.duration);
+    const takeBase = {
+      source: tkUrl,
+      recorded_at: new Date().toISOString(),
+      duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100
+        : sanitized && sanitized.probe.duration > 0 ? Math.round(sanitized.probe.duration * 100) / 100 : undefined,
+      mime: typeof tkBody.mime === "string" ? tkBody.mime : undefined,
+      // The file as it now stands (post-sanitize), not what the page saw.
+      width: sanitized?.probe.width || Number(tkBody.width) || undefined,
+      height: sanitized?.probe.height || Number(tkBody.height) || undefined,
+      capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw",
+      rotation_baked: sanitized?.rotation_baked || undefined,
+      reframed: sanitized?.reframed,
+      look: sanitized?.look,
+      face: tkFace,
+      loudness: sanitized?.loudness,
+    };
+    // "Record all": one recording, cut where each scene's script begins.
+    let takes: Take[];
+    let windows: Array<{ start: number; end: number }> | undefined;
+    if (recordAll) {
+      try {
+        const split = await attachTakeAcrossScenes(tkProjectObj, takeBase, config.dataDir);
+        takes = split.takes; windows = split.windows;
+      } catch (e: any) { return { status: 400, body: { error: `record all: ${e?.message || e}` } }; }
+    } else if (deair && (deair.head > 0 || deair.tail > 0)) {
+      takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase, trim_start: deair.start, trim_end: deair.end, duration: Math.round((deair.end - deair.start) * 100) / 100 })];
+    } else {
+      takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase })];
+    }
+    // The take is now the scene's clock: transcribe it and re-time every
+    // word-anchored overlay (storyboard entry and built scene alike).
+    const retimes: RetimeResult[] = [];
+    for (const t of takes) {
+      try { retimes.push(await retimeScene(tkProjectObj, t.scene_index, config.dataDir)); }
+      catch (e: any) { console.warn(`  take: re-time skipped for scene ${t.scene_index + 1}: ${e?.message || e}`); }
+    }
+    const retime = retimes[0];
+    const take = takes[0];
+    // The take is the voice: the generated voiceover clip of every scene
+    // that now has a take is dropped (else both play, measured live).
+    { const dv = dropVoiceUnderTakes(tkProjectObj); if (dv) console.log(`  take: ${dv} generated voiceover clip(s) dropped under the take(s)`); }
+    // The scene's speaker component: cast on a built scene that has none
+    // (a film built before the rule), set to the booth's choice when one
+    // was made; the clips then point at the copy each scene wants.
+    const tkModes: string[] = [];
+    for (const t of takes) {
+      const built = (tkProjectObj.scenes || [])[t.scene_index];
+      if (!built) continue;
+      if (tkBackground) setSpeakerBackground(built, tkBackground);
+      else castSpeakerLayer(built);
+      tkModes.push(sceneSpeakerBackground(built));
+    }
+    syncSpeakerClips(tkProjectObj);
+    ensureSpeakerNeeds(tkProjectObj);
+    const tkMissing = takes.map((t) => missingSpeakerCopies(tkProjectObj, t)).reduce((a, m) => ({ blur: a.blur || m.blur, alpha: a.alpha || m.alpha }), { blur: false, alpha: false });
+    const tkBlurNote = tkMissing.blur && tkMissing.alpha ? "blurred and alpha copies running -- the scenes switch to them when the matte is done (a few minutes for a 15 s take on the server)"
+      : tkMissing.blur ? "blurred copy running -- the scene switches to it when the matte is done (a few minutes for a 15 s take on the server)"
+      : tkMissing.alpha ? "alpha copy running -- the scene plays the person over its background when the matte is done (a few minutes for a 15 s take on the server)"
+      : tkModes.length ? `background ${tkModes.join("/")}` : "";
+    tkProjectObj.updated_at = new Date().toISOString();
+    await saveProject(tkProjectObj);
+    // The board card shows the take's still in place of the silhouette
+    // (storyboard-cards.ts, activeTake): re-shoot the cards the way a
+    // provided screen does (measured live, proj_25b2858c: the take
+    // landed, the scene re-timed to 4.98s, the card kept the outline).
+    reshootStoryboardCardsSoon(tkTenant, tkProject);
+    if (tkMissing.blur || tkMissing.alpha) {
+      queueTakeMatte({
+        tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, dataDir: config.dataDir, strength: tkBlurStrength,
+        blur: tkMissing.blur, alpha: tkMissing.alpha,
+        resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
+        afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
+      });
+    }
+    let released = 0;
+    for (const t of takes) released += resolveTakeWaiters(tkTenant, tkProject, t);
+    const tkNotes = [
+      recordAll ? `all: ${takes.map((t) => `scene ${t.scene_index + 1} [${t.trim_start}-${t.trim_end}s]`).join(", ")}` : `scene ${sceneIndex + 1}`,
+      take.duration ? `${take.duration}s` : "",
+      sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
+      sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
+      sanitized?.look ? `${sanitized.look} look` : "",
+      tkBlurNote,
+      tkFace ? `face at ${Math.round(tkFace.cx * 100)}%/${Math.round(tkFace.cy * 100)}% (${Math.round(tkFace.size * 100)}% tall)` : "no face found",
+      deair && (deair.head > 0 || deair.tail > 0) ? `de-aired -${deair.head}s head / -${deair.tail}s tail` : "",
+      sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
+      retime ? `${retime.spine.source} spine, ${(retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0)} anchor(s) resolved` : "",
+      released ? `${released} waiting job(s) released` : "",
+    ].filter(Boolean).join(", ");
+    console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)} (${tkNotes})`);
+    return { status: 200, body: {
+      ok: true, project_id: tkProject, take, takes, windows, speaker_track: tkProjectObj.speaker_track,
+      open_needs: openTakeNeeds(tkProjectObj),
+      spine: retime ? { source: retime.spine.source, duration: retime.duration, words: retime.spine.words.length,
+        resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0),
+        unresolved: [...(retime.storyboard?.unresolved || []), ...(retime.built?.unresolved || [])] } : undefined,
+    } };
+}
+
 function armedNeedPath(tenantId: string): string { return path.join(config.dataDir, tenantId, "armed-need.json"); }
 async function readArmedNeed(tenantId: string): Promise<ArmedNeed | null> {
   try {
@@ -2360,7 +2523,33 @@ Rules:
         await saveProject(evProjectObj);
         console.log(`  provide-asset: ${evTenant}/${evProject} scene ${evScene + 1} need ${evIndex + 1} <- ${path.basename(evUrl)}${evRecast ? ` (${evRecast.how})` : ""}`);
         reshootStoryboardCardsSoon(evTenant, evProject);
-        jsonResponse(res, 200, { ok: true, scene_index: evScene, asset_index: evIndex, need: evNeed, recast: evRecast, disarmed: evDisarmed, open_needs: openTakeNeeds(evProjectObj), open_proof: openAssetNeeds(evProjectObj) });
+        // ONE SESSION, BOTH PIECES (Marc: "I turned on the sound and video
+        // capture -- what should happen?"): the Recorder with its camera on
+        // uploads a camera file beside the tab recording (camera-<stamp>.webm
+        // next to recording-<stamp>.webm, or `camera_url` in the body). For a
+        // screen-recording need on a person film that file is the scene's
+        // TAKE -- the voice and the face -- attached the same way the booth
+        // attaches one; the take's background follows the scene's setting
+        // (alpha over the page, and the matte makes the copy).
+        let evTake: Record<string, unknown> | undefined;
+        if (evNeed && evNeed.type === "screen_recording" && personCarries((evProjectObj.treatment as any)?.filmGrammar)) {
+          let camUrl = typeof evBody.camera_url === "string" && evBody.camera_url.startsWith(evPrefix) && !evBody.camera_url.includes("..") ? evBody.camera_url : "";
+          if (!camUrl) {
+            const m = path.basename(evUrl).match(/^recording-(.+)\.(webm|mp4)$/);
+            if (m) {
+              const sibling = `${evPrefix}camera-${m[1]}.${m[2]}`;
+              try { await fs.access(resolveVideoPath(sibling, config.dataDir)); camUrl = sibling; } catch { /* no camera beside it */ }
+            }
+          }
+          if (camUrl) {
+            try {
+              const tkOut = await attachTakeToScene(evTenant, evProject, { url: camUrl, scene_index: evScene, capture: "recorder", look: "natural" });
+              if (tkOut.status === 200) { evTake = tkOut.body; console.log(`  provide-asset: the Recorder's camera file is scene ${evScene + 1}'s take (${path.basename(camUrl)})`); }
+              else console.warn(`  provide-asset: camera file not attached as the take: ${String((tkOut.body as any)?.error || tkOut.status)}`);
+            } catch (e: any) { console.warn(`  provide-asset: camera file not attached as the take: ${e?.message || e}`); }
+          }
+        }
+        jsonResponse(res, 200, { ok: true, scene_index: evScene, asset_index: evIndex, need: evNeed, recast: evRecast, disarmed: evDisarmed, take: evTake, open_needs: openTakeNeeds(evProjectObj), open_proof: openAssetNeeds(evProjectObj) });
         return;
       }
 
@@ -2624,155 +2813,8 @@ Rules:
         const [, tkTenant, tkProject] = takeMatch.map(decodeURIComponent);
         let tkBody: Record<string, unknown> = {};
         try { tkBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
-        const tkUrl = String(tkBody.url || "");
-        const expectedPrefix = `/assets/${tkTenant}/projects/${tkProject}/assets/`;
-        if (!tkUrl.startsWith(expectedPrefix) || tkUrl.includes("..")) {
-          jsonResponse(res, 400, { error: `url must be an asset of this project (${expectedPrefix}...)` });
-          return;
-        }
-        const tkPeek = await loadProject(tkTenant, tkProject);
-        if (!tkPeek) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        const recordAll = tkBody.scene_index === "all";
-        // THE SLOW WORK FIRST, ON THE FILE ONLY. Sanitizing and transcribing
-        // take tens of seconds; holding a loaded project across them and
-        // saving at the end let a build's copy-back land in between and get
-        // wiped (measured live: proj_234d8a01's built scenes vanished under a
-        // stale attach). The project is loaded for mutation only after the
-        // file work is done, and saved within milliseconds.
-        let sanitized: TakeSanitizeResult | undefined;
-        try {
-          sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas, tkBody.look === "soft" ? "soft" : "natural");
-        } catch (e: any) {
-          console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
-        }
-        // BACKGROUND BLUR (core/take-matte.ts): person matting on a copy of
-        // the sanitized take; the copy becomes the take, the raw stays. A
-        // failure never blocks the attach -- the take lands unblurred and
-        // the note says so.
-        // The blur is queued AFTER the attach (queueTakeBlur): the take lands
-        // now, unblurred, and swaps to the blurred copy when the matte is
-        // done -- minutes of matting inside this request held the connection
-        // past the proxy's limit (measured live: dropped at 300 s).
-        // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): the booth's
-        // choice -- room, blur or alpha -- is written on the scene's speaker
-        // component; the matte makes the copy the choice needs, after the
-        // attach. No choice keeps the scene's setting.
-        const tkBackground = asSpeakerBackground(tkBody.background);
-        const tkBlurStrength = Number(tkBody.blur_strength) > 0 ? Number(tkBody.blur_strength) : undefined;
-        await primeTakeWords(tkPeek, tkUrl, config.dataDir);
-        const tkDurationHint = Number(tkBody.duration) > 0 ? Number(tkBody.duration) : (sanitized?.probe.duration || 0);
-        // Where is the face? Measured once here so the layout can build its
-        // bands around the person instead of assuming a chest-up selfie.
-        let tkFace: Take["face"];
-        try { tkFace = (await detectFace(resolveVideoPath(tkUrl, config.dataDir), tkDurationHint)) || undefined; }
-        catch (e: any) { console.warn(`  take: face detection skipped: ${e?.message || e}`); }
-        // The breath before the first word and the reach for the stop button
-        // after the last are not part of the take: trim to the speech.
-        const deair = tkBody.scene_index === "all" ? null : await deAirTake(tkPeek, tkUrl, tkDurationHint, config.dataDir);
-        const tkProjectObj = await loadProject(tkTenant, tkProject);
-        if (!tkProjectObj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        ensureSpeakerNeeds(tkProjectObj);
-        const open = openTakeNeeds(tkProjectObj);
-        const sceneIndex = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0
-          ? Number(tkBody.scene_index) : (open[0] ?? 0);
-        const duration = Number(tkBody.duration);
-        const takeBase = {
-          source: tkUrl,
-          recorded_at: new Date().toISOString(),
-          duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 100) / 100
-            : sanitized && sanitized.probe.duration > 0 ? Math.round(sanitized.probe.duration * 100) / 100 : undefined,
-          mime: typeof tkBody.mime === "string" ? tkBody.mime : undefined,
-          // The file as it now stands (post-sanitize), not what the page saw.
-          width: sanitized?.probe.width || Number(tkBody.width) || undefined,
-          height: sanitized?.probe.height || Number(tkBody.height) || undefined,
-          capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw",
-          rotation_baked: sanitized?.rotation_baked || undefined,
-          reframed: sanitized?.reframed,
-          look: sanitized?.look,
-          face: tkFace,
-          loudness: sanitized?.loudness,
-        };
-        // "Record all": one recording, cut where each scene's script begins.
-        let takes: Take[];
-        let windows: Array<{ start: number; end: number }> | undefined;
-        if (recordAll) {
-          try {
-            const split = await attachTakeAcrossScenes(tkProjectObj, takeBase, config.dataDir);
-            takes = split.takes; windows = split.windows;
-          } catch (e: any) { jsonResponse(res, 400, { error: `record all: ${e?.message || e}` }); return; }
-        } else if (deair && (deair.head > 0 || deair.tail > 0)) {
-          takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase, trim_start: deair.start, trim_end: deair.end, duration: Math.round((deair.end - deair.start) * 100) / 100 })];
-        } else {
-          takes = [attachTake(tkProjectObj, { scene_index: sceneIndex, ...takeBase })];
-        }
-        // The take is now the scene's clock: transcribe it and re-time every
-        // word-anchored overlay (storyboard entry and built scene alike).
-        const retimes: RetimeResult[] = [];
-        for (const t of takes) {
-          try { retimes.push(await retimeScene(tkProjectObj, t.scene_index, config.dataDir)); }
-          catch (e: any) { console.warn(`  take: re-time skipped for scene ${t.scene_index + 1}: ${e?.message || e}`); }
-        }
-        const retime = retimes[0];
-        const take = takes[0];
-        // The take is the voice: the generated voiceover clip of every scene
-        // that now has a take is dropped (else both play, measured live).
-        { const dv = dropVoiceUnderTakes(tkProjectObj); if (dv) console.log(`  take: ${dv} generated voiceover clip(s) dropped under the take(s)`); }
-        // The scene's speaker component: cast on a built scene that has none
-        // (a film built before the rule), set to the booth's choice when one
-        // was made; the clips then point at the copy each scene wants.
-        const tkModes: string[] = [];
-        for (const t of takes) {
-          const built = (tkProjectObj.scenes || [])[t.scene_index];
-          if (!built) continue;
-          if (tkBackground) setSpeakerBackground(built, tkBackground);
-          else castSpeakerLayer(built);
-          tkModes.push(sceneSpeakerBackground(built));
-        }
-        syncSpeakerClips(tkProjectObj);
-        ensureSpeakerNeeds(tkProjectObj);
-        const tkMissing = takes.map((t) => missingSpeakerCopies(tkProjectObj, t)).reduce((a, m) => ({ blur: a.blur || m.blur, alpha: a.alpha || m.alpha }), { blur: false, alpha: false });
-        const tkBlurNote = tkMissing.blur && tkMissing.alpha ? "blurred and alpha copies running -- the scenes switch to them when the matte is done (a few minutes for a 15 s take on the server)"
-          : tkMissing.blur ? "blurred copy running -- the scene switches to it when the matte is done (a few minutes for a 15 s take on the server)"
-          : tkMissing.alpha ? "alpha copy running -- the scene plays the person over its background when the matte is done (a few minutes for a 15 s take on the server)"
-          : tkModes.length ? `background ${tkModes.join("/")}` : "";
-        tkProjectObj.updated_at = new Date().toISOString();
-        await saveProject(tkProjectObj);
-        // The board card shows the take's still in place of the silhouette
-        // (storyboard-cards.ts, activeTake): re-shoot the cards the way a
-        // provided screen does (measured live, proj_25b2858c: the take
-        // landed, the scene re-timed to 4.98s, the card kept the outline).
-        reshootStoryboardCardsSoon(tkTenant, tkProject);
-        if (tkMissing.blur || tkMissing.alpha) {
-          queueTakeMatte({
-            tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, dataDir: config.dataDir, strength: tkBlurStrength,
-            blur: tkMissing.blur, alpha: tkMissing.alpha,
-            resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
-            afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
-          });
-        }
-        let released = 0;
-        for (const t of takes) released += resolveTakeWaiters(tkTenant, tkProject, t);
-        const tkNotes = [
-          recordAll ? `all: ${takes.map((t) => `scene ${t.scene_index + 1} [${t.trim_start}-${t.trim_end}s]`).join(", ")}` : `scene ${sceneIndex + 1}`,
-          take.duration ? `${take.duration}s` : "",
-          sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
-          sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
-          sanitized?.look ? `${sanitized.look} look` : "",
-          tkBlurNote,
-          tkFace ? `face at ${Math.round(tkFace.cx * 100)}%/${Math.round(tkFace.cy * 100)}% (${Math.round(tkFace.size * 100)}% tall)` : "no face found",
-          deair && (deair.head > 0 || deair.tail > 0) ? `de-aired -${deair.head}s head / -${deair.tail}s tail` : "",
-          sanitized?.loudness ? `${sanitized.loudness.measured_lufs} LUFS${sanitized.loudness.normalized_to_lufs != null ? ` -> ${sanitized.loudness.normalized_to_lufs}` : ""}` : "",
-          retime ? `${retime.spine.source} spine, ${(retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0)} anchor(s) resolved` : "",
-          released ? `${released} waiting job(s) released` : "",
-        ].filter(Boolean).join(", ");
-        console.log(`  take: ${tkProject} <- ${path.basename(tkUrl)} (${tkNotes})`);
-        jsonResponse(res, 200, {
-          ok: true, project_id: tkProject, take, takes, windows, speaker_track: tkProjectObj.speaker_track,
-          open_needs: openTakeNeeds(tkProjectObj),
-          spine: retime ? { source: retime.spine.source, duration: retime.duration, words: retime.spine.words.length,
-            resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0),
-            unresolved: [...(retime.storyboard?.unresolved || []), ...(retime.built?.unresolved || [])] } : undefined,
-        });
+        const tkOut = await attachTakeToScene(tkTenant, tkProject, tkBody);
+        jsonResponse(res, tkOut.status, tkOut.body);
         return;
       }
 
