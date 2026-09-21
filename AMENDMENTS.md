@@ -4650,3 +4650,9 @@ the scene with the booth, phone and upload sources, on the media lane.
   scene's graphics on any grammar (measured live, proj_45e6d1bb: a hook
   with only a clip need photographed as an empty codegen frame -- "there
   doesn't seem to be any speaker placeholder").
+- On a film no person carries a camera ask IS a clip: the writer listed
+  the sketch's three cameos as camera_video needs and wrote no use
+  (measured live, proj_09b6d0cb); `normalizeClipNeeds` marks them at the
+  board stand-ins pass, `ensureClipNeed` converts a writer's own camera
+  ask instead of doubling it, and the take tool's clip branch casts the
+  slate and re-shoots the cards.

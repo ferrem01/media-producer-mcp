@@ -11,12 +11,15 @@
 
 import type { Project } from "./types.js";
 import { castScreenSlates } from "./asset-needs.js";
-import { personCarries } from "./take-needs.js";
+import { personCarries, normalizeClipNeeds } from "./take-needs.js";
 import { spineForScene, retimeSceneWith } from "./measured-spine.js";
 
 export async function castBoardStandIns(project: Project, dataDir?: string): Promise<{ cast: number; cleared: number; scenes: number[] }> {
   const scenes = (project.storyboard?.scenes || []) as any[];
   const personFilm = personCarries((project.treatment as any)?.filmGrammar);
+  // A camera ask on a film no person carries is a clip (take-needs.ts).
+  const clips = normalizeClipNeeds(project);
+  if (clips) console.log(`  Board stand-ins: ${clips} camera ask(s) on a film no person carries read as clips`);
   let cast = 0, cleared = 0;
   const touched: number[] = [];
   for (let i = 0; i < scenes.length; i++) {

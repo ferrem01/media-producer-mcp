@@ -24,6 +24,11 @@ describe("the clip need", () => {
     const need = ensureClipNeed(project, 0);
     expect(need).toMatchObject({ type: "camera_video", use: "clip", status: "needed", description: CLIP_NEED_DESCRIPTION, recording_instructions: "So... what worked?" });
     expect(ensureClipNeed(project, 0)).toBe(need); // idempotent
+    // The writer's own camera ask on a scene becomes the clip instead of a second need.
+    const own: any = { treatment: { filmGrammar: "hype-cut" }, storyboard: { scenes: [{ label: "Ask", assets: [{ type: "camera_video", description: "The CMO, casual, walking past a desk", status: "needed" }] }] } };
+    const conv = ensureClipNeed(own, 0);
+    expect(conv).toMatchObject({ type: "camera_video", use: "clip", description: "The CMO, casual, walking past a desk" });
+    expect(own.storyboard.scenes[0].assets.length).toBe(1);
     expect(clipNeedOf(project, 0)).toBe(need);
     expect(clipNeedOf(project, 1)).toBeUndefined();
     expect(openTakeNeeds(project)).toEqual([0]); // the booth and the take job wait on it
@@ -55,6 +60,21 @@ describe("the clip need", () => {
     expect(server).toMatch(/const asClip = params\.as === "clip" \|\| \(!personFilm && params\.as !== "speaker"\);/);
     expect(server).toMatch(/if \(asClip && params\.scene_index === undefined\) return err\("A clip lands on ONE scene: pass scene_index\."\);/);
     expect(server).toMatch(/ensureClipNeed\(project, params\.scene_index!\);/);
+    expect(server).toMatch(/ensureClipNeed\(project, params\.scene_index!\);\n\s*\/\/ The board shows the clip[^\n]*\n\s*try \{ await castBoardStandIns\(project, config\.dataDir\); \}/);
+    // The writer lists camera asks for the cameos and forgets use "clip": on a film no person carries they are clips.
+    const { normalizeClipNeeds } = await import("../src/core/take-needs.js");
+    const sketch: any = { treatment: { filmGrammar: "hype-cut" }, storyboard: { scenes: [
+      { assets: [{ type: "camera_video", description: "The CMO", status: "needed" }] },
+      { assets: [{ type: "screen_recording", description: "GA4", status: "needed" }, { type: "camera_video", description: "The marketer", status: "needed" }] },
+    ] } };
+    expect(normalizeClipNeeds(sketch)).toBe(2);
+    expect(sketch.storyboard.scenes[0].assets[0].use).toBe("clip");
+    expect(sketch.storyboard.scenes[1].assets[0].use).toBeUndefined();
+    expect(normalizeClipNeeds(sketch)).toBe(0); // idempotent
+    const person: any = { treatment: { filmGrammar: "creator-cut" }, storyboard: { scenes: [{ assets: [{ type: "camera_video", description: "x", status: "needed" }] }] } };
+    expect(normalizeClipNeeds(person)).toBe(0); // a person film's camera asks are takes
+    const standins = await read("src/core/board-standins.ts");
+    expect(standins).toMatch(/const clips = normalizeClipNeeds\(project\);/);
   });
 
   it("the writer may ask for a cameo on any film; the recipe hold keeps it; the booth hides the background choice; Studio lists it as a clip on the scene", async () => {
