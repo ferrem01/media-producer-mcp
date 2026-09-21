@@ -156,6 +156,17 @@ export interface ComponentAnimation {
 export interface ComponentPose {
   rotate_x?: number;
   rotate_y?: number;
+  /** THE ARRIVAL (the naano landing page): the pose the object starts in,
+   *  eased to the standing pose above over `duration` seconds from `at`
+   *  (default: from the component's entrance, 1.2 s, power3.out). With
+   *  `floor` (default on) a soft shadow under the object tightens as it
+   *  settles, so the tilt reads as an object over a surface. Wrapper
+   *  level: any component can arrive tilted. */
+  from?: { rotate_x?: number; rotate_y?: number; scale?: number };
+  duration?: number;
+  at?: number;
+  ease?: string;
+  floor?: boolean;
 }
 
 export interface SceneComponent {
@@ -532,6 +543,7 @@ export interface StoryboardComponent {
   enter?: ComponentAnimation;
   exit?: ComponentAnimation;
   anchors?: SceneComponent["anchors"];
+  pose?: ComponentPose;
 }
 
 export interface StoryboardScene {

@@ -4505,3 +4505,22 @@ color, type floating in it, the product on white cards inside it.
   list and world injection (density rides in), the builder's backdrop
   set, the assembler's backdrop types and travel-safe list, the director's
   world picks, the tool enums and instructions, SPEC-world's worlds list.
+
+## 2026-09-21 -- The pose arrival: any component can come in tilted and settle
+
+Marc's pick 3 from the naano film, on the wrapper for every component
+rather than on one mock: `pose` already held the standing 3D tilt
+(`rotate_x`, `rotate_y`, a `gsap.set` on the wrapper with perspective).
+It now takes `from` (the pose the object arrives in, plus a `scale`),
+`duration` (1.2 s), `at` (default: the component's entrance) and `ease`
+(power3.out), and the assembler tweens the wrapper from the one to the
+other. With `floor` (default on when `from` is set) a soft drop shadow
+under the object tightens as it lands -- what reads as an object over a
+surface rather than a rotated rectangle. The naano landing page is a
+browser-frame with `pose: { from: { rotate_x: 30, rotate_y: -14, scale:
+0.94 }, duration: 1.4 }`; the same fields work on a dashboard, a
+screenshot, a card. Pose stays the object; the camera stays the scene.
+- The board's `pose` rides through the build (the generator passed
+  position, anchors, enter and exit but dropped it), through the update
+  tool's board cast and the built-scene component edit (`poseObject`
+  shared by both), and `StoryboardComponent` names it.

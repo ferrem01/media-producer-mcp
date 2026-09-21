@@ -127,4 +127,24 @@ describe("the naano takeaways", () => {
     const director = await read("src/llm/creative-director.ts");
     expect(director).toMatch(/\["light", "dark", "paper", "sky"\] as const/);
   });
+
+  it("the pose arrival: any component's wrapper eases from pose.from to its standing pose with a shadow floor; the board's pose rides through the build and the tools", async () => {
+    const asm = await read("src/core/scene-assembler.ts");
+    expect(asm).toMatch(/if \(c\.pose\.from && typeof c\.pose\.from === 'object'\) \{/);
+    expect(asm).toMatch(/var pDur = typeof c\.pose\.duration === 'number' && c\.pose\.duration > 0 \? c\.pose\.duration : 1\.2;/);
+    expect(asm).toMatch(/var pEase = c\.pose\.ease \|\| 'power3\.out';/);
+    // From the entrance when at is not set: the object arrives as it enters.
+    expect(asm).toMatch(/var pAt = typeof c\.pose\.at === 'number' \? c\.pose\.at : \(\(c\.enter && typeof c\.enter\.at === 'number'\) \? c\.enter\.at : 0\);/);
+    expect(asm).toMatch(/if \(c\.pose\.floor !== false\) \{/);
+    expect(asm).toMatch(/drop-shadow\(0 60px 50px rgba\(10, 10, 30, 0\.34\)\)/);
+    const gen = await read("src/llm/scene-generator.ts");
+    expect(gen).toMatch(/\.\.\.\(\(c as any\)\.pose && typeof \(c as any\)\.pose === "object" \? \{ pose: \(c as any\)\.pose \} : \{\}\),/);
+    const server = await read("src/server.ts");
+    expect(server).toMatch(/const poseObject = z\.object\(\{/);
+    expect(server).toMatch(/from: z\.object\(\{ rotate_x: z\.number\(\)\.optional\(\), rotate_y: z\.number\(\)\.optional\(\), scale: z\.number\(\)\.optional\(\) \}\)\.optional\(\)/);
+    expect(server).toMatch(/pose: poseObject\.optional\(\)\.describe\("3D pose: the standing tilt and, with from, the arrival it eases in from"\),/);
+    const types = await read("src/core/types.ts");
+    expect(types).toMatch(/from\?: \{ rotate_x\?: number; rotate_y\?: number; scale\?: number \};/);
+    expect(types).toMatch(/anchors\?: SceneComponent\["anchors"\];\n  pose\?: ComponentPose;/);
+  });
 });
