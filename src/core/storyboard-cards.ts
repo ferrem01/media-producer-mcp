@@ -23,7 +23,7 @@ import { assembleScene } from "./scene-assembler.js";
 import { LAUNCH_OPTS } from "./capture.js";
 import { buildAuthoredCompositionScene, buildTemplateScene } from "../llm/scene-generator.js";
 import type { Project } from "./types.js";
-import { activeTake, personCarries } from "./take-needs.js";
+import { activeTake, personCarries, clipNeedOf } from "./take-needs.js";
 import { ensureTakePoster, ensureMediaPoster } from "./take-poster.js";
 import { resolveVideoPath } from "./video-path.js";
 import fsSync from "node:fs";
@@ -91,7 +91,7 @@ const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g,
  * the layout assumes, labeled, under whatever graphics the scene stages.
  * Once a take is attached the card shows that take's still instead.
  */
-export function speakerPlaceholderHtml(canvas: { width: number; height: number }, posterDataUrl?: string): string {
+export function speakerPlaceholderHtml(canvas: { width: number; height: number }, posterDataUrl?: string, label = "SPEAKER ON CAMERA"): string {
   const W = canvas.width, H = canvas.height;
   const tall = H > W;
   // Head centre and size follow the default face the layout assumes
@@ -115,7 +115,7 @@ export function speakerPlaceholderHtml(canvas: { width: number; height: number }
   <ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${(r * 0.92).toFixed(0)}" ry="${r.toFixed(0)}" fill="url(#rim)"/>
   <ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${(r * 0.92).toFixed(0)}" ry="${r.toFixed(0)}" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="${sw.toFixed(1)}"/>
   <rect width="${W}" height="${H}" fill="url(#rim)" opacity="0"/>
-  <text x="${cx.toFixed(0)}" y="${(H * (tall ? 0.94 : 0.93)).toFixed(0)}" text-anchor="middle" font-family="DejaVu Sans, system-ui, sans-serif" font-size="${(Math.min(W, H) * 0.032).toFixed(0)}" font-weight="600" letter-spacing="${(Math.min(W, H) * 0.01).toFixed(0)}" fill="#8d93a1">SPEAKER ON CAMERA</text>
+  <text x="${cx.toFixed(0)}" y="${(H * (tall ? 0.94 : 0.93)).toFixed(0)}" text-anchor="middle" font-family="DejaVu Sans, system-ui, sans-serif" font-size="${(Math.min(W, H) * 0.032).toFixed(0)}" font-weight="600" letter-spacing="${(Math.min(W, H) * 0.01).toFixed(0)}" fill="#8d93a1">${esc(label)}</text>
 </svg>`;
   const bg = posterDataUrl
     ? `background:#1c1e24 url(${posterDataUrl}) center/cover no-repeat;`
@@ -329,6 +329,11 @@ export async function renderStoryboardCards(project: Project, opts: {
             } catch { /* outline instead */ }
           }
           html = html.replace(/<body[^>]*>/, (m) => `${m}\n${speakerPlaceholderHtml(canvas, posterDataUrl)}`);
+        } else if (!speakerFilm && clipNeedOf(project, i)?.status === "needed") {
+          // A LIVE-ACTION CLIP still to record on a film no person carries:
+          // the same outline, labeled for the reader, under the scene's
+          // graphics (the slate the board casts sits on top).
+          html = html.replace(/<body[^>]*>/, (m) => `${m}\n${speakerPlaceholderHtml(canvas, undefined, "CAMEO ON CAMERA")}`);
         }
         const f = path.join(opts.outDir, `card_work_${i}.html`);
         await fs.writeFile(f, html);

@@ -85,4 +85,25 @@ describe("the clip need", () => {
     const types = project.storyboard.scenes[0].assets.map((a: any) => a.type + (a.use ? ":" + a.use : "") + "|" + a.description.slice(0, 12));
     expect(types).toEqual(["camera_video:clip|a cameo", "screen_recording|GA4", "camera_video|Camera take "]);
   });
+
+  it("the board shows the clip: an open clip need casts a slate like a screen need, and the card draws the outline labeled for the reader", async () => {
+    const { castScreenSlates } = await import("../src/core/asset-needs.js");
+    const scene: any = { label: "Hook", components: [{ type: "kinetic-text", data: { text: "So... what worked?" } }], assets: [
+      { type: "camera_video", use: "clip", description: "A live-action clip for this scene (a cameo on camera)", status: "needed" },
+    ] };
+    const r = castScreenSlates(scene);
+    expect(r.cast.length).toBe(1);
+    expect(r.cast[0]).toMatchObject({ type: "asset-placeholder", position: { x: "0%", y: "0%", width: "100%", height: "100%" }, data: { asset_type: "Live-action clip needed", hint: "Record it in Studio (Camera clip) -- it takes this slot" } });
+    expect(r.components.map((c: any) => c.type)).toEqual(["kinetic-text", "asset-placeholder"]);
+    // Provided: the slate clears.
+    scene.components = r.components; scene.assets[0].status = "provided"; scene.assets[0].path = "/assets/t/projects/p/assets/cameo.webm";
+    const r2 = castScreenSlates(scene);
+    expect(r2.cleared).toBe(1); expect(r2.components.map((c: any) => c.type)).toEqual(["kinetic-text"]);
+    // A plain speaker take need is NOT slated (the outline and the take flow own it).
+    const spk: any = { components: [], assets: [{ type: "camera_video", description: "Camera take of this scene's spoken lines", status: "needed" }] };
+    expect(castScreenSlates(spk).cast.length).toBe(0);
+    const cards = await read("src/core/storyboard-cards.ts");
+    expect(cards).toMatch(/else if \(!speakerFilm && clipNeedOf\(project, i\)\?\.status === "needed"\) \{/);
+    expect(cards).toMatch(/speakerPlaceholderHtml\(canvas, undefined, "CAMEO ON CAMERA"\)/);
+  });
 });

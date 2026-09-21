@@ -4644,3 +4644,9 @@ track, matte, words or re-time. The writer may ask for one ("ANY FILM
 for a LIVE-ACTION CAMEO", never stock footage of "a founder"); the
 recipe's take hold leaves it alone; Studio lists it as a camera clip on
 the scene with the booth, phone and upload sources, on the media lane.
+- The board shows the clip: an open clip need casts a slate like a screen
+  need ("Live-action clip needed -- record it in Studio"), and the card
+  draws the head-and-shoulders outline labeled CAMEO ON CAMERA under the
+  scene's graphics on any grammar (measured live, proj_45e6d1bb: a hook
+  with only a clip need photographed as an empty codegen frame -- "there
+  doesn't seem to be any speaker placeholder").
