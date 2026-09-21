@@ -4524,3 +4524,14 @@ screenshot, a card. Pose stays the object; the camera stays the scene.
   position, anchors, enter and exit but dropped it), through the update
   tool's board cast and the built-scene component edit (`poseObject`
   shared by both), and `StoryboardComponent` names it.
+
+## 2026-09-21 -- The world pin lands with a board edit; the big clouds hang from the top
+
+Proving the three naano features on the test board: `update` with
+`world: "sky"` beside a `storyboard.scenes` edit did nothing to the
+world -- the board branch returned before the project-level edits. The
+pin is now `applyWorldPin`, shared by both branches, and the board edit's
+reply carries the new world. And on the board the line at the top of
+scene 2 ran into the upper cloud (the two big clouds sat at 4-34% of the
+height): they now hang from the top edge, cut by it as in the film, and
+end by about 18%, so a line at the top stays clear.

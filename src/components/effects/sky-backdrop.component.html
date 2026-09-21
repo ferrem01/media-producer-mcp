@@ -93,8 +93,12 @@
     // Slots: big clouds in the upper corners first, then a low one, then
     // smaller ones across the middle band -- and never over the centre
     // where the type lives.
+    // The two big clouds HANG from the top edge, cut by it as in the film,
+    // and end by ~18% of the height: a line at the top of the frame stays
+    // clear of them (measured on the board: "What if every reply" ran into
+    // the cloud at 4-34%).
     var SLOTS = [
-      [0.02, 0.04, 0.37, 0.3], [0.58, -0.05, 0.43, 0.34], [0.36, 0.9, 0.3, 0.22],
+      [0.0, -0.14, 0.36, 0.3], [0.6, -0.16, 0.42, 0.32], [0.36, 0.9, 0.3, 0.22],
       [-0.1, 0.9, 0.22, 0.18], [0.84, 0.9, 0.24, 0.2], [0.24, -0.12, 0.2, 0.16], [-0.08, 0.34, 0.14, 0.12], [0.92, 0.36, 0.14, 0.12],
     ];
     var speed = Number(data.drift) >= 0 ? Number(data.drift) : 9; // px per second, rightward

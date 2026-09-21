@@ -102,6 +102,16 @@ describe("update tool: storyboard scenes[].components sets a board scene's cast"
     expect(s1.scene_template).toBeUndefined();
   });
 
+  it("a world pin sent with a board edit lands in the same call", async () => {
+    const r = await callUpdate({ project_id: projectId, world: "sky", storyboard: { scenes: [{ index: 0, label: "HOOK - on the sky" }] } });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.world?.backdrop?.component).toBe("sky-backdrop");
+    const p: any = await loadProject(TENANT, projectId);
+    expect(p.world.backdrop.component).toBe("sky-backdrop");
+    expect(p.world.theme).toBe("dark");
+    expect(p.storyboard.scenes[0].label).toBe("HOOK - on the sky");
+  });
+
   it("an appended scene takes a cast too", async () => {
     const r = await callUpdate({ project_id: projectId, storyboard: { scenes: [{ label: "CLOSE - z", duration_seconds: 4, components: [{ type: "cursor-performer", data: {} }] }] } });
     expect(r.isError).toBe(false);

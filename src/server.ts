@@ -368,6 +368,23 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
  *  or render in flight, and a failed project, are locked. */
 const EDITABLE_BOARD_STATES = new Set<string>(["storyboard", "draft", "generated", "rendered"]);
 
+/** The film's WORLD is project-level state written once at generate time;
+ *  the update tool re-derives it with the pin (brand palette + seed stay
+ *  consistent), stores it, and stamps the saved treatment so builds inherit
+ *  it. Shared by the project-level edit and the board edit. */
+async function applyWorldPin(project: any, tenantId: string, world: "light" | "dark" | "paper" | "plain" | "sky"): Promise<void> {
+  const { deriveWorld } = await import("./llm/world.js");
+  const kitForWorld = (await loadBrandKit(tenantId).catch(() => null)) || project.brand_kit || { colors: {}, fonts: [] };
+  const savedT = project.treatment;
+  project.world = deriveWorld({
+    brandKit: kitForWorld,
+    treatment: savedT,
+    visualSystem: { world },
+    seedSource: `${tenantId}:${String(savedT?.concept || project.prompt || project.name || "").slice(0, 80)}`,
+  });
+  if (savedT) savedT.visualSystem = { ...(savedT.visualSystem || {}), world };
+}
+
 export const MCP_INSTRUCTIONS = `Media Producer turns prompts into branded films (video/image/deck): code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
 THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate until right -- spend revisions HERE: feedback redrafts the WHOLE board (minutes); the storyboard tool edits ONE scene. Build ONCE (mode:'full' + project_id), tweak, render. mode:'full' cold = drafts only.
@@ -1396,13 +1413,17 @@ export function createMcpServer(): McpServer {
           scene.assets[asset_index].path = path;
         }
 
+        // A world pin sent with a board edit lands in the same call (this
+        // branch returns before the project-level edits below; measured:
+        // world:"sky" beside a scenes edit did nothing).
+        if (params.world !== undefined) await applyWorldPin(project, params.tenant_id, params.world);
         try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         // The stills must follow the data: a direct board edit re-photographs
         // the cards in the background.
         reshootStoryboardCardsSoon(params.tenant_id, project.project_id);
-        return ok({ status: "updated", project_id: project.project_id, storyboard: project.storyboard });
+        return ok({ status: "updated", project_id: project.project_id, storyboard: project.storyboard, ...(params.world !== undefined ? { world: (project as any).world } : {}) });
       }
 
       // ── Property updates (status, name, canvas, scene/component props) ──
@@ -1427,17 +1448,7 @@ export function createMcpServer(): McpServer {
         // Re-derive with the pin (brand palette + seed stay consistent),
         // store it, and stamp the saved treatment so builds inherit it.
         if (params.world !== undefined) {
-          const { deriveWorld } = await import("./llm/world.js");
-          const kitForWorld = (await loadBrandKit(params.tenant_id).catch(() => null)) || (project as any).brand_kit || { colors: {}, fonts: [] };
-          const savedT = (project as any).treatment;
-          const newWorld = deriveWorld({
-            brandKit: kitForWorld,
-            treatment: savedT,
-            visualSystem: { world: params.world },
-            seedSource: `${params.tenant_id}:${String(savedT?.concept || project.prompt || project.name || "").slice(0, 80)}`,
-          });
-          (project as any).world = newWorld;
-          if (savedT) savedT.visualSystem = { ...(savedT.visualSystem || {}), world: params.world };
+          await applyWorldPin(project, params.tenant_id, params.world);
           updated = true;
         }
         if (params.canvas !== undefined) {
