@@ -433,3 +433,37 @@ export function roleOfLabel(label: unknown, r: Recipe): string | undefined {
   if (head) return head;
   return roles.find((role) => new RegExp(`(^|[^a-z])${role}([^a-z]|$)`).test(s));
 }
+
+/** AN EMPTY SURFACE IS DROPPED: a browser-frame (or any windowed mock)
+ *  whose content is a blank div, and a number row with no figures, are
+ *  the writer sketching a "window" it never filled (measured live,
+ *  proj_ff9e68e4: an empty white browser-frame under scenes 5-9 and a
+ *  number-counter-row with no data on the proof). They ship as a white
+ *  rectangle and an empty slot. Dropped when the scene keeps something
+ *  else; a scene with nothing else keeps it (the gates will say so).
+ *  Returns what was dropped, in plain lines. */
+export function holdEmptySurfaces(scene: { components?: any[] }): string[] {
+  if (!Array.isArray(scene.components)) return [];
+  const out: string[] = [];
+  const isEmptyFrame = (c: any) => {
+    if (!c || typeof c !== "object" || c.type !== "browser-frame") return false;
+    const html = String(c.data?.content_html ?? c.data?.html ?? "");
+    const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+    return !text && !/<(img|video|svg|iframe)\b/i.test(html) && !c.data?.screenshot_url && !c.data?.src;
+  };
+  const isEmptyRow = (c: any) => {
+    if (!c || typeof c !== "object") return false;
+    if (c.type === "number-counter-row") return !Array.isArray(c.data?.stats) || !c.data.stats.length;
+    if (c.type === "dashboard-kpi") return !Array.isArray(c.data?.metrics) || !c.data.metrics.length;
+    return false;
+  };
+  const keep = scene.components.filter((c) => !isEmptyFrame(c) && !isEmptyRow(c));
+  if (keep.length === scene.components.length || !keep.length) return out;
+  for (const c of scene.components) {
+    if (isEmptyFrame(c)) out.push("an empty browser-frame dropped (a blank window is a white rectangle)");
+    else if (isEmptyRow(c)) out.push(`an empty ${c.type} dropped (no figures)`);
+  }
+  scene.components = keep;
+  return out;
+}
+

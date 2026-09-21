@@ -293,4 +293,30 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     applyRecipeMotion(fan, r, "feature_fan");
     expect(fan.components[0].enter).toEqual({ effect: "cut" });
   });
+
+  it("an empty surface is dropped: a blank browser-frame and a number row with no figures go when the scene keeps something else", async () => {
+    const { holdEmptySurfaces } = await import("../src/core/recipes.js");
+    const s: any = { components: [
+      { type: "browser-frame", data: { url: "app.quotient.ai", title: "Quotient", content_html: "<div style=\"background:#ffffff;height:100%\"></div>" } },
+      { type: "number-counter-row", data: {} },
+      { type: "dashboard-kpi", data: { metrics: [] } },
+      { type: "checklist-toggles", data: { items: ["a"] } },
+    ] };
+    const notes = holdEmptySurfaces(s);
+    expect(s.components.map((c: any) => c.type)).toEqual(["checklist-toggles"]);
+    expect(notes).toEqual(["an empty browser-frame dropped (a blank window is a white rectangle)", "an empty number-counter-row dropped (no figures)", "an empty dashboard-kpi dropped (no figures)"]);
+    // A frame with content, a row with stats, a frame with a screenshot: kept.
+    const k: any = { components: [{ type: "browser-frame", data: { content_html: "<h1>Hello</h1>" } }, { type: "number-counter-row", data: { stats: [{ value: 3 }] } }, { type: "browser-frame", data: { content_html: "", screenshot_url: "/assets/x.png" } }, { type: "kinetic-text", data: { text: "x" } }] };
+    expect(holdEmptySurfaces(k)).toEqual([]);
+    expect(k.components.length).toBe(4);
+    // A scene with nothing else keeps its empty window: the gates report it, the board is not blanked.
+    const lone: any = { components: [{ type: "browser-frame", data: { content_html: "<div></div>" } }] };
+    expect(holdEmptySurfaces(lone)).toEqual([]);
+    expect(lone.components.length).toBe(1);
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/for \(const n of holdEmptySurfaces\(d\)\) console\.log/);
+    const r = (await import("../src/core/recipes.js")).getRecipe("launch-what-if-features")!;
+    expect(r.spine.find((b) => b.role === "proof")!.note).toMatch(/never an empty window or a number row without data/);
+    expect(r.spine.find((b) => b.role === "feature_checklist")!.note).toMatch(/ALONE on the world -- no window/);
+  });
 });

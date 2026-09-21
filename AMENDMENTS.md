@@ -4535,3 +4535,17 @@ reply carries the new world. And on the board the line at the top of
 scene 2 ran into the upper cloud (the two big clouds sat at 4-34% of the
 height): they now hang from the top edge, cut by it as in the film, and
 end by about 18%, so a line at the top stays clear.
+
+## 2026-09-21 -- An empty surface is dropped
+
+Proving the naano features on the test board: the writer put an empty
+white browser-frame under scenes 5 to 9 (`content_html` a blank div)
+and a number-counter-row with no data on the proof -- a white rectangle
+and an empty slot on the film. `holdEmptySurfaces` (recipes.ts, run on
+every board after the recipe holds) drops a browser-frame whose content
+has no text, image or screenshot, and a number-counter-row or
+dashboard-kpi with no figures, when the scene keeps something else; a
+scene with nothing else keeps its window so the gates report it rather
+than the board going blank. The launch recipe's feature notes now say
+ALONE on the world, no window, and the proof note says the figures must
+be filled in.

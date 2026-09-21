@@ -76,7 +76,7 @@
         "keyword:type-on",
         "checklist:toggles"
       ],
-      "note": "The first feature as a checklist-toggles component: three to five rows (icon, label, switch) sliding into a stack, each switch flipping on as the voice names its row; one short line of type names the feature above it."
+      "note": "The first feature as a checklist-toggles component ALONE on the world -- no window, no browser frame around it: three to five rows (icon, label, switch) sliding into a stack, each switch flipping on as the voice names its row; one short line of type names the feature above it."
     },
     {
       "role": "feature_fan",
@@ -91,7 +91,7 @@
         "keyword:type-on",
         "cards:fan"
       ],
-      "note": "The second feature as a card-fan component: the group it works on (the people, the templates, the sources) as three to six cards spreading into a 3D arc and turning slowly; one short line of type names the feature."
+      "note": "The second feature as a card-fan component ALONE on the world (layout \"ring\" for a turning carousel, \"fan\" for a spread): the group it works on (the people, the templates, the sources) as three to seven cards; one short line of type names the feature."
     },
     {
       "role": "feature_surface",
@@ -132,7 +132,7 @@
         "use": "card",
         "kind": "mockup"
       },
-      "note": "The result on the product's surface with its numbers (a dashboard, a table with the winning row); the line names the outcome, a number stamps on it. Real figures only."
+      "note": "The result on the product's surface WITH ITS FIGURES FILLED IN (a dashboard-kpi with metrics, a table with the winning row); the line names the outcome, a number stamps on it. Real figures only, from the brief; never an empty window or a number row without data."
     },
     {
       "role": "close",
