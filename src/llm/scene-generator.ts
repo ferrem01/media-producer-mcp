@@ -1072,6 +1072,22 @@ export function buildAuthoredCompositionScene(
   // REPLACES the speaker rather than sitting beside her.
   var isTakeover = speakerBase && (draft as any).transparent_background === false;
   var tallFrame = opts.canvas.height > opts.canvas.width;
+  // A LIVE-ACTION CLIP ON THE SCENE (the take tool's clip path, data.clip)
+  // is the scene's PICTURE, not a proof cut in over it: on a film no person
+  // carries it takes the media-backdrop slot -- full-bleed, cover, under
+  // the type -- exactly as b-roll does. Left to the cutaway rule it was
+  // plated white, framed on a region of the tall frame and layered over
+  // the caption (measured on the sketch board, proj_09b6d0cb: a 9x16
+  // pillarbox with the line hidden under it). Over a speaker it stays a
+  // cutaway: the person is the picture there and the clip cuts in and back.
+  var clipComp: { type: string; data: Record<string, unknown> } | undefined;
+  if (!speakerBase) {
+    var clipI = authored.findIndex(function(c) { return (c.type === "video" || c.type === "image") && !!c.data && (c.data as any).clip === true; });
+    if (clipI !== -1) {
+      clipComp = authored[clipI];
+      authored = authored.filter(function(_c, i) { return i !== clipI; });
+    }
+  }
   // PHONE REEL: a person over the camera on a tall frame. Some desktop
   // components have no phone form at all and the board keeps reaching for
   // them (measured live, proj_37d090da: a notification-stack as thin grey
@@ -1156,7 +1172,7 @@ export function buildAuthoredCompositionScene(
   // no darkening overlay (it is keyed to a cutout upstream). Measured on
   // the rendered test film: two wish beats went black under generated
   // stills while every other beat was sky.
-  var skyObject = !speakerBase && !opts.brollVideoUrl && !!opts.imageUrl && !!w && w.backdrop.component === "sky-backdrop";
+  var skyObject = !speakerBase && !clipComp && !opts.brollVideoUrl && !!opts.imageUrl && !!w && w.backdrop.component === "sky-backdrop";
   if (skyObject) {
     components.push({
       id: "obj",
@@ -1167,7 +1183,17 @@ export function buildAuthoredCompositionScene(
     });
     console.log(`    sky world: the hero still is an object on the sky (46% of the frame, centred), the sky stays`);
   }
-  if (!speakerBase && !skyObject && (opts.brollVideoUrl || opts.imageUrl)) {
+  if (clipComp) {
+    mediaBackdrop = true;
+    components[0] = {
+      id: "bg",
+      type: clipComp.type,
+      z_index: 1,
+      position: { x: 0, y: 0, width: "100%", height: "100%" },
+      data: { ...clipComp.data, object_fit: "cover", fit: "cover", drift: false },
+    };
+    console.log(`    live-action clip: the scene's picture (full-bleed, under the type) replaces the world backdrop for this scene`);
+  } else if (!speakerBase && !skyObject && (opts.brollVideoUrl || opts.imageUrl)) {
     mediaBackdrop = true;
     components[0] = opts.brollVideoUrl ? {
       id: "bg",

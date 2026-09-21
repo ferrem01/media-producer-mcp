@@ -20,7 +20,7 @@ import { getTakeHtml } from "./take-page.js";
 import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries, dropVoiceUnderTakes, clipNeedOf, ensureClipNeed } from "./core/take-needs.js";
-import { provideAsset, openAssetNeeds, recastProvidedNeed } from "./core/asset-needs.js";
+import { provideAsset, openAssetNeeds, recastProvidedNeed, isScreenSlate } from "./core/asset-needs.js";
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
 import { listMusicOptions, resolveMusicChoice, musicLocalPath, musicAssetUrl } from "./audio/music.js";
@@ -447,15 +447,17 @@ async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Re
   const dur = Number(tkBody.duration) > 0 ? Math.round(Number(tkBody.duration) * 100) / 100 : (sanitized?.probe.duration ? Math.round(sanitized.probe.duration * 100) / 100 : 0);
   const position = (need as any).position && typeof (need as any).position === "object" ? (need as any).position : { x: 0, y: 0, width: "100%", height: "100%" };
   const comp = { type: "video", position, z_index: 12, data: { src: url, object_fit: "cover", start_at: 0, clip: true }, enter: { effect: "cut", at: 0 } };
-  const replaceClip = (list: any[] | undefined) => {
-    const kept = (list || []).filter((c) => !(c && typeof c === "object" && c.type === "video" && c.data && c.data.clip === true));
-    return [...kept, comp];
-  };
+  // The clip takes the slot: the earlier clip and the slate the board cast
+  // for this need both leave (measured live, proj_09b6d0cb: the slate stayed
+  // on the board under the clip after the take landed).
+  const stale = (c: any) => !!c && typeof c === "object"
+    && ((c.type === "video" && c.data && c.data.clip === true) || (isScreenSlate(c) && String(c.data.need) === need.description));
+  const replaceClip = (list: any[] | undefined) => [...(list || []).filter((c) => !stale(c)), comp];
   sbScene.components = replaceClip(sbScene.components);
   if (dur > 0 && (Number(sbScene.duration_seconds) || 0) < dur) sbScene.duration_seconds = Math.ceil(dur * 10) / 10;
   const built = (project.scenes || [])[sceneIndex] as any;
   if (built) {
-    const others = (built.components || []).filter((c: any) => !(c && c.type === "video" && c.data && c.data.clip === true));
+    const others = (built.components || []).filter((c: any) => !stale(c));
     built.components = [...others, { id: `clip_${sceneIndex}_${(project.takes || []).length}`, ...comp }];
     if (dur > 0 && (Number(built.duration_seconds) || 0) < dur) built.duration_seconds = Math.ceil(dur * 10) / 10;
   }

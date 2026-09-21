@@ -4656,3 +4656,17 @@ the scene with the booth, phone and upload sources, on the media lane.
   board stand-ins pass, `ensureClipNeed` converts a writer's own camera
   ask instead of doubling it, and the take tool's clip branch casts the
   slate and re-shoots the cards.
+- The clip landed, the cards went black (measured live, proj_09b6d0cb:
+  three AI cameos attached, scenes 1 and 9 photographed as pure black).
+  Three faults, one arc. The card shooter swapped the clip for its poster
+  on a staged copy and then handed the authored builder the pre-swap list
+  -- the file page shot a `<video>` with no source (`stageProvidedMedia`,
+  exported, is now the one list the builder gets). The builder treated the
+  clip as a cut-in proof: plated white, framed on a region of the tall
+  frame (a 9x16 pillarbox on a 4x5 card) and layered over the caption. A
+  clip (`data.clip`) on a film no person carries is now the scene's
+  PICTURE: the media-backdrop slot, full-bleed, cover, under the type,
+  exactly as b-roll -- over a speaker it stays a cutaway (the person is
+  the picture there). And the slate the board cast for the need stayed
+  under the clip: `attachClipToScene` clears it on the board and the
+  built scene when the clip arrives.
