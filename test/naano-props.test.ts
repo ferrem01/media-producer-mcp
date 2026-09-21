@@ -39,7 +39,27 @@ describe("the naano takeaways", () => {
     expect(cf).toMatch(/perspective: 1400px/);
     expect(cf).toMatch(/tl\.to\(stage, \{ rotationY: turn \* 0\.6/);
     expect(cf).toMatch(/data\.focus !== undefined/);
-    expect(cf).toMatch(/cards = cards\.slice\(0, 7\);/);
+    expect(cf).toMatch(/cards = cards\.slice\(0, ring \? 10 : 7\);/);
+  });
+
+  it("the ring: one custom property tweened by GSAP drives the slots' CSS (a seek suppresses callbacks), the slot carries the card's size, the far cards dim and soften", async () => {
+    const cf = await fs.readFile(comp("props", "card-fan"), "utf-8");
+    expect(cf).toMatch(/var ring = data\.layout === 'ring';/);
+    // No onUpdate/proxy drive: GSAP's seek() does not fire callbacks, so the capture would freeze the ring.
+    expect(cf).not.toMatch(/onUpdate/);
+    expect(cf).toMatch(/tl\.to\(stage, \{ '--cf-rot': \(startRot \+ turn\) \+ 'deg', duration: Math\.max\(0\.1, duration - at\), ease: 'none' \}, at\);/);
+    expect(cf).toMatch(/rotateY\(calc\(var\(--cf-rot, 0deg\) \+ var\(--cf-a, 0deg\)\)\) translateZ\(var\(--cf-r, 300px\)\)/);
+    expect(cf).toMatch(/scale\(calc\(0\.9 \+ 0\.11 \* \(1 \+ cos\(/);
+    expect(cf).toMatch(/filter: blur\(calc\(1\.4px \* \(1 - cos\(/);
+    // The assembler clamps every child to max-width 100%: a zero-width slot collapsed its card (measured: 0px wide).
+    expect(cf).toMatch(/o\.slot\.style\.width = cardW \+ 'px'/);
+    expect(cf).toMatch(/\.cfan-slot > \.cfan-card \{ left: 0; top: 0; margin: 0 !important; width: 100% !important; height: 100% !important; \}/);
+    // speed (deg/s) is an alternative to turn; collapse shrinks the cards away.
+    expect(cf).toMatch(/Number\(data\.speed\) \* Math\.max\(0, duration - at\)/);
+    expect(cf).toMatch(/data\.collapse_at !== undefined/);
+    const schema = JSON.parse(await read("src/components/props/card-fan.schema.json"));
+    expect(schema.data.layout.enum).toEqual(["fan", "ring"]);
+    for (const k of ["turn", "speed", "start", "radius", "tilt", "collapse_at"]) expect(schema.data[k].type).toBe("number");
   });
 
   it("kinetic type streaks while it travels and lands sharp; data.blur=false turns it off", async () => {
