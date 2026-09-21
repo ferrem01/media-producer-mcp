@@ -4549,3 +4549,14 @@ scene with nothing else keeps its window so the gates report it rather
 than the board going blank. The launch recipe's feature notes now say
 ALONE on the world, no window, and the proof note says the figures must
 be filled in.
+
+## 2026-09-21 -- Photographic clouds: cutouts in the kit become the sky's sprites
+
+Two cloud cutouts minted with generate_clip mode='cutout' (Veo, keyed
+off a green ground) into the tenant's kit; `deriveWorld` now resolves
+every kit image named cloud-*.png into `surface.sprites` and the
+generator passes them as the backdrop's `clouds`, so the drawn puffs
+give way to photographs -- the same move as the paper world's tooth.
+Measured: one of the two clips came back as a cloud bank cut by the
+frame (a hard bottom edge), unusable as a sprite; the prompt must ask
+for a single cloud with sky all around it.

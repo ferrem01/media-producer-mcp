@@ -35,7 +35,7 @@ export interface WorldSpec {
    *  letterpress (~0.85), texture the photographic tooth. Sky: tone is the
    *  sky color (the brand primary), intensity the cloud density. Carried
    *  into the backdrop component's data by scene assembly. */
-  surface?: { tone: string; intensity: number; texture?: string };
+  surface?: { tone: string; intensity: number; texture?: string; sprites?: string[] };
 }
 
 /** Relative luminance > 0.5 -> light. */
@@ -147,11 +147,18 @@ export function deriveWorld(opts: {
     || (!pinned && /\b(?:blue\s+)?sky\b|\bclouds?\b|\bcloudscape\b/.test(styleText));
   if (sky) {
     const tone = palette[0];
+    // PHOTOGRAPHIC CLOUDS: cloud cutouts minted into the brand kit
+    // (generate_clip mode='cutout', named cloud-*) replace the drawn puffs
+    // -- the same move as the paper world's tooth. Resolved from the kit,
+    // so minting them is all a tenant has to do.
+    const sprites = (kit.assets || [])
+      .filter((a: any) => a?.type === "image" && /cloud[\w-]*\.png$/i.test(String(a?.url || "")))
+      .map((a: any) => String(a.url));
     return {
       backdrop: { component: "sky-backdrop", seed: hash31(opts.seedSource), palette },
       theme: "dark",
       chapter_slots: 1,
-      surface: { tone, intensity: /\bovercast\b|\bcloudy\b/.test(styleText) ? 0.6 : 0.35 },
+      surface: { tone, intensity: /\bovercast\b|\bcloudy\b/.test(styleText) ? 0.6 : 0.35, ...(sprites.length ? { sprites } : {}) },
     };
   }
 

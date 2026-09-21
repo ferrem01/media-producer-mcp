@@ -1115,7 +1115,7 @@ export function buildAuthoredCompositionScene(
           // the gradient backdrops). Sky world: tone is the sky, intensity
           // the cloud density.
           ...(w.surface ? { tone: w.surface.tone, intensity: w.surface.intensity,
-            ...(w.backdrop.component === "sky-backdrop" ? { density: w.surface.intensity } : {}),
+            ...(w.backdrop.component === "sky-backdrop" ? { density: w.surface.intensity, ...(w.surface.sprites?.length ? { clouds: w.surface.sprites } : {}) } : {}),
             ...(w.surface.texture ? { texture_url: w.surface.texture } : {}) } : {}),
         },
       };

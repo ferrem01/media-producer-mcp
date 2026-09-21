@@ -116,7 +116,7 @@ describe("the naano takeaways", () => {
     for (const k of ["seed", "colors", "tone", "density", "drift", "clouds", "time_offset"]) expect(schema.data[k]).toBeTruthy();
     const gen = await read("src/llm/scene-generator.ts");
     expect(gen).toMatch(/BACKDROP_CAST_TYPES = \[.*"paper-ground", "sky-backdrop"\]/);
-    expect(gen).toMatch(/w\.backdrop\.component === "sky-backdrop" \? \{ density: w\.surface\.intensity \}/);
+    expect(gen).toMatch(/w\.backdrop\.component === "sky-backdrop" \? \{ density: w\.surface\.intensity, \.\.\.\(w\.surface\.sprites\?\.length \? \{ clouds: w\.surface\.sprites \} : \{\}\) \}/);
     const asm = await read("src/core/scene-assembler.ts");
     expect(asm).toMatch(/"paper-ground", "sky-backdrop",\n\]\);/);
     expect(asm).toMatch(/TRAVEL_SAFE = \{ 'paper-ground': 1, 'sky-backdrop': 1 \}/);
