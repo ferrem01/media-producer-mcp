@@ -2995,13 +2995,31 @@ Rules:
                   position: { x: "0%", y: "0%", width: "100%", height: "100%" },
                   data: { video_url: videoUrl, frame_style: "none", corner_radius: 0, crop: "auto" },
                 }];
-                if (body?.camera_url) {
+                // THE SPEAKER IS A VIDEO COMPONENT (core/speaker-layer.ts): the
+                // camera file, when it lives in this project, becomes the new
+                // scene's TAKE (the voice and the face) and a circle speaker
+                // component sits bottom-right over the recording. A camera
+                // file elsewhere (an older extension uploads it to the library)
+                // keeps the old burned-in bubble.
+                const camUrl = typeof body?.camera_url === "string" ? (body.camera_url as string) : "";
+                const camInProject = !!camUrl && camUrl.startsWith(`/assets/${rgTenant}/projects/${destId}/assets/`) && !camUrl.includes("..");
+                if (camUrl && camInProject) {
+                  const cw = destProj.canvas?.width || 1920, ch = destProj.canvas?.height || 1080;
+                  const wide = cw >= ch, bw = wide ? 20 : 36, bh = Math.round((bw * cw / ch) * 10) / 10, mx = 4, my = Math.round((mx * cw / ch) * 10) / 10;
+                  comps.push({
+                    id: sceneId + "_spk",
+                    type: "video",
+                    z_index: 40,
+                    position: { x: `${100 - bw - mx}%`, y: `${100 - bh - my}%`, width: `${bw}%`, height: `${bh}%` },
+                    data: { src: "speaker", object_fit: "cover", background: "room", shape: "circle" },
+                  });
+                } else if (camUrl) {
                   comps.push({
                     id: sceneId + "_cam",
                     type: "screencast-frame",
                     z_index: 40,
                     position: { x: "82%", y: "61.3%", width: "15%", height: "26.7%" },
-                    data: { video_url: body.camera_url as string, frame_style: "none", corner_radius: 0, shape: "circle" },
+                    data: { video_url: camUrl, frame_style: "none", corner_radius: 0, shape: "circle" },
                   });
                 }
                 const newScene: any = {
@@ -3027,7 +3045,17 @@ Rules:
                 const { saveProject: saveDest } = await import("./persistence/project.js");
                 await saveDest(destProj);
                 console.log(`  recorder-append: ${destId} += scene ${sceneId} (${(recDur || 0).toFixed(1)}s take${body?.camera_url ? " + camera" : ""})`);
-                jsonResponse(res, 200, { ok: true, appended_scene: sceneId, project_id: destId });
+                // The camera as the take, after the save (attachTakeToScene
+                // loads the project itself and does the slow file work first).
+                let appendedTake: Record<string, unknown> | undefined;
+                if (camUrl && camInProject) {
+                  const newIndex = destProj.scenes.findIndex((s: any) => s.id === sceneId);
+                  try {
+                    const tkOut = await attachTakeToScene(rgTenant, destId, { url: camUrl, scene_index: newIndex, capture: "recorder", look: "natural" });
+                    if (tkOut.status === 200) appendedTake = tkOut.body; else console.warn(`  recorder-append: camera not attached as the take: ${String((tkOut.body as any)?.error || tkOut.status)}`);
+                  } catch (e: any) { console.warn(`  recorder-append: camera not attached as the take: ${e?.message || e}`); }
+                }
+                jsonResponse(res, 200, { ok: true, appended_scene: sceneId, project_id: destId, take: appendedTake });
                 return;
               } catch (ae: any) {
                 console.error(`  recorder-append: FAILED (${ae?.message || ae}) -- falling back to new project`);

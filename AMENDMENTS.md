@@ -4374,3 +4374,13 @@ the page and you, cut out in front of it, in one go.
 - The Recorder's camera now records like the booth: 1080p at 30 fps,
   8 Mbps video, 128 kbps audio (was 720p at 2.5 Mbps -- soft and dark
   as a take next to a booth take, measured on scene 7). Extension 0.33.2.
+- Measured live the same night: Marc re-recorded scene 7 with the new
+  extension and it became a scene 8 with two screencast frames. The
+  popup caches the armed slot into settings when it opens; a slot armed
+  in Studio after that was invisible to the recorder, and the take went
+  the append route (into the library). The extension (0.33.3) now asks
+  the server for the armed slot at stop -- a live arm wins over the
+  cache -- and a recording for a project lands in that project. The
+  append route casts the new scene in the component model too: the tab
+  recording as the ground, a circle speaker component bottom-right, the
+  camera file attached as the scene's take.

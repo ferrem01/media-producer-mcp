@@ -321,6 +321,19 @@ describe("the choice, wherever it is made", () => {
     const pipeline = await fsp.readFile("src/llm/pipeline.ts", "utf8");
     expect(pipeline).toMatch(/if \(\(sc as any\)\.transparent_background === false\) continue;\s*if \(castSpeakerLayer\(sc as any\)\)/);
   });
+  it("the Recorder: the armed slot is asked of the server at stop; a take for a project lands in it; an appended scene casts the speaker component with the camera as its take", async () => {
+    const bg = await fsp.readFile("recorder-extension/background.js", "utf8");
+    expect(bg).toMatch(/const ar = await fetch\(`\$\{srv\}\/api\/armed-need\/\$\{encodeURIComponent\(s\.settings\.tenant\)\}/);
+    expect(bg).toMatch(/destNeed = `\$\{a\.scene_index\}:\$\{a\.asset_index\}`;/);
+    const off = await fsp.readFile("recorder-extension/offscreen.js", "utf8");
+    expect(off).toMatch(/const uploadProject = upload\.destProjectId \? upload\.destProjectId : upload\.project;/);
+    expect(off).toMatch(/camera_url: camJson \? camJson\.url : undefined \}\) \},/);
+    const index = await fsp.readFile("src/index.ts", "utf8");
+    expect(index).toMatch(/data: \{ src: "speaker", object_fit: "cover", background: "room", shape: "circle" \},/);
+    expect(index).toMatch(/const tkOut = await attachTakeToScene\(rgTenant, destId, \{ url: camUrl, scene_index: newIndex, capture: "recorder", look: "natural" \}\);/);
+    expect(index).toMatch(/const tkOut = await attachTakeToScene\(evTenant, evProject, \{ url: camUrl, scene_index: evScene, capture: "recorder", look: "natural" \}\);/);
+  });
+
   it("the matte records the copies on the take and re-points the clips; the raw take stays the source", async () => {
     const matte = await fsp.readFile("src/core/take-matte.ts", "utf8");
     expect(matte).toMatch(/if \(blurUrl\) t\.blur = blurUrl;\s*if \(alphaUrl\) t\.alpha = alphaUrl;/);

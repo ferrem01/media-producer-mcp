@@ -256,7 +256,10 @@ async function stop(upload) {
       const xhr = new XMLHttpRequest();
       // A recording made FOR a need is uploaded into that project's own
       // assets, where its storyboard expects the file.
-      const uploadProject = (upload.destProjectId && upload.destNeed) ? upload.destProjectId : upload.project;
+      // A recording FOR a project (a need, or a scene appended to it) lands
+      // in that project's assets, where its board and its take route expect
+      // the file; only a fresh walkthrough goes to the library.
+      const uploadProject = upload.destProjectId ? upload.destProjectId : upload.project;
       xhr.open("POST", `${base}/api/upload-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(uploadProject)}?${q(`&name=${encodeURIComponent(name)}`)}`);
       xhr.upload.onprogress = (e) => { if (e.lengthComputable) report(e.loaded); };
       xhr.onload = () => {
