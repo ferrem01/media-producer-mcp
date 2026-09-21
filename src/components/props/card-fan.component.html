@@ -1,0 +1,140 @@
+<template>
+  <div class="cfan"><div class="cfan-stage"></div></div>
+</template>
+
+<style scoped>
+  /* ── card-fan: a group (the people, the templates, the sources) as photo
+     or product cards spread in a 3D arc, entering one by one from below and
+     turning slowly while the voice names them; an optional focus card comes
+     forward. White cards with a soft floor shadow (the naano launch film,
+     beat 7). ── */
+  .cfan { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; perspective: 1400px; perspective-origin: 50% 40%;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .cfan-stage { position: relative; transform-style: preserve-3d; }
+  .cfan-card { position: absolute; left: 50%; top: 50%; box-sizing: border-box; overflow: hidden;
+    border-radius: 6.5%/5%; background: var(--cf-card, #ffffff); color: var(--cf-ink, #17171c);
+    box-shadow: 0 22px 44px rgba(20, 16, 40, 0.22), 0 3px 8px rgba(20, 16, 40, 0.1);
+    display: flex; flex-direction: column; transform-origin: 50% 118%; backface-visibility: hidden; }
+  .cfan-dark .cfan-card { background: var(--cf-card, #1c1c24); color: var(--cf-ink, #f5f6fa);
+    box-shadow: 0 22px 44px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+  .cfan-pic { flex: 0 0 64%; display: flex; align-items: center; justify-content: center;
+    background: var(--cf-tint, #eef0f5); overflow: hidden; }
+  .cfan-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cfan-initials { width: 46%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-weight: 800; color: #fff; letter-spacing: 0.02em;
+    background: var(--cf-avatar, var(--mp-color-primary, #4f46e5)); font-size: var(--cf-fs-big, 34px); }
+  .cfan-text { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 0.18em;
+    padding: 0.5em 0.7em; font-size: var(--cf-fs, 18px); line-height: 1.15; }
+  .cfan-label { font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cfan-sub { font-weight: 500; opacity: 0.62; font-size: 0.82em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.cfan');
+    var stage = el.querySelector('.cfan-stage');
+    var cards = Array.isArray(data.cards) ? data.cards.filter(function (c) { return c && (c.label || c.src || c.initials); }) : [];
+    if (!cards.length) cards = [{ label: 'One' }, { label: 'Two' }, { label: 'Three' }];
+    cards = cards.slice(0, 7);
+    if (data.theme === 'dark') host.classList.add('cfan-dark');
+    if (data.card_color) host.style.setProperty('--cf-card', data.card_color);
+    if (data.text_color) host.style.setProperty('--cf-ink', data.text_color);
+    if (Number(data.scale) > 0 && Number(data.scale) !== 1) host.style.zoom = String(Number(data.scale));
+
+    // SIZE TO THE BOX: the fan's outer cards must stay inside it.
+    var hostW = host.clientWidth || 800, hostH = host.clientHeight || 500;
+    var n = cards.length;
+    var spread = data.spread !== undefined ? Number(data.spread) || 0 : 13; // degrees between neighbours
+    var half = (n - 1) / 2;
+    var cardH = Math.min(hostH * 0.66, hostW * 0.5);
+    var cardW = cardH * 0.74;
+    // Neighbour offset along x; the arc's outer edge needs to fit the width.
+    var stepX = Math.min(cardW * 0.62, n > 1 ? (hostW * 0.86 - cardW) / (n - 1) : 0);
+    var fs = Math.max(11, Math.round(cardH * 0.075));
+    host.style.setProperty('--cf-fs', fs + 'px');
+    host.style.setProperty('--cf-fs-big', Math.round(cardH * 0.13) + 'px');
+    stage.style.width = hostW + 'px';
+    stage.style.height = hostH + 'px';
+
+    var palette = ['#4f46e5', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6', '#ef4444'];
+    var nodes = [];
+    cards.forEach(function (c, i) {
+      var card = document.createElement('div');
+      card.className = 'cfan-card';
+      card.style.width = cardW + 'px';
+      card.style.height = cardH + 'px';
+      card.style.marginLeft = (-cardW / 2) + 'px';
+      card.style.marginTop = (-cardH / 2) + 'px';
+      var pic = document.createElement('div');
+      pic.className = 'cfan-pic';
+      if (c.color) pic.style.setProperty('--cf-tint', 'color-mix(in srgb, ' + c.color + ' 16%, #ffffff)');
+      if (typeof c.src === 'string' && c.src) {
+        var img = document.createElement('img');
+        img.src = c.src; img.alt = '';
+        pic.appendChild(img);
+      } else {
+        var ini = document.createElement('div');
+        ini.className = 'cfan-initials';
+        ini.style.setProperty('--cf-avatar', c.color || palette[i % palette.length]);
+        var words = String(c.initials || c.label || '?').trim().split(/\s+/);
+        ini.textContent = c.initials ? String(c.initials).slice(0, 3) : (words[0][0] + (words[1] ? words[1][0] : '')).toUpperCase();
+        pic.appendChild(ini);
+      }
+      var txt = document.createElement('div');
+      txt.className = 'cfan-text';
+      var lab = document.createElement('div');
+      lab.className = 'cfan-label';
+      lab.textContent = String(c.label || '');
+      txt.appendChild(lab);
+      if (c.sublabel) {
+        var sub = document.createElement('div');
+        sub.className = 'cfan-sub';
+        sub.textContent = String(c.sublabel);
+        txt.appendChild(sub);
+      }
+      card.appendChild(pic); card.appendChild(txt);
+      stage.appendChild(card);
+      // Fan pose: rotated around a pivot below the deck, offset along x, the
+      // centre card nearest the eye. Deterministic: poses come from the index alone.
+      var k = i - half;
+      nodes.push({ el: card, x: k * stepX, rot: k * spread, z: -Math.abs(k) * 26, y: Math.abs(k) * cardH * 0.03, i: i });
+    });
+
+    var at = data.at !== undefined ? Math.max(0, Number(data.at) || 0) : 0.4;
+    var stagger = Number(data.stagger) > 0 ? Number(data.stagger) : 0.16;
+    var order = data.order === 'center-out'
+      ? nodes.slice().sort(function (a, b) { return Math.abs(a.i - half) - Math.abs(b.i - half); })
+      : nodes;
+    order.forEach(function (o, j) {
+      var when = at + j * stagger;
+      // From below the deck, upright and blurred, into the fan pose.
+      gsap.set(o.el, { autoAlpha: 0, x: o.x * 0.4, y: hostH * 0.55, z: o.z, rotation: 0, scale: 0.94, filter: 'blur(8px)' });
+      tl.to(o.el, { autoAlpha: 1, x: o.x, y: o.y, rotation: o.rot, scale: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' }, when);
+      tl.set(o.el, { filter: 'none' }, when + 0.7);
+    });
+    var landed = at + (order.length - 1) * stagger + 0.7;
+
+    // The slow turn: the whole fan yaws a few degrees while it holds. Slow
+    // against the fast entry (the speed contrast that reads as expensive).
+    var turn = data.turn !== undefined ? Number(data.turn) || 0 : 7;
+    if (turn && ctx.duration > landed + 0.4) {
+      gsap.set(stage, { rotationY: -turn * 0.6, rotationX: 4 });
+      tl.to(stage, { rotationY: turn * 0.6, duration: Math.max(1.2, ctx.duration - at), ease: 'sine.inOut' }, at);
+    }
+
+    // Focus: one card comes forward and lifts (the one the voice names).
+    if (data.focus !== undefined && data.focus !== null && data.focus !== '') {
+      var fi = Math.max(0, Math.min(n - 1, Math.round(Number(data.focus) || 0)));
+      var fAt = data.focus_at !== undefined ? Number(data.focus_at) || 0 : landed + 0.25;
+      var f = nodes[fi];
+      tl.to(f.el, { z: 90, y: f.y - cardH * 0.08, scale: 1.06, rotation: f.rot * 0.5, duration: 0.45, ease: 'power3.out' }, fAt);
+      nodes.forEach(function (o) { if (o !== f) tl.to(o.el, { opacity: 0.72, duration: 0.4 }, fAt); });
+    }
+
+    var hold = Number(data.hold) || 0;
+    if (hold > 0) tl.to(host, { autoAlpha: 0, y: -20, duration: 0.3, ease: 'power2.in' }, at + hold);
+    return tl;
+  }
+</script>

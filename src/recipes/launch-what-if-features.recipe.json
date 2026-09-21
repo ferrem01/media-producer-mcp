@@ -1,0 +1,284 @@
+{
+  "id": "launch-what-if-features",
+  "name": "Launch film: what-if beats, three features, proof",
+  "grammar": "hype-cut",
+  "frames_proven": [
+    "16x9"
+  ],
+  "suits": [
+    "a product launch with a voice and no person on camera",
+    "a wish the viewer already has, then the product that grants it",
+    "three features in thirty seconds, each as one moving object",
+    "a URL to close on"
+  ],
+  "length_s": [
+    26,
+    34
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        2,
+        2.5,
+        3
+      ],
+      "enters": [
+        "keyword:assemble"
+      ],
+      "note": "The question the viewer already asks themselves, six words or fewer, the words climbing in from below with motion blur (kinetic-text entrance 'assemble'); the world's ground alone behind them, no product."
+    },
+    {
+      "role": "wish",
+      "shot": "idea_card",
+      "made": "illustration",
+      "dur": [
+        2,
+        2.5,
+        3.5
+      ],
+      "repeat": [
+        1,
+        2
+      ],
+      "enters": [
+        "keyword:assemble",
+        "object:slide-up"
+      ],
+      "note": "\"What if ...\" -- one wish per beat over the one object that stands for it (the customer as a silhouette, the conversation as a call pill); the object slides up under the words; the product still unnamed."
+    },
+    {
+      "role": "reveal",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        2,
+        2.5,
+        3
+      ],
+      "enters": [
+        "stamp:wordmark"
+      ],
+      "note": "\"Meet <product>\": the wordmark lands big on the world with one accent (a sparkle, a ring); the voice says the name and nothing else."
+    },
+    {
+      "role": "feature_checklist",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        3,
+        3.5,
+        4
+      ],
+      "enters": [
+        "keyword:type-on",
+        "checklist:toggles"
+      ],
+      "note": "The first feature as a checklist-toggles component: three to five rows (icon, label, switch) sliding into a stack, each switch flipping on as the voice names its row; one short line of type names the feature above it."
+    },
+    {
+      "role": "feature_fan",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        3,
+        3.5,
+        4
+      ],
+      "enters": [
+        "keyword:type-on",
+        "cards:fan"
+      ],
+      "note": "The second feature as a card-fan component: the group it works on (the people, the templates, the sources) as three to six cards spreading into a 3D arc and turning slowly; one short line of type names the feature."
+    },
+    {
+      "role": "feature_surface",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        3,
+        3.5,
+        4
+      ],
+      "enters": [
+        "keyword:type-on"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "use": "card",
+        "kind": "mockup"
+      },
+      "note": "The third feature on the product's real surface (a library mock), cut in full and held; one short line of type names the feature over its lower third."
+    },
+    {
+      "role": "proof",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        3,
+        3.5,
+        4
+      ],
+      "enters": [
+        "keyword:type-on",
+        "stamp:number"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "use": "card",
+        "kind": "mockup"
+      },
+      "note": "The result on the product's surface with its numbers (a dashboard, a table with the winning row); the line names the outcome, a number stamps on it. Real figures only."
+    },
+    {
+      "role": "close",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        3.5,
+        4,
+        4.5
+      ],
+      "enters": [
+        "stamp:wordmark",
+        "stamp:url",
+        "button:cta",
+        "end_card@start"
+      ],
+      "note": "Back to the world's ground: the wordmark, the URL in a pill, a cursor clicking it; the voice says the ask in five words and stops."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 3,
+    "max_hold_s": 4.5,
+    "wpm": 155,
+    "first_cut_by_s": 3,
+    "end_card_s": 4
+  },
+  "layers": {
+    "voice": "voiceover",
+    "type": {
+      "style": "display-sans-heavy",
+      "pos": "center",
+      "per": "word",
+      "max_words": 6,
+      "note": "one sentence per beat, the voice says it and the type shows its key words; type-card beats assemble word by word with motion blur, feature beats type on one line above the object"
+    },
+    "captions": {
+      "style": "none"
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "world": "one brand ground for the type beats (a sky, a color, a gradient) and a white product world for the feature and proof beats; every object has a floor shadow and a little perspective; nothing appears before the voice calls for it",
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": true,
+      "feel": "driving"
+    }
+  },
+  "motion": {
+    "elements": {
+      "keyword": {
+        "in": "assemble",
+        "in_s": 0.8,
+        "per": "word",
+        "out": "smear-up",
+        "out_s": 0.7
+      },
+      "object": {
+        "in": "slide-up",
+        "in_s": 0.6,
+        "out": "cut"
+      },
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.35,
+        "out": "fade",
+        "out_s": 0.25
+      },
+      "checklist": {
+        "in": "cut",
+        "per": "row",
+        "out": "cut"
+      },
+      "cards": {
+        "in": "cut",
+        "per": "card",
+        "out": "cut"
+      },
+      "cutaway": {
+        "in": "rise",
+        "in_s": 0.5,
+        "out": "cut"
+      },
+      "button": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "end_card": {
+        "in": "fade",
+        "in_s": 0.4
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "wish": "fixed",
+      "reveal": "fixed",
+      "feature_checklist": "fixed",
+      "feature_fan": "fixed",
+      "feature_surface": "fixed",
+      "proof": "fixed",
+      "close": "fixed"
+    },
+    "physics": "snappy"
+  },
+  "asks": {
+    "take": "none",
+    "screens": 0,
+    "broll": 0,
+    "images": "one object per wish beat (hero_image, in the film's palette)",
+    "mockups": "the product's real surface for the third feature and the proof"
+  },
+  "latitude": {
+    "optional": [],
+    "fixed": [
+      "hook",
+      "reveal",
+      "close"
+    ],
+    "may_double": [
+      "wish"
+    ]
+  },
+  "source": {
+    "film": "naano_launch_x",
+    "length_s": 30,
+    "frame": "16x9",
+    "cuts_s": [
+      2.5,
+      5.0,
+      8.0,
+      10.5,
+      14.0,
+      17.5,
+      21.0,
+      25.0
+    ],
+    "measured": "2026-09-21"
+  }
+}

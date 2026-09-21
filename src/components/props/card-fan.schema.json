@@ -1,0 +1,85 @@
+{
+  "type": "card-fan",
+  "label": "Card Fan",
+  "category": "props",
+  "description": "A group as cards spread in a 3D arc: the people (photo or initials), the templates, the sources. Cards enter one by one from below into the fan, the fan turns slowly while the voice names the group, and one card can come forward (focus). White cards with a floor shadow on a light world, charcoal on dark. Three to six cards; one line of type names the group. The launch-film feature beat (naano). Position and size it with the component's box; the fan sizes itself to it.",
+  "data": {
+    "cards": {
+      "type": "array",
+      "label": "Cards in left-to-right order: [{label, sublabel, src: a REAL /assets/... image or omit for an initials avatar, initials, color}] (3-6)",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "label": "Card title (a name, a template, a source)", "required": true },
+          "sublabel": { "type": "string", "label": "Second line (a role, a count)", "optional": true },
+          "src": { "type": "string", "label": "Image (a real asset URL); omit for an initials avatar", "optional": true },
+          "initials": { "type": "string", "label": "Avatar initials when no image (default: from the label)", "optional": true },
+          "color": { "type": "color", "label": "Avatar/tint color for this card", "optional": true }
+        }
+      }
+    },
+    "at": {
+      "type": "number",
+      "label": "When the first card enters (scene seconds; default 0.4)",
+      "optional": true
+    },
+    "stagger": {
+      "type": "number",
+      "label": "Seconds between cards entering (default 0.16)",
+      "optional": true
+    },
+    "order": {
+      "type": "string",
+      "label": "left-to-right (default) | center-out (the middle card first)",
+      "optional": true,
+      "enum": ["left-to-right", "center-out"]
+    },
+    "spread": {
+      "type": "number",
+      "label": "Degrees between neighbouring cards (default 13; 0 for a straight row)",
+      "optional": true
+    },
+    "turn": {
+      "type": "number",
+      "label": "Degrees of slow yaw while the fan holds (default 7; 0 for none)",
+      "optional": true
+    },
+    "focus": {
+      "type": "number",
+      "label": "Index of the card that comes forward (omit for none)",
+      "optional": true
+    },
+    "focus_at": {
+      "type": "number",
+      "label": "When the focus card comes forward (scene seconds; default: after the last card lands)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "light (white cards, default) | dark (charcoal cards for a dark ground)",
+      "optional": true,
+      "enum": ["light", "dark"]
+    },
+    "card_color": {
+      "type": "color",
+      "label": "Card fill override",
+      "optional": true
+    },
+    "text_color": {
+      "type": "color",
+      "label": "Text color override",
+      "optional": true
+    },
+    "hold": {
+      "type": "number",
+      "label": "Seconds before the fan exits (0/omit = stays)",
+      "optional": true
+    },
+    "scale": {
+      "type": "number",
+      "label": "Size multiplier for the whole prop",
+      "optional": true
+    }
+  }
+}

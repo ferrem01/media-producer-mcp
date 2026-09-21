@@ -212,7 +212,8 @@ function fx(spec: { in?: string; in_s?: number; out?: string; out_s?: number } |
 }
 
 /** The recipe's motion on a scene's cast, deterministically: stamps and
- *  pills (sticker-prop), lower-thirds and provided cutaways take the
+ *  pills (sticker-prop), lower-thirds, the checklist and card-fan props
+ *  and provided cutaways take the
  *  recipe's enter/exit unless the writer set one; a fixed camera marks the
  *  scene so no punch-in is invented. Returns how many components changed. */
 export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: boolean; camera_moves?: unknown[] }, r: Recipe, role?: string): number {
@@ -223,9 +224,19 @@ export function applyRecipeMotion(scene: { components?: any[]; camera_fixed?: bo
     let spec: any = null;
     if (c.type === "sticker-prop") spec = String(c.data?.kind || "") === "stamp" ? el.stamp : (el.button || el.stamp);
     else if (c.type === "lower-third") spec = el.lower_third;
-    else if (c.type === "kinetic-text" && el.keyword) spec = el.keyword;
+    else if (c.type === "kinetic-text" && el.keyword) {
+      spec = el.keyword;
+      // The type's own entrances (type-on, assemble) and the smear-up exit
+      // are the component's, not the assembler's: they land on its data.
+      const kin = String(el.keyword.in || ""), kout = String(el.keyword.out || "");
+      const d = (c.data && typeof c.data === "object") ? c.data : (c.data = {});
+      if ((kin === "type-on" || kin === "assemble") && d.entrance === undefined) { d.entrance = kin; n++; }
+      if (kout === "smear-up" && d.exit === undefined) { d.exit = kout; n++; }
+    }
     else if (c.type === "chapter-kicker") spec = el.kicker;
     else if (c.type === "logo-band") spec = el.logo_band;
+    else if (c.type === "checklist-toggles") spec = el.checklist;
+    else if (c.type === "card-fan") spec = el.cards;
     if (!spec) continue;
     const eIn = fx(spec, "in"), eOut = fx(spec, "out");
     if (eIn && c.enter === undefined) { c.enter = eIn; n++; }

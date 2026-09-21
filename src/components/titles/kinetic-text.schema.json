@@ -106,6 +106,12 @@
       "type": "color",
       "label": "Ring stroke (default: accent, else brand primary)",
       "optional": true
+    },
+    "blur": {
+      "type": "boolean",
+      "label": "Motion blur on the travel: a word in flight streaks along its axis and lands sharp (assemble entrance, smear-up exit). Default true; false for a clean transform.",
+      "optional": true,
+      "default": true
     }
   }
 }
