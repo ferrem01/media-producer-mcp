@@ -32,7 +32,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
-import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief } from "../core/recipes.js";
+import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces } from "../core/recipes.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2810,6 +2810,9 @@ async function runUnifiedPipeline(
     { const w = castWordmarkCards(storyboard as any, recipeObj); if (w) console.log(`  Recipe: ${w} wordmark card(s) cast as st-logo-close`); }
     for (const d of storyboard.scenes as any[]) { for (const n of holdLogoBandToBrief(d, String(opts.prompt || ""))) console.log(`  Recipe: "${d.label || ""}" -- ${n}`); }
   }
+  // Every board, recipe or not: a blank window or an empty number row is
+  // the writer's sketch of a surface it never filled.
+  for (const d of storyboard.scenes as any[]) { for (const n of holdEmptySurfaces(d)) console.log(`  Board: "${d.label || ""}" -- ${n}`); }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
     if (opts.project_id) { try { spineProject = await loadProject(opts.tenant_id, opts.project_id); } catch { /* fresh build */ } }
