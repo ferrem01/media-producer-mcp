@@ -319,4 +319,17 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(r.spine.find((b) => b.role === "proof")!.note).toMatch(/never an empty window or a number row without data/);
     expect(r.spine.find((b) => b.role === "feature_checklist")!.note).toMatch(/ALONE on the world -- no window/);
   });
+
+  it("a close cast with the URL pill stands: the wordmark card is not re-cast over it", async () => {
+    const { getRecipe, castWordmarkCards } = await import("../src/core/recipes.js");
+    const r = getRecipe("launch-what-if-features")!;
+    const board: any = { scenes: [
+      { label: "Close - start free", voiceover_text: "Start free at getquotient.ai", components: [{ type: "kinetic-text", data: { text: "Launch your first campaign" } }, { type: "sticker-prop", data: { kind: "url", text: "getquotient.ai" } }] },
+      { label: "Reveal - meet Quotient", voiceover_text: "Meet Quotient", components: [] },
+    ] };
+    expect(castWordmarkCards(board, r)).toBe(1); // the reveal gets its card; the close keeps its pill
+    expect(board.scenes[0].scene_template).toBeUndefined();
+    expect(board.scenes[0].components.map((c: any) => c.type)).toEqual(["kinetic-text", "sticker-prop"]);
+    expect(board.scenes[1].scene_template?.type).toBe("st-logo-close");
+  });
 });
