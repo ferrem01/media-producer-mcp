@@ -89,6 +89,46 @@ function resolveDucking(project: Project): Parameters<typeof mixAudio>[0]["ducki
   };
 }
 
+/**
+ * THE CLIP'S SOUND. A live-action clip on a scene (the take tool's clip
+ * path: a `video` component with data.clip) carries its own line -- the
+ * cameo's joke IS the audio -- and the mixer only knew the project's tracks
+ * (measured live, proj_09b6d0cb: the rendered sketch had music and no
+ * "So, what worked?"). Each clip becomes a voice-level track at its scene's
+ * film start (plus its cut-in), from its own start_at, cut to the scene,
+ * and the music ducks under it like a voiceover. `startOf` gives the film
+ * time a scene starts at (transitions included).
+ */
+export function clipAudioTracks(project: Pick<Project, "scenes">, startOf: (sceneIndex: number) => number): AudioTrackInput[] {
+  const out: AudioTrackInput[] = [];
+  (project.scenes || []).forEach((scene, i) => {
+    for (const c of (scene.components || []) as any[]) {
+      if (!c || c.type !== "video" || !c.data || c.data.clip !== true || typeof c.data.src !== "string" || !c.data.src) continue;
+      const e = c.enter && typeof c.enter === "object" ? Number(c.enter.at) : NaN;
+      const at = Number.isFinite(e) && e > 0 ? e : 0;
+      const span = Math.max(0, (Number(scene.duration_seconds) || 0) - at);
+      if (span <= 0) continue;
+      const startAt = Number(c.data.start_at);
+      out.push({
+        path: resolveVideoPath(c.data.src),
+        type: "voiceover",
+        volume: typeof c.data.volume === "number" ? Math.max(0, Math.min(1, c.data.volume)) : 1,
+        startTime: Math.round((startOf(i) + at) * 1000) / 1000,
+        trimStart: Number.isFinite(startAt) && startAt > 0 ? startAt : 0,
+        duration: Math.round(span * 1000) / 1000,
+      });
+    }
+  });
+  return out;
+}
+
+/** The ducking options with the clips as triggers too: the bed dips under a
+ *  cameo's line exactly as under narration. */
+function duckUnderClips(ducking: Parameters<typeof mixAudio>[0]["ducking"], clips: AudioTrackInput[]): Parameters<typeof mixAudio>[0]["ducking"] {
+  if (!ducking || clips.length === 0) return ducking;
+  return { ...ducking, triggerTracks: [...ducking.triggerTracks, ...clips.map((c) => c.path)] };
+}
+
 export interface RenderOptions {
   /** The project to render */
   project: Project;
@@ -797,11 +837,12 @@ async function renderVideoWithSpeakerTrack(
 
     // ── 7. Audio mixing (project-level background music / voiceover) ──
   const totalProjectDuration = scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
-  if (project.audio && project.audio.tracks.length > 0) {
+  const clipTracks = clipAudioTracks(project, (i) => sceneStartTimes[i] || 0);
+  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0) {
     console.log(`
-[speaker-track] Mixing ${project.audio.tracks.length} audio track(s)...`);
+[speaker-track] Mixing ${project.audio?.tracks.length || 0} audio track(s)${clipTracks.length ? ` + ${clipTracks.length} clip(s) on scenes` : ""}...`);
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
-    const audioTracks = project.audio.tracks.map((t) => ({
+    const audioTracks: AudioTrackInput[] = (project.audio?.tracks || []).map((t) => ({
       path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
@@ -811,8 +852,9 @@ async function renderVideoWithSpeakerTrack(
       fadeOut: t.fade_out,
       loop: t.loop,
     }));
+    audioTracks.push(...clipTracks);
 
-    const duckingOpts = resolveDucking(project);
+    const duckingOpts = duckUnderClips(resolveDucking(project), clipTracks);
 
     await mixAudio({
       videoPath: outputPath,
@@ -1204,15 +1246,20 @@ async function renderVideo(
   const totalInserted = insertedTransitions.reduce((s, tr) => s + tr.seconds, 0);
   const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0) + totalInserted;
 
-  if (project.audio && project.audio.tracks.length > 0) {
+  // Where each scene starts on the film clock: its content start plus the
+  // transition time inserted before it.
+  const contentStarts: number[] = [];
+  project.scenes.reduce((acc, s) => { contentStarts.push(acc); return acc + s.duration_seconds; }, 0);
+  const clipTracks = clipAudioTracks(project, (i) => contentStarts[i] + insertedBefore(contentStarts[i]));
+  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0) {
     onProgress?.(96, "mixing audio");
-    console.log(`\n  Mixing ${project.audio.tracks.length} audio track(s)...`);
+    console.log(`\n  Mixing ${project.audio?.tracks.length || 0} audio track(s)${clipTracks.length ? ` + ${clipTracks.length} clip(s) on scenes` : ""}...`);
     if (totalInserted > 0) {
       console.log(`  Transitions inserted ${totalInserted.toFixed(2)}s of video; shifting timed audio tracks to match.`);
     }
 
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
-    const audioTracks: AudioTrackInput[] = project.audio.tracks.map((t) => ({
+    const audioTracks: AudioTrackInput[] = (project.audio?.tracks || []).map((t) => ({
       path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
@@ -1223,8 +1270,10 @@ async function renderVideo(
       loop: t.loop,
     }));
 
+    audioTracks.push(...clipTracks);
+
     // Resolve ducking track IDs to file paths (mixer matches by path)
-    const duckingOpts = resolveDucking(project);
+    const duckingOpts = duckUnderClips(resolveDucking(project), clipTracks);
 
     await mixAudio({
       videoPath: outputPath,

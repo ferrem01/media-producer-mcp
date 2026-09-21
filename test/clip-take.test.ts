@@ -189,4 +189,30 @@ describe("the clip need", () => {
     expect(cut.id).not.toBe("bg");
     expect(isCutInProof(cut)).toBe(true);
   });
+
+  it("the clip's sound: each clip on a scene is a voice-level track at its scene's film start, from its start_at, cut to the scene; the bed ducks under it; the mix runs even with no project tracks", async () => {
+    const { clipAudioTracks } = await import("../src/core/render.js");
+    const project: any = { scenes: [
+      { duration_seconds: 5, components: [{ type: "kinetic-text", data: {} }, { type: "video", data: { src: "/assets/t/projects/p/assets/cmo-cut.mp4", clip: true, start_at: 0 }, enter: { effect: "cut", at: 0 } }] },
+      { duration_seconds: 1.5, components: [{ type: "video", data: { src: "/assets/t/projects/p/assets/broll.mp4" } }] },
+      { duration_seconds: 6, components: [{ type: "video", data: { src: "/assets/t/projects/p/assets/delivery-cut.mp4", clip: true, start_at: 0.5, volume: 0.8 }, enter: { effect: "cut", at: 1 } }] },
+    ] };
+    const starts = [0, 5.4, 7.3];
+    const tracks = clipAudioTracks(project, (i) => starts[i]);
+    expect(tracks.map((t) => t.path.endsWith("cmo-cut.mp4") || t.path.endsWith("delivery-cut.mp4"))).toEqual([true, true]);
+    expect(tracks[0]).toMatchObject({ type: "voiceover", volume: 1, startTime: 0, trimStart: 0, duration: 5 });
+    expect(tracks[1]).toMatchObject({ type: "voiceover", volume: 0.8, startTime: 8.3, trimStart: 0.5, duration: 5 });
+    const render = await read("src/core/render.ts");
+    // Both render paths mix the clips and run the mix when clips alone exist; the ducking triggers include them.
+    expect(render.match(/if \(\(project\.audio && project\.audio\.tracks\.length > 0\) \|\| clipTracks\.length > 0\) \{/g)?.length).toBe(2);
+    expect(render.match(/audioTracks\.push\(\.\.\.clipTracks\);/g)?.length).toBe(2);
+    expect(render.match(/duckUnderClips\(resolveDucking\(project\), clipTracks\)/g)?.length).toBe(2);
+    expect(render).toMatch(/clipAudioTracks\(project, \(i\) => contentStarts\[i\] \+ insertedBefore\(contentStarts\[i\]\)\)/);
+    expect(render).toMatch(/clipAudioTracks\(project, \(i\) => sceneStartTimes\[i\] \|\| 0\)/);
+    // The mixer cuts a track to its duration and uses it for the ducking window.
+    const mixer = await read("src/audio/mixer.ts");
+    expect(mixer).toMatch(/const span = track\.duration && track\.duration > 0 \? Math\.min\(track\.duration, opts\.totalDuration\) : opts\.totalDuration;/);
+    expect(mixer).toMatch(/atrim=\$\{trimStart\}:\$\{trimStart \+ span\}/);
+    expect(mixer).toMatch(/let triggerDuration = triggerTrack\.duration && triggerTrack\.duration > 0 \? triggerTrack\.duration : opts\.totalDuration;/);
+  });
 });

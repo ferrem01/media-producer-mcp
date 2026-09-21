@@ -21,6 +21,9 @@ export interface AudioTrackInput {
   fadeIn?: number;       // seconds
   fadeOut?: number;      // seconds
   loop?: boolean;
+  /** Play only this many seconds of the source (after trimStart): a clip on
+   *  one scene ends with its scene, never spilling into the next. */
+  duration?: number;
 }
 
 export interface DuckingOptions {
@@ -77,7 +80,8 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
     // Trim: optionally skip the source head (e.g. downbeat alignment), then
     // cap at total duration. asetpts rebases so startTime delays still work.
     const trimStart = Math.max(0, track.trimStart || 0);
-    filters.push(`atrim=${trimStart}:${trimStart + opts.totalDuration}`);
+    const span = track.duration && track.duration > 0 ? Math.min(track.duration, opts.totalDuration) : opts.totalDuration;
+    filters.push(`atrim=${trimStart}:${trimStart + span}`);
     filters.push(`asetpts=PTS-STARTPTS`);
 
     // Delay if startTime is set
@@ -126,8 +130,8 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
       const windows: Array<{ start: number; end: number }> = [];
       for (const ti of triggerIdxs) {
         const triggerTrack = opts.tracks[ti];
-        let triggerDuration = opts.totalDuration;
-        try {
+        let triggerDuration = triggerTrack.duration && triggerTrack.duration > 0 ? triggerTrack.duration : opts.totalDuration;
+        if (!(triggerTrack.duration && triggerTrack.duration > 0)) try {
           const probeResult = await execFileAsync("ffprobe", [
             "-v", "quiet", "-show_entries", "format=duration",
             "-of", "csv=p=0", triggerTrack.path
