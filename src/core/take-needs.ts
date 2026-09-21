@@ -75,6 +75,12 @@ export function ensureSpeakerNeeds(project: Project): boolean {
       return;
     }
     let need = scene.assets.find((a) => a.type === "camera_video" && a.description === TAKE_NEED_DESCRIPTION);
+    // ONE take need per scene: a writer's own camera ask ("Founder on
+    // camera, static locked shot") on a person film duplicates the take
+    // the board already asks for (measured live, proj_8b613c9a: two
+    // camera rows per scene in Studio). A clip need is not a take and stays.
+    const dupes = scene.assets.filter((a) => a.type === "camera_video" && a.description !== TAKE_NEED_DESCRIPTION && !isClipNeed(a) && a.status !== "provided");
+    if (dupes.length) { scene.assets = scene.assets.filter((a) => !dupes.includes(a)); changed = true; }
     const active = activeTake(project, i);
     if (!need) {
       need = {

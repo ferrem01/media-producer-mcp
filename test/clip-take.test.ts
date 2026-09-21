@@ -71,4 +71,18 @@ describe("the clip need", () => {
     expect(studio).toMatch(/a\.use === 'clip' \? 'Camera clip' : kind/);
     expect(studio).toMatch(/n\.need\.type === 'camera_video' && n\.need\.use !== 'clip'; \}\)\) hasSpk = true;/);
   });
+
+  it("one take need per scene on a person film: the writer's own camera ask is dropped as a duplicate; a clip need stays", async () => {
+    const { ensureSpeakerNeeds } = await import("../src/core/take-needs.js");
+    const project: any = { treatment: { filmGrammar: "creator-cut" }, storyboard: { scenes: [
+      { label: "Hook", voiceover_text: "So... what worked?", duration_seconds: 3, assets: [
+        { type: "camera_video", description: "Founder on camera, static locked shot", status: "needed" },
+        { type: "camera_video", use: "clip", description: "a cameo", status: "needed" },
+        { type: "screen_recording", description: "GA4", status: "needed" },
+      ] },
+    ] } };
+    expect(ensureSpeakerNeeds(project)).toBe(true);
+    const types = project.storyboard.scenes[0].assets.map((a: any) => a.type + (a.use ? ":" + a.use : "") + "|" + a.description.slice(0, 12));
+    expect(types).toEqual(["camera_video:clip|a cameo", "screen_recording|GA4", "camera_video|Camera take "]);
+  });
 });
