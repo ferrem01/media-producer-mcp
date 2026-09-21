@@ -4670,3 +4670,15 @@ the scene with the booth, phone and upload sources, on the media lane.
   the picture there). And the slate the board cast for the need stayed
   under the clip: `attachClipToScene` clears it on the board and the
   built scene when the clip arrives.
+
+## 2026-09-21 -- What is in the slot: View on a provided need
+
+Marc, on the sketch board with three AI cameos attached: "I kind of wanted
+to watch the videos that have been generated and I couldn't inside the
+storyboard... when something gets uploaded, we can still see what the hell
+we put in there." A provided need's row (the scene card and the popover's
+need row) now leads with View: the panel under the row plays the file
+itself -- a clip or recording as a video with controls and sound, a still
+as an image -- with its file name, folding away on a second click or
+Close. The path is the need's own; the token rides along for the asset
+route. Replace, Re-record and the rest stay beside it.
