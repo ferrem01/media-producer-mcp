@@ -623,7 +623,7 @@ export interface AssetRequirement {
    *  card: floats over the person on a plate.
    *  split: on a tall frame the screen owns the top of the frame and the
    *  person stays under it (the talking-head-under-the-screen shape). */
-  use?: "cutaway" | "card" | "split";
+  use?: "cutaway" | "card" | "split" | "clip";
   /** When it enters -- a word anchor ("@dashboard") or scene seconds. */
   at?: string | number;
   /** When it leaves -- a word anchor or scene seconds (omit = the claim's end). */

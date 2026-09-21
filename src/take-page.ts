@@ -336,6 +336,21 @@ ${QUOTIENT_CSS}
         var r0 = document.querySelector('input[name="bg"][value="' + mode + '"]'); if (r0) r0.checked = true;
       } catch (eBg) {}
       var allScenes = (p.storyboard && p.storyboard.scenes) || [];
+      // A CLIP, NOT THE SPEAKER: a scene whose camera need is a clip (or a
+      // film no person carries) records a live-action moment that lands as
+      // a video on the scene -- room/blur/alpha do not apply.
+      try {
+        var sbSc = sceneIndex >= 0 ? allScenes[sceneIndex] : null;
+        var grammarP = (p.treatment && p.treatment.filmGrammar) || '';
+        var clipNeed = !!(sbSc && (sbSc.assets || []).some(function (a0) { return a0 && a0.type === 'camera_video' && a0.use === 'clip'; }))
+          || (sceneIndex >= 0 && grammarP && grammarP !== 'speaker' && grammarP !== 'creator-cut');
+        if (clipNeed) {
+          var bgc = $('bgChoice'); if (bgc) bgc.style.display = 'none';
+          var clipNote = document.createElement('div'); clipNote.className = 'hint'; clipNote.id = 'clipNote';
+          clipNote.textContent = 'This is a clip on the scene, not the speaker: it lands as a video where the scene shows it.';
+          if (bgc && bgc.parentNode) bgc.parentNode.insertBefore(clipNote, bgc);
+        }
+      } catch (eClip) {}
       var scenes = sceneIndex >= 0 && allScenes[sceneIndex] ? [allScenes[sceneIndex]] : allScenes;
       sceneLabel = sceneIndex >= 0 && allScenes[sceneIndex] ? ('Scene ' + (sceneIndex + 1) + (allScenes[sceneIndex].label ? ' · ' + allScenes[sceneIndex].label : '')) : '';
       cues = buildCues(scenes);

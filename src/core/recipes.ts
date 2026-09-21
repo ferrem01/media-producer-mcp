@@ -292,7 +292,7 @@ export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; as
   // a camera take asked for it is the writer's reflex, not the recipe's
   // (measured live, proj_2384e533: every chapter asked for a take).
   if (!String(beat.shot).startsWith("person") && Array.isArray(scene.assets)) {
-    const takes = scene.assets.filter((a) => a && typeof a === "object" && a.type === "camera_video" && a.status !== "provided");
+    const takes = scene.assets.filter((a) => a && typeof a === "object" && a.type === "camera_video" && a.use !== "clip" && a.status !== "provided");
     if (takes.length) { scene.assets = scene.assets.filter((a) => !takes.includes(a)); out.push("the camera take ask dropped: no person on this beat"); }
   }
   // A beat made as motion graphics, as the person's take, or as type asks

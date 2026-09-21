@@ -42,7 +42,7 @@ import {
 import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
-import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries } from "./core/take-needs.js";
+import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
 import { castBoardStandIns } from "./core/board-standins.js";
 import { sanitizeTake } from "./core/take-sanitize.js";
@@ -1632,15 +1632,23 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string(),
       project_id: z.string(),
       scene_index: z.number().int().min(0).optional().describe("0-based storyboard scene to record. Omit to wait for a take on any scene."),
+      as: z.enum(["speaker", "clip"]).optional().describe("speaker (default on speaker/creator-cut films): the person's take -- the film's voice and clock. clip: a LIVE-ACTION MOMENT on one scene of any film (a founder's two-second cameo on a hype-cut sketch): recorded in the same booth, attached as a video component on that scene, never the speaker track. Requires scene_index; the default on a film no person carries."),
     },
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
-      if (!personCarries((project.treatment as any)?.filmGrammar)) {
-        return err(`Takes are for films a person carries (speaker, creator-cut); this project's grammar is '${(project.treatment as any)?.filmGrammar || "unset"}'.`);
-      }
       if (!project.storyboard?.scenes?.length) return err("This project has no storyboard yet. Build one with generate(mode='storyboard') first.");
-      if (ensureSpeakerNeeds(project)) { project.updated_at = new Date().toISOString(); await saveProject(project); }
+      const personFilm = personCarries((project.treatment as any)?.filmGrammar);
+      const asClip = params.as === "clip" || (!personFilm && params.as !== "speaker");
+      if (asClip && params.scene_index === undefined) return err("A clip lands on ONE scene: pass scene_index.");
+      if (!personFilm && !asClip) {
+        return err(`Takes are for films a person carries (speaker, creator-cut); this project's grammar is '${(project.treatment as any)?.filmGrammar || "unset"}'. For a live-action moment on one scene pass as: "clip".`);
+      }
+      if (asClip) {
+        if (!project.storyboard.scenes[params.scene_index!]) return err(`scene_index ${params.scene_index} is out of range (${project.storyboard.scenes.length} scenes).`);
+        ensureClipNeed(project, params.scene_index!);
+        project.updated_at = new Date().toISOString(); await saveProject(project);
+      } else if (ensureSpeakerNeeds(project)) { project.updated_at = new Date().toISOString(); await saveProject(project); }
       const open = openTakeNeeds(project);
       const openProof = openAssetNeeds(project);
       const sceneIndex = params.scene_index;
@@ -1656,7 +1664,7 @@ export function createMcpServer(): McpServer {
           open_needs: after ? openTakeNeeds(after) : [],
           speaker_track: after?.speaker_track,
           studio_url: previewUrl(params.tenant_id, params.project_id),
-          message: "The take is attached. Build with generate(mode='full', project_id) and then render.",
+          message: asClip ? "The clip is on the scene as a video component. Build with generate(mode='full', project_id) and then render." : "The take is attached. Build with generate(mode='full', project_id) and then render.",
         };
       });
       const studioUrl = previewUrl(params.tenant_id, params.project_id);

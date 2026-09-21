@@ -4200,7 +4200,7 @@ ${QUOTIENT_CSS}
     rows.forEach(function(r) {
       var a = r.need, have = a.status === 'provided' && a.path;
       var kind = NP_LABELS[a.type] || a.type;
-      var what = a.type === 'camera_video' ? 'A take of the lines' : escHtml(a.description || '');
+      var what = a.type === 'camera_video' ? (a.use === 'clip' ? 'A live-action clip on this scene' + (a.description && a.description !== 'A live-action clip for this scene (a cameo on camera)' ? ' · ' + escHtml(a.description) : '') : 'A take of the lines') : escHtml(a.description || '');
       var srcs = NP_SOURCES[a.type] || ['upload'];
       var acts = '';
       srcs.forEach(function(src) {
@@ -4215,7 +4215,7 @@ ${QUOTIENT_CSS}
         }
       });
       h += '<div class="np-row"><div class="np-what">' + what +
-        '<small>' + escHtml(kind) + (a.use === 'card' ? ' · card' : (a.use === 'split' ? ' · split' : (a.type !== 'camera_video' ? ' · cutaway' : ''))) +
+        '<small>' + escHtml(a.use === 'clip' ? 'Camera clip' : kind) + (a.use === 'card' ? ' · card' : (a.use === 'split' ? ' · split' : (a.use === 'clip' ? ' · on the scene' : (a.type !== 'camera_video' ? ' · cutaway' : '')))) +
         ' · ' + (have ? '<b class="ok">provided</b>' : (a.priority === 'nice_to_have' ? 'optional' : '<b>needed</b>')) + '</small></div>' +
         '<div class="np-act">' + acts + '</div>' +
         '<div class="np-panel" data-np-panel="' + si + '-' + r.ai + '" style="display:none"></div></div>';
@@ -6218,7 +6218,7 @@ ${QUOTIENT_CSS}
       });
       // THE OPEN SLOTS: a dashed block per need still waiting, on its own
       // row under the footage, where the file will land. Click: the picker.
-      var open = openNeedsOf(p).filter(function(n) { return n.si === si && n.need.type !== 'camera_video'; });
+      var open = openNeedsOf(p).filter(function(n) { return n.si === si && (n.need.type !== 'camera_video' || n.need.use === 'clip'); });
       open.forEach(function(n, k) {
         var row = Math.min(3, vids.length + k);
         var rowEl2 = document.createElement('div');
@@ -6255,7 +6255,7 @@ ${QUOTIENT_CSS}
       var p = state.currentProject;
       if (!p || !p.scenes || !state.compositeLoaded) return 1;
       var needRows = {};
-      openNeedsOf(p).forEach(function(n) { if (n.need.type !== 'camera_video') needRows[n.si] = (needRows[n.si] || 0) + 1; });
+      openNeedsOf(p).forEach(function(n) { if (n.need.type !== 'camera_video' || n.need.use === 'clip') needRows[n.si] = (needRows[n.si] || 0) + 1; });
       var doc = els.previewIframe.contentDocument;
       if (!doc) return 1;
       var spkSrcs = (((p.speaker || {}).clips) || []).map(function(c) { return (c.source || '').split('/').pop(); }).filter(Boolean);
@@ -6284,8 +6284,8 @@ ${QUOTIENT_CSS}
     // Open slots keep their lane on screen: a take still needed puts the
     // speaker lane up; a screen, b-roll or drawing still needed the media lane.
     var openNeeds = openNeedsOf(p);
-    if (openNeeds.some(function(n) { return n.need.type === 'camera_video'; })) hasSpk = true;
-    var hasOpenMedia = openNeeds.some(function(n) { return n.need.type !== 'camera_video'; });
+    if (openNeeds.some(function(n) { return n.need.type === 'camera_video' && n.need.use !== 'clip'; })) hasSpk = true;
+    var hasOpenMedia = openNeeds.some(function(n) { return n.need.type !== 'camera_video' || n.need.use === 'clip'; });
     // Roomy bands with real gaps between beds: squeezing speaker + music
     // against the bottom edge made them read as one smudge.
     var hasFx = ((p || {}).scenes || []).some(function(s2) {
@@ -6645,7 +6645,7 @@ ${QUOTIENT_CSS}
     }
     // Takes still needed: a dashed piece at the scene, on the speaker lane.
     if (y.speaker >= 0 && total > 0) {
-      openNeedsOf(p).filter(function(n) { return n.need.type === 'camera_video'; }).forEach(function(n) {
+      openNeedsOf(p).filter(function(n) { return n.need.type === 'camera_video' && n.need.use !== 'clip'; }).forEach(function(n) {
         var sc1 = p.scenes[n.si]; if (!sc1) return;
         var f1 = sceneStartFor(n.si), d1 = sc1.duration_seconds || 0;
         if (!(d1 > 0.05)) return;

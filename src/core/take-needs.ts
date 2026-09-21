@@ -10,7 +10,7 @@
  */
 
 import { takeOwns } from "./speaker-layer.js";
-import type { Project, Take, SpeakerTrackClip, StoryboardScene } from "./types.js";
+import type { Project, Take, SpeakerTrackClip, StoryboardScene, AssetRequirement } from "./types.js";
 
 /** Marker on the auto-emitted need so it can be found and updated. */
 export const TAKE_NEED_DESCRIPTION = "Camera take of this scene's spoken lines";
@@ -23,6 +23,33 @@ export const TAKE_NEED_DESCRIPTION = "Camera take of this scene's spoken lines";
 export const PERSON_GRAMMARS = ["speaker", "creator-cut"] as const;
 export function personCarries(grammar: unknown): boolean {
   return typeof grammar === "string" && (PERSON_GRAMMARS as readonly string[]).includes(grammar);
+}
+
+/** A CLIP, NOT THE SPEAKER: a camera_video need with `use: "clip"` is a
+ *  live-action moment on ONE scene of a film no person carries (a
+ *  founder's two-second cameo on a hype-cut sketch). Recorded in the
+ *  same booth, but attached as a video component on the scene -- never
+ *  the speaker track, no matte, no words, no re-timing. The rare path;
+ *  the take machinery stays for person films. */
+export function isClipNeed(a: unknown): boolean {
+  return !!a && typeof a === "object" && (a as any).type === "camera_video" && (a as any).use === "clip";
+}
+export function clipNeedOf(project: Project, sceneIndex: number): AssetRequirement | undefined {
+  const scene = project.storyboard?.scenes?.[sceneIndex];
+  return (scene?.assets || []).find((a) => isClipNeed(a));
+}
+export const CLIP_NEED_DESCRIPTION = "A live-action clip for this scene (a cameo on camera)";
+/** Put a clip need on a scene of any film (the take tool's as: "clip"). */
+export function ensureClipNeed(project: Project, sceneIndex: number, description?: string): AssetRequirement {
+  const scene = project.storyboard!.scenes[sceneIndex];
+  if (!Array.isArray(scene.assets)) scene.assets = [];
+  let need = scene.assets.find((a) => isClipNeed(a));
+  if (!need) {
+    need = { type: "camera_video", use: "clip", description: description || CLIP_NEED_DESCRIPTION, status: "needed", priority: "critical",
+      fallback: "The scene builds without the clip until it lands.", recording_instructions: String(scene.voiceover_text || "").trim() || undefined } as AssetRequirement;
+    scene.assets.push(need);
+  }
+  return need;
 }
 
 /**
@@ -107,7 +134,7 @@ export function activeTake(project: Project, sceneIndex: number): Take | undefin
 export function openTakeNeeds(project: Project): number[] {
   const out: number[] = [];
   (project.storyboard?.scenes || []).forEach((scene, i) => {
-    const need = (scene.assets || []).find((a) => a.type === "camera_video" && a.description === TAKE_NEED_DESCRIPTION);
+    const need = (scene.assets || []).find((a) => a.type === "camera_video" && (a.description === TAKE_NEED_DESCRIPTION || isClipNeed(a)));
     if (need && need.status === "needed") out.push(i);
   });
   return out;

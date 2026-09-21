@@ -1,0 +1,74 @@
+import { describe, it, expect } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { isClipNeed, clipNeedOf, ensureClipNeed, openTakeNeeds, CLIP_NEED_DESCRIPTION, TAKE_NEED_DESCRIPTION } from "../src/core/take-needs.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const read = (p: string) => fs.readFile(path.resolve(__dirname, "..", p), "utf8");
+
+// A CLIP, NOT THE SPEAKER (AMENDMENTS 2026-09-21): a live-action moment on
+// one scene of a film no person carries -- the founder's two-second cameo
+// on a hype-cut sketch -- recorded in the same booth and attached as a
+// video component on that scene. The rare path; the take machinery stays
+// for person films.
+describe("the clip need", () => {
+  it("is a camera_video need with use clip; ensureClipNeed puts one on a scene of any film, idempotently; openTakeNeeds counts it", () => {
+    expect(isClipNeed({ type: "camera_video", use: "clip" })).toBe(true);
+    expect(isClipNeed({ type: "camera_video" })).toBe(false);
+    expect(isClipNeed({ type: "screen_recording", use: "clip" })).toBe(false);
+    const project: any = { treatment: { filmGrammar: "hype-cut" }, storyboard: { scenes: [
+      { label: "Hook", voiceover_text: "So... what worked?", duration_seconds: 3, assets: [] },
+      { label: "Pile", duration_seconds: 10, assets: [{ type: "screen_recording", status: "needed", description: "GA4" }] },
+    ] } };
+    const need = ensureClipNeed(project, 0);
+    expect(need).toMatchObject({ type: "camera_video", use: "clip", status: "needed", description: CLIP_NEED_DESCRIPTION, recording_instructions: "So... what worked?" });
+    expect(ensureClipNeed(project, 0)).toBe(need); // idempotent
+    expect(clipNeedOf(project, 0)).toBe(need);
+    expect(clipNeedOf(project, 1)).toBeUndefined();
+    expect(openTakeNeeds(project)).toEqual([0]); // the booth and the take job wait on it
+    need.status = "provided";
+    expect(openTakeNeeds(project)).toEqual([]);
+    // A speaker need is unchanged by it.
+    const spk: any = { treatment: { filmGrammar: "speaker" }, storyboard: { scenes: [{ voiceover_text: "x", assets: [{ type: "camera_video", description: TAKE_NEED_DESCRIPTION, status: "needed" }] }] } };
+    expect(openTakeNeeds(spk)).toEqual([0]);
+  });
+
+  it("the attach route takes the clip path for a clip need or a film no person carries: a video component on the scene, the need provided, the scene grown to the clip, the waiter released, nothing about the speaker", async () => {
+    const idx = await read("src/index.ts");
+    expect(idx).toMatch(/async function attachClipToScene\(/);
+    expect(idx).toMatch(/if \(tkClipNeed \|\| \(tkSceneIdx >= 0 && !personCarries\(\(tkPeek\.treatment as any\)\?\.filmGrammar\)\)\) \{\n\s*return attachClipToScene\(/);
+    const at = idx.indexOf("async function attachClipToScene(");
+    const body = idx.slice(at, idx.indexOf("async function attachTakeToScene("));
+    expect(body).toMatch(/type: "video", position, z_index: 12, data: \{ src: url, object_fit: "cover", start_at: 0, clip: true \}, enter: \{ effect: "cut", at: 0 \}/);
+    expect(body).toMatch(/need\.status = "provided"; need\.path = url;/);
+    expect(body).toMatch(/sbScene\.duration_seconds = Math\.ceil\(dur \* 10\) \/ 10;/);
+    expect(body).toMatch(/resolveTakeWaiters\(tkTenant, tkProject, take\)/);
+    expect(body).not.toMatch(/speaker_track|castSpeakerLayer|queueTakeMatte|retimeScene|primeTakeWords/);
+    // "Record all" never takes the clip path.
+    expect(idx).toMatch(/if \(!recordAll\) \{\n\s*const tkSceneIdx/);
+  });
+
+  it("the take tool serves a clip on any film (as: 'clip', the default off person films) and still refuses a speaker take there", async () => {
+    const server = await read("src/server.ts");
+    expect(server).toMatch(/as: z\.enum\(\["speaker", "clip"\]\)\.optional\(\)/);
+    expect(server).toMatch(/const asClip = params\.as === "clip" \|\| \(!personFilm && params\.as !== "speaker"\);/);
+    expect(server).toMatch(/if \(asClip && params\.scene_index === undefined\) return err\("A clip lands on ONE scene: pass scene_index\."\);/);
+    expect(server).toMatch(/ensureClipNeed\(project, params\.scene_index!\);/);
+  });
+
+  it("the writer may ask for a cameo on any film; the recipe hold keeps it; the booth hides the background choice; Studio lists it as a clip on the scene", async () => {
+    const builder = await read("src/llm/storyboard-builder.ts");
+    expect(builder).toMatch(/ANY FILM for a LIVE-ACTION CAMEO/);
+    expect(builder).toMatch(/\{type: \\"camera_video\\", use: \\"clip\\"/);
+    const recipes = await read("src/core/recipes.ts");
+    expect(recipes).toMatch(/a\.type === "camera_video" && a\.use !== "clip" && a\.status !== "provided"/);
+    const page = await read("src/take-page.ts");
+    expect(page).toMatch(/a0\.type === 'camera_video' && a0\.use === 'clip'/);
+    expect(page).toMatch(/This is a clip on the scene, not the speaker/);
+    const studio = await read("src/preview-app/preview-app.ts");
+    expect(studio).toMatch(/'A live-action clip on this scene'/);
+    expect(studio).toMatch(/a\.use === 'clip' \? 'Camera clip' : kind/);
+    expect(studio).toMatch(/n\.need\.type === 'camera_video' && n\.need\.use !== 'clip'; \}\)\) hasSpk = true;/);
+  });
+});
