@@ -238,10 +238,25 @@ export const SCREEN_SLATE_TYPE = "asset-placeholder";
 export function isScreenSlate(c: unknown): boolean {
   return !!c && typeof c === "object" && (c as any).type === SCREEN_SLATE_TYPE && typeof (c as any).data?.need === "string";
 }
+/** A live-action clip on one scene (core/take-needs.ts, isClipNeed) is
+ *  slated like a screen: the board must show a person is expected there
+ *  (measured live, proj_45e6d1bb: a hook with only a clip need showed as
+ *  an empty codegen frame). */
+function isClipNeedLocal(need: AssetRequirement | undefined | null): boolean {
+  return !!need && need.type === "camera_video" && (need as any).use === "clip";
+}
 function isScreenNeed(need: AssetRequirement | undefined | null): need is AssetRequirement {
-  return !!need && (need.type === "screen_recording" || need.type === "screenshot");
+  return !!need && (need.type === "screen_recording" || need.type === "screenshot" || isClipNeedLocal(need));
 }
 function screenSlate(need: AssetRequirement): Record<string, unknown> {
+  if (isClipNeedLocal(need)) {
+    return {
+      need: need.description,
+      text: need.description,
+      asset_type: "Live-action clip needed",
+      hint: "Record it in Studio (Camera clip) -- it takes this slot",
+    };
+  }
   return {
     need: need.description,
     text: need.description,
