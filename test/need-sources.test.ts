@@ -128,7 +128,7 @@ describe("the sources: every need is collected its own way, in the board", () =>
     const desktop = await read("src/preview-app/preview-app.ts");
     expect(desktop).toMatch(/function openNeedsOf\(project\)/);
     expect(desktop).toMatch(/a\.status === 'needed' && !a\.path && a\.priority !== 'nice_to_have'/);
-    expect(desktop).toMatch(/if \(openNeeds\.some\(function\(n\) \{ return n\.need\.type === 'camera_video'; \}\)\) hasSpk = true;/);
+    expect(desktop).toMatch(/if \(openNeeds\.some\(function\(n\) \{ return n\.need\.type === 'camera_video' && n\.need\.use !== 'clip'; \}\)\) hasSpk = true;/); // a clip need is a media need, not the speaker lane
     expect(desktop).toMatch(/var hasMedia = !!\(\(state\.mediaClips \|\| \[\]\)\.length\) \|\| hasOpenMedia;/);
     expect(desktop).toMatch(/b\.className = 'ml-seg ml-need';[\s\S]*?openNeedPicker\(p, n\.si, n\.ai\)/);
     expect(desktop).toMatch(/nb\.className = 'spk-clip spk-need';[\s\S]*?openNeedPicker\(p, n\.si, n\.ai\)/);

@@ -19,7 +19,7 @@ import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
 import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
-import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries, dropVoiceUnderTakes } from "./core/take-needs.js";
+import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries, dropVoiceUnderTakes, clipNeedOf, ensureClipNeed } from "./core/take-needs.js";
 import { provideAsset, openAssetNeeds, recastProvidedNeed } from "./core/asset-needs.js";
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
@@ -429,6 +429,45 @@ const ARMED_TTL_MS = 2 * 60 * 60 * 1000;
  * needs. Also called when the Recorder fills a screen-recording slot with
  * a camera file beside it. Returns the HTTP status and body to send.
  */
+/** THE CLIP PATH: a recording lands as a `video` component on one scene
+ *  (the need's position, else the whole frame, cover), the need flips to
+ *  provided, and a scene shorter than the clip grows to it. Nothing about
+ *  the speaker runs. The take job waiting on the scene is released. */
+async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Record<string, unknown>, peek: Project, sceneIndex: number): Promise<{ status: number; body: Record<string, unknown> }> {
+  const url = String(tkBody.url || "");
+  let sanitized: TakeSanitizeResult | undefined;
+  try { sanitized = await sanitizeTake(resolveVideoPath(url, config.dataDir), peek.canvas, "natural"); }
+  catch (e: any) { console.warn(`  clip: sanitize skipped for ${path.basename(url)}: ${e?.message || e}`); }
+  const project = await loadProject(tkTenant, tkProject);
+  if (!project) return { status: 404, body: { error: "Project not found" } };
+  const sbScene = project.storyboard?.scenes?.[sceneIndex] as any;
+  if (!sbScene) return { status: 404, body: { error: `Scene ${sceneIndex + 1} not found` } };
+  const need = ensureClipNeed(project, sceneIndex);
+  need.status = "provided"; need.path = url;
+  const dur = Number(tkBody.duration) > 0 ? Math.round(Number(tkBody.duration) * 100) / 100 : (sanitized?.probe.duration ? Math.round(sanitized.probe.duration * 100) / 100 : 0);
+  const position = (need as any).position && typeof (need as any).position === "object" ? (need as any).position : { x: 0, y: 0, width: "100%", height: "100%" };
+  const comp = { type: "video", position, z_index: 12, data: { src: url, object_fit: "cover", start_at: 0, clip: true }, enter: { effect: "cut", at: 0 } };
+  const replaceClip = (list: any[] | undefined) => {
+    const kept = (list || []).filter((c) => !(c && typeof c === "object" && c.type === "video" && c.data && c.data.clip === true));
+    return [...kept, comp];
+  };
+  sbScene.components = replaceClip(sbScene.components);
+  if (dur > 0 && (Number(sbScene.duration_seconds) || 0) < dur) sbScene.duration_seconds = Math.ceil(dur * 10) / 10;
+  const built = (project.scenes || [])[sceneIndex] as any;
+  if (built) {
+    const others = (built.components || []).filter((c: any) => !(c && c.type === "video" && c.data && c.data.clip === true));
+    built.components = [...others, { id: `clip_${sceneIndex}_${(project.takes || []).length}`, ...comp }];
+    if (dur > 0 && (Number(built.duration_seconds) || 0) < dur) built.duration_seconds = Math.ceil(dur * 10) / 10;
+  }
+  project.updated_at = new Date().toISOString();
+  await saveProject(project);
+  reshootStoryboardCardsSoon(tkTenant, tkProject);
+  const take: Take = { id: `clip_${sceneIndex}`, scene_index: sceneIndex, source: url, recorded_at: new Date().toISOString(), duration: dur || undefined, capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw" } as Take;
+  const released = resolveTakeWaiters(tkTenant, tkProject, take);
+  console.log(`  clip: scene ${sceneIndex + 1} -- ${path.basename(url)} attached as a video component (${dur}s)${released ? `, ${released} waiter(s) released` : ""}`);
+  return { status: 200, body: { ok: true, clip: true, scene_index: sceneIndex, url, duration: dur, component: comp, retime: null, note: "a clip on the scene, not the speaker" } };
+}
+
 async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
     const tkUrl = String(tkBody.url || "");
     const expectedPrefix = `/assets/${tkTenant}/projects/${tkProject}/assets/`;
@@ -438,6 +477,17 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
     const tkPeek = await loadProject(tkTenant, tkProject);
     if (!tkPeek) { return { status: 404, body: { error: "Project not found" } }; }
     const recordAll = tkBody.scene_index === "all";
+    // A CLIP, NOT THE SPEAKER (core/take-needs.ts, isClipNeed): the scene's
+    // camera need is a live-action moment on a film no person carries, or
+    // the film is not person-carried at all. The file becomes a video
+    // component on that scene -- no speaker track, matte, words or re-time.
+    if (!recordAll) {
+      const tkSceneIdx = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0 ? Number(tkBody.scene_index) : -1;
+      const tkClipNeed = tkSceneIdx >= 0 ? clipNeedOf(tkPeek, tkSceneIdx) : undefined;
+      if (tkClipNeed || (tkSceneIdx >= 0 && !personCarries((tkPeek.treatment as any)?.filmGrammar))) {
+        return attachClipToScene(tkTenant, tkProject, tkBody, tkPeek, tkSceneIdx);
+      }
+    }
     // THE SLOW WORK FIRST, ON THE FILE ONLY. Sanitizing and transcribing
     // take tens of seconds; holding a loaded project across them and
     // saving at the end let a build's copy-back land in between and get

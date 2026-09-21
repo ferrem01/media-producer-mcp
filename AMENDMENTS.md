@@ -4623,3 +4623,24 @@ path on any grammar. Also measured: the voice is the clock, and the
 writer's 15-word line on a 3.5 s beat doubled the beat (28 s board,
 42.5 s film); the voice block now says so and holds the writer to the
 beat's word budget.
+
+## 2026-09-21 -- A clip, not the speaker: a live-action moment on one scene of any film
+
+The "So... What Worked?" brief is a sketch: a founder's two-second line
+on camera, a silent marketer, the screen and the music carrying the
+rest. That is hype-cut's rhythm with one live-action beat, and the take
+machinery only served films a person carries. The rare path, added
+beside the norm: a `camera_video` need with `use: "clip"`
+(`isClipNeed`, `ensureClipNeed`, core/take-needs.ts). The `take` tool
+takes `as: "clip"` (the default on a film no person carries; needs a
+scene_index) and puts the need on the scene; the same booth records it
+(no room/blur/alpha choice -- the page says it is a clip on the scene);
+`POST /api/take` routes a clip need, or any scene of a non-person film,
+to `attachClipToScene`: the file lands as a `video` component on that
+scene (the need's position, else the whole frame, cover), the need flips
+to provided, a scene shorter than the clip grows to it, the take job's
+waiter is released -- and nothing about the speaker runs: no speaker
+track, matte, words or re-time. The writer may ask for one ("ANY FILM
+for a LIVE-ACTION CAMEO", never stock footage of "a founder"); the
+recipe's take hold leaves it alone; Studio lists it as a camera clip on
+the scene with the booth, phone and upload sources, on the media lane.
