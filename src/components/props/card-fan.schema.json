@@ -2,20 +2,40 @@
   "type": "card-fan",
   "label": "Card Fan",
   "category": "props",
-  "description": "A group as cards spread in a 3D arc: the people (photo or initials), the templates, the sources. Cards enter one by one from below into the fan, the fan turns slowly while the voice names the group, and one card can come forward (focus). White cards with a floor shadow on a light world, charcoal on dark. Three to six cards; one line of type names the group. The launch-film feature beat (naano). Position and size it with the component's box; the fan sizes itself to it.",
+  "description": "A group as cards: the people (photo or initials), the templates, the sources. layout 'fan' (default): cards enter one by one from below into a 3D arc, the fan turns slowly while the voice names the group, one card can come forward (focus). layout 'ring': the cards stand on a circle and the whole ring TURNS at a constant rate across the beat -- cards pass in front and behind, the near card biggest and sharpest, the far ones smaller and dimmer -- and can collapse away one by one at the end (the launch-film 'the right creators' beat). White cards with a floor shadow on a light world, charcoal on dark. Three to six cards in a fan, up to ten in a ring; one line of type names the group. Position and size it with the component's box; it sizes itself to it.",
   "data": {
     "cards": {
       "type": "array",
-      "label": "Cards in left-to-right order: [{label, sublabel, src: a REAL /assets/... image or omit for an initials avatar, initials, color}] (3-6)",
+      "label": "Cards in order: [{label, sublabel, src: a REAL /assets/... image or omit for an initials avatar, initials, color}] (3-6 in a fan, up to 10 in a ring)",
       "required": true,
       "items": {
         "type": "object",
         "properties": {
-          "label": { "type": "string", "label": "Card title (a name, a template, a source)", "required": true },
-          "sublabel": { "type": "string", "label": "Second line (a role, a count)", "optional": true },
-          "src": { "type": "string", "label": "Image (a real asset URL); omit for an initials avatar", "optional": true },
-          "initials": { "type": "string", "label": "Avatar initials when no image (default: from the label)", "optional": true },
-          "color": { "type": "color", "label": "Avatar/tint color for this card", "optional": true }
+          "label": {
+            "type": "string",
+            "label": "Card title (a name, a template, a source)",
+            "required": true
+          },
+          "sublabel": {
+            "type": "string",
+            "label": "Second line (a role, a count)",
+            "optional": true
+          },
+          "src": {
+            "type": "string",
+            "label": "Image (a real asset URL); omit for an initials avatar",
+            "optional": true
+          },
+          "initials": {
+            "type": "string",
+            "label": "Avatar initials when no image (default: from the label)",
+            "optional": true
+          },
+          "color": {
+            "type": "color",
+            "label": "Avatar/tint color for this card",
+            "optional": true
+          }
         }
       }
     },
@@ -29,11 +49,23 @@
       "label": "Seconds between cards entering (default 0.16)",
       "optional": true
     },
+    "layout": {
+      "type": "string",
+      "label": "fan (default: a spread arc) | ring (a turning carousel around a vertical axis)",
+      "optional": true,
+      "enum": [
+        "fan",
+        "ring"
+      ]
+    },
     "order": {
       "type": "string",
       "label": "left-to-right (default) | center-out (the middle card first)",
       "optional": true,
-      "enum": ["left-to-right", "center-out"]
+      "enum": [
+        "left-to-right",
+        "center-out"
+      ]
     },
     "spread": {
       "type": "number",
@@ -42,7 +74,27 @@
     },
     "turn": {
       "type": "number",
-      "label": "Degrees of slow yaw while the fan holds (default 7; 0 for none)",
+      "label": "fan: degrees of slow yaw while it holds (default 7). ring: degrees the ring turns over the whole beat (default 180; negative turns the other way)",
+      "optional": true
+    },
+    "speed": {
+      "type": "number",
+      "label": "ring only: degrees per second, instead of turn (e.g. 50)",
+      "optional": true
+    },
+    "start": {
+      "type": "number",
+      "label": "ring only: the ring's starting angle in degrees (default 0: card 1 at the front)",
+      "optional": true
+    },
+    "radius": {
+      "type": "number",
+      "label": "ring only: circle radius as a fraction of the box's short side (default: sized so the cards fit the circle)",
+      "optional": true
+    },
+    "tilt": {
+      "type": "number",
+      "label": "ring only: camera pitch in degrees, seeing the ring from slightly above (default 10)",
       "optional": true
     },
     "focus": {
@@ -55,11 +107,19 @@
       "label": "When the focus card comes forward (scene seconds; default: after the last card lands)",
       "optional": true
     },
+    "collapse_at": {
+      "type": "number",
+      "label": "ring only: scene seconds when the cards shrink away one by one (omit to hold)",
+      "optional": true
+    },
     "theme": {
       "type": "string",
       "label": "light (white cards, default) | dark (charcoal cards for a dark ground)",
       "optional": true,
-      "enum": ["light", "dark"]
+      "enum": [
+        "light",
+        "dark"
+      ]
     },
     "card_color": {
       "type": "color",

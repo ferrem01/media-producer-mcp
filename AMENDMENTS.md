@@ -4421,3 +4421,24 @@ frames); the gap was craft. Four of the seven takeaways, shipped:
 - Both props are excluded from the phone zoom (they size to their box).
 Left for later, from the same list: perspective tilt on mocks, the call
 and URL pills as props, a sky world.
+
+## 2026-09-21 -- The card ring: the turn is the feature
+
+Marc: the beat he liked in the naano film is not a fan, it is a ring --
+photo cards standing on a circle, the whole ring turning, the card
+nearest the camera biggest and sharpest, the far ones small behind
+(frames 12.4-15.7 s). `card-fan` gains `layout: "ring"`: slots on a
+circle (`rotateY(a) translateZ(R) rotateY(-a)`, so every card faces the
+camera as in the video), `turn` degrees across the beat at a constant
+rate (or `speed` in deg/s), `start`, `radius`, `tilt` (seen from slightly
+above), `collapse_at` (the cards shrink away one by one). Parameters, not
+a script: the rotation is the component's own timeline.
+- Two things measured on the way. GSAP's `seek()` suppresses callbacks,
+  so an `onUpdate`-driven ring froze under the capture's frame seeking
+  (the proxy value moved, the styles did not). The ring is now ONE custom
+  property (`--cf-rot`) tweened on the stage; each slot's transform,
+  scale, opacity and depth blur are CSS `calc()`/`cos()` of it, so a seek
+  renders it. And the assembler's safety rule (`.mp-component * {
+  max-width: 100% }`) collapsed a card inside a zero-width slot to 0 px:
+  the slot now carries the card's size.
+

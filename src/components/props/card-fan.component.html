@@ -4,14 +4,34 @@
 
 <style scoped>
   /* ── card-fan: a group (the people, the templates, the sources) as photo
-     or product cards spread in a 3D arc, entering one by one from below and
-     turning slowly while the voice names them; an optional focus card comes
-     forward. White cards with a soft floor shadow (the naano launch film,
-     beat 7). ── */
+     or product cards. layout 'fan' (default): spread in a 3D arc, entering
+     one by one from below, a slow yaw while the voice names them, an
+     optional focus card forward. layout 'ring': the cards stand on a
+     circle around a vertical axis and the whole ring TURNS at a constant
+     rate across the beat -- cards pass in front and behind, the near card
+     is biggest and sharpest, the far ones smaller and dimmer -- then may
+     collapse away one by one (the naano launch film, "The right
+     creators", 12.4-15.7s). White cards with a soft floor shadow. ── */
   .cfan { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     pointer-events: none; perspective: 1400px; perspective-origin: 50% 40%;
     font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
   .cfan-stage { position: relative; transform-style: preserve-3d; }
+  /* ring: each card sits in a SLOT placed on the circle (position and
+     billboard turn on the slot, entrance and emphasis on the card). */
+  .cfan-slot { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d;
+    /* The ring's rotation is ONE custom property (--cf-rot, tweened by GSAP
+       on the stage); each slot adds its own angle (--cf-a). The transform
+       puts the slot on the circle and turns it back to face the camera;
+       scale and opacity follow cos(angle): near = big and bright. Pure
+       CSS from a tweened number, so a frame seek renders it (GSAP's
+       seek suppresses tween callbacks, so nothing may depend on one). */
+    transform: rotateY(calc(var(--cf-rot, 0deg) + var(--cf-a, 0deg))) translateZ(var(--cf-r, 300px))
+      rotateY(calc(-1 * (var(--cf-rot, 0deg) + var(--cf-a, 0deg))))
+      scale(calc(0.9 + 0.11 * (1 + cos(var(--cf-rot, 0deg) + var(--cf-a, 0deg)))));
+    opacity: calc(0.55 + 0.225 * (1 + cos(var(--cf-rot, 0deg) + var(--cf-a, 0deg))));
+    /* Depth of field: the far cards soften, the near card is sharp. */
+    filter: blur(calc(1.4px * (1 - cos(var(--cf-rot, 0deg) + var(--cf-a, 0deg))))); }
+  .cfan-slot > .cfan-card { left: 0; top: 0; margin: 0 !important; width: 100% !important; height: 100% !important; }
   .cfan-card { position: absolute; left: 50%; top: 50%; box-sizing: border-box; overflow: hidden;
     border-radius: 6.5%/5%; background: var(--cf-card, #ffffff); color: var(--cf-ink, #17171c);
     box-shadow: 0 22px 44px rgba(20, 16, 40, 0.22), 0 3px 8px rgba(20, 16, 40, 0.1);
@@ -37,7 +57,8 @@
     var stage = el.querySelector('.cfan-stage');
     var cards = Array.isArray(data.cards) ? data.cards.filter(function (c) { return c && (c.label || c.src || c.initials); }) : [];
     if (!cards.length) cards = [{ label: 'One' }, { label: 'Two' }, { label: 'Three' }];
-    cards = cards.slice(0, 7);
+    var ring = data.layout === 'ring';
+    cards = cards.slice(0, ring ? 10 : 7);
     if (data.theme === 'dark') host.classList.add('cfan-dark');
     if (data.card_color) host.style.setProperty('--cf-card', data.card_color);
     if (data.text_color) host.style.setProperty('--cf-ink', data.text_color);
@@ -48,7 +69,7 @@
     var n = cards.length;
     var spread = data.spread !== undefined ? Number(data.spread) || 0 : 13; // degrees between neighbours
     var half = (n - 1) / 2;
-    var cardH = Math.min(hostH * 0.66, hostW * 0.5);
+    var cardH = ring ? Math.min(hostH * 0.48, hostW * 0.26) : Math.min(hostH * 0.66, hostW * 0.5);
     var cardW = cardH * 0.74;
     // Neighbour offset along x; the arc's outer edge needs to fit the width.
     var stepX = Math.min(cardW * 0.62, n > 1 ? (hostW * 0.86 - cardW) / (n - 1) : 0);
@@ -95,6 +116,14 @@
         txt.appendChild(sub);
       }
       card.appendChild(pic); card.appendChild(txt);
+      if (ring) {
+        var slot = document.createElement('div');
+        slot.className = 'cfan-slot';
+        slot.appendChild(card);
+        stage.appendChild(slot);
+        nodes.push({ el: card, slot: slot, i: i });
+        return;
+      }
       stage.appendChild(card);
       // Fan pose: rotated around a pivot below the deck, offset along x, the
       // centre card nearest the eye. Deterministic: poses come from the index alone.
@@ -104,6 +133,70 @@
 
     var at = data.at !== undefined ? Math.max(0, Number(data.at) || 0) : 0.4;
     var stagger = Number(data.stagger) > 0 ? Number(data.stagger) : 0.16;
+    var hold = Number(data.hold) || 0;
+
+    if (ring) {
+      // THE RING. Slot i sits at angle a_i = 360/n * i on a circle of radius
+      // R; the ring's rotation rot(t) runs from `start` by `turn` degrees
+      // over the beat at a constant rate (or `speed` deg/s). A slot's
+      // transform is rotateY(a+rot) translateZ(R) rotateY(-(a+rot)): on the
+      // circle, then turned back to face the camera (the video's cards all
+      // show their faces; the far ones are seen small behind the near
+      // ones, which preserve-3d depth-sorts for us). Emphasis follows
+      // cos(a+rot): the near card scales up and is fully opaque, the far
+      // card dims. Everything is a function of the timeline's time -- one
+      // custom property tweened by GSAP, the rest is CSS (see the slot's
+      // rule), so a frame seek renders it without callbacks.
+      var duration = ctx.duration || 5;
+      var turn = data.speed !== undefined && Number(data.speed) !== 0
+        ? Number(data.speed) * Math.max(0, duration - at)
+        : (data.turn !== undefined ? Number(data.turn) || 0 : 180);
+      var startRot = data.start !== undefined ? Number(data.start) || 0 : 0;
+      var tilt = data.tilt !== undefined ? Number(data.tilt) || 0 : 10;
+      // A wide ring: the video's cards span most of the frame, the near
+      // ones almost touching, the far ones small between them.
+      var R = Number(data.radius) > 0 ? Number(data.radius) * Math.min(hostW, hostH)
+        : Math.max(hostW * 0.3, (n * cardW * 1.12) / (2 * Math.PI));
+      R = Math.min(R, hostW * 0.38);
+      // The ring must fit: shrink the cards if the circle cannot hold them.
+      var maxCardW = (2 * Math.PI * R) / (n * 1.08);
+      if (cardW > maxCardW) { cardW = maxCardW; cardH = cardW / 0.74; }
+      nodes.forEach(function (o) { o.el.style.width = cardW + 'px'; o.el.style.height = cardH + 'px'; o.el.style.marginLeft = (-cardW / 2) + 'px'; o.el.style.marginTop = (-cardH / 2) + 'px'; });
+      var fsR = Math.max(11, Math.round(cardH * 0.075));
+      host.style.setProperty('--cf-fs', fsR + 'px');
+      host.style.setProperty('--cf-fs-big', Math.round(cardH * 0.13) + 'px');
+      stage.style.transform = 'rotateX(' + tilt + 'deg)';
+      // Slots carry the card's size (the assembler clamps every child to
+      // max-width 100%: a zero-width slot would collapse its card).
+      nodes.forEach(function (o) {
+        o.slot.style.width = cardW + 'px'; o.slot.style.height = cardH + 'px';
+        o.slot.style.marginLeft = (-cardW / 2) + 'px'; o.slot.style.marginTop = (-cardH / 2) + 'px';
+        o.slot.style.setProperty('--cf-a', ((360 / n) * o.i) + 'deg');
+      });
+      stage.style.setProperty('--cf-r', R + 'px');
+      stage.style.setProperty('--cf-rot', startRot + 'deg');
+      var angleOf = function (o) { return ((360 / n) * o.i + startRot) * Math.PI / 180; };
+      // Entrance: each card rises into its slot, in angle order from the front.
+      var order = nodes.slice().sort(function (p, q) { return Math.cos(angleOf(p)) < Math.cos(angleOf(q)) ? 1 : -1; });
+      order.forEach(function (o, j) {
+        var when = at + j * stagger;
+        gsap.set(o.el, { autoAlpha: 0, y: hostH * 0.28, filter: 'blur(6px)' });
+        tl.to(o.el, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.55, ease: 'power3.out' }, when);
+        tl.set(o.el, { filter: 'none' }, when + 0.55);
+      });
+      // The turn: constant rate from the first entrance to the end.
+      tl.to(stage, { '--cf-rot': (startRot + turn) + 'deg', duration: Math.max(0.1, duration - at), ease: 'none' }, at);
+      // Collapse: the cards shrink away one by one, nearest last.
+      if (data.collapse_at !== undefined && data.collapse_at !== null && data.collapse_at !== '') {
+        var cAt = Number(data.collapse_at) || 0;
+        var byFar = nodes.slice().sort(function (p, q) { return p.i - q.i; });
+        byFar.forEach(function (o, j) {
+          tl.to(o.el, { scale: 0, autoAlpha: 0, duration: 0.32, ease: 'power2.in', overwrite: 'auto' }, cAt + j * 0.07);
+        });
+      } else if (hold > 0) tl.to(host, { autoAlpha: 0, y: -20, duration: 0.3, ease: 'power2.in' }, at + hold);
+      return tl;
+    }
+
     var order = data.order === 'center-out'
       ? nodes.slice().sort(function (a, b) { return Math.abs(a.i - half) - Math.abs(b.i - half); })
       : nodes;
@@ -133,7 +226,6 @@
       nodes.forEach(function (o) { if (o !== f) tl.to(o.el, { opacity: 0.72, duration: 0.4 }, fAt); });
     }
 
-    var hold = Number(data.hold) || 0;
     if (hold > 0) tl.to(host, { autoAlpha: 0, y: -20, duration: 0.3, ease: 'power2.in' }, at + hold);
     return tl;
   }
