@@ -49,6 +49,9 @@ describe("the clip need", () => {
     expect(body).toMatch(/need\.status = "provided"; need\.path = url;/);
     expect(body).toMatch(/sbScene\.duration_seconds = Math\.ceil\(dur \* 10\) \/ 10;/);
     expect(body).toMatch(/resolveTakeWaiters\(tkTenant, tkProject, take\)/);
+    // The slate the board cast for this need leaves with the clip's arrival, on the board and the built scene.
+    expect(body).toMatch(/\(isScreenSlate\(c\) && String\(c\.data\.need\) === need\.description\)/);
+    expect(body).toMatch(/const others = \(built\.components \|\| \[\]\)\.filter\(\(c: any\) => !stale\(c\)\);/);
     expect(body).not.toMatch(/speaker_track|castSpeakerLayer|queueTakeMatte|retimeScene|primeTakeWords/);
     // "Record all" never takes the clip path.
     expect(idx).toMatch(/if \(!recordAll\) \{\n\s*const tkSceneIdx/);
@@ -125,5 +128,65 @@ describe("the clip need", () => {
     const cards = await read("src/core/storyboard-cards.ts");
     expect(cards).toMatch(/else if \(!speakerFilm && clipNeedOf\(project, i\)\?\.status === "needed"\) \{/);
     expect(cards).toMatch(/speakerPlaceholderHtml\(canvas, undefined, "CAMEO ON CAMERA"\)/);
+  });
+
+  it("a clip that has landed is photographed as its poster frame: the staged list (clip -> image wearing a data URL) is what the authored builder gets", async () => {
+    const { stageProvidedMedia } = await import("../src/core/storyboard-cards.js");
+    const os = await import("node:os");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mp-clip-card-"));
+    const jpg = path.join(dir, "poster.jpg");
+    await fs.writeFile(jpg, Buffer.from("ffd8ffe0", "hex"));
+    const project: any = { tenant_id: "t", project_id: "p" };
+    const comps = [
+      { type: "kinetic-text", data: { text: "So... what worked?" } },
+      { type: "video", z_index: 12, data: { src: "/assets/t/projects/p/assets/cmo-cut.mp4", object_fit: "cover", clip: true }, enter: { effect: "cut", at: 0 } },
+      { type: "video", data: { src: "https://cdn.example.com/broll.mp4" } },
+    ];
+    const seen: string[] = [];
+    const staged = await stageProvidedMedia(project, comps, dir, async (_p, src) => { seen.push(src); return jpg; });
+    expect(seen).toEqual(["/assets/t/projects/p/assets/cmo-cut.mp4"]);
+    expect(staged[0]).toBe(comps[0]);
+    expect(staged[1]).toMatchObject({ type: "image", z_index: 12, enter: { effect: "cut", at: 0 }, data: { object_fit: "cover", drift: false } });
+    expect(staged[1].data.src).toBe("data:image/jpeg;base64," + Buffer.from("ffd8ffe0", "hex").toString("base64"));
+    expect(staged[2]).toBe(comps[2]);
+    // A poster that cannot be made leaves the clip as it was.
+    const none = await stageProvidedMedia(project, comps, dir, async () => null);
+    expect(none[1]).toBe(comps[1]);
+    // The shoot builds the authored scene from the STAGED list, not the pre-swap one.
+    const cards = await read("src/core/storyboard-cards.ts");
+    expect(cards).toMatch(/\(staged as any\)\.components = await stageProvidedMedia\(project, \(staged as any\)\.components, opts\.dataDir\);/);
+    expect(cards).toMatch(/buildAuthoredCompositionScene\(`card_s\$\{i\}`, staged, staged_authored, cardOpts\)/);
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("the built scene: on a film no person carries, the clip is the scene's PICTURE (the media-backdrop slot, full-bleed, cover, under the type), never a white-plated cutaway; over a speaker it stays a cutaway", async () => {
+    const { buildAuthoredCompositionScene } = await import("../src/llm/scene-generator.js");
+    const { isCutInProof } = await import("../src/core/scene-assembler.js");
+    const draft: any = { label: "The Ask", duration_seconds: 5, purpose: "", visual_notes: "", components: [], beats: [] };
+    const clip = { type: "video", position: { x: 0, y: 0, width: "100%", height: "100%" }, z_index: 12, data: { src: "/assets/t/projects/p/assets/cmo-cut.mp4", object_fit: "cover", start_at: 0, clip: true }, enter: { effect: "cut", at: 0 } };
+    const line = { type: "kinetic-text", position: { x: "6%", y: "78%", width: "88%", height: "14%" }, data: { text: "So... *what worked?*", entrance: "type-on", plate: true, at: 0.3 } };
+    const build = (hasSpeakerTrack: boolean) => buildAuthoredCompositionScene("s1", draft, [line, clip] as any, {
+      sceneIndex: 0, totalScenes: 13, brandKit: { colors: { primary: "#393bf5" }, fonts: [] },
+      canvas: { width: 1080, height: 1350 }, hasSpeakerTrack, treatment: { filmGrammar: hasSpeakerTrack ? "speaker" : "hype-cut", frame: "4x5" },
+    } as any).scene.components as any[];
+    const comps = build(false);
+    const bg = comps[0];
+    expect(bg).toMatchObject({ id: "bg", type: "video", z_index: 1, position: { x: 0, y: 0, width: "100%", height: "100%" }, data: { src: "/assets/t/projects/p/assets/cmo-cut.mp4", object_fit: "cover", clip: true } });
+    expect(bg.frame_anchor).toBeUndefined();
+    expect(isCutInProof(bg)).toBe(false);
+    expect(comps.filter((c) => c.type === "video").length).toBe(1);
+    const text = comps.find((c) => c.type === "kinetic-text");
+    expect(text.z_index).toBeGreaterThan(bg.z_index);
+    // The card's poster swap (an image wearing data.clip) takes the same slot.
+    const still = buildAuthoredCompositionScene("s1", draft, [line, { ...clip, type: "image", data: { ...clip.data, src: "data:image/jpeg;base64,/9j/", drift: false } }] as any, {
+      sceneIndex: 0, totalScenes: 13, brandKit: { colors: {}, fonts: [] }, canvas: { width: 1080, height: 1350 },
+    } as any).scene.components as any[];
+    expect(still[0]).toMatchObject({ id: "bg", type: "image", z_index: 1, data: { clip: true, fit: "cover", drift: false } });
+    // Over a speaker the clip is a cutaway: the person is the picture there.
+    const over = build(true);
+    const cut = over.find((c) => c.type === "video");
+    expect(cut).toBeTruthy();
+    expect(cut.id).not.toBe("bg");
+    expect(isCutInProof(cut)).toBe(true);
   });
 });

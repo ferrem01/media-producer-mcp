@@ -191,7 +191,8 @@ describe("the mock is the placeholder: a provided screen takes its slot on any f
     // ...and the BOARD scene is recast too, so the card and the band agree with the film
     expect(index).toMatch(/const board = project\.storyboard\?\.scenes\?\.\[sceneIndex\];[\s\S]*?recastProvidedNeed\(board as any, need, prevPath, \{ personFilm \}\)/);
     const cards = await read("src/core/storyboard-cards.ts");
-    expect(cards).toMatch(/const pf = await ensureMediaPoster\(project as any, src, opts\.dataDir!\);/);
+    expect(cards).toMatch(/const pf = await poster\(project, src, dataDir\);/);
+    expect(cards).toMatch(/\(staged as any\)\.components = await stageProvidedMedia\(project, \(staged as any\)\.components, opts\.dataDir\);/);
     expect(cards).toMatch(/type: "image", data: \{ \.\.\.c\.data, src: `data:image\/jpeg;base64,/);
     expect(index).toMatch(/const nsRecast = recastInBuiltScene\(nsProj, nsScene, need, nsPrev\);/);
     expect(await read("src/preview-app/preview-app.ts")).toMatch(/function npRecastNote\(r\)/);

@@ -223,6 +223,36 @@ export interface StoryboardCardsResult {
  * contact sheet (`storyboard-cards.png`) into outDir. Throws only on total
  * failure; a single scene failing degrades to its schematic placeholder.
  */
+/**
+ * The card's copy of a scene's components with provided media inlined: a
+ * clip under /assets becomes an `image` wearing the clip's poster (a frame
+ * one second in, made once per file) as a data URL, a still under /assets
+ * is inlined the same way. Anything else passes through; a file that cannot
+ * be read leaves its component as it was (the card shows the slot rather
+ * than failing). `poster` is injectable for tests.
+ */
+export async function stageProvidedMedia(project: Project, components: any[], dataDir: string,
+  poster: (project: Project, src: string, dataDir: string) => Promise<string | null> = ensureMediaPoster as any): Promise<any[]> {
+  return Promise.all(components.map(async (c: any) => {
+    const src = c && c.data && typeof c.data.src === "string" ? c.data.src : "";
+    if (!src || !src.startsWith("/assets/")) return c;
+    try {
+      if (c.type === "video") {
+        const pf = await poster(project, src, dataDir);
+        if (!pf) return c;
+        return { ...c, type: "image", data: { ...c.data, src: `data:image/jpeg;base64,${fsSync.readFileSync(pf).toString("base64")}`, drift: false } };
+      }
+      if (c.type === "image") {
+        const local = resolveVideoPath(src, dataDir);
+        const ext = path.extname(local).slice(1).toLowerCase();
+        const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/png";
+        return { ...c, data: { ...c.data, src: `data:${mime};base64,${fsSync.readFileSync(local).toString("base64")}` } };
+      }
+    } catch { /* the card shows the slot empty rather than failing */ }
+    return c;
+  }));
+}
+
 export async function renderStoryboardCards(project: Project, opts: {
   componentLibDir: string;
   gsapDir: string;
@@ -269,26 +299,16 @@ export async function renderStoryboardCards(project: Project, opts: {
         // still under /assets never loads there. A clip wears a frame one
         // second in; a still is inlined. (Measured live, proj_179c8dfa: the
         // recording was on the board and the card still showed the slate.)
+        // The staged list is what the builder gets: the authored list is
+        // re-read from it (measured live, proj_09b6d0cb: three cameo clips
+        // attached, the cards black -- the swap landed on a copy the
+        // authored builder never saw, and the file page shot a video with
+        // no source).
         if (opts.dataDir && Array.isArray((staged as any).components)) {
-          (staged as any).components = await Promise.all(((staged as any).components as any[]).map(async (c: any) => {
-            const src = c && c.data && typeof c.data.src === "string" ? c.data.src : "";
-            if (!src || !src.startsWith("/assets/")) return c;
-            try {
-              if (c.type === "video") {
-                const pf = await ensureMediaPoster(project as any, src, opts.dataDir!);
-                if (!pf) return c;
-                return { ...c, type: "image", data: { ...c.data, src: `data:image/jpeg;base64,${fsSync.readFileSync(pf).toString("base64")}`, drift: false } };
-              }
-              if (c.type === "image") {
-                const local = resolveVideoPath(src, opts.dataDir!);
-                const ext = path.extname(local).slice(1).toLowerCase();
-                const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/png";
-                return { ...c, data: { ...c.data, src: `data:${mime};base64,${fsSync.readFileSync(local).toString("base64")}` } };
-              }
-            } catch { /* the card shows the slot empty rather than failing */ }
-            return c;
-          }));
+          (staged as any).components = await stageProvidedMedia(project, (staged as any).components, opts.dataDir);
         }
+        const staged_authored = ((staged as any).components || []).filter(
+          (c: any) => c && typeof c === "object" && c.data && typeof c.type === "string");
         const take = speakerFilm ? activeTake(project, i) : undefined;
         if (speakerFilm && take?.face) (staged as any).take_face = take.face;
         const cardOpts = {
@@ -309,7 +329,7 @@ export async function renderStoryboardCards(project: Project, opts: {
         // swarm edit landed in the data with nothing to show for it).
         const { scene } = isTemplate
           ? buildTemplateScene(`card_s${i}`, staged, { ...cardOpts, scene: staged })!
-          : buildAuthoredCompositionScene(`card_s${i}`, staged, authored, cardOpts);
+          : buildAuthoredCompositionScene(`card_s${i}`, staged, staged_authored, cardOpts);
         const types = [...new Set((scene.components || []).map((c: any) => c.type))] as string[];
         const comps = await Promise.all(types.map(async (t) => {
           const p = lib.get(t);

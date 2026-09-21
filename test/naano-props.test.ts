@@ -166,7 +166,7 @@ describe("the naano takeaways", () => {
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/cutout: world\.backdrop\.component === "sky-backdrop",/);
     const gen = await read("src/llm/scene-generator.ts");
-    expect(gen).toMatch(/var skyObject = !speakerBase && !opts\.brollVideoUrl && !!opts\.imageUrl && !!w && w\.backdrop\.component === "sky-backdrop";/);
+    expect(gen).toMatch(/var skyObject = !speakerBase && !clipComp && !opts\.brollVideoUrl && !!opts\.imageUrl && !!w && w\.backdrop\.component === "sky-backdrop";/);
     expect(gen).toMatch(/data: \{ src: opts\.imageUrl, fit: "contain", overlay_opacity: 0, drift: false, at: 0\.25 \},/);
     expect(gen).toMatch(/if \(!speakerBase && !skyObject && \(opts\.brollVideoUrl \|\| opts\.imageUrl\)\) \{/);
     // dashboard-kpi fills its box
