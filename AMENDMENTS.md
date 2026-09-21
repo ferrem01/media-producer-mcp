@@ -4560,3 +4560,21 @@ give way to photographs -- the same move as the paper world's tooth.
 Measured: one of the two clips came back as a cloud bank cut by the
 frame (a hard bottom edge), unusable as a sprite; the prompt must ask
 for a single cloud with sky all around it.
+
+## 2026-09-21 -- From the rendered test film: clouds in the corners, the URL-pill close stands
+
+The first render of the naano test board (proj_ff9e68e4, 32 s) proved
+the motion -- the blurred climb, the call pill typing on, the toggles,
+the ring turning, the arrival -- and showed three things. (1) A title
+line at the top measured white-on-white where it crossed a hanging
+cloud, and the repair flipped its ink to dark on the blue: the two big
+clouds now keep to the corners (the centre of the top band, about 24-76%
+of the width, stays clear). (2) The recipe re-cast the dark logo-close
+template over a close that already carried the URL pill: a sticker-prop
+kind "url" on the close now counts as cast, and the recipe's close note
+says the wordmark card only when the brief asks for it. (3) dashboard-kpi
+renders small in a big box (its own 1100 px cap); the proof beat uses
+number-counter-row on the test board, and the mock is a follow-up. Also
+seen: the two wish beats carry generated illustrations as full-frame
+grounds from before the world switch, which cover the sky -- on a sky
+world an illustration should be an object on the sky, not a ground.

@@ -97,8 +97,12 @@
     // and end by ~18% of the height: a line at the top of the frame stays
     // clear of them (measured on the board: "What if every reply" ran into
     // the cloud at 4-34%).
+    // ...and they keep to the CORNERS: the centre of the top band (about
+    // 24-76% of the width) stays clear, because a title line up there
+    // measured white-on-white against a cloud and the repair flipped its
+    // ink to dark on the blue (measured on the rendered test film).
     var SLOTS = [
-      [0.0, -0.14, 0.36, 0.3], [0.6, -0.16, 0.42, 0.32], [0.36, 0.9, 0.3, 0.22],
+      [-0.06, -0.14, 0.3, 0.3], [0.76, -0.16, 0.32, 0.32], [0.36, 0.9, 0.3, 0.22],
       [-0.1, 0.9, 0.22, 0.18], [0.84, 0.9, 0.24, 0.2], [0.24, -0.12, 0.2, 0.16], [-0.08, 0.34, 0.14, 0.12], [0.92, 0.36, 0.14, 0.12],
     ];
     var speed = Number(data.drift) >= 0 ? Number(data.drift) : 9; // px per second, rightward

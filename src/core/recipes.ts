@@ -372,7 +372,11 @@ export function castWordmarkCards(board: { scenes: Array<{ label?: unknown; voic
     const enters = beat.enters || [];
     if (!enters.some((e) => /^stamp:wordmark/.test(e))) continue;
     const comps = Array.isArray(s.components) ? s.components : [];
-    const hasLogo = !!s.scene_template || comps.some((c) => c && typeof c === "object" && (c.type === "st-logo-close" || (c.type === "sticker-prop" && String(c.data?.kind || "") === "image")));
+    // A close that already carries the URL as a pill (sticker-prop kind
+    // "url" -- the naano close: the line and the link on the world, no
+    // card) is cast; the wordmark card would cover it (measured on the
+    // rendered test film: a dark logo-close over a sky film's close).
+    const hasLogo = !!s.scene_template || comps.some((c) => c && typeof c === "object" && (c.type === "st-logo-close" || (c.type === "sticker-prop" && ["image", "url"].includes(String(c.data?.kind || "")))));
     if (hasLogo) continue;
     const wantsUrl = enters.some((e) => /^stamp:url/.test(e));
     const own = String(s.voiceover_text || "");
