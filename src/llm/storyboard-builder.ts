@@ -111,7 +111,7 @@ const SCENE_TOOL_SCHEMA = {
         properties: {
           type: { type: "string", description: "screenshot | screen_recording | stock_footage | mockup | illustration" },
           description: { type: "string" },
-          use: { type: "string", description: "cutaway | card" },
+          use: { type: "string", description: "cutaway | card | split | clip (a live-action cameo on one scene of a film no person carries)" },
           at: { type: "string", description: "word anchor, e.g. \"@dashboard\"" },
           until: { type: "string", description: "word anchor the proof leaves on" },
           focus: { type: "string", description: "where the eye should go on it, in words" },

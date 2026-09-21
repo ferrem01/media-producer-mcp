@@ -39,7 +39,7 @@ describe("the board carries its stand-ins: the screen slate is cast when the boa
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/const st = await castBoardStandIns\(project, config\.dataDir\);/);
     const server = await read("src/server.ts");
-    expect((server.match(/await castBoardStandIns\(project, config\.dataDir\)/g) || []).length).toBe(2);
+    expect((server.match(/await castBoardStandIns\(project, config\.dataDir\)/g) || []).length).toBe(3); // the update tool (project + board branches) and the take tool's clip branch
     const { settledMoment } = await import("../src/core/storyboard-cards.js");
     const t = settledMoment({ duration_seconds: 10, components: [{ type: "asset-placeholder", data: {}, enter: { effect: "cut", at: 4 }, exit: { effect: "cut", at: 8 } } as any] });
     expect(t).toBeGreaterThanOrEqual(4.8); expect(t).toBeLessThanOrEqual(8.5);

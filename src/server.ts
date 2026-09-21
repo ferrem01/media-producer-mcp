@@ -1647,7 +1647,10 @@ export function createMcpServer(): McpServer {
       if (asClip) {
         if (!project.storyboard.scenes[params.scene_index!]) return err(`scene_index ${params.scene_index} is out of range (${project.storyboard.scenes.length} scenes).`);
         ensureClipNeed(project, params.scene_index!);
+        // The board shows the clip: the slate is cast now and the cards re-shoot.
+        try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
         project.updated_at = new Date().toISOString(); await saveProject(project);
+        reshootStoryboardCardsSoon(params.tenant_id, params.project_id);
       } else if (ensureSpeakerNeeds(project)) { project.updated_at = new Date().toISOString(); await saveProject(project); }
       const open = openTakeNeeds(project);
       const openProof = openAssetNeeds(project);

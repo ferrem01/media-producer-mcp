@@ -39,11 +39,32 @@ export function clipNeedOf(project: Project, sceneIndex: number): AssetRequireme
   return (scene?.assets || []).find((a) => isClipNeed(a));
 }
 export const CLIP_NEED_DESCRIPTION = "A live-action clip for this scene (a cameo on camera)";
+/** ON A FILM NO PERSON CARRIES, A CAMERA ASK IS A CLIP: the writer lists
+ *  camera_video needs for the sketch's cameos and forgets use "clip"
+ *  (measured live, proj_09b6d0cb: three of three). There is no other
+ *  meaning for a camera need there. Idempotent; returns how many changed. */
+export function normalizeClipNeeds(project: Project): number {
+  if (personCarries((project.treatment as any)?.filmGrammar)) return 0;
+  let n = 0;
+  for (const scene of project.storyboard?.scenes || []) {
+    for (const a of scene.assets || []) {
+      if (a && a.type === "camera_video" && (a as any).use !== "clip") { (a as any).use = "clip"; n++; }
+    }
+  }
+  return n;
+}
 /** Put a clip need on a scene of any film (the take tool's as: "clip"). */
 export function ensureClipNeed(project: Project, sceneIndex: number, description?: string): AssetRequirement {
   const scene = project.storyboard!.scenes[sceneIndex];
   if (!Array.isArray(scene.assets)) scene.assets = [];
   let need = scene.assets.find((a) => isClipNeed(a));
+  // The writer's own camera ask on this scene ("The CMO, casual, walking
+  // past a desk") IS the clip: it is converted, not doubled (measured live,
+  // proj_09b6d0cb: three cameo asks written without use "clip").
+  if (!need) {
+    const own = scene.assets.find((a) => a.type === "camera_video" && a.description !== TAKE_NEED_DESCRIPTION && a.status !== "provided");
+    if (own) { (own as any).use = "clip"; if (description) own.description = description; need = own; }
+  }
   if (!need) {
     need = { type: "camera_video", use: "clip", description: description || CLIP_NEED_DESCRIPTION, status: "needed", priority: "critical",
       fallback: "The scene builds without the clip until it lands.", recording_instructions: String(scene.voiceover_text || "").trim() || undefined } as AssetRequirement;
