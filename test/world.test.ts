@@ -37,6 +37,10 @@ describe("deriveWorld", () => {
     // A pin to another world wins over the prose.
     const pinned = deriveWorld({ brandKit: LIGHT_KIT, treatment: { concept: "clouds" } as any, visualSystem: { world: "light" }, seedSource: "t:sky3" });
     expect(pinned.backdrop.component).toBe("mesh-gradient");
+    // Cloud cutouts in the kit become the sky's sprites (the photographic upgrade).
+    const kitWithClouds: any = { ...LIGHT_KIT, assets: [{ type: "image", url: "/assets/t/brand-kit/images/cloud-1-cutout.png" }, { type: "image", url: "/assets/t/brand-kit/images/logo.png" }, { type: "video", url: "/assets/t/brand-kit/video/cloud-1.mp4" }] };
+    const sprited = deriveWorld({ brandKit: kitWithClouds, visualSystem: { world: "sky" }, seedSource: "t:sky4" });
+    expect(sprited.surface?.sprites).toEqual(["/assets/t/brand-kit/images/cloud-1-cutout.png"]);
     // A light world stays light and a plain stays plain: the sky is never inferred from nothing.
     expect(deriveWorld({ brandKit: LIGHT_KIT, seedSource: "t:x" }).backdrop.component).toBe("mesh-gradient");
   });
