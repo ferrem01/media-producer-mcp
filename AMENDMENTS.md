@@ -4355,3 +4355,19 @@ the cut-out scenes; crf 24 / cpu-used 4 costs no time (measured here:
 the same 17 s on a 3 s slice, the file 1.7x larger). The soft look
 (temporal denoise) stays a per-take choice, on by default -- turn it off
 for a sharper take. Light on the face beats any setting.
+
+## 2026-09-21 -- One Recorder session, both pieces
+
+Marc recorded scene 7's page with the Recorder's sound and camera on and
+asked what should happen. Nothing useful did: the armed-slot path took
+the tab video for the need and dropped the camera file (it was only used
+on the Recorder's new-project path). Now, for a screen-recording need on
+a person film, the camera file beside the tab recording (sent as
+`camera_url`, or found as `camera-<stamp>` next to `recording-<stamp>`)
+is attached as the scene's take through `attachTakeToScene` -- the body
+of `POST /api/take`, extracted so both routes share it: sanitize, prime
+the words, face, de-air, re-time, drop the generated voice, the speaker
+component's background (alpha over the page), the matte. The extension
+(0.33.1) sends `camera_url`; older installs are covered by the sibling
+lookup. Record the tab with the mic and camera on, and the scene gets
+the page and you, cut out in front of it, in one go.

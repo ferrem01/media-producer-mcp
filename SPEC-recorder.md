@@ -44,6 +44,18 @@ The recording that lands through `provide-asset` clears the record, and
 Studio's live-sync reloads the film so the slate leaves and the block
 becomes footage.
 
+**With the camera on (shipped 2026-09-21).** A recording made FOR a
+screen-recording need on a person film with the Recorder's camera on
+gives the scene both pieces from one session: the tab video fills the
+slot (the page), and the camera file -- uploaded beside it as
+`camera-<stamp>.webm`, sent as `camera_url`, or found by name -- is
+attached as the scene's TAKE the way the booth attaches one (sanitized,
+transcribed, de-aired, the words re-timed). The take's background follows
+the scene's speaker component (alpha over the page: the matte makes the
+copy). The tab video's own audio never plays -- the take is the voice.
+Server: `POST /api/provide-asset` -> `attachTakeToScene` (the body of
+`POST /api/take`, shared).
+
 ## The three modes
 
 ### Mode A — narrate live while demoing
