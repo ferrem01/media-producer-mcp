@@ -26,7 +26,15 @@ export interface MediaEnrichmentOpts {
   generateImages?: boolean;
   /** A tall frame (9x16, 4x5) gets portrait stills, not landscape ones cropped. */
   portrait?: boolean;
+  /** THE SKY WORLD: a hero still is an OBJECT on the sky, not a ground. The
+   *  prompt asks for one object on a plain solid green field and the result
+   *  is keyed to a transparent PNG (the generate_clip cutout keyer), so the
+   *  generator can set it on the sky (SPEC-world.md). */
+  cutout?: boolean;
 }
+
+/** The cutout suffix: one object, a flat keyable field, nothing else. */
+export const CUTOUT_SUFFIX = " -- ONE single object only, centered, illustrated with soft depth and a small floor shadow, on a PLAIN SOLID FLAT GREEN background (#00ff00) that fills every corner, nothing else in frame, no text, no ground plane, no sky, no scene.";
 
 export interface MediaEnrichmentResult {
   project?: Project;          // updated with assets (if provided)
@@ -140,11 +148,22 @@ Rules:
       console.log(`    Scene ${item.index + 1}: "${item.prompt.substring(0, 60)}..."`);
       var size = opts.portrait ? "1024x1536" : "1536x1024", quality = "high";
       var result = await generateImage({
-        prompt: item.prompt,
+        prompt: opts.cutout ? item.prompt + CUTOUT_SUFFIX : item.prompt,
         size: size as any,
         quality: quality as any,
         outputPath: imgPath,
       });
+      if (opts.cutout) {
+        // Key the green field to alpha; the cutout is the still the scene gets.
+        try {
+          var { keyStillToCutout } = await import("../media/video-gen.js");
+          var cutPath = imgPath.replace(/\.png$/, "-cutout.png");
+          await keyStillToCutout(result.path, cutPath);
+          result = { ...result, path: cutPath };
+        } catch (e: any) {
+          console.warn(`    Scene ${item.index + 1}: cutout keying failed (${e?.message || e}); the flat still stands`);
+        }
+      }
       return { index: item.index, result, prompt: item.prompt, size, quality };
     })
   );

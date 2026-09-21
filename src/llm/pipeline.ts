@@ -33,6 +33,7 @@ import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castPro
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
 import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces } from "../core/recipes.js";
+import { recipeWantsVoice } from "./storyboard-builder.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2745,7 +2746,12 @@ async function runUnifiedPipeline(
   // tempo-cut/hype-cut/editorial belong on this list too: proj_bf247f37
   // (tempo-cut) shipped EIGHT baked voiceover tracks reading its scene
   // LABELS out loud -- the exact failure this strip exists to prevent.
-  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour") && !opts.voiceover;
+  // ...unless the RECIPE has a voice: a cut measured from a voiced film keeps
+  // its narrator on any grammar (recipeWantsVoice; the writer got the same
+  // rule in its block). The lines then also feed TTS, as on a spoken film.
+  const recipeVoice = recipeWantsVoice(recipeObj);
+  if (recipeVoice && opts.voiceover === undefined) opts.voiceover = true;
+  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour") && !opts.voiceover && !recipeVoice;
   if (textIsVoiceover) {
     for (const d of storyboard.scenes as any[]) {
       if (d.voiceover_text) d.voiceover_text = undefined;
@@ -3237,6 +3243,8 @@ async function runUnifiedPipeline(
     llmConfig: opts.llmConfig,
     generateImages: opts.generateImages,
     portrait: canvas.height > canvas.width,
+    // The sky world: stills are objects on the sky, keyed to cutouts.
+    cutout: world.backdrop.component === "sky-backdrop",
   });
   if (enrichResult.project) {
     project = enrichResult.project;

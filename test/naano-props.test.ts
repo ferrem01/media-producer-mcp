@@ -147,4 +147,31 @@ describe("the naano takeaways", () => {
     expect(types).toMatch(/from\?: \{ rotate_x\?: number; rotate_y\?: number; scale\?: number \};/);
     expect(types).toMatch(/anchors\?: SceneComponent\["anchors"\];\n  pose\?: ComponentPose;/);
   });
+
+  it("a template scene on the sky world sits on the sky, not on the webgl ribbons", async () => {
+    const gen = await read("src/llm/scene-generator.ts");
+    expect(gen).toMatch(/var onSky = !!opts\.world && opts\.world\.backdrop\.component === "sky-backdrop";/);
+    expect(gen).toMatch(/stComponents\.unshift\(onSky \? \{\n\s*id: "tpl_bg",\n\s*type: "sky-backdrop",/);
+    expect(gen).toMatch(/clouds: opts\.world!\.surface\.sprites/);
+  });
+
+  it("on the sky world a hero still is an object on the sky: asked for as a cutout, keyed to alpha, set in the middle band over the sky", async () => {
+    const enrich = await read("src/llm/media-enrichment.ts");
+    expect(enrich).toMatch(/cutout\?: boolean;/);
+    expect(enrich).toMatch(/prompt: opts\.cutout \? item\.prompt \+ CUTOUT_SUFFIX : item\.prompt,/);
+    expect(enrich).toMatch(/await keyStillToCutout\(result\.path, cutPath\);/);
+    const vg = await read("src/media/video-gen.ts");
+    expect(vg).toMatch(/export async function keyStillToCutout\(framePng: string, outPng: string\)/);
+    expect(vg).toMatch(/await keyStillToCutout\(tmpFrame, outPng\);/); // the clip path shares it
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/cutout: world\.backdrop\.component === "sky-backdrop",/);
+    const gen = await read("src/llm/scene-generator.ts");
+    expect(gen).toMatch(/var skyObject = !speakerBase && !opts\.brollVideoUrl && !!opts\.imageUrl && !!w && w\.backdrop\.component === "sky-backdrop";/);
+    expect(gen).toMatch(/data: \{ src: opts\.imageUrl, fit: "contain", overlay_opacity: 0, drift: false, at: 0\.25 \},/);
+    expect(gen).toMatch(/if \(!speakerBase && !skyObject && \(opts\.brollVideoUrl \|\| opts\.imageUrl\)\) \{/);
+    // dashboard-kpi fills its box
+    const dk = await fs.readFile(path.resolve(__dirname, "../src/components/mockups/dashboard-kpi.component.html"), "utf-8");
+    expect(dk).toMatch(/var fit = Math\.min\(1\.8, \(boxW - 80\) \/ 1100, boxH > 0 \? \(boxH - 80\) \/ 420 : 1\.8\);/);
+    expect(dk).toMatch(/frame\.style\.zoom = fit\.toFixed\(3\);/);
+  });
 });

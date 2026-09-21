@@ -332,4 +332,19 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(board.scenes[0].components.map((c: any) => c.type)).toEqual(["kinetic-text", "sticker-prop"]);
     expect(board.scenes[1].scene_template?.type).toBe("st-logo-close");
   });
+
+  it("the recipe's voice wins over the grammar's no-narrator rule: the writer gets the narrator block, the pipeline keeps the lines and turns TTS on", async () => {
+    const { recipeWantsVoice } = await import("../src/llm/storyboard-builder.js");
+    const { getRecipe } = await import("../src/core/recipes.js");
+    expect(recipeWantsVoice(getRecipe("launch-what-if-features"))).toBe(true);
+    expect(recipeWantsVoice(getRecipe("story-ad-idea-beats"))).toBe(false); // type is the voice there
+    expect(recipeWantsVoice(undefined)).toBe(false);
+    const builder = await read("src/llm/storyboard-builder.ts");
+    expect(builder).toMatch(/\$\{recipeVoiceBlock\(opts\.recipe\)\}/);
+    expect(builder).toMatch(/THE RECIPE'S VOICE -- A NARRATOR \(overrides the grammar's "text is the voiceover" rule\)/);
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/const recipeVoice = recipeWantsVoice\(recipeObj\);/);
+    expect(pipeline).toMatch(/if \(recipeVoice && opts\.voiceover === undefined\) opts\.voiceover = true;/);
+    expect(pipeline).toMatch(/&& !opts\.voiceover && !recipeVoice;/);
+  });
 });

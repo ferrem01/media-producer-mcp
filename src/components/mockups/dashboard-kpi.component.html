@@ -230,6 +230,17 @@
     var topbar = el.querySelector('.dashboard-topbar');
     var grid = el.querySelector('.kpi-grid');
     var titleEl = el.querySelector('.topbar-title');
+    // FILL THE BOX: the frame is designed at 1100 px and its type is fixed
+    // pixels, so in a 1460 px box it sat at 75% of its slot and in a
+    // full-frame proof beat read small (measured on the naano test film).
+    // Scale the whole frame to the box it was given, up to 1.8x, never
+    // past its height.
+    var dkRootEl = el.querySelector('.dashboard-kpi');
+    var boxW = dkRootEl ? dkRootEl.clientWidth : 0, boxH = dkRootEl ? dkRootEl.clientHeight : 0;
+    if (boxW > 1180) {
+      var fit = Math.min(1.8, (boxW - 80) / 1100, boxH > 0 ? (boxH - 80) / 420 : 1.8);
+      if (fit > 1.02) { frame.style.zoom = fit.toFixed(3); dkRootEl.style.padding = '40px'; }
+    }
 
     titleEl.textContent = data.title || 'Dashboard';
 
