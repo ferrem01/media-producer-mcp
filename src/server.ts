@@ -146,11 +146,21 @@ const parseJsonParam = (v: unknown): unknown => {
   try { return JSON.parse(s); } catch { return v; }
 };
 
-/** Component 3D pose (static tilt). */
-const poseSchema = z.preprocess(parseJsonParam, z.object({
+/** Component 3D pose: the standing tilt, and optionally the ARRIVAL --
+ *  the pose it starts in, eased to the standing pose (the object settling
+ *  flat, a shadow floor tightening under it). Wrapper level: any
+ *  component. */
+const poseObject = z.object({
   rotate_x: z.number().optional(),
   rotate_y: z.number().optional(),
-}).nullable()).optional();
+  from: z.object({ rotate_x: z.number().optional(), rotate_y: z.number().optional(), scale: z.number().optional() }).optional()
+    .describe("The pose the object ARRIVES in (e.g. {rotate_x: 28, rotate_y: -12}); it eases to the standing pose over duration"),
+  duration: z.number().optional().describe("Seconds the arrival takes (default 1.2)"),
+  at: z.number().optional().describe("Scene seconds the arrival starts (default: the component's entrance)"),
+  ease: z.string().optional().describe("GSAP ease for the arrival (default power3.out)"),
+  floor: z.boolean().optional().describe("A soft shadow under the object that tightens as it settles (default true when from is set)"),
+});
+const poseSchema = z.preprocess(parseJsonParam, poseObject.nullable()).optional();
 
 /** Scene audio hints (voiceover text + sync points). */
 const audioHintsSchema = z.preprocess(parseJsonParam, z.object({
@@ -1217,7 +1227,7 @@ export function createMcpServer(): McpServer {
       z_index: z.number().optional(),
       enter: animationSchema,
       exit: animationSchema,
-      pose: poseSchema.describe("Component static 3D tilt (rotate_x / rotate_y degrees). Pass null to clear."),
+      pose: poseSchema.describe("Component 3D pose: the standing tilt (rotate_x / rotate_y degrees) and, with from, the ARRIVAL it eases in from (the naano landing page: from {rotate_x: 28, rotate_y: -12} to flat over 1.2 s, a shadow floor under it). Pass null to clear."),
 
       // Overlay-level updates
 
@@ -1257,6 +1267,7 @@ export function createMcpServer(): McpServer {
             enter: animationSchema,
             exit: animationSchema,
             anchors: z.record(z.unknown()).optional(),
+            pose: poseObject.optional().describe("3D pose: the standing tilt and, with from, the arrival it eases in from"),
           })).optional().describe("Replace this scene's CAST on the board, deterministically: the full list of components in stack order (type + data; a position is honored by the build, an unplaced component is laid out by it). Omit to keep the cast; pass [] to clear it. Works before any build -- a built film is rebuilt from the board with generate mode='full'. A scene template on the scene is dropped unless scene_template is passed too."),
           scene_template: z.object({ type: z.string(), data: z.record(z.unknown()).optional() }).nullable().optional().describe("Set the scene's template (a full-frame card such as st-logo-close) or pass null to drop it."),
         })).optional(),

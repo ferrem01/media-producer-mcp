@@ -60,7 +60,7 @@ describe("update tool: storyboard scenes[].components sets a board scene's cast"
   });
 
   it("replaces the whole cast, keeps positions and data verbatim, and leaves the other fields alone", async () => {
-    const ring = { type: "card-fan", position: { x: "8%", y: "20%", width: "84%", height: "76%" }, data: { layout: "ring", turn: 200, collapse_at: 3, cards: [{ label: "Maya Chen" }, { label: "Jon Ortiz" }] }, enter: { effect: "cut" } };
+    const ring = { type: "card-fan", position: { x: "8%", y: "20%", width: "84%", height: "76%" }, data: { layout: "ring", turn: 200, collapse_at: 3, cards: [{ label: "Maya Chen" }, { label: "Jon Ortiz" }] }, enter: { effect: "cut" }, pose: { from: { rotate_x: 28, rotate_y: -12 }, duration: 1.2 } };
     const line = { type: "kinetic-text", data: { text: "The people it *already knows*", entrance: "type-on" } };
     const r = await callUpdate({ project_id: projectId, storyboard: { scenes: [{ index: 0, components: [line, ring] }] } });
     expect(r.isError, r.text).toBe(false);
@@ -70,6 +70,7 @@ describe("update tool: storyboard scenes[].components sets a board scene's cast"
     expect(s0.components[1].position).toEqual(ring.position);
     expect(s0.components[1].data).toEqual(ring.data);
     expect(s0.components[1].enter).toEqual({ effect: "cut" });
+    expect(s0.components[1].pose).toEqual({ from: { rotate_x: 28, rotate_y: -12 }, duration: 1.2 }); // the arrival rides with the cast
     expect(s0.label).toBe("HOOK - x"); expect(s0.duration_seconds).toBe(3.5); expect(s0.visual_notes).toBe("v");
     expect(r.json.storyboard.scenes[0].components.length).toBe(2);
   });

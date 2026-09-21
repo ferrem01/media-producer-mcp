@@ -1294,6 +1294,9 @@ export function buildAuthoredCompositionScene(
       // Word anchors ride along: the numbers in data are their resolved
       // values, and a take arriving later re-resolves them in place.
       ...((c as any).anchors ? { anchors: (c as any).anchors } : {}),
+      // The board's pose (a standing tilt, an arrival) is the wrapper's:
+      // it rides through untouched, on any component.
+      ...((c as any).pose && typeof (c as any).pose === "object" ? { pose: (c as any).pose } : {}),
       ...(normalizeAnim((c as any).enter) ? { enter: normalizeAnim((c as any).enter)! } : {}),
       ...(normalizeAnim((c as any).exit) ? { exit: normalizeAnim((c as any).exit)! } : {}),
     });

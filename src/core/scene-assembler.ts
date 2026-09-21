@@ -834,6 +834,29 @@ export function wrapperChoreoScript(
           rotationX: c.pose.rotate_x || 0,
           transformPerspective: 1100,
         });
+        // THE ARRIVAL (pose.from): the object comes in tilted and eases to
+        // its standing pose -- the naano landing page settling flat -- on
+        // the wrapper, so any component can do it. With a floor, a soft
+        // shadow under it tightens as it lands, which is what reads as an
+        // object over a surface rather than a rotated rectangle.
+        if (c.pose.from && typeof c.pose.from === 'object') {
+          var pf = c.pose.from;
+          var pAt = typeof c.pose.at === 'number' ? c.pose.at : ((c.enter && typeof c.enter.at === 'number') ? c.enter.at : 0);
+          var pDur = typeof c.pose.duration === 'number' && c.pose.duration > 0 ? c.pose.duration : 1.2;
+          var pEase = c.pose.ease || 'power3.out';
+          master.fromTo(el,
+            { rotationY: pf.rotate_y !== undefined ? pf.rotate_y : (c.pose.rotate_y || 0),
+              rotationX: pf.rotate_x !== undefined ? pf.rotate_x : (c.pose.rotate_x || 0),
+              scale: pf.scale !== undefined ? pf.scale : 1, transformPerspective: 1100 },
+            { rotationY: c.pose.rotate_y || 0, rotationX: c.pose.rotate_x || 0, scale: 1, duration: pDur, ease: pEase, immediateRender: true },
+            pAt);
+          if (c.pose.floor !== false) {
+            master.fromTo(el,
+              { filter: 'drop-shadow(0 60px 50px rgba(10, 10, 30, 0.34))' },
+              { filter: 'drop-shadow(0 22px 28px rgba(10, 10, 30, 0.2))', duration: pDur, ease: pEase, immediateRender: true },
+              pAt);
+          }
+        }
       }
       var traverses = c.enter && c.exit && OPPOSITE[c.enter.effect] === c.exit.effect;
       if (traverses) {
