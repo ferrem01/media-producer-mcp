@@ -77,4 +77,30 @@ describe("the naano takeaways", () => {
     const gen = await read("src/llm/scene-generator.ts");
     expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"checklist-toggles", "card-fan", "video", "image"\]/);
   });
+
+  it("the call pill: a bar that types its line on, sized to its box, one button pressed at an anchor; the url pill: glassy, its own cursor click", async () => {
+    const cp = await fs.readFile(comp("props", "call-pill"), "utf-8");
+    expect(cp).not.toMatch(/requestAnimationFrame|setInterval|performance\.now|Math\.random/);
+    // Words are laid out from the first frame and only revealed: a late font swap cannot clip the bar.
+    expect(cp).toMatch(/\.clp-text span \{ visibility: hidden; \}/);
+    expect(cp).toMatch(/tl\.set\(s, \{ visibility: 'visible' \}, when\);/);
+    expect(cp).toMatch(/var answer = data\.answer === 'accept' \|\| data\.answer === 'decline'/);
+    expect(cp).toMatch(/answered_text/);
+    expect(cp).toMatch(/host\.style\.setProperty\('--clp-h', h \+ 'px'\);/);
+    const cps = JSON.parse(await read("src/components/props/call-pill.schema.json"));
+    expect(cps.category).toBe("props");
+    expect(cps.data.text.required).toBe(true);
+    expect(cps.data.answer.enum).toEqual(["accept", "decline"]);
+    expect(cps.data.theme.enum).toEqual(["dark", "light"]);
+    const sp = await fs.readFile(comp("props", "sticker-prop"), "utf-8");
+    expect(sp).toMatch(/else if \(kind === 'url'\) \{/);
+    expect(sp).toMatch(/if \(data\.cursor !== false && typeof createCursor === 'function'\)/);
+    expect(sp).toMatch(/clickCursor\(tl, cur, clickAt\);/);
+    expect(sp).toMatch(/\.stkp-url \{[^}]*backdrop-filter: blur\(14px\)/);
+    expect(sp).not.toMatch(/repeat: -1/); // a finite breath: the timeline's duration stays finite
+    const sps = JSON.parse(await read("src/components/props/sticker-prop.schema.json"));
+    expect(sps.data.kind.enum).toEqual(["stamp", "gesture", "pill", "ring", "image", "url"]);
+    expect(sps.data.click_at.type).toBe("number");
+    expect(sps.data.ink.enum).toEqual(["white", "dark"]);
+  });
 });

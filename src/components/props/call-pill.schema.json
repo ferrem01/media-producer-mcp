@@ -1,0 +1,80 @@
+{
+  "type": "call-pill",
+  "label": "Call Pill",
+  "category": "props",
+  "description": "An incoming call as a prop: a dark pill (white on a light theme) with an icon, a line that types on word by word, and the two round buttons, decline (red) and accept (green). Optionally one button is pressed at a word anchor. The 'what if your brand joined the conversation' beat of a launch film: an invitation, a request, a conversation starting. Position and size it with the component's box (a wide, short box: the pill is a bar and sizes to it). One per scene.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "The line, 3-7 words; *stars* accent a word (e.g. \"What if your *brand* joined\")",
+      "required": true
+    },
+    "icon": {
+      "type": "string",
+      "label": "Glyph or emoji at the left (default ?)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the pill arrives (scene seconds; default 0.3)",
+      "optional": true
+    },
+    "type_at": {
+      "type": "number",
+      "label": "When the first word types on (default: 0.35s after the pill)",
+      "optional": true
+    },
+    "word_interval": {
+      "type": "number",
+      "label": "Seconds between words (default 0.16)",
+      "optional": true
+    },
+    "word_times": {
+      "type": "array",
+      "label": "Explicit per-word times in scene seconds (word anchors); overrides word_interval",
+      "optional": true
+    },
+    "answer": {
+      "type": "string",
+      "label": "Which button is pressed: accept | decline (omit for none)",
+      "optional": true,
+      "enum": ["accept", "decline"]
+    },
+    "answer_at": {
+      "type": "number",
+      "label": "When the button is pressed (scene seconds; default: after the last word)",
+      "optional": true
+    },
+    "answered_text": {
+      "type": "string",
+      "label": "accept only: the line the pill shows after the press (e.g. \"Joined the conversation\")",
+      "optional": true
+    },
+    "buttons": {
+      "type": "boolean",
+      "label": "Show the two buttons (default true)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "dark (default) | light",
+      "optional": true,
+      "enum": ["dark", "light"]
+    },
+    "accent_color": {
+      "type": "color",
+      "label": "Color of the *starred* word (default a pink-violet)",
+      "optional": true
+    },
+    "hold": {
+      "type": "number",
+      "label": "Seconds before the pill exits (0/omit = stays)",
+      "optional": true
+    },
+    "scale": {
+      "type": "number",
+      "label": "Size multiplier for the whole prop",
+      "optional": true
+    }
+  }
+}

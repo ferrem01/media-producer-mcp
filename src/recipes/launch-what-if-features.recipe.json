@@ -47,7 +47,7 @@
         "keyword:assemble",
         "object:slide-up"
       ],
-      "note": "\"What if ...\" -- one wish per beat over the one object that stands for it (the customer as a silhouette, the conversation as a call pill); the object slides up under the words; the product still unnamed."
+      "note": "\"What if ...\" -- one wish per beat over the one object that stands for it (the customer as a silhouette; the conversation as a call-pill component whose line types on with its accept and decline buttons); the object slides up under the words; the product still unnamed."
     },
     {
       "role": "reveal",
@@ -149,7 +149,7 @@
         "button:cta",
         "end_card@start"
       ],
-      "note": "Back to the world's ground: the wordmark, the URL in a pill, a cursor clicking it; the voice says the ask in five words and stops."
+      "note": "Back to the world's ground: the wordmark, the URL as a sticker-prop kind \"url\" (a glassy pill with an arrow) that a cursor comes to and clicks, the voice says the ask in five words and stops."
     }
   ],
   "rhythm": {

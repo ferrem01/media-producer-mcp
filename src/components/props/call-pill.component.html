@@ -1,0 +1,141 @@
+<template>
+  <div class="clp"></div>
+</template>
+
+<style scoped>
+  /* ── call-pill: an incoming call as a prop. A dark pill with an icon, a
+     line that types on word by word, and the two round buttons -- decline
+     (red) and accept (green). The "what if your brand joined the
+     conversation" beat of the naano launch film (8.6-10.6s). Optionally
+     one button is pressed at a word anchor. ── */
+  .clp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .clp-pill { display: flex; align-items: center; gap: 0.5em; height: var(--clp-h, 72px); max-width: 100%;
+    box-sizing: border-box; padding: 0 0.55em 0 0.55em; border-radius: 0.34em;
+    background: linear-gradient(180deg, #2a2b31 0%, #17181c 100%); color: #f5f6fa;
+    box-shadow: 0 18px 40px rgba(10, 8, 24, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    font-size: var(--clp-fs, 24px); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+  .clp-light .clp-pill { background: linear-gradient(180deg, #ffffff 0%, #f3f4f8 100%); color: #17171c;
+    box-shadow: 0 18px 40px rgba(20, 16, 40, 0.18), 0 2px 6px rgba(20, 16, 40, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+  .clp-icon { flex: 0 0 auto; width: 1.3em; height: 1.3em; display: flex; align-items: center; justify-content: center;
+    font-size: 1.05em; font-weight: 700; opacity: 0.92; }
+  .clp-text { flex: 0 1 auto; padding-right: 0.35em; overflow: hidden; }
+  /* Words are laid out from the start and only REVEALED (visibility), so
+     the bar is its final width from the first frame and a late font swap
+     cannot clip the line. */
+  .clp-text span { visibility: hidden; }
+  .clp-text .clp-acc { color: var(--clp-accent, #e879f9); }
+  .clp-btns { flex: 0 0 auto; display: flex; gap: 0.32em; margin-left: auto; }
+  .clp-btn { width: 1.35em; height: 1.35em; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.18), 0 2px 5px rgba(0, 0, 0, 0.25); position: relative; }
+  .clp-btn svg { width: 58%; height: 58%; display: block; }
+  .clp-decline { background: #ef4444; }
+  .clp-accept { background: #22c55e; }
+  .clp-ring { position: absolute; inset: -0.16em; border-radius: 50%; border: 0.08em solid currentColor; opacity: 0; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.clp');
+    if (data.theme === 'light') host.classList.add('clp-light');
+    if (data.accent_color) host.style.setProperty('--clp-accent', data.accent_color);
+    if (Number(data.scale) > 0 && Number(data.scale) !== 1) host.style.zoom = String(Number(data.scale));
+
+    // SIZE TO THE BOX: the pill is a bar; its height follows the box, its
+    // width follows the words, and it never spills the box.
+    var hostW = host.clientWidth || 700, hostH = host.clientHeight || 120;
+    var h = Math.min(hostH * 0.82, hostW * 0.15, 150);
+    host.style.setProperty('--clp-h', h + 'px');
+    host.style.setProperty('--clp-fs', Math.max(12, Math.round(h * 0.34)) + 'px');
+
+    var pill = document.createElement('div');
+    pill.className = 'clp-pill';
+    var icon = document.createElement('div');
+    icon.className = 'clp-icon';
+    icon.textContent = data.icon !== undefined ? String(data.icon) : '?';
+    var text = document.createElement('div');
+    text.className = 'clp-text';
+    // *stars* mark accent words; every word types on in reading order.
+    var words = [];
+    var re = /\*([^*]+)\*|([^*]+)/g, m;
+    var src = String(data.text || 'What if your *brand* joined');
+    while ((m = re.exec(src)) !== null) {
+      var acc = m[1] !== undefined;
+      String(acc ? m[1] : m[2]).split(/\s+/).forEach(function (w) { if (w) words.push({ w: w, acc: acc }); });
+    }
+    var spans = words.map(function (it, i) {
+      var s = document.createElement('span');
+      if (it.acc) s.className = 'clp-acc';
+      s.textContent = (i > 0 ? ' ' : '') + it.w;
+      s.style.whiteSpace = 'pre';
+      text.appendChild(s);
+      return s;
+    });
+    var btns = document.createElement('div');
+    btns.className = 'clp-btns';
+    var PHONE = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M6.6 10.8a15.3 15.3 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>';
+    var decline = document.createElement('div'); decline.className = 'clp-btn clp-decline';
+    decline.innerHTML = PHONE.replace('<svg', '<svg style="transform:rotate(135deg)"');
+    var accept = document.createElement('div'); accept.className = 'clp-btn clp-accept';
+    accept.innerHTML = PHONE;
+    [decline, accept].forEach(function (b) { var r = document.createElement('div'); r.className = 'clp-ring'; b.appendChild(r); });
+    if (data.buttons !== false) { btns.appendChild(decline); btns.appendChild(accept); }
+    pill.appendChild(icon); pill.appendChild(text); pill.appendChild(btns);
+    host.appendChild(pill);
+
+    // Fit: the whole line is laid out (hidden words keep their space), so
+    // a long line shrinks the bar's type before it can clip. The text never
+    // yields to the buttons (measured: "got answered" clipped at "answere"
+    // because a shrinkable flex child hides its own overflow from scrollWidth).
+    text.style.flexShrink = '0';
+    var fs = parseFloat(getComputedStyle(pill).fontSize) || 24;
+    var need = pill.scrollWidth;
+    if (need > hostW * 0.98) pill.style.fontSize = Math.max(11, Math.floor(fs * (hostW * 0.98) / need)) + 'px';
+
+    // Entrance: the pill arrives like a notification -- a short rise with a
+    // blur smear and a settle.
+    var at = data.at !== undefined ? Math.max(0, Number(data.at) || 0) : 0.3;
+    if (window.mpSnapIn) mpSnapIn(tl, pill, at, { y: 36, duration: 0.36 });
+    else { gsap.set(pill, { autoAlpha: 0, y: 30 }); tl.to(pill, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power3.out' }, at); }
+
+    // The line types on word by word (the naano pill), on the interval or
+    // on explicit word times.
+    var typeAt = data.type_at !== undefined ? Number(data.type_at) : at + 0.35;
+    var step = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.16;
+    spans.forEach(function (s, i) {
+      var when = Array.isArray(data.word_times) && data.word_times[i] !== undefined ? Number(data.word_times[i]) : typeAt + i * step;
+      tl.set(s, { visibility: 'visible' }, when);
+    });
+
+    // The answer: one button is pressed at its anchor -- a press, a ring
+    // that expands and fades, the other button dims. accept may then swap
+    // the line for answered_text (e.g. "Joined the conversation").
+    var answer = data.answer === 'accept' || data.answer === 'decline' ? data.answer : null;
+    if (answer && data.buttons !== false) {
+      var aAt = data.answer_at !== undefined ? Number(data.answer_at) : typeAt + spans.length * step + 0.6;
+      var btn = answer === 'accept' ? accept : decline;
+      var other = answer === 'accept' ? decline : accept;
+      var ring = btn.querySelector('.clp-ring');
+      tl.to(btn, { scale: 0.86, duration: 0.1, ease: 'power2.in' }, aAt)
+        .to(btn, { scale: 1.08, duration: 0.16, ease: 'back.out(2)' }, aAt + 0.1)
+        .to(btn, { scale: 1, duration: 0.2, ease: 'power2.inOut' }, aAt + 0.26);
+      gsap.set(ring, { scale: 0.8, opacity: 0, color: answer === 'accept' ? '#22c55e' : '#ef4444' });
+      tl.fromTo(ring, { scale: 0.8, opacity: 0.9 }, { scale: 2.2, opacity: 0, duration: 0.6, ease: 'power2.out' }, aAt + 0.05);
+      tl.to(other, { opacity: 0.35, duration: 0.3 }, aAt + 0.1);
+      if (answer === 'accept' && typeof data.answered_text === 'string' && data.answered_text.trim()) {
+        var done = document.createElement('span');
+        done.textContent = data.answered_text.trim();
+        done.style.display = 'none';
+        text.appendChild(done);
+        tl.set(spans, { display: 'none' }, aAt + 0.3);
+        tl.set(done, { display: 'inline', visibility: 'visible' }, aAt + 0.3);
+      }
+      if (answer === 'decline') tl.to(pill, { autoAlpha: 0, y: -14, duration: 0.3, ease: 'power2.in' }, aAt + 0.7);
+    }
+
+    var hold = Number(data.hold) || 0;
+    if (hold > 0) tl.to(pill, { autoAlpha: 0, y: -14, duration: 0.3, ease: 'power2.in' }, at + hold);
+    return tl;
+  }
+</script>

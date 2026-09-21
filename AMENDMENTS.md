@@ -4457,3 +4457,26 @@ templated scene drops the template unless one is passed in the same edit
 (a template covers the cast). An appended scene takes a cast too. The
 cards re-photograph after the edit as before. Test:
 `update-board-cast.test.ts`, against the in-process MCP server.
+
+## 2026-09-21 -- Two props from the naano film: the call pill and the URL pill
+
+Marc's pick 5. Two moments the film makes physical: an invitation as an
+incoming call, and the close as a link you click.
+- **`call-pill`** (props): a dark bar (white on `theme: light`) with an
+  icon, a line that types on word by word (`type_at`, `word_interval` or
+  `word_times`, *stars* for the accent word) and the two round buttons,
+  decline and accept. `answer` presses one at `answer_at`: a press, a
+  ring, the other button dims; `answered_text` swaps the line after an
+  accept ("Joined the conversation"); a decline takes the pill away. The
+  bar sizes to its box. Words are laid out from the first frame and only
+  revealed (visibility), so a late font swap cannot clip the line, and
+  the text never yields to the buttons (a shrinkable flex child hides its
+  overflow from scrollWidth; measured: "got answered" clipped).
+- **sticker-prop `kind: "url"`**: the address as a glassy pill (translucent
+  white, hairline, inner highlight, arrow), rising in with a smear and
+  breathing; `cursor` (default on) brings a cursor from bottom-right to
+  click it at `click_at` -- the pill presses, a ring pulses. `ink: dark`
+  for a light ground. Sized to its box: a close-beat pill is the subject
+  of its corner, not seasoning. Uses the shared cursor helpers;
+  cursor-performer remains the way to thread one hand across scenes.
+- The launch recipe's beat notes name both by component type.
