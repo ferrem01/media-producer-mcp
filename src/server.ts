@@ -377,7 +377,7 @@ BEFORE GENERATING
     Real person (both): take(project_id) -> a link the human records on (phone); the job completes when the take lands.
   Choosing: ask what carries the argument.
 - FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else; never changes the grammar. Instagram ad = 9x16 + any grammar.
-- THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper|plain, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
+- THE OTHER TWO AXES (omit to infer, pass to pin): visual_system {world: light|dark|paper|plain|sky, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
 - Brand comes from the tenant's brand kit. No kit? extract_brand_from_website or upload assets first, or the film is unbranded.
 - A recorded screen demo? The Chrome recorder extension (/extension.zip) captures tab + voice and builds it.
 
@@ -1176,7 +1176,7 @@ export function createMcpServer(): McpServer {
         background: z.string().optional(),
       }).optional(),
       status: z.enum(["draft", "storyboard", "generated", "rendering", "rendered", "failed"]).optional(),
-      world: z.enum(["light", "dark", "paper", "plain"]).optional().describe("Re-derive and store the film's WORLD (the continuous ground every scene sits on): light (airy mesh), dark (cinematic), paper (print sheet), plain (FLAT brand-white, no backdrop at all). Project-level; storyboard cards re-photograph on the new world, and builds inherit it."),
+      world: z.enum(["light", "dark", "paper", "plain", "sky"]).optional().describe("Re-derive and store the film's WORLD (the continuous ground every scene sits on): light (airy mesh), dark (cinematic), paper (print sheet), plain (FLAT brand-white, no backdrop at all), sky (cumulus clouds drifting on the brand color; type floats, the product sits on white cards). Project-level; storyboard cards re-photograph on the new world, and builds inherit it."),
 
       // Scene-level updates
       label: z.string().optional(),
@@ -2775,7 +2775,7 @@ export function createMcpServer(): McpServer {
       // usable from every client; flat params like film_grammar were never
       // affected.
       visual_system: jsonish(z.object({
-        world: z.enum(["light", "dark", "paper", "plain"]).optional().describe("The film's continuous surface: light (airy mesh), dark (cinematic), paper (painted print/letterpress sheet with the ink channel), plain (FLAT brand-white canvas, no backdrop at all -- for product-first films where UI chrome is the star)."),
+        world: z.enum(["light", "dark", "paper", "plain", "sky"]).optional().describe("The film's continuous surface: light (airy mesh), dark (cinematic), paper (painted print/letterpress sheet with the ink channel), plain (FLAT brand-white canvas, no backdrop at all -- for product-first films where UI chrome is the star), sky (cumulus clouds drifting slowly on a sky in the brand color -- the launch-film world: type floats in it, the product sits on white cards inside it)."),
         motion: z.enum(["punchy", "calm", "cutout-physics"]).optional().describe("The physics contract: punchy (house slams/pushes), calm (settle-never-bounce editorial restraint), cutout-physics (rigid flat pieces that drop/settle/swing like stickers)."),
         type: z.enum(["grotesk", "editorial-serif", "typewriter", "script"]).optional().describe("Display-type voice for the film's big text."),
         motif: z.object({

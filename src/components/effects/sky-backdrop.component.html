@@ -1,0 +1,127 @@
+<template>
+  <div class="skyb"><div class="skyb-glow"></div></div>
+</template>
+
+<style scoped>
+  /* ── sky-backdrop: the SKY WORLD's full-bleed ground (SPEC-world.md).
+     Cumulus clouds drifting slowly across a sky in the brand color -- the
+     naano launch film's world: type floats in the sky, the product world
+     sits on white cards inside it. Clouds are built from shaded puffs
+     (radial gradients), edged by a turbulence displacement and softened
+     by a halo layer; positions, sizes and drift come from the world seed,
+     so every scene of a film shares one sky, and the drift is clocked to
+     FILM time (time_offset) so a cut never resets the clouds. Nothing
+     is random and nothing reads a wall clock. ── */
+  .skyb { width: 100%; height: 100%; position: relative; overflow: hidden;
+    background: linear-gradient(180deg, var(--skyb-top, #1f86f7) 0%, var(--skyb-mid, #2f95ff) 55%, var(--skyb-low, #5cb0ff) 100%); }
+  .skyb-glow { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(60% 55% at 50% 45%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 70%); }
+  .skyb-cloud { position: absolute; will-change: transform; }
+  .skyb-layer { position: absolute; inset: 0; }
+  .skyb-halo { opacity: 0.55; }
+  .skyb-layer i { position: absolute; border-radius: 50%; display: block;
+    background: radial-gradient(circle at 38% 30%, #ffffff 0%, #f7fbff 45%, #d9e9fb 78%, #b9d3f2 100%); }
+  .skyb-halo i { background: #ffffff; }
+  .skyb-img { position: absolute; display: block; will-change: transform; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.skyb');
+    var W = host.clientWidth || 1920, H = host.clientHeight || 1080;
+    var seed0 = (Number(data.seed) || 7) >>> 0;
+    var rnd = function (k) { var v = Math.sin(seed0 * 0.618 + k * 47.3) * 43758.5453; return v - Math.floor(v); };
+
+    // THE SKY IS THE BRAND COLOR: the palette's first anchor (the primary)
+    // becomes the sky; a deeper band at the top, lighter toward the
+    // horizon. tone overrides it outright.
+    var base = typeof data.tone === 'string' && /^#([0-9a-fA-F]{3}){1,2}$/.test(data.tone) ? data.tone
+      : (Array.isArray(data.colors) && /^#([0-9a-fA-F]{3}){1,2}$/.test(String(data.colors[0] || '')) ? String(data.colors[0]) : '#2a8dff');
+    var hex = function (c) { c = c.replace('#', ''); if (c.length === 3) c = c.split('').map(function (x) { return x + x; }).join(''); return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)]; };
+    var mix = function (a, b, t) { var A = hex(a), B = hex(b); return 'rgb(' + A.map(function (v, i) { return Math.round(v + (B[i] - v) * t); }).join(',') + ')'; };
+    host.style.setProperty('--skyb-top', mix(base, '#08245a', 0.12));
+    host.style.setProperty('--skyb-mid', mix(base, '#ffffff', 0.06));
+    host.style.setProperty('--skyb-low', mix(base, '#ffffff', 0.3));
+
+    // The puff filter: turbulence edges, a touch of blur, alpha hardened
+    // back so the cloud has a body, not a haze. One per instance.
+    var fid = 'skyb' + seed0 + '-' + Math.round(W);
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+    svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+    svg.innerHTML =
+      '<defs><filter id="' + fid + '-puff" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.016 0.026" numOctaves="4" seed="' + (seed0 % 97) + '" result="n"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G" result="d"/>' +
+      '<feGaussianBlur in="d" stdDeviation="3.5" result="b"/>' +
+      '<feComponentTransfer in="b"><feFuncA type="table" tableValues="0 0 0.15 0.85 1 1"/></feComponentTransfer></filter>' +
+      '<filter id="' + fid + '-halo" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="26"/></filter></defs>';
+    host.appendChild(svg);
+
+    // Density: how much sky the clouds take. 0.35 is the film's look (two
+    // big clouds in the upper corners and one peeking in at the bottom
+    // edge); 0 is a clear sky. The middle band and the lower third stay
+    // clear: that is where the type, the cards and the URL pill live, and
+    // a white pill on a white cloud is invisible (measured).
+    var density = Math.max(0, Math.min(1, Number(data.density) >= 0 ? Number(data.density) : 0.35));
+    var count = Math.round(density * 8);
+    // Cloud sprites (data.clouds: transparent PNGs from the brand kit) win
+    // over the drawn puffs when they are given -- photographic tooth.
+    var sprites = Array.isArray(data.clouds) ? data.clouds.filter(function (u) { return typeof u === 'string' && /^(\/|https?:|file:|data:)/.test(u); }) : [];
+
+    var drawCloud = function (w, h, k) {
+      var el2 = document.createElement('div');
+      el2.className = 'skyb-cloud';
+      el2.style.width = w + 'px'; el2.style.height = h + 'px';
+      var puffs = [], n = 6 + Math.round(rnd(k * 11 + 1) * 3);
+      for (var i = 0; i < n; i++) {
+        var cx = w * 0.12 + rnd(k * 11 + i * 3 + 2) * w * 0.76, cy = h * 0.42 + rnd(k * 11 + i * 3 + 3) * h * 0.3, rad = h * (0.2 + rnd(k * 11 + i * 3 + 4) * 0.26);
+        var mid = 1 - Math.abs((cx / w) - 0.5) * 1.6; cy -= mid * h * 0.18; rad *= 0.85 + mid * 0.35; // a cumulus crown
+        puffs.push([cx, cy, rad, rad]);
+      }
+      puffs.push([w * 0.5, h * 0.72, h * 0.34 * 2.4, h * 0.34]); // the flat base
+      var layer = function (cls, sh, filt) {
+        var s = '<div class="skyb-layer ' + cls + '" style="filter:url(#' + filt + ')">';
+        puffs.forEach(function (p) { s += '<i style="left:' + (p[0] - p[2]) + 'px;top:' + (p[1] - p[3] + sh) + 'px;width:' + (p[2] * 2) + 'px;height:' + (p[3] * 2) + 'px"></i>'; });
+        return s + '</div>';
+      };
+      el2.innerHTML = layer('skyb-halo', 10, fid + '-halo') + layer('skyb-body', 0, fid + '-puff');
+      return el2;
+    };
+
+    // Slots: big clouds in the upper corners first, then a low one, then
+    // smaller ones across the middle band -- and never over the centre
+    // where the type lives.
+    var SLOTS = [
+      [0.02, 0.04, 0.37, 0.3], [0.58, -0.05, 0.43, 0.34], [0.36, 0.9, 0.3, 0.22],
+      [-0.1, 0.9, 0.22, 0.18], [0.84, 0.9, 0.24, 0.2], [0.24, -0.12, 0.2, 0.16], [-0.08, 0.34, 0.14, 0.12], [0.92, 0.36, 0.14, 0.12],
+    ];
+    var speed = Number(data.drift) >= 0 ? Number(data.drift) : 9; // px per second, rightward
+    var t0 = Number(data.time_offset) || 0;
+    var dur = ctx.duration || 5;
+    for (var c = 0; c < Math.min(count, SLOTS.length); c++) {
+      var s = SLOTS[c];
+      var w = Math.round(W * s[2] * (0.92 + rnd(c * 7 + 5) * 0.16)), h = Math.round(H * s[3] * (0.92 + rnd(c * 7 + 6) * 0.16));
+      var node;
+      if (sprites.length) {
+        node = document.createElement('img');
+        node.className = 'skyb-img';
+        node.src = sprites[c % sprites.length];
+        node.style.width = w + 'px'; node.style.height = 'auto';
+      } else node = drawCloud(w, h, c);
+      var x0 = Math.round(W * s[0]), y0 = Math.round(H * s[1]);
+      node.style.left = x0 + 'px'; node.style.top = y0 + 'px';
+      host.appendChild(node);
+      // Drift: far clouds (smaller) move slower -- parallax from one number.
+      var v = speed * (0.6 + s[2]);
+      // Film-time continuity: a scene that starts at film second t0 shows
+      // the clouds where the previous scene left them. Wrapped so a long
+      // film never drifts a cloud out of the frame.
+      var span = W + w;
+      var phase = function (t) { var p = (x0 + v * t + w) % span; if (p < 0) p += span; return p - w - x0; };
+      tl.fromTo(node, { x: phase(t0) }, { x: phase(t0) + v * dur, duration: dur, ease: 'none' }, 0);
+    }
+    return tl;
+  }
+</script>

@@ -1,0 +1,15 @@
+{
+  "type": "sky-backdrop",
+  "label": "Sky Backdrop",
+  "category": "effects",
+  "description": "The sky world's full-bleed ground: cumulus clouds drifting slowly across a sky in the brand color (the palette's primary; a deeper band at the top, lighter toward the horizon). Clouds are drawn from the world seed -- shaded puffs, turbulence edges, a soft halo -- or come from cloud sprites in the brand kit; they keep the upper corners and the low band, never the centre where the type lives, and drift on film time so a cut never resets them. Cast by the build as the film's one backdrop; scenes do not choose it.",
+  "data": {
+    "seed": { "type": "number", "label": "World seed (cloud shapes, sizes and slots)", "optional": true },
+    "colors": { "type": "array", "label": "World palette; the first color is the sky", "optional": true },
+    "tone": { "type": "color", "label": "Sky color override (default: the palette's first color)", "optional": true },
+    "density": { "type": "number", "label": "How much sky the clouds take, 0-1 (default 0.35: two big clouds in the upper corners and one low)", "optional": true },
+    "drift": { "type": "number", "label": "Drift in px per second, rightward (default 9; 0 holds the clouds still)", "optional": true },
+    "clouds": { "type": "array", "label": "Cloud sprites: transparent PNG URLs from the brand kit, used instead of the drawn clouds", "optional": true },
+    "time_offset": { "type": "number", "label": "Film seconds at which this scene starts (set by the build for continuity)", "optional": true }
+  }
+}

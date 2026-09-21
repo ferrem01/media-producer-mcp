@@ -4480,3 +4480,28 @@ incoming call, and the close as a link you click.
   of its corner, not seasoning. Uses the shared cursor helpers;
   cursor-performer remains the way to thread one hand across scenes.
 - The launch recipe's beat notes name both by component type.
+
+## 2026-09-21 -- The sky world
+
+Marc's pick 6 from the naano film, a net new world beside light, dark,
+paper and plain: cumulus clouds drifting slowly on a sky in the brand
+color, type floating in it, the product on white cards inside it.
+- `deriveWorld`: `visual_system.world: "sky"` (pin) or the prose keyword
+  ("sky", "clouds") lands on `sky-backdrop`; a dark-theme world (white
+  type on the color); `surface.tone` is the palette's primary (the sky),
+  `surface.intensity` the cloud density (0.35; "overcast"/"cloudy" 0.6).
+  `worldBackground` returns the sky color; the prompt block says ONE SKY
+  and names the materials (white cards: the mocks and the props).
+- `sky-backdrop` (effects): the sky as a vertical gradient of the primary
+  (deeper at the top, lighter at the horizon), clouds drawn from the
+  world seed -- shaded puffs, turbulence edges, a soft halo -- in slots
+  that keep the upper corners and peek in at the bottom edge, never the
+  middle band or the lower third (a white pill on a white cloud is
+  invisible; measured on the first probe). Drift is clocked to film time
+  (`time_offset`), wrapped, with parallax by size. `clouds` takes sprite
+  URLs from the brand kit in place of the drawn clouds (the photographic
+  upgrade, when a tenant has them). Nothing random, no wall clock.
+- Wired everywhere a backdrop is known: the generator's backdrop-cast
+  list and world injection (density rides in), the builder's backdrop
+  set, the assembler's backdrop types and travel-safe list, the director's
+  world picks, the tool enums and instructions, SPEC-world's worlds list.

@@ -103,4 +103,28 @@ describe("the naano takeaways", () => {
     expect(sps.data.click_at.type).toBe("number");
     expect(sps.data.ink.enum).toEqual(["white", "dark"]);
   });
+
+  it("the sky backdrop: clouds from the seed, drift on film time, the brand primary as the sky; cast as a backdrop everywhere a backdrop is known", async () => {
+    const sb = await fs.readFile(path.resolve(__dirname, "../src/components/effects/sky-backdrop.component.html"), "utf-8");
+    expect(sb).not.toMatch(/requestAnimationFrame|setInterval|performance\.now|Math\.random/);
+    expect(sb).toMatch(/var t0 = Number\(data\.time_offset\) \|\| 0;/);
+    expect(sb).toMatch(/tl\.fromTo\(node, \{ x: phase\(t0\) \}, \{ x: phase\(t0\) \+ v \* dur, duration: dur, ease: 'none' \}, 0\);/);
+    expect(sb).toMatch(/feTurbulence/);
+    expect(sb).toMatch(/String\(data\.colors\[0\]\)/);
+    const schema = JSON.parse(await read("src/components/effects/sky-backdrop.schema.json"));
+    expect(schema.category).toBe("effects");
+    for (const k of ["seed", "colors", "tone", "density", "drift", "clouds", "time_offset"]) expect(schema.data[k]).toBeTruthy();
+    const gen = await read("src/llm/scene-generator.ts");
+    expect(gen).toMatch(/BACKDROP_CAST_TYPES = \[.*"paper-ground", "sky-backdrop"\]/);
+    expect(gen).toMatch(/w\.backdrop\.component === "sky-backdrop" \? \{ density: w\.surface\.intensity \}/);
+    const asm = await read("src/core/scene-assembler.ts");
+    expect(asm).toMatch(/"paper-ground", "sky-backdrop",\n\]\);/);
+    expect(asm).toMatch(/TRAVEL_SAFE = \{ 'paper-ground': 1, 'sky-backdrop': 1 \}/);
+    const sbld = await read("src/llm/storyboard-builder.ts");
+    expect(sbld).toMatch(/BACKDROPS = new Set\(\["paper-ground", "sky-backdrop"/);
+    const server = await read("src/server.ts");
+    expect((server.match(/z\.enum\(\["light", "dark", "paper", "plain", "sky"\]\)/g) || []).length).toBe(2);
+    const director = await read("src/llm/creative-director.ts");
+    expect(director).toMatch(/\["light", "dark", "paper", "sky"\] as const/);
+  });
 });
