@@ -391,7 +391,7 @@ export function recipeWantsVoice(recipe: { layers?: Record<string, unknown> } | 
 function recipeVoiceBlock(recipe: { layers?: Record<string, unknown> } | undefined | null): string {
   if (!recipeWantsVoice(recipe)) return "";
   return `## THE RECIPE'S VOICE -- A NARRATOR (overrides the grammar's "text is the voiceover" rule)
-This recipe was measured from a film WITH A VOICE. Every scene carries voiceover_text: the one sentence the narrator says on that beat, at the recipe's pace (its word budget), plain spoken language, no stage directions. The on-screen type shows the beat's KEY WORDS (the recipe's max_words), never the whole sentence; the voice says the sentence. The grammar's "TEXT IS THE VOICEOVER: no narrator" line does NOT apply to this film.
+This recipe was measured from a film WITH A VOICE. Every scene carries voiceover_text: the one sentence the narrator says on that beat, plain spoken language, no stage directions. THE VOICE IS THE CLOCK: a beat runs as long as its line takes to say, so the line MUST fit the beat's word budget above ("about N words, never more than M") -- a fifteen-word line on a 3.5 s beat doubles the beat and the film (measured). Cut words, not the recipe. The on-screen type shows the beat's KEY WORDS (the recipe's max_words), never the whole sentence; the voice says the sentence. The grammar's "TEXT IS THE VOICEOVER: no narrator" line does NOT apply to this film.
 
 `;
 }

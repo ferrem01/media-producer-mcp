@@ -435,7 +435,20 @@ export function roleOfLabel(label: unknown, r: Recipe): string | undefined {
   // the breather, not the promise -- measured live, proj_25b2858c).
   const head = roles.find((role) => new RegExp(`^\\s*${role}([^a-z]|$)`).test(s));
   if (head) return head;
-  return roles.find((role) => new RegExp(`(^|[^a-z])${role}([^a-z]|$)`).test(s));
+  const anywhere = roles.find((role) => new RegExp(`(^|[^a-z])${role}([^a-z]|$)`).test(s));
+  if (anywhere) return anywhere;
+  // "Feature 3 - the campaign board": the writer numbered a family of
+  // roles instead of naming one (feature_checklist, feature_fan,
+  // feature_surface). The N-th role sharing that stem is the beat
+  // (measured live, proj_d8a2d6a7: none of the three feature beats
+  // matched, so no hold and no motion reached them and a slate shipped).
+  const m = s.match(/^\s*([a-z]+)[\s_-]*(\d+)/);
+  if (m) {
+    const stem = m[1], n = parseInt(m[2], 10);
+    const family = roles.filter((role) => role === stem || role.startsWith(stem + "_"));
+    if (family.length >= n && n >= 1) return family[n - 1];
+  }
+  return undefined;
 }
 
 /** AN EMPTY SURFACE IS DROPPED: a browser-frame (or any windowed mock)

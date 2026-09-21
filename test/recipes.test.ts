@@ -342,9 +342,21 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const builder = await read("src/llm/storyboard-builder.ts");
     expect(builder).toMatch(/\$\{recipeVoiceBlock\(opts\.recipe\)\}/);
     expect(builder).toMatch(/THE RECIPE'S VOICE -- A NARRATOR \(overrides the grammar's "text is the voiceover" rule\)/);
+    expect(builder).toMatch(/THE VOICE IS THE CLOCK: a beat runs as long as its line takes to say/);
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/const recipeVoice = recipeWantsVoice\(recipeObj\);/);
     expect(pipeline).toMatch(/if \(recipeVoice && opts\.voiceover === undefined\) opts\.voiceover = true;/);
     expect(pipeline).toMatch(/&& !opts\.voiceover && !recipeVoice;/);
+  });
+
+  it("a numbered family label maps to the N-th role of that family: 'Feature 3' is feature_surface", async () => {
+    const { getRecipe, roleOfLabel } = await import("../src/core/recipes.js");
+    const r = getRecipe("launch-what-if-features")!;
+    expect(roleOfLabel("Feature 1 - The agent daily checklist", r)).toBe("feature_checklist");
+    expect(roleOfLabel("Feature 3 - The campaign board", r)).toBe("feature_fan" === "x" ? "" : "feature_surface");
+    expect(roleOfLabel("feature-2: the people", r)).toBe("feature_fan");
+    expect(roleOfLabel("Feature 4 - too many", r)).toBeUndefined();
+    expect(roleOfLabel("Feature_surface - named outright", r)).toBe("feature_surface");
+    expect(roleOfLabel("Wish 1 - every reply", r)).toBe("wish"); // a single-role family
   });
 });

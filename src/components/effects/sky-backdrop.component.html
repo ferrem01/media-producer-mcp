@@ -101,8 +101,11 @@
     // 24-76% of the width) stays clear, because a title line up there
     // measured white-on-white against a cloud and the repair flipped its
     // ink to dark on the blue (measured on the rendered test film).
+    // The low cloud keeps to a corner as well: a bottom-band caption over
+    // a cloud peeking in at the centre measured white-on-white and had
+    // its ink flipped dark (measured on the second test film).
     var SLOTS = [
-      [-0.06, -0.14, 0.3, 0.3], [0.76, -0.16, 0.32, 0.32], [0.36, 0.9, 0.3, 0.22],
+      [-0.06, -0.14, 0.3, 0.3], [0.76, -0.16, 0.32, 0.32], [0.74, 0.9, 0.3, 0.22],
       [-0.1, 0.9, 0.22, 0.18], [0.84, 0.9, 0.24, 0.2], [0.24, -0.12, 0.2, 0.16], [-0.08, 0.34, 0.14, 0.12], [0.92, 0.36, 0.14, 0.12],
     ];
     var speed = Number(data.drift) >= 0 ? Number(data.drift) : 9; // px per second, rightward
