@@ -79,6 +79,25 @@ describe("the sources: every need is collected its own way, in the board", () =>
     expect(phone).toMatch(/'\/stock-search\/' \+ encodeURIComponent\(tenant\)/);
   });
 
+  it("Studio: what is in the slot can be watched -- a provided need's row leads with View, and the panel plays the file itself (a clip with controls, a still as an image), folding away on a second click", async () => {
+    const desktop = await read("src/preview-app/preview-app.ts");
+    // Both rows (the scene card and the popover's need row) lead with View when the file is in.
+    expect(desktop.match(/var acts = have \? '<button class="np-btn np-view" data-np-src="view" data-np-scene="' \+ si \+ '" data-np-asset="' \+ (r\.ai|ai) \+ '">View<\/button>' : '';/g)?.length).toBe(2);
+    expect(desktop).toMatch(/if \(src === 'view'\) \{\n\s*\/\/ WHAT IS IN THE SLOT/);
+    expect(desktop).toMatch(/panel\.innerHTML = npViewHtml\(need\);/);
+    expect(desktop).toMatch(/'<video class="np-view-el" src="' \+ escAttr\(src\) \+ '" controls playsinline preload="metadata"><\/video>'/);
+    expect(desktop).toMatch(/'<img class="np-view-el" src="' \+ escAttr\(src\) \+ '" alt="">'/);
+    expect(desktop).toMatch(/var src = pth\.charAt\(0\) === '\/' \? withToken\(pth\) : pth;/);
+    expect(desktop).toMatch(/if \(src === 'view'\) \{ panel\.style\.display = 'none'; panel\.dataset\.src = ''; panel\.innerHTML = ''; return; \}/);
+    // The page script parses: the regexes inside the template literal carry their backslashes.
+    const { getPreviewHtml } = await import("../src/preview-app/preview-app.js");
+    const html = getPreviewHtml({} as any);
+    const scripts = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const sc of scripts) expect(() => new Function(sc)).not.toThrow();
+    expect(html).toMatch(/\/\\\.\(mp4\|webm\|mov\|m4v\)\(\\\?\|\$\)\/i\.test/);
+  });
+
   it("the Recorder: a For picker of the project's open screen needs; a recording made for one fills it and takes its slot", async () => {
     const popup = await read("recorder-extension/popup.js");
     expect(popup).toMatch(/type: "qr-needs", project: projectId/);

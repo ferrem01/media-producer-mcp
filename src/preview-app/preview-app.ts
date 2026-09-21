@@ -993,6 +993,10 @@ ${QUOTIENT_CSS}
   .np-row .np-what small { display: block; color: var(--content-secondary); font-size: 11px; }
   .np-row .np-what small b { color: var(--orange-500); font-weight: 700; }
   .np-row .np-what small b.ok { color: #047857; }
+  .np-view { flex-basis: 100%; padding: 6px 0 2px; }
+  .np-view .np-view-el { display: block; max-width: 100%; max-height: 360px; border-radius: 10px; background: #000; margin: 0 auto; }
+  .np-view img.np-view-el { background: transparent; }
+  .np-view .np-view-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 11px; color: var(--content-secondary); }
   .np-row .np-act { display: flex; flex-direction: column; gap: 4px; }
   .np-btn { display: inline-flex; align-items: center; height: 28px; font-size: 12px; font-weight: 500; padding: 0 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-secondary); background: var(--surface-primary); color: var(--content-primary); cursor: pointer; text-decoration: none; white-space: nowrap; box-shadow: var(--shadow-weak); transition: all 150ms cubic-bezier(.4,0,.2,1); font-family: inherit; }
   .np-btn:hover { background: var(--accent); }
@@ -4202,7 +4206,7 @@ ${QUOTIENT_CSS}
       var kind = NP_LABELS[a.type] || a.type;
       var what = a.type === 'camera_video' ? (a.use === 'clip' ? 'A live-action clip on this scene' + (a.description && a.description !== 'A live-action clip for this scene (a cameo on camera)' ? ' · ' + escHtml(a.description) : '') : 'A take of the lines') : escHtml(a.description || '');
       var srcs = NP_SOURCES[a.type] || ['upload'];
-      var acts = '';
+      var acts = have ? '<button class="np-btn np-view" data-np-src="view" data-np-scene="' + si + '" data-np-asset="' + r.ai + '">View</button>' : '';
       srcs.forEach(function(src) {
         if (src === 'upload') {
           acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + r.ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
@@ -4223,6 +4227,27 @@ ${QUOTIENT_CSS}
     var built = !!(project.scenes && project.scenes.length);
     if (rows.some(function(r) { return r.need.type !== 'camera_video'; })) h += '<div class="np-note">' + (built ? 'A found, drawn or uploaded file takes its slot in the scene right away.' : 'A found, drawn or uploaded file takes its slot at the build. The film builds without it.') + '</div>';
     return h + '</div>';
+  }
+  // The provided file, playable: a clip or recording as a <video> with
+  // controls (sound on -- a cameo has a line), a still as an <img>. The
+  // path is what the need holds; the token rides along for the asset route.
+  function npIsVideoPath(pth, type) {
+    if (/\\.(mp4|webm|mov|m4v)(\\?|$)/i.test(String(pth || ''))) return true;
+    if (/\\.(png|jpe?g|webp|gif|svg)(\\?|$)/i.test(String(pth || ''))) return false;
+    return type === 'camera_video' || type === 'screen_recording' || type === 'stock_footage';
+  }
+  function npViewHtml(need) {
+    var pth = String(need.path || '');
+    if (!pth) return '<div class="np-empty">Nothing in this slot yet.</div>';
+    var src = pth.charAt(0) === '/' ? withToken(pth) : pth;
+    var name = pth.split('/').pop().split('?')[0];
+    var isVid = npIsVideoPath(pth, need.type);
+    var media = isVid
+      ? '<video class="np-view-el" src="' + escAttr(src) + '" controls playsinline preload="metadata"></video>'
+      : '<img class="np-view-el" src="' + escAttr(src) + '" alt="">';
+    return '<div class="np-view">' + media +
+      '<div class="np-view-meta"><span>' + escHtml(name) + (need.use === 'clip' ? ' · a live-action clip on this scene' : '') + '</span>' +
+      '<button class="np-btn np-view-close">Close</button></div></div>';
   }
   function npProjectTall(project) {
     var f = String((project.treatment && project.treatment.frame) || '16x9');
@@ -4250,10 +4275,23 @@ ${QUOTIENT_CSS}
     // picker opens the booth on its own, so the first "Record here" a
     // person pressed toggled the booth AWAY and the button read as dead
     // (Marc, on the speaker lane). Keep it, bring it into view.
-    if (panel.style.display !== 'none' && panel.dataset.src === src) { try { panel.scrollIntoView({ block: 'nearest' }); } catch (e0) {} return; }
+    if (panel.style.display !== 'none' && panel.dataset.src === src) {
+      if (src === 'view') { panel.style.display = 'none'; panel.dataset.src = ''; panel.innerHTML = ''; return; }
+      try { panel.scrollIntoView({ block: 'nearest' }); } catch (e0) {} return;
+    }
     panel.dataset.src = src; panel.style.display = ''; panel.innerHTML = '';
     var scene = ((project.storyboard && project.storyboard.scenes) || [])[si] || {};
     var need = (scene.assets || [])[ai] || {};
+    if (src === 'view') {
+      // WHAT IS IN THE SLOT (Marc: "I kind of wanted to watch the videos
+      // that have been generated and I couldn't inside the storyboard"):
+      // the provided file itself, playable, right under its row. A second
+      // click on View folds it away.
+      panel.innerHTML = npViewHtml(need);
+      var vClose = panel.querySelector('.np-view-close');
+      if (vClose) vClose.addEventListener('click', function() { panel.style.display = 'none'; panel.dataset.src = ''; panel.innerHTML = ''; });
+      return;
+    }
     if (src === 'booth') {
       // RECORD HERE: the take page itself, in the dialog, on this scene. It
       // tells us when the take is attached (postMessage) and the film reloads.
@@ -9582,7 +9620,7 @@ ${QUOTIENT_CSS}
     var sb = ((project.storyboard || {}).scenes || [])[si]; var a = sb && (sb.assets || [])[ai];
     if (!a) return '';
     var have = a.status === 'provided' && a.path;
-    var acts = '';
+    var acts = have ? '<button class="np-btn np-view" data-np-src="view" data-np-scene="' + si + '" data-np-asset="' + ai + '">View</button>' : '';
     (NP_SOURCES[a.type] || ['upload']).forEach(function(src) {
       if (src === 'upload') acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
       else acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + ai + '">' + (have && src === 'find' ? 'Find another' : (have && src === 'draw' ? 'Redraw' : (have && src === 'booth' ? 'Re-record here' : NP_SOURCE_LABELS[src]))) + '</button>';
