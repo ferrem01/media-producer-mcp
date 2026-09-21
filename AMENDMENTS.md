@@ -4384,3 +4384,40 @@ the page and you, cut out in front of it, in one go.
   append route casts the new scene in the component model too: the tab
   recording as the ground, a circle speaker component bottom-right, the
   camera file attached as the scene's take.
+
+## 2026-09-21 -- From the naano launch film: motion blur on type, two props, a tenth recipe
+
+Marc sent a 30 s launch film made in HyperFrames (naano, on X) and asked
+what to take from it. It is the same stack as ours (HTML, CSS, JS to
+frames); the gap was craft. Four of the seven takeaways, shipped:
+- **Motion blur on kinetic type** (`kinetic-text`, `data.blur`, default
+  on): a word in flight streaks along its own axis (one SVG
+  `feGaussianBlur` per word, its vertical deviation tweened to zero with
+  the climb, the filter dropped on landing so the line renders crisp and
+  costs nothing); the smear-up exit blurs the leaving words. This is most
+  of why the naano type reads as After Effects and ours read as a
+  transform tween.
+- **`checklist-toggles`** (props): a feature as rows (icon, label, switch)
+  sliding into a stack of white pill cards, each switch flipping to the
+  accent color at its own `at` -- a word anchor -- else on an interval.
+  Rows size themselves to the box; a long label shrinks its row before it
+  clips; `theme: dark` for a dark ground.
+- **`card-fan`** (props): a group as three to six cards (image or initials
+  avatar, label, sublabel) spreading into a 3D arc from below, a slow yaw
+  while it holds, an optional `focus` card that comes forward. Sized to
+  the box; deterministic poses, no Math.random.
+- **`launch-what-if-features`** (hype-cut, 16x9, 26-34 s): the cut of the
+  naano film with its content removed. Hook question in type that climbs
+  in; one or two "what if" wishes over an object each; the wordmark;
+  three features as one moving object each (the checklist, the fan, the
+  product's surface); the proof on a surface with real numbers; URL pill
+  and cursor to close. The beat notes name the two props by component
+  type so the writer casts the catalog entry.
+- `applyRecipeMotion`: a recipe's `keyword.in` of `type-on`/`assemble`
+  and `keyword.out` of `smear-up` are the type's own entrances, not
+  assembler effects -- they now land on the kinetic-text `data`
+  (`entrance`, `exit`) when the writer set none. The two props take the
+  recipe's `checklist`/`cards` elements (a cut: they animate themselves).
+- Both props are excluded from the phone zoom (they size to their box).
+Left for later, from the same list: perspective tilt on mocks, the call
+and URL pills as props, a sky world.

@@ -1,6 +1,6 @@
 # SPEC-recipes.md -- the recipe: the measured cut of a film with the content removed
 
-Status: shipped 2026-09-19 (library of nine). Companion docs: `SPEC-creative-axes.md`
+Status: shipped 2026-09-19 (library of ten). Companion docs: `SPEC-creative-axes.md`
 (grammar), `SPEC-format-and-spine.md` (frame), `SPEC-creator-cut.md`, `SPEC-briefs.md`.
 
 ## Why
@@ -91,6 +91,7 @@ full-frame screen. Every other style is the plated chest-band lane.
 | story-ad-idea-beats | hype-cut | 9x16 | Gamma, 16s | no person: type is the voice, one illustrated object per beat (the clock, the balloons); feeling, pain, wordmark reveal, product output fanning in, payoff, end card with a pill button |
 | ask-work-result | canvas-tour | 1x1 | Runway in ChatGPT, 28.5s | an agent demo: a second of the payoff, the ask typed in full, the agent's checklist with its elapsed time, the deliverable full frame for half the film with two claim lines, one CTA line, wordmark on black; four lines of type in all |
 | founder-bookends-chapters | creator-cut | 16x9 | Voicepanel Grade, 88.5s | a founder on a couch with props beside the head that get badged on the turn; the wordmark on white; 'let me show you how'; two or three chapters of MOTION GRAPHICS on white, each named by a kicker with step dots, one surface building per chapter; back to the founder with a logo band; wordmark and URL |
+| launch-what-if-features | hype-cut | 16x9 | naano launch (X), 30s | no person, a voice: a question in type that climbs in with motion blur; one or two "what if" wishes over an object each; the wordmark; three features as one moving object each (a checklist whose switches flip on as the voice names the rows, a fan of cards turning in 3D, the product's surface); the proof on a surface with real numbers; URL pill and cursor to close |
 
 ## Adding one
 

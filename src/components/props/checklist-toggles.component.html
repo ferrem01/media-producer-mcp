@@ -1,0 +1,106 @@
+<template>
+  <div class="cktg"></div>
+</template>
+
+<style scoped>
+  /* ── checklist-toggles: a feature as rows that switch ON as the voice
+     names them. White pill cards with a soft floor shadow, an icon, a
+     label and a switch whose knob slides and whose track turns the accent
+     color at the row's word anchor (the naano launch film, beat 8). ── */
+  .cktg { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: var(--ck-gap, 14px); pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .cktg-row { display: flex; align-items: center; gap: 0.55em; width: 100%; max-width: var(--ck-w, 560px);
+    box-sizing: border-box; padding: 0.42em 0.6em 0.42em 0.55em; border-radius: 999px;
+    background: var(--ck-card, #ffffff); color: var(--ck-ink, #17171c);
+    box-shadow: 0 14px 34px rgba(20, 16, 40, 0.16), 0 2px 6px rgba(20, 16, 40, 0.08);
+    font-size: var(--ck-fs, 24px); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+  .cktg-dark .cktg-row { background: var(--ck-card, #1c1c24); color: var(--ck-ink, #f5f6fa);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+  .cktg-icon { flex: 0 0 auto; width: 1.55em; height: 1.55em; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 0.92em; line-height: 1;
+    background: color-mix(in srgb, var(--ck-on, #22c55e) 14%, transparent); }
+  .cktg-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+  .cktg-sw { flex: 0 0 auto; position: relative; width: 2.1em; height: 1.2em; border-radius: 999px;
+    background: var(--ck-off, #d5d7de); transition: none; }
+  .cktg-dark .cktg-sw { background: var(--ck-off, #3a3a46); }
+  .cktg-knob { position: absolute; top: 0.12em; left: 0.12em; width: 0.96em; height: 0.96em; border-radius: 50%;
+    background: #fff; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.cktg');
+    var items = Array.isArray(data.items) ? data.items.filter(function (it) { return it && (typeof it === 'string' || it.label); }) : [];
+    if (!items.length) items = [{ label: 'Ready' }];
+    if (data.theme === 'dark') host.classList.add('cktg-dark');
+    if (data.color) host.style.setProperty('--ck-on', data.color);
+    if (data.card_color) host.style.setProperty('--ck-card', data.card_color);
+    if (data.text_color) host.style.setProperty('--ck-ink', data.text_color);
+    if (Number(data.scale) > 0 && Number(data.scale) !== 1) host.style.zoom = String(Number(data.scale));
+
+    // SIZE TO THE BOX: rows share the height, the pill never spills the width.
+    var hostW = host.clientWidth || 600, hostH = host.clientHeight || 400;
+    var n = items.length;
+    var rowH = Math.min(hostH / (n * 1.32), hostW * 0.16, 132);
+    var fs = Math.max(12, Math.round(rowH * 0.36));
+    host.style.setProperty('--ck-fs', fs + 'px');
+    host.style.setProperty('--ck-gap', Math.round(rowH * 0.26) + 'px');
+    host.style.setProperty('--ck-w', Math.round(Math.min(hostW * 0.92, fs * 24)) + 'px');
+
+    var onColor = data.color || 'var(--mp-color-success, #22c55e)';
+    var at = data.at !== undefined ? Math.max(0, Number(data.at) || 0) : 0.4;
+    var stagger = Number(data.stagger) > 0 ? Number(data.stagger) : 0.14;
+    var interval = Number(data.interval) > 0 ? Number(data.interval) : 0.55;
+    var flipDelay = data.flip_delay !== undefined ? Number(data.flip_delay) || 0 : 0.5;
+    var rows = [];
+    items.forEach(function (raw, i) {
+      var it = typeof raw === 'string' ? { label: raw } : raw;
+      var row = document.createElement('div');
+      row.className = 'cktg-row';
+      var icon = document.createElement('div');
+      icon.className = 'cktg-icon';
+      icon.textContent = it.icon ? String(it.icon) : '';
+      if (!it.icon) icon.style.display = 'none';
+      var label = document.createElement('div');
+      label.className = 'cktg-label';
+      label.textContent = String(it.label || '');
+      var sw = document.createElement('div');
+      sw.className = 'cktg-sw';
+      var knob = document.createElement('div');
+      knob.className = 'cktg-knob';
+      sw.appendChild(knob);
+      row.appendChild(icon); row.appendChild(label); row.appendChild(sw);
+      host.appendChild(row);
+      // Fit: a long label shrinks its own row before it clips.
+      var over = row.scrollWidth - row.clientWidth;
+      if (over > 2) row.style.fontSize = Math.max(11, Math.floor(fs * row.clientWidth / row.scrollWidth)) + 'px';
+      rows.push({ row: row, sw: sw, knob: knob, it: it });
+    });
+
+    rows.forEach(function (o, i) {
+      var enter = at + i * stagger;
+      // Rows slide up into the stack with a short blur smear and a settle.
+      gsap.set(o.row, { autoAlpha: 0, y: 46, scale: 0.96, filter: 'blur(8px)' });
+      tl.to(o.row, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.5, ease: 'back.out(1.4)' }, enter);
+      tl.set(o.row, { filter: 'none' }, enter + 0.5);
+      // The switch flips at the row's own word anchor (it.at), else on the
+      // recipe's interval after the row lands.
+      var flip = o.it.at !== undefined && o.it.at !== null && o.it.at !== ''
+        ? Math.max(enter + 0.15, Number(o.it.at) || 0)
+        : at + (n - 1) * stagger + flipDelay + i * interval;
+      if (o.it.on === false) return; // a row that stays off (the "before")
+      var travel = o.sw.clientWidth - o.knob.clientWidth - 2 * (o.knob.offsetLeft || 0);
+      tl.to(o.knob, { x: Math.max(8, travel), duration: 0.28, ease: 'power3.out' }, flip);
+      tl.to(o.sw, { backgroundColor: onColor, duration: 0.22, ease: 'power2.out' }, flip);
+      // The row acknowledges the flip: a small lift and back.
+      tl.to(o.row, { scale: 1.03, duration: 0.12, ease: 'power2.out' }, flip)
+        .to(o.row, { scale: 1, duration: 0.22, ease: 'power2.inOut' }, flip + 0.12);
+    });
+
+    var hold = Number(data.hold) || 0;
+    if (hold > 0) tl.to(host, { autoAlpha: 0, y: -18, duration: 0.3, ease: 'power2.in' }, at + hold);
+    return tl;
+  }
+</script>

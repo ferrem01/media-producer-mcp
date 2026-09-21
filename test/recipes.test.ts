@@ -5,10 +5,10 @@ import path from "node:path";
 const read = (p: string) => fs.readFile(path.join(process.cwd(), p), "utf8");
 
 describe("the recipe: the measured cut of a film with the content removed", () => {
-  it("the library loads nine valid recipes, each under one grammar with proven frames and a measured source", async () => {
+  it("the library loads ten valid recipes, each under one grammar with proven frames and a measured source", async () => {
     const { loadRecipes, validateRecipe, recipeSceneBand } = await import("../src/core/recipes.js");
     const rs = loadRecipes();
-    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-story-broll", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
+    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-story-broll", "launch-what-if-features", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
     for (const r of rs) {
       expect(validateRecipe(r)).toEqual([]);
       expect(["creator-cut", "speaker", "hype-cut", "canvas-tour"]).toContain(r.grammar);
@@ -25,7 +25,7 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const { getRecipe, recipeBlock, recipeSceneBand, recipesForGrammar } = await import("../src/core/recipes.js");
     const g = getRecipe("story-ad-idea-beats")!;
     expect(g.grammar).toBe("hype-cut");
-    expect(recipesForGrammar("hype-cut").map((r) => r.id)).toEqual(["story-ad-idea-beats"]);
+    expect(recipesForGrammar("hype-cut").map((r) => r.id)).toEqual(["launch-what-if-features", "story-ad-idea-beats"]);
     expect(recipeSceneBand(g)).toEqual({ min: 6, max: 9 });
     expect(g.asks.take).toBe("none");
     expect((g.layers as any).voice).toBe("type");
@@ -234,7 +234,8 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const k = getRecipe("speaker-kinetic-claims")!;
     const s2: any = { components: [{ type: "kinetic-text", data: {} }] };
     applyRecipeMotion(s2, k, "claim");
-    expect(s2.components[0].enter).toBeUndefined(); // type-on is not an assembler effect: left to the component
+    expect(s2.components[0].enter).toBeUndefined(); // type-on is not an assembler effect: it lands on the component's data
+    expect(s2.components[0].data.entrance).toBe("type-on");
     expect(s2.camera_fixed).toBeUndefined(); // punch-in per claim
   });
   it("is the third axis: the director gets the menu and honors a pin, the writer gets the block, the pipeline checks and applies, the tool takes it", async () => {
@@ -256,5 +257,40 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect((server.match(/recipe: z\.string\(\)\.optional\(\)\.describe\("The RECIPE axis/g) || []).length).toBe(3);
     expect((server.match(/recipe: params\.recipe,/g) || []).length).toBe(2);
     expect(await read("package.json")).toMatch(/cp -r src\/recipes dist\//);
+  });
+
+  it("the launch film: nine beats in thirty seconds, no person, the checklist and the fan cast by the writer and held to the recipe's motion", async () => {
+    const { getRecipe, recipeBlock, recipeSceneBand, applyRecipeMotion, holdMadeToRecipe, roleOfLabel } = await import("../src/core/recipes.js");
+    const r = getRecipe("launch-what-if-features")!;
+    expect(r.grammar).toBe("hype-cut");
+    expect(r.frames_proven).toEqual(["16x9"]);
+    expect(r.asks.take).toBe("none");
+    expect(recipeSceneBand(r)).toEqual({ min: 8, max: 9 });
+    expect(r.spine.map((b) => b.role)).toEqual(["hook", "wish", "reveal", "feature_checklist", "feature_fan", "feature_surface", "proof", "close"]);
+    // Thirty seconds at the targets: the source film's length.
+    const target = r.spine.reduce((t, b) => t + b.dur[1] * (b.repeat ? b.repeat[1] : 1), 0);
+    expect(target).toBeGreaterThanOrEqual(28); expect(target).toBeLessThanOrEqual(32);
+    // The writer's block names the two props by component type, so the catalog entry is cast.
+    const block = recipeBlock(r, "16x9");
+    expect(block).toMatch(/checklist-toggles component/);
+    expect(block).toMatch(/card-fan component/);
+    expect(block).toMatch(/entrance 'assemble'/);
+    // The feature beats are motion graphics: a screen need the writer added goes; the props stay.
+    const scene: any = { label: "Feature_checklist - three things it does", purpose: "x", assets: [{ type: "screen_recording", status: "needed" }], components: [{ type: "checklist-toggles", data: { items: [{ label: "a" }] } }, { type: "kinetic-text", data: { text: "x" } }] };
+    expect(roleOfLabel(scene.label, r)).toBe("feature_checklist");
+    expect(holdMadeToRecipe(scene, r)).toEqual(["1 screen need(s) dropped: the beat is motion graphics"]);
+    expect(scene.components.length).toBe(2);
+    // The props self-animate: the recipe gives them a cut, never a layered enter; the keyword takes assemble/smear-up.
+    const n = applyRecipeMotion(scene, r, "feature_checklist");
+    expect(scene.components[0].enter).toEqual({ effect: "cut" });
+    expect(scene.components[0].exit).toBeUndefined();
+    expect(scene.components[1].enter).toBeUndefined(); // the type's entrances are its own, not the assembler's
+    expect(scene.components[1].data.entrance).toBe("assemble");
+    expect(scene.components[1].data.exit).toBe("smear-up");
+    expect(scene.camera_fixed).toBe(true);
+    expect(n).toBe(3);
+    const fan: any = { components: [{ type: "card-fan", data: { cards: [{ label: "a" }] } }] };
+    applyRecipeMotion(fan, r, "feature_fan");
+    expect(fan.components[0].enter).toEqual({ effect: "cut" });
   });
 });

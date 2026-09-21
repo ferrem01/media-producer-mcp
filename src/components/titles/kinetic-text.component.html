@@ -127,6 +127,23 @@
       // Measure AFTER layout, BEFORE transforms: each word's climb starts
       // just past the stage bottom, wherever its slot is.
       var stageH = (ctx.canvas && ctx.canvas.height) || 1080;
+      // MOTION BLUR ON THE TRAVEL (data.blur, default on): a word in flight
+      // streaks along its own axis and is sharp the moment it lands -- the
+      // After Effects tell the naano launch film has and a plain transform
+      // tween lacks. One SVG filter per word, its vertical stdDeviation
+      // tweened to zero with the climb, then the filter is dropped so the
+      // landed line costs nothing and renders crisp.
+      var mbOn = data.blur !== false && stageH > 0;
+      window.__ktmb = (window.__ktmb || 0) + 1; // unique per instance, stable per boot
+      var mbId = 'ktmb' + window.__ktmb;
+      var mbSvg = null;
+      if (mbOn) {
+        mbSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        mbSvg.setAttribute('width', '0');
+        mbSvg.setAttribute('height', '0');
+        mbSvg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+        el.querySelector('.kinetic-text').appendChild(mbSvg);
+      }
       spansA.forEach(function (o, i) {
         var slotTop = o.span.getBoundingClientRect().top;
         var rise = Math.max(120, stageH * 1.1 - slotTop);
@@ -137,6 +154,24 @@
           rotation: (rnd(i, 3) - 0.5) * 14,
         });
         tl.to(o.span, { y: 0, x: 0, rotation: 0, duration: 0.8, ease: 'power2.out' }, when);
+        if (mbSvg) {
+          var f = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+          f.setAttribute('id', mbId + '-' + i);
+          f.setAttribute('x', '-40%'); f.setAttribute('y', '-120%');
+          f.setAttribute('width', '180%'); f.setAttribute('height', '340%');
+          f.setAttribute('color-interpolation-filters', 'sRGB');
+          var fb = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+          fb.setAttribute('stdDeviation', '0 0');
+          f.appendChild(fb);
+          mbSvg.appendChild(f);
+          // Streak length follows the climb speed: a word rising a whole
+          // frame smears more than one rising a line.
+          var smear = Math.min(28, Math.max(10, rise * 0.024));
+          tl.set(o.span, { filter: 'url(#' + mbId + '-' + i + ')' }, when);
+          // Decays a touch slower than the travel so mid-flight still streaks.
+          tl.fromTo(fb, { attr: { stdDeviation: '0 ' + smear } }, { attr: { stdDeviation: '0 0' }, duration: 0.8, ease: 'power1.out' }, when);
+          tl.set(o.span, { filter: 'none' }, when + 0.8);
+        }
         if (o.it.accent && o.span.children.length) {
           // Land wavy, then settle letter by letter.
           Array.prototype.slice.call(o.span.children).forEach(function (c, ci) {
@@ -258,6 +293,8 @@
             autoAlpha: 0,
             duration: 0.7, ease: 'power2.in',
           }, follow + xr(i, 4) * 0.2);
+          // The leaving word streaks as it accelerates (data.blur, default on).
+          if (data.blur !== false) tl.to(w, { filter: 'blur(9px)', duration: 0.7, ease: 'power2.in' }, follow + xr(i, 4) * 0.2);
         });
         if (!wordEls.length) tl.to(container, { y: -260, autoAlpha: 0, duration: 0.6, ease: 'power2.in' }, exitAt);
       } else {
