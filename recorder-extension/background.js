@@ -487,6 +487,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         s.events.mutationsIdle = idleFromActivity(s.events._activity, durationMs);
         delete s.events._activity;
         const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        // THE ARMED SLOT IS THE SERVER'S TRUTH. The popup caches the armed
+        // need into settings when it opens; a slot armed in Studio after that
+        // (or after the last take filled the previous one) was invisible here
+        // and the take went the append route -- a new scene with two frames
+        // (measured live: Marc's scene 7 re-record became a scene 8). Ask
+        // the server now, at stop, and let a live arm win over the cache.
+        let destProject = s.settings.destProject || "";
+        let destNeed = (s.settings.destProject && s.settings.destNeed) || "";
+        try {
+          const srv = (s.settings.server || SERVER).replace(/\/+$/, "");
+          const ar = await fetch(`${srv}/api/armed-need/${encodeURIComponent(s.settings.tenant)}?token=${encodeURIComponent(s.settings.token)}`);
+          const aj = ar.ok ? await ar.json() : null;
+          const a = aj && aj.armed;
+          if (a && a.project_id && Number.isInteger(a.scene_index) && Number.isInteger(a.asset_index)) {
+            destProject = a.project_id;
+            destNeed = `${a.scene_index}:${a.asset_index}`;
+          }
+        } catch (e) { /* offline: the cached choice stands */ }
         // Offscreen owns the blobs; it uploads video (+camera) -> events -> generate.
         await chrome.runtime.sendMessage({
           type: "qr-offscreen-stop",
@@ -502,9 +520,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             camera: !!s.settings.camera,
             // Save-to picker: append the take to this project as a new scene
             // instead of assembling a fresh walkthrough project.
-            destProjectId: s.settings.destProject || "",
+            destProjectId: destProject,
             // For picker: "scene:asset" of the need this recording fills.
-            destNeed: (s.settings.destProject && s.settings.destNeed) || "",
+            destNeed: destNeed,
           },
         });
         sendResponse({ ok: true });

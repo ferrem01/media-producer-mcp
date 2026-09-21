@@ -87,9 +87,12 @@ describe("the sources: every need is collected its own way, in the board", () =>
     const bg = await read("recorder-extension/background.js");
     expect(bg).toMatch(/msg\.type === "qr-needs"/);
     expect(bg).toMatch(/a\.type === "screen_recording" \|\| a\.type === "screenshot"\) && a\.status === "needed"/);
-    expect(bg).toMatch(/destNeed: \(s\.settings\.destProject && s\.settings\.destNeed\) \|\| ""/);
+    // The armed slot is the server's truth at stop: a live arm wins over the popup's cached choice.
+    expect(bg).toMatch(/let destNeed = \(s\.settings\.destProject && s\.settings\.destNeed\) \|\| "";/);
+    expect(bg).toMatch(/destNeed = `\$\{a\.scene_index\}:\$\{a\.asset_index\}`;/);
     const off = await read("recorder-extension/offscreen.js");
-    expect(off).toMatch(/const uploadProject = \(upload\.destProjectId && upload\.destNeed\) \? upload\.destProjectId : upload\.project;/);
+    // A recording for a project (a need, or an appended scene) lands in that project's assets.
+    expect(off).toMatch(/const uploadProject = upload\.destProjectId \? upload\.destProjectId : upload\.project;/);
     expect(off).toMatch(/\/api\/provide-asset\/\$\{encodeURIComponent\(upload\.tenant\)\}\/\$\{encodeURIComponent\(upload\.destProjectId\)\}/);
   });
 
