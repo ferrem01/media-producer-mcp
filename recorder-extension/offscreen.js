@@ -121,12 +121,15 @@ async function prep(streamId, mic, camera, dims, micDeviceId) {
       // whole stream, audio included, so a user who unticked the mic still got
       // recorded. Now the switch governs the microphone in BOTH directions.
       const videoWanted = camera
-        ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } }
+        // The camera as the booth asks for it: 1080p, 30 fps. On a person
+        // film this file becomes the scene's TAKE (the face, cut out over
+        // the page); 720p at 2.5 Mbps read soft and dark next to a booth take.
+        ? { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, facingMode: "user" } }
         : {};
       if (!mic) {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: false, ...videoWanted });
         camStream = micStream;
-        camRecorder = new MediaRecorder(camStream, { mimeType: "video/webm;codecs=vp9", videoBitsPerSecond: 2_500_000 });
+        camRecorder = new MediaRecorder(camStream, { mimeType: "video/webm;codecs=vp9", videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 });
         camChunks = [];
         camRecorder.ondataavailable = (e) => { if (e.data && e.data.size) camChunks.push(e.data); };
         const st0 = tab.getVideoTracks()[0]?.getSettings?.() || {};
@@ -170,7 +173,7 @@ async function prep(streamId, mic, camera, dims, micDeviceId) {
         // tab file stays video-only. Both recorders start in the same tick,
         // so the two files share one clock.
         camStream = micStream;
-        camRecorder = new MediaRecorder(camStream, { mimeType: "video/webm;codecs=vp9,opus", videoBitsPerSecond: 2_500_000 });
+        camRecorder = new MediaRecorder(camStream, { mimeType: "video/webm;codecs=vp9,opus", videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 });
         camChunks = [];
         camRecorder.ondataavailable = (e) => { if (e.data && e.data.size) camChunks.push(e.data); };
       } else {
