@@ -4442,3 +4442,18 @@ a script: the rotation is the component's own timeline.
   max-width: 100% }`) collapsed a card inside a zero-width slot to 0 px:
   the slot now carries the card's size.
 
+
+## 2026-09-21 -- The cast is set on the board, deterministically
+
+Putting the ring on scene 6 of the naano test board took a paragraph of
+feedback and a writer call for what is a data edit: the update tool's
+scene edit took lines only (label, purpose, notes, duration), and Studio
+Inspect edits built scenes. The update tool's `storyboard.scenes[]` now
+takes `components` -- the whole cast in stack order, each `{type, data,
+position?, z_index?, enter?, exit?, anchors?}` (`StoryboardComponent` in
+types.ts) -- and `scene_template` (set one, or null to drop it). Omit
+`components` to keep the cast, pass `[]` to clear it; a cast set on a
+templated scene drops the template unless one is passed in the same edit
+(a template covers the cast). An appended scene takes a cast too. The
+cards re-photograph after the edit as before. Test:
+`update-board-cast.test.ts`, against the in-process MCP server.
