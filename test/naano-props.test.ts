@@ -174,4 +174,12 @@ describe("the naano takeaways", () => {
     expect(dk).toMatch(/var fit = Math\.min\(1\.8, \(boxW - 80\) \/ 1100, boxH > 0 \? \(boxH - 80\) \/ 420 : 1\.8\);/);
     expect(dk).toMatch(/frame\.style\.zoom = fit\.toFixed\(3\);/);
   });
+
+  it("on the sky world an illustration need is drawn for any grammar, as the beat's hero_image on the cutout path", async () => {
+    const pipeline = await read("src/llm/pipeline.ts");
+    expect(pipeline).toMatch(/if \(world\.backdrop\.component === "sky-backdrop"\) \{\n\s*for \(const d of storyboard\.scenes as any\[\]\) \{\n\s*if \(d\.hero_image \|\| !Array\.isArray\(d\.assets\)\) continue;/);
+    expect(pipeline).toMatch(/d\.hero_image = drawPrompt\(need\);/);
+    const sb = await fs.readFile(path.resolve(__dirname, "../src/components/effects/sky-backdrop.component.html"), "utf-8");
+    expect(sb).toMatch(/\[0\.74, 0\.9, 0\.3, 0\.22\]/); // the low cloud keeps to a corner
+  });
 });

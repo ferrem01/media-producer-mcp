@@ -3233,6 +3233,18 @@ async function runUnifiedPipeline(
   }
 
   // 3. Media enrichment (images, future: video, music)
+  // ON THE SKY WORLD an illustration need is drawn for any grammar: the
+  // in-house idea-beat draw below runs only on person films (a non-person
+  // film's ground is laid by the generator), so a hype-cut wish beat
+  // asking for its object got nothing (measured live, proj_d8a2d6a7). The
+  // need becomes the scene's hero_image and rides the cutout path.
+  if (world.backdrop.component === "sky-backdrop") {
+    for (const d of storyboard.scenes as any[]) {
+      if (d.hero_image || !Array.isArray(d.assets)) continue;
+      const need = d.assets.find((a: any) => a && typeof a === "object" && a.type === "illustration" && a.status !== "provided" && a.description);
+      if (need) { d.hero_image = drawPrompt(need); console.log(`  Sky world: "${d.label || ""}" -- the illustration need is drawn as the beat's object`); }
+    }
+  }
   opts.onProgress?.({ step: "media", percent: 16, detail: "Preparing imagery & assets" });
   trace?.beginEvent("media_enrichment");
   var enrichResult = await enrichProjectMedia({

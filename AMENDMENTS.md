@@ -4604,3 +4604,22 @@ Four follow-ups from the rendered naano test film, Marc's "voice: 1, and
   (st-logo-close) dropped to dark webgl ribbons in a sky film; on the sky
   world the injected z0 backdrop is the sky-backdrop with the world's
   data, the wordmark in white on the brand color.
+
+## 2026-09-21 -- The voiced test film: three more holds
+
+The first voiced launch film (proj_d8a2d6a7, 46.5 s): the narrator is
+there on every beat, the reveal sits on the sky, the props stand alone.
+Three things it showed. (1) A bottom-band caption over the low cloud
+peeking in at the centre measured white-on-white and had its ink flipped
+dark, like the top line before it: the low cloud keeps to a corner too.
+(2) The writer labeled the feature beats "Feature 1/2/3" instead of
+naming the roles, so `roleOfLabel` matched none of them -- no hold, no
+motion, and a screen-recording slate shipped on a motion-graphics beat.
+A numbered family label now maps to the N-th role sharing that stem.
+(3) The in-house illustration draw runs only on person films, so a
+hype-cut wish beat asking for its object got nothing: on the sky world
+an illustration need becomes the scene's hero_image and rides the cutout
+path on any grammar. Also measured: the voice is the clock, and the
+writer's 15-word line on a 3.5 s beat doubled the beat (28 s board,
+42.5 s film); the voice block now says so and holds the writer to the
+beat's word budget.
