@@ -41,7 +41,7 @@
     },
     "tasks": {
       "type": "array",
-      "label": "Task rows: [{text, due: 'Jul 5', priority: 'high'|'medium'|'low', owner: 'Marc F...', avatar_url, platform: 'linkedin'|'x', deliverable: 'Marc LinkedI...', done?}]",
+      "label": "Task rows: [{text, due: 'Jul 5', priority: 'high'|'medium'|'low', owner: 'Marc F...', avatar_url, platform: 'linkedin'|'x', deliverable: 'Marc LinkedI...', status?: 'todo' (default) | 'in_progress' | 'in_review' | 'done'}]. Tasks are GROUPED BY STATUS the way the product groups them -- Completed, In review, In progress, To-do, each with its own header, icon and count -- and a section with nothing in it is not drawn. (`done: true` still reads as status 'done'.)",
       "optional": true
     },
     "calendar": {
@@ -61,7 +61,7 @@
     },
     "script": {
       "type": "array",
-      "label": "Actions: switch-tab {tab: 'brief'|'tasks'|'activation'|'deliverables'|'metrics'} (tab press + view crossfade -- THE tour beat; 'metrics' also fires the KPI count-ups + line draw), start-task {index, label?} (the ring half-fills in the brand colour and the row's chip reads 'In progress' -- work PICKED UP), complete-task {index} (checkbox fills green, Completed count ticks), move-event {index, day, top?} (the calendar card LIFTS with a shadow and glides to another day column -- the drag-and-drop beat), set-event-status {index, status} (calendar card status flips, e.g. draft -> published), set-deliverable-status {index, status} (table status flips to the green rocket), scroll-view {amount, duration}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (tabs, brief, tasks, calendar, deliverables).",
+      "label": "Actions: switch-tab {tab: 'brief'|'tasks'|'activation'|'deliverables'|'metrics'} (tab press + view crossfade -- THE tour beat; 'metrics' also fires the KPI count-ups + line draw), set-task-status {index, status: 'todo'|'in_progress'|'in_review'|'done'} (the task MOVES to that section: its row closes in the old one and opens in the new, the section headers open and close with their contents, both counts and the Completed n/N follow), start-task {index} (= in_progress), complete-task {index} (= done), move-event {index, day, top?} (the calendar card LIFTS with a shadow and glides to another day column -- the drag-and-drop beat), set-event-status {index, status} (calendar card status flips, e.g. draft -> published), set-deliverable-status {index, status} (table status flips to the green rocket), scroll-view {amount, duration}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (tabs, brief, tasks, calendar, deliverables).",
       "optional": true
     },
     "cursor_targets": {
