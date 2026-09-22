@@ -83,7 +83,7 @@ const CASES: Record<string, Case> = {
   // The menu row is built hidden and only faded in -- it still has a box, so
   // the aim resolves before it is ever shown.
   socialMenu: {
-    type: "quotient-social", duration: 3.2, at: 1.8,
+    type: "quotient-social", duration: 3.2, at: 1.65,
     selector: '.qsp-schedmenu-row[data-menu="publish"]',
     data: {
       platform: "linkedin", status: "draft", post_title: "BrightLoop LinkedIn Draft",
@@ -135,17 +135,27 @@ async function aimOf(browser: Browser, c: Case) {
     return await page.evaluate((sel) => {
       const cur = document.querySelector(".mp-cursor");
       const el = document.querySelector(sel);
-      if (!cur || !el) return { found: false, inside: false, missBy: 9999, opacity: 0 };
+      if (!cur || !el) return { found: false, inside: false, missBy: 9999, opacity: 0,
+        ringOpacity: 0, ringVisible: false, ringAspect: 0, flash: false };
       const cb = cur.getBoundingClientRect(), eb = el.getBoundingClientRect();
       // The arrow's POINT is what clicks, not the middle of the 24px box.
       const tip = { x: cb.left + 2, y: cb.top + 2 };
       const dx = tip.x < eb.left ? eb.left - tip.x : (tip.x > eb.right ? tip.x - eb.right : 0);
       const dy = tip.y < eb.top ? eb.top - tip.y : (tip.y > eb.bottom ? tip.y - eb.bottom : 0);
+      // The click has to be SEEN: the ring leaving the tip is the gesture,
+      // and it must still be a circle (the assembler's max-width:100% safety
+      // rule once squeezed it into an ellipse inside the 24px cursor box).
+      const ring = cur.querySelector(".mp-cursor-ring") as HTMLElement | null;
+      const rb = ring ? ring.getBoundingClientRect() : null;
       return {
         found: true,
         inside: dx === 0 && dy === 0,
         missBy: Math.round(Math.hypot(dx, dy)),
         opacity: Number(getComputedStyle(cur).opacity),
+        ringOpacity: ring ? Number(getComputedStyle(ring).opacity) : 0,
+        ringVisible: ring ? getComputedStyle(ring).visibility === "visible" : false,
+        ringAspect: rb && rb.height ? rb.width / rb.height : 0,
+        flash: !!document.querySelector(".mp-click-flash"),
       };
     }, c.selector);
   } finally {
@@ -167,6 +177,12 @@ describe("cursor aim", () => {
         expect(r.opacity, `${name}: cursor must be visible at the click`).toBeGreaterThan(0.5);
         expect(r.missBy, `${name}: pointer missed by ${r.missBy}px`).toBe(0);
         expect(r.inside, `${name}: pointer must be inside the target`).toBe(true);
+        // A press the audience cannot see is a pointer hovering, which is the
+        // note this came back with: the mouse gets there and there is no click.
+        expect(r.ringVisible, `${name}: the click ring must be showing`).toBe(true);
+        expect(r.ringOpacity, `${name}: the click ring must be visible`).toBeGreaterThan(0.02);
+        expect(r.ringAspect, `${name}: the click ring must stay a circle`).toBeCloseTo(1, 1);
+        expect(r.flash, `${name}: the clicked element must answer with a tap tint`).toBe(true);
       }
     } finally {
       await browser.close();

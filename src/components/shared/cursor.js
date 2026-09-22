@@ -44,6 +44,22 @@ function createCursor(container, options) {
             'fill="' + color + '" stroke="#ffffff" stroke-width="1.5"/>' +
     '</svg>';
 
+  // THE CLICK HAS TO BE SEEN. A 15% scale dip lasts two frames and reads as
+  // nothing; a ring leaving the tip is the one gesture an audience already
+  // knows. It lives inside the cursor so it always fires from the point.
+  var ringR = Math.round(size * 0.9);
+  var ring = document.createElement('div');
+  ring.className = 'mp-cursor-ring';
+  ring.style.cssText =
+    'position:absolute;left:' + (2 - ringR) + 'px;top:' + (2 - ringR) + 'px;' +
+    'width:' + (ringR * 2) + 'px;height:' + (ringR * 2) + 'px;border-radius:50%;' +
+    'border:' + Math.max(2, Math.round(size * 0.1)) + 'px solid ' + color + ';' +
+    // The assembler clamps every component descendant to max-width:100%,
+    // which squeezed the ring into an ellipse inside the 24px cursor box.
+    'pointer-events:none;box-sizing:border-box;max-width:none';
+  gsap.set(ring, { autoAlpha: 0, scale: 0.25, transformOrigin: '50% 50%' });
+  el.appendChild(ring);
+
   if (typeof opts.label === 'string' && opts.label.trim()) {
     var pill = document.createElement('div');
     pill.className = 'mp-cursor-label';
@@ -93,6 +109,39 @@ function moveCursor(tl, cursor, target, at, duration, ease) {
 function clickCursor(tl, cursor, at) {
   tl.to(cursor, { scale: 0.85, duration: 0.08, ease: 'power2.in' }, at);
   tl.to(cursor, { scale: 1,    duration: 0.08, ease: 'power2.out' }, at + 0.08);
+  var ring = cursor.querySelector('.mp-cursor-ring');
+  if (ring) {
+    tl.fromTo(ring, { autoAlpha: 0.8, scale: 0.25 },
+      { autoAlpha: 0, scale: 1.55, duration: 0.42, ease: 'power2.out', immediateRender: false }, at);
+  }
+}
+
+/**
+ * THE THING BEING CLICKED ANSWERS. A pointer that presses and nothing moves
+ * is a pointer hovering. A tap tint over the element's own box says the click
+ * landed, without touching the mock's styles (which are busy doing their own
+ * work) -- it is drawn over them and taken away.
+ *
+ * @param {gsap.core.Timeline} tl
+ * @param {HTMLElement} container
+ * @param {{x:number,y:number,w:number,h:number}} box  Element box, container px.
+ * @param {number} at
+ */
+function clickFlash(tl, container, box, at) {
+  if (!box || !box.w || !box.h) return null;
+  var pad = 3;
+  var f = document.createElement('div');
+  f.className = 'mp-click-flash';
+  f.style.cssText =
+    'position:absolute;pointer-events:none;z-index:9998;border-radius:8px;' +
+    'background:rgba(20,20,32,0.13);' +
+    'left:' + (box.x - box.w / 2 - pad) + 'px;top:' + (box.y - box.h / 2 - pad) + 'px;' +
+    'width:' + (box.w + pad * 2) + 'px;height:' + (box.h + pad * 2) + 'px;max-width:none';
+  gsap.set(f, { autoAlpha: 0 });
+  container.appendChild(f);
+  tl.to(f, { autoAlpha: 1, duration: 0.07, ease: 'power2.out' }, at);
+  tl.to(f, { autoAlpha: 0, duration: 0.26, ease: 'power2.out' }, at + 0.1);
+  return f;
 }
 
 /**
@@ -146,7 +195,10 @@ function elementTarget(container, name) {
   for (var i = nodes.length - 1; i >= 0; i--) {
     var r = nodes[i].getBoundingClientRect();
     if (!r.width && !r.height) continue;
-    return { x: (r.left - c.left) + r.width / 2, y: (r.top - c.top) + r.height / 2 };
+    return {
+      x: (r.left - c.left) + r.width / 2, y: (r.top - c.top) + r.height / 2,
+      w: r.width, h: r.height,
+    };
   }
   return null;
 }

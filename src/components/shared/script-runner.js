@@ -95,6 +95,7 @@ function _processOneAction(tl, container, action, at, dur, targets, ctx, handler
           if (target) {
             moveCursor(tl, cursor, target, at, 0.3, action.ease);
             clickCursor(tl, cursor, at + 0.3);
+            if (action.flash !== false) clickFlash(tl, container, target, at + 0.3);
           }
         } else {
           clickCursor(tl, cursor, at);
@@ -109,6 +110,7 @@ function _processOneAction(tl, container, action, at, dur, targets, ctx, handler
           if (target) {
             moveCursor(tl, cursor, target, at, 0.3, action.ease);
             doubleClickCursor(tl, cursor, at + 0.3);
+            if (action.flash !== false) clickFlash(tl, container, target, at + 0.3);
           }
         } else {
           doubleClickCursor(tl, cursor, at);
