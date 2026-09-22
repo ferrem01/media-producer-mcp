@@ -53,7 +53,7 @@ import { config } from "../config.js";
 import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateVideoClip } from "../media/video-gen.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
-import type { BrandKit, Canvas, OutputFormat, StoryboardScene, Project, Storyboard, ReferenceImage, Scene, SceneBeat, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, StoryboardScene, Project, Storyboard, ReferenceImage, Scene, SceneBeat, SceneTransition, AudioTrack } from "../core/types.js";
 import { frameFromDims, FRAME_SPECS } from "../core/types.js";
 import { beatMidpoints, formatBeatSheet, rescaleBeats } from "../core/beats.js";
 import { measureBeatActivity } from "../core/beat-gate.js";
@@ -159,6 +159,10 @@ export interface PipelineOpts {
   /** The board's own music mood as it stood when the build began ("none"
    *  keeps the bed out and is written back as such). */
   boardMusicMood?: string;
+  /** Tracks a person put on the film by hand (the audio tool: a narrator
+   *  line, an effect) -- carried through a rebuild, which otherwise starts
+   *  the film's audio from nothing. */
+  keptAudioTracks?: AudioTrack[];
 
   /** BUILD-FROM-BOARD: an approved saved storyboard to build VERBATIM.
    *  Skips the creative director AND the storyboard builder -- the board the
@@ -355,6 +359,11 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
       // build shipped the driving track again from the treatment's mood).
       boardMood = (existing?.storyboard as any)?.audio?.music_mood;
       opts.boardMusicMood = boardMood;
+      // A track the build did not make (the audio tool's narrator line, an
+      // effect) is the person's, and outlives the rebuild (measured live,
+      // proj_09b6d0cb: "Four days later..." placed, the next build shipped
+      // without it).
+      opts.keptAudioTracks = handAddedTracks(existing?.audio?.tracks);
       if (choice?.source === "none" || boardMood === "none") { chosenMusic = null; opts.backgroundMusic = false; console.log("  Music: the board says no bed"); }
       else if (choice && choice.source !== "auto") {
         const { resolveMusicChoice } = await import("../audio/music.js");
@@ -2229,6 +2238,12 @@ function buildCritiqueFeedback(critique: CritiqueResult): string {
  * is recorded on the project for inspection and iteration. Used by both the
  * storyboard-only and full generation paths so project.storyboard is always populated.
  */
+/** The tracks a person put on the film by hand: not the bed the build
+ *  picks (music_bed) and not the narration it generates (vo_*). */
+export function handAddedTracks(tracks: AudioTrack[] | undefined): AudioTrack[] {
+  return (tracks || []).filter((t) => t && t.id !== "music_bed" && !/^(vo|voiceover|narration)[_-]/i.test(String(t.id)));
+}
+
 function storyboardToSaved(
   storyboard: { name: string; scenes: Array<any> },
   voice?: string,
@@ -4302,6 +4317,13 @@ async function runUnifiedPipeline(
   // Persist the storyboard builder's storyboard (visual notes + suggested components) on the
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
+  // The person's own tracks ride through (see keptAudioTracks).
+  if (opts.keptAudioTracks?.length) {
+    if (!project.audio) project.audio = { tracks: [] };
+    const have = new Set(project.audio.tracks.map((t) => t.id));
+    for (const t of opts.keptAudioTracks) if (!have.has(t.id)) project.audio.tracks.push(t);
+    console.log(`  Audio: ${opts.keptAudioTracks.length} hand-added track(s) carried through the build`);
+  }
   // The board's own none outlives the build (see the music choice above).
   const keptMood = opts.boardMusicMood === "none" ? "none" : treatment?.audioSystem?.music_mood;
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood);

@@ -4748,3 +4748,9 @@ she delivers. Two props:
 Both are self-placing full-stage props, never phone-zoomed. The narrator
 line ("Four days later..." with a French accent) is made with the
 instruction-following TTS and placed on the audio track at the card.
+- A track a person put on the film by hand outlives a rebuild. The
+  unified pipeline starts the film's audio from nothing, so the narrator
+  line placed with the audio tool was gone after the next build. Tracks
+  that are not the build's own (`music_bed`, `vo_*`) are read at the
+  start of the build (`handAddedTracks`, on the options as
+  `keptAudioTracks`) and put back once the build's audio is assembled.
