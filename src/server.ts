@@ -73,6 +73,7 @@ import { normalizeBeats } from "./core/beats.js";
 import { normalizeSpeakerPipRefs } from "./core/scene-assembler.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
+import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
@@ -2633,7 +2634,7 @@ export function createMcpServer(): McpServer {
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),
-      action: z.enum(["add", "update", "remove", "search"]).describe("Action to perform. Use 'search' to search Jamendo music library."),
+      action: z.enum(["add", "update", "remove", "search", "search_sfx"]).describe("Action to perform. 'search' searches the Jamendo music library; 'search_sfx' lists SOUND EFFECTS -- the house set (synthesized here: whooshes, ticks, thuds, dings, a whirr, a riser; no licence, always there) and, where a free FREESOUND_API_KEY is set, Creative-Commons-0 matches for `query`. Place one with action='add' and track.sfx."),
       query: z.string().optional().describe("Search query for music (use with action='search')"),
       mood: z.string().optional().describe("Mood filter for music search (e.g. 'happy', 'calm')"),
       genre: z.string().optional().describe("Genre filter for music search"),
@@ -2646,6 +2647,7 @@ export function createMcpServer(): McpServer {
         id: z.string(),
         type: z.enum(["voiceover", "music", "sfx"]).optional(),
         source: z.string().optional().describe("Audio file path. Omit for voiceover with text."),
+        sfx: z.string().optional().describe("A sound effect id from action='search_sfx' (e.g. 'house-whoosh-soft', 'freesound-12345'). The file is copied into the project and becomes this track's source -- pass type 'sfx' and a start_time."),
         text: z.string().optional().describe("Text to generate TTS voiceover from (type must be voiceover)"),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice (default: nova)"),
         volume: z.number().min(0).max(1).optional(),
@@ -2668,6 +2670,20 @@ export function createMcpServer(): McpServer {
       if (!project) return err("Project not found");
 
       // Handle search action (no project needed)
+      if (params.action === "search_sfx") {
+        try {
+          const opts = await listSfxOptions({ query: params.query });
+          return ok({
+            ...opts,
+            note: opts.freesound_configured
+              ? "house-* is the set made here; freesound-* is CC0 (public domain)."
+              : "The house set only. A free Freesound API key (FREESOUND_API_KEY) adds the CC0 catalogue -- no subscription.",
+          });
+        } catch (e: any) {
+          return err(`Sound-effect search failed: ${e.message}`);
+        }
+      }
+
       if (params.action === "search") {
         if (!params.query) return err("query required for search action");
         try {
@@ -2708,6 +2724,17 @@ export function createMcpServer(): McpServer {
         }
 
         // Download from Jamendo if source starts with "jamendo:"
+        // A SOUND EFFECT BY ID: the library file is copied into the project
+        // and becomes this track's source (audio/sfx.ts).
+        if (!source && params.track.sfx) {
+          try {
+            const picked = await resolveSfxChoice(params.track.sfx, projectAssetsDir(params.tenant_id, params.project_id));
+            source = picked.url;
+          } catch (e: any) {
+            return err(`Sound effect: ${e.message}`);
+          }
+        }
+
         if (!source && params.track.source && params.track.source.startsWith("jamendo:")) {
           const trackId = params.track.source.replace("jamendo:", "");
           const assetsDir = projectAssetsDir(params.tenant_id, params.project_id);

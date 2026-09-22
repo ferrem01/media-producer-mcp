@@ -156,7 +156,7 @@ describe("the sources: every need is collected its own way, in the board", () =>
 
   it("the armed need: Studio points the Recorder at a slot, the popup opens set to it, the landing recording disarms it", async () => {
     const index = await read("src/index.ts");
-    expect(index).toMatch(/\|music-options\|arm-need\|armed-need\|/);
+    expect(index).toMatch(/\|music-options\|sfx-options\|arm-need\|armed-need\|/);
     expect(index).toMatch(/\/api\\\/arm-need\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/\/api\\\/armed-need\\\/\(\[\^\/\]\+\)\$\//);
     expect(index).toMatch(/if \(anNeed\.type !== "screen_recording" && anNeed\.type !== "screenshot"\)/);
