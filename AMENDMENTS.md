@@ -4799,3 +4799,26 @@ sounds we MAKE.
   quiet moment. `room-tone` is a loopable four seconds of low-mid air that
   breathes slightly, laid under a whole film at a level nobody notices
   until it is missing.
+
+## 2026-09-22 -- Duplicate a project: copy it before you try something
+
+Marc wanted a shorter cut of a film he liked, without risking the film he
+liked. There was no copy tool, so the copy was hand-assembled: create a
+project, POST all twelve built scenes, copy the music track, copy the
+board, flip the status. Two of those five steps were wrong -- the render
+refused because the copy had no storyboard, and the board arrived with 14
+scenes where the built film had 12, so a later rebuild of that copy would
+not have matched what was watched. "I guess we dont have a copy or
+duplicate function/tool?"
+`duplicateProject` (persistence/project.ts) copies the project DIRECTORY --
+scenes, storyboard, audio, takes, assets, board cards -- so the copy
+renders exactly what the original renders. Then a new id and name, and
+every mention of the old id inside the record re-pointed at the new one
+(a whole-record replace: the id is a long unique token, and this catches
+the asset URLs, take sources and clip srcs that a field-by-field copy
+forgets -- the files came along, so the paths must follow). The RENDER is
+not inherited: output/ stays behind, the render flags are cleared, and a
+"rendered" project copies as "generated", because a copy has never been
+rendered. `include_output: true` keeps the mp4 for an archive copy.
+Reachable as `create` with `copy_of` (and an optional new `name`), and as
+`POST /api/projects/{tenant}/{project}/duplicate` for Studio.

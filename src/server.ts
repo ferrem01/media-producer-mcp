@@ -33,8 +33,7 @@ import {
   reorderScenes,
   addComponent,
   updateComponent,
-  removeComponent,
-} from "./persistence/project.js";
+  removeComponent, duplicateProject } from "./persistence/project.js";
 import {
   loadBrandKit,
   saveBrandKit,
@@ -950,13 +949,23 @@ export function createMcpServer(): McpServer {
     "Create a new media project (video, image, presentation, one-pager, slideshow, gif, social)",
     {
       tenant_id: z.string().optional().describe("Tenant identifier (optional on authenticated sessions -- the session's tenant is used)"),
-      name: z.string().describe("Project name"),
+      name: z.string().describe("Project name. Copying and leaving it out names the copy \"<original> (copy)\"."),
+      copy_of: z.string().optional().describe("DUPLICATE an existing project instead of starting empty: its project_id. The copy renders exactly what the original renders -- scenes, storyboard, audio, takes and assets all come along, with every reference re-pointed at the copy. The render itself is not inherited (a copy has never been rendered). Use it before trying an edit you may want to throw away."),
+      include_output: z.boolean().optional().describe("copy_of only: also copy the original's rendered mp4 (an archive copy). Default false."),
       format: z.enum(["video", "image", "slideshow", "presentation", "one-pager", "gif", "social", "email-header", "thumbnail"]).describe("Output format"),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry (default: 16x9). 9x16 for Reels/TikTok/Shorts, 4x5 for feed posts, 1x1 square."),
       recipe: z.string().optional().describe("The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (presenter-n-things, presenter-split-tour, presenter-location-hop, founder-story-broll, speaker-kinetic-claims, speaker-one-take-cards, story-ad-idea-beats, ask-work-result, founder-bookends-chapters, launch-what-if-features). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none."),
       fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
     async (params) => {
+      if (params.copy_of) {
+        const copy = await duplicateProject(params.tenant_id!, params.copy_of, {
+          name: params.name, include_output: params.include_output,
+        });
+        if (!copy) return err(`Project not found: ${params.copy_of}`);
+        console.log(`  Duplicated ${params.copy_of} -> ${copy.project_id} ("${copy.name}")`);
+        return ok(copy);
+      }
       const project = await createProject({
         tenant_id: params.tenant_id,
         name: params.name,

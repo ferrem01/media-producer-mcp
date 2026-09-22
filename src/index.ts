@@ -53,7 +53,7 @@ import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
@@ -1466,6 +1466,23 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           return;
         }
         jsonResponse(res, 200, project);
+        return;
+      }
+
+      // ── API: Duplicate project ──
+      // POST /api/projects/{tenant}/{project}/duplicate {name?, include_output?}
+      // The copy renders exactly what the original renders; the render itself
+      // is not inherited. Studio's "make a copy before you try something".
+      const dupMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/duplicate$/);
+      if (dupMatch && method === "POST") {
+        const [, dupTenant, dupProject] = dupMatch.map(decodeURIComponent);
+        const dupBody = await parseBody(req).catch(() => ({} as Record<string, unknown>));
+        const copy = await duplicateProject(dupTenant, dupProject, {
+          name: typeof dupBody.name === "string" ? dupBody.name : undefined,
+          include_output: dupBody.include_output === true,
+        });
+        if (!copy) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        jsonResponse(res, 200, { ok: true, project_id: copy.project_id, name: copy.name, status: copy.status, scenes: (copy.scenes || []).length });
         return;
       }
 
