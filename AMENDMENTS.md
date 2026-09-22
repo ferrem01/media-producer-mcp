@@ -4754,3 +4754,7 @@ instruction-following TTS and placed on the audio track at the card.
   that are not the build's own (`music_bed`, `vo_*`) are read at the
   start of the build (`handAddedTracks`, on the options as
   `keptAudioTracks`) and put back once the build's audio is assembled.
+- The board's cut is the cut. Two storm beats came back blur-crossfade
+  on a rebuild while the board said none, twice, from somewhere in the
+  build the board does not own. After the build, every scene the board
+  has a transition for (none included) gets it back.

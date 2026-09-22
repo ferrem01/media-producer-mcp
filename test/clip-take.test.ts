@@ -291,6 +291,8 @@ describe("the clip need", () => {
     expect(handAddedTracks(undefined)).toEqual([]);
     const pipe = await read("src/llm/pipeline.ts");
     expect(pipe).toMatch(/opts\.keptAudioTracks = handAddedTracks\(existing\?\.audio\?\.tracks\);/);
+    // The board's cut is the cut: re-applied to every built scene after the build.
+    expect(pipe).toMatch(/if \(opts\.presetStoryboard && project\.scenes\.length === storyboard\.scenes\.length\) \{\n\s*storyboard\.scenes\.forEach\(\(s: any, i: number\) => \{\n\s*const t = boardTransition\(s\);\n\s*if \(t && project\.scenes\[i\]\) \(project\.scenes\[i\] as any\)\.transition_in = t;/);
     expect(pipe).toMatch(/for \(const t of opts\.keptAudioTracks\) if \(!have\.has\(t\.id\)\) project\.audio\.tracks\.push\(t\);/);
   });
 });

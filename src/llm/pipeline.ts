@@ -25,7 +25,7 @@ import { generateTreatment, formatTreatmentForStoryboard, type Treatment } from 
 import { strategizeRevision, type SceneRevisionSpec, type RevisedComponent } from "./revision-strategy.js";
 import { reviseComponent } from "./component-revise.js";
 import { critiqueAndReviseScene } from "./revision-critique.js";
-import { generateScene } from "./scene-generator.js";
+import { generateScene, boardTransition } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { spineForScene } from "../core/measured-spine.js";
 import { activeTake, personCarries } from "../core/take-needs.js";
@@ -4317,6 +4317,17 @@ async function runUnifiedPipeline(
   // Persist the storyboard builder's storyboard (visual notes + suggested components) on the
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
+  // THE BOARD'S CUT IS THE CUT. A scene's build may hand back a transition
+  // of its own (measured live, proj_09b6d0cb: two storm beats came back
+  // blur-crossfade on a rebuild while the board said none, twice). The
+  // board's own transition, "none" included, is re-applied to every built
+  // scene it has one for.
+  if (opts.presetStoryboard && project.scenes.length === storyboard.scenes.length) {
+    storyboard.scenes.forEach((s: any, i: number) => {
+      const t = boardTransition(s);
+      if (t && project.scenes[i]) (project.scenes[i] as any).transition_in = t;
+    });
+  }
   // The person's own tracks ride through (see keptAudioTracks).
   if (opts.keptAudioTracks?.length) {
     if (!project.audio) project.audio = { tracks: [] };
