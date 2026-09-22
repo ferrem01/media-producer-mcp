@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — Home is a place: one rail for Films, Team and Brand
+
+Marc: the cards are not the same size; make this page auth like Studio; put
+the left nav on Team too; and "brand is a tray that comes out on studio -- need
+to turn it into a page."
+
+- `preview-app/home-shell.ts` (new) — the shell all three share: tokens, the
+  rail, and `bootHome()`, which resolves the tenant the way Studio does (the
+  link, else `/auth/me`, else sign in), wires the three items, and shows WHO IS
+  SIGNED IN with a sign-out. Three pages, one room.
+- **The brand kit is a page.** It was a 189-line tray that slid out of Studio,
+  which meant the tenant's colors, voice and assets were reachable only while
+  editing a film. Ported whole to `/brand` (`preview-app/brand-page.ts`):
+  colours, style, voice, guidelines, fonts, logos, assets, drag-drop upload.
+  The tray and its CSS are gone from Studio -- that header was the thing to
+  clean up, and it now carries only the back arrow.
+- `/team` moves onto the rail too, restyled in the shell's tokens.
+- **EVERY CARD THE SAME SIZE**, measured rather than eyeballed: the meta block
+  reserves two title lines whether or not the title needs them, so a long name
+  no longer makes its card taller than the one beside it. `test/home-pages.test.ts`
+  renders a shelf of 16x9, 9x16, 1x1 and 4x5 films with titles of wildly
+  different length and asserts ONE distinct width and ONE distinct height.
+- The same test pins the rail on all three pages (every item present, the
+  current one marked, each href carrying the tenant) and that the brand page
+  kept the kit's controls. `team-access` now guards the shell, where the rail
+  is defined.
+
+---
+
 ## 2026-09-22 — Home: a rail, and cards that page through their scenes
 
 Marc, on the library: the cards should carry the per-scene stills Studio shows

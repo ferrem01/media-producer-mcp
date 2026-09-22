@@ -91,10 +91,12 @@ describe("the team store on disk: login, invite, remove", () => {
     expect(index).toMatch(/if \(urlPath === "\/team"\) \{/);
     expect(await read("src/studio-phone.ts")).toMatch(/teamA\.href = '\/team\?tenant='/);
     // Team left the desktop Studio header for HOME's left rail (the header was
-    // carrying too much); the page still has to be one click away.
-    const library = await read("src/preview-app/library-app.ts");
-    expect(library).toMatch(/id="nav-team"/);
-    expect(library).toMatch(/nav-team'\)\.href = withToken\('\/team'/);
+    // carrying too much). The rail is shared by Films, Team and Brand, so the
+    // guard sits where it is defined; test/home-pages.test.ts then proves all
+    // three pages actually render it and point at each other.
+    const shell = await read("src/preview-app/home-shell.ts");
+    expect(shell).toMatch(/id="nav-\$\{id\}"|nav-team/);
+    expect(shell).toMatch(/team\.href = withToken\('\/team' \+ q\)/);
     expect(await read("src/server.ts")).toMatch(/tool\(\s*"team",/);
   });
 });
