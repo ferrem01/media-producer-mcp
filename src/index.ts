@@ -24,6 +24,8 @@ import { provideAsset, openAssetNeeds, recastProvidedNeed, isScreenSlate } from 
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
 import { listMusicOptions, resolveMusicChoice, musicLocalPath, musicAssetUrl } from "./audio/music.js";
+import { listSfxOptions, SFX_DIR } from "./audio/sfx.js";
+import { ensureFoleyLibrary } from "./audio/foley.js";
 import { qrSvg } from "./core/qr.js";
 import type { Take, Project, AssetRequirement } from "./core/types.js";
 import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type RetimeResult } from "./core/measured-spine.js";
@@ -934,6 +936,18 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
+      // The house sound-effect set, for the picker's preview (audio only).
+      // Minted on first request, so a fresh server has it without a deploy step.
+      const sfxFileMatch = urlPath.match(/^\/assets\/_system\/sfx\/([^/]+)$/);
+      if (sfxFileMatch && (method === "GET" || method === "HEAD")) {
+        const f = decodeURIComponent(sfxFileMatch[1]);
+        if (f.includes("..") || !/\.(wav|mp3|m4a|ogg|aac)$/i.test(f)) { res.writeHead(403); res.end("Forbidden"); return; }
+        try { await ensureFoleyLibrary(SFX_DIR); } catch { /* serve whatever is there */ }
+        try { await streamFile(req, res, path.join(config.dataDir, "_system", "sfx", f)); }
+        catch { res.writeHead(404); res.end("Asset not found"); }
+        return;
+      }
+
       // ── Static asset serving for tenant-level assets ──
       const tenantAssetMatch = urlPath.match(/^\/assets\/([^/]+)\/assets\/(.+)$/);
       if (tenantAssetMatch && (method === "GET" || method === "HEAD")) {
@@ -1150,7 +1164,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2706,6 +2720,23 @@ Rules:
         } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
         return;
       }
+      // GET /api/sfx-options/{tenant}/{project}?q=  the house set (always)
+      //   and, with a free FREESOUND_API_KEY, CC0 matches for the query.
+      const sfxOptionsMatch = urlPath.match(/^\/api\/sfx-options\/([^/]+)\/([^/]+)$/);
+      if (sfxOptionsMatch && method === "GET") {
+        const [, sxTenant, sxProject] = sfxOptionsMatch.map(decodeURIComponent);
+        const sxProj = await loadProject(sxTenant, sxProject);
+        if (!sxProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const sq = new URL(req.url || "/", "http://localhost").searchParams;
+        try {
+          const options = await listSfxOptions({ query: sq.get("q") || undefined });
+          const placed = (sxProj.audio?.tracks || []).filter((t) => t.type === "sfx")
+            .map((t) => ({ id: t.id, source: t.source, start_time: t.start_time, volume: t.volume }));
+          jsonResponse(res, 200, { ok: true, ...options, placed });
+        } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
+        return;
+      }
+
       const musicPickMatch = urlPath.match(/^\/api\/music\/([^/]+)\/([^/]+)$/);
       if (musicPickMatch && method === "POST") {
         const [, mpTenant, mpProject] = musicPickMatch.map(decodeURIComponent);

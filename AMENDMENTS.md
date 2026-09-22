@@ -4758,3 +4758,34 @@ instruction-following TTS and placed on the audio track at the card.
   on a rebuild while the board said none, twice, from somewhere in the
   build the board does not own. After the build, every scene the board
   has a transition for (none included) gets it back.
+
+## 2026-09-22 -- A sound-effect library: the house set is synthesized, the free shelf is CC0
+
+Marc, after the first cut of the sketch went out with nothing but a
+narrator line: "I don't know of any library for sound effects... maybe we
+should start building a library." Every free catalogue wants an API key
+and every good one wants a subscription, so the library starts with
+sounds we MAKE.
+- `audio/foley.ts`: fourteen effects synthesized from noise and sine
+  partials shaped by envelopes and a state-variable filter -- whooshes
+  (soft, fast), a whirr loop, tick, click, a keyboard burst, pop, thud,
+  paper drop, ding, swell, riser, deflate, camera shutter. Seeded PRNG,
+  never the platform's: the same id is the same sound on every machine.
+  Peak-normalized to a common level, faded at both ends so the mixer can
+  start one anywhere. Minted into `_system/sfx` on first use (or first
+  request for a preview), so a fresh server has the shelf with no deploy
+  step and no files in the repo. Auditioned by spectrogram, which is how
+  the first pass was caught: one bandpass left the whooshes reading as
+  broadband hiss, so they cascade two and roll off the top -- air moving,
+  not noise.
+- `audio/sfx.ts`: the shelves. The house set is always there; Freesound is
+  searched ONLY for Creative Commons 0 (public domain, no attribution,
+  safe in a paid ad), with the licence in the query rather than a
+  post-filter, and a second check before anything is cached. It needs a
+  free FREESOUND_API_KEY -- no subscription -- and without one the shelf
+  is simply absent.
+- The `audio` tool lists them (`action: "search_sfx"`) and places one by
+  id (`track.sfx`): the file is copied into the project's assets and
+  becomes the track's source. Studio has `/api/sfx-options` and the house
+  files are served for preview. An effect placed this way is the person's,
+  so it rides through a rebuild like any hand-added track.
