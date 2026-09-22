@@ -245,6 +245,13 @@
     border: 1.6px solid #c6c4be; display: inline-block; flex-shrink: 0;
   }
   .qcp-ring.dashed { border-style: dashed; }
+  /* IN PROGRESS: the ring half-fills in the brand colour -- work has started
+     but is not done. The agent picks a task up here and checks it off later. */
+  .qcp-ring.doing { border-color: var(--mp-color-primary, #393bf5); border-style: solid; position: relative; overflow: hidden; }
+  .qcp-ring.doing::after {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 50%;
+    background: var(--mp-color-primary, #393bf5);
+  }
   .qcp-ring.done { background: #47934f; border-color: #47934f; position: relative; }
   .qcp-ring.done::after {
     content: ''; position: absolute; left: 3.5px; top: 5.5px;
@@ -818,11 +825,23 @@
           compiledTab = name;
           if (name === 'metrics') playMetrics(tl2, at + 0.4, true);
         },
+        // A task PICKED UP: the ring half-fills and the row's chip reads that
+        // the agent is on it. complete-task then finishes the same row, so a
+        // film can show work starting and landing as two separate beats.
+        'start-task': function(tl2, ctr, action, at) {
+          var row = taskRows.children[action.index || 0];
+          if (!row) return;
+          var ring = row.querySelector('.qcp-ring');
+          classAt(tl2, ring, at, ['doing'], ['dashed']);
+          tl2.fromTo(ring, { scale: 0.7 }, { scale: 1, duration: 0.26, ease: 'back.out(2.2)', immediateRender: false }, at);
+          var chip = row.querySelector('.qcp-chat-chip');
+          if (chip) textAt(tl2, chip, at, action.label || 'In progress', chip.textContent);
+        },
         'complete-task': function(tl2, ctr, action, at) {
           var row = taskRows.children[action.index || 0];
           if (!row) return;
           var ring = row.querySelector('.qcp-ring');
-          classAt(tl2, ring, at, ['done'], ['dashed']);
+          classAt(tl2, ring, at, ['done'], ['dashed', 'doing']);
           tl2.fromTo(ring, { scale: 0.6 }, { scale: 1, duration: 0.3, ease: 'back.out(2.5)', immediateRender: false }, at);
           var prevDone = compiledDone;
           compiledDone++;

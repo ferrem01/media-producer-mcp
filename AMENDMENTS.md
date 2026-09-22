@@ -4824,3 +4824,16 @@ Reachable as `create` with `copy_of` (and an optional new `name`), and as
 `POST /api/projects/{tenant}/{project}/duplicate` for Studio.
 - ...and `format` is optional when copying: a copy takes the original's
   format, and the tool demanded one on the first live call.
+
+## 2026-09-22 -- A task can be PICKED UP, not only finished
+
+The campaign mock could only complete a task, so a film could show work
+landing but never work starting. Marc, restructuring the call film: the
+agent should "quickly move to the tasks tab... and then each one of those
+need to move into like in progress status", and only later, after the
+posts and the blog exist, come back so each task "has each task item,
+check, check, check, all done". That is two beats, and the component had
+one. `start-task {index, label?}` (quotient-campaign): the row's ring
+half-fills in the brand colour and its chip reads "In progress";
+`complete-task` clears that state on its way to the green check, so the
+same row can start in one scene and finish in another.

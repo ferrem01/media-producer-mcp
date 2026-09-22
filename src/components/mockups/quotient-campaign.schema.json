@@ -56,12 +56,12 @@
     },
     "metrics": {
       "type": "object",
-      "label": "Metrics tab: {range: 'Jul 05 – Jul 19', kpis: [{label, value: number (counts up), display?: '48.2K', delta?: '+62%'}] (4 fit best), chart: {title, points: [numbers], labels: [x-axis]}, channels: [{platform: 'linkedin'|'x'|'email', name, impressions: '31,400', clicks, ctr}]}",
+      "label": "Metrics tab: {range: 'Jul 05 \u2013 Jul 19', kpis: [{label, value: number (counts up), display?: '48.2K', delta?: '+62%'}] (4 fit best), chart: {title, points: [numbers], labels: [x-axis]}, channels: [{platform: 'linkedin'|'x'|'email', name, impressions: '31,400', clicks, ctr}]}",
       "optional": true
     },
     "script": {
       "type": "array",
-      "label": "Actions: switch-tab {tab: 'brief'|'tasks'|'activation'|'deliverables'|'metrics'} (tab press + view crossfade -- THE tour beat; 'metrics' also fires the KPI count-ups + line draw), complete-task {index} (checkbox fills green, Completed count ticks), move-event {index, day, top?} (the calendar card LIFTS with a shadow and glides to another day column -- the drag-and-drop beat), set-event-status {index, status} (calendar card status flips, e.g. draft -> published), set-deliverable-status {index, status} (table status flips to the green rocket), scroll-view {amount, duration}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (tabs, brief, tasks, calendar, deliverables).",
+      "label": "Actions: switch-tab {tab: 'brief'|'tasks'|'activation'|'deliverables'|'metrics'} (tab press + view crossfade -- THE tour beat; 'metrics' also fires the KPI count-ups + line draw), start-task {index, label?} (the ring half-fills in the brand colour and the row's chip reads 'In progress' -- work PICKED UP), complete-task {index} (checkbox fills green, Completed count ticks), move-event {index, day, top?} (the calendar card LIFTS with a shadow and glides to another day column -- the drag-and-drop beat), set-event-status {index, status} (calendar card status flips, e.g. draft -> published), set-deliverable-status {index, status} (table status flips to the green rocket), scroll-view {amount, duration}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (tabs, brief, tasks, calendar, deliverables).",
       "optional": true
     },
     "cursor_targets": {
