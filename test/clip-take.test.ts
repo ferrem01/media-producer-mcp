@@ -278,4 +278,19 @@ describe("the clip need", () => {
     const cs = JSON.parse(await read("src/components/props/time-card.schema.json"));
     expect(cs.data.text.required).toBe(true);
   });
+
+  it("a track a person put on the film by hand outlives a rebuild: the bed and the build's own narration are the build's, everything else is carried through", async () => {
+    const { handAddedTracks } = await import("../src/llm/pipeline.js");
+    const tracks: any[] = [
+      { id: "music_bed", type: "music", source: "/x/bed.mp3", volume: 0.45 },
+      { id: "vo_scene_0", type: "voiceover", source: "/x/vo0.mp3", volume: 1 },
+      { id: "narrator_four_days", type: "voiceover", source: "/assets/t/projects/p/assets/four-days-later.mp3", volume: 1, start_time: 17 },
+      { id: "whoosh", type: "sfx", source: "/x/whoosh.mp3", volume: 0.6, start_time: 3 },
+    ];
+    expect(handAddedTracks(tracks).map((t) => t.id)).toEqual(["narrator_four_days", "whoosh"]);
+    expect(handAddedTracks(undefined)).toEqual([]);
+    const pipe = await read("src/llm/pipeline.ts");
+    expect(pipe).toMatch(/opts\.keptAudioTracks = handAddedTracks\(existing\?\.audio\?\.tracks\);/);
+    expect(pipe).toMatch(/for \(const t of opts\.keptAudioTracks\) if \(!have\.has\(t\.id\)\) project\.audio\.tracks\.push\(t\);/);
+  });
 });
