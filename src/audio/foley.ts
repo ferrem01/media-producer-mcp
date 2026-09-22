@@ -182,6 +182,18 @@ export function renderFoley(id: string): Float32Array {
         v = (Math.sin(2 * Math.PI * f * wobble * t) * 0.8 + Math.sin(2 * Math.PI * f * 2 * t) * 0.15) * env(t, spec.duration, 0.01, 1.6);
         break;
       }
+      case "room-tone": {
+        // THE FILM IS NEVER DIGITALLY SILENT. A scored film with gaps of
+        // absolute silence reads as broken audio (measured on the sketch:
+        // four seconds of -180 dB under the close). A quiet room: low-mid
+        // noise, slowly breathing, made to loop -- laid under everything at
+        // a level nobody notices until it is missing.
+        const bed1 = svf(rnd() * 2 - 1, st, 420, 0.8).lp;
+        const bed2 = svf(bed1, st2, 900, 0.7).lp;
+        const breathe = 0.82 + 0.18 * Math.sin(2 * Math.PI * 0.13 * t) * Math.sin(2 * Math.PI * 0.071 * t);
+        v = bed2 * breathe * 3.2;
+        break;
+      }
       case "camera-shutter": {
         const a = t < 0.035 ? Math.pow(1 - t / 0.035, 4) : 0;
         const b = t > 0.06 && t < 0.11 ? Math.pow(1 - (t - 0.06) / 0.05, 4) : 0;
@@ -245,6 +257,7 @@ export const FOLEY_SET: FoleySpec[] = [
   { id: "swell", label: "Swell", tags: ["swell", "build", "rise", "before"], duration: 1.4 },
   { id: "riser", label: "Riser", tags: ["riser", "tension", "build", "montage"], duration: 2.0 },
   { id: "deflate", label: "Deflate", tags: ["deflate", "fail", "sad", "gag", "down"], duration: 0.9 },
+  { id: "room-tone", label: "Room tone (loop)", tags: ["room", "tone", "ambience", "bed", "silence", "loop", "air"], duration: 4.0 },
   { id: "camera-shutter", label: "Camera shutter", tags: ["camera", "shutter", "photo", "snap"], duration: 0.16 },
 ];
 
