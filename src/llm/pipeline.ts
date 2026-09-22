@@ -336,6 +336,11 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
   // THE MUSIC CHOICE (SPEC-briefs.md, the sources): a bed chosen in the
   // board is the bed the film is cut against; "none" ships no bed.
   let chosenMusic: import("../audio/music.js").MusicTrack | null | undefined;
+  // The board's mood outlives the build: a rebuild writes the board back
+  // from the writer's draft with the treatment's mood, which turned a
+  // "none" the update tool had set into "driving" again (measured live,
+  // proj_09b6d0cb). Kept here, it is written back as it was.
+  let boardMood: string | undefined;
   if (opts.project_id) {
     try {
       const existing = await loadProject(opts.tenant_id, opts.project_id);
@@ -345,7 +350,7 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
       // is the same no: a rebuild must not bring the bed back (measured live,
       // proj_09b6d0cb: the bed removed and the mood set to none, the next
       // build shipped the driving track again from the treatment's mood).
-      const boardMood = (existing?.storyboard as any)?.audio?.music_mood;
+      boardMood = (existing?.storyboard as any)?.audio?.music_mood;
       if (choice?.source === "none" || boardMood === "none") { chosenMusic = null; opts.backgroundMusic = false; console.log("  Music: the board says no bed"); }
       else if (choice && choice.source !== "auto") {
         const { resolveMusicChoice } = await import("../audio/music.js");
@@ -3188,7 +3193,9 @@ async function runUnifiedPipeline(
 
   // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
-    project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
+    // The board's own none outlives the redraft (see the music choice above).
+    const keptMood = (project.storyboard as any)?.audio?.music_mood === "none" ? "none" : treatment?.audioSystem?.music_mood;
+    project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood);
     project.prompt = opts.prompt;
     // THE BRIEF SURVIVES: the first prompt is the brief; a redraft passes it
     // through. The board is then checked against what the brief locked.
@@ -4287,7 +4294,9 @@ async function runUnifiedPipeline(
   // Persist the storyboard builder's storyboard (visual notes + suggested components) on the
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
-  project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
+  // The board's own none outlives the build (see the music choice above).
+  const keptMood = (project.storyboard as any)?.audio?.music_mood === "none" ? "none" : treatment?.audioSystem?.music_mood;
+  project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood);
   project.prompt = opts.prompt;
   project.brief = opts.brief || project.brief || opts.prompt;
   project.status = "generated";
