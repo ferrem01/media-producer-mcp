@@ -108,7 +108,10 @@ function buildEntry(project: Project, mtime: number): Entry {
     frame: (project.canvas as any)?.frame || "16x9",
     scene_count: scenes.length,
     duration_seconds: Math.round(duration * 10) / 10,
-    rendered: !!p.rendered,
+    // Older films carry the fact only in their STATUS -- the boolean came
+    // later. Measured on the live tenant: 76 rendered films counted as zero,
+    // and they fell out of every filter chip.
+    rendered: !!p.rendered || project.status === "rendered",
     render_stale: p.render_stale || undefined,
     render_size_bytes: p.render_size_bytes || undefined,
     film_grammar: p.treatment?.filmGrammar || p.film_grammar || undefined,
