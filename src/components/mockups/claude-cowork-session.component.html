@@ -585,12 +585,14 @@
     var workOn = [];   // [start, end] windows -> stop button visible
     var passthrough = []; // cursor/camera actions handed to the script runner
     var typingAt = null;
+    var typedMessage = ''; // what the composer held when the send fires
 
     script.forEach(function (a) {
       var at = a.at || 0;
       var act = a.action;
       if (act === 'type-message') {
         typingAt = at;
+        typedMessage = a.text || '';
         events.push({ t: at, kind: 'send-show' });
         tl.call(function () { inputBox.classList.add('is-active'); }, null, at);
         typeText(tl, inputEl, a.text || '', at, a.speed || 30);
@@ -598,6 +600,13 @@
         var bubble = addNode(userBlock(a.text || inputEl.textContent || ''));
         // The bubble's text is known at build only if passed; fall back to the
         // typed text captured at fire time.
+        // PAIRED BOUNDARY: the inverse a hair earlier, so scrubbing back
+        // across the send puts the typed message back in the composer instead
+        // of leaving it empty for good.
+        var prior = typedMessage;
+        tl.call(function () {
+          if (prior) { inputEl.textContent = prior; inputBox.classList.add('is-active'); }
+        }, null, Math.max(0, at - 0.001));
         if (!a.text) {
           var bEl = bubble.querySelector('.cws-user');
           tl.call(function () { if (inputEl.textContent) bEl.textContent = inputEl.textContent; inputEl.textContent = ''; inputBox.classList.remove('is-active'); }, null, at);

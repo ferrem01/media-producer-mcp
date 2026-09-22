@@ -421,8 +421,12 @@
     }
 
     if (data.script && data.script.length > 0) {
+      // What the composer held when the send fires -- handlers compile in
+      // script order, so the send knows the text the typing put there.
+      var typedPrompt = '';
       runScript(tl, el, data.script, cursorTargets, ctx, {
         'type-prompt': function (tl, ctr, action, at) {
+          typedPrompt = action.text || '';
           // The send button pops in with the first keystroke, like the app.
           // TIMELINE tweens (not call() callbacks): the scrubber renders the
           // correct state at any playhead position in either direction --
@@ -439,6 +443,13 @@
           tl.fromTo(sendBtn, { scale: 0.82 },
             { scale: 1, duration: 0.32, ease: 'back.out(3)', immediateRender: false }, at);
           tl.set(sendBtn, { autoAlpha: 0 }, at + 0.22);
+          // PAIRED BOUNDARY. A bare call() never un-does itself: scrubbing
+          // back across the send left the composer empty for the rest of the
+          // film, and in Studio it stayed empty. The inverse a hair earlier
+          // puts the typed prompt back, so a reverse crossing restores the
+          // TRUE prior state (the quotient-chat doctrine).
+          var prior = typedPrompt;
+          tl.call(function () { inputEl.textContent = prior; }, null, Math.max(0, at + 0.219));
           tl.call(function () { inputEl.textContent = ''; }, null, at + 0.22);
           // The working line only appears when a scene ASKS for it -- no
           // implicit blurb on every send.

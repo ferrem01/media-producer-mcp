@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — The composer empties; the film should already be gone
+
+Watching the shorter Cowork film: the home scene goes blank for nearly a
+second before the cut. `send-prompt` clears the composer 0.22s after the press
+(that is the app being honest), and the scene held for another 0.55s on an
+empty box under a 1.8x zoom, then crossfaded. Two fixes, one of them a real
+bug:
+
+- proj_3bb7a076 scene_006: the prompt types at 50 cps from 0.25, the press is
+  at 2.7 and the scene ENDS at 2.9 -- before the clear at 2.92. The last frame
+  is the full prompt with the send button lit. 3.8s -> 2.9s.
+- **The clear was an unpaired `tl.call`** in both `claude-cowork-home` and
+  `claude-cowork-session`. A bare callback never un-does itself, so crossing
+  the send BACKWARDS (the Studio scrubber) left the composer empty for the rest
+  of the film. Both now write the paired boundary -- the typed text restored a
+  hair before the clear -- which is the quotient-chat doctrine applied where it
+  had been missed.
+- `test/composer-scrub.test.ts` pins it: type, send, scrub back, the prompt is
+  there. Verified it FAILS without the fix (`expected '' to be '...'`).
+- Also recorded: a probe that plays past a scene's end and then seeks back is
+  not measuring what the renderer sees. The renderer only ever steps FORWARD
+  from 0, so a backwards-only artifact looks like a bug that is not there --
+  and hid the real one, which only shows when something scrubs back.
+
+---
+
 ## 2026-09-22 — One render per film: a second press no longer starts a second render
 
 A film "wouldn't render". Nothing was broken: TWO render jobs were running on
