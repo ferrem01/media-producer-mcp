@@ -156,6 +156,9 @@ export interface PipelineOpts {
    *  being built: a track the board chose (the prep cuts against it), or
    *  null for "no bed". Undefined = the build picks by mood. */
   chosenMusic?: import("../audio/music.js").MusicTrack | null;
+  /** The board's own music mood as it stood when the build began ("none"
+   *  keeps the bed out and is written back as such). */
+  boardMusicMood?: string;
 
   /** BUILD-FROM-BOARD: an approved saved storyboard to build VERBATIM.
    *  Skips the creative director AND the storyboard builder -- the board the
@@ -351,6 +354,7 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
       // proj_09b6d0cb: the bed removed and the mood set to none, the next
       // build shipped the driving track again from the treatment's mood).
       boardMood = (existing?.storyboard as any)?.audio?.music_mood;
+      opts.boardMusicMood = boardMood;
       if (choice?.source === "none" || boardMood === "none") { chosenMusic = null; opts.backgroundMusic = false; console.log("  Music: the board says no bed"); }
       else if (choice && choice.source !== "auto") {
         const { resolveMusicChoice } = await import("../audio/music.js");
@@ -3194,7 +3198,7 @@ async function runUnifiedPipeline(
   // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
     // The board's own none outlives the redraft (see the music choice above).
-    const keptMood = (project.storyboard as any)?.audio?.music_mood === "none" ? "none" : treatment?.audioSystem?.music_mood;
+    const keptMood = opts.boardMusicMood === "none" ? "none" : treatment?.audioSystem?.music_mood;
     project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood);
     project.prompt = opts.prompt;
     // THE BRIEF SURVIVES: the first prompt is the brief; a redraft passes it
@@ -4295,7 +4299,7 @@ async function runUnifiedPipeline(
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
   // The board's own none outlives the build (see the music choice above).
-  const keptMood = (project.storyboard as any)?.audio?.music_mood === "none" ? "none" : treatment?.audioSystem?.music_mood;
+  const keptMood = opts.boardMusicMood === "none" ? "none" : treatment?.audioSystem?.music_mood;
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood);
   project.prompt = opts.prompt;
   project.brief = opts.brief || project.brief || opts.prompt;
