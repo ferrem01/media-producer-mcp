@@ -6,6 +6,8 @@
  * search over the words a person actually remembers (title, prompt, and the
  * text ON SCREEN), and a way to put films down that is not `rm`.
  */
+import { SHELL_TOKENS, RAIL_CSS, RAIL_JS, railHtml } from "./home-shell.js";
+
 export function getLibraryHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -17,36 +19,8 @@ export function getLibraryHtml(): string {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #faf9f7; --surface: #ffffff; --surface-2: #f4f2ee;
-    --border: #e6e3dd; --border-2: #d8d4cc;
-    --text: #17171c; --text-2: #5f5c56; --text-3: #8d8980;
-    --accent: #393bf5; --danger: #c2410c;
-    --radius: 12px; --shadow: 0 1px 2px rgba(20,20,40,.05), 0 8px 24px rgba(20,20,40,.06);
-  }
-  :root:not([data-theme="light"]) { }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #121214; --surface: #1b1b1f; --surface-2: #232328;
-      --border: #2e2e34; --border-2: #3a3a42;
-      --text: #f4f3f1; --text-2: #a8a49c; --text-3: #7b776f;
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #121214; --surface: #1b1b1f; --surface-2: #232328;
-    --border: #2e2e34; --border-2: #3a3a42;
-    --text: #f4f3f1; --text-2: #a8a49c; --text-3: #7b776f;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 400 15px/1.5 Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
-  a { color: inherit; text-decoration: none; }
-
+${SHELL_TOKENS}
+${RAIL_CSS}
   header.lib-head {
     position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 92%, transparent);
     backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
@@ -81,30 +55,17 @@ export function getLibraryHtml(): string {
   .chip .n { opacity: .6; font-variant-numeric: tabular-nums; }
   select.chip { padding-right: 8px; }
 
-  /* HOME has a left rail: the films, the team, the brand. It exists so the
-     Studio header can stop carrying them. */
-  .shell { display: flex; align-items: flex-start; }
-  nav.rail {
-    position: sticky; top: 0; flex: none; width: 188px; min-height: 100vh;
-    padding: 16px 10px; border-right: 1px solid var(--border); background: var(--surface);
-  }
-  .rail-brand { font-size: 15px; font-weight: 700; padding: 6px 10px 14px; letter-spacing: -0.01em; }
-  .rail a {
-    display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 10px; margin-bottom: 2px;
-    border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--text-2);
-  }
-  .rail a:hover { background: var(--surface-2); color: var(--text); }
-  .rail a.on { background: var(--surface-2); color: var(--text); font-weight: 600; }
-  .rail a .ico { width: 17px; display: inline-flex; justify-content: center; opacity: .75; }
-  .rail-foot { position: absolute; bottom: 14px; left: 10px; right: 10px; font-size: 11px; color: var(--text-3); padding: 0 10px; }
-  .work { flex: 1; min-width: 0; }
   main { max-width: 1400px; margin: 0 auto; padding: 18px 16px 120px; }
   /* start, not stretch: a 9x16 card in the row must not pull every 16x9 card
      beside it into a tall box with a white void under the title. */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 18px; align-items: start; }
+  /* EVERY CARD THE SAME SIZE. The meta block reserves two title lines whether
+     or not the title needs them, so a long name does not make its card taller
+     than the one beside it. */
   .card {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     overflow: hidden; cursor: pointer; position: relative;
+    display: flex; flex-direction: column;
     transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
   }
   .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--border-2); }
@@ -138,10 +99,12 @@ export function getLibraryHtml(): string {
     padding: 2px 8px; border-radius: 5px; background: rgba(12,12,18,.72); color: #fff; z-index: 2;
   }
   .copies:hover { background: var(--accent); }
-  .meta { padding: 10px 12px 12px; }
+  .meta { padding: 10px 12px 12px; flex: none; }
   .cname {
     font-size: 14px; font-weight: 600; line-height: 1.35; margin: 0 0 5px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    /* exactly two lines, always: 2 x 1.35 x 14px */
+    height: 37.8px;
   }
   .cmeta { font-size: 12px; color: var(--text-3); display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
   .cmeta b { font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -167,13 +130,6 @@ export function getLibraryHtml(): string {
   }
   .actionbar.up { transform: translateX(-50%) translateY(0); }
   .actionbar .n { font-size: 13px; font-weight: 600; padding-left: 6px; }
-  .btn {
-    height: 32px; padding: 0 13px; font: 500 13px/1 Inter, sans-serif; color: var(--text);
-    background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
-  }
-  .btn:hover { border-color: var(--border-2); }
-  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
-  .btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
   .toast {
     position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
     background: var(--text); color: var(--bg); font-size: 13px; font-weight: 500;
@@ -219,13 +175,7 @@ export function getLibraryHtml(): string {
 </head>
 <body>
 <div class="shell">
-<nav class="rail">
-  <div class="rail-brand">Quotient Studio</div>
-  <a class="on" id="nav-films" href="#"><span class="ico">&#9635;</span> Films</a>
-  <a id="nav-team" href="#"><span class="ico">&#128101;</span> Team</a>
-  <a id="nav-brand" href="#"><span class="ico">&#127912;</span> Brand</a>
-  <div class="rail-foot" id="rail-tenant"></div>
-</nav>
+${railHtml("films")}
 <div class="work">
 <header class="lib-head">
   <div class="head-in">
@@ -258,8 +208,8 @@ export function getLibraryHtml(): string {
 </div></div>
 <script>
 (function () {
+${RAIL_JS}
   var params = new URLSearchParams(location.search);
-  var TOKEN = params.get('token') || '';
   var state = {
     tenant: params.get('tenant') || '',
     q: params.get('q') || '',
@@ -270,27 +220,6 @@ export function getLibraryHtml(): string {
     picking: false, selected: Object.create(null), expanded: Object.create(null)
   };
 
-  // Append a query param to a path that may or may not already have a query.
-  // Doing this by hand is how the poster url became ".../poster&v=..." for
-  // anyone signed in by COOKIE (no token in the link): a path that does not
-  // exist, a 404, and a shelf of placeholder letters where every still should
-  // have been.
-  function withParam(p, k, v) {
-    if (v === undefined || v === null || v === '') return p;
-    return p + (p.indexOf('?') === -1 ? '?' : '&') + k + '=' + encodeURIComponent(v);
-  }
-  function withToken(p) { return withParam(p, 'token', TOKEN); }
-  function api(path, opts) {
-    opts = opts || {}; opts.headers = opts.headers || {};
-    if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
-    if (opts.body) opts.headers['Content-Type'] = 'application/json';
-    return fetch(withToken(path), opts).then(function (r) {
-      if (!r.ok) return r.json().catch(function () { return null; }).then(function (b) {
-        throw new Error((b && b.error) || ('Error ' + r.status));
-      });
-      return r.json();
-    });
-  }
   var toastT;
   function toast(msg) {
     var el = document.getElementById('toast');
@@ -320,11 +249,7 @@ export function getLibraryHtml(): string {
   function initials(name) {
     return (name || '?').split(/\\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase();
   }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
-    });
-  }
+  var esc = railEsc;
 
   // ── Posters load only when a card is actually on screen: 251 films must not
   //    ask the server for 251 stills to show you the first twelve. ──
@@ -442,7 +367,7 @@ export function getLibraryHtml(): string {
     }
     var qs = '?filter=' + encodeURIComponent(state.filter) + '&sort=' + encodeURIComponent(state.sort) +
       (state.q ? '&q=' + encodeURIComponent(state.q) : '') + (state.archived ? '&archived=1' : '') + '&limit=200';
-    api('/api/library/' + encodeURIComponent(state.tenant) + qs).then(function (r) {
+    railApi('/api/library/' + encodeURIComponent(state.tenant) + qs).then(function (r) {
       if (seq !== loadSeq) return;              // a later keystroke already won
       state.cards = r.cards; state.total = r.total; state.counts = r.counts;
       render();
@@ -575,7 +500,7 @@ export function getLibraryHtml(): string {
     var ids = selectedIds();
     if (!ids.length) { toast('Nothing selected'); return; }
     if (act === 'delete' && !confirm('Delete ' + ids.length + ' film' + (ids.length === 1 ? '' : 's') + ' permanently? This cannot be undone.')) return;
-    api('/api/library/' + encodeURIComponent(state.tenant) + '/bulk', {
+    railApi('/api/library/' + encodeURIComponent(state.tenant) + '/bulk', {
       method: 'POST', body: JSON.stringify({ action: act, project_ids: ids })
     }).then(function (r) {
       toast((act === 'archive' ? 'Archived ' : act === 'restore' ? 'Restored ' : 'Deleted ') + r.done);
@@ -584,25 +509,11 @@ export function getLibraryHtml(): string {
     }).catch(function (err) { toast(err.message); });
   });
 
-  function wireRail() {
-    var q = state.tenant ? '?tenant=' + encodeURIComponent(state.tenant) : '';
-    document.getElementById('nav-team').href = withToken('/team' + q);
-    // The brand kit lives in Studio's panel; home is where you go to it from.
-    document.getElementById('nav-brand').href = withToken('/studio' + q + (q ? '&' : '?') + 'panel=brand');
-    document.getElementById('nav-films').href = withToken('/library' + q);
-    var foot = document.getElementById('rail-tenant');
-    if (foot) foot.textContent = state.tenant;
-  }
+  bootHome(function (tenant) {
+    state.tenant = tenant;
+    load();
+  });
 
-  // Tenant: from the link, or from who is signed in.
-  if (state.tenant) { wireRail(); load(); }
-  else {
-    fetch('/auth/me').then(function (r) { if (!r.ok) throw new Error('signed out'); return r.json(); })
-      .then(function (me) { state.tenant = me.tenant_id; wireRail(); load(); })
-      .catch(function () {
-        location.href = '/auth/google/login?return_to=' + encodeURIComponent(location.pathname + location.search);
-      });
-  }
 })();
 </script>
 </body>

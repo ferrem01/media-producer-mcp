@@ -4,7 +4,7 @@
  * token-in-the-link (or cookie session) auth as the take page. The token
  * IS the tenant, so a link with only a token works too.
  */
-import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
+import { SHELL_TOKENS, RAIL_CSS, RAIL_JS, railHtml } from "./preview-app/home-shell.js";
 
 export function getTeamHtml(): string {
   return `<!DOCTYPE html>
@@ -13,74 +13,70 @@ export function getTeamHtml(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Team · Studio</title>
-${QUOTIENT_FONT_LINKS}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-${QUOTIENT_CSS}
-  body { padding: 20px 16px 48px; max-width: 640px; margin-inline: auto; }
-  h1 { font: 500 20px/28px var(--font-sans); letter-spacing: -0.01em; margin: 0 0 4px; }
-  .sub { color: var(--muted-foreground); margin: 0 0 18px; font-size: 14px; }
-  .box { background: var(--card); border: 1px solid var(--border-secondary); border-radius: var(--radius); box-shadow: var(--shadow-sub); padding: 16px; margin: 0 0 14px; }
-  .lead { color: var(--muted-foreground); font: 500 12px/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 8px; }
-  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border-secondary); }
+${SHELL_TOKENS}
+${RAIL_CSS}
+  header.page-head {
+    position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+  }
+  .head-in { max-width: 680px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: baseline; gap: 12px; }
+  h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+  main { max-width: 680px; margin: 0 auto; padding: 20px 16px 80px; }
+  .sub { color: var(--text-3); margin: 0 0 18px; font-size: 13px; }
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 0 0 14px; }
+  .lead { color: var(--text-3); font: 700 11px/16px Inter, sans-serif; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
   .row:first-of-type { border-top: 0; }
   .who { min-width: 0; }
   .who .e { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .who .n { color: var(--muted-foreground); font-size: 13px; }
-  button, .btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 12px; border: 1px solid var(--border-secondary);
-    background: var(--surface-primary); color: var(--foreground); border-radius: var(--radius); font: 500 14px/20px var(--font-sans); cursor: pointer;
-    box-shadow: var(--shadow-weak); transition: all 150ms cubic-bezier(.4,0,.2,1); -webkit-appearance: none; appearance: none; }
-  button:hover { background: var(--accent); }
-  button:active { transform: translateY(1px); }
-  button:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
-  button.primary { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
-  button.primary:hover { background: color-mix(in srgb, var(--primary) 90%, transparent); }
-  button.quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted-foreground); }
-  button.quiet:hover { background: var(--accent); color: var(--foreground); }
+  .who .n { color: var(--text-3); font-size: 13px; }
+  button.quiet { background: transparent; border-color: transparent; color: var(--text-3); }
+  button.quiet:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
   form { display: flex; gap: 8px; }
-  input[type=email] { flex: 1; min-width: 0; height: 36px; border: 1px solid var(--input); background: var(--surface-primary); color: var(--foreground);
-    border-radius: var(--radius); padding: 8px 12px; font: 400 14px/20px var(--font-sans); outline: none; }
-  input[type=email]::placeholder { color: var(--muted-foreground); }
-  input[type=email]:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
-  .status { color: var(--muted-foreground); font-size: 14px; min-height: 20px; margin-top: 8px; }
-  .status.err { color: var(--destructive); }
-  a.back { color: var(--muted-foreground); font-size: 14px; text-decoration: none; }
-  a.back:hover { color: var(--foreground); }
+  input[type=email] {
+    flex: 1; min-width: 0; height: 32px; border: 1px solid var(--border-2); background: var(--surface);
+    color: var(--text); border-radius: var(--radius-sm); padding: 6px 11px; font: inherit; font-size: 14px; outline: none;
+  }
+  input[type=email]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .status { color: var(--text-3); font-size: 13px; min-height: 20px; margin-top: 8px; }
+  .status.err { color: var(--danger); }
 </style>
 </head>
 <body>
-<a class="back" id="back" href="/studio">&larr; Studio</a>
-<h1>Team</h1>
-<p class="sub" id="sub">Loading…</p>
-<div class="box">
-  <div class="lead">Invite</div>
-  <form id="inviteForm"><input type="email" id="inviteEmail" placeholder="name@company.com" required autocomplete="off"><button class="primary" type="submit">Invite</button></form>
-  <div class="status" id="status"></div>
-  <p class="sub" style="margin:10px 0 0">Everyone at your company domain joins automatically when they sign in. Invite an address from outside it here. Members see every project and the brand kit.</p>
+<div class="shell">
+${railHtml("team")}
+<div class="work">
+  <header class="page-head"><div class="head-in"><h1>Team</h1><span class="sub" id="sub" style="margin:0">Loading&#8230;</span></div></header>
+  <main>
+    <div class="box">
+      <div class="lead">Invite</div>
+      <form id="inviteForm"><input type="email" id="inviteEmail" placeholder="name@company.com" required autocomplete="off"><button class="btn primary" type="submit">Invite</button></form>
+      <div class="status" id="status"></div>
+      <p class="sub" style="margin:10px 0 0">Everyone at your company domain joins automatically when they sign in. Invite an address from outside it here. Members see every project and the brand kit.</p>
+    </div>
+    <div class="box"><div class="lead">Members</div><div id="members"></div></div>
+    <div class="box" id="invitesBox" style="display:none"><div class="lead">Invited, not signed in yet</div><div id="invites"></div></div>
+  </main>
 </div>
-<div class="box"><div class="lead">Members</div><div id="members"></div></div>
-<div class="box" id="invitesBox" style="display:none"><div class="lead">Invited, not signed in yet</div><div id="invites"></div></div>
+</div>
 <script>
 (function () {
+${RAIL_JS}
   var $ = function (id) { return document.getElementById(id); };
-  var qp = new URLSearchParams(location.search);
-  var tenant = qp.get('tenant') || '';
-  var token = qp.get('token') || '';
-  if (!tenant && token) {
-    try { var seg = token.split('.')[1] || ''; var pay = JSON.parse(atob(seg.replace(/-/g, '+').replace(/_/g, '/'))); tenant = String(pay.tenant_id || pay.tenant || ''); } catch (e) {}
-  }
-  function withToken(url) { return token ? url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token) : url; }
-  function say(msg, err) { var st = $('status'); st.textContent = msg || ''; st.className = 'status' + (err ? ' err' : ''); }
-  $('back').href = '/studio' + (tenant ? '?tenant=' + encodeURIComponent(tenant) + (token ? '&token=' + encodeURIComponent(token) : '') : '');
+  var tenant = '';
   var me = '';
+  function say(msg, err) { var st = $('status'); st.textContent = msg || ''; st.className = 'status' + (err ? ' err' : ''); }
   function start() {
-    if (!tenant) {
-      fetch('/auth/me').then(function (r) { return r.ok ? r.json() : null; }).then(function (m) {
-        if (!m || !m.tenant_id) { $('sub').textContent = 'Sign in to Studio first, then open Team from there.'; return; }
-        tenant = m.tenant_id; me = m.email || ''; load();
-      }).catch(function () { $('sub').textContent = 'Sign in to Studio first, then open Team from there.'; });
-      return;
-    }
-    fetch('/auth/me').then(function (r) { return r.ok ? r.json() : null; }).then(function (m) { me = (m && m.email) || ''; }).catch(function () {}).then(load);
+    // The rail signs the page in the way Studio does and hands back the tenant.
+    bootHome(function (t) {
+      tenant = t;
+      fetch(withToken('/auth/me')).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (m) { me = (m && m.email) || ''; }).catch(function () {}).then(load);
+    });
   }
   function render(t) {
     $('sub').textContent = 'Tenant ' + t.tenant_id + (t.domains && t.domains.length ? ' · everyone @' + t.domains.join(', @') : '');

@@ -56,6 +56,7 @@ import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js"
 import { listProjects, loadProject, saveProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
 import { searchLibrary, forgetProject } from "./core/library.js";
 import { getLibraryHtml } from "./preview-app/library-app.js";
+import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
@@ -317,6 +318,7 @@ function renderMcpLanding(server: unknown): string {
   <nav>
     <a href="/architecture">Architecture &amp; docs</a>
     <a href="/library">Films</a>
+    <a href="/brand">Brand</a>
     <a href="/studio">Studio</a>
     <a href="/upload">Upload</a>
     <a href="/playground">Playground</a>
@@ -1125,6 +1127,20 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
       // THE LIBRARY: the tenant's films, in front of Studio. Same auth as
       // Studio -- the shell is served here, every byte of data stays gated.
+      // The brand kit is a PLACE (it was a tray inside Studio), so it is a page
+      // in home's rail beside Films and Team. Same auth as Studio: the shell is
+      // served here, every byte of data stays gated.
+      if (urlPath === "/brand") {
+        const tBrand = extractToken(req);
+        if (isAuthEnabled() && !(tBrand && validateToken(tBrand))) {
+          res.writeHead(302, { Location: "/auth/google/login?return_to=" + encodeURIComponent(url) });
+          res.end();
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getBrandPageHtml());
+        return;
+      }
       if (urlPath === "/library" || urlPath === "/films") {
         const tLib = extractToken(req);
         if (isAuthEnabled() && !(tLib && validateToken(tLib))) {
