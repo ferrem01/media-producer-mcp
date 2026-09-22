@@ -15,8 +15,9 @@ async function seed(tenant: string) {
     return p;
   };
 
+  // Older films record the render only in their status: no `rendered` flag.
   await make("Every Call Is Content", {
-    status: "rendered", rendered: true,
+    status: "rendered",
     prompt: "turn a customer call into marketing",
     scenes: [{ id: "s1", duration_seconds: 4, components: [
       { id: "c1", type: "st-statement", data: { text: "What if a sales call wrote your campaign?" } },
@@ -59,8 +60,10 @@ describe("the tenant library", () => {
     const call = all.cards.find((c) => c.name === "Every Call Is Content")!;
     expect(call).toBeTruthy();
     expect(call.copies?.length).toBe(1);
-    // The rendered one leads: it is the one you actually want to watch.
+    // The rendered one leads: it is the one you actually want to watch --
+    // and it is recognised from its status alone.
     expect(call.rendered).toBe(true);
+    expect(all.counts.rendered).toBe(1);
 
     // A phrase that only exists ON SCREEN.
     const onScreen = await searchLibrary(tenant, { q: "sales call" });
