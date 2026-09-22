@@ -1193,8 +1193,6 @@ ${QUOTIENT_CSS}
       <button class="btn btn-secondary" id="project-delete-btn" style="display:none;" title="Delete this project &#8212; scenes, assets and rendered MP4. Asks first; cannot be undone.">&#128465;</button>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
-      <button class="btn btn-secondary" id="brand-btn" style="display:none;" title="View and edit this tenant's brand kit: colors, voice, logos, assets">&#127912; Brand</button>
-      <a class="btn btn-secondary" id="team-btn" style="display:none;text-decoration:none;" title="Who shares this tenant: invite a colleague, remove a member">&#128101; Team</a>
       <span id="render-wrap" style="display:none;align-items:center;gap:8px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
         <button class="btn btn-primary" id="render-menu-btn" title="Render options">&#9662;</button>
@@ -2683,8 +2681,6 @@ ${QUOTIENT_CSS}
       updateRenderUI();
       renderStatusRefresh();
 
-      var brandBtnEl = document.getElementById('brand-btn');
-      if (brandBtnEl) brandBtnEl.style.display = '';
       var projDelBtnEl = document.getElementById('project-delete-btn');
       if (projDelBtnEl) projDelBtnEl.style.display = '';
 
@@ -5081,6 +5077,15 @@ ${QUOTIENT_CSS}
   (function wireBrand() {
     var btn = document.getElementById('brand-btn');
     if (btn) btn.addEventListener('click', brandOpen);
+    // Brand left Studio's header for home's left rail, so home links BACK in
+    // to the panel: /studio?...&panel=brand opens it once the tenant is known.
+    if (new URLSearchParams(window.location.search).get('panel') === 'brand') {
+      var tries = 0;
+      var waitForTenant = setInterval(function () {
+        if (state.tenantId) { clearInterval(waitForTenant); brandOpen(); }
+        else if (++tries > 60) { clearInterval(waitForTenant); }
+      }, 100);
+    }
     document.getElementById('brand-overlay').addEventListener('click', function(e) {
       if (e.target === document.getElementById('brand-overlay')) brandClose();
     });
@@ -8792,9 +8797,7 @@ ${QUOTIENT_CSS}
     if (me.picture) { pic.src = me.picture; pic.style.display = 'inline-block'; }
     chip.style.display = 'inline-flex';
   }
-  function showBrandBtn() {
-    var b = document.getElementById('brand-btn');
-    if (b) b.style.display = '';
+  function wireHomeLink() {
     // Back to the library, on the EXACT view left behind (search, filter and
     // all) when this Studio was opened from there.
     var lib = document.getElementById('library-btn');
@@ -8808,19 +8811,12 @@ ${QUOTIENT_CSS}
           (ltok ? (state.tenantId ? '&' : '?') + 'token=' + encodeURIComponent(ltok) : '');
       }
     }
-    // The Team page shares the tenant (and the link's token, when there is one).
-    var t = document.getElementById('team-btn');
-    if (t && state.tenantId) {
-      var tok = new URLSearchParams(window.location.search).get('token');
-      t.href = '/team?tenant=' + encodeURIComponent(state.tenantId) + (tok ? '&token=' + encodeURIComponent(tok) : '');
-      t.style.display = '';
-    }
   }
   var params = new URLSearchParams(window.location.search);
   var tenantParam = params.get('tenant');
   if (tenantParam) {
     state.tenantId = tenantParam;
-    showBrandBtn();
+    wireHomeLink();
     loadProjects();
     fetch('/auth/me').then(function(r) { return r.ok ? r.json() : null; })
       .then(showUserChip).catch(function() {});
@@ -8831,7 +8827,7 @@ ${QUOTIENT_CSS}
     }).then(function(me) {
       state.tenantId = me.tenant_id;
       showUserChip(me);
-      showBrandBtn();
+      wireHomeLink();
       loadProjects();
     }).catch(function() {
       window.location.href = '/auth/google/login?return_to=' +

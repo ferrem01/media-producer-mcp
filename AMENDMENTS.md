@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — Home: a rail, and cards that page through their scenes
+
+Marc, on the library: the cards should carry the per-scene stills Studio shows
+down its left side and let you cycle them; every card the same size whatever
+the frame; and Team and Brand belong here, not in Studio's header ("it's a bit
+of a mess"). Also -- a shelf of nothing but placeholder letters, because of the
+cookie-session poster bug (previous entry).
+
+- `core/poster.ts` — `ensureProjectPoster(t, p, sceneIndex?)`. The COVER may
+  come from the render (the film as it plays); a NAMED SCENE is always
+  photographed, so paging shows the scene itself rather than a guess at where
+  it sits in the mp4. Cached per scene as `poster_s{N}.jpg`.
+  `GET /api/projects/{t}/{p}/poster?scene=N`.
+- The card pages with ‹ › on hover and an "n/total" counter. Position 0 is the
+  cover; 1..n-1 are the scenes. Stills are fetched only when someone actually
+  pages, so a shelf of 251 films still costs one still per card.
+- HOME has a left rail: Films, Team, Brand. Studio's header loses both buttons
+  and keeps the back arrow. Brand has no standalone page, so the rail deep-links
+  `/studio?...&panel=brand`, which opens the panel once the tenant resolves.
+- Every card is one 16x9 box; a tall film is letterboxed WHOLE inside it rather
+  than cropped to a band, with its frame named in the meta line.
+- ARCHIVE HIDES, IT DOES NOT DELETE (asked directly): `archived_at` is a
+  timestamp on the project record, the film and its render stay on disk, and
+  Restore puts it back. Permanent delete exists only inside the archive view,
+  and the bulk route refuses any film that is not already archived.
+
+---
+
 ## 2026-09-22 — The LIBRARY: 251 films, and a way to find one
 
 Backlog item 00, shipped. The only way into a film was its project id; finding
