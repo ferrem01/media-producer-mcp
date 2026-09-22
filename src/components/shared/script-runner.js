@@ -65,20 +65,33 @@ function _processActions(tl, container, actions, targets, ctx, handlers, cursor,
 
 function _processOneAction(tl, container, action, at, dur, targets, ctx, handlers, cursor, camera) {
   var target, el;
+  // A named target the film set wins; otherwise the marked element wins over
+  // the mock's fallback percentages, so a click lands ON the thing.
+  function aim(name) {
+    var explicit = targets && Object.prototype.hasOwnProperty.call(targets, name) && targets.__explicit;
+    var t = explicit ? resolveTarget(targets, name)
+                     : (elementTarget(container, name) || resolveTarget(targets, name));
+    // A target may be a RESOLVER: a component whose blocks are built and then
+    // hidden until their reveal (a chat log) knows where a line will be at a
+    // given moment, and nothing else does. It is called with the timeline
+    // position of the action asking.
+    if (typeof t === 'function') t = t(at);
+    return t;
+  }
 
   switch (action.action) {
 
     // ── Cursor actions ──
 
     case 'move-cursor':
-      target = resolveTarget(targets, action.target);
+      target = aim(action.target);
       if (target && cursor) moveCursor(tl, cursor, target, at, dur, action.ease);
       break;
 
     case 'click':
       if (cursor) {
         if (action.target) {
-          target = resolveTarget(targets, action.target);
+          target = aim(action.target);
           if (target) {
             moveCursor(tl, cursor, target, at, 0.3, action.ease);
             clickCursor(tl, cursor, at + 0.3);
@@ -92,7 +105,7 @@ function _processOneAction(tl, container, action, at, dur, targets, ctx, handler
     case 'double-click':
       if (cursor) {
         if (action.target) {
-          target = resolveTarget(targets, action.target);
+          target = aim(action.target);
           if (target) {
             moveCursor(tl, cursor, target, at, 0.3, action.ease);
             doubleClickCursor(tl, cursor, at + 0.3);
@@ -105,7 +118,7 @@ function _processOneAction(tl, container, action, at, dur, targets, ctx, handler
 
     case 'hover':
       if (cursor) {
-        target = resolveTarget(targets, action.target);
+        target = aim(action.target);
         if (target) moveCursor(tl, cursor, target, at, dur, action.ease);
       }
       break;

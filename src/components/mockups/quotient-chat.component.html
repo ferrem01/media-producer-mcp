@@ -559,6 +559,10 @@
     function verbEl(a) {
       var d = document.createElement('div');
       d.className = 'qch-verb';
+      // A line the agent wrote is a LINK to the thing it made: the cursor can
+      // be sent to it by entity ("campaign", "blog", "task"), which is how a
+      // film gets from the conversation to the page it opens.
+      if (a.entity) d.setAttribute('data-cursor-target', String(a.entity));
       var inline = a.inline_title
         ? '<span class="qch-vtitle">' + esc(a.title || '') + '</span>'
         : esc(a.noun || entNoun(a.entity));
@@ -805,6 +809,13 @@
         tl2.call(function() { node.textContent = value; }, null, t);
       }
 
+      // Transform-immune position of a node inside the component box.
+      function offsetIn(node, stop) {
+        var x = 0, y = 0, n = node;
+        while (n && n !== stop) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+        return { x: x, y: y };
+      }
+
       var script = data.script.slice().sort(function(a, b) { return (a.at || 0) - (b.at || 0); });
       var viewH = msgs.clientHeight;
       var pendingTyped = '';
@@ -869,6 +880,13 @@
           ev.node = node;
           ev.scrollAfter = Math.max(0, msgs.scrollHeight - viewH);
           ev.naturalDisplay = getComputedStyle(node).display;
+          // Where this block sits in the scroll CONTENT, measured while it is
+          // still visible -- the only moment it can be measured. Offsets
+          // (not rects) so the root's entry slide does not bias them.
+          var off = offsetIn(node, el);
+          ev.boxX = off.x; ev.boxY = off.y;
+          ev.boxW = node.offsetWidth; ev.boxH = node.offsetHeight;
+          ev.entity = action.entity || null;
           events.push(ev);
         } else {
           ev.scrollAfter = Math.max(0, msgs.scrollHeight - viewH);
@@ -878,6 +896,43 @@
       // Hide all script nodes now that offsets are measured.
       events.forEach(function(ev) { if (ev.node) ev.node.style.display = 'none'; });
       msgs.scrollTop = Math.max(0, msgs.scrollHeight - viewH);
+
+      // THE CONVERSATION IS CLICKABLE. A line the agent wrote ("Created
+      // campaign") is the link from the chat to the page it opens, so a film
+      // can send the cursor to it by entity name. The block is hidden until
+      // its reveal, so instead of a box we publish a RESOLVER: given the
+      // moment of the click, it subtracts the scroll the log will be at by
+      // then and returns the line's centre. The last line wearing the name at
+      // or before that moment wins.
+      var msgsOff = offsetIn(msgs, el);
+      function scrollAt(t) {
+        var s2 = 0;
+        for (var i3 = 0; i3 < events.length; i3++) {
+          if (events[i3].at > t + 0.001) break;
+          s2 = events[i3].scrollAfter;
+        }
+        return s2;
+      }
+      var entityNames = {};
+      events.forEach(function(ev) { if (ev.node && ev.entity) entityNames[String(ev.entity)] = true; });
+      Object.keys(entityNames).forEach(function(name) {
+        if (cursorTargets[name]) return;
+        cursorTargets[name] = function(t) {
+          var pick = null;
+          for (var i4 = 0; i4 < events.length; i4++) {
+            var ev2 = events[i4];
+            if (ev2.at > t + 0.001) break;
+            if (ev2.node && String(ev2.entity) === name) pick = ev2;
+          }
+          if (!pick) return null;
+          // boxY is already the node's place inside the component box; only
+          // the log's scroll has to come off it.
+          var y = pick.boxY - scrollAt(t) + pick.boxH / 2;
+          // Off-screen in the log means there is nothing to click.
+          if (y < msgsOff.y || y > msgsOff.y + viewH) return null;
+          return { x: pick.boxX + Math.min(pick.boxW, 520) / 2, y: y };
+        };
+      });
 
       function reveal(tl2, ev, t) {
         tl2.set(ev.node, { display: ev.naturalDisplay }, t);
