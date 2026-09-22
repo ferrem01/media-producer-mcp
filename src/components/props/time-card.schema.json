@@ -1,0 +1,59 @@
+{
+  "type": "time-card",
+  "label": "Time Card",
+  "category": "props",
+  "description": "A cartoon narrator's time card: 'Four days later...' in ornate script on a painted sky with puffy clouds, a slow push across the beat. A parody of the form (nothing borrowed), built for a one-line read-over. Fills its box. Pair it with a narrator line on the audio track.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Text",
+      "required": true,
+      "default": "Some time later\u2026"
+    },
+    "tone": {
+      "type": "string",
+      "label": "Sky",
+      "optional": true,
+      "default": "day",
+      "enum": [
+        "day",
+        "dusk"
+      ]
+    },
+    "font_size": {
+      "type": "number",
+      "label": "Font size (px)",
+      "optional": true,
+      "description": "Default 16% of the box's short side"
+    },
+    "font_family": {
+      "type": "string",
+      "label": "Script face (Google Fonts)",
+      "optional": true,
+      "default": "Dancing Script"
+    },
+    "color": {
+      "type": "string",
+      "label": "Ink",
+      "optional": true,
+      "default": "#16305f"
+    },
+    "drift": {
+      "type": "boolean",
+      "label": "Slow push",
+      "optional": true,
+      "default": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Start (s)",
+      "optional": true,
+      "default": 0
+    },
+    "duration": {
+      "type": "number",
+      "label": "Duration (s)",
+      "optional": true
+    }
+  }
+}

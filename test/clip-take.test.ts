@@ -261,4 +261,21 @@ describe("the clip need", () => {
     expect(pipe.match(/const keptMood = opts\.boardMusicMood === "none" \? "none" : treatment\?\.audioSystem\?\.music_mood;\n\s*project\.storyboard = storyboardToSaved\(storyboard, opts\.voice as string, keptMood\);/g)?.length).toBe(2);
     expect(pipe).not.toMatch(/storyboardToSaved\(storyboard, opts\.voice as string, treatment\?\.audioSystem\?\.music_mood\)/);
   });
+
+  it("the storm and the time card: two full-stage props for the sketch's montage -- self-placing, never phone-zoomed; the storm's cards sit at positive timeline positions", async () => {
+    const gen = await read("src/llm/scene-generator.ts");
+    expect(gen).toMatch(/var SELF_PLACING_TYPES = \[[^\]]*"tool-storm", "time-card"\]/);
+    expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"tool-storm", "time-card", "checklist-toggles", "card-fan", "video", "image"\]/);
+    const storm = await read("src/components/props/tool-storm.component.html");
+    expect(storm).toMatch(/mode === 'fly'/); expect(storm).toMatch(/stage\.classList\.add\('ring'\)/); expect(storm).toMatch(/repeat: -1, immediateRender: false \}, t0 \+ first\)/);
+    expect(storm).not.toMatch(/tl\.add\(tw, t0 - lead\)/);
+    expect(storm).not.toMatch(/Math\.random/);
+    const ss = JSON.parse(await read("src/components/props/tool-storm.schema.json"));
+    expect(ss.data.mode.enum).toEqual(["fly", "ring", "storm"]);
+    const card = await read("src/components/props/time-card.component.html");
+    expect(card).toMatch(/fonts\.googleapis\.com\/css2\?family=/);
+    expect(card).toMatch(/data\.text \|\| 'Some time later/);
+    const cs = JSON.parse(await read("src/components/props/time-card.schema.json"));
+    expect(cs.data.text.required).toBe(true);
+  });
 });

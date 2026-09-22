@@ -4726,3 +4726,25 @@ gone when the cut lands before it.
   "these veo clips did not fill the full screen"). A clip is sanitized
   without a canvas now (rotation, loudness); the video component's cover
   fit frames it at render.
+
+## 2026-09-22 -- The storm: she comes apart while the tools multiply
+
+Marc, on the sketch: the montage should be funny -- "flashes of her
+getting progressively more flustered... and overlaid on top of that all
+these screens flashing by or rotating in a circle... making five screens
+look like a hundred", then a cartoon narrator's "Four days later" before
+she delivers. Two props:
+- `tool-storm`: the five tools as lightweight window cards (colour, mark,
+  the shape of the surface; no cursors, no figures) over the person. Three
+  modes escalate: fly (one by one from the sides, stacking), ring (they
+  circle her, the same five coming round), storm (a blizzard crossing on
+  their own lines with white flashes). Every position is a function of
+  the card's index. The storm's crossings are two tweens per card at
+  positive positions -- a negative position means "from the end" to
+  GSAP, which emptied the first probe.
+- `time-card`: ornate script on a painted sky with a slow push -- a parody
+  of the form, nothing borrowed -- for a one-line read-over. The script
+  face is fetched from Google Fonts the way the kit's own faces are.
+Both are self-placing full-stage props, never phone-zoomed. The narrator
+line ("Four days later..." with a French accent) is made with the
+instruction-following TTS and placed on the audio track at the card.

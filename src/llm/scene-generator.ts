@@ -383,7 +383,7 @@ var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 // plated caption that fits its lane, the stage overlay) and must NOT be
 // zoomed on top of that. Everything else gets the phone zoom on a tall
 // speaker frame: a mock, a stamp, a pill set, a composer, a stat.
-var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "chapter-kicker", "logo-band", "checklist-toggles", "card-fan", "video", "image"];
+var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "chapter-kicker", "logo-band", "tool-storm", "time-card", "checklist-toggles", "card-fan", "video", "image"];
 function phoneZoomable(type: string): boolean {
   return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
 }
@@ -588,7 +588,7 @@ var HIGH_OVERLAY_TYPES = ["floating-pills"];
 // ...and the lower third, which anchors itself bottom-left/right with its
 // own safe margins: in a 35%-wide side slot it hung off the frame edge
 // (measured live, proj_438fa7db: "TEST 01 -- PL", clipped).
-var SELF_PLACING_TYPES = ["chapter-kicker", "logo-band", "lower-third"];
+var SELF_PLACING_TYPES = ["chapter-kicker", "logo-band", "lower-third", "tool-storm", "time-card"];
 /** Ambient full-stage type BEHIND the windows, above the backdrop. */
 var GHOST_TYPES = ["ghost-type"];
 /** Backdrop-cast components: in a WORLD film these are redundant -- the

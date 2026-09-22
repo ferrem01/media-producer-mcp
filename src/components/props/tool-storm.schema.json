@@ -1,0 +1,77 @@
+{
+  "type": "tool-storm",
+  "label": "Tool Storm",
+  "category": "props",
+  "description": "The five tools as window cards multiplying over the person: five that read as a hundred. mode 'fly': the windows arrive one by one from the sides and stack loosely (the first beat, readable). mode 'ring': they circle the frame, the same five coming round again, near cards big and bright, far ones small and dim (the second beat). mode 'storm': a blizzard of cards crossing the frame on their own lines with a spin, too fast to read, with white flashes (the third beat). Lightweight cards (the tool's colour, mark and the shape of its surface; no cursors, no figures). Sized to its box; every position is a function of the card's index so the frames are the same on every seek. Meant to ride over a live-action clip of the person.",
+  "data": {
+    "mode": {
+      "type": "string",
+      "label": "Mode",
+      "optional": true,
+      "default": "fly",
+      "enum": [
+        "fly",
+        "ring",
+        "storm"
+      ]
+    },
+    "tools": {
+      "type": "array",
+      "label": "Tools",
+      "optional": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "meta-ads",
+          "klaviyo",
+          "ga4",
+          "sheets",
+          "powerpoint"
+        ]
+      },
+      "description": "The tools, cycled in order (default all five)"
+    },
+    "count": {
+      "type": "number",
+      "label": "Cards",
+      "optional": true,
+      "description": "How many windows (default 5 fly, 15 ring, 40 storm; max 80)"
+    },
+    "card_width": {
+      "type": "number",
+      "label": "Card width (% of box)",
+      "optional": true,
+      "description": "Default 40 fly, 30 ring, 26 storm"
+    },
+    "speed": {
+      "type": "number",
+      "label": "Speed",
+      "optional": true,
+      "default": 1
+    },
+    "turn": {
+      "type": "number",
+      "label": "Ring turns",
+      "optional": true,
+      "description": "ring: full turns across the beat (default 0.9 x speed)"
+    },
+    "flash": {
+      "type": "boolean",
+      "label": "Storm flashes",
+      "optional": true,
+      "default": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Start (s)",
+      "optional": true,
+      "default": 0
+    },
+    "duration": {
+      "type": "number",
+      "label": "Duration (s)",
+      "optional": true,
+      "description": "Defaults to the scene's"
+    }
+  }
+}
