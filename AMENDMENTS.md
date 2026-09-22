@@ -4822,3 +4822,5 @@ not inherited: output/ stays behind, the render flags are cleared, and a
 rendered. `include_output: true` keeps the mp4 for an archive copy.
 Reachable as `create` with `copy_of` (and an optional new `name`), and as
 `POST /api/projects/{tenant}/{project}/duplicate` for Studio.
+- ...and `format` is optional when copying: a copy takes the original's
+  format, and the tool demanded one on the first live call.
