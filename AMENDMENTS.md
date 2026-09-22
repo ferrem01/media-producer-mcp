@@ -4708,3 +4708,7 @@ gone when the cut lands before it.
   builder INCLUDING "none" (`boardTransition`), which the two builder
   paths used to drop as "no transition" -- and the render then inserted
   its crossfade.
+- ...and the board's mood outlives the build: the full build wrote the
+  board back from the writer's draft with the treatment's mood, so the
+  "none" the update tool had set read "driving" again after one rebuild.
+  The mood read at the start of the build is what is written back.

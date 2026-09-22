@@ -252,5 +252,8 @@ describe("the clip need", () => {
     expect(types).toMatch(/export interface StoryboardScene \{\n\s*\/\*\* Scene label \*\/\n\s*label: string;\n\s*\/\*\* The cut into this scene[^\n]*\n\s*transition_in\?: SceneTransition;/);
     const pipe = await read("src/llm/pipeline.ts");
     expect(pipe).toMatch(/if \(choice\?\.source === "none" \|\| boardMood === "none"\) \{ chosenMusic = null; opts\.backgroundMusic = false;/);
+    // ...and the board is written back with its own none, not the treatment's mood.
+    expect(pipe.match(/const keptMood = \(project\.storyboard as any\)\?\.audio\?\.music_mood === "none" \? "none" : treatment\?\.audioSystem\?\.music_mood;\n\s*project\.storyboard = storyboardToSaved\(storyboard, opts\.voice as string, keptMood\);/g)?.length).toBe(2);
+    expect(pipe).not.toMatch(/storyboardToSaved\(storyboard, opts\.voice as string, treatment\?\.audioSystem\?\.music_mood\)/);
   });
 });
