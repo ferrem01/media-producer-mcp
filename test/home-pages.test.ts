@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { chromium, type Browser } from "playwright";
 import { getLibraryHtml } from "../src/preview-app/library-app.js";
 import { getBrandPageHtml } from "../src/preview-app/brand-page.js";
@@ -23,27 +24,46 @@ const CARDS = [
 
 const ME = { email: "marc@getquotient.ai", name: "Marc Ferrentino", tenant_id: "marc-getquotient-ai" };
 
+/**
+ * Serve the page over HTTP, not file://. These pages ask "/auth/me" who is
+ * signed in and go to the login when nobody answers; on a file:// page that
+ * request is file:///auth/me, which no route mock reliably intercepts -- CI
+ * redirected itself to a blank page while the same test passed locally.
+ */
+async function serve(html: string) {
+  const server = http.createServer((req, res) => {
+    const url = req.url || "/";
+    const json = (body: unknown) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(body));
+    };
+    if (url.startsWith("/auth/me")) return json(ME);
+    if (url.startsWith("/api/library/")) {
+      return json({ cards: CARDS, total: CARDS.length, counts: { all: 6, rendered: 4, built: 1, board: 1, archived: 0 } });
+    }
+    if (url.startsWith("/api/team/")) {
+      return json({ tenant_id: ME.tenant_id, domains: ["getquotient.ai"], members: [{ email: ME.email, name: ME.name, via: "founder" }], invites: [] });
+    }
+    if (url.startsWith("/api/brand-kit/")) {
+      return json({ colors: { primary: "#393bf5", background: "#ffffff" }, fonts: [{ family: "Inter", source: "google", weights: [400, 700] }], logos: [], assets: [], voice: "nova" });
+    }
+    if (url.includes("/poster")) { res.writeHead(204); return res.end(); }
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(html);
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as AddressInfo).port;
+  return { url: `http://127.0.0.1:${port}/`, close: () => new Promise<void>((r) => server.close(() => r())) };
+}
+
 async function open(browser: Browser, html: string) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "home-"));
-  const file = path.join(dir, "page.html");
-  await fs.writeFile(file, html);
+  const site = await serve(html);
   const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
-  await page.route("**/auth/me**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(ME) }));
-  await page.route("**/api/library/**", (r) => r.fulfill({
-    status: 200, contentType: "application/json",
-    body: JSON.stringify({ cards: CARDS, total: CARDS.length, counts: { all: 6, rendered: 4, built: 1, board: 1, archived: 0 } }),
-  }));
-  await page.route("**/api/team/**", (r) => r.fulfill({
-    status: 200, contentType: "application/json",
-    body: JSON.stringify({ tenant_id: ME.tenant_id, domains: ["getquotient.ai"], members: [{ email: ME.email, name: ME.name, via: "founder" }], invites: [] }),
-  }));
-  await page.route("**/api/brand-kit/**", (r) => r.fulfill({
-    status: 200, contentType: "application/json",
-    body: JSON.stringify({ colors: { primary: "#393bf5", background: "#ffffff" }, fonts: [{ family: "Inter", source: "google", weights: [400, 700] }], logos: [], assets: [], voice: "nova" }),
-  }));
-  await page.route("**/poster**", (r) => r.fulfill({ status: 204, body: "" }));
-  await page.goto(`file://${file}`, { waitUntil: "domcontentloaded" });
-  return { page, cleanup: () => fs.rm(dir, { recursive: true, force: true }).catch(() => {}) };
+  // Google Fonts is not reachable from CI; do not wait on it.
+  await page.route("https://fonts.googleapis.com/**", (r) => r.abort());
+  await page.route("https://fonts.gstatic.com/**", (r) => r.abort());
+  await page.goto(site.url, { waitUntil: "domcontentloaded" });
+  return { page, cleanup: () => site.close() };
 }
 
 describe("home", () => {
