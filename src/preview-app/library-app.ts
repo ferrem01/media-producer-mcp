@@ -82,7 +82,9 @@ export function getLibraryHtml(): string {
   select.chip { padding-right: 8px; }
 
   main { max-width: 1400px; margin: 0 auto; padding: 18px 16px 120px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 18px; }
+  /* start, not stretch: a 9x16 card in the row must not pull every 16x9 card
+     beside it into a tall box with a white void under the title. */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 18px; align-items: start; }
   .card {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     overflow: hidden; cursor: pointer; position: relative;
@@ -92,7 +94,10 @@ export function getLibraryHtml(): string {
   .card.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
   .thumb { position: relative; background: var(--surface-2); aspect-ratio: 16/9; overflow: hidden; }
   .thumb.f9x16 { aspect-ratio: 3/4; } .thumb.f4x5 { aspect-ratio: 4/5; } .thumb.f1x1 { aspect-ratio: 1/1; }
-  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .25s ease; }
+  /* The poster sits ON TOP of the initials: a positioned placeholder paints
+     over an in-flow image, so every loaded still was hidden behind its own
+     fallback. */
+  .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .25s ease; z-index: 1; }
   .thumb img.in { opacity: 1; }
   .thumb .initials {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
