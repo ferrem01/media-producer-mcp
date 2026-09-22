@@ -82,7 +82,7 @@ describe("the team store on disk: login, invite, remove", () => {
     expect((await resolveTenantForLogin("pat@gmail.com", "Pat")).tenantId).toBe("pat-gmail-com");
     await expect(inviteMember("marc-getquotient-ai", "not an email", "marc@getquotient.ai")).rejects.toThrow(/not an email/);
   });
-  it("the wiring: login goes through the team store, the API route is tenant-enforced, both Studios link the page, the MCP tool exists", async () => {
+  it("the wiring: login goes through the team store, the API route is tenant-enforced, home and the phone link the page, the MCP tool exists", async () => {
     const read = (f: string) => fs.readFile(path.join(__dirname, "..", f), "utf-8");
     expect(await read("src/auth/google-oauth.ts")).toMatch(/const user = await resolveTenantForLogin\(userInfo\.email, userInfo\.name, userInfo\.picture\);/);
     const index = await read("src/index.ts");
@@ -90,7 +90,11 @@ describe("the team store on disk: login, invite, remove", () => {
     expect(index).toMatch(/urlPath\.match\(\/\^\\\/api\\\/team\\\/\(\[\^\/\]\+\)\$\/\)/);
     expect(index).toMatch(/if \(urlPath === "\/team"\) \{/);
     expect(await read("src/studio-phone.ts")).toMatch(/teamA\.href = '\/team\?tenant='/);
-    expect(await read("src/preview-app/preview-app.ts")).toMatch(/id="team-btn"/);
+    // Team left the desktop Studio header for HOME's left rail (the header was
+    // carrying too much); the page still has to be one click away.
+    const library = await read("src/preview-app/library-app.ts");
+    expect(library).toMatch(/id="nav-team"/);
+    expect(library).toMatch(/nav-team'\)\.href = withToken\('\/team'/);
     expect(await read("src/server.ts")).toMatch(/tool\(\s*"team",/);
   });
 });
