@@ -4793,3 +4793,9 @@ sounds we MAKE.
   search action could be called at all (measured live: the first
   `search_sfx` came back a validation error naming `track`). It is
   optional now, with one guard before the branches that write.
+- Room tone joins the set. The scored sketch had four seconds of ABSOLUTE
+  silence under its close (-180 dB, measured on the render): a film with
+  dialogue and effects and then nothing reads as broken audio, not as a
+  quiet moment. `room-tone` is a loopable four seconds of low-mid air that
+  breathes slightly, laid under a whole film at a level nobody notices
+  until it is missing.
