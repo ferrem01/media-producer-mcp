@@ -92,8 +92,12 @@ export function getLibraryHtml(): string {
   }
   .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--border-2); }
   .card.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+  /* ONE box for every film, whatever its frame: a shelf of ragged rows reads
+     as broken, not as informative. A tall film is shown WHOLE inside it
+     (letterboxed on the card surface) rather than cropped to a band, and the
+     frame is named in the meta line. */
   .thumb { position: relative; background: var(--surface-2); aspect-ratio: 16/9; overflow: hidden; }
-  .thumb.f9x16 { aspect-ratio: 3/4; } .thumb.f4x5 { aspect-ratio: 4/5; } .thumb.f1x1 { aspect-ratio: 1/1; }
+  .thumb.tall img { object-fit: contain; background: var(--surface-2); }
   /* The poster sits ON TOP of the initials: a positioned placeholder paints
      over an in-flow image, so every loaded still was hidden behind its own
      fallback. */
@@ -104,7 +108,7 @@ export function getLibraryHtml(): string {
     font-size: 30px; font-weight: 700; color: var(--text-3); letter-spacing: -0.02em;
     background: linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--accent) 8%, var(--surface-2)));
   }
-  .badges { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 5px; }
+  .badges { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 5px; z-index: 2; }
   .badge {
     font-size: 11px; font-weight: 600; letter-spacing: .01em; padding: 2px 7px; border-radius: 5px;
     background: rgba(12,12,18,.72); color: #fff; backdrop-filter: blur(4px);
@@ -114,7 +118,7 @@ export function getLibraryHtml(): string {
   .badge.state-board    { background: rgba(120,53,15,.82); }
   .copies {
     position: absolute; right: 8px; bottom: 8px; font-size: 11px; font-weight: 600;
-    padding: 2px 8px; border-radius: 5px; background: rgba(12,12,18,.72); color: #fff;
+    padding: 2px 8px; border-radius: 5px; background: rgba(12,12,18,.72); color: #fff; z-index: 2;
   }
   .copies:hover { background: var(--accent); }
   .meta { padding: 10px 12px 12px; }
@@ -126,7 +130,7 @@ export function getLibraryHtml(): string {
   .cmeta b { font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
   .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); opacity: .6; }
   .pick {
-    position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 6px;
+    position: absolute; top: 8px; left: 8px; z-index: 3; width: 22px; height: 22px; border-radius: 6px;
     border: 2px solid #fff; background: rgba(12,12,18,.45); display: none;
     align-items: center; justify-content: center; color: #fff; font-size: 14px; line-height: 1;
   }
@@ -278,7 +282,7 @@ export function getLibraryHtml(): string {
     var st = stateOf(c);
     var poster = withToken('/api/projects/' + encodeURIComponent(state.tenant) + '/' + encodeURIComponent(c.project_id) + '/poster') +
       '&v=' + encodeURIComponent(c.touched_at || '');
-    var frameCls = c.frame && c.frame !== '16x9' ? ' f' + c.frame.replace(':', 'x') : '';
+    var frameCls = c.frame && c.frame !== '16x9' ? ' tall' : '';
     return '<div class="card' + (state.selected[c.project_id] ? ' sel' : '') + '" data-id="' + esc(c.project_id) + '">' +
       '<div class="pick">' + (state.selected[c.project_id] ? '&#10003;' : '') + '</div>' +
       '<div class="thumb' + frameCls + '">' +
