@@ -4837,3 +4837,19 @@ one. `start-task {index, label?}` (quotient-campaign): the row's ring
 half-fills in the brand colour and its chip reads "In progress";
 `complete-task` clears that state on its way to the green check, so the
 same row can start in one scene and finish in another.
+- ...and then the tasks view was rebuilt to group by status, the way the
+  product does. Marc sent the real screen beside the mock: the product
+  splits tasks into sections -- In review, In progress, To-do -- each with
+  its own header, icon and count, and moving a task moves it between
+  sections. The mock had one hardcoded "To-do" group and said the status
+  in a chip. Now: `status` on a task ('todo' default, 'in_progress',
+  'in_review', 'done'), sections in that order (Completed first, To-do
+  last), a section with nothing in it is not drawn, and the rings are the
+  product's own (dashed grey, blue radio, purple half, green check). The
+  Chat column goes; the product shows five.
+  `set-task-status {index, status}` moves a task, with `start-task` and
+  `complete-task` as the named aliases. Because the renderer SEEKS the
+  timeline, a row cannot be reparented at play time: every row a task will
+  ever occupy is built up front, one per (task, status) the script visits,
+  and the timeline only opens one and closes another. Counts and the
+  Completed n/N follow each move.
