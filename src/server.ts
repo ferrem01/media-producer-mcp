@@ -1287,6 +1287,16 @@ export function createMcpServer(): McpServer {
             pose: poseObject.optional().describe("3D pose: the standing tilt and, with from, the arrival it eases in from"),
           })).optional().describe("Replace this scene's CAST on the board, deterministically: the full list of components in stack order (type + data; a position is honored by the build, an unplaced component is laid out by it). Omit to keep the cast; pass [] to clear it. Works before any build -- a built film is rebuilt from the board with generate mode='full'. A scene template on the scene is dropped unless scene_template is passed too."),
           scene_template: z.object({ type: z.string(), data: z.record(z.unknown()).optional() }).nullable().optional().describe("Set the scene's template (a full-frame card such as st-logo-close) or pass null to drop it."),
+          assets: z.array(z.object({
+            type: z.enum(["screenshot", "screen_recording", "stock_footage", "mockup", "illustration", "camera_video"]),
+            description: z.string(),
+            status: z.enum(["needed", "provided"]).optional(),
+            path: z.string().optional(),
+            use: z.enum(["cutaway", "card", "split", "clip"]).optional(),
+            priority: z.enum(["critical", "recommended", "nice_to_have"]).optional(),
+            at: z.number().optional(),
+            until: z.number().optional(),
+          })).optional().describe("Replace this scene's NEEDS on the board, deterministically: the full list of assets the scene asks for. Pass [] when the cast IS the plan (a library stand-in for a screen nobody will record) -- an open screen need would otherwise cast a slate over it. Omit to keep the needs."),
         })).optional(),
         remove_scenes: z.array(z.number()).optional().describe("Indices of storyboard scenes to remove"),
         reorder_scenes: z.array(z.number()).optional().describe("Current indices in desired order"),
@@ -1373,6 +1383,11 @@ export function createMcpServer(): McpServer {
                   if (sceneUpdate.scene_template === null) delete existing.scene_template;
                   else existing.scene_template = { type: sceneUpdate.scene_template.type, data: sceneUpdate.scene_template.data || {} };
                 }
+                // The needs, set directly: what the scene asks for is the
+                // caller's list, whole; [] means the cast is the plan.
+                if (sceneUpdate.assets !== undefined) {
+                  existing.assets = sceneUpdate.assets.map((a: any) => ({ ...a, status: a.status || "needed", priority: a.priority || (a.type === "camera_video" ? "critical" : "recommended") })) as any;
+                }
               } else {
                 // Append new scene
                 project.storyboard.scenes.push({
@@ -1381,7 +1396,7 @@ export function createMcpServer(): McpServer {
                   template: sceneUpdate.template || "C1",
                   voiceover_text: sceneUpdate.voiceover_text,
                   duration_seconds: sceneUpdate.duration_seconds || 5,
-                  assets: [],
+                  assets: (sceneUpdate.assets || []).map((a: any) => ({ ...a, status: a.status || "needed", priority: a.priority || (a.type === "camera_video" ? "critical" : "recommended") })) as any,
                   visual_notes: sceneUpdate.visual_notes || "",
                   ...(sceneUpdate.components !== undefined ? { components: sceneUpdate.components as any } : {}),
                   ...(sceneUpdate.scene_template ? { scene_template: { type: sceneUpdate.scene_template.type, data: sceneUpdate.scene_template.data || {} } } : {}),

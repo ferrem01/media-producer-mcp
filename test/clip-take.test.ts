@@ -215,4 +215,23 @@ describe("the clip need", () => {
     expect(mixer).toMatch(/atrim=\$\{trimStart\}:\$\{trimStart \+ span\}/);
     expect(mixer).toMatch(/let triggerDuration = triggerTrack\.duration && triggerTrack\.duration > 0 \? triggerTrack\.duration : opts\.totalDuration;/);
   });
+
+  it("a library stand-in for a screen: tool-screen is a proof surface (the builder's screen slot; a provided recording takes its slot), and the board edit can set a scene's needs whole -- [] when the cast is the plan", async () => {
+    const { castScreenSlates, isProofSurface } = await import("../src/core/asset-needs.js");
+    expect(isProofSurface("tool-screen")).toBe(true);
+    // With an open screen need the slate takes the stand-in's slot (the doctrine); with none, the stand-in stays.
+    const open: any = { components: [{ type: "tool-screen", position: { x: "0%", y: "20%", width: "100%", height: "60%" }, data: { tool: "klaviyo" } }], assets: [{ type: "screen_recording", description: "Klaviyo analytics", status: "needed" }] };
+    const r = castScreenSlates(open);
+    expect(r.components.map((c: any) => c.type)).toEqual(["asset-placeholder"]);
+    const planned: any = { components: [{ type: "tool-screen", data: { tool: "klaviyo" } }], assets: [] };
+    expect(castScreenSlates(planned).components.map((c: any) => c.type)).toEqual(["tool-screen"]);
+    const srv = await read("src/server.ts");
+    expect(srv).toMatch(/assets: z\.array\(z\.object\(\{\n\s*type: z\.enum\(\["screenshot", "screen_recording", "stock_footage", "mockup", "illustration", "camera_video"\]\),/);
+    expect(srv).toMatch(/if \(sceneUpdate\.assets !== undefined\) \{\n\s*existing\.assets = sceneUpdate\.assets\.map/);
+    const schema = JSON.parse(await read("src/components/mockups/tool-screen.schema.json"));
+    expect(schema.data.tool.enum).toEqual(["meta-ads", "klaviyo", "ga4", "sheets", "powerpoint"]);
+    const comp = await read("src/components/mockups/tool-screen.component.html");
+    expect(comp).toMatch(/typeof createCursor === 'function'/);
+    expect(comp).toMatch(/var fit = Math\.min\(2\.2, \(boxW \* 0\.9\) \/ 1200, \(boxH \* 0\.94\) \/ 760\);/);
+  });
 });

@@ -1,0 +1,74 @@
+{
+  "type": "tool-screen",
+  "label": "Tool Screen",
+  "category": "mockups",
+  "description": "A stand-in for a recording of one of the tools a marketer opens: the tool's own colour and mark, the shape of its data surface, and a cursor doing the beat's action -- scanning numbers and copying one (meta-ads, klaviyo), jabbing between report rows (ga4), scrolling a dense sheet (sheets / view utm), pasting a copied row into a fresh line (sheets / view paste), pasting a chart onto a slide (powerpoint). A likeness the kicker names, not a counterfeit; the numbers are fixed demo figures. Sized to its box (designed at 1200x760). Made for the 1-2 s montage beat: the screen is up at once, a slow push runs the whole beat.",
+  "data": {
+    "tool": {
+      "type": "string",
+      "label": "Tool",
+      "required": true,
+      "enum": [
+        "meta-ads",
+        "klaviyo",
+        "ga4",
+        "sheets",
+        "powerpoint"
+      ],
+      "description": "Which tool's screen"
+    },
+    "view": {
+      "type": "string",
+      "label": "View",
+      "optional": true,
+      "enum": [
+        "utm",
+        "paste"
+      ],
+      "description": "sheets only: 'utm' (default) a dense UTM tracking sheet the cursor scrolls; 'paste' a rollup sheet a copied row is pasted into"
+    },
+    "action": {
+      "type": "string",
+      "label": "Action",
+      "optional": true,
+      "enum": [
+        "scan",
+        "jab",
+        "scroll",
+        "paste"
+      ],
+      "description": "The beat's verb. Default per tool: meta-ads/klaviyo scan, ga4 jab, sheets scroll (utm) or paste, powerpoint paste"
+    },
+    "kicker": {
+      "type": "string",
+      "label": "Kicker",
+      "optional": true,
+      "description": "The label pill naming the tool (default: the tool's name; false hides it)"
+    },
+    "at": {
+      "type": "number",
+      "label": "Start (s)",
+      "optional": true,
+      "default": 0
+    },
+    "duration": {
+      "type": "number",
+      "label": "Duration (s)",
+      "optional": true,
+      "description": "The beat's length; defaults to the scene's"
+    },
+    "push": {
+      "type": "boolean",
+      "label": "Slow push",
+      "optional": true,
+      "default": true,
+      "description": "A 4% push-in across the beat"
+    },
+    "cursor": {
+      "type": "boolean",
+      "label": "Cursor",
+      "optional": true,
+      "default": true
+    }
+  }
+}

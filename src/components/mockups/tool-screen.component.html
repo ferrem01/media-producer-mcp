@@ -1,0 +1,265 @@
+<template>
+  <div class="ts-root">
+    <div class="ts-win">
+      <div class="ts-bar"></div>
+      <div class="ts-body"></div>
+    </div>
+    <div class="ts-kicker"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* A TOOL SCREEN: one of the tools a marketer opens, as a stand-in for a
+     recording of it -- the tool's own colour, its mark, the shape of its
+     data surface, a cursor doing the beat's action. Designed at 1200x760
+     and scaled to the box it is given. Not a counterfeit: a likeness the
+     kicker names. */
+  .ts-root { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+  .ts-win { position: relative; width: 1200px; height: 760px; flex: 0 0 auto; border-radius: 14px; overflow: hidden; background: #fff; color: #1f2937; box-shadow: 0 30px 80px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2); transform-origin: 50% 50%; }
+  .ts-bar { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 20px; font-size: 15px; font-weight: 600; flex: 0 0 auto; }
+  .ts-bar .ts-logo { display: flex; align-items: center; gap: 10px; }
+  .ts-bar .ts-logo svg { width: 26px; height: 26px; display: block; }
+  .ts-bar .ts-logo b { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+  .ts-bar .ts-nav { display: flex; gap: 22px; margin-left: 22px; font-weight: 500; opacity: 0.8; }
+  .ts-bar .ts-nav .on { opacity: 1; font-weight: 700; position: relative; }
+  .ts-bar .ts-nav .on::after { content: ''; position: absolute; left: 0; right: 0; bottom: -18px; height: 3px; border-radius: 2px; background: currentColor; }
+  .ts-bar .ts-right { margin-left: auto; display: flex; align-items: center; gap: 12px; opacity: 0.8; font-weight: 500; font-size: 13px; }
+  .ts-bar .ts-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #ef4444); }
+  .ts-body { position: relative; height: 704px; overflow: hidden; }
+  .ts-side { position: absolute; left: 0; top: 0; bottom: 0; width: 64px; }
+  .ts-side i { display: block; width: 26px; height: 26px; border-radius: 8px; margin: 18px auto 0; background: rgba(0,0,0,0.10); }
+  .ts-main { position: absolute; left: 0; top: 0; right: 0; bottom: 0; padding: 22px 28px; }
+  .ts-main.side { left: 64px; }
+  .ts-title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+  .ts-sub { font-size: 13px; opacity: 0.7; margin-bottom: 14px; display: flex; gap: 10px; align-items: center; }
+  .ts-chip { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,0.06); font-size: 12px; font-weight: 600; }
+  .ts-btn { display: inline-block; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; color: #fff; }
+  .ts-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .ts-kpis { display: flex; gap: 14px; margin-bottom: 16px; }
+  .ts-kpi { flex: 1; padding: 14px 16px; border-radius: 10px; background: #fff; border: 1px solid rgba(0,0,0,0.08); }
+  .ts-kpi small { display: block; font-size: 12px; opacity: 0.65; margin-bottom: 4px; font-weight: 600; }
+  .ts-kpi b { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .ts-table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: #fff; border-radius: 10px; overflow: hidden; }
+  .ts-table th { text-align: left; font-weight: 700; font-size: 12px; text-transform: none; padding: 11px 12px; border-bottom: 1px solid rgba(0,0,0,0.12); opacity: 0.75; white-space: nowrap; }
+  .ts-table td { padding: 11px 12px; border-bottom: 1px solid rgba(0,0,0,0.06); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ts-table td.num, .ts-table th.num { text-align: right; }
+  .ts-table tr.hl td { background: var(--ts-hl, rgba(37,99,235,0.10)); }
+  .ts-table td.sel { outline: 2px solid var(--ts-accent, #2563eb); outline-offset: -2px; border-radius: 4px; }
+  .ts-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+  .ts-chart { width: 100%; height: 150px; display: block; margin-bottom: 14px; }
+  .ts-toast { position: absolute; padding: 6px 12px; border-radius: 8px; background: #111827; color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,0.25); pointer-events: none; }
+  /* sheets */
+  .ts-grid { position: absolute; left: 0; right: 0; top: 0; bottom: 0; overflow: hidden; background: #fff; }
+  .ts-formula { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-bottom: 1px solid #d0d5db; font-size: 12.5px; background: #fff; }
+  .ts-formula .cellref { width: 52px; text-align: center; border: 1px solid #d0d5db; border-radius: 4px; padding: 3px 0; font-weight: 600; }
+  .ts-formula .fx { opacity: 0.6; font-style: italic; }
+  .ts-cols { display: flex; height: 26px; background: #f8f9fa; border-bottom: 1px solid #d0d5db; font-size: 11.5px; font-weight: 600; color: #444; }
+  .ts-cols span, .ts-row span { flex: 0 0 auto; border-right: 1px solid #e3e6ea; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px; line-height: 26px; }
+  .ts-cols span.rn, .ts-row span.rn { width: 44px; background: #f8f9fa; color: #444; text-align: center; padding: 0; }
+  .ts-rows { position: relative; }
+  .ts-row { display: flex; height: 26px; border-bottom: 1px solid #e3e6ea; font-size: 12.5px; color: #202124; }
+  .ts-row.head span { font-weight: 700; background: #eef3ff; }
+  .ts-row span.sel { outline: 2px solid #1a73e8; outline-offset: -2px; }
+  .ts-row span.fill { background: rgba(26,115,232,0.14); }
+  .ts-tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 34px; background: #f8f9fa; border-top: 1px solid #d0d5db; display: flex; align-items: center; gap: 4px; padding: 0 12px; font-size: 12.5px; }
+  .ts-tabs span { padding: 6px 14px; border-radius: 6px 6px 0 0; }
+  .ts-tabs span.on { background: #fff; color: #188038; font-weight: 700; border: 1px solid #d0d5db; border-bottom: 0; }
+  /* powerpoint */
+  .ts-ribbon { display: flex; gap: 18px; padding: 8px 20px; font-size: 13px; background: #f3f2f1; border-bottom: 1px solid #d6d4d2; color: #333; }
+  .ts-ribbon span.on { color: #B7472A; font-weight: 700; border-bottom: 2px solid #B7472A; padding-bottom: 4px; }
+  .ts-rail { position: absolute; left: 0; top: 40px; bottom: 0; width: 200px; background: #f3f2f1; border-right: 1px solid #d6d4d2; padding: 16px; box-sizing: border-box; }
+  .ts-thumb { position: relative; width: 100%; aspect-ratio: 16/9; background: #fff; border: 1px solid #c8c6c4; border-radius: 3px; margin-bottom: 12px; padding: 8px; box-sizing: border-box; }
+  .ts-thumb.on { outline: 2px solid #B7472A; outline-offset: 1px; }
+  .ts-thumb i { display: block; height: 4px; background: #d6d4d2; border-radius: 2px; margin-bottom: 4px; }
+  .ts-thumb i.t { height: 7px; width: 60%; background: #9c9a98; }
+  .ts-stage { position: absolute; left: 200px; right: 0; top: 40px; bottom: 0; background: #e6e5e4; display: flex; align-items: center; justify-content: center; }
+  .ts-slide { width: 860px; height: 484px; background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,0.18); position: relative; padding: 40px 48px; box-sizing: border-box; }
+  .ts-slide h1 { margin: 0 0 18px; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; color: #1f2937; }
+  .ts-ph { position: absolute; left: 48px; right: 48px; top: 120px; bottom: 44px; border: 2px dashed #b8b6b4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #8a8886; font-size: 14px; }
+  .ts-pasted { position: absolute; left: 48px; right: 48px; top: 120px; bottom: 44px; background: #fff; }
+  .ts-pasted svg { width: 100%; height: 100%; display: block; }
+  .ts-kicker { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); padding: 8px 16px; border-radius: 999px; background: rgba(15,23,42,0.86); color: #fff; font-size: 15px; font-weight: 800; letter-spacing: 0.14em; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.ts-root'), win = el.querySelector('.ts-win'), bar = el.querySelector('.ts-bar'), body = el.querySelector('.ts-body'), kick = el.querySelector('.ts-kicker');
+    var tool = String(data.tool || 'meta-ads');
+    var view = String(data.view || '');
+    var dur = Number(data.duration) > 0 ? Number(data.duration) : (ctx && ctx.duration > 0 ? ctx.duration : 1.5);
+    var at = Number(data.at) > 0 ? Number(data.at) : 0;
+    var span = Math.max(0.6, dur - at);
+    var SVG = 'http://www.w3.org/2000/svg';
+
+    // FILL THE BOX: designed at 1200x760, scaled to the slot it was given,
+    // with a breath of margin (the stage bleeds ~20px past the canvas on
+    // each side for the camera, so a window flush to the slot loses its
+    // edges -- measured: 1120 wide on a 1080 canvas).
+    var boxW = root.clientWidth || 1200, boxH = root.clientHeight || 760;
+    var fit = Math.min(2.2, (boxW * 0.9) / 1200, (boxH * 0.94) / 760);
+    if (Math.abs(fit - 1) > 0.02) win.style.zoom = fit.toFixed(3);
+
+    function h(tag, cls, text, parent) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; if (parent) parent.appendChild(n); return n; }
+    function icon(pathD, color, size) { var s = document.createElementNS(SVG, 'svg'); s.setAttribute('viewBox', '0 0 24 24'); if (size) { s.style.width = size + 'px'; s.style.height = size + 'px'; } var p = document.createElementNS(SVG, 'path'); p.setAttribute('d', pathD); p.setAttribute('fill', color); s.appendChild(p); return s; }
+    function logo(pathD, color, name) { var l = h('div', 'ts-logo'); if (pathD) l.appendChild(icon(pathD, color)); if (name) h('b', null, name, l); bar.appendChild(l); return l; }
+    function nav(items, on) { var n = h('div', 'ts-nav', null, bar); items.forEach(function(t, i) { h('span', i === on ? 'on' : '', t, n); }); return n; }
+    function right(text) { var r = h('div', 'ts-right', null, bar); if (text) h('span', null, text, r); h('div', 'ts-avatar', null, r); return r; }
+    function table(parent, cols, rows, numFrom) {
+      var t = h('table', 'ts-table', null, parent), thead = h('thead', null, null, t), tr = h('tr', null, null, thead);
+      cols.forEach(function(c, i) { h('th', i >= numFrom ? 'num' : '', c, tr); });
+      var tb = h('tbody', null, null, t), trs = [];
+      rows.forEach(function(r) { var row = h('tr', null, null, tb); r.forEach(function(v, i) { var td = h('td', i >= numFrom ? 'num' : '', null, row); if (v && typeof v === 'object') { var d = h('span', 'ts-dot', null, td); d.style.background = v.dot; td.appendChild(document.createTextNode(v.text)); } else td.textContent = v; }); trs.push(row); });
+      return { table: t, rows: trs };
+    }
+    function cell(row, i) { return row.children[i]; }
+    function center(node) { var r = node.getBoundingClientRect(), b = root.getBoundingClientRect(); return { x: r.left - b.left + r.width * 0.55, y: r.top - b.top + r.height * 0.5 }; }
+    function toast(node, text, when) { var c = center(node), t = h('div', 'ts-toast', text, root); t.style.left = Math.round(c.x + 14) + 'px'; t.style.top = Math.round(c.y - 40) + 'px'; gsap.set(t, { autoAlpha: 0, y: 6, scale: 0.9 }); tl.to(t, { autoAlpha: 1, y: 0, scale: 1, duration: 0.18, ease: 'back.out(2)' }, when); return t; }
+    var cur = null;
+    if (data.cursor !== false && typeof createCursor === 'function') cur = createCursor(root, { size: Math.max(20, Math.round(22 * Math.max(0.8, fit))), color: '#111827' });
+    function go(node, when, d) { if (!cur || !node) return; var c = center(node); moveCursor(tl, cur, { x: c.x, y: c.y }, when, d != null ? d : 0.3); }
+    function click(when) { if (cur) clickCursor(tl, cur, when); }
+
+    var accent = '#2563eb', hl = 'rgba(37,99,235,0.10)', kickerText = '';
+    var scanCells = [], copyCell = null, copyText = 'Copied', highlightRows = [], scroller = null, pasteRow = null, pasteVals = null, pastePh = null;
+
+    if (tool === 'meta-ads') {
+      accent = '#0866FF'; hl = 'rgba(8,102,255,0.10)'; kickerText = 'META ADS MANAGER';
+      win.style.background = '#f0f2f5'; bar.style.background = '#fff'; bar.style.borderBottom = '1px solid #dadde1';
+      logo('__META__', '#0866FF', 'Ads Manager'); nav(['Campaigns', 'Ad sets', 'Ads'], 0).style.color = '#0866FF'; right('Quotient Ad Account');
+      var mm = h('div', 'ts-main', null, body), tb = h('div', 'ts-toolbar', null, mm);
+      var cb = h('span', 'ts-btn', '+ Create', tb); cb.style.background = '#0866FF'; h('span', 'ts-chip', 'Last 30 days', tb); h('span', 'ts-chip', 'Filters', tb); h('span', 'ts-chip', 'Columns: Performance', tb);
+      var rows = [
+        [{ dot: '#31a24c', text: 'Q3 Launch – Prospecting' }, 'Active', '1,284', '412,905', '918,330', '$4.12', '$5,290.14', '3.41x'],
+        [{ dot: '#31a24c', text: 'Retargeting – Cart' }, 'Active', '862', '96,120', '301,772', '$2.88', '$2,482.56', '5.12x'],
+        [{ dot: '#31a24c', text: 'Brand Awareness – Video' }, 'Active', '58,410', '1,204,880', '2,910,004', '$0.07', '$4,110.00', '—'],
+        [{ dot: '#8a8d91', text: 'Lead Gen – Webinar' }, 'Paused', '311', '58,203', '141,900', '$9.65', '$3,001.15', '1.92x'],
+        [{ dot: '#31a24c', text: 'Summer Sale – Catalog' }, 'Active', '2,046', '338,571', '702,114', '$3.05', '$6,240.30', '4.06x'],
+        [{ dot: '#31a24c', text: 'Lookalike 1% – US' }, 'Active', '974', '221,004', '540,688', '$3.71', '$3,613.54', '2.87x'],
+        [{ dot: '#8a8d91', text: 'Blog Content – Traffic' }, 'Paused', '6,880', '188,120', '402,331', '$0.31', '$2,132.80', '—'],
+        [{ dot: '#31a24c', text: 'App Install – iOS' }, 'Active', '1,502', '146,377', '389,552', '$2.10', '$3,154.20', '2.33x']
+      ];
+      var t = table(mm, ['Campaign', 'Delivery', 'Results', 'Reach', 'Impressions', 'Cost per result', 'Amount spent', 'ROAS'], rows, 2);
+      highlightRows = [t.rows[0], t.rows[1], t.rows[4]]; scanCells = [cell(t.rows[0], 6), cell(t.rows[1], 7), cell(t.rows[4], 7)]; copyCell = cell(t.rows[4], 7);
+    } else if (tool === 'klaviyo') {
+      accent = '#1f8f4e'; hl = 'rgba(31,143,78,0.12)'; kickerText = 'KLAVIYO';
+      win.style.background = '#f4f5f4'; bar.style.background = '#0b0b0b'; bar.style.color = '#fff';
+      var kl = logo(null, null, 'klaviyo'); var kd = h('span', null, null, kl); kd.style.cssText = 'width:10px;height:10px;border-radius:50%;background:#7CF29B;display:inline-block;margin-left:-4px;';
+      nav(['Campaigns', 'Flows', 'Analytics', 'Audience'], 2); right('Quotient');
+      var km = h('div', 'ts-main', null, body); h('div', 'ts-title', 'Campaign performance', km); var ks = h('div', 'ts-sub', null, km); h('span', 'ts-chip', 'Last 30 days', ks); h('span', null, 'Compared to previous period', ks);
+      var kk = h('div', 'ts-kpis', null, km); [['Open rate', '42.8%'], ['Click rate', '3.1%'], ['Revenue per recipient', '$1.42'], ['Attributed revenue', '$38,204']].forEach(function(p) { var k = h('div', 'ts-kpi', null, kk); h('small', null, p[0], k); h('b', null, p[1], k); });
+      var krows = [
+        ['Sep drop: New in Analytics', 'Sep 12', '24,880', '44.1%', '3.6%', '$1.61', '$40,056'],
+        ['Weekly digest #38', 'Sep 9', '31,204', '39.8%', '2.4%', '$0.92', '$28,708'],
+        ['Webinar reminder', 'Sep 5', '8,412', '51.2%', '6.1%', '$0.38', '$3,197'],
+        ['Cart nudge – 24h', 'Flow', '4,105', '47.5%', '8.9%', '$3.84', '$15,763'],
+        ['Founder note', 'Aug 29', '30,990', '40.3%', '2.1%', '$0.71', '$22,003'],
+        ['Case study: Jesani', 'Aug 22', '29,760', '38.4%', '2.9%', '$1.12', '$33,331'],
+        ['Welcome series – step 2', 'Flow', '2,206', '58.0%', '11.2%', '$2.05', '$4,522']
+      ];
+      var kt = table(km, ['Campaign', 'Sent', 'Recipients', 'Open rate', 'Click rate', 'Rev / recipient', 'Revenue'], krows, 2);
+      highlightRows = [kt.rows[0], kt.rows[3], kt.rows[5]]; scanCells = [cell(kt.rows[0], 3), cell(kt.rows[3], 5), cell(kt.rows[5], 6)]; copyCell = cell(kt.rows[3], 5);
+    } else if (tool === 'ga4') {
+      accent = '#1a73e8'; hl = 'rgba(26,115,232,0.10)'; kickerText = 'GOOGLE ANALYTICS';
+      win.style.background = '#fff'; bar.style.background = '#fff'; bar.style.borderBottom = '1px solid #dadce0';
+      logo('__GA__', '#F9AB00', 'Analytics'); var gp = h('span', 'ts-chip', 'Quotient – GA4', bar); gp.style.marginLeft = '6px'; right('All accounts');
+      var side = h('div', 'ts-side', null, body); side.style.borderRight = '1px solid #e0e0e0'; for (var si = 0; si < 5; si++) h('i', null, null, side);
+      var gm = h('div', 'ts-main side', null, body); h('div', 'ts-title', 'Traffic acquisition: Session default channel group', gm); var gs = h('div', 'ts-sub', null, gm); h('span', 'ts-chip', 'Last 28 days', gs); h('span', 'ts-chip', 'Aug 25 – Sep 21', gs);
+      var svg = document.createElementNS(SVG, 'svg'); svg.setAttribute('class', 'ts-chart'); svg.setAttribute('viewBox', '0 0 1000 150'); svg.setAttribute('preserveAspectRatio', 'none');
+      var pts = [62, 58, 70, 66, 74, 71, 80, 84, 78, 90, 96, 88, 101, 110, 104, 118, 122, 116, 128, 134];
+      function line(arr, color, w) { var d = arr.map(function(v, i) { return (i ? 'L' : 'M') + (i * (1000 / (arr.length - 1))).toFixed(1) + ',' + (150 - v).toFixed(1); }).join(' '); var p = document.createElementNS(SVG, 'path'); p.setAttribute('d', d); p.setAttribute('fill', 'none'); p.setAttribute('stroke', color); p.setAttribute('stroke-width', w); p.setAttribute('vector-effect', 'non-scaling-stroke'); svg.appendChild(p); }
+      for (var gl = 1; gl <= 3; gl++) { var g = document.createElementNS(SVG, 'line'); g.setAttribute('x1', 0); g.setAttribute('x2', 1000); g.setAttribute('y1', gl * 37); g.setAttribute('y2', gl * 37); g.setAttribute('stroke', '#e8eaed'); g.setAttribute('vector-effect', 'non-scaling-stroke'); svg.appendChild(g); }
+      line(pts.map(function(v) { return v * 0.55; }), '#f9ab00', 2); line(pts, '#1a73e8', 2.5); gm.appendChild(svg);
+      var grows = [
+        ['Organic Search', '18,204', '22,910', '14,388', '62.8%', '412'],
+        ['Direct', '9,118', '12,004', '7,612', '63.4%', '298'],
+        ['Paid Social', '7,840', '9,331', '5,120', '54.9%', '236'],
+        ['Email', '4,206', '6,118', '4,701', '76.8%', '311'],
+        ['Referral', '2,990', '3,502', '2,114', '60.4%', '88'],
+        ['Paid Search', '2,481', '3,010', '1,905', '63.3%', '141'],
+        ['Organic Social', '1,772', '2,140', '1,208', '56.4%', '39']
+      ];
+      var gt = table(gm, ['Session default channel group', 'Users', 'Sessions', 'Engaged sessions', 'Engagement rate', 'Conversions'], grows, 1);
+      highlightRows = [gt.rows[2], gt.rows[0], gt.rows[3]]; scanCells = [cell(gt.rows[2], 5), cell(gt.rows[0], 1), cell(gt.rows[3], 5)]; copyCell = cell(gt.rows[3], 5);
+    } else if (tool === 'sheets') {
+      accent = '#188038'; hl = 'rgba(24,128,56,0.12)';
+      var paste = view === 'paste'; kickerText = paste ? 'GOOGLE SHEETS' : 'THE UTM SHEET';
+      win.style.background = '#fff'; bar.style.background = '#fff'; bar.style.borderBottom = '1px solid #d0d5db';
+      logo('__SHEETS__', '#188038', paste ? 'Weekly Rollup – Q3' : 'UTM Tracking – Master'); nav(['File', 'Edit', 'View', 'Insert', 'Format', 'Data'], -1).style.fontSize = '13px'; right('Share');
+      var grid = h('div', 'ts-grid', null, body), fb = h('div', 'ts-formula', null, grid); h('span', 'cellref', paste ? 'A7' : 'E14', fb); h('span', 'fx', 'fx', fb);
+      var cols = paste ? ['Channel', 'Spend', 'Clicks', 'Conv.', 'CPA', 'ROAS', 'Notes'] : ['Date', 'Campaign', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'Clicks', 'Notes'];
+      var widths = paste ? [190, 130, 120, 110, 110, 110, 300] : [96, 190, 130, 130, 170, 170, 90, 180];
+      var ch = h('div', 'ts-cols', null, grid); h('span', 'rn', '', ch); cols.forEach(function(c, i) { var s = h('span', null, String.fromCharCode(65 + i), ch); s.style.width = widths[i] + 'px'; s.style.textAlign = 'center'; });
+      var rowsEl = h('div', 'ts-rows', null, grid); scroller = rowsEl;
+      function row(n, vals, cls) { var r = h('div', 'ts-row' + (cls ? ' ' + cls : ''), null, rowsEl); h('span', 'rn', String(n), r); vals.forEach(function(v, i) { var s = h('span', null, v, r); s.style.width = widths[i] + 'px'; }); return r; }
+      row(1, cols, 'head');
+      if (paste) {
+        [['Paid Social – Meta', '$18,704', '41,020', '2,113', '$8.85', '3.41x', 'Q3 launch + retargeting'], ['Email – Klaviyo', '$1,200', '19,331', '1,604', '$0.75', '9.12x', 'Sep drop, digests'], ['Organic Search', '$0', '22,910', '412', '—', '—', 'GA4, last 28 days'], ['Paid Search', '$6,140', '3,010', '141', '$43.55', '1.12x', 'Brand terms only'], ['Referral', '$0', '3,502', '88', '—', '—', 'Partners']].forEach(function(v, i) { row(i + 2, v); });
+        pasteVals = ['Webinar – Sep', '$2,980', '8,412', '311', '$9.58', '1.92x', 'Pasted from Meta + GA4'];
+        pasteRow = row(7, pasteVals.map(function() { return ''; }));
+        for (var e = 8; e <= 26; e++) row(e, cols.map(function() { return ''; }));
+      } else {
+        var srcs = ['facebook', 'google', 'klaviyo', 'linkedin', 'newsletter', 'instagram'], meds = ['paid_social', 'cpc', 'email', 'paid_social', 'email', 'paid_social'], camps = ['q3_launch', 'cart_retarget', 'sep_drop', 'webinar_sep', 'brand_video', 'summer_sale', 'lookalike_us', 'founder_note'], conts = ['video_15s', 'carousel_a', 'hero_v2', 'static_b', 'reel_c', 'digest_38'];
+        for (var r = 0; r < 42; r++) { var d = 1 + (r * 7) % 28, s = r % srcs.length, c = (r * 3) % camps.length, k = (r * 5) % conts.length; row(r + 2, ['Sep ' + (d < 10 ? '0' + d : d), camps[c].replace(/_/g, ' '), srcs[s], meds[s], camps[c], conts[k], String(120 + ((r * 397) % 4200)), r % 4 === 0 ? 'check spend' : '']); }
+        copyCell = rowsEl.children[14].children[5];
+      }
+      var tabs = h('div', 'ts-tabs', null, grid); h('span', 'on', paste ? 'Rollup' : 'UTMs', tabs); h('span', null, paste ? 'Meta' : 'Sources', tabs); h('span', null, paste ? 'GA4' : 'Archive', tabs);
+    } else if (tool === 'powerpoint') {
+      accent = '#B7472A'; kickerText = 'POWERPOINT';
+      win.style.background = '#e6e5e4'; bar.style.background = '#B7472A'; bar.style.color = '#fff';
+      logo('__PPT__', '#fff', 'Q3 Campaign Results.pptx'); right('Present');
+      var rb = h('div', 'ts-ribbon', null, body); ['File', 'Home', 'Insert', 'Design', 'Transitions', 'Animations', 'Slide Show', 'Review', 'View'].forEach(function(t, i) { h('span', i === 2 ? 'on' : '', t, rb); });
+      var rail = h('div', 'ts-rail', null, body); for (var th = 0; th < 4; th++) { var tt = h('div', 'ts-thumb' + (th === 2 ? ' on' : ''), null, rail); h('i', 't', null, tt); h('i', null, null, tt); h('i', null, null, tt); }
+      var stage = h('div', 'ts-stage', null, body), slide = h('div', 'ts-slide', null, stage); h('h1', null, 'Q3 Results – What Worked', slide);
+      pastePh = h('div', 'ts-ph', 'Click to add content', slide);
+      var pasted = h('div', 'ts-pasted', null, slide); var ps = document.createElementNS(SVG, 'svg'); ps.setAttribute('viewBox', '0 0 760 300'); ps.setAttribute('preserveAspectRatio', 'none'); pasted.appendChild(ps);
+      var bars = [3.41, 9.12, 1.12, 1.92, 5.12, 2.33], names = ['Meta', 'Klaviyo', 'Paid Search', 'Webinar', 'Retarget', 'App'];
+      var barEls = [];
+      bars.forEach(function(v, i) { var x = 40 + i * 118, hgt = v / 9.12 * 230; var rct = document.createElementNS(SVG, 'rect'); rct.setAttribute('x', x); rct.setAttribute('width', 70); rct.setAttribute('y', 260 - hgt); rct.setAttribute('height', hgt); rct.setAttribute('rx', 4); rct.setAttribute('fill', i === 1 ? '#B7472A' : '#4a5568'); ps.appendChild(rct); barEls.push(rct); var lb = document.createElementNS(SVG, 'text'); lb.setAttribute('x', x + 35); lb.setAttribute('y', 286); lb.setAttribute('text-anchor', 'middle'); lb.setAttribute('font-size', '15'); lb.setAttribute('font-family', 'Inter, system-ui, sans-serif'); lb.setAttribute('fill', '#374151'); lb.textContent = names[i]; ps.appendChild(lb); });
+      var ax = document.createElementNS(SVG, 'line'); ax.setAttribute('x1', 30); ax.setAttribute('x2', 740); ax.setAttribute('y1', 260); ax.setAttribute('y2', 260); ax.setAttribute('stroke', '#9ca3af'); ps.appendChild(ax);
+      gsap.set(pasted, { autoAlpha: 0, scale: 0.7, transformOrigin: '50% 50%' });
+      gsap.set(barEls, { scaleY: 0, transformOrigin: '50% 100%' });
+      pasteRow = pasted; pasteVals = barEls;
+    }
+    root.style.setProperty('--ts-accent', accent); root.style.setProperty('--ts-hl', hl);
+    bar.querySelectorAll('.ts-logo svg path').forEach(function(p) { if (p.getAttribute('d') === '__META__') p.setAttribute('d', 'M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a6.624 6.624 0 0 0 .265.86 5.297 5.297 0 0 0 .371.761c.696 1.159 1.818 1.927 3.593 1.927 1.497 0 2.633-.671 3.965-2.444.76-1.012 1.144-1.626 2.663-4.32l.756-1.339.186-.325c.061.1.121.196.183.3l2.152 3.595c.724 1.21 1.665 2.556 2.47 3.314 1.046.987 1.992 1.22 3.06 1.22 1.075 0 1.876-.355 2.455-.843a3.743 3.743 0 0 0 .81-.973c.542-.939.861-2.127.861-3.745 0-2.72-.681-5.357-2.084-7.45-1.282-1.912-2.957-2.93-4.716-2.93-1.047 0-2.088.467-3.053 1.308-.652.57-1.257 1.29-1.82 2.05-.69-.875-1.335-1.547-1.958-2.056-1.182-.966-2.315-1.303-3.454-1.303zm10.16 2.053c1.147 0 2.188.758 2.992 1.999 1.132 1.748 1.647 4.195 1.647 6.4 0 1.548-.368 2.9-1.839 2.9-.58 0-1.027-.23-1.664-1.004-.496-.601-1.343-1.878-2.832-4.358l-.617-1.028a44.908 44.908 0 0 0-1.255-1.98c.07-.109.141-.224.211-.327 1.12-1.667 2.118-2.602 3.358-2.602zm-10.201.553c1.265 0 2.058.791 2.675 1.446.307.327.737.871 1.234 1.579l-1.02 1.566c-.757 1.163-1.882 3.017-2.837 4.338-1.191 1.649-1.81 1.817-2.486 1.817-.524 0-1.038-.237-1.383-.794-.263-.426-.464-1.13-.464-2.046 0-2.221.63-4.535 1.66-6.088.454-.687.964-1.226 1.533-1.533a2.264 2.264 0 0 1 1.088-.285z'); if (p.getAttribute('d') === '__GA__') p.setAttribute('d', 'M22.84 2.9982v17.9987c.0086 1.6473-1.3197 2.9897-2.967 2.9984a2.9808 2.9808 0 01-.3677-.0208c-1.528-.226-2.6477-1.5558-2.6105-3.1V3.1204c-.0369-1.5458 1.0856-2.8762 2.6157-3.1 1.6361-.1915 3.1178.9796 3.3093 2.6158.014.1201.0208.241.0202.3619zM4.1326 18.0548c-1.6417 0-2.9726 1.331-2.9726 2.9726C1.16 22.6691 2.4909 24 4.1326 24s2.9726-1.3309 2.9726-2.9726-1.331-2.9726-2.9726-2.9726zm7.8728-9.0098c-.0171 0-.0342 0-.0513.0003-1.6495.0904-2.9293 1.474-2.891 3.1256v7.9846c0 2.167.9535 3.4825 2.3505 3.763 1.6118.3266 3.1832-.7152 3.5098-2.327.04-.1974.06-.3983.0593-.5998v-8.9585c.003-1.6474-1.33-2.9852-2.9773-2.9882z'); if (p.getAttribute('d') === '__SHEETS__') p.setAttribute('d', 'M11.318 12.545H7.91v-1.909h3.41v1.91zM14.728 0v6h6l-6-6zm1.363 10.636h-3.41v1.91h3.41v-1.91zm0 3.273h-3.41v1.91h3.41v-1.91zM20.727 6.5v15.864c0 .904-.732 1.636-1.636 1.636H4.909a1.636 1.636 0 0 1-1.636-1.636V1.636C3.273.732 4.005 0 4.909 0h9.318v6.5h6.5zm-3.273 2.773H6.545v7.909h10.91v-7.91zm-6.136 4.636H7.91v1.91h3.41v-1.91z'); if (p.getAttribute('d') === '__PPT__') p.setAttribute('d', 'M13.5 1.5q1.453 0 2.795.375 1.342.375 2.508 1.06 1.166.686 2.12 1.641.956.955 1.641 2.121.686 1.166 1.061 2.508Q24 10.547 24 12q0 1.453-.375 2.795-.375 1.342-1.06 2.508-.686 1.166-1.641 2.12-.955.956-2.121 1.641-1.166.686-2.508 1.061-1.342.375-2.795.375-1.29 0-2.52-.305-1.23-.304-2.337-.884-1.108-.58-2.063-1.418-.955-.838-1.693-1.893H.997q-.411 0-.704-.293T0 17.004V6.996q0-.41.293-.703T.996 6h3.89q.739-1.055 1.694-1.893.955-.837 2.063-1.418 1.107-.58 2.337-.884Q12.21 1.5 13.5 1.5zm.75 1.535v8.215h8.215q-.14-1.64-.826-3.076-.686-1.436-1.782-2.531-1.095-1.096-2.537-1.782-1.441-.685-3.07-.826zm-5.262 7.57q0-.68-.228-1.166-.229-.486-.627-.79-.399-.305-.938-.446-.539-.14-1.172-.14H2.848v7.863h1.84v-2.742H5.93q.574 0 1.119-.17t.978-.493q.434-.322.698-.802.263-.48.263-1.114zM13.5 21q1.172 0 2.262-.287t2.056-.82q.967-.534 1.776-1.278.808-.744 1.418-1.664.61-.92.984-1.986.375-1.067.469-2.227h-9.703V3.035q-1.735.14-3.27.908T6.797 6h4.207q.41 0 .703.293t.293.703v10.008q0 .41-.293.703t-.703.293H6.797q.644.715 1.412 1.271.768.557 1.623.944.855.387 1.781.586Q12.54 21 13.5 21zM5.812 9.598q.575 0 .915.228.34.229.34.838 0 .27-.124.44-.123.17-.31.275-.188.105-.422.146-.234.041-.445.041H4.687V9.598Z'); });
+
+    // The kicker names the tool (the viewer reads the label, not the pixels).
+    if (data.kicker === false) kick.style.display = 'none';
+    else { kick.textContent = data.kicker || kickerText; gsap.set(kick, { autoAlpha: 0, y: 8 }); tl.to(kick, { autoAlpha: 1, y: 0, duration: 0.22, ease: 'power2.out' }, at + 0.05); }
+
+    // Settled: the screen is up at once (a beat this short has no room for an entrance).
+    gsap.set(win, { autoAlpha: 0 }); tl.to(win, { autoAlpha: 1, duration: 0.12 }, at);
+    if (data.push !== false) tl.fromTo(win, { scale: 1 }, { scale: 1.045, duration: span, ease: 'none' }, at);
+
+    // THE ACTION (the beat's verb): scan / jab down the numbers and copy one;
+    // scroll a long sheet; paste into a fresh row; paste a chart onto a slide.
+    var action = data.action || (tool === 'sheets' ? (view === 'paste' ? 'paste' : 'scroll') : tool === 'powerpoint' ? 'paste' : tool === 'ga4' ? 'jab' : 'scan');
+    var t0 = at + 0.1, tEnd = at + span - 0.1;
+    if (action === 'scan' || action === 'jab') {
+      var n = scanCells.length, step = (tEnd - t0) / (n + 0.6), jab = action === 'jab';
+      scanCells.forEach(function(c, i) { var when = t0 + step * i; go(c, when, jab ? 0.14 : Math.min(0.42, step * 0.8)); if (highlightRows[i]) tl.call(function(r) { highlightRows.forEach(function(x) { x.classList.remove('hl'); }); r.classList.add('hl'); }, [highlightRows[i]], when + (jab ? 0.12 : step * 0.6)); });
+      var cAt = t0 + step * (n - 1) + step * 0.7;
+      if (copyCell && cAt < tEnd) { click(cAt); tl.call(function() { copyCell.classList.add('sel'); }, null, cAt); toast(copyCell, copyText, cAt + 0.05); }
+    } else if (action === 'scroll' && scroller) {
+      var visible = 704 - 34 - 26 - 34, total = scroller.children.length * 26, dist = Math.max(0, total - visible);
+      var sEnd = t0 + (tEnd - t0) * 0.78;
+      tl.fromTo(scroller, { y: 0 }, { y: -dist, duration: sEnd - t0, ease: 'power1.inOut' }, t0);
+      if (cur) { moveCursor(tl, cur, { x: boxW * 0.62, y: boxH * 0.3 }, t0, 0.2); moveCursor(tl, cur, { x: boxW * 0.62, y: boxH * 0.72 }, t0 + 0.25, sEnd - t0 - 0.25, 'power1.inOut'); }
+      if (copyCell) { tl.call(function() { var c = center(copyCell); if (cur) gsap.set(cur, { x: c.x, y: c.y }); copyCell.classList.add('sel'); }, null, sEnd + 0.02); click(sEnd + 0.04); tl.call(function() { toast(copyCell, copyText, 0); }, null, sEnd + 0.08); }
+    } else if (action === 'paste' && pasteRow) {
+      var pAt = t0 + (tEnd - t0) * 0.42;
+      if (tool === 'powerpoint') {
+        go(pastePh, t0, Math.min(0.4, pAt - t0)); click(pAt);
+        tl.to(pastePh, { autoAlpha: 0, duration: 0.1 }, pAt);
+        tl.to(pasteRow, { autoAlpha: 1, scale: 1, duration: 0.28, ease: 'back.out(1.6)' }, pAt + 0.02);
+        tl.to(pasteVals, { scaleY: 1, duration: 0.32, ease: 'power3.out', stagger: 0.04 }, pAt + 0.1);
+      } else {
+        var first = pasteRow.children[1]; go(first, t0, Math.min(0.4, pAt - t0)); click(pAt);
+        tl.call(function() { first.classList.add('sel'); }, null, pAt);
+        pasteVals.forEach(function(v, i) { var s = pasteRow.children[i + 1]; tl.call(function(sp, val) { sp.textContent = val; sp.classList.add('fill'); }, [s, v], pAt + 0.06 + i * 0.035); });
+      }
+    }
+    return tl;
+  }
+</script>
