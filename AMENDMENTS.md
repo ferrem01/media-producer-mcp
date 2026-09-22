@@ -4789,3 +4789,7 @@ sounds we MAKE.
   becomes the track's source. Studio has `/api/sfx-options` and the house
   files are served for preview. An effect placed this way is the person's,
   so it rides through a rebuild like any hand-added track.
+- ...and the audio tool's `track` was required by the schema, so neither
+  search action could be called at all (measured live: the first
+  `search_sfx` came back a validation error naming `track`). It is
+  optional now, with one guard before the branches that write.

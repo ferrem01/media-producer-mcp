@@ -2655,7 +2655,7 @@ export function createMcpServer(): McpServer {
         loop: z.boolean().optional(),
         fade_in: z.number().optional(),
         fade_out: z.number().optional(),
-      }),
+      }).optional().describe("The track to add, update or remove. The search actions need no track."),
       ducking: z.object({
         enabled: z.boolean(),
         duck_track: z.string().describe("Track ID to duck (usually music)"),
@@ -2700,6 +2700,8 @@ export function createMcpServer(): McpServer {
       if (!project.audio) {
         project.audio = { tracks: [] };
       }
+
+      if (!params.track) return err("track is required for add, update and remove");
 
       if (params.action === "add") {
         if (!params.track.type) {
