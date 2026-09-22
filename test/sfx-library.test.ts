@@ -106,6 +106,9 @@ describe("the sound-effect library", () => {
     expect(srv).toMatch(/action: z\.enum\(\["add", "update", "remove", "search", "search_sfx"\]\)/);
     expect(srv).toMatch(/sfx: z\.string\(\)\.optional\(\)\.describe\("A sound effect id from action='search_sfx'/);
     expect(srv).toMatch(/if \(params\.action === "search_sfx"\) \{/);
+    // A search needs no track -- the schema demanded one, so neither search action could be called at all.
+    expect(srv).toMatch(/\}\)\.optional\(\)\.describe\("The track to add, update or remove\. The search actions need no track\."\),/);
+    expect(srv).toMatch(/if \(!params\.track\) return err\("track is required for add, update and remove"\);/);
     expect(srv).toMatch(/const picked = await resolveSfxChoice\(params\.track\.sfx, projectAssetsDir\(params\.tenant_id, params\.project_id\)\);/);
     const idx = await read("src/index.ts");
     expect(idx).toMatch(/\/api\\\/sfx-options\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\$\//);
