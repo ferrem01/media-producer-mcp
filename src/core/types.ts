@@ -644,6 +644,11 @@ export interface Project {
   name: string;
   format: OutputFormat;
   status: ProjectStatus;
+  /** Archived films leave the library without leaving the disk. A tenant with
+   *  251 films needs a way to put one down that is not `rm`: set to clear it
+   *  off the shelf, cleared to bring it back, and only an explicit delete in
+   *  the archive view actually removes anything. */
+  archived_at?: string;
   canvas: Canvas;
   brand_kit: BrandKit;
   scenes: Scene[];

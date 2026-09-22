@@ -54,6 +54,9 @@ import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
 import { listProjects, loadProject, saveProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
+import { searchLibrary, forgetProject } from "./core/library.js";
+import { getLibraryHtml } from "./preview-app/library-app.js";
+import { ensureProjectPoster } from "./core/poster.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
@@ -313,6 +316,7 @@ function renderMcpLanding(server: unknown): string {
   <div class="endpoint"><div class="label">MCP endpoint</div><code>${escHtml(mcpUrl)}</code></div>
   <nav>
     <a href="/architecture">Architecture &amp; docs</a>
+    <a href="/library">Films</a>
     <a href="/studio">Studio</a>
     <a href="/upload">Upload</a>
     <a href="/playground">Playground</a>
@@ -1119,6 +1123,19 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         res.end();
         return;
       }
+      // THE LIBRARY: the tenant's films, in front of Studio. Same auth as
+      // Studio -- the shell is served here, every byte of data stays gated.
+      if (urlPath === "/library" || urlPath === "/films") {
+        const tLib = extractToken(req);
+        if (isAuthEnabled() && !(tLib && validateToken(tLib))) {
+          res.writeHead(302, { Location: "/auth/google/login?return_to=" + encodeURIComponent(url) });
+          res.end();
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getLibraryHtml());
+        return;
+      }
       if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
         // ONE Studio, two views. On a phone the same link serves the phone
         // view (what you do on a phone: record, upload, what is still
@@ -1164,7 +1181,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1447,6 +1464,97 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
+      // ── API: The tenant LIBRARY ──
+      // GET /api/library/{tenant}?q=&filter=&sort=&archived=&limit=&offset=
+      // Search covers the name, the prompt and narrative, and the words ON
+      // SCREEN -- what a person actually remembers about a film they made.
+      const libMatch = urlPath.match(/^\/api\/library\/([^/]+)$/);
+      if (libMatch && method === "GET") {
+        const tenantId = decodeURIComponent(libMatch[1]);
+        const qp = new URL(url, "http://x").searchParams;
+        const result = await searchLibrary(tenantId, {
+          q: qp.get("q") || undefined,
+          filter: (qp.get("filter") as any) || undefined,
+          sort: (qp.get("sort") as any) || undefined,
+          archived: qp.get("archived") === "1",
+          limit: qp.get("limit") ? Number(qp.get("limit")) : undefined,
+          offset: qp.get("offset") ? Number(qp.get("offset")) : undefined,
+        });
+        jsonResponse(res, 200, result);
+        return;
+      }
+
+      // ── API: A film's poster (made on demand, cached beside the output) ──
+      const libPosterMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/poster$/);
+      if (libPosterMatch && method === "GET") {
+        const [, pTenant, pProject] = libPosterMatch.map(decodeURIComponent);
+        const poster = await ensureProjectPoster(pTenant, pProject);
+        if (!poster) { res.writeHead(204); res.end(); return; }
+        try {
+          const buf = await fs.readFile(poster);
+          res.writeHead(200, {
+            "Content-Type": "image/jpeg",
+            "Content-Length": String(buf.length),
+            // The url carries the project's own timestamp, so this can be held.
+            "Cache-Control": "public, max-age=86400",
+          });
+          res.end(buf);
+        } catch { res.writeHead(204); res.end(); }
+        return;
+      }
+
+      // ── API: Archive / restore a film (reversible; delete is separate) ──
+      const archMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/archive$/);
+      if (archMatch && method === "POST") {
+        const [, aTenant, aProject] = archMatch.map(decodeURIComponent);
+        const aBody = await parseBody(req).catch(() => ({} as any));
+        const project = await loadProject(aTenant, aProject);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const wantArchived = aBody?.archived !== false;
+        if (wantArchived) project.archived_at = new Date().toISOString();
+        else delete project.archived_at;
+        await saveProject(project);
+        forgetProject(aTenant, aProject);
+        jsonResponse(res, 200, { ok: true, project_id: aProject, archived: wantArchived });
+        return;
+      }
+
+      // ── API: Library bulk action ──
+      // POST /api/library/{tenant}/bulk {action: "archive"|"restore"|"delete", project_ids}
+      const bulkMatch = urlPath.match(/^\/api\/library\/([^/]+)\/bulk$/);
+      if (bulkMatch && method === "POST") {
+        const bTenant = decodeURIComponent(bulkMatch[1]);
+        const bBody = await parseBody(req).catch(() => ({} as any));
+        const ids: string[] = Array.isArray(bBody?.project_ids) ? bBody.project_ids.slice(0, 500) : [];
+        const action = String(bBody?.action || "archive");
+        if (!ids.length) { jsonResponse(res, 400, { error: "project_ids required" }); return; }
+        if (!["archive", "restore", "delete"].includes(action)) {
+          jsonResponse(res, 400, { error: "action must be archive, restore or delete" }); return;
+        }
+        let done = 0;
+        for (const id of ids) {
+          try {
+            if (action === "delete") {
+              // Only ever from the archive: a film has to be put down before
+              // it can be thrown away.
+              const p = await loadProject(bTenant, id);
+              if (!p || !p.archived_at) continue;
+              if (await deleteProject(bTenant, id)) done++;
+            } else {
+              const p = await loadProject(bTenant, id);
+              if (!p) continue;
+              if (action === "archive") p.archived_at = new Date().toISOString();
+              else delete p.archived_at;
+              await saveProject(p);
+              done++;
+            }
+            forgetProject(bTenant, id);
+          } catch { /* one bad film must not stop the batch */ }
+        }
+        jsonResponse(res, 200, { ok: true, action, requested: ids.length, done });
+        return;
+      }
+
       // ── API: List projects ──
       const listMatch = urlPath.match(/^\/api\/projects\/([^/]+)$/);
       if (listMatch && method === "GET") {
@@ -1497,6 +1605,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           jsonResponse(res, 404, { error: "Project not found" });
           return;
         }
+        forgetProject(tenantId, projectId);
         jsonResponse(res, 200, { ok: true, deleted: projectId });
         return;
       }
