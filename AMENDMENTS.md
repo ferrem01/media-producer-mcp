@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — The workshop joins the rail
+
+"What about the component playground? would be nice to have it linked into the
+home page somehow."
+
+- The rail gets a second group, under a rule: **Workshop -> Components**. It is
+  separated because it is not tenant data -- the component library is ONE
+  library for every film in the building -- and its link carries the sign-in
+  but no tenant, which the test asserts.
+- The playground gets a **Home** link in its topbar, carrying the token. It was
+  an address you had to know; now it is reached from home and returns there.
+- Checked before assuming: `/playground` IS behind the auth middleware (401
+  unauthenticated, including its catalog API). It has no TENANT scoping, which
+  is correct for a global library, not an oversight.
+
+---
+
 ## 2026-09-22 — Home is a place: one rail for Films, Team and Brand
 
 Marc: the cards are not the same size; make this page auth like Studio; put
