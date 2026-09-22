@@ -4712,3 +4712,10 @@ gone when the cut lands before it.
   board back from the writer's draft with the treatment's mood, so the
   "none" the update tool had set read "driving" again after one rebuild.
   The mood read at the start of the build is what is written back.
+- ...and the cut is carried on the save: `storyboardToSaved` wrote the
+  board back without `transition_in` (the same omission scene_template
+  and camera_moves had before it), so a hard cut set on the board built
+  once and was gone from the board on the next save. The board's mood
+  now rides on the build options (`boardMusicMood`): the unified pipeline
+  saves a fresh project object, which is why reading it off the project
+  never saw the board's none.

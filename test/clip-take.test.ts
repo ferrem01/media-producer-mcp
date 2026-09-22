@@ -251,6 +251,8 @@ describe("the clip need", () => {
     const types = await read("src/core/types.ts");
     expect(types).toMatch(/export interface StoryboardScene \{\n\s*\/\*\* Scene label \*\/\n\s*label: string;\n\s*\/\*\* The cut into this scene[^\n]*\n\s*transition_in\?: SceneTransition;/);
     const pipe = await read("src/llm/pipeline.ts");
+    // ...and the save carries the cut back to the board, so the next build still has it.
+    expect(pipe).toMatch(/camera_moves: s\.camera_moves,\n[\s\S]{0,400}?\.\.\.\(s\.transition_in \? \{ transition_in: s\.transition_in \} : \{\}\),/);
     expect(pipe).toMatch(/if \(choice\?\.source === "none" \|\| boardMood === "none"\) \{ chosenMusic = null; opts\.backgroundMusic = false;/);
     // ...and the board is written back with its own none, not the treatment's mood.
     expect(pipe).toMatch(/boardMood = \(existing\?\.storyboard as any\)\?\.audio\?\.music_mood;\n\s*opts\.boardMusicMood = boardMood;/);

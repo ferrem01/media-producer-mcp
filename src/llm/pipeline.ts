@@ -2250,6 +2250,10 @@ function storyboardToSaved(
       // rebuilding an approved storyboard silently dropped every travel the
       // reviewer signed off on.
       camera_moves: s.camera_moves,
+      // The cut, carried: a hard cut the board asked for (transition_in
+      // "none") went the way of the moves before it -- built once, gone
+      // from the board on the next save (measured live, proj_09b6d0cb).
+      ...(s.transition_in ? { transition_in: s.transition_in } : {}),
       // The ground, carried: a scene with no person under it (a chapter on
       // white, a wordmark card) is opaque -- the recipe pass sets it and
       // the take-need rule reads it (measured live, proj_87b44c22: the flag
