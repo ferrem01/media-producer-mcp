@@ -279,8 +279,13 @@
   .qcp-group-row > svg { width: 14px; height: 14px; color: #55534e; }
   .qcp-group-row .qcp-ring { border-style: dashed; }
   .qcp-group-count { color: #6b6963; font-weight: 500; }
-  /* A section with nothing in it is not shown; it opens when a task lands. */
-  .qcp-group { overflow: hidden; }
+  /* A section with nothing in it is not shown; it opens when a task lands.
+     Its height is never animated: tweening to 'auto' measures the section
+     while the FIRST row is still opening and then locks that value, so the
+     rest of the rows land inside a box too short for them (measured live in
+     Studio: "In progress 3" showing one and a half rows). The rows animate
+     their own height; the section simply is, or is not, in the layout. */
+  .qcp-group.is-empty { display: none; }
   .qcp-group .qcp-table { margin-bottom: 18px; }
   .qcp-task-rows .qcp-row { height: 44px; padding-top: 0; padding-bottom: 0; overflow: hidden; }
   .qcp-table { margin: 0 24px 24px; border: 1px solid #eceae6; border-radius: 12px; overflow: hidden; }
@@ -611,7 +616,8 @@
           var on = statuses[i] === st;
           gsap.set(rowEls[st][i], { height: on ? ROW_H : 0, autoAlpha: on ? 1 : 0 });
         });
-        gsap.set(groupEls[st], { height: counts[st] ? 'auto' : 0, autoAlpha: counts[st] ? 1 : 0 });
+        groupEls[st].classList.toggle('is-empty', counts[st] === 0);
+        gsap.set(groupEls[st], { autoAlpha: 1 });
         groupCountEls[st].textContent = String(counts[st]);
       });
       return counts;
@@ -924,11 +930,8 @@
             if (st !== from && st !== to) return;
             var was = st === to ? counts[st] - 1 : counts[st] + 1;
             textAt(tl2, groupCountEls[st], at + 0.12, String(counts[st]), String(was));
-            if (counts[st] === 0) tl2.to(groupEls[st], { height: 0, autoAlpha: 0, duration: 0.26, ease: 'power2.inOut' }, at + 0.02);
-            if (was === 0 && counts[st] > 0) {
-              gsap.set(groupEls[st], { height: 0, autoAlpha: 0 });
-              tl2.to(groupEls[st], { height: 'auto', autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, at);
-            }
+            if (counts[st] === 0) classAt(tl2, groupEls[st], at + 0.28, ['is-empty'], []);
+            if (was === 0 && counts[st] > 0) classAt(tl2, groupEls[st], at, [], ['is-empty']);
           });
           var prevDone = compiledDone;
           compiledDone = counts.done;
