@@ -2232,10 +2232,15 @@ export function createMcpServer(): McpServer {
       });
 
       return ok({
-        status: "queued",
+        status: job.reused ? "already_rendering" : "queued",
         job_id: job.id,
         project_id: project.project_id,
-        message: "Render queued. Use get(target='job', job_id='" + job.id + "') to check status; the completed job includes download_url -- a direct MP4 link to give the user (no server access needed).",
+        message: (job.reused
+          ? "This film is ALREADY rendering (job " + job.id + ", " + (job.progress?.percent ?? 0) + "%). " +
+            "Returning that job rather than starting a second render beside it -- two renders of one film " +
+            "each fork a browser per scene and both crawl. "
+          : "Render queued. ") +
+          "Use get(target='job', job_id='" + job.id + "') to check status; the completed job includes download_url -- a direct MP4 link to give the user (no server access needed).",
       });
     },
   );
