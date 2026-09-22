@@ -18,6 +18,9 @@ export interface RenderJob {
   id: string;
   tenantId: string;
   projectId: string;
+  /** True when this is the render already in flight, handed back rather than
+   *  a second one started beside it. */
+  reused?: boolean;
   status: "queued" | "rendering" | "completed" | "failed";
   progress?: { scene: number; totalScenes: number; percent: number };
   startedAt?: number;
@@ -61,6 +64,14 @@ function toRenderJob(job: Job): RenderJob {
  * Queue a render job. Returns the job immediately with status "queued".
  * The render runs in the background.
  */
+export function activeRender(tenantId: string, projectId: string): Job | null {
+  return (
+    listAllJobs(tenantId, "render").find(
+      (j) => j.projectId === projectId && (j.status === "running" || j.status === "queued"),
+    ) || null
+  );
+}
+
 export function queueRender(
   tenantId: string,
   projectId: string,
@@ -70,6 +81,15 @@ export function queueRender(
     trace?: TraceBuilder;
   },
 ): RenderJob {
+  // ONE RENDER PER FILM. The queue is fire-and-forget with no concurrency
+  // limit, so pressing Render again on a film that is already rendering does
+  // not queue behind it -- it runs a SECOND full render alongside the first,
+  // each forking a browser per scene. Measured on a 12-scene film: both jobs
+  // alive, both crawling, a five-minute render turned into twenty. Hand back
+  // the render already working instead.
+  const inFlight = activeRender(tenantId, projectId);
+  if (inFlight) return { ...toRenderJob(inFlight), reused: true };
+
   const job = queueJob("render", tenantId, async (j) => {
     j.projectId = projectId;
     await runRender(j, projectId, options);

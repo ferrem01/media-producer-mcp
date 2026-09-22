@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — One render per film: a second press no longer starts a second render
+
+A film "wouldn't render". Nothing was broken: TWO render jobs were running on
+the same project at once (18:44 and 18:48), both alive, both crawling -- scene
+6/12 and 5/12 after nine minutes. The job queue (`job-queue.ts`) is
+fire-and-forget with NO concurrency limit, so a second Render on a film that is
+already rendering starts a full second render beside the first. Each render
+forks a browser per scene, so the two starve each other and a five-minute
+render becomes twenty.
+
+- `render-queue.ts` — `activeRender(tenant, project)` finds the queued/running
+  render for a film, and `queueRender` hands it back (`reused: true`) instead
+  of starting another. Work dirs are per-job (`_work/<job.id>`), so the two
+  jobs never corrupted each other -- they only competed.
+- `server.ts` render tool and the Studio `POST /render` route both report
+  `already_rendering` with the running job's id and percent, so the caller sees
+  what it got.
+- `test/render-guard.test.ts` pins it, including that one film's render is not
+  confused with another's or another tenant's.
+- STILL MISSING: there is no way to cancel a render. The scenes render in a
+  parallel pool with no per-scene checkpoint, so cancelling means killing the
+  forked workers -- a bigger change, and deploying it restarts the server,
+  which kills whatever is in flight. Worth doing; not done here.
+
+---
+
 ## 2026-09-22 — A click you can see: the ring, the tap tint, and the cut that follows
 
 Watching the film back: "the mouse comes in, it gets to the right area, and

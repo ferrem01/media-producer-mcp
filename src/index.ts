@@ -2369,7 +2369,10 @@ Rules:
         const rQuality = rBody?.quality === "preview" ? "preview" : rBody?.quality === "production" ? "production" : undefined;
         const job = queueRender(tenantId, projectId, rQuality ? ({ quality: rQuality } as any) : undefined);
         jsonResponse(res, 200, {
-          status: "queued",
+          // Studio's Render button: a second press while one is in flight gets
+          // the job already running, not a second render beside it.
+          status: job.reused ? "already_rendering" : "queued",
+          already_rendering: !!job.reused,
           job_id: job.id,
           project_id: projectId,
           tenant_id: tenantId,
