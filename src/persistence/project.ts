@@ -6,6 +6,7 @@
  */
 
 import fs from "node:fs/promises";
+import path from "node:path";
 import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Project, OutputFormat, Canvas, BrandKit, Scene, Storyboard, StoryboardScene } from "../core/types.js";
@@ -97,6 +98,68 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
   await saveProject(project);
 
   return project;
+}
+
+/**
+ * DUPLICATE A PROJECT. "Copy it and try something" is how the work actually
+ * goes (Marc, after a hand-assembled copy that took five steps and got two
+ * of them wrong: "i guess we dont have a copy or duplicate function/tool?").
+ *
+ * The whole directory is copied -- scenes, storyboard, audio, takes, assets,
+ * board cards -- so the copy renders EXACTLY what the original renders. Then:
+ *  - a new id and name,
+ *  - every reference to the old project id inside the record re-pointed at
+ *    the new one (asset URLs, take sources, clip srcs: the files came along,
+ *    so the paths must follow or the copy plays the original's media and
+ *    breaks when the original is deleted),
+ *  - the RENDER is not inherited: a copy has never been rendered, whatever
+ *    the original's state, so output/ is left behind and the render flags
+ *    are cleared.
+ * `include_output` keeps the original's mp4 for a copy meant as an archive.
+ */
+export async function duplicateProject(
+  tenantId: string,
+  projectId: string,
+  opts: { name?: string; include_output?: boolean } = {},
+): Promise<Project | null> {
+  const source = await loadProject(tenantId, projectId);
+  if (!source) return null;
+  const newId = `proj_${uuidv4().replace(/-/g, "").slice(0, 8)}`;
+  const from = projectDir(tenantId, projectId);
+  const to = projectDir(tenantId, newId);
+  await fs.mkdir(to, { recursive: true });
+  const entries = await fs.readdir(from, { withFileTypes: true });
+  for (const e of entries) {
+    if (e.name === "project.json") continue;             // rewritten below
+    if (e.name === "output" && !opts.include_output) continue;
+    await fs.cp(path.join(from, e.name), path.join(to, e.name), { recursive: true });
+  }
+  await fs.mkdir(path.join(to, "assets"), { recursive: true });
+  await fs.mkdir(path.join(to, "output"), { recursive: true });
+
+  // Re-point every mention of the old id. The record is JSON, the id is a
+  // long unique token, so a whole-record replace is exact and catches the
+  // places a field-by-field copy forgets.
+  const repointed = JSON.parse(
+    JSON.stringify(source).split(projectId).join(newId),
+  ) as Project;
+  repointed.project_id = newId;
+  repointed.name = opts.name || `${source.name} (copy)`;
+  repointed.created_at = new Date().toISOString();
+  repointed.updated_at = repointed.created_at;
+  if (!opts.include_output) {
+    delete (repointed as any).rendered;
+    delete (repointed as any).rendered_at;
+    delete (repointed as any).render_size_bytes;
+    delete (repointed as any).render_stale;
+    delete (repointed as any).download_url;
+    // "rendered" is not a state a copy can be in; it is as built as its source.
+    if (repointed.status === "rendered" || repointed.status === "rendering") {
+      repointed.status = (repointed.scenes || []).length ? "generated" : "storyboard";
+    }
+  }
+  await saveProject(repointed);
+  return repointed;
 }
 
 // ── Read ──

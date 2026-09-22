@@ -18,6 +18,25 @@ Palmier: edit the timeline). Our moat is **"on-brand, correct video from a promp
 
 ## Top 3 (do next)
 
+### 00. The tenant HOME: find a film without remembering its name  *(asked 2026-09-22)*
+251 projects in one tenant and the only way in is a project id. Marc, after
+twenty minutes of hunting for two films he had made himself: "I think we need
+a visual way with search to find videos in a tenant... this was really hard."
+A home page at the tenant root, in front of Studio:
+- **A card per project**: a still from the film (the first card of the
+  storyboard sheet, or a frame of the render), the name, the runtime, the
+  scene count, the state (board / built / rendered), the date, the frame
+  (16x9, 9x16, 4x5, 1x1).
+- **Search at the top**, over what a person actually remembers: the name, the
+  words ON SCREEN (every component's text), the narrative, and the original
+  prompt. Searching "what if" or "sales call" has to find the film that says
+  it. (The scan that found Marc's two films did exactly this over the project
+  records -- the server can do it directly.)
+- **Click a card into Studio**, and a back arrow in Studio that returns to the
+  home page with the search still in it.
+- Duplicates are the norm (seven copies of one film, three rendered): group
+  copies that share a name, newest first, and say which one is rendered.
+
 ### 0. The Quotient Recorder — Chrome extension + instrumented capture  *(specced: `SPEC-recorder.md`)*
 Record → Stop → link to a finished film. The extension captures the tab PLUS an
 events sidecar (clicks with element boxes, navigations, idle spans) — ground truth
