@@ -63,6 +63,12 @@ export const RAIL_CSS = `
   .rail a.rail-item.on { background: var(--surface-2); color: var(--text); font-weight: 600; }
   .rail a.rail-item .ico { width: 17px; display: inline-flex; justify-content: center; opacity: .75; }
   .rail-spacer { flex: 1; }
+  /* The workshop is not tenant data -- the component library is one library
+     for every film in the building -- so it sits under a rule of its own. */
+  .rail-group {
+    margin: 10px 10px 4px; padding-top: 10px; border-top: 1px solid var(--border);
+    font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3);
+  }
   /* Who you are signed in as, the way Studio shows it. */
   .rail-me { display: flex; align-items: center; gap: 8px; padding: 8px 10px 4px; min-width: 0; }
   .rail-me img, .rail-me .av {
@@ -82,11 +88,11 @@ export const RAIL_CSS = `
       position: static; width: auto; height: auto; flex-direction: row; align-items: center;
       gap: 4px; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 8px;
     }
-    .rail-brand, .rail-spacer, .rail-me, .rail-out { display: none; }
+    .rail-brand, .rail-spacer, .rail-me, .rail-out, .rail-group { display: none; }
   }
 `;
 
-export type RailPage = "films" | "team" | "brand";
+export type RailPage = "films" | "team" | "brand" | "components";
 
 export function railHtml(active: RailPage): string {
   const item = (id: RailPage, icon: string, label: string) =>
@@ -96,6 +102,8 @@ export function railHtml(active: RailPage): string {
   ${item("films", "&#9635;", "Films")}
   ${item("team", "&#128101;", "Team")}
   ${item("brand", "&#127912;", "Brand")}
+  <div class="rail-group">Workshop</div>
+  ${item("components", "&#9783;", "Components")}
   <div class="rail-spacer"></div>
   <div class="rail-me" id="rail-me" style="display:none"></div>
   <a class="rail-out" id="rail-out" href="/auth/logout" style="display:none">Sign out</a>
@@ -139,6 +147,10 @@ export const RAIL_JS = `
     if (films) films.href = withToken('/library' + q);
     if (team) team.href = withToken('/team' + q);
     if (brandN) brandN.href = withToken('/brand' + q);
+    // The playground is the component workshop: one library for every film, so
+    // it carries no tenant -- only the sign-in.
+    var comps = document.getElementById('nav-components');
+    if (comps) comps.href = withToken('/playground');
   }
   function showMe(me) {
     var box = document.getElementById('rail-me');

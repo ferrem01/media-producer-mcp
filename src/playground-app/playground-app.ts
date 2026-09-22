@@ -39,6 +39,13 @@ body {
   min-height: 48px;
 }
 #topbar .logo { font-weight: 700; font-size: 14px; color: #818cf8; white-space: nowrap; }
+/* The way back to home. The workshop is reached FROM there, so it has to
+   return there -- the playground was an address you had to know. */
+#topbar .home-back {
+  font-size: 13px; font-weight: 500; color: #94a3b8; text-decoration: none;
+  padding: 4px 9px; border-radius: 7px; border: 1px solid #334155; white-space: nowrap;
+}
+#topbar .home-back:hover { color: #e2e8f0; background: #334155; }
 #topbar input[type="text"] {
   background: #0f172a; border: 1px solid #334155; border-radius: 6px;
   color: #e2e8f0; padding: 5px 10px; font-size: 12px; width: 220px;
@@ -398,6 +405,7 @@ select.field-input { cursor: pointer; }
 <div id="app">
 
   <div id="topbar">
+    <a class="home-back" id="home-back" href="/library" title="Back to your films">&#8592; Home</a>
     <span class="logo">Playground</span>
     <input type="text" id="tenant-input" placeholder="tenant-id" />
     <span id="comp-name">No component loaded</span>
@@ -492,6 +500,12 @@ select.field-input { cursor: pointer; }
 
 <script>
 (function() {
+  // Carry whatever signed this page in back to home.
+  (function () {
+    var tok = new URLSearchParams(location.search).get('token');
+    var back = document.getElementById('home-back');
+    if (back && tok) back.href = '/library?token=' + encodeURIComponent(tok);
+  })();
   // ── State ──
   var state = {
     tenantId: '',

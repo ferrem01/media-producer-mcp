@@ -109,7 +109,7 @@ describe("home", () => {
           }, { timeout: 15_000 });
           // The rail carries all three, and the signed-in person, on every page.
           const rail = await page.$$eval(".rail a.rail-item", (a) => a.map((x) => x.id));
-          expect(rail, `${name} rail`).toEqual(["nav-films", "nav-team", "nav-brand"]);
+          expect(rail, `${name} rail`).toEqual(["nav-films", "nav-team", "nav-brand", "nav-components"]);
           expect(await page.$eval(`#${active}`, (e) => e.classList.contains("on")), `${name} marks itself`).toBe(true);
           expect(await page.textContent("#rail-me"), `${name} shows who is signed in`).toContain("Marc Ferrentino");
           // Every item points at a real page, with the tenant carried across.
@@ -118,6 +118,10 @@ describe("home", () => {
             expect(url, `${name} -> ${id}`).toContain(href);
             expect(url, `${name} -> ${id} carries the tenant`).toContain("tenant=marc-getquotient-ai");
           }
+          // The workshop is one library for every film, so it carries no tenant.
+          const comps = await page.$eval("#nav-components", (e) => (e as HTMLAnchorElement).getAttribute("href"));
+          expect(comps, `${name} -> components`).toContain("/playground");
+          expect(comps, `${name} -> components is not tenant-scoped`).not.toContain("tenant=");
         } finally { await page.close(); await cleanup(); }
       }
     } finally { await browser.close(); }
