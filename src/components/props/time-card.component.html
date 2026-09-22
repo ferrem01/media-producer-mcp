@@ -1,0 +1,61 @@
+<template>
+  <div class="tc-root">
+    <div class="tc-sky"></div>
+    <div class="tc-clouds"></div>
+    <div class="tc-text"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* A TIME CARD: the cartoon narrator's "Four days later..." -- ornate
+     script on a painted sky, a slow push, the line read over it. A parody
+     of the form, not the card itself. */
+  .tc-root { position: relative; width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .tc-sky { position: absolute; inset: -6%; background: linear-gradient(180deg, #3aa0e8 0%, #6cc1f4 42%, #a9def9 72%, #d8f0fb 100%); transform-origin: 50% 50%; }
+  .tc-sky.dusk { background: linear-gradient(180deg, #2b3f8a 0%, #7a5fa8 40%, #e58a6a 75%, #f5c986 100%); }
+  .tc-clouds { position: absolute; inset: -6%; transform-origin: 50% 50%;
+    background:
+      radial-gradient(ellipse 22% 14% at 18% 28%, rgba(255,255,255,0.95) 0 58%, transparent 60%),
+      radial-gradient(ellipse 16% 11% at 30% 24%, rgba(255,255,255,0.95) 0 58%, transparent 60%),
+      radial-gradient(ellipse 26% 12% at 24% 33%, rgba(255,255,255,0.95) 0 58%, transparent 60%),
+      radial-gradient(ellipse 20% 12% at 78% 20%, rgba(255,255,255,0.92) 0 58%, transparent 60%),
+      radial-gradient(ellipse 14% 10% at 88% 16%, rgba(255,255,255,0.92) 0 58%, transparent 60%),
+      radial-gradient(ellipse 24% 11% at 83% 25%, rgba(255,255,255,0.92) 0 58%, transparent 60%),
+      radial-gradient(ellipse 28% 13% at 12% 80%, rgba(255,255,255,0.9) 0 58%, transparent 60%),
+      radial-gradient(ellipse 18% 10% at 26% 76%, rgba(255,255,255,0.9) 0 58%, transparent 60%),
+      radial-gradient(ellipse 30% 13% at 76% 84%, rgba(255,255,255,0.9) 0 58%, transparent 60%),
+      radial-gradient(ellipse 18% 10% at 90% 79%, rgba(255,255,255,0.9) 0 58%, transparent 60%);
+  }
+  .tc-text { position: relative; padding: 0 6%; text-align: center; font-family: 'Dancing Script', 'Brush Script MT', 'Segoe Script', 'Apple Chancery', cursive; font-weight: 700; color: #16305f; line-height: 1.05; text-shadow: 0 2px 0 rgba(255,255,255,0.55), 0 10px 30px rgba(0,40,90,0.25); letter-spacing: 0.01em; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.tc-root'), sky = el.querySelector('.tc-sky'), clouds = el.querySelector('.tc-clouds'), text = el.querySelector('.tc-text');
+    var dur = Number(data.duration) > 0 ? Number(data.duration) : (ctx && ctx.duration > 0 ? ctx.duration : 2);
+    var at = Number(data.at) > 0 ? Number(data.at) : 0;
+    var span = Math.max(0.5, dur - at);
+    var boxW = root.clientWidth || 1080, boxH = root.clientHeight || 1350;
+    if (data.tone === 'dusk') sky.classList.add('dusk');
+    // The script face, fetched like the brand's own (the page already links
+    // Google Fonts for the kit); a missing face falls back to the system's script.
+    if (data.font !== false && !document.getElementById('mp-font-time-card')) {
+      var l = document.createElement('link'); l.id = 'mp-font-time-card'; l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(data.font_family || 'Dancing Script') + ':wght@700&display=swap';
+      document.head.appendChild(l);
+    }
+    if (data.font_family) text.style.fontFamily = "'" + data.font_family + "', 'Brush Script MT', cursive";
+    text.textContent = data.text || 'Some time later…';
+    var fs = Number(data.font_size) > 0 ? Number(data.font_size) : Math.round(Math.min(boxW, boxH) * 0.16);
+    text.style.fontSize = fs + 'px';
+    if (data.color) text.style.color = data.color;
+    gsap.set(text, { autoAlpha: 0, scale: 0.92, y: 10 });
+    tl.to(text, { autoAlpha: 1, scale: 1, y: 0, duration: 0.35, ease: 'power2.out' }, at + 0.05);
+    if (data.drift !== false) {
+      tl.fromTo(sky, { scale: 1 }, { scale: 1.05, duration: span, ease: 'none' }, at);
+      tl.fromTo(clouds, { x: 0, scale: 1 }, { x: -Math.round(boxW * 0.03), scale: 1.07, duration: span, ease: 'none' }, at);
+    }
+    return tl;
+  }
+</script>

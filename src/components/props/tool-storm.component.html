@@ -1,0 +1,141 @@
+<template>
+  <div class="tsm-root"><div class="tsm-stage"></div></div>
+</template>
+
+<style scoped>
+  /* THE TOOL STORM: the five tools as window cards multiplying over the
+     person -- five that read as a hundred. Three modes escalate: fly (the
+     windows arrive one by one and stack), ring (they circle her, the same
+     five coming round again), storm (a blizzard crossing the frame too
+     fast to read). Every position is a function of the card's index --
+     the frames are the same on every seek. */
+  .tsm-root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', system-ui, -apple-system, sans-serif; perspective: 1400px; }
+  .tsm-stage { position: absolute; inset: 0; transform-style: preserve-3d; }
+  .tsm-slot { position: absolute; left: 50%; top: 50%; width: var(--st-cw, 360px); height: var(--st-ch, 230px); margin-left: calc(var(--st-cw, 360px) / -2); margin-top: calc(var(--st-ch, 230px) / -2); transform-style: preserve-3d; will-change: transform; }
+  .tsm-stage.ring .tsm-slot {
+    transform: rotateY(calc(var(--st-rot, 0deg) + var(--st-a, 0deg))) translateZ(var(--st-r, 380px)) rotateY(calc(-1 * (var(--st-rot, 0deg) + var(--st-a, 0deg)))) translateY(var(--st-y, 0px)) scale(calc(0.72 + 0.14 * (1 + cos(var(--st-rot, 0deg) + var(--st-a, 0deg)))));
+    opacity: calc(0.35 + 0.325 * (1 + cos(var(--st-rot, 0deg) + var(--st-a, 0deg))));
+  }
+  .tsm-card { position: absolute; inset: 0; border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 18px 44px rgba(0,0,0,0.38), 0 1px 3px rgba(0,0,0,0.25); color: #1f2937; }
+  .tsm-bar { display: flex; align-items: center; gap: 8px; height: 17%; padding: 0 5%; color: #fff; font-weight: 800; font-size: var(--st-fs, 15px); letter-spacing: -0.01em; white-space: nowrap; }
+  .tsm-bar svg { width: 1.25em; height: 1.25em; flex: 0 0 auto; }
+  .tsm-bar i { width: 0.55em; height: 0.55em; border-radius: 50%; background: #7CF29B; display: inline-block; }
+  .tsm-body { position: absolute; left: 0; right: 0; top: 17%; bottom: 0; background: #fff; }
+  .tsm-kpi { position: absolute; left: 5%; top: 8%; width: 90%; height: 20%; display: flex; gap: 4%; }
+  .tsm-kpi b { flex: 1; border-radius: 6px; background: #f3f4f6; border: 1px solid #e5e7eb; }
+  .tsm-rows { position: absolute; left: 5%; right: 5%; top: 34%; bottom: 8%; background: repeating-linear-gradient(to bottom, #eef0f3 0 2px, transparent 2px 15%); }
+  .tsm-rows::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 34%; background: repeating-linear-gradient(to bottom, transparent 0 4%, #d9dce2 4% 9%, transparent 9% 15%); }
+  .tsm-rows::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 22%; background: repeating-linear-gradient(to bottom, transparent 0 4%, var(--st-acc, #2563eb) 4% 9%, transparent 9% 15%); opacity: 0.55; }
+  .tsm-chart { position: absolute; left: 5%; right: 5%; top: 34%; bottom: 8%; display: flex; align-items: flex-end; gap: 3%; }
+  .tsm-chart b { flex: 1; background: var(--st-acc, #2563eb); border-radius: 3px 3px 0 0; opacity: 0.85; }
+  .tsm-grid { position: absolute; inset: 0; background-image: linear-gradient(to right, #e3e6ea 1px, transparent 1px), linear-gradient(to bottom, #e3e6ea 1px, transparent 1px); background-size: 14% 100%, 100% 12.5%; }
+  .tsm-grid::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 12.5%; background: #eef3ff; }
+  .tsm-grid::after { content: ''; position: absolute; left: 14%; width: 14%; top: 37.5%; height: 12.5%; outline: 2px solid #1a73e8; outline-offset: -2px; }
+  .tsm-slide { position: absolute; left: 12%; right: 12%; top: 12%; bottom: 12%; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
+  .tsm-slide::before { content: ''; position: absolute; left: 10%; top: 12%; width: 55%; height: 10%; background: #374151; border-radius: 2px; }
+  .tsm-slide::after { content: ''; position: absolute; left: 10%; right: 10%; top: 34%; bottom: 14%; border: 2px dashed #c8c6c4; }
+  .tsm-body.dark { background: #f4f5f4; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.tsm-root'), stage = el.querySelector('.tsm-stage');
+    var SVG = 'http://www.w3.org/2000/svg';
+    var mode = String(data.mode || 'fly');
+    var dur = Number(data.duration) > 0 ? Number(data.duration) : (ctx && ctx.duration > 0 ? ctx.duration : 2.5);
+    var at = Number(data.at) > 0 ? Number(data.at) : 0;
+    var span = Math.max(0.5, dur - at);
+    var speed = Number(data.speed) > 0 ? Number(data.speed) : 1;
+    var boxW = root.clientWidth || 1080, boxH = root.clientHeight || 1350;
+    var TOOLS = {
+      'meta-ads':   { name: 'Ads Manager', bar: '#0866FF', acc: '#0866FF', mark: 'M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a6.624 6.624 0 0 0 .265.86 5.297 5.297 0 0 0 .371.761c.696 1.159 1.818 1.927 3.593 1.927 1.497 0 2.633-.671 3.965-2.444.76-1.012 1.144-1.626 2.663-4.32l.756-1.339.186-.325c.061.1.121.196.183.3l2.152 3.595c.724 1.21 1.665 2.556 2.47 3.314 1.046.987 1.992 1.22 3.06 1.22 1.075 0 1.876-.355 2.455-.843a3.743 3.743 0 0 0 .81-.973c.542-.939.861-2.127.861-3.745 0-2.72-.681-5.357-2.084-7.45-1.282-1.912-2.957-2.93-4.716-2.93-1.047 0-2.088.467-3.053 1.308-.652.57-1.257 1.29-1.82 2.05-.69-.875-1.335-1.547-1.958-2.056-1.182-.966-2.315-1.303-3.454-1.303zm10.16 2.053c1.147 0 2.188.758 2.992 1.999 1.132 1.748 1.647 4.195 1.647 6.4 0 1.548-.368 2.9-1.839 2.9-.58 0-1.027-.23-1.664-1.004-.496-.601-1.343-1.878-2.832-4.358l-.617-1.028a44.908 44.908 0 0 0-1.255-1.98c.07-.109.141-.224.211-.327 1.12-1.667 2.118-2.602 3.358-2.602zm-10.201.553c1.265 0 2.058.791 2.675 1.446.307.327.737.871 1.234 1.579l-1.02 1.566c-.757 1.163-1.882 3.017-2.837 4.338-1.191 1.649-1.81 1.817-2.486 1.817-.524 0-1.038-.237-1.383-.794-.263-.426-.464-1.13-.464-2.046 0-2.221.63-4.535 1.66-6.088.454-.687.964-1.226 1.533-1.533a2.264 2.264 0 0 1 1.088-.285z', body: 'rows' },
+      'klaviyo':    { name: 'klaviyo', bar: '#0b0b0b', acc: '#1f8f4e', mark: 'dot', body: 'kpi' },
+      'ga4':        { name: 'Analytics', bar: '#F9AB00', acc: '#1a73e8', mark: 'M22.84 2.9982v17.9987c.0086 1.6473-1.3197 2.9897-2.967 2.9984a2.9808 2.9808 0 01-.3677-.0208c-1.528-.226-2.6477-1.5558-2.6105-3.1V3.1204c-.0369-1.5458 1.0856-2.8762 2.6157-3.1 1.6361-.1915 3.1178.9796 3.3093 2.6158.014.1201.0208.241.0202.3619zM4.1326 18.0548c-1.6417 0-2.9726 1.331-2.9726 2.9726C1.16 22.6691 2.4909 24 4.1326 24s2.9726-1.3309 2.9726-2.9726-1.331-2.9726-2.9726-2.9726zm7.8728-9.0098c-.0171 0-.0342 0-.0513.0003-1.6495.0904-2.9293 1.474-2.891 3.1256v7.9846c0 2.167.9535 3.4825 2.3505 3.763 1.6118.3266 3.1832-.7152 3.5098-2.327.04-.1974.06-.3983.0593-.5998v-8.9585c.003-1.6474-1.33-2.9852-2.9773-2.9882z', body: 'chart', ink: '#1f2937' },
+      'sheets':     { name: 'Sheets', bar: '#188038', acc: '#188038', mark: 'M11.318 12.545H7.91v-1.909h3.41v1.91zM14.728 0v6h6l-6-6zm1.363 10.636h-3.41v1.91h3.41v-1.91zm0 3.273h-3.41v1.91h3.41v-1.91zM20.727 6.5v15.864c0 .904-.732 1.636-1.636 1.636H4.909a1.636 1.636 0 0 1-1.636-1.636V1.636C3.273.732 4.005 0 4.909 0h9.318v6.5h6.5zm-3.273 2.773H6.545v7.909h10.91v-7.91zm-6.136 4.636H7.91v1.91h3.41v-1.91z', body: 'grid' },
+      'powerpoint': { name: 'PowerPoint', bar: '#B7472A', acc: '#B7472A', mark: 'M13.5 1.5q1.453 0 2.795.375 1.342.375 2.508 1.06 1.166.686 2.12 1.641.956.955 1.641 2.121.686 1.166 1.061 2.508Q24 10.547 24 12q0 1.453-.375 2.795-.375 1.342-1.06 2.508-.686 1.166-1.641 2.12-.955.956-2.121 1.641-1.166.686-2.508 1.061-1.342.375-2.795.375-1.29 0-2.52-.305-1.23-.304-2.337-.884-1.108-.58-2.063-1.418-.955-.838-1.693-1.893H.997q-.411 0-.704-.293T0 17.004V6.996q0-.41.293-.703T.996 6h3.89q.739-1.055 1.694-1.893.955-.837 2.063-1.418 1.107-.58 2.337-.884Q12.21 1.5 13.5 1.5zm.75 1.535v8.215h8.215q-.14-1.64-.826-3.076-.686-1.436-1.782-2.531-1.095-1.096-2.537-1.782-1.441-.685-3.07-.826zm-5.262 7.57q0-.68-.228-1.166-.229-.486-.627-.79-.399-.305-.938-.446-.539-.14-1.172-.14H2.848v7.863h1.84v-2.742H5.93q.574 0 1.119-.17t.978-.493q.434-.322.698-.802.263-.48.263-1.114zM13.5 21q1.172 0 2.262-.287t2.056-.82q.967-.534 1.776-1.278.808-.744 1.418-1.664.61-.92.984-1.986.375-1.067.469-2.227h-9.703V3.035q-1.735.14-3.27.908T6.797 6h4.207q.41 0 .703.293t.293.703v10.008q0 .41-.293.703t-.703.293H6.797q.644.715 1.412 1.271.768.557 1.623.944.855.387 1.781.586Q12.54 21 13.5 21zM5.812 9.598q.575 0 .915.228.34.229.34.838 0 .27-.124.44-.123.17-.31.275-.188.105-.422.146-.234.041-.445.041H4.687V9.598Z', body: 'slide' }
+    };
+    var tools = (Array.isArray(data.tools) && data.tools.length ? data.tools : ['meta-ads', 'klaviyo', 'ga4', 'sheets', 'powerpoint']).filter(function(t) { return TOOLS[t]; });
+    if (!tools.length) tools = ['meta-ads'];
+    var count = Math.max(1, Math.min(80, Number(data.count) > 0 ? Math.round(Number(data.count)) : (mode === 'storm' ? 40 : mode === 'ring' ? 15 : 5)));
+    var cwPct = Number(data.card_width) > 0 ? Number(data.card_width) : (mode === 'storm' ? 26 : mode === 'ring' ? 30 : 40);
+    var cw = Math.round(boxW * cwPct / 100), chh = Math.round(cw * 0.64);
+    stage.style.setProperty('--st-cw', cw + 'px'); stage.style.setProperty('--st-ch', chh + 'px'); stage.style.setProperty('--st-fs', Math.max(9, Math.round(cw * 0.042)) + 'px');
+    // A deterministic spread: the golden angle, so no two cards share a place.
+    function frac(x) { return x - Math.floor(x); }
+    function h1(i) { return frac((i + 1) * 0.6180339887); }
+    function h2(i) { return frac((i + 1) * 0.7548776662); }
+    function h3(i) { return frac((i + 1) * 0.5698402910); }
+    function card(i) {
+      var id = tools[i % tools.length], t = TOOLS[id];
+      var slot = document.createElement('div'); slot.className = 'tsm-slot';
+      var c = document.createElement('div'); c.className = 'tsm-card'; c.style.setProperty('--st-acc', t.acc);
+      var bar = document.createElement('div'); bar.className = 'tsm-bar'; bar.style.background = t.bar; if (t.ink) bar.style.color = t.ink;
+      if (t.mark === 'dot') { var nm = document.createElement('span'); nm.textContent = t.name; bar.appendChild(nm); var d = document.createElement('i'); bar.appendChild(d); }
+      else { var s = document.createElementNS(SVG, 'svg'); s.setAttribute('viewBox', '0 0 24 24'); var p = document.createElementNS(SVG, 'path'); p.setAttribute('d', t.mark); p.setAttribute('fill', t.ink || '#fff'); s.appendChild(p); bar.appendChild(s); var nm2 = document.createElement('span'); nm2.textContent = t.name; bar.appendChild(nm2); }
+      c.appendChild(bar);
+      var body = document.createElement('div'); body.className = 'tsm-body' + (id === 'klaviyo' ? ' dark' : '');
+      if (t.body === 'rows') { var r = document.createElement('div'); r.className = 'tsm-rows'; r.style.top = '10%'; body.appendChild(r); }
+      else if (t.body === 'kpi') { var k = document.createElement('div'); k.className = 'tsm-kpi'; for (var q = 0; q < 4; q++) k.appendChild(document.createElement('b')); body.appendChild(k); var r2 = document.createElement('div'); r2.className = 'tsm-rows'; body.appendChild(r2); }
+      else if (t.body === 'chart') { var ch = document.createElement('div'); ch.className = 'tsm-chart'; ch.style.top = '12%'; [62, 74, 58, 80, 71, 90, 84, 96, 88, 100].forEach(function(v) { var b = document.createElement('b'); b.style.height = v + '%'; ch.appendChild(b); }); body.appendChild(ch); }
+      else if (t.body === 'grid') { var g = document.createElement('div'); g.className = 'tsm-grid'; body.appendChild(g); }
+      else { var sl = document.createElement('div'); sl.className = 'tsm-slide'; body.appendChild(sl); body.style.background = '#e6e5e4'; }
+      c.appendChild(body); slot.appendChild(c); stage.appendChild(slot);
+      return slot;
+    }
+    var slots = [];
+    for (var i = 0; i < count; i++) slots.push(card(i));
+    var t0 = at, tEnd = at + span;
+
+    if (mode === 'fly') {
+      // One by one from alternating sides, landing in a loose stack that
+      // creeps toward the centre; each lands with a small settle.
+      var step = span / (count + 1.5);
+      slots.forEach(function(sl, i) {
+        var side = i % 2 === 0 ? -1 : 1;
+        var x = (h1(i) - 0.5) * boxW * 0.42, y = (h2(i) - 0.5) * boxH * 0.5, rot = (h3(i) - 0.5) * 16;
+        gsap.set(sl, { x: side * boxW * 0.9, y: y + (h3(i) - 0.5) * 120, rotation: side * 18, autoAlpha: 0, scale: 0.9 });
+        var when = t0 + step * i;
+        tl.to(sl, { x: x, y: y, rotation: rot, autoAlpha: 1, scale: 1, duration: Math.min(0.55, step * 1.4) / speed, ease: 'back.out(1.4)' }, when);
+      });
+      tl.to(stage, { scale: 1.03, duration: span, ease: 'none' }, t0);
+    } else if (mode === 'ring') {
+      stage.classList.add('ring');
+      var R = Math.round(Math.min(boxW, boxH * 0.75) * 0.42);
+      stage.style.setProperty('--st-r', R + 'px');
+      slots.forEach(function(sl, i) { sl.style.setProperty('--st-a', ((360 / count) * i) + 'deg'); sl.style.setProperty('--st-y', Math.round((h2(i) - 0.5) * boxH * 0.34) + 'px'); });
+      var turns = Number(data.turn) > 0 ? Number(data.turn) : 0.9 * speed;
+      stage.style.setProperty('--st-rot', '0deg');
+      gsap.set(stage, { autoAlpha: 0 }); tl.to(stage, { autoAlpha: 1, duration: 0.25 }, t0);
+      tl.to(stage, { '--st-rot': (-360 * turns) + 'deg', duration: span, ease: data.ease || 'power1.in' }, t0);
+    } else {
+      // The storm: every card crosses the frame on its own line, at its own
+      // pace, with a spin -- and comes round again (a repeat is seek-safe).
+      slots.forEach(function(sl, i) {
+        var dir = i % 3 === 0 ? -1 : (i % 3 === 1 ? 1 : (h3(i) > 0.5 ? 1 : -1));
+        var y0 = (h2(i) - 0.5) * boxH * 1.05, y1 = y0 + (h1(i) - 0.5) * boxH * 0.4;
+        var xs = dir * (boxW * 0.65 + cw), xe = -dir * (boxW * 0.65 + cw);
+        var d = (0.9 + h3(i) * 1.1) / speed, phase = h1(i);
+        var sc = 0.6 + h2(i) * 0.7, r0 = (h3(i) - 0.5) * 40, r1 = r0 + (h1(i) - 0.5) * 60;
+        gsap.set(sl, { scale: sc, autoAlpha: 0.94, zIndex: Math.round(sc * 100) });
+        // Each card is already part-way across when the beat opens (its
+        // phase), then crosses again and again: the first leg runs from the
+        // phase point to the end, the loop follows from the start. Both sit
+        // at positive times -- a negative position means "from the end" to
+        // GSAP, which emptied the storm (measured on the probe).
+        var mix = function(a, b, f) { return a + (b - a) * f; };
+        var first = (1 - phase) * d;
+        tl.fromTo(sl, { x: mix(xs, xe, phase), y: mix(y0, y1, phase), rotation: mix(r0, r1, phase) }, { x: xe, y: y1, rotation: r1, duration: first, ease: 'none', immediateRender: true }, t0);
+        tl.fromTo(sl, { x: xs, y: y0, rotation: r0 }, { x: xe, y: y1, rotation: r1, duration: d, ease: 'none', repeat: -1, immediateRender: false }, t0 + first);
+      });
+      if (data.flash !== false) {
+        var fl = document.createElement('div'); fl.style.cssText = 'position:absolute;inset:0;background:#fff;pointer-events:none;'; root.appendChild(fl);
+        gsap.set(fl, { autoAlpha: 0 });
+        var n = Math.max(2, Math.round(span * 2.2 * speed));
+        for (var f = 0; f < n; f++) { var fa = t0 + span * (f + 0.5) / n; tl.to(fl, { autoAlpha: 0.35, duration: 0.05 }, fa).to(fl, { autoAlpha: 0, duration: 0.14 }, fa + 0.05); }
+      }
+      tl.to(stage, { scale: 1.06, duration: span, ease: 'none' }, t0);
+    }
+    return tl;
+  }
+</script>
