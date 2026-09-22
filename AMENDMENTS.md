@@ -4719,3 +4719,10 @@ gone when the cut lands before it.
   now rides on the build options (`boardMusicMood`): the unified pipeline
   saves a fresh project object, which is why reading it off the project
   never saw the board's none.
+- The clip keeps its whole picture. The take sanitizer crops a take wider
+  than the frame and PILLARBOXES one taller (right for a speaker's head),
+  and the clip path passed the canvas through -- so every 9:16 Veo cameo
+  on the 4:5 sketch shipped with 140px bars baked into the file (Marc:
+  "these veo clips did not fill the full screen"). A clip is sanitized
+  without a canvas now (rotation, loudness); the video component's cover
+  fit frames it at render.

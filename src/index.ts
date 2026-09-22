@@ -436,7 +436,13 @@ const ARMED_TTL_MS = 2 * 60 * 60 * 1000;
 async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Record<string, unknown>, peek: Project, sceneIndex: number): Promise<{ status: number; body: Record<string, unknown> }> {
   const url = String(tkBody.url || "");
   let sanitized: TakeSanitizeResult | undefined;
-  try { sanitized = await sanitizeTake(resolveVideoPath(url, config.dataDir), peek.canvas, "natural"); }
+  // The clip keeps its whole picture: no reframe to the canvas (the
+  // sanitizer pillarboxes a take taller than the frame -- right for a
+  // speaker's head, wrong for a picture meant to fill; measured live,
+  // proj_09b6d0cb: 9:16 cameos on a 4:5 film with 140px bars baked in).
+  // The video component's cover fit frames it at render. Rotation and
+  // loudness are still made right.
+  try { sanitized = await sanitizeTake(resolveVideoPath(url, config.dataDir), undefined, "natural"); }
   catch (e: any) { console.warn(`  clip: sanitize skipped for ${path.basename(url)}: ${e?.message || e}`); }
   const project = await loadProject(tkTenant, tkProject);
   if (!project) return { status: 404, body: { error: "Project not found" } };
