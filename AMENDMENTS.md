@@ -6,6 +6,46 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — The LIBRARY: 251 films, and a way to find one
+
+Backlog item 00, shipped. The only way into a film was its project id; finding
+two films he had made himself took twenty minutes. The tenant now has a shelf
+in front of Studio.
+
+- `core/library.ts` — a card per film (still, name, runtime, scenes, frame,
+  state, date) and a search over three haystacks: the NAME, the INTENT (prompt,
+  narrative, treatment concept, every scene's purpose/notes/voiceover) and the
+  SCREEN (every string any component carries, minus urls, ids and data URIs).
+  Every token must land somewhere -- a search is a filter, not a suggestion --
+  and where it lands sets the rank, so the half-remembered title beats a word
+  buried in a caption. The index is in memory, per project, invalidated by that
+  project.json's mtime: a search over the tenant costs one stat per film.
+- `touched_at` is always present. 111 of the 251 real films have no
+  `updated_at` at all, so date sorting had holes in it; it falls back through
+  `created_at` to the file's mtime.
+- COPIES ARE THE NORM (ten "Quotient Analytics — what if you could just ask",
+  eight "One brief, one campaign"). Films sharing a name collapse into one card
+  led by the rendered one, with the rest carried as `copies` and expanded in
+  place. The shelf shows IDEAS.
+- `core/poster.ts` — the still, made on demand and cached beside the output: a
+  frame a third of the way into the render when there is one (frame 0 of a film
+  is usually its fade-up), otherwise the first scene photographed past its
+  entrance. Behind a gate of two, and the page only asks for posters of cards
+  actually on screen -- 251 films must not launch 251 browsers to show twelve.
+- ARCHIVE, not `rm`: `archived_at` on the project takes a film off the shelf
+  and is reversible; permanent delete only exists in the archive view, and the
+  bulk route refuses to delete a film that was never archived. The way to clean
+  up 251 films should not be the irreversible one.
+- Routes: `GET /api/library/{tenant}`, `GET /api/projects/{t}/{p}/poster`,
+  `POST .../archive`, `POST /api/library/{t}/bulk`. Page at `/library`, and
+  Studio's header carries a back arrow that returns to the EXACT view left
+  behind (search, filter and sort), via sessionStorage.
+- `test/library.test.ts` pins the search (on-screen phrase, prompt phrase, title
+  ranking, all-tokens-must-land), the grouping, the archive shelf and the date
+  fallback.
+
+---
+
 ## 2026-09-22 — The composer empties; the film should already be gone
 
 Watching the shorter Cowork film: the home scene goes blank for nearly a

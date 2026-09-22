@@ -1185,6 +1185,7 @@ ${QUOTIENT_CSS}
 <body>
 <div id="app">
   <header>
+    <a class="btn btn-secondary" id="library-btn" style="text-decoration:none;" title="All the films in this tenant">&#8592; Films</a>
     <h1>Studio</h1>
     <div class="header-controls">
       <label>Project</label>
@@ -8794,6 +8795,19 @@ ${QUOTIENT_CSS}
   function showBrandBtn() {
     var b = document.getElementById('brand-btn');
     if (b) b.style.display = '';
+    // Back to the library, on the EXACT view left behind (search, filter and
+    // all) when this Studio was opened from there.
+    var lib = document.getElementById('library-btn');
+    if (lib) {
+      var last = null;
+      try { last = sessionStorage.getItem('mp.library.last'); } catch (e) {}
+      if (last) { lib.href = last; }
+      else {
+        var ltok = new URLSearchParams(window.location.search).get('token');
+        lib.href = '/library' + (state.tenantId ? '?tenant=' + encodeURIComponent(state.tenantId) : '') +
+          (ltok ? (state.tenantId ? '&' : '?') + 'token=' + encodeURIComponent(ltok) : '');
+      }
+    }
     // The Team page shares the tenant (and the link's token, when there is one).
     var t = document.getElementById('team-btn');
     if (t && state.tenantId) {

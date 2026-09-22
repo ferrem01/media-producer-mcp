@@ -1602,7 +1602,7 @@ function resolveAssetPath(source: string, tenantId: string, projectId: string): 
 /**
  * Load component .component.html sources for all types used in the project.
  */
-async function loadComponentSources(
+export async function loadComponentSources(
   project: Project,
   componentLibDir: string,
   extraDirs?: string[],
