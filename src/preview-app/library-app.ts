@@ -214,7 +214,16 @@ export function getLibraryHtml(): string {
     picking: false, selected: Object.create(null), expanded: Object.create(null)
   };
 
-  function withToken(p) { return TOKEN ? p + (p.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(TOKEN) : p; }
+  // Append a query param to a path that may or may not already have a query.
+  // Doing this by hand is how the poster url became ".../poster&v=..." for
+  // anyone signed in by COOKIE (no token in the link): a path that does not
+  // exist, a 404, and a shelf of placeholder letters where every still should
+  // have been.
+  function withParam(p, k, v) {
+    if (v === undefined || v === null || v === '') return p;
+    return p + (p.indexOf('?') === -1 ? '?' : '&') + k + '=' + encodeURIComponent(v);
+  }
+  function withToken(p) { return withParam(p, 'token', TOKEN); }
   function api(path, opts) {
     opts = opts || {}; opts.headers = opts.headers || {};
     if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
@@ -280,8 +289,9 @@ export function getLibraryHtml(): string {
 
   function cardHtml(c) {
     var st = stateOf(c);
-    var poster = withToken('/api/projects/' + encodeURIComponent(state.tenant) + '/' + encodeURIComponent(c.project_id) + '/poster') +
-      '&v=' + encodeURIComponent(c.touched_at || '');
+    var poster = withToken(withParam(
+      '/api/projects/' + encodeURIComponent(state.tenant) + '/' + encodeURIComponent(c.project_id) + '/poster',
+      'v', c.touched_at || ''));
     var frameCls = c.frame && c.frame !== '16x9' ? ' tall' : '';
     return '<div class="card' + (state.selected[c.project_id] ? ' sel' : '') + '" data-id="' + esc(c.project_id) + '">' +
       '<div class="pick">' + (state.selected[c.project_id] ? '&#10003;' : '') + '</div>' +
