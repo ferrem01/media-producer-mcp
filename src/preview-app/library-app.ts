@@ -81,6 +81,23 @@ export function getLibraryHtml(): string {
   .chip .n { opacity: .6; font-variant-numeric: tabular-nums; }
   select.chip { padding-right: 8px; }
 
+  /* HOME has a left rail: the films, the team, the brand. It exists so the
+     Studio header can stop carrying them. */
+  .shell { display: flex; align-items: flex-start; }
+  nav.rail {
+    position: sticky; top: 0; flex: none; width: 188px; min-height: 100vh;
+    padding: 16px 10px; border-right: 1px solid var(--border); background: var(--surface);
+  }
+  .rail-brand { font-size: 15px; font-weight: 700; padding: 6px 10px 14px; letter-spacing: -0.01em; }
+  .rail a {
+    display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 10px; margin-bottom: 2px;
+    border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--text-2);
+  }
+  .rail a:hover { background: var(--surface-2); color: var(--text); }
+  .rail a.on { background: var(--surface-2); color: var(--text); font-weight: 600; }
+  .rail a .ico { width: 17px; display: inline-flex; justify-content: center; opacity: .75; }
+  .rail-foot { position: absolute; bottom: 14px; left: 10px; right: 10px; font-size: 11px; color: var(--text-3); padding: 0 10px; }
+  .work { flex: 1; min-width: 0; }
   main { max-width: 1400px; margin: 0 auto; padding: 18px 16px 120px; }
   /* start, not stretch: a 9x16 card in the row must not pull every 16x9 card
      beside it into a tall box with a white void under the title. */
@@ -164,7 +181,36 @@ export function getLibraryHtml(): string {
     transition: opacity .18s ease; z-index: 40;
   }
   .toast.on { opacity: 1; }
+  /* ── The scene carousel: the same stills Studio shows down its left side ── */
+  .nav-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
+    width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(12,12,18,.6); color: #fff; font-size: 14px; line-height: 1;
+    display: none; align-items: center; justify-content: center; padding: 0;
+  }
+  .card:hover .nav-arrow { display: flex; }
+  .nav-arrow:hover { background: rgba(12,12,18,.85); }
+  .nav-arrow.prev { left: 6px; } .nav-arrow.next { right: 6px; }
+  .scenepos {
+    position: absolute; top: 8px; right: 8px; z-index: 3; font-size: 11px; font-weight: 600;
+    padding: 2px 7px; border-radius: 5px; background: rgba(12,12,18,.72); color: #fff;
+    display: none; font-variant-numeric: tabular-nums;
+  }
+  .card:hover .scenepos, .scenepos.stuck { display: block; }
+  .thumb.loading::after {
+    content: ''; position: absolute; inset: 0; z-index: 2;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent);
+    animation: sweep 1s linear infinite;
+  }
+  @keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
   @media (max-width: 640px) {
+    .shell { display: block; }
+    nav.rail {
+      position: static; width: auto; min-height: 0; display: flex; gap: 4px; overflow-x: auto;
+      border-right: none; border-bottom: 1px solid var(--border); padding: 8px;
+    }
+    .rail-brand, .rail-foot { display: none; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
     .head-top { flex-wrap: wrap; }
     .search-wrap { max-width: none; order: 3; width: 100%; }
@@ -172,6 +218,15 @@ export function getLibraryHtml(): string {
 </style>
 </head>
 <body>
+<div class="shell">
+<nav class="rail">
+  <div class="rail-brand">Quotient Studio</div>
+  <a class="on" id="nav-films" href="#"><span class="ico">&#9635;</span> Films</a>
+  <a id="nav-team" href="#"><span class="ico">&#128101;</span> Team</a>
+  <a id="nav-brand" href="#"><span class="ico">&#127912;</span> Brand</a>
+  <div class="rail-foot" id="rail-tenant"></div>
+</nav>
+<div class="work">
 <header class="lib-head">
   <div class="head-in">
     <div class="head-top">
@@ -200,6 +255,7 @@ export function getLibraryHtml(): string {
   <button class="btn" id="pickdone">Done</button>
 </div>
 <div class="toast" id="toast"></div>
+</div></div>
 <script>
 (function () {
   var params = new URLSearchParams(location.search);
@@ -293,11 +349,16 @@ export function getLibraryHtml(): string {
       '/api/projects/' + encodeURIComponent(state.tenant) + '/' + encodeURIComponent(c.project_id) + '/poster',
       'v', c.touched_at || ''));
     var frameCls = c.frame && c.frame !== '16x9' ? ' tall' : '';
-    return '<div class="card' + (state.selected[c.project_id] ? ' sel' : '') + '" data-id="' + esc(c.project_id) + '">' +
+    var pageable = c.scene_count > 1;
+    return '<div class="card' + (state.selected[c.project_id] ? ' sel' : '') + '" data-id="' + esc(c.project_id) +
+        '" data-scenes="' + c.scene_count + '" data-pos="0">' +
       '<div class="pick">' + (state.selected[c.project_id] ? '&#10003;' : '') + '</div>' +
       '<div class="thumb' + frameCls + '">' +
         '<div class="initials">' + esc(initials(c.name)) + '</div>' +
         '<img data-src="' + esc(poster) + '" alt="">' +
+        (pageable ? '<button class="nav-arrow prev" data-step="-1" title="Previous scene">&#8249;</button>' +
+                    '<button class="nav-arrow next" data-step="1" title="Next scene">&#8250;</button>' +
+                    '<span class="scenepos">1/' + c.scene_count + '</span>' : '') +
         '<div class="badges"><span class="badge state-' + st.k + '">' + esc(st.label) + '</span></div>' +
         (c.copies && c.copies.length ? '<span class="copies" data-copies="' + esc(c.project_id) + '">+' + c.copies.length + ' ' + (c.copies.length === 1 ? 'copy' : 'copies') + '</span>' : '') +
       '</div>' +
@@ -452,7 +513,42 @@ export function getLibraryHtml(): string {
     state.selected = Object.create(null); render();
   });
 
+  // Page one card through its scenes. Position 0 is the film's cover (a frame
+  // of the render where there is one); 1..n-1 are the scenes themselves, the
+  // same stills Studio shows down its left side.
+  function pageCard(card, step) {
+    var n = Number(card.getAttribute('data-scenes')) || 1;
+    var pos = Number(card.getAttribute('data-pos')) || 0;
+    var next = (pos + step + n) % n;
+    card.setAttribute('data-pos', String(next));
+    var id = card.getAttribute('data-id');
+    var thumb = card.querySelector('.thumb');
+    var img = card.querySelector('.thumb img');
+    var label = card.querySelector('.scenepos');
+    if (label) { label.textContent = (next + 1) + '/' + n; label.classList.add('stuck'); }
+    var base = '/api/projects/' + encodeURIComponent(state.tenant) + '/' + encodeURIComponent(id) + '/poster';
+    var src = withToken(next === 0 ? base : withParam(base, 'scene', next));
+    if (!img) {
+      // The first still errored (a film with nothing to photograph); give the
+      // card an image back so paging still works.
+      img = document.createElement('img');
+      thumb.insertBefore(img, thumb.firstChild.nextSibling);
+    }
+    thumb.classList.add('loading');
+    img.classList.remove('in');
+    var done = function () { thumb.classList.remove('loading'); };
+    img.onload = function () { img.classList.add('in'); done(); };
+    img.onerror = function () { done(); };
+    img.src = src;
+  }
+
   document.getElementById('grid').addEventListener('click', function (e) {
+    var arrow = e.target.closest('.nav-arrow');
+    if (arrow) {
+      e.stopPropagation();
+      pageCard(arrow.closest('.card'), Number(arrow.getAttribute('data-step')));
+      return;
+    }
     var copies = e.target.closest('[data-copies]');
     if (copies) {
       e.stopPropagation();
@@ -488,11 +584,21 @@ export function getLibraryHtml(): string {
     }).catch(function (err) { toast(err.message); });
   });
 
+  function wireRail() {
+    var q = state.tenant ? '?tenant=' + encodeURIComponent(state.tenant) : '';
+    document.getElementById('nav-team').href = withToken('/team' + q);
+    // The brand kit lives in Studio's panel; home is where you go to it from.
+    document.getElementById('nav-brand').href = withToken('/studio' + q + (q ? '&' : '?') + 'panel=brand');
+    document.getElementById('nav-films').href = withToken('/library' + q);
+    var foot = document.getElementById('rail-tenant');
+    if (foot) foot.textContent = state.tenant;
+  }
+
   // Tenant: from the link, or from who is signed in.
-  if (state.tenant) { load(); }
+  if (state.tenant) { wireRail(); load(); }
   else {
     fetch('/auth/me').then(function (r) { if (!r.ok) throw new Error('signed out'); return r.json(); })
-      .then(function (me) { state.tenant = me.tenant_id; load(); })
+      .then(function (me) { state.tenant = me.tenant_id; wireRail(); load(); })
       .catch(function () {
         location.href = '/auth/google/login?return_to=' + encodeURIComponent(location.pathname + location.search);
       });

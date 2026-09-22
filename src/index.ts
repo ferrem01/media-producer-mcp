@@ -1488,7 +1488,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       const libPosterMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/poster$/);
       if (libPosterMatch && method === "GET") {
         const [, pTenant, pProject] = libPosterMatch.map(decodeURIComponent);
-        const poster = await ensureProjectPoster(pTenant, pProject);
+        const sceneQ = new URL(url, "http://x").searchParams.get("scene");
+        const sceneIdx = sceneQ != null && /^\d+$/.test(sceneQ) ? Number(sceneQ) : undefined;
+        const poster = await ensureProjectPoster(pTenant, pProject, sceneIdx);
         if (!poster) { res.writeHead(204); res.end(); return; }
         try {
           const buf = await fs.readFile(poster);

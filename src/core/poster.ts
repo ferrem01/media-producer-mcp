@@ -61,8 +61,8 @@ async function fromRender(project: Project, mp4: string, out: string): Promise<b
   return false;
 }
 
-async function fromFirstScene(project: Project, out: string): Promise<boolean> {
-  const scene = (project.scenes || [])[0];
+async function fromScene(project: Project, out: string, index: number): Promise<boolean> {
+  const scene = (project.scenes || [])[index];
   if (!scene || !(scene.components || []).length) return false;
   const canvas = (project.canvas || { width: 1920, height: 1080 }) as any;
   const dir = await fs.mkdtemp(path.join(path.dirname(out), ".poster-"));
@@ -106,14 +106,25 @@ async function fromFirstScene(project: Project, out: string): Promise<boolean> {
  * The poster for a film, made if it does not exist yet. Returns the file path,
  * or null when the film has nothing to photograph.
  */
-export async function ensureProjectPoster(tenantId: string, projectId: string): Promise<string | null> {
-  const key = `${tenantId}/${projectId}`;
+/**
+ * The poster for a film, or for ONE SCENE of it.
+ *
+ * The scene stills are the same pictures Studio shows down its left side, and
+ * a card that can page through them says what a film IS in a way one frame
+ * cannot. They are captured per scene, on demand, and cached beside the film.
+ */
+export async function ensureProjectPoster(
+  tenantId: string,
+  projectId: string,
+  sceneIndex?: number,
+): Promise<string | null> {
+  const key = `${tenantId}/${projectId}/${sceneIndex ?? "cover"}`;
   const running = inFlight.get(key);
   if (running) return running;
 
   const job = (async () => {
     const outDir = projectOutputDir(tenantId, projectId);
-    const out = path.join(outDir, "poster.jpg");
+    const out = path.join(outDir, sceneIndex == null ? "poster.jpg" : `poster_s${sceneIndex}.jpg`);
     const projectMtime = await mtimeOf(projectJsonPath(tenantId, projectId));
     if (projectMtime === 0) return null;
     const posterMtime = await mtimeOf(out);
@@ -123,12 +134,17 @@ export async function ensureProjectPoster(tenantId: string, projectId: string): 
     if (!project) return null;
     await fs.mkdir(outDir, { recursive: true });
 
-    const mp4 = path.join(outDir, "output.mp4");
-    if ((await mtimeOf(mp4)) > 0 && await gate(() => fromRender(project, mp4, out))) return out;
+    // The COVER may come from the render (the film as it actually plays); a
+    // named scene is always photographed, so paging is the same pictures
+    // Studio shows and not a guess at where that scene sits in the mp4.
+    if (sceneIndex == null) {
+      const mp4 = path.join(outDir, "output.mp4");
+      if ((await mtimeOf(mp4)) > 0 && await gate(() => fromRender(project, mp4, out))) return out;
+    }
     try {
-      if (await gate(() => fromFirstScene(project, out))) return out;
+      if (await gate(() => fromScene(project, out, sceneIndex ?? 0))) return out;
     } catch (e: any) {
-      console.warn(`poster: ${projectId} first-scene capture failed (${e?.message})`);
+      console.warn(`poster: ${projectId} scene ${sceneIndex ?? 0} capture failed (${e?.message})`);
     }
     return null;
   })().finally(() => { inFlight.delete(key); });
