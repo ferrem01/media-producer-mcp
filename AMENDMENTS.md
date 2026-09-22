@@ -4853,3 +4853,13 @@ same row can start in one scene and finish in another.
   ever occupy is built up front, one per (task, status) the script visits,
   and the timeline only opens one and closes another. Counts and the
   Completed n/N follow each move.
+- ...and a section's height is never animated. Tweening it to `auto`
+  measures the section while its FIRST row is still opening and then locks
+  that value, so the rows that land after it sit inside a box too short for
+  them. It only shows when the film PLAYS: a seek re-measures at the
+  moment it renders, so every rendered frame looked right while Studio's
+  preview cut the list off mid-row (Marc, on scenes 7 and 11: "you're kind
+  of cutting off the bottom there"). A section is now simply in the
+  layout or not (`is-empty`), and only the rows animate their height.
+  Worth keeping as a rule: a component checked by seeking alone is not
+  checked -- play it.
