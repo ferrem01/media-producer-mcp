@@ -27,7 +27,7 @@ describe("the music choice: the film's bed is a need, chosen in the board", () =
     expect(prep).toMatch(/chosenMusic\?: MusicTrack \| null;/);
     expect(prep).toMatch(/if \(ctx\.chosenMusic\) \{\s*music = ctx\.chosenMusic;/);
     const pipeline = await read("src/llm/pipeline.ts");
-    expect(pipeline).toMatch(/if \(choice\?\.source === "none"\) \{ chosenMusic = null; opts\.backgroundMusic = false;/);
+    expect(pipeline).toMatch(/if \(choice\?\.source === "none" \|\| boardMood === "none"\) \{ chosenMusic = null; opts\.backgroundMusic = false;/);
     expect(pipeline).toMatch(/chosenMusic = await resolveMusicChoice\(choice, /);
     expect(pipeline).toMatch(/chosenMusic: opts\.chosenMusic \|\| undefined,/);
     const server = await read("src/server.ts");

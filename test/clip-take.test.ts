@@ -234,4 +234,23 @@ describe("the clip need", () => {
     expect(comp).toMatch(/typeof createCursor === 'function'/);
     expect(comp).toMatch(/var fit = Math\.min\(2\.2, \(boxW \* 0\.9\) \/ 1200, \(boxH \* 0\.94\) \/ 760\);/);
   });
+
+  it("the board's own no survives a rebuild: a scene's transition_in (including 'none', a hard cut) rides from the board through the builder, the update tool writes it there, and music_mood 'none' on the board keeps the bed out", async () => {
+    const { boardTransition } = await import("../src/llm/scene-generator.js");
+    expect(boardTransition({})).toBeUndefined();
+    expect(boardTransition({ transition_in: null })).toBeUndefined();
+    expect(boardTransition({ transition_in: { type: "none" } })).toEqual({ type: "none", duration_seconds: 0 });
+    expect(boardTransition({ transition_in: { type: "crossfade" } })).toEqual({ type: "crossfade", duration_seconds: 0.5 });
+    expect(boardTransition({ transition_in: { type: "glass-turn", duration_seconds: 0.8 } })).toEqual({ type: "glass-turn", duration_seconds: 0.8 });
+    const gen = await read("src/llm/scene-generator.ts");
+    expect(gen.match(/= boardTransition\(draft\);/g)?.length).toBe(2);
+    expect(gen).not.toMatch(/draft\.transition_in\.type !== "none"/);
+    const srv = await read("src/server.ts");
+    expect(srv).toMatch(/transition_in: transitionSchema\.describe\("The cut INTO this scene/);
+    expect(srv).toMatch(/if \(sceneUpdate\.transition_in !== undefined\) existing\.transition_in = sceneUpdate\.transition_in as any;/);
+    const types = await read("src/core/types.ts");
+    expect(types).toMatch(/export interface StoryboardScene \{\n\s*\/\*\* Scene label \*\/\n\s*label: string;\n\s*\/\*\* The cut into this scene[^\n]*\n\s*transition_in\?: SceneTransition;/);
+    const pipe = await read("src/llm/pipeline.ts");
+    expect(pipe).toMatch(/if \(choice\?\.source === "none" \|\| boardMood === "none"\) \{ chosenMusic = null; opts\.backgroundMusic = false;/);
+  });
 });

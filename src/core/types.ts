@@ -549,6 +549,8 @@ export interface StoryboardComponent {
 export interface StoryboardScene {
   /** Scene label */
   label: string;
+  /** The cut into this scene, as the board wrote it ("none" = a hard cut). */
+  transition_in?: SceneTransition;
   /** What this scene communicates */
   purpose: string;
   /** DEAD legacy slot (once an "O1"/"C1"/"D1" id). storyboardToSaved has

@@ -4697,3 +4697,14 @@ per-track `duration` (the cut, and the ducking window without a probe).
 The mix runs when clips alone exist, with no project tracks. Verified on
 the mixer directly: the CMO's line at 4.1 s with the clip placed at 1 s,
 gone when the cut lands before it.
+- The board's own no survives a rebuild. Two edits made on the built film
+  vanished on the next build (measured live, proj_09b6d0cb): the music
+  bed removed and the board's mood set to none came back as the
+  treatment's driving track, and the hard cut into the marketer's line
+  went back to the render's default white dissolve. The pipeline now
+  reads `storyboard.audio.music_mood === "none"` as the same no as the
+  music choice; a scene's `transition_in` lives on the board
+  (`StoryboardScene`, the update tool's scene edit) and rides through the
+  builder INCLUDING "none" (`boardTransition`), which the two builder
+  paths used to drop as "no transition" -- and the render then inserted
+  its crossfade.

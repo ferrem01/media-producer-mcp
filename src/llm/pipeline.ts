@@ -341,7 +341,12 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
       const existing = await loadProject(opts.tenant_id, opts.project_id);
       if (!pipelineHasNarration) pipelineHasNarration = !!(existing?.speaker_track?.clips?.length);
       const choice = existing?.music;
-      if (choice?.source === "none") { chosenMusic = null; opts.backgroundMusic = false; console.log("  Music: the board says no bed"); }
+      // The board's own "none" (storyboard.audio.music_mood, the update tool)
+      // is the same no: a rebuild must not bring the bed back (measured live,
+      // proj_09b6d0cb: the bed removed and the mood set to none, the next
+      // build shipped the driving track again from the treatment's mood).
+      const boardMood = (existing?.storyboard as any)?.audio?.music_mood;
+      if (choice?.source === "none" || boardMood === "none") { chosenMusic = null; opts.backgroundMusic = false; console.log("  Music: the board says no bed"); }
       else if (choice && choice.source !== "auto") {
         const { resolveMusicChoice } = await import("../audio/music.js");
         chosenMusic = await resolveMusicChoice(choice, path.join(projectDir(opts.tenant_id, opts.project_id), "assets")).catch((e: any) => { console.warn(`  Music: the chosen bed could not be read (${e?.message || e}); picking by mood`); return undefined; });
