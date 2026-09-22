@@ -77,12 +77,25 @@ async function fromFirstScene(project: Project, out: string): Promise<boolean> {
     await fs.writeFile(htmlPath, html);
     // Past the entrance, before the exit: the frame the scene is ABOUT.
     const dur = Number(scene.duration_seconds) || 3;
+    // The scene has to be photographed at its real size or the layout is not
+    // the layout; the POSTER is then scaled down to card size. Shipping the
+    // full frame meant a shelf of 251 films handing the browser 251 full-HD
+    // jpegs (28 KB each against 6 KB).
+    const full = path.join(dir, "full.jpg");
     await captureSingleFrame({
-      htmlPath, outputPath: out,
+      htmlPath, outputPath: full,
       width: canvas.width, height: canvas.height,
-      format: "jpeg", quality: 72,
+      format: "jpeg", quality: 82,
       atTime: Math.min(dur * 0.6, Math.max(0.5, dur * 0.35)),
     });
+    if ((await mtimeOf(full)) === 0) return false;
+    try {
+      await execFileAsync("ffmpeg", [
+        "-y", "-i", full, "-vf", `scale=${POSTER_W}:-2`, "-q:v", "4", out,
+      ], { timeout: 20_000 });
+    } catch {
+      await fs.copyFile(full, out);   // no ffmpeg: a big poster beats none
+    }
     return (await mtimeOf(out)) > 0;
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
