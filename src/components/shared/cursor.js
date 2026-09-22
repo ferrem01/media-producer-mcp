@@ -126,6 +126,31 @@ function showCursor(tl, cursor, at) {
  * @param {string} name     Target name to resolve.
  * @returns {{x: string|number, y: string|number}|null}
  */
+/**
+ * THE CURSOR AIMS AT THE THING, not at a guess. A mock marks what can be
+ * clicked with data-cursor-target="name"; this returns that element's
+ * centre in pixels relative to the component box, which is what
+ * moveCursor wants. Percentage targets drift the moment the layout does
+ * (measured: every mock aimed its clicks with hardcoded percentages).
+ */
+function elementTarget(container, name) {
+  if (!container || !name) return null;
+  var sel = '[data-cursor-target="' + String(name).replace(/"/g, '') + '"]';
+  var nodes = container.querySelectorAll(sel);
+  if (!nodes || !nodes.length) return null;
+  var c = container.getBoundingClientRect();
+  // Last match wins: in a scrolling log the MOST RECENT thing wearing that
+  // name is the one a film means. A node with no box (hidden until its
+  // reveal) is not a place the cursor can go -- the component can publish a
+  // resolver for those in cursor_targets instead.
+  for (var i = nodes.length - 1; i >= 0; i--) {
+    var r = nodes[i].getBoundingClientRect();
+    if (!r.width && !r.height) continue;
+    return { x: (r.left - c.left) + r.width / 2, y: (r.top - c.top) + r.height / 2 };
+  }
+  return null;
+}
+
 function resolveTarget(targets, name) {
   if (!targets || !name) return null;
   if (targets[name]) return targets[name];

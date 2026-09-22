@@ -6,6 +6,42 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — A click lands ON the thing: the cursor aims at marked elements
+
+A film that shows a pointer clicking "Created campaign" or the Tasks tab is
+making a claim the viewer checks in one frame. Every mock aimed its clicks with
+hardcoded percentages, which drift the moment the layout does.
+
+- `shared/cursor.js` — `elementTarget(container, name)` returns the centre of
+  `[data-cursor-target="name"]` in component pixels. The LAST match with a box
+  wins: in a scrolling log the most recent thing wearing that name is the one a
+  film means, and a node with no box is not a place the cursor can go.
+- `shared/script-runner.js` — `move-cursor`/`click`/`double-click`/`hover`
+  prefer the marked element over the mock's fallback percentages, and a target
+  may now be a RESOLVER: a function called with the timeline position of the
+  action asking. Only the component knows where a block that is hidden until
+  its reveal will be.
+- Marked up: all six `quotient-campaign` tabs, `quotient-social`'s Schedule
+  button and its Publish Now row, `quotient-blog`'s Publish CTA, and every
+  `quotient-chat` verb line (by entity: "campaign", "blog", "task" ...), which
+  makes the conversation the LINK to the page it opens.
+- `quotient-chat` publishes a resolver per entity: its blocks are built,
+  measured and hidden until their reveal, so the resolver holds each line's
+  place in the scroll content and subtracts the scroll the log will be at by
+  the moment of the click; off-screen means there is nothing to click.
+- `test/cursor-aim.test.ts` — five clicks across the four mocks, each asserted
+  to land with the arrow's POINT inside the target and the cursor visible. A
+  cursor that never moved is invisible, which is the silent failure mode this
+  pins (the chat missed by 118px before the resolver).
+- Applied to proj_2ba9de13 ("Every Call Is Content shorter v2"): scene 7 clicks
+  the campaign line before the cut, scene 8 clicks Tasks before the tasks go in
+  progress, scenes 11 and 13 click Schedule/Publish Now and Publish — one
+  clicking language across the film, per Marc: everything that can be done in
+  the UI can be done by the agent and vice versa, so there is no rule dividing
+  the cursor from the highlight.
+
+---
+
 ## 2026-09-17 — Tall-frame framing for every desktop surface, not only cutaways
 
 The Cursor-style smoke film (proj_91b654b5, canvas-tour on 9x16): the
