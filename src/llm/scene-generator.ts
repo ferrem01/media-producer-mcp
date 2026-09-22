@@ -1056,6 +1056,16 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
   return slots;
 }
 
+/** The scene's transition as the board wrote it: a named transition with
+ *  its length, or "none" (a hard cut, kept explicit so the render's default
+ *  crossfade stays out), or nothing (the render decides). */
+export function boardTransition(draft: { transition_in?: { type?: string; duration_seconds?: number } | null }): SceneTransition | undefined {
+  var t = draft.transition_in;
+  if (!t || !t.type) return undefined;
+  if (t.type === "none") return { type: "none", duration_seconds: 0 } as SceneTransition;
+  return { type: t.type as SceneTransition["type"], duration_seconds: t.duration_seconds || 0.5 };
+}
+
 export function buildAuthoredCompositionScene(
   sceneId: string,
   draft: DraftScene,
@@ -1356,13 +1366,12 @@ export function buildAuthoredCompositionScene(
       ...(normalizeAnim((c as any).exit) ? { exit: normalizeAnim((c as any).exit)! } : {}),
     });
   });
-  var acTransition: SceneTransition | undefined;
-  if (draft.transition_in && draft.transition_in.type !== "none") {
-    acTransition = {
-      type: draft.transition_in.type as SceneTransition["type"],
-      duration_seconds: draft.transition_in.duration_seconds || 0.5,
-    };
-  }
+  // The board's transition rides through -- INCLUDING "none": a hard cut
+  // the board asks for must reach the render, which otherwise inserts its
+  // default crossfade (measured live, proj_09b6d0cb: the cut into the
+  // marketer's line set tight on the built scene, back to a white
+  // dissolve on the next build).
+  var acTransition: SceneTransition | undefined = boardTransition(draft);
   // The camera: the storyboard's own moves, else creator-cut's rule.
   var cameraMoves: any[] | undefined = (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined;
   // A list of nothing but resets is a camera that never moved (measured
@@ -1546,13 +1555,7 @@ async function generateCodegenScene(
   var customSources = new Map<string, string>();
   customSources.set(compName, sceneHtml);
 
-  var transition: SceneTransition | undefined;
-  if (draft.transition_in && draft.transition_in.type !== "none") {
-    transition = {
-      type: draft.transition_in.type as SceneTransition["type"],
-      duration_seconds: draft.transition_in.duration_seconds || 0.5,
-    };
-  }
+  var transition: SceneTransition | undefined = boardTransition(draft);
 
   var scene: Scene = {
     id: sceneId,
