@@ -83,5 +83,8 @@ describe("duplicating a project", () => {
     expect(srv).toMatch(/if \(params\.copy_of\) \{\n\s*const copy = await duplicateProject\(params\.tenant_id!, params\.copy_of, \{/);
     const idx = await read("src/index.ts");
     expect(idx).toMatch(/\/api\\\/projects\\\/\(\[\^\/\]\+\)\\\/\(\[\^\/\]\+\)\\\/duplicate\$\//);
+    // A copy takes its format from the original, so `format` is only required when starting empty.
+    expect(srv).toMatch(/"thumbnail"\]\)\.optional\(\)/);
+    expect(srv).toMatch(/if \(!params\.format\) return err\("format is required \(omit it only when copy_of duplicates an existing project\)"\);/);
   });
 });
