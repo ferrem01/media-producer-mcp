@@ -930,7 +930,8 @@
           var y = pick.boxY - scrollAt(t) + pick.boxH / 2;
           // Off-screen in the log means there is nothing to click.
           if (y < msgsOff.y || y > msgsOff.y + viewH) return null;
-          return { x: pick.boxX + Math.min(pick.boxW, 520) / 2, y: y };
+          var w = Math.min(pick.boxW, 520);
+          return { x: pick.boxX + w / 2, y: y, w: w, h: pick.boxH };
         };
       });
 

@@ -6,6 +6,33 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-22 — A click you can see: the ring, the tap tint, and the cut that follows
+
+Watching the film back: "the mouse comes in, it gets to the right area, and
+there's no click." The press was a 15% scale dip over two frames -- a gesture
+the pointer makes to itself.
+
+- `shared/cursor.js` — `clickCursor` now fires a RING from the arrow's point
+  (0.25 -> 1.55 over 0.42s, fading out), and `clickFlash` lays a tap tint over
+  the clicked element's own box for a quarter second. The tint is drawn OVER
+  the mock, never into its styles, so a component's own press states keep
+  working. `elementTarget` returns the box (w/h) so the tint knows its size,
+  and the chat's resolver does the same for a line.
+- Both carry `max-width:none`: the assembler's `.mp-component * { max-width:
+  100% }` safety rule squeezed the 44px ring to the 24px cursor box and it
+  rendered as an ellipse. Measured, not guessed -- the test now pins the ring's
+  aspect at 1.
+- `script-runner.js` — `click`/`double-click` fire the tint by default;
+  `flash: false` on the action opts out.
+- proj_2ba9de13: the campaign click in scene 6 lands at 9.15s and scene 7 now
+  cuts in (`transition_in: none`) instead of dissolving. The click OPENS the
+  campaign; a half-second crossfade smears the cause into the effect.
+- Gotcha recorded: a probe that appends actions to a board it re-fetched AFTER
+  writing gets two of everything. The doubled click is what made the first
+  trace read non-monotonically.
+
+---
+
 ## 2026-09-22 — A click lands ON the thing: the cursor aims at marked elements
 
 A film that shows a pointer clicking "Created campaign" or the Tasks tab is
