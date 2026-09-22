@@ -179,7 +179,7 @@ export function getLibraryHtml(): string {
       <span class="lib-count" id="count"></span>
       <div class="search-wrap">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
-        <input id="q" type="search" autocomplete="off" placeholder="Search a title, a prompt, or words on screen…">
+        <input id="q" type="text" autocomplete="off" placeholder="Search a title, a prompt, or words on screen…">
         <button class="q-clear" id="qclear" title="Clear">&times;</button>
       </div>
       <span class="grow"></span>
