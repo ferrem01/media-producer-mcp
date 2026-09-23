@@ -733,6 +733,14 @@ select.field-input { cursor: pointer; }
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(body);
     }
+    // Carry the sign-in. This page relied entirely on the session cookie, so a
+    // token link into it (the kind home hands out, and every share link) got a
+    // 401 on the catalog and "Failed to load" on My Components.
+    var pgTok = new URLSearchParams(window.location.search).get('token');
+    if (pgTok) {
+      opts.headers['Authorization'] = 'Bearer ' + pgTok;
+      path += (path.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(pgTok);
+    }
     return fetch(path, opts).then(function(r) {
       if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || r.statusText); });
       var ct = r.headers.get('content-type') || '';
