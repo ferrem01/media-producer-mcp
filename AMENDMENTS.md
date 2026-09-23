@@ -39,6 +39,11 @@ component list.
 "What about the component playground? would be nice to have it linked into the
 home page somehow."
 
+- The rail's icons are QUOTIENT'S OWN FAMILY: Lucide, 24-viewBox strokes, drawn
+  the way the app shell draws them (`fill:none; stroke:currentColor;
+  stroke-width:1.7; round caps` -- quotient-app-shell.component.html:170).
+  `users` is lifted verbatim from that nav so Team looks the same in both
+  places. They were emoji before.
 - The rail gets a second group, under a rule: **Workshop -> Components**.
   CORRECTED same day: the link first went out WITHOUT the tenant, on the
   reasoning that the component library is global. The house library is; whose

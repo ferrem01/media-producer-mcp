@@ -61,7 +61,14 @@ export const RAIL_CSS = `
   }
   .rail a.rail-item:hover { background: var(--surface-2); color: var(--text); }
   .rail a.rail-item.on { background: var(--surface-2); color: var(--text); font-weight: 600; }
-  .rail a.rail-item .ico { width: 17px; display: inline-flex; justify-content: center; opacity: .75; }
+  /* Quotient's own icon family (Lucide, 24-viewBox strokes) drawn the way the
+     app shell draws it -- see quotient-app-shell.component.html:170. */
+  .rail a.rail-item .ico { width: 17px; height: 17px; display: inline-flex; flex: none; opacity: .75; }
+  .rail a.rail-item.on .ico { opacity: 1; }
+  .rail a.rail-item .ico svg {
+    width: 17px; height: 17px;
+    fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  }
   .rail-spacer { flex: 1; }
   /* The workshop is not tenant data -- the component library is one library
      for every film in the building -- so it sits under a rule of its own. */
@@ -94,16 +101,26 @@ export const RAIL_CSS = `
 
 export type RailPage = "films" | "team" | "brand" | "components";
 
+/** The rail's icons, in Quotient's family: Lucide, 24-viewBox, stroked. `users`
+ *  is lifted verbatim from the app shell's own nav so Team looks the same in
+ *  both places. */
+const ICONS: Record<RailPage, string> = {
+  films: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg>',
+  team: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
+  brand: '<svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.83-.44-1.12-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 011.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.96 6.01 17.46 2 12 2z"/><circle cx="6.5" cy="12.5" r=".6"/><circle cx="8.5" cy="7.5" r=".6"/><circle cx="13.5" cy="6.5" r=".6"/><circle cx="17.5" cy="10.5" r=".6"/></svg>',
+  components: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>',
+};
+
 export function railHtml(active: RailPage): string {
-  const item = (id: RailPage, icon: string, label: string) =>
-    `<a class="rail-item${id === active ? " on" : ""}" id="nav-${id}" href="#"><span class="ico">${icon}</span> ${label}</a>`;
+  const item = (id: RailPage, label: string) =>
+    `<a class="rail-item${id === active ? " on" : ""}" id="nav-${id}" href="#"><span class="ico">${ICONS[id]}</span> ${label}</a>`;
   return `<nav class="rail">
   <div class="rail-brand">Quotient Studio</div>
-  ${item("films", "&#9635;", "Films")}
-  ${item("team", "&#128101;", "Team")}
-  ${item("brand", "&#127912;", "Brand")}
+  ${item("films", "Films")}
+  ${item("team", "Team")}
+  ${item("brand", "Brand")}
   <div class="rail-group">Workshop</div>
-  ${item("components", "&#9783;", "Components")}
+  ${item("components", "Components")}
   <div class="rail-spacer"></div>
   <div class="rail-me" id="rail-me" style="display:none"></div>
   <a class="rail-out" id="rail-out" href="/auth/logout" style="display:none">Sign out</a>
