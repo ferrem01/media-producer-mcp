@@ -1104,7 +1104,9 @@ ${QUOTIENT_CSS}
      separate boxes, so the seams are invisible until you watch it. Same
      store (each scene's voiceover_text), read as a document. */
   .sv-wrap { max-width: 760px; margin: 0 auto; padding: 22px 24px 120px; }
-  .sv-head { margin-bottom: 18px; }
+  .sv-wrap { position: relative; }
+  .sv-head { margin-bottom: 18px; padding-right: 150px; }
+  .sv-wrap > .dv-modes { position: absolute; top: 22px; right: 24px; }
   .sv-title { font: 600 18px/24px var(--font-sans); letter-spacing: -0.01em; }
   .sv-sub { font-size: 13px; color: var(--content-secondary); margin-top: 4px; }
   .sv-sub b { color: var(--content-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -4622,7 +4624,7 @@ ${QUOTIENT_CSS}
   }
 
   function draftModesHtml() {
-    return ' <span class="dv-modes">' +
+    return '<span class="dv-modes">' +
       '<button class="dv-mode' + (draftMode === 'board' ? ' on' : '') + '" data-mode="board">Board</button>' +
       '<button class="dv-mode' + (draftMode === 'script' ? ' on' : '') + '" data-mode="script" ' +
         'title="The whole talk track as one document">Script</button></span>';
@@ -4689,9 +4691,9 @@ ${QUOTIENT_CSS}
       spokenSecs += speechSeconds(s.voiceover_text);
     });
     var h = '<div class="sv-wrap"><div class="sv-head">' +
-      '<div class="sv-title">' + escHtml(project.name || project.project_id) + draftModesHtml() + '</div>' +
+      '<div class="sv-title">' + escHtml(project.name || project.project_id) + '</div>' +
       '<div class="sv-sub"><b>' + scenes.length + '</b> scenes \u00b7 the film runs <b>' + clockOf(filmSecs) +
-        '</b> \u00b7 <b>' + clockOf(spokenSecs) + '</b> of speech</div></div>';
+        '</b> \u00b7 <b>' + clockOf(spokenSecs) + '</b> of speech</div></div>' + draftModesHtml();
     if (!filmHasVoice(project, scenes)) {
       h += '<div class="sv-note">This film\u2019s argument is carried on screen, not by a voice \u2014 ' +
         'its grammar has no continuous talk track. You can still write lines here; they become the narration if you add one.</div>';
@@ -4817,10 +4819,10 @@ ${QUOTIENT_CSS}
     var total = 0;
     scenes.forEach(function(x) { total += Number(x.duration_seconds) || 0; });
     var h = '<div class="dv-head"><div>' +
-      '<div class="dv-title">' + escHtml(project.name || project.project_id) + draftModesHtml() + '</div>' +
+      '<div class="dv-title">' + escHtml(project.name || project.project_id) + '</div>' +
       '<div class="dv-sub">Storyboard draft — ' + scenes.length + ' scenes · ~' + Math.round(total) + 's · nothing built yet · iterate here, then build once</div>' +
       (sb.narrative ? '<div class="dv-narr">' + escHtml(sb.narrative) + '</div>' : '') +
-      '</div></div>';
+      '</div>' + draftModesHtml() + '</div>';
     if (!s) { dv.innerHTML = h + '<div class="dv-card">No scenes in this storyboard.</div>'; return; }
     h += '<div class="dv-card">';
     h += draftIsAuthored(s)
