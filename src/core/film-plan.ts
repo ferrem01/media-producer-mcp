@@ -16,10 +16,11 @@
 import type { Project, StoryboardScene } from "./types.js";
 import { personCarries } from "./take-needs.js";
 
-export type ShotKind = "speaker" | "split" | "screen" | "footage" | "image" | "graphic";
+export type ShotKind = "speaker" | "cutaway" | "split" | "screen" | "footage" | "image" | "graphic";
 
 export const SHOT_LABEL: Record<ShotKind, string> = {
   speaker: "Speaker",
+  cutaway: "Speaker + cutaway",
   split: "Split",
   screen: "Screen",
   footage: "Footage",
@@ -46,7 +47,15 @@ export function shotKind(scene: StoryboardScene, grammar?: unknown): ShotKind {
   const personOn = (personCarries(grammar) && s.transparent_background !== false) || hasSpeakerComponent(scene);
   if (personOn) {
     if (assets.some((a) => a?.use === "split")) return "split";
-    return "speaker";
+    // A proof that CUTS IN on a word (SPEC-creator-cut.md) takes the frame
+    // for part of the beat: the person, then the screen, then the person.
+    // Reading that as plain "Speaker" hid a one-second flash of Claude in a
+    // beat the brief wanted full-screen (measured live, proj_4dfaa63e).
+    const cutIn = (scene.components || []).some((c: any) => {
+      const e = c && typeof c === "object" ? c.enter : null;
+      return !!e && typeof e === "object" && e.effect === "cut";
+    }) || assets.some((a) => a?.use === "cutaway" || (a?.type && a.type !== "camera_video" && !a?.use && a?.at));
+    return cutIn ? "cutaway" : "speaker";
   }
   if (assets.some((a) => a?.type === "camera_video" && a?.use === "clip")) return "speaker";
   const types = compTypes(scene);

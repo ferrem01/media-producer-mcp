@@ -48,6 +48,9 @@ describe("the plan (core/film-plan.ts)", () => {
     expect(shotKind({ components: [{ type: "quotient-email" }] } as any, "tempo-cut")).toBe("screen");
     expect(shotKind({ broll_query: "an office" } as any, "launch-film")).toBe("footage");
     expect(shotKind({ hero_image: "a bridge" } as any, "editorial")).toBe("image");
+    // A proof that cuts in on a word is a cutaway inside a speaker beat.
+    expect(shotKind({ components: [{ type: "claude-desktop", enter: { effect: "cut", at: 0.6 } }] } as any, "creator-cut")).toBe("cutaway");
+    expect(shotKind({ assets: [{ type: "screenshot", use: "cutaway", description: "x" }] } as any, "creator-cut")).toBe("cutaway");
     // A speaker component on any grammar is the person.
     expect(shotKind({ components: [{ type: "video", data: { src: "speaker" } }] } as any, "hype-cut")).toBe("speaker");
   });
@@ -144,9 +147,9 @@ describe("the plan view in Studio", () => {
       const errors: string[] = [];
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(`http://127.0.0.1:${port}/studio?tenant=t1&project=p1`);
-      await page.waitForSelector('.dv-mode[data-mode="plan"]', { timeout: 15000 });
-      await page.click('.dv-mode[data-mode="plan"]');
-      await page.waitForSelector(".pv-row");
+      // A board opens on its plan.
+      await page.waitForSelector(".pv-row", { timeout: 15000 });
+      expect(await page.getAttribute(".dv-mode.on", "data-mode")).toBe("plan");
 
       // Every scene, four columns.
       expect(await page.$$eval(".pv-row", (r) => r.length)).toBe(3);
@@ -187,6 +190,10 @@ describe("the plan view in Studio", () => {
       expect(orders[0]).toEqual([2, 0, 1]);
       await page.waitForFunction(() => document.querySelector('.pv-beat[data-i="0"]')?.textContent === "Handled");
       expect(await page.$$eval(".pv-beat", (b) => b.map((x) => x.textContent))).toEqual(["Handled", "Hook", "Start anywhere"]);
+      // # opens that scene on the board; Plan is one click back.
+      await page.click('.pv-open[data-i="1"]');
+      await page.waitForSelector(".dv-card");
+      expect(await page.getAttribute(".dv-mode.on", "data-mode")).toBe("board");
       expect(errors).toEqual([]);
     } finally {
       await browser.close();

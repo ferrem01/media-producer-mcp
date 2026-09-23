@@ -139,7 +139,7 @@ const SCENE_TOOL_SCHEMA = {
       },
     },
   },
-  required: ["label", "duration_seconds", "purpose", "visual_notes"],
+  required: ["label", "duration_seconds", "purpose", "visual_notes", "shot"],
 };
 
 const TOOLS: LLMTool[] = [
