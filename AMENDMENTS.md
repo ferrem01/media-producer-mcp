@@ -6,6 +6,31 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — The audience page as a creator-cut SPLIT: refit, zoom, and the writer knows how
+
+Re-drafting the signals ad around audience-person-detail (proj_de974ad1)
+surfaced four things the component needed to be a real split:
+
+- **A plain position does not make a split.** On a tall speaker frame the
+  build re-docks every surface into bands that miss the face, so
+  `{y:0, height:50%}` rendered as a strip mid-frame. The split is a cut-in
+  screen whose data carries `use: "split"` (`enter {effect:"cut", at:0}` for
+  the whole beat): pinned to the top, sized from the face, the rig slides
+  the person under it. The storyboard writer's `enter` description now says
+  so; the Plan reads such a component as **Split**.
+- **Fit after layout.** The box is sized after the component builds; a fit
+  computed once used the fallback size (a feed focus showed the Details
+  column). capFitFocus refits on a ResizeObserver.
+- **`data.zoom`.** Even filling the band, feed titles were ~12px in a 1080
+  frame -- unreadable in a Reel. zoom closes in from the region's top-left
+  (the newest rows); 2 puts titles at ~25px.
+- **Edges clamp.** Padding around a region at the page's edge exposed the
+  speaker behind it as a dark strip; the translate now stops at the page.
+- Beat 7 on a 9x16 uses `focus: "feed"`: a landscape page contained in a
+  tall frame is a thin band; the full-height feed is the story.
+
+---
+
 ## 2026-09-23 — Quotient audience pages in the house library; the activity feed moves
 
 Marc captured three Quotient pages into his tenant (audience-person-detail,

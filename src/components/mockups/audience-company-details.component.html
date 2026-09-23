@@ -82,7 +82,7 @@
     capActivityFeed(tl, root, split.feed, { person: data.default_actor || 'Jordan Lee', today: data.today, accent: data.accent });
 
     var frame = el.querySelector('.cap-frame');
-    capFitFocus(el, frame, 2305, 1245, data.focus, {
+    capFitFocus(el, frame, 2305, 1245, data.focus, data.zoom, {
       feed: function () {
         var g = root.querySelector('h3');
         var tab = capTextEl(root, 'Activity');

@@ -118,7 +118,7 @@
     var tl = gsap.timeline();
     data = data || {};
     var frame = el.querySelector('.cap-frame');
-    capFitFocus(el, frame, 2305, 1245, null, null);
+    capFitFocus(el, frame, 2305, 1245, null, 1, null);
     if (data.entrance === 'rise') {
       gsap.set(frame, { autoAlpha: 0, y: 24 });
       tl.to(frame, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.1);

@@ -322,7 +322,24 @@ function capSplitActivityScript(data) {
  * aligned -- new activity lands at the top, so that is where the eye goes.
  * `regions` maps a name to a function returning the region's element(s).
  */
-function capFitFocus(el, frame, nativeW, nativeH, focus, regions) {
+function capFitFocus(el, frame, nativeW, nativeH, focus, zoom, regions) {
+  // The box is often sized AFTER the component builds (the scene's layout
+  // pass places it): a fit computed once, at build, used the fallback native
+  // size and showed the wrong part of the page (measured on a storyboard card:
+  // a feed focus showing the Details column). Fit now, and again whenever
+  // the box's size changes.
+  var last = '';
+  var run = function () {
+    var key = el.clientWidth + 'x' + el.clientHeight;
+    if (key === last) return;
+    last = key;
+    capFitFocusOnce(el, frame, nativeW, nativeH, focus, zoom, regions);
+  };
+  run();
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(run).observe(el);
+}
+
+function capFitFocusOnce(el, frame, nativeW, nativeH, focus, zoom, regions) {
   var pw = el.clientWidth || nativeW;
   var ph = el.clientHeight || nativeH;
   frame.style.position = 'absolute';
@@ -346,8 +363,15 @@ function capFitFocus(el, frame, nativeW, nativeH, focus, regions) {
   // the region stays LEFT aligned: titles read left to right, the times on
   // the far right are what give.
   var availH = nativeH - ry;
-  var s2 = Math.max(pw / rw, ph / availH) || 1;
+  // zoom > 1 closes in from the region's top-left corner (the newest rows,
+  // their icons and titles): a feed at phone scale needs ~2x to be read.
+  var z = Math.max(1, Number(zoom) || 1);
+  var s2 = (Math.max(pw / rw, ph / availH) || 1) * z;
   var tx = rw * s2 > pw + 1 ? -rx * s2 : (pw - rw * s2) / 2 - rx * s2;
   var ty = -ry * s2;
+  // Never past the page's own edges: padding around a region at the page's
+  // edge would expose whatever is behind the component (a dark strip).
+  if (nativeW * s2 >= pw) tx = Math.min(0, Math.max(pw - nativeW * s2, tx));
+  if (nativeH * s2 >= ph) ty = Math.min(0, Math.max(ph - nativeH * s2, ty));
   frame.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + s2 + ')';
 }

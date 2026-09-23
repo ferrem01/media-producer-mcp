@@ -47,6 +47,8 @@ export function shotKind(scene: StoryboardScene, grammar?: unknown): ShotKind {
   const personOn = (personCarries(grammar) && s.transparent_background !== false) || hasSpeakerComponent(scene);
   if (personOn) {
     if (assets.some((a) => a?.use === "split")) return "split";
+    // A library screen cast AS the split (cut in, data.use "split").
+    if ((scene.components || []).some((c: any) => c && typeof c === "object" && c.data?.use === "split")) return "split";
     // A proof that CUTS IN on a word (SPEC-creator-cut.md) takes the frame
     // for part of the beat: the person, then the screen, then the person.
     // Reading that as plain "Speaker" hid a one-second flash of Claude in a
