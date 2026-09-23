@@ -151,4 +151,17 @@ describe("home", () => {
       } finally { await page.close(); await cleanup(); }
     } finally { await browser.close(); }
   }, 90_000);
+  it("deleting the film you are in sends you home, not to an empty Studio", async () => {
+    // It used to drop ?project and reload Studio -- an empty editor with a
+    // picker, for a film that no longer exists. Home is where the next one is.
+    const studio = await fs.readFile(path.resolve(import.meta.dirname, "../src/preview-app/preview-app.ts"), "utf-8");
+    const at = studio.indexOf("Delete project");
+    expect(at).toBeGreaterThan(0);
+    const handler = studio.slice(at, at + 1400);
+    expect(handler).toMatch(/window\.location\.href = homeHref\(\);/);
+    expect(handler, "the old reload-into-empty-Studio path is gone").not.toMatch(/searchParams\.delete\('project'\)/);
+    // And the back arrow and the delete share one idea of where home is.
+    expect(studio).toMatch(/function homeHref\(\)/);
+    expect(studio).toMatch(/lib\.href = homeHref\(\);/);
+  });
 });
