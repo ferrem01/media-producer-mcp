@@ -51,6 +51,8 @@ describe("the plan (core/film-plan.ts)", () => {
     // A proof that cuts in on a word is a cutaway inside a speaker beat.
     expect(shotKind({ components: [{ type: "claude-desktop", enter: { effect: "cut", at: 0.6 } }] } as any, "creator-cut")).toBe("cutaway");
     expect(shotKind({ assets: [{ type: "screenshot", use: "cutaway", description: "x" }] } as any, "creator-cut")).toBe("cutaway");
+    // A library screen cast as the split (cut in, data.use "split").
+    expect(shotKind({ components: [{ type: "audience-person-detail", enter: { effect: "cut", at: 0 }, data: { use: "split" } }] } as any, "creator-cut")).toBe("split");
     // A speaker component on any grammar is the person.
     expect(shotKind({ components: [{ type: "video", data: { src: "speaker" } }] } as any, "hype-cut")).toBe("speaker");
   });

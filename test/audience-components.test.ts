@@ -197,3 +197,23 @@ describe("the activity feed runtime (shared/activity-feed.js)", () => {
     }
   });
 });
+
+describe("focus + zoom", () => {
+  it("zooms from the feed's top-left and never exposes what is behind the page", async () => {
+    const html = await assemble("audience-person-detail", { focus: "feed", zoom: 2, today: "2026-09-23",
+      activity: [{ at: 0.1, type: "page_view", detail: "/pricing", source: "Website" }] }, 1080, 1920, { x: "0%", y: "0%", width: "100%", height: "47%" });
+    const r = await withPage(html, 1080, 1920, async (page) => {
+      await page.evaluate(() => { (window as any).__MP_TIMELINE.time(1.2); });
+      return page.evaluate(() => {
+        const comp = document.querySelector(".mp-component")!.getBoundingClientRect();
+        const body = document.querySelector(".cap-body")!.getBoundingClientRect();
+        const title = [...document.querySelectorAll(".cap-body div")].find((d) => (d.firstChild?.nodeValue || "").includes("viewed a page"))!;
+        return { compLeft: comp.left, bodyLeft: body.left, fontPx: parseFloat(getComputedStyle(title).fontSize) * (title.getBoundingClientRect().height / (title as HTMLElement).offsetHeight) };
+      });
+    });
+    // The page's left edge is at or beyond the box's: no strip of background.
+    expect(r.bodyLeft).toBeLessThanOrEqual(r.compLeft + 0.5);
+    // Rows read on a phone: the title renders well above its 14px native size.
+    expect(r.fontPx).toBeGreaterThan(22);
+  }, 60000);
+});

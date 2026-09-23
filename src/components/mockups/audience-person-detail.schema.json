@@ -2,7 +2,7 @@
   "type": "audience-person-detail",
   "label": "Quotient Audience — Person",
   "category": "mockups",
-  "description": "Quotient's person page (a real capture, anonymized: 'Sarah Chen', sarah@northwind.co at Northwind): Overview stats (Last Activity, Total Clicks, Total Emails Opened), the Recent Activity feed grouped by day, and the Details column (Name, Email, Company, Job Title, Location, Lead Score, Lists, custom properties). THE ACTIVITY FEED IS SCRIPTABLE: data.activity (or {action:'activity'} rows in data.script) lands new events at their `at` -- each row is cloned from a real row, filled in, and inserted at the top of the day group its date belongs to (a new day gets its own header, in date order). Every event type: email_sent, email_delivered, email_opened, email_clicked, email_replied, email_bounced, unsubscribed, page_view, form_submitted, signup, meeting_booked, deal_stage_changed, crm_event, lead_score_changed, list_added, property_updated, flow_entered, product_event, custom. Signals from anywhere read as one timeline: a page view (source 'Website'), a deal stage change (detail 'Qualified -> Proposal', source 'HubSpot'), a product event (name 'First campaign sent', source 'Product'), the email Quotient sent back. data.focus 'feed' fills the box with the feed (top aligned, where new rows land) -- use it for a split's top half; 'details' the right column; default shows the whole page. Set person_name/person_email (avatar initials follow) and data.details {\"Company\": \"Acme\", \"Lead Score\": \"65\"}. The capture verbs (highlight, click, set-text, count-up, scroll) target visible text: count-up {text:'40', to:'65'} moves the lead score.",
+  "description": "Quotient's person page (a real capture, anonymized: 'Sarah Chen', sarah@northwind.co at Northwind): Overview stats (Last Activity, Total Clicks, Total Emails Opened), the Recent Activity feed grouped by day, and the Details column (Name, Email, Company, Job Title, Location, Lead Score, Lists, custom properties). THE ACTIVITY FEED IS SCRIPTABLE: data.activity (or {action:'activity'} rows in data.script) lands new events at their `at` -- each row is cloned from a real row, filled in, and inserted at the top of the day group its date belongs to (a new day gets its own header, in date order). Every event type: email_sent, email_delivered, email_opened, email_clicked, email_replied, email_bounced, unsubscribed, page_view, form_submitted, signup, meeting_booked, deal_stage_changed, crm_event, lead_score_changed, list_added, property_updated, flow_entered, product_event, custom. Signals from anywhere read as one timeline: a page view (source 'Website'), a deal stage change (detail 'Qualified -> Proposal', source 'HubSpot'), a product event (name 'First campaign sent', source 'Product'), the email Quotient sent back. data.focus 'feed' fills the box with the feed (top aligned, where new rows land) -- use it for a split's top half, with zoom ~2 so the rows read on a phone; 'details' the right column; default shows the whole page. Set person_name/person_email (avatar initials follow) and data.details {\"Company\": \"Acme\", \"Lead Score\": \"65\"}. The capture verbs (highlight, click, set-text, count-up, scroll) target visible text: count-up {text:'40', to:'65'} moves the lead score.",
   "capture": {
     "source_url": "https://www.getquotient.ai (Quotient app; people anonymized)",
     "captured_at": "2026-09-23",
@@ -45,6 +45,12 @@
         "details"
       ],
       "placeholder": "full (default) | feed | details"
+    },
+    "zoom": {
+      "type": "number",
+      "label": "Zoom (with a focus)",
+      "optional": true,
+      "placeholder": "1 (default); 2 = the newest rows, readable on a phone"
     },
     "today": {
       "type": "string",
