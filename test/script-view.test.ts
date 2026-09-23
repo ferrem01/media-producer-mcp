@@ -95,4 +95,21 @@ describe("the script view", () => {
     // change it cannot apply, rather than silently mangling the mapping.
     expect(io.scriptToBlocks(text + "\n## A new scene\nAnd a line.")).toHaveLength(3);
   });
+  it("puts the view switch on the scene rail, not above one scene's card", () => {
+    // It sat in the content header, above a single scene -- a control that
+    // changed the page's SCOPE while appearing to belong to the scene under
+    // it. Board shows one scene, Script shows the whole film: that is a
+    // navigation mode, so it belongs on the navigator.
+    const html = getPreviewHtml();
+    expect(html).toMatch(/function renderDraftModes[\s\S]{0,200}getElementById\('scene-list-head'\)/);
+    expect(html, "the content header must not carry it").not.toMatch(/dv-title">' \+ escHtml\(project\.name \|\| project\.project_id\) \+ draftModesHtml/);
+  });
+
+  it("keeps ONE scene list on the page: the rail carries the fit in script mode", () => {
+    const html = getPreviewHtml();
+    // The first pass had a ledger beside the field AND the rail on the left --
+    // two scene lists, same film.
+    expect(html).not.toContain("sv-ledger");
+    expect(html).toMatch(/draftMode === 'script'[\s\S]{0,260}fitSecs\(says\)/);
+  });
 });
