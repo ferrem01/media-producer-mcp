@@ -202,17 +202,23 @@ describe("the plan view in Studio", () => {
       expect(await page.$("#project-select")).toBeNull();
       expect(await page.textContent("#project-name")).toBe("Quotient Email Ad");
       await page.click("#project-name");
-      await page.keyboard.type("Quotient Email \u2014 IG Reel");
+      await page.keyboard.type("Customers \u2014 Signals Reel");
       await page.keyboard.press("Enter");
       await expect.poll(() => renames.length).toBe(1);
-      expect(renames[0]).toEqual({ name: "Quotient Email \u2014 IG Reel" });
-      await page.waitForFunction(() => document.querySelector(".pv-title")?.textContent === "Quotient Email \u2014 IG Reel");
-      expect(await page.title()).toBe("Quotient Email \u2014 IG Reel \u00b7 Studio");
+      expect(renames[0]).toEqual({ name: "Customers \u2014 Signals Reel" });
+      await page.waitForFunction(() => document.querySelector(".pv-title")?.textContent === "Customers \u2014 Signals Reel");
+      expect(await page.title()).toBe("Customers \u2014 Signals Reel \u00b7 Studio");
+      // Every regex in the page survives the template literal: an eaten
+      // backslash turned /\\s+/ into /s+/ and every "s" typed into the
+      // name saved as a space ("Cu tomer Journey", measured live).
+      const html = getPreviewHtml();
+      expect(html).not.toMatch(/\.replace\(\/s\+\/g/);
+      expect(html).not.toMatch(/\.split\(\/s\+\//);
       // Escape puts it back without saving.
       await page.click("#project-name");
       await page.keyboard.type("nope");
       await page.keyboard.press("Escape");
-      expect(await page.textContent("#project-name")).toBe("Quotient Email \u2014 IG Reel");
+      expect(await page.textContent("#project-name")).toBe("Customers \u2014 Signals Reel");
       expect(renames).toHaveLength(1);
 
       // # opens that scene on the board; Plan is one click back.
