@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — phone-lockscreen: the consequence beat
+
+The signals ad's beat 2 ("their clicks live in one tool, their deal in
+another, your emails in a third") failed as three disconnected tool
+fragments -- a diagram of systems. Research on the category (identity
+resolution's "one customer, three people"; B2B skit ads) pointed at showing
+a consequence instead. Marc chose the lock screen over a tools group chat:
+"I don't think it's obvious in A that something bad has happened... a lot of
+mental calculations."
+
+New house component **phone-lockscreen** (mockups): date + clock, then
+notifications that land at their `at` newest-on-top (older ones slide down,
+as a phone stacks them), then a stamp that slams ON the newest one (over its
+body, title still readable) with a jolt. Every time takes word anchors. The
+stamp's first placement straddled two cards and hid "Deal moved"; under the
+stack it fell into a Reel's bottom-18% caption band -- both measured, both
+rejected; the test pins it on the newest card and above that band.
+
+(chat-simulator's schema offers platform "imessage" but the component
+ignores it -- always a desktop Slack window. Left as is; noted.)
+
+---
+
 ## 2026-09-23 — The writer can see what goes inside a list
 
 The signals ad's "one person, three strangers" beat rendered a kanban with

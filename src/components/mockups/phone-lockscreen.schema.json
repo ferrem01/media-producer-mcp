@@ -1,0 +1,120 @@
+{
+  "type": "phone-lockscreen",
+  "label": "Phone lock screen — notifications",
+  "category": "mockups",
+  "description": "A phone's lock screen, full-frame on a 9x16 (designed at 1080 wide, scaled to the box): date + big clock, then NOTIFICATIONS that land one by one (newest on top, older ones slide down -- the way a phone stacks them), and an optional STAMP that slams onto the newest one with a jolt. The consequence beat: show what the viewer's customer actually receives -- 'CRM: Deal moved -> Proposal' lands, then 'Mail: Welcome! Start your free trial' lands under... and the stamp says WRONG EMAIL. Each notification's `at` and the stamp's `at` take word anchors (\"@tool\") so they land on the spoken words. Pair each landing with a 'ding' and the stamp with a 'thud' on the film's sound effects.",
+  "data": {
+    "time": {
+      "type": "string",
+      "label": "Clock",
+      "optional": true,
+      "placeholder": "2:16"
+    },
+    "date": {
+      "type": "string",
+      "label": "Date line",
+      "optional": true,
+      "placeholder": "Wednesday, September 23"
+    },
+    "notifications": {
+      "type": "array",
+      "label": "Notifications (land in time order; newest shows on top)",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number",
+            "label": "At (s or @word)"
+          },
+          "app": {
+            "type": "string",
+            "label": "App name",
+            "placeholder": "CRM | Mail | Analytics"
+          },
+          "icon": {
+            "type": "string",
+            "label": "Icon (emoji or letter)",
+            "placeholder": "✉️"
+          },
+          "icon_color": {
+            "type": "string",
+            "label": "Icon color",
+            "placeholder": "#6366f1"
+          },
+          "icon_url": {
+            "type": "string",
+            "label": "Icon image URL"
+          },
+          "title": {
+            "type": "string",
+            "label": "Title",
+            "placeholder": "Deal moved: Northwind → Proposal"
+          },
+          "body": {
+            "type": "string",
+            "label": "Body",
+            "placeholder": "Sarah Chen · $48,000"
+          },
+          "ago": {
+            "type": "string",
+            "label": "Time label",
+            "placeholder": "now | 1m ago"
+          }
+        }
+      }
+    },
+    "stamp": {
+      "type": "object",
+      "label": "Stamp (slams onto the newest notification)",
+      "optional": true,
+      "properties": {
+        "text": {
+          "type": "string",
+          "label": "Text",
+          "placeholder": "WRONG EMAIL."
+        },
+        "at": {
+          "type": "number",
+          "label": "At (s or @word)"
+        },
+        "color": {
+          "type": "string",
+          "label": "Color",
+          "placeholder": "#ff5a4f"
+        },
+        "rotation": {
+          "type": "number",
+          "label": "Rotation (deg)",
+          "placeholder": "-7"
+        },
+        "place": {
+          "type": "string",
+          "label": "Where",
+          "enum": [
+            "on",
+            "below"
+          ],
+          "placeholder": "on (the newest notification, default) | below the stack"
+        }
+      }
+    },
+    "wallpaper": {
+      "type": "string",
+      "label": "Wallpaper (CSS background)",
+      "optional": true
+    },
+    "wallpaper_from": {
+      "type": "string",
+      "label": "Glow color",
+      "optional": true,
+      "placeholder": "#6b7cff"
+    },
+    "wallpaper_to": {
+      "type": "string",
+      "label": "Edge color",
+      "optional": true,
+      "placeholder": "#171335"
+    }
+  }
+}
