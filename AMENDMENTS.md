@@ -12,9 +12,14 @@ Marc, on Descript's script editor: the viewer hears one voice, so writing the
 talk track in twelve separate boxes hides how it flows. A second view of the
 storyboard, not a second store.
 
-- Studio's draft view gets a **Board | Script** toggle (sat on the title line
-  at first, which read as part of scene one -- it belongs opposite the title,
-  where a view switcher lives).
+- Studio's draft view gets a **Board | Script** switch. It took three tries to
+  place, and the third one is the only defensible answer. Inline after the film
+  name it read as part of scene one; opposite the title it was still a control
+  sitting above ONE scene's card that silently changed the whole page's SCOPE.
+  Marc: "the script view shows all the scenes in one view, while the board view
+  shows you just a single scene... it doesn't seem like it belongs there."
+  Right: it is a NAVIGATION mode, so it lives on the navigator -- the top of
+  the scene rail, which is the film-level list in both modes.
 - **ONE TEXT FIELD**, second pass. The first build was a textarea per scene,
   which LOOKED like a document but was not one: you could not select across a
   boundary or paste a whole speech in. Marc: "it's just one solid text area and
@@ -22,9 +27,11 @@ storyboard, not a second store.
   with `##` opens a scene. Placing a scene, renaming one, and moving a sentence
   across a boundary are all just typing. A speech pasted with no markers stays
   one block rather than being lost.
-- A **ledger** beside the field reads the film back out of the text -- number,
-  name, speech against duration -- and highlights the scene the cursor is in,
-  so the fit signal survives without cluttering the writing surface.
+- **ONE scene list.** The first pass put a ledger beside the field while the
+  rail sat on the left: two lists of the same scenes. The RAIL carries the fit
+  now (speech against duration, amber when the words do not fit) and follows
+  the caret; clicking a scene in it jumps the caret to that scene. The main
+  pane is nothing but the field.
 - **One store.** The script is a projection of the scenes; saving writes back
   through the SAME route the board card uses (`PATCH /storyboard/{t}/{p}/scenes/{i}`),
   one scene at a time -- and that route already takes `label`, so renaming a

@@ -1105,34 +1105,19 @@ ${QUOTIENT_CSS}
      store (each scene's voiceover_text), read as a document. */
   .sv-wrap { max-width: 760px; margin: 0 auto; padding: 22px 24px 120px; }
   .sv-wrap { position: relative; }
-  .sv-head { margin-bottom: 18px; padding-right: 150px; }
-  .sv-wrap > .dv-modes { position: absolute; top: 22px; right: 24px; }
+  .sv-head { margin-bottom: 18px; }
   .sv-title { font: 600 18px/24px var(--font-sans); letter-spacing: -0.01em; }
   .sv-sub { font-size: 13px; color: var(--content-secondary); margin-top: 4px; }
   .sv-sub b { color: var(--content-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
   /* One field, and a ledger beside it that reads the film out of the text. */
-  .sv-split { display: flex; gap: 22px; align-items: flex-start; }
+  /* One field. The scene list lives in the rail, where it lives in both modes. */
   .sv-field {
-    flex: 1; min-height: 60vh; border: none; outline: none; resize: none;
+    width: 100%; min-height: 62vh; border: none; outline: none; resize: none;
     background: transparent; color: var(--content-primary);
     font: 400 17px/1.8 var(--font-serif, Georgia, 'Times New Roman', serif);
     padding: 4px 0 40px;
   }
   .sv-field::placeholder { color: var(--content-tertiary); font-style: italic; }
-  .sv-ledger {
-    flex: none; width: 210px; position: sticky; top: 12px;
-    border-left: 1px solid var(--border-secondary); padding-left: 14px;
-  }
-  .sv-row {
-    display: flex; align-items: baseline; gap: 7px; padding: 4px 6px; margin: 0 -6px;
-    border-radius: 6px; font-size: 12px; color: var(--content-secondary);
-  }
-  .sv-row.on { background: var(--surface-tertiary); color: var(--content-primary); }
-  .sv-row.new .sv-rfit { color: var(--accent-blue); }
-  .sv-rnum { font-variant-numeric: tabular-nums; color: var(--content-tertiary); font-size: 11px; }
-  .sv-rlab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sv-rfit { font-variant-numeric: tabular-nums; font-size: 11px; color: var(--content-tertiary); }
-  .sv-rfit.over { color: #b45309; font-weight: 600; }
   .sv-bar code {
     font: 11px ui-monospace, SFMono-Regular, monospace; background: var(--surface-tertiary);
     padding: 1px 5px; border-radius: 4px;
@@ -1173,6 +1158,8 @@ ${QUOTIENT_CSS}
     border-radius: var(--radius); padding: 10px 12px; font-size: 13px;
     color: var(--content-secondary); margin-bottom: 16px;
   }
+  .dv-rail-over { color: #b45309; font-weight: 600; }
+  #scene-list-head { padding: 8px 10px; }
   .dv-modes { display: inline-flex; gap: 2px; background: var(--surface-tertiary); border-radius: 999px; padding: 2px; }
   .dv-mode {
     height: 26px; padding: 0 12px; border: none; background: transparent; cursor: pointer;
@@ -1257,7 +1244,7 @@ ${QUOTIENT_CSS}
     <!-- The needs live in each scene's card (draft view and the storyboard
          editor), not here (Marc). One hidden picker serves every Upload. -->
     <input type="file" id="np-file" accept="image/*,video/*" style="display:none">
-    <div class="sidebar-header">Scenes</div>
+    <div class="sidebar-header" id="scene-list-head">Scenes</div>
     <div id="scene-list"><div class="empty-state">Load a project</div></div>
   </div>
 
@@ -4639,8 +4626,10 @@ ${QUOTIENT_CSS}
     var fw = Number(cv.width) || 1920, fh = Number(cv.height) || 1080;
     document.documentElement.style.setProperty('--mp-frame', fw + '/' + fh);
     document.body.classList.toggle('frame-tall', fh > fw);
+    renderDraftModes(project);
     if (draftMode === 'script') {
       renderScriptView(project);
+      renderDraftRail(project);
     } else {
       renderDraftCard(project);
       renderDraftRail(project);
@@ -4650,14 +4639,21 @@ ${QUOTIENT_CSS}
     resumeDraftJob(project);
   }
 
-  function draftModesHtml() {
-    return '<span class="dv-modes">' +
-      '<button class="dv-mode' + (draftMode === 'board' ? ' on' : '') + '" data-mode="board">Board</button>' +
+  // WHERE THIS LIVES MATTERS. It was in the content header, above a single
+  // scene's card -- a control that silently changed the page's SCOPE while
+  // appearing to belong to the scene under it. Board shows one scene; Script
+  // shows the whole film. That is a navigation mode, so it belongs on the
+  // navigator: the top of the scene rail, which is the film-level list in
+  // both modes.
+  function renderDraftModes(project) {
+    var head = document.getElementById('scene-list-head');
+    if (!head) return;
+    head.innerHTML = '<span class="dv-modes">' +
+      '<button class="dv-mode' + (draftMode === 'board' ? ' on' : '') + '" data-mode="board" ' +
+        'title="One scene at a time, with its frame">Board</button>' +
       '<button class="dv-mode' + (draftMode === 'script' ? ' on' : '') + '" data-mode="script" ' +
         'title="The whole talk track as one document">Script</button></span>';
-  }
-  function wireDraftModes(project) {
-    document.querySelectorAll('.dv-mode').forEach(function(b) {
+    head.querySelectorAll('.dv-mode').forEach(function(b) {
       b.addEventListener('click', function() {
         var m = b.getAttribute('data-mode');
         if (m === draftMode) return;
@@ -4736,36 +4732,51 @@ ${QUOTIENT_CSS}
     });
   }
 
+  // Clicking a scene in the rail while reading the script puts the caret at
+  // the top of that scene, which is what "go to scene 4" means in a document.
+  function scriptCaretToScene(i) {
+    var field = document.getElementById('sv-field');
+    if (!field) return;
+    var lines = field.value.split('\\n');
+    var seen = -1, at = 0;
+    for (var n = 0; n < lines.length; n++) {
+      var isMark = lines[n].indexOf(SCRIPT_MARK) === 0 || lines[n].trim() === '##';
+      if (isMark) { seen++; if (seen === i) { at += lines[n].length + 1; break; } }
+      at += lines[n].length + 1;
+    }
+    field.focus();
+    field.setSelectionRange(at, at);
+    // Put it in view: a textarea scrolls by line height.
+    var lh = parseFloat(getComputedStyle(field).lineHeight) || 28;
+    field.scrollTop = Math.max(0, (field.value.slice(0, at).split('\\n').length - 3) * lh);
+  }
+
   function renderScriptView(project) {
     var dv = document.getElementById('draft-view');
     var sb = project.storyboard || {};
     var scenes = sb.scenes || [];
     var h = '<div class="sv-wrap"><div class="sv-head">' +
       '<div class="sv-title">' + escHtml(project.name || project.project_id) + '</div>' +
-      '<div class="sv-sub" id="sv-sub"></div></div>' + draftModesHtml();
+      '<div class="sv-sub" id="sv-sub"></div></div>';
     if (!filmHasVoice(project, scenes)) {
       h += '<div class="sv-note">This film\u2019s argument is carried on screen, not by a voice \u2014 ' +
         'its grammar has no continuous talk track. You can still write the script here.</div>';
     }
-    h += '<div class="sv-split">' +
-      '<textarea id="sv-field" class="sv-field" spellcheck="true" ' +
+    h += '<textarea id="sv-field" class="sv-field" spellcheck="true" ' +
         'placeholder="Write the whole thing. Start a scene with ## and its name.">' +
-        escHtml(scriptFromScenes(scenes)) + '</textarea>' +
-      '<div class="sv-ledger" id="sv-ledger"></div>' +
-    '</div>';
+        escHtml(scriptFromScenes(scenes)) + '</textarea>';
     h += '<div class="sv-bar"><button class="dv-btn" id="sv-save" disabled>Save script</button>' +
       '<span id="sv-status">A line starting with <code>##</code> begins a scene \u00b7 ' +
         'one sentence per line \u00b7 a line that says only (pause) holds a beat</span></div>';
     h += '</div>';
     dv.innerHTML = h;
-    wireDraftModes(project);
     wireScriptView(project);
   }
 
   function wireScriptView(project) {
     var scenes = (project.storyboard || {}).scenes || [];
     var field = document.getElementById('sv-field');
-    var ledger = document.getElementById('sv-ledger');
+
     var sub = document.getElementById('sv-sub');
     var saveBtn = document.getElementById('sv-save');
     var status = document.getElementById('sv-status');
@@ -4787,20 +4798,14 @@ ${QUOTIENT_CSS}
       sub.innerHTML = '<b>' + blocks.length + '</b> scene' + (blocks.length === 1 ? '' : 's') +
         ' \u00b7 the film runs <b>' + clockOf(filmSecs) + '</b> \u00b7 <b>' + clockOf(spoken) + '</b> of speech';
 
+      // The rail is the scene list: keep its selection on the scene the caret
+      // is in, and its fit numbers on what is actually typed.
       var here = caretBlock();
-      var rows = blocks.map(function(b, i) {
-        var scene = scenes[i];
-        var dur = scene ? (Number(scene.duration_seconds) || 0) : 0;
-        var says = speechSeconds(b.text);
-        var over = scene && says > dur + 0.25 && dur > 0;
-        return '<div class="sv-row' + (i === here ? ' on' : '') + (scene ? '' : ' new') + '">' +
-          '<span class="sv-rnum">' + String(i + 1).padStart(2, '0') + '</span>' +
-          '<span class="sv-rlab">' + escHtml(b.label || (scene && scene.label) || 'Untitled') + '</span>' +
-          '<span class="sv-rfit' + (over ? ' over' : '') + '">' +
-            (scene ? fitSecs(says) + ' / ' + dur + 's' : 'new scene') + '</span>' +
-        '</div>';
-      }).join('');
-      ledger.innerHTML = rows || '<div class="sv-row">nothing yet</div>';
+      if (here !== draftSel && here < scenes.length) {
+        draftSel = here;
+        blocks.forEach(function(b, i) { if (scenes[i] && b.text !== undefined) scenes[i]._draftSpeech = b.text; });
+        renderDraftRail(project);
+      }
 
       // What the save can and cannot do. Adding or removing a ## changes the
       // film's STRUCTURE, which is a board operation, not a text one.
@@ -4873,7 +4878,7 @@ ${QUOTIENT_CSS}
       '<div class="dv-title">' + escHtml(project.name || project.project_id) + '</div>' +
       '<div class="dv-sub">Storyboard draft — ' + scenes.length + ' scenes · ~' + Math.round(total) + 's · nothing built yet · iterate here, then build once</div>' +
       (sb.narrative ? '<div class="dv-narr">' + escHtml(sb.narrative) + '</div>' : '') +
-      '</div>' + draftModesHtml() + '</div>';
+      '</div></div>';
     if (!s) { dv.innerHTML = h + '<div class="dv-card">No scenes in this storyboard.</div>'; return; }
     h += '<div class="dv-card">';
     h += draftIsAuthored(s)
@@ -4977,7 +4982,6 @@ ${QUOTIENT_CSS}
       '<button class="btn" id="dv-scene-revise">✎ Revise</button></div>';
     h += '</div></div>';
     dv.innerHTML = h;
-    wireDraftModes(project);
     bindSceneNeeds(project, dv);
     var fb = document.getElementById('dv-scene-feedback');
     var sceneBtn = document.getElementById('dv-scene-revise');
@@ -5025,10 +5029,23 @@ ${QUOTIENT_CSS}
         ? '<img class="dv-rail-thumb" src="' + escAttr(draftStillUrl(project, i)) + '" onerror="this.remove()">'
         : '<div class="dv-rail-thumb-ph">after build</div>';
       var beats = (s.beats || []).length;
+      var dur = Number(s.duration_seconds) || 0;
+      // Reading the script, the useful fact about a scene is whether its words
+      // FIT it -- so the rail carries that instead of its beat count. One
+      // scene list on the page, in one place, in both modes.
+      var meta;
+      if (draftMode === 'script') {
+        var says = speechSeconds(s.voiceover_text);
+        var over = says > dur + 0.25 && dur > 0;
+        meta = '<span class="' + (over ? 'dv-rail-over' : '') + '">' +
+          (says > 0 ? fitSecs(says) + ' / ' + dur + 's' : dur + 's · silent') + '</span>';
+      } else {
+        meta = dur + 's' + (beats ? ' · ' + beats + ' beats' : '');
+      }
       h += '<div class="dv-rail-item' + (i === draftSel ? ' active' : '') + '" data-index="' + i + '">' +
         frame +
         '<div><div class="dv-rail-label">' + (i + 1) + '. ' + escHtml(s.label || 'Scene') + '</div>' +
-        '<div class="dv-rail-meta">' + (Number(s.duration_seconds) || 0) + 's' + (beats ? ' · ' + beats + ' beats' : '') + '</div></div>' +
+        '<div class="dv-rail-meta">' + meta + '</div></div>' +
         '</div>';
     });
     if (scenes.length) h += '<div class="dv-rail-add" data-at="' + scenes.length + '" title="Insert a new scene here">+</div>';
@@ -5036,6 +5053,7 @@ ${QUOTIENT_CSS}
     els.sceneList.querySelectorAll('.dv-rail-item').forEach(function(el) {
       el.addEventListener('click', function() {
         draftSel = parseInt(el.dataset.index, 10);
+        if (draftMode === 'script') { scriptCaretToScene(draftSel); renderDraftRail(project); return; }
         renderDraftCard(project);
         renderDraftRail(project);
         syncDraftFooterActive();
