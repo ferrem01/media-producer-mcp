@@ -111,7 +111,9 @@
       dot.style.background = accentShades[i % accentShades.length];
       header.appendChild(dot);
 
-      var headerText = document.createTextNode(columns[i].title);
+      // Tolerate the obvious variants a writer reaches for: name/label for
+      // the title, {title, subtitle} objects for cards.
+      var headerText = document.createTextNode(columns[i].title || columns[i].name || columns[i].label || '');
       header.appendChild(headerText);
       col.appendChild(header);
 
@@ -123,8 +125,10 @@
       for (var c = 0; c < cards.length; c++) {
         var card = document.createElement('div');
         card.className = 'kanban-card';
-        card.textContent = cards[c];
-        card.setAttribute('data-card-name', cards[c]);
+        var cardText = typeof cards[c] === 'string' ? cards[c]
+          : [cards[c] && (cards[c].title || cards[c].name || cards[c].text), cards[c] && (cards[c].subtitle || cards[c].detail)].filter(Boolean).join(' \u00b7 ');
+        card.textContent = cardText;
+        card.setAttribute('data-card-name', cardText);
         body.appendChild(card);
       }
 

@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — The writer can see what goes inside a list
+
+The signals ad's "one person, three strangers" beat rendered a kanban with
+"UNDEFINED" column headers and an "[object Object]" card: the writer used
+`name` for column titles and `{title, subtitle}` for cards. Not a writer
+whim -- it could not see the fields:
+
+- **The catalog** printed every array as `array<object>` (or
+  `array<undefined>`), never the item's fields. `itemShape` now prints them:
+  `columns: array<{title: string, cards: array<string>}>`, enums inline, one
+  level of nesting. Every component with a list of objects (metrics,
+  columns, events, markers, stats, steps...) benefits.
+- **Eight schemas** declared array items malformed (fields straight under
+  `items`, no `type`/`properties`): kanban-board, calendar-view, form-wizard,
+  world-map, us-map, bubble-map, map-route, number-counter-row. Normalized;
+  a test walks every schema so it cannot come back. The playground's array
+  editor now shows their sub-fields too.
+- **kanban-board** tolerates the obvious variants (name/label for a title;
+  `{title, subtitle}` cards render "title · subtitle").
+
+---
+
 ## 2026-09-23 — The audience page as a creator-cut SPLIT: refit, zoom, and the writer knows how
 
 Re-drafting the signals ad around audience-person-detail (proj_de974ad1)

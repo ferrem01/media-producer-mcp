@@ -9,10 +9,26 @@
       "label": "Bubbles",
       "optional": true,
       "items": {
-        "x_pct": { "type": "number", "label": "X Position (%)" },
-        "y_pct": { "type": "number", "label": "Y Position (%)" },
-        "value": { "type": "number", "label": "Value" },
-        "label": { "type": "string", "label": "Label", "optional": true }
+        "type": "object",
+        "properties": {
+          "x_pct": {
+            "type": "number",
+            "label": "X Position (%)"
+          },
+          "y_pct": {
+            "type": "number",
+            "label": "Y Position (%)"
+          },
+          "value": {
+            "type": "number",
+            "label": "Value"
+          },
+          "label": {
+            "type": "string",
+            "label": "Label",
+            "optional": true
+          }
+        }
       }
     },
     "title": {
