@@ -2283,6 +2283,7 @@ function storyboardToSaved(
       // every uploaded file away on the way back to disk.
       assets: Array.isArray(s.assets) ? s.assets : [],
       visual_notes: s.visual_notes || "",
+      ...(typeof s.shot === "string" && s.shot.trim() ? { shot: s.shot.trim() } : {}),
       components: s.components || [],
       broll_query: s.broll_query,
       hero_image: s.hero_image,

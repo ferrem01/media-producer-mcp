@@ -30,6 +30,7 @@ export interface SurgicalSceneOp {
 const SCENE_SCHEMA_NOTE = `A scene is a JSON object with:
 - "label" (string), "purpose" (string), "voiceover_text" (string, optional), "duration_seconds" (number)
 - "visual_notes" (string): the full visual direction -- BG/MG/FG, mood, motion
+- "shot" (string): ONE plan-table line, under 15 words -- what fills the frame, in plain words
 - "beats": [{"label", "duration_seconds", "action", "voiceover_text"?}] summing to the scene duration
 - EITHER "components": [{"type": "<library type>", "data": {... including "script": [{action, at, ...}] for performable surfaces}}]
   OR "scene_template": {"type": "st-...", "data": {...}} for designer-built full-scene compositions

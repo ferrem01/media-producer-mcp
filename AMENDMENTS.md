@@ -6,6 +6,47 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — The PLAN view: the film as one table (replaces Script)
+
+Marc, looking at a beat-by-beat table drafted in chat for the Quotient Email
+ad: "I really like this planning view of film. It is easy to digest visually
+and even the script... I am looking for a easy way for my marketing head and i
+to collab on a film. Our current storyboard is actually really hard to get a
+feel for." The board opens ONE scene with every field; Script showed the whole
+film but only its words. The table shows every scene with the four things a
+reviewer weighs: what the beat is for, when it lands, what fills the frame,
+and what is said.
+
+- **Studio: Board | Plan.** Plan replaces Script on the rail switch. Columns:
+  # (opens the scene on the board), Beat, Time (running span, amber "N s of
+  speech" when the line outruns the beat), Shot, Line. Beat/Shot/Line edit in
+  place and write through the board's own `PATCH /api/storyboard/{t}/{p}/scenes/{i}`
+  -- one store. Enter commits a beat or shot; in a line it is a new sentence.
+  The footer (re-draft, build) stays on screen.
+- **Shot = kind + sentence.** The kind (Speaker / Split / Screen / Footage /
+  Image / Motion graphic) is READ off the scene's data in `core/film-plan.ts`
+  (person grammar and not a takeover -> Speaker, a `use:"split"` proof ->
+  Split, product mocks / screen recordings -> Screen, ...), so it cannot
+  disagree with the build. The sentence is a new optional `shot` field -- the
+  storyboard writer is asked for it (under 15 words), the update tool and the
+  surgical writer carry it -- falling back to the first sentence of
+  `visual_notes` on older boards (shown muted). Emptying the cell hands it back.
+- **Drag a beat by its grip** -> `POST /api/storyboard/{t}/{p}/order {order}`
+  (`order[k]` = old index landing at k). Board-only (409 on a built film,
+  whose scenes are their own list). Takes and speaker clips follow their scene
+  (they point at it by position); the stills are renamed with it and the
+  cards re-shoot. Only the grip arms the row, or every text selection in a
+  cell would start a drag.
+- **generate's storyboard job returns `plan`**, the same table as markdown,
+  and the generate tool description tells the client to show it first -- so a
+  film starts as a plan two people react to. (Not in MCP_INSTRUCTIONS: that
+  page is capped at 5000 chars.)
+- Script's one-field editor is gone with it; `speechSeconds`/`fitSecs` stay
+  (the Time column and the rail's fit use them). Comments per row are the
+  natural next step for the two-person loop -- deferred until the view is used.
+
+---
+
 ## 2026-09-23 — Deleting the film you are in sends you home
 
 It used to drop `?project` and reload Studio: an empty editor and a picker,

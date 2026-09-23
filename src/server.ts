@@ -42,6 +42,7 @@ import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
+import { planMarkdown } from "./core/film-plan.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
 import { castBoardStandIns } from "./core/board-standins.js";
 import { sanitizeTake } from "./core/take-sanitize.js";
@@ -818,6 +819,9 @@ export async function queueStoryboardGeneration(params: {
       project_id: project.project_id,
       preview_url: previewUrl(params.tenant_id, project.project_id),
       ...(cardsUrl ? { storyboard_cards_url: cardsUrl, scene_still_urls: cardStills } : {}),
+      // THE PLAN: the whole film as one table (beat, time, shot, line) --
+      // show this to the person first; it is what they react to.
+      plan: planMarkdown(project),
       storyboard: project.storyboard,
     };
   });
@@ -1287,6 +1291,7 @@ export function createMcpServer(): McpServer {
           voiceover_text: z.string().optional(),
           duration_seconds: z.number().optional(),
           visual_notes: z.string().optional(),
+          shot: z.string().optional().describe("The plan table's one line for this scene: what fills the frame, in plain words. Empty string hands the cell back to the visual notes."),
           components: z.array(z.object({
             type: z.string().describe("A library component type (see the catalog), e.g. kinetic-text, card-fan, checklist-toggles"),
             data: z.record(z.unknown()).optional(),
@@ -1384,6 +1389,9 @@ export function createMcpServer(): McpServer {
                 if (sceneUpdate.voiceover_text !== undefined) existing.voiceover_text = sceneUpdate.voiceover_text;
                 if (sceneUpdate.duration_seconds !== undefined) existing.duration_seconds = sceneUpdate.duration_seconds;
                 if (sceneUpdate.visual_notes !== undefined) existing.visual_notes = sceneUpdate.visual_notes;
+                if (sceneUpdate.shot !== undefined) {
+                  if (sceneUpdate.shot.trim()) existing.shot = sceneUpdate.shot.trim(); else delete existing.shot;
+                }
                 // The cast, set directly: the whole list replaces what the
                 // writer put there; a template would cover it, so it goes
                 // unless the caller sets one in the same edit.
@@ -2860,7 +2868,7 @@ export function createMcpServer(): McpServer {
 
   tool(
     "generate",
-    "Generate media from a natural language prompt. THE GOLDEN WORKFLOW (how every good film here was made): (1) generate -> you get a STORYBOARD, not a film; (2) iterate the storyboard round and round with mode='storyboard' + feedback until every beat is right -- this is the cheap, fast loop, spend your revisions HERE; (3) build the scenes ONCE with mode='full' + project_id; (4) after that only small tweaks (update/revise/Studio), then render. For video targets mode defaults to 'storyboard' -- generating a film cold stops at the storyboard on purpose; building is a deliberate second call. Pass mode='full' explicitly to build in one shot (quick drafts, fire-and-forget). Non-video targets (image, component, scene revisions) are one-shot as before. Rendering to MP4 is the separate render tool. Recorder films (screen recordings from the Quotient Recorder extension) assemble automatically on upload and get a SPEAKER lane -- edit their talk track with edit_speaker, not by regenerating.",
+    "Generate media from a natural language prompt. THE GOLDEN WORKFLOW (how every good film here was made): (1) generate -> you get a STORYBOARD, not a film -- its finished job carries plan, the whole film as a markdown table (beat | time | shot | line): show the person that table first; (2) iterate the storyboard round and round with mode='storyboard' + feedback until every beat is right -- this is the cheap, fast loop, spend your revisions HERE; (3) build the scenes ONCE with mode='full' + project_id; (4) after that only small tweaks (update/revise/Studio), then render. For video targets mode defaults to 'storyboard' -- generating a film cold stops at the storyboard on purpose; building is a deliberate second call. Pass mode='full' explicitly to build in one shot (quick drafts, fire-and-forget). Non-video targets (image, component, scene revisions) are one-shot as before. Rendering to MP4 is the separate render tool. Recorder films (screen recordings from the Quotient Recorder extension) assemble automatically on upload and get a SPEAKER lane -- edit their talk track with edit_speaker, not by regenerating.",
     {
       tenant_id: z.string().optional(),
       prompt: z.string().default("").describe("Description of what to generate. Optional when the project already has a storyboard (uses its narrative)."),
