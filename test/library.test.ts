@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 // THE LIBRARY. 251 films in one tenant and the only way in was a project id:
 // twenty minutes of hunting for two films he had made himself. A search has
@@ -112,7 +114,48 @@ describe("the tenant library", () => {
     await seed(tenant);
     const { searchLibrary } = await import("../src/core/library.js");
     expect((await searchLibrary(tenant, { filter: "rendered" })).cards.every((c) => c.rendered)).toBe(true);
+    // "Claude Social Post Hype" has a scene with a component in it, so it is
+    // BUILT even though its status still reads "storyboard" -- which is the
+    // whole point: the shelf describes what a film IS, not what a status field
+    // was last set to. A board is a film with nothing in its scenes yet.
     const boards = await searchLibrary(tenant, { filter: "board" });
-    expect(boards.cards.map((c) => c.name)).toEqual(["Claude Social Post Hype"]);
+    expect(boards.cards.map((c) => c.name)).toEqual([]);
+    const built = await searchLibrary(tenant, { filter: "built" });
+    expect(built.cards.map((c) => c.name)).toContain("Claude Social Post Hype");
+  });
+
+  it("calls a film BUILT when it has scenes, whatever its status field says", async () => {
+    const tenant = `t-lib4-${Date.now()}`;
+    const { createProject, saveProject } = await import("../src/persistence/project.js");
+    // The shape found in the wild: a finished film whose status was knocked
+    // back to "storyboard" by a board edit. Five of them, two with an mp4.
+    const p = await createProject({ tenant_id: tenant, name: "Knocked Back", format: "video", frame: "16x9" } as any);
+    p.status = "storyboard";
+    p.scenes = [{ id: "s1", duration_seconds: 4, components: [{ id: "c", type: "st-statement", data: {} }] }] as any;
+    await saveProject(p as any);
+    // And a real board: a scene list with nothing in it yet.
+    const b = await createProject({ tenant_id: tenant, name: "Actually A Board", format: "video", frame: "16x9" } as any);
+    b.status = "storyboard";
+    b.scenes = [] as any;
+    await saveProject(b as any);
+
+    const { searchLibrary } = await import("../src/core/library.js");
+    const r = await searchLibrary(tenant, {});
+    const built = r.cards.find((c) => c.name === "Knocked Back")!;
+    const board = r.cards.find((c) => c.name === "Actually A Board")!;
+    expect(built.built, "a film with scenes is built").toBe(true);
+    expect(board.built, "an empty board is not").toBe(false);
+    expect(r.counts.built).toBe(1);
+    expect(r.counts.board).toBe(1);
+    expect((await searchLibrary(tenant, { filter: "built" })).cards.map((c) => c.name)).toEqual(["Knocked Back"]);
+    expect((await searchLibrary(tenant, { filter: "board" })).cards.map((c) => c.name)).toEqual(["Actually A Board"]);
+  });
+
+  it("does not let a board edit unbuild a film", async () => {
+    // The cause: update({storyboard}) set status = "storyboard" unconditionally,
+    // so repairing a board relabelled a rendered film as a board.
+    const src = await fs.readFile(path.resolve(import.meta.dirname, "../src/server.ts"), "utf-8");
+    expect(src).not.toMatch(/\n {10}project\.status = "storyboard";/);
+    expect(src).toMatch(/if \(project\.status === "draft"\) project\.status = "storyboard";/);
   });
 });
