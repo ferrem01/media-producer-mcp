@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — "[object Object]" in the board: a round trip that ate its own data
+
+Spotted while scanning every project for component types (the tenant-components
+hunt): three films carried the literal string `"[object Object]"` as a scene's
+component list.
+
+- A board scene's `components` are `Array<string | StoryboardComponent>` -- a
+  bare type name OR a full object. Studio's scene editor rendered the field with
+  `(b.components || []).join(', ')`, which turns every OBJECT into
+  `"[object Object]"`, and saved it straight back with
+  `split(',').map(trim)`. So opening that modal and pressing Save on any scene
+  whose board components were objects destroyed the type AND its data.
+- Both ends now go through `boardCompNames()` (show the type) and
+  `boardCompsFromNames()` (map the typed names back onto the ORIGINAL entries,
+  so editing the text keeps each component's data; a newly typed name becomes a
+  plain string).
+- `test/board-components.test.ts` pins the round trip, including that adding and
+  removing a name leaves the other components' data intact, and that the
+  stringifying `.join(` is gone from the editor.
+- The three films were repaired from their BUILT scenes, which still knew the
+  real types: proj_21bd3c13 (the original) and the two copies made from it, all
+  scene 5 -- one bad save, carried forward by `duplicateProject`. Re-scanned:
+  0 remaining.
+- Noted, not fixed: the `update` tool's board schema accepts only object-shaped
+  components, while the type (and the builder) also allow bare strings.
+
+---
+
 ## 2026-09-22 — The workshop joins the rail
 
 "What about the component playground? would be nice to have it linked into the

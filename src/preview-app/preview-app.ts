@@ -3160,6 +3160,29 @@ ${QUOTIENT_CSS}
   // sites refresh the storyboard; there is one codegen component per scene now, so a
   // component-layer list conveyed nothing.) Values come from the scene's edited
   // storyboard fields, falling back to the original storyboard entry.
+  // A board scene's components are EITHER a bare type name or a full object
+  // ({type, data, ...}). The scene editor showed them with .join(', '), which
+  // turns every object into the string "[object Object]" -- and then saved that
+  // string back, destroying the type AND its data. Both ends go through here.
+  function boardCompNames(list) {
+    return (Array.isArray(list) ? list : []).map(function(c) {
+      return typeof c === 'string' ? c : (c && c.type) || '';
+    }).filter(Boolean);
+  }
+  // Typed names -> the ORIGINAL entries where the name still matches, so
+  // editing the text field keeps each component's data instead of flattening
+  // it to a bare name.
+  function boardCompsFromNames(names, original) {
+    var orig = Array.isArray(original) ? original : [];
+    return names.map(function(n) {
+      for (var i = 0; i < orig.length; i++) {
+        var c = orig[i];
+        if (c && typeof c === 'object' && c.type === n) return c;
+      }
+      return n;
+    });
+  }
+
   // Map a StoryboardScene (project.storyboard.scenes[idx]) into the editor's field shape.
   function storyboardSceneToFields(ps) {
     ps = ps || {};
@@ -10167,7 +10190,7 @@ ${QUOTIENT_CSS}
         '<div class="sm-field"><label>B-roll search</label><input id="sm-broll" type="text" placeholder="e.g. team collaborating in office" value="' + escAttr(b.broll_query || '') + '"></div>' +
       '</div>' +
       '<div class="sm-field"><label>Hero image prompt</label><input id="sm-hero" type="text" placeholder="AI background image (leave blank if using b-roll)" value="' + escAttr(b.hero_image || '') + '"></div>' +
-      '<div class="sm-field"><label>Components (comma-separated)</label><input id="sm-components" type="text" placeholder="e.g. cta-card, stat-grid" value="' + escAttr((b.components || []).join(', ')) + '"></div>' +
+      '<div class="sm-field"><label>Components (comma-separated)</label><input id="sm-components" type="text" placeholder="e.g. cta-card, stat-grid" value="' + escAttr(boardCompNames(b.components).join(', ')) + '"></div>' +
       (function() {
         var p = state.currentProject; if (!p || !p.scenes) return '';
         var si = p.scenes.findIndex(function(x) { return x.id === sceneId; });
@@ -10199,7 +10222,9 @@ ${QUOTIENT_CSS}
       visual_notes: modalVal('sm-visual'),
       broll_query: modalVal('sm-broll'),
       hero_image: modalVal('sm-hero'),
-      components: modalVal('sm-components').split(',').map(function(c) { return c.trim(); }).filter(Boolean),
+      components: boardCompsFromNames(
+        modalVal('sm-components').split(',').map(function(c) { return c.trim(); }).filter(Boolean),
+        (studio.sb && studio.sb.components) || []),
       beats: readBeatRowsForSave(),
     };
     if (durRaw && !isNaN(parseFloat(durRaw))) bodyS.duration_seconds = parseFloat(durRaw);
