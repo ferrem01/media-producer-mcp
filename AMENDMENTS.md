@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — A built film kept being called a board
+
+Marc: "some films that are fully built out and even rendered still have the
+board tag." Five of 181, and three of them were films I had relabelled myself
+an hour earlier.
+
+- **The cause**: `update({storyboard})` ended with an unconditional
+  `project.status = "storyboard"`. Editing a board -- even repairing one, which
+  changes nothing about what the film shows -- knocked a BUILT or RENDERED film
+  back to the board state. proj_2ba9de13 went from `rendered` to `storyboard`
+  with its mp4 still sitting on disk. Now only a `draft` moves forward into the
+  board state; staleness was never the status's job (`render_stale` is derived
+  from the mp4's mtime against `updated_at`).
+- **The deeper fault**: the card believed the record. `p.rendered` is FALSE on
+  the raw project for every one of the five -- it is computed by
+  `renderStatusFields()` at read time, not stored -- so a film whose status had
+  drifted had nothing left saying it was ever made. The card now reads what the
+  film IS: `rendered` from the mp4 ON DISK (its mtime joins the index's cache
+  key, since a render does not always touch project.json), and `built` from
+  whether any scene has components. A status field cannot mislabel a film again.
+- The filter chips move with it: Built = has scenes with something in them;
+  Board = a film with nothing in its scenes yet.
+- `test/library.test.ts` pins both, including the source guard against the
+  unconditional demotion. An older fixture had to change meaning with it: a
+  "storyboard" film holding a component is BUILT now, which is the point.
+
+---
+
 ## 2026-09-23 — "[object Object]" in the board: a round trip that ate its own data
 
 Spotted while scanning every project for component types (the tenant-components

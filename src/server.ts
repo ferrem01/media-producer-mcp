@@ -1424,7 +1424,14 @@ export function createMcpServer(): McpServer {
             (sum, s) => sum + s.duration_seconds, 0
           );
 
-          project.status = "storyboard";
+          // A BOARD EDIT DOES NOT UNBUILD THE FILM. This used to knock every
+          // project back to "storyboard", so editing the board of a built --
+          // or RENDERED -- film relabelled it a board and lost that it had
+          // ever been made. Staleness is already derived (render_stale
+          // compares the mp4's mtime against updated_at), so the status does
+          // not need to carry it. Only a film that has not been built yet
+          // moves forward into the board state.
+          if (project.status === "draft") project.status = "storyboard";
         }
 
         // Asset provision

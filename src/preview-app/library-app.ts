@@ -243,7 +243,10 @@ ${RAIL_JS}
   }
   function stateOf(c) {
     if (c.rendered) return { k: 'rendered', label: c.render_stale ? 'Rendered · stale' : 'Rendered' };
-    if (c.status === 'generated' || c.status === 'rendering') return { k: 'built', label: c.status === 'rendering' ? 'Rendering' : 'Built' };
+    if (c.status === 'rendering') return { k: 'built', label: 'Rendering' };
+    // A film with scenes in it is BUILT, whatever its status field says: a
+    // board edit used to knock a finished film back to "storyboard".
+    if (c.built || c.status === 'generated') return { k: 'built', label: 'Built' };
     return { k: 'board', label: 'Board' };
   }
   function initials(name) {

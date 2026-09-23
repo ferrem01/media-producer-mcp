@@ -14,7 +14,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { projectsDir, projectJsonPath } from "../persistence/paths.js";
+import { projectsDir, projectJsonPath, projectOutputDir } from "../persistence/paths.js";
 import { loadProject } from "../persistence/project.js";
 import type { Project } from "./types.js";
 
@@ -22,6 +22,9 @@ export interface LibraryCard {
   project_id: string;
   name: string;
   status: string;
+  /** Does this film have scenes with something in them? A board that has been
+   *  built is not a board any more, whatever its status says. */
+  built: boolean;
   format: string;
   frame: string;
   scene_count: number;
@@ -41,6 +44,10 @@ export interface LibraryCard {
 
 interface Entry {
   mtime: number;
+  /** The rendered mp4's mtime, 0 when there is none. Part of the cache key:
+   *  a render does not always touch project.json, and the card must not go on
+   *  claiming a film was never made. */
+  renderMtime: number;
   card: LibraryCard;
   haystack: { name: string; intent: string; screen: string };
 }
@@ -72,7 +79,7 @@ function collectStrings(value: unknown, out: string[], budget = { left: 24000 },
   }
 }
 
-function buildEntry(project: Project, mtime: number): Entry {
+function buildEntry(project: Project, mtime: number, renderMtime: number): Entry {
   const scenes = project.scenes || [];
   const duration = scenes.reduce((sum, s) => sum + (Number(s.duration_seconds) || 0), 0);
   const p = project as unknown as Record<string, any>;
@@ -104,14 +111,16 @@ function buildEntry(project: Project, mtime: number): Entry {
     project_id: project.project_id,
     name: project.name,
     status: project.status,
+    built: scenes.some((s) => ((s.components as unknown[]) || []).length > 0),
     format: project.format,
     frame: (project.canvas as any)?.frame || "16x9",
     scene_count: scenes.length,
     duration_seconds: Math.round(duration * 10) / 10,
-    // Older films carry the fact only in their STATUS -- the boolean came
-    // later. Measured on the live tenant: 76 rendered films counted as zero,
-    // and they fell out of every filter chip.
-    rendered: !!p.rendered || project.status === "rendered",
+    // WHAT THE FILM IS, not what its status field remembers. The mp4 on disk
+    // is the fact; the flag came later than some films, and the status can be
+    // moved by an unrelated edit. Measured on the live tenant: five films with
+    // built scenes (two with a finished mp4) were labelled "Board".
+    rendered: renderMtime > 0 || !!p.rendered || project.status === "rendered",
     render_stale: p.render_stale || undefined,
     render_size_bytes: p.render_size_bytes || undefined,
     film_grammar: p.treatment?.filmGrammar || p.film_grammar || undefined,
@@ -123,6 +132,7 @@ function buildEntry(project: Project, mtime: number): Entry {
 
   return {
     mtime,
+    renderMtime,
     card,
     haystack: {
       name: project.name.toLowerCase(),
@@ -149,11 +159,15 @@ export async function libraryEntries(tenantId: string): Promise<Entry[]> {
     live.add(key);
     let mtime = 0;
     try { mtime = (await fs.stat(projectJsonPath(tenantId, id))).mtimeMs; } catch { continue; }
+    let renderMtime = 0;
+    try {
+      renderMtime = (await fs.stat(path.join(projectOutputDir(tenantId, id), "output.mp4"))).mtimeMs;
+    } catch { /* never rendered */ }
     const cached = index.get(key);
-    if (cached && cached.mtime === mtime) { out.push(cached); continue; }
+    if (cached && cached.mtime === mtime && cached.renderMtime === renderMtime) { out.push(cached); continue; }
     const project = await loadProject(tenantId, id);
     if (!project) continue;
-    const entry = buildEntry(project, mtime);
+    const entry = buildEntry(project, mtime, renderMtime);
     index.set(key, entry);
     out.push(entry);
   }
@@ -174,8 +188,9 @@ export type LibraryFilter = "all" | "rendered" | "built" | "board";
 function matchesFilter(card: LibraryCard, filter: LibraryFilter): boolean {
   if (filter === "all") return true;
   if (filter === "rendered") return card.rendered;
-  if (filter === "built") return !card.rendered && (card.status === "generated" || card.status === "rendering");
-  return !card.rendered && (card.status === "storyboard" || card.status === "draft");
+  // Built = it has scenes with content, whatever the status field says.
+  if (filter === "built") return !card.rendered && (card.built || card.status === "generated" || card.status === "rendering");
+  return !card.rendered && !card.built && (card.status === "storyboard" || card.status === "draft");
 }
 
 /**
