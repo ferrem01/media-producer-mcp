@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — Hotfix: renaming a film turned every "s" into a space
+
+Marc: typing "Customer" into the header name saved "Cu tomer". The rename's
+whitespace collapse was written `/\s+/g` in the TS source; Studio's page is
+one template literal, which eats a single backslash, so the page ran
+`/s+/g` -- every "s" became a space. Doubled (`/\\s+/g`); the test's
+rename now contains an "s" (the old one happened not to) and asserts no
+`.replace(/s+/g` or `.split(/s+/` reaches the page. proj_de974ad1's name
+restored.
+
+---
+
 ## 2026-09-23 — Studio: the film's name, renamed in place (the picker is gone)
 
 Marc: "remove the giant project dropdown and replace it with an editable

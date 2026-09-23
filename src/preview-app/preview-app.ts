@@ -2449,7 +2449,7 @@ ${QUOTIENT_CSS}
     el.addEventListener('blur', function() {
       el.scrollLeft = 0;
       var p = state.currentProject;
-      var name = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+      var name = String(el.textContent || '').replace(/\\s+/g, ' ').trim();
       if (!p) return;
       if (!name) { el.textContent = p.name || p.project_id; return; }
       if (name === (p.name || '')) { el.textContent = name; return; }
