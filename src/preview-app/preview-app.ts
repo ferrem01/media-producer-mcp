@@ -4069,10 +4069,9 @@ ${QUOTIENT_CSS}
             studioStatus('Delete failed: ' + ((r && r.error) || 'unknown'), 'err');
             return;
           }
-          // Full reset: drop the ?project param and reload the picker fresh.
-          var url = new URL(window.location.href);
-          url.searchParams.delete('project');
-          window.location.href = url.toString();
+          // The film you were editing is gone, so there is nothing for Studio
+          // to show: go HOME, to the shelf, where the next one is.
+          window.location.href = homeHref();
         })
         .catch(function(e) {
           btn.disabled = false;
@@ -8915,20 +8914,20 @@ ${QUOTIENT_CSS}
     if (me.picture) { pic.src = me.picture; pic.style.display = 'inline-block'; }
     chip.style.display = 'inline-flex';
   }
+  // Home, on the EXACT view left behind (search, filter and all) when this
+  // Studio was opened from there. Used by the back arrow and by anything that
+  // leaves Studio with nothing to come back to.
+  function homeHref() {
+    var last = null;
+    try { last = sessionStorage.getItem('mp.library.last'); } catch (e) {}
+    if (last) return last;
+    var ltok = new URLSearchParams(window.location.search).get('token');
+    return '/library' + (state.tenantId ? '?tenant=' + encodeURIComponent(state.tenantId) : '') +
+      (ltok ? (state.tenantId ? '&' : '?') + 'token=' + encodeURIComponent(ltok) : '');
+  }
   function wireHomeLink() {
-    // Back to the library, on the EXACT view left behind (search, filter and
-    // all) when this Studio was opened from there.
     var lib = document.getElementById('library-btn');
-    if (lib) {
-      var last = null;
-      try { last = sessionStorage.getItem('mp.library.last'); } catch (e) {}
-      if (last) { lib.href = last; }
-      else {
-        var ltok = new URLSearchParams(window.location.search).get('token');
-        lib.href = '/library' + (state.tenantId ? '?tenant=' + encodeURIComponent(state.tenantId) : '') +
-          (ltok ? (state.tenantId ? '&' : '?') + 'token=' + encodeURIComponent(ltok) : '');
-      }
-    }
+    if (lib) lib.href = homeHref();
   }
   var params = new URLSearchParams(window.location.search);
   var tenantParam = params.get('tenant');

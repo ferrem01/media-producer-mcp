@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — Deleting the film you are in sends you home
+
+It used to drop `?project` and reload Studio: an empty editor and a picker,
+for a film that no longer exists. Now it goes home -- to the exact view left
+behind (search, filter, sort) when Studio was opened from there, else the
+tenant's shelf. The back arrow and the delete now share one `homeHref()`, so
+there is a single idea of where home is.
+
+---
+
 ## 2026-09-23 — The SCRIPT view: the film as one continuous talk track
 
 Marc, on Descript's script editor: the viewer hears one voice, so writing the
