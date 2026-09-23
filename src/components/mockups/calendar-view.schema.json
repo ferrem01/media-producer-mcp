@@ -15,21 +15,24 @@
       "label": "Events",
       "required": true,
       "items": {
-        "day": {
-          "type": "number",
-          "label": "Day",
-          "required": true
-        },
-        "title": {
-          "type": "string",
-          "label": "Event Title",
-          "required": true
-        },
-        "color": {
-          "type": "string",
-          "label": "Color",
-          "optional": true,
-          "placeholder": "#A78BFA"
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "number",
+            "label": "Day",
+            "required": true
+          },
+          "title": {
+            "type": "string",
+            "label": "Event Title",
+            "required": true
+          },
+          "color": {
+            "type": "string",
+            "label": "Color",
+            "optional": true,
+            "placeholder": "#A78BFA"
+          }
         }
       }
     }

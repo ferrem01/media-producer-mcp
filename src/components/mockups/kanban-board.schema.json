@@ -9,16 +9,19 @@
       "label": "Columns",
       "required": true,
       "items": {
-        "title": {
-          "type": "string",
-          "label": "Column Title",
-          "required": true
-        },
-        "cards": {
-          "type": "array",
-          "label": "Cards",
-          "items": {
-            "type": "string"
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "Column Title",
+            "required": true
+          },
+          "cards": {
+            "type": "array",
+            "label": "Cards",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }

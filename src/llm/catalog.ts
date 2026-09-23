@@ -19,7 +19,7 @@ export interface ComponentCatalogEntry {
     required?: boolean;
     optional?: boolean;
     placeholder?: string;
-    items?: { type: string };
+    items?: { type?: string; properties?: Record<string, any> };
   }>;
   script_actions?: Array<{ action: string; description: string }>;
   default_cursor_targets?: Record<string, { x: string | number; y: string | number }>;
@@ -123,7 +123,7 @@ export function formatCatalogForPrompt(catalog: ComponentCatalogEntry[]): string
           var field = comp.data[key];
           var reqStr = field.required ? " (required)" : field.optional ? " (optional)" : "";
           var typeStr = field.type;
-          if (field.items) typeStr += `<${field.items.type}>`;
+          if (field.items) typeStr += `<${itemShape(field.items)}>`;
           lines.push(`    - ${key}: ${typeStr}${reqStr}${field.label ? ` -- ${field.label}` : ""}`);
         }
       }
@@ -144,4 +144,25 @@ export function formatCatalogForPrompt(catalog: ComponentCatalogEntry[]): string
   }
 
   return lines.join("\n");
+}
+
+/** An array's item, as the writer needs to see it: a list of objects shows
+ *  its fields (`{title: string, cards: array<string>}`), not just "object" --
+ *  with only "object" the writer guessed field names and a kanban rendered
+ *  "undefined" column headers and "[object Object]" cards (measured live,
+ *  proj_de974ad1). One level of nesting shown; deeper stays "object". */
+export function itemShape(items: { type?: string; properties?: Record<string, any> } | undefined, depth = 0): string {
+  if (!items) return "unknown";
+  const props = items.properties;
+  if (props && typeof props === "object" && Object.keys(props).length) {
+    if (depth > 1) return "object";
+    const fields = Object.entries(props).map(([k, v]: [string, any]) => {
+      let t = (v && v.type) || "any";
+      if (t === "array" && v.items) t += `<${itemShape(v.items, depth + 1)}>`;
+      if (v && Array.isArray(v.enum) && v.enum.length && v.enum.length <= 12) t = v.enum.map((e: unknown) => JSON.stringify(e)).join("|");
+      return `${k}: ${t}`;
+    });
+    return `{${fields.join(", ")}}`;
+  }
+  return items.type || "any";
 }

@@ -8,7 +8,10 @@
       "type": "string",
       "label": "Map region",
       "optional": true,
-      "enum": ["world", "us"],
+      "enum": [
+        "world",
+        "us"
+      ],
       "default": "world"
     },
     "routes": {
@@ -16,8 +19,17 @@
       "label": "Routes",
       "required": true,
       "items": {
-        "from": { "type": "object", "label": "Origin: {x, y (0-100 % of map box), label}" },
-        "to": { "type": "object", "label": "Destination: {x, y (0-100 % of map box), label}" }
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "object",
+            "label": "Origin: {x, y (0-100 % of map box), label}"
+          },
+          "to": {
+            "type": "object",
+            "label": "Destination: {x, y (0-100 % of map box), label}"
+          }
+        }
       }
     },
     "dot_color": {
@@ -34,7 +46,10 @@
       "type": "string",
       "label": "Theme",
       "optional": true,
-      "enum": ["light", "dark"],
+      "enum": [
+        "light",
+        "dark"
+      ],
       "default": "dark"
     },
     "seed": {

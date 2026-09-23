@@ -9,9 +9,22 @@
       "label": "Markers",
       "optional": true,
       "items": {
-        "x_pct": { "type": "number", "label": "X Position (%)" },
-        "y_pct": { "type": "number", "label": "Y Position (%)" },
-        "label": { "type": "string", "label": "Label", "optional": true }
+        "type": "object",
+        "properties": {
+          "x_pct": {
+            "type": "number",
+            "label": "X Position (%)"
+          },
+          "y_pct": {
+            "type": "number",
+            "label": "Y Position (%)"
+          },
+          "label": {
+            "type": "string",
+            "label": "Label",
+            "optional": true
+          }
+        }
       }
     },
     "title": {
