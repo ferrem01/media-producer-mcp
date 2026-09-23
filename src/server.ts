@@ -43,6 +43,7 @@ import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
 import { planMarkdown } from "./core/film-plan.js";
+import { forgetProject } from "./core/library.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
 import { castBoardStandIns } from "./core/board-standins.js";
 import { sanitizeTake } from "./core/take-sanitize.js";
@@ -784,6 +785,7 @@ export async function queueStoryboardGeneration(params: {
     if (params.project_id && params.project_id !== project.project_id) {
       const origProject = await loadProject(params.tenant_id, params.project_id);
       if (origProject) {
+        const scratchId = project.project_id;
         origProject.prompt = project.prompt;
         origProject.storyboard = project.storyboard;
         origProject.status = "storyboard";
@@ -791,6 +793,18 @@ export async function queueStoryboardGeneration(params: {
         origProject.updated_at = new Date().toISOString();
         await saveProject(origProject);
         project = origProject;
+        // THE REDRAFT RAN IN A SCRATCH PROJECT. Once its board is copied
+        // over, the scratch is a stale twin in the tenant's films (measured
+        // live: a redraft of proj_4dfaa63e left proj_2f214503). The build
+        // path already removes its working copy; this is the same cleanup
+        // for a redraft -- unless the board still points into the scratch
+        // dir, in which case keeping it is the safe side.
+        if (!JSON.stringify(origProject.storyboard || {}).includes(scratchId)) {
+          await deleteProject(params.tenant_id, scratchId).catch(() => false);
+          forgetProject(params.tenant_id, scratchId);
+        } else {
+          console.warn(`  Redraft: scratch ${scratchId} kept -- the board still references it`);
+        }
       }
     }
     j.projectId = project.project_id;
