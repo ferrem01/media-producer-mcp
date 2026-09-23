@@ -61,6 +61,7 @@ const SCENE_TOOL_SCHEMA = {
     duration_seconds: { type: "number" },
     purpose: { type: "string", description: "What this scene communicates -- its job in the story" },
     visual_notes: { type: "string", description: "The WORLD: setting, layers, what persists (5+ sentences, motion verbs, BG/MG/FG)" },
+    shot: { type: "string", description: "ONE line for the plan table a reviewer reads: what fills the frame, in plain words, under 15 words (\"The chat typing the ask on top, the speaker below\"; \"A checklist ticking itself off\"). Not the visual notes -- the one-glance version." },
     components: {
       type: "array",
       items: {
@@ -311,6 +312,7 @@ export interface DraftScene {
    *  lifted off the line at normalize time; the captions tint them. */
   emphasis?: string[];
   purpose: string;         // what this scene communicates -- its job in the story
+  shot?: string;           // one plan-table line: what fills the frame
   visual_notes: string;    // visual direction (what the viewer experiences, motion verbs, depth layers)
   /** Library components to embed. Plain string = type only (codegen fills the
    *  data). Object = storyboard-authored data; for performable (🎬 Scriptable)

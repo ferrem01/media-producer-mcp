@@ -582,6 +582,10 @@ export interface StoryboardScene {
   assets: AssetRequirement[];
   /** Visual description for the storyboard */
   visual_notes: string;
+  /** ONE line for the plan table: what fills the frame, in plain words
+   *  ("the chat typing the ask on top, the speaker below"). Optional -- the
+   *  plan falls back to the first sentence of visual_notes (core/film-plan.ts). */
+  shot?: string;
   /** Library components the storyboard builder suggested embedding in this
    *  scene. Plain string = type only. Object = storyboard-authored data; for
    *  performable surfaces data.script is the timed on-screen performance. */

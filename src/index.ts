@@ -55,6 +55,7 @@ import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
 import { listProjects, loadProject, saveProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
 import { searchLibrary, forgetProject } from "./core/library.js";
+import { planRows, reorderBoard } from "./core/film-plan.js";
 import { getLibraryHtml } from "./preview-app/library-app.js";
 import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
@@ -201,6 +202,7 @@ function applyStoryboardFields(ps: any, body: any): void {
   if (typeof body?.purpose === "string") ps.purpose = body.purpose;
   if (typeof body?.script === "string") ps.voiceover_text = body.script;
   if (typeof body?.visual_notes === "string") ps.visual_notes = body.visual_notes;
+  if (typeof body?.shot === "string") ps.shot = body.shot.trim() || undefined;
   if (typeof body?.broll_query === "string") ps.broll_query = body.broll_query.trim() || undefined;
   if (typeof body?.hero_image === "string") ps.hero_image = body.hero_image.trim() || undefined;
   if (body?.duration_seconds != null && !isNaN(Number(body.duration_seconds))) {
@@ -3784,7 +3786,7 @@ Rules:
       }
 
       // ── API: Edit a storyboard scene's lines by INDEX (the board) ──
-      // PATCH /api/storyboard/{t}/{p}/scenes/{index} {voiceover_text?, label?, visual_notes?}
+      // PATCH /api/storyboard/{t}/{p}/scenes/{index} {voiceover_text?, label?, visual_notes?, shot?}
       // The board edits the storyboard record, which exists before any scene
       // is built (the storyboard-scene route below needs a built scene id).
       // On a speaker board the need's recording instructions follow the
@@ -3811,6 +3813,12 @@ Rules:
         }
         if (typeof body.label === "string" && body.label.trim() && body.label.trim() !== sbScene.label) { sbScene.label = body.label.trim(); changed = true; }
         if (typeof body.visual_notes === "string" && body.visual_notes.trim() !== String(sbScene.visual_notes || "").trim()) { sbScene.visual_notes = body.visual_notes.trim(); changed = true; }
+        // The plan's shot line: a reviewer's one-glance words for the frame.
+        // Emptying it hands the cell back to the visual notes.
+        if (typeof body.shot === "string" && body.shot.trim() !== String(sbScene.shot || "").trim()) {
+          if (body.shot.trim()) sbScene.shot = body.shot.trim(); else delete sbScene.shot;
+          changed = true;
+        }
         let retime: RetimeResult | null = null;
         if (changed) {
           retime = await afterLinesEdit(project, idx);
@@ -3826,6 +3834,58 @@ Rules:
           script_changed_since_take: linesMovedPastTake(project, idx),
           spine: retime ? { source: retime.spine.source, resolved: (retime.storyboard?.resolved || 0) + (retime.built?.resolved || 0) } : undefined,
         });
+        return;
+      }
+
+      // ── API: The plan (Studio's Plan view) ──
+      // GET /api/storyboard/{t}/{p}/plan -> {rows: PlanRow[]}
+      // The film as one table: beat, time, shot, line. The shot's kind is
+      // read off the scene's data server-side (core/film-plan.ts), the same
+      // reading the generate reply's table uses.
+      const sbPlanMatch = urlPath.match(/^\/api\/storyboard\/([^/]+)\/([^/]+)\/plan$/);
+      if (sbPlanMatch && method === "GET") {
+        const [, tenantId, projectId] = sbPlanMatch.map(decodeURIComponent);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        jsonResponse(res, 200, { rows: planRows(project) });
+        return;
+      }
+
+      // ── API: Reorder the board (the Plan view's drag) ──
+      // POST /api/storyboard/{t}/{p}/order {order: number[]}  order[k] = the
+      // old index of the scene that lands at k. Board-only: a built film's
+      // scenes are their own list, and moving the board under them would
+      // pair every built scene with another scene's words. Takes and speaker
+      // clips follow their scene; the stills are renamed so the rail never
+      // shows the wrong frame while the cards re-shoot.
+      const sbOrderMatch = urlPath.match(/^\/api\/storyboard\/([^/]+)\/([^/]+)\/order$/);
+      if (sbOrderMatch && method === "POST") {
+        const [, tenantId, projectId] = sbOrderMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        if ((project.scenes || []).length) {
+          jsonResponse(res, 409, { error: "This film is built -- reorder its scenes on the timeline, not the board." });
+          return;
+        }
+        const order = Array.isArray(body.order) ? body.order.map(Number) : [];
+        if (!reorderBoard(project, order)) {
+          jsonResponse(res, 400, { error: `order must list every scene index once (0..${(project.storyboard?.scenes?.length || 1) - 1})` });
+          return;
+        }
+        const outDir = projectOutputDir(tenantId, projectId);
+        const still = (i: number) => path.join(outDir, `storyboard_card_scene_${i + 1}.png`);
+        const moved: Array<[string, string]> = [];
+        await Promise.all(order.map(async (oldIdx, newIdx) => {
+          if (oldIdx === newIdx) return;
+          const tmp = still(oldIdx) + `.mv${newIdx}`;
+          try { await fs.rename(still(oldIdx), tmp); moved.push([tmp, still(newIdx)]); } catch { /* no still yet */ }
+        }));
+        await Promise.all(moved.map(([from, to]) => fs.rename(from, to).catch(() => {})));
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        reshootStoryboardCardsSoon(tenantId, projectId);
+        jsonResponse(res, 200, { ok: true, rows: planRows(project) });
         return;
       }
 
