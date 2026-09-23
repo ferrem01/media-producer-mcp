@@ -46,3 +46,20 @@ describe("the board stays editable after the build", () => {
     expect(server).not.toMatch(/project's DRAFT storyboard \(project status 'storyboard'\/'draft'\)/);
   });
 });
+
+// A REDRAFT (generate mode=storyboard + project_id) also runs in a scratch
+// project and copies its board onto the film. The scratch lingered as a
+// second film with the same subject (measured live: a redraft of
+// proj_4dfaa63e left proj_2f214503).
+describe("a storyboard redraft leaves no scratch project behind", () => {
+  it("deletes the scratch once the board is copied, unless the board still points into it", async () => {
+    const server = await read("../src/server.ts");
+    const from = server.indexOf("// If updating an existing project, copy the storyboard over.");
+    const block = server.slice(from, server.indexOf("THE TRUE STORYBOARD", from));
+    expect(from).toBeGreaterThan(0);
+    expect(block).toMatch(/const scratchId = project\.project_id;/);
+    expect(block).toMatch(/origProject\.storyboard = project\.storyboard;[\s\S]*await saveProject\(origProject\);[\s\S]*if \(!JSON\.stringify\(origProject\.storyboard \|\| \{\}\)\.includes\(scratchId\)\) \{\s*await deleteProject\(params\.tenant_id, scratchId\)/);
+    expect(block).toMatch(/forgetProject\(params\.tenant_id, scratchId\);/);
+    expect(block).toMatch(/scratch \$\{scratchId\} kept/);
+  });
+});

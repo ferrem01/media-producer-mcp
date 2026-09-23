@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — A storyboard redraft no longer leaves a scratch film behind
+
+Marc: "why is there 2 projects now?" A redraft (generate mode=storyboard +
+project_id) runs the pipeline in a scratch project and copies its board onto
+the film -- and never removed the scratch, so every redraft added a second
+film with a new director-given name (proj_4dfaa63e's redraft left
+proj_2f214503, deleted with Marc's OK). The build path already removes its
+working copy; the redraft path now does the same once the board is saved,
+unless the copied board still references the scratch dir (then it is kept,
+loudly). A scan of the tenant found three older leftovers of the same kind
+(board-only twins of another film's board), left for Marc to confirm.
+
+---
+
 ## 2026-09-23 — Plan is where a board opens; cutaways read as cutaways
 
 - Studio opens an unbuilt film on **Plan** (Marc: "can you make plan the
