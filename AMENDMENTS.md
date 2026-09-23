@@ -11,15 +11,33 @@ session can pick up mid-thread.
 "What about the component playground? would be nice to have it linked into the
 home page somehow."
 
-- The rail gets a second group, under a rule: **Workshop -> Components**. It is
-  separated because it is not tenant data -- the component library is ONE
-  library for every film in the building -- and its link carries the sign-in
-  but no tenant, which the test asserts.
+- The rail gets a second group, under a rule: **Workshop -> Components**.
+  CORRECTED same day: the link first went out WITHOUT the tenant, on the
+  reasoning that the component library is global. The house library is; whose
+  components to show beside it is not. The playground already has a My
+  Components tab that reads `?tenant=` off its own url, with its own list /
+  source / schema / delete routes that already know the captured layout (flat
+  html, schema under `captured/`). Sent there tenant-less, that tab just reads
+  "enter a tenant id". The link carries the tenant; the test asserts it.
 - The playground gets a **Home** link in its topbar, carrying the token. It was
   an address you had to know; now it is reached from home and returns there.
 - Checked before assuming: `/playground` IS behind the auth middleware (401
   unauthenticated, including its catalog API). It has no TENANT scoping, which
   is correct for a global library, not an oversight.
+
+**A note on how this went wrong**, because the shape is worth remembering: asked
+whether the tenant had user components, I answered from `list target='components'`
+-- which calls `listComponentCatalog()`, house directory only, no tenant
+argument. It could not have known. The "evidence" was a 194-vs-192 count whose
+two extras were `film-polish` and `image`: house components with no schema file,
+appearing when counting `.component.html` and vanishing when counting schemas. A
+counting artifact, read as a fact about someone's data. Marc pushed back
+("I one hundred percent created them"), and a scan of all 181 projects for types
+absent from the house library found four of his: `linkedin-feed-post`,
+`x-fox-news`, `getquotient-desktop`, `canva-skip-navigation`. THEN, still not
+having read the playground's own client, I scoped a four-route rewrite around a
+feature that was already finished. The tool worked; the link into it did not.
+Read the client before redesigning the server.
 
 ---
 

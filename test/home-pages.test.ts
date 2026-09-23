@@ -118,10 +118,12 @@ describe("home", () => {
             expect(url, `${name} -> ${id}`).toContain(href);
             expect(url, `${name} -> ${id} carries the tenant`).toContain("tenant=marc-getquotient-ai");
           }
-          // The workshop is one library for every film, so it carries no tenant.
+          // The playground's My Components tab reads ?tenant= off its own url:
+          // without it the tab reads "enter a tenant id", which is what sending
+          // people there tenant-less actually did.
           const comps = await page.$eval("#nav-components", (e) => (e as HTMLAnchorElement).getAttribute("href"));
           expect(comps, `${name} -> components`).toContain("/playground");
-          expect(comps, `${name} -> components is not tenant-scoped`).not.toContain("tenant=");
+          expect(comps, `${name} -> components carries the tenant`).toContain("tenant=marc-getquotient-ai");
         } finally { await page.close(); await cleanup(); }
       }
     } finally { await browser.close(); }

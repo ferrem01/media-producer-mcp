@@ -147,10 +147,11 @@ export const RAIL_JS = `
     if (films) films.href = withToken('/library' + q);
     if (team) team.href = withToken('/team' + q);
     if (brandN) brandN.href = withToken('/brand' + q);
-    // The playground is the component workshop: one library for every film, so
-    // it carries no tenant -- only the sign-in.
+    // The playground already has a My Components tab and reads ?tenant= off
+    // its own url; without the tenant it just says "enter a tenant id". The
+    // house library is global, but WHOSE components to show beside it is not.
     var comps = document.getElementById('nav-components');
-    if (comps) comps.href = withToken('/playground');
+    if (comps) comps.href = withToken('/playground' + q);
   }
   function showMe(me) {
     var box = document.getElementById('rail-me');
