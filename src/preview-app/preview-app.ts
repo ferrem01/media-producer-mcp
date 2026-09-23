@@ -1099,6 +1099,57 @@ ${QUOTIENT_CSS}
   .dv-vo-edit textarea { width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical; border: 1px solid var(--border-secondary);
     border-radius: var(--radius); padding: 8px 10px; font: inherit; font-size: 13px; line-height: 1.45; color: var(--content-primary); }
   .dv-vo-row { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; }
+  /* ── SCRIPT VIEW: the film as one continuous talk track ──────────────
+     The viewer hears one voice; the board makes you write it in twelve
+     separate boxes, so the seams are invisible until you watch it. Same
+     store (each scene's voiceover_text), read as a document. */
+  .sv-wrap { max-width: 760px; margin: 0 auto; padding: 22px 24px 120px; }
+  .sv-head { margin-bottom: 18px; }
+  .sv-title { font: 600 18px/24px var(--font-sans); letter-spacing: -0.01em; }
+  .sv-sub { font-size: 13px; color: var(--content-secondary); margin-top: 4px; }
+  .sv-sub b { color: var(--content-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sv-doc { border-top: 1px solid var(--border-secondary); }
+  .sv-scene { position: relative; }
+  .sv-marker {
+    display: flex; align-items: center; gap: 9px; padding: 14px 0 5px; cursor: pointer;
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--content-tertiary);
+  }
+  .sv-marker:hover .sv-mlabel { color: var(--content-primary); }
+  .sv-marker .sv-num {
+    font-variant-numeric: tabular-nums; background: var(--surface-tertiary); color: var(--content-secondary);
+    border-radius: 5px; padding: 1px 6px; letter-spacing: 0;
+  }
+  .sv-scene.on .sv-num { background: var(--accent-blue); color: #fff; }
+  .sv-mlabel { color: var(--content-secondary); letter-spacing: 0; text-transform: none; font-weight: 500; font-size: 12px; }
+  .sv-rule { flex: 1; height: 1px; background: var(--border-secondary); }
+  .sv-fit { letter-spacing: 0; text-transform: none; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .sv-fit.over { color: #b45309; }
+  .sv-lines {
+    width: 100%; border: none; outline: none; resize: none; overflow: hidden;
+    background: transparent; color: var(--content-primary);
+    font: 400 17px/1.75 var(--font-serif, Georgia, 'Times New Roman', serif);
+    padding: 2px 0 10px; display: block;
+  }
+  .sv-lines::placeholder { color: var(--content-tertiary); font-style: italic; }
+  .sv-lines:focus { background: color-mix(in srgb, var(--accent-blue) 4%, transparent); }
+  .sv-empty { color: var(--content-tertiary); font-size: 13px; padding: 18px 0; }
+  .sv-bar {
+    position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; margin-top: 10px; background: var(--surface-primary);
+    border-top: 1px solid var(--border-secondary); font-size: 13px; color: var(--content-secondary);
+  }
+  .sv-note {
+    background: var(--surface-secondary); border: 1px solid var(--border-secondary);
+    border-radius: var(--radius); padding: 10px 12px; font-size: 13px;
+    color: var(--content-secondary); margin-bottom: 16px;
+  }
+  .dv-modes { display: inline-flex; gap: 2px; background: var(--surface-tertiary); border-radius: 999px; padding: 2px; }
+  .dv-mode {
+    height: 26px; padding: 0 12px; border: none; background: transparent; cursor: pointer;
+    border-radius: 999px; font: 500 12px/1 var(--font-sans); color: var(--content-secondary);
+  }
+  .dv-mode.on { background: var(--surface-primary); color: var(--content-primary); box-shadow: var(--shadow-weak); }
   .dv-btn, #draft-view button:not(.btn):not(.np-btn):not(.sm-btn) { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; white-space: nowrap;
     border: 1px solid var(--border-secondary); border-radius: var(--radius); background: var(--surface-primary); color: var(--content-primary);
     font: 500 13px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow-weak); transition: all 150ms cubic-bezier(.4,0,.2,1); -webkit-appearance: none; appearance: none; }
@@ -4158,6 +4209,9 @@ ${QUOTIENT_CSS}
   // iterate-round-and-round loop lives HERE, not only in the MCP.
   var draftBuild = { job: null, timer: null, kind: null };
   var draftSel = 0;
+  // 'board' = a scene at a time, with its frame. 'script' = the whole talk
+  // track as one document. Same store either way.
+  var draftMode = 'board';
   // ── This scene needs ──
   // A scene's needs (assets[] with status needed/provided) -- the camera
   // take when it has lines, and on a creator-cut film the proof the claim
@@ -4556,11 +4610,200 @@ ${QUOTIENT_CSS}
     var fw = Number(cv.width) || 1920, fh = Number(cv.height) || 1080;
     document.documentElement.style.setProperty('--mp-frame', fw + '/' + fh);
     document.body.classList.toggle('frame-tall', fh > fw);
-    renderDraftCard(project);
-    renderDraftRail(project);
-    renderDraftFooter(project);
+    if (draftMode === 'script') {
+      renderScriptView(project);
+    } else {
+      renderDraftCard(project);
+      renderDraftRail(project);
+      renderDraftFooter(project);
+    }
     dv.style.display = 'block';
     resumeDraftJob(project);
+  }
+
+  function draftModesHtml() {
+    return ' <span class="dv-modes">' +
+      '<button class="dv-mode' + (draftMode === 'board' ? ' on' : '') + '" data-mode="board">Board</button>' +
+      '<button class="dv-mode' + (draftMode === 'script' ? ' on' : '') + '" data-mode="script" ' +
+        'title="The whole talk track as one document">Script</button></span>';
+  }
+  function wireDraftModes(project) {
+    document.querySelectorAll('.dv-mode').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var m = b.getAttribute('data-mode');
+        if (m === draftMode) return;
+        draftMode = m;
+        renderDraftView(project);
+      });
+    });
+  }
+
+  // ── THE SCRIPT VIEW ───────────────────────────────────────────────────
+  // The viewer hears ONE continuous talk track; the board makes you write it
+  // in a dozen separate boxes, so a limp handoff or a repeated line is
+  // invisible until you watch the cut. This reads the same store -- each
+  // scene's voiceover_text -- as a single document, with the scenes as thin
+  // markers you write straight through.
+
+  // Narration runs about 2.6 words a second (~155 wpm). A line that says only
+  // (pause) is the board's beat convention and holds silence, not words.
+  var SPEECH_WPS = 2.6, PAUSE_SECONDS = 0.6;
+  function speechSeconds(text) {
+    var secs = 0, words = 0;
+    String(text || '').split('\\n').forEach(function(line) {
+      var t = line.trim();
+      if (!t) return;
+      if (/^\\(pause\\)$/i.test(t)) { secs += PAUSE_SECONDS; return; }
+      words += t.split(/\\s+/).filter(Boolean).length;
+    });
+    return secs + words / SPEECH_WPS;
+  }
+  function clockOf(sec) {
+    var s = Math.max(0, Math.round(sec));
+    var m = Math.floor(s / 60);
+    return m ? m + ':' + String(s % 60).padStart(2, '0') : s + 's';
+  }
+  // The per-scene fit needs a decimal: rounded to the second, a scene that
+  // runs half a second long read "3s of speech in 3s" and was flagged over,
+  // which just looks broken.
+  function fitSecs(sec) {
+    if (sec >= 60) return clockOf(sec);
+    return (Math.round(sec * 10) / 10) + 's';
+  }
+  // Does this film TALK? A voice-led grammar, or any board that already has
+  // lines in it. On a tempo-cut the on-screen type IS the voiceover, and a
+  // script view would invent a talk track the film does not have.
+  function filmHasVoice(project, scenes) {
+    var g = (project.treatment && project.treatment.filmGrammar) || '';
+    if (['speaker', 'screencast', 'creator-cut', 'launch-film', 'editorial'].indexOf(g) !== -1) return true;
+    return scenes.some(function(s) { return String(s.voiceover_text || '').trim(); });
+  }
+
+  function renderScriptView(project) {
+    var dv = document.getElementById('draft-view');
+    var sb = project.storyboard || {};
+    var scenes = sb.scenes || [];
+    var filmSecs = 0, spokenSecs = 0;
+    scenes.forEach(function(s) {
+      filmSecs += Number(s.duration_seconds) || 0;
+      spokenSecs += speechSeconds(s.voiceover_text);
+    });
+    var h = '<div class="sv-wrap"><div class="sv-head">' +
+      '<div class="sv-title">' + escHtml(project.name || project.project_id) + draftModesHtml() + '</div>' +
+      '<div class="sv-sub"><b>' + scenes.length + '</b> scenes \u00b7 the film runs <b>' + clockOf(filmSecs) +
+        '</b> \u00b7 <b>' + clockOf(spokenSecs) + '</b> of speech</div></div>';
+    if (!filmHasVoice(project, scenes)) {
+      h += '<div class="sv-note">This film\u2019s argument is carried on screen, not by a voice \u2014 ' +
+        'its grammar has no continuous talk track. You can still write lines here; they become the narration if you add one.</div>';
+    }
+    h += '<div class="sv-doc">';
+    scenes.forEach(function(s, i) {
+      var dur = Number(s.duration_seconds) || 0;
+      var says = speechSeconds(s.voiceover_text);
+      var over = says > dur + 0.25 && dur > 0;
+      h += '<div class="sv-scene' + (i === draftSel ? ' on' : '') + '" data-i="' + i + '">' +
+        '<div class="sv-marker" data-pick="' + i + '">' +
+          '<span class="sv-num">' + String(i + 1).padStart(2, '0') + '</span>' +
+          '<span class="sv-mlabel">' + escHtml(s.label || ('Scene ' + (i + 1))) + '</span>' +
+          '<span class="sv-rule"></span>' +
+          '<span class="sv-fit' + (over ? ' over' : '') + '">' +
+            (says > 0 ? fitSecs(says) + ' of speech in ' + dur + 's' : dur + 's \u00b7 silent') +
+          '</span>' +
+        '</div>' +
+        '<textarea class="sv-lines" data-scene="' + i + '" rows="1" ' +
+          'placeholder="' + (i === 0 ? 'Write the opening line\u2026' : 'Nothing said here') + '">' +
+          escHtml(s.voiceover_text || '') + '</textarea>' +
+      '</div>';
+    });
+    h += '</div>';
+    h += '<div class="sv-bar"><button class="dv-btn" id="sv-save" disabled>Save script</button>' +
+      '<span id="sv-status">Edits save to each scene\u2019s lines \u00b7 one sentence per line \u00b7 a line that says only (pause) holds a beat</span></div>';
+    h += '</div>';
+    dv.innerHTML = h;
+    wireDraftModes(project);
+    wireScriptView(project);
+  }
+
+  function wireScriptView(project) {
+    var dirty = Object.create(null);
+    var saveBtn = document.getElementById('sv-save');
+    var status = document.getElementById('sv-status');
+    var boxes = document.querySelectorAll('.sv-lines');
+
+    function grow(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; }
+    function retotal() {
+      var scenes = (project.storyboard || {}).scenes || [];
+      var spoken = 0;
+      scenes.forEach(function(s, i) {
+        var box = document.querySelector('.sv-lines[data-scene="' + i + '"]');
+        var text = box ? box.value : (s.voiceover_text || '');
+        spoken += speechSeconds(text);
+        var fit = document.querySelectorAll('.sv-fit')[i];
+        var dur = Number(s.duration_seconds) || 0;
+        var says = speechSeconds(text);
+        if (fit) {
+          fit.textContent = says > 0 ? fitSecs(says) + ' of speech in ' + dur + 's' : dur + 's \u00b7 silent';
+          fit.classList.toggle('over', says > dur + 0.25 && dur > 0);
+        }
+      });
+      var sub = document.querySelector('.sv-sub');
+      if (sub) {
+        var film = 0;
+        scenes.forEach(function(s) { film += Number(s.duration_seconds) || 0; });
+        sub.innerHTML = '<b>' + scenes.length + '</b> scenes \u00b7 the film runs <b>' + clockOf(film) +
+          '</b> \u00b7 <b>' + clockOf(spoken) + '</b> of speech';
+      }
+    }
+
+    boxes.forEach(function(box) {
+      grow(box);
+      box.addEventListener('input', function() {
+        grow(box);
+        dirty[box.getAttribute('data-scene')] = box.value;
+        saveBtn.disabled = false;
+        status.textContent = Object.keys(dirty).length + ' scene' + (Object.keys(dirty).length === 1 ? '' : 's') + ' edited';
+        retotal();
+      });
+      box.addEventListener('focus', function() {
+        draftSel = Number(box.getAttribute('data-scene')) || 0;
+        document.querySelectorAll('.sv-scene').forEach(function(n, i) { n.classList.toggle('on', i === draftSel); });
+      });
+    });
+
+    document.querySelectorAll('[data-pick]').forEach(function(m) {
+      m.addEventListener('click', function() {
+        var i = Number(m.getAttribute('data-pick')) || 0;
+        var box = document.querySelector('.sv-lines[data-scene="' + i + '"]');
+        if (box) box.focus();
+      });
+    });
+
+    saveBtn.addEventListener('click', function() {
+      var idx = Object.keys(dirty);
+      if (!idx.length) return;
+      saveBtn.disabled = true;
+      status.textContent = 'Saving\u2026';
+      // The SAME write the board card uses, one scene at a time: the script
+      // is a view of the scenes, never a second copy of the words.
+      var chain = Promise.resolve();
+      idx.forEach(function(i) {
+        chain = chain.then(function() {
+          return api('PATCH', '/storyboard/' + encodeURIComponent(state.tenantId) + '/' +
+            encodeURIComponent(project.project_id) + '/scenes/' + i, { voiceover_text: dirty[i] })
+            .then(function() {
+              var sc = (project.storyboard || {}).scenes || [];
+              if (sc[i]) sc[i].voiceover_text = dirty[i];
+            });
+        });
+      });
+      chain.then(function() {
+        status.textContent = 'Saved ' + idx.length + ' scene' + (idx.length === 1 ? '' : 's');
+        dirty = Object.create(null);
+      }).catch(function(e) {
+        saveBtn.disabled = false;
+        status.textContent = 'Save failed: ' + (e.message || e);
+      });
+    });
   }
   // The selected scene's card, full size in the main window: the frame
   // (photographed at the settled moment, camera at rest), then the record
@@ -4574,7 +4817,7 @@ ${QUOTIENT_CSS}
     var total = 0;
     scenes.forEach(function(x) { total += Number(x.duration_seconds) || 0; });
     var h = '<div class="dv-head"><div>' +
-      '<div class="dv-title">' + escHtml(project.name || project.project_id) + '</div>' +
+      '<div class="dv-title">' + escHtml(project.name || project.project_id) + draftModesHtml() + '</div>' +
       '<div class="dv-sub">Storyboard draft — ' + scenes.length + ' scenes · ~' + Math.round(total) + 's · nothing built yet · iterate here, then build once</div>' +
       (sb.narrative ? '<div class="dv-narr">' + escHtml(sb.narrative) + '</div>' : '') +
       '</div></div>';
@@ -4681,6 +4924,7 @@ ${QUOTIENT_CSS}
       '<button class="btn" id="dv-scene-revise">✎ Revise</button></div>';
     h += '</div></div>';
     dv.innerHTML = h;
+    wireDraftModes(project);
     bindSceneNeeds(project, dv);
     var fb = document.getElementById('dv-scene-feedback');
     var sceneBtn = document.getElementById('dv-scene-revise');

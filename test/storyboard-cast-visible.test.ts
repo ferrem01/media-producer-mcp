@@ -59,11 +59,13 @@ describe("a saved storyboard says what it was cast as", () => {
 
   it("renders the template chip from .type, not the object", async () => {
     const app = await read("../src/preview-app/preview-app.ts");
-    const at = app.indexOf("function renderDraftView");
+    // Anchored on the function that actually draws the chip, not on the view
+    // above it: a fixed character window from renderDraftView broke the moment
+    // another view (the script view) was added between the two.
+    const at = app.indexOf("function renderDraftCard");
     expect(at).toBeGreaterThan(0);
-    // Window sized to renderDraftView's head; the storyboard-card still and
-    // its comment now sit above the chips, so 3000 chars no longer reached them.
-    const body = app.slice(at, at + 4500);
+    const end = app.indexOf("function ", at + 30);
+    const body = app.slice(at, end > at ? end : at + 6000);
     expect(body).toMatch(/s\.scene_template && s\.scene_template\.type/);
   });
 
