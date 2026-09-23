@@ -19,8 +19,15 @@ export interface ParsedComponent {
  */
 export function parseComponent(source: string): ParsedComponent {
   const template = extractSection(source, "template");
-  const style = extractSection(source, "style");
-  const script = extractSection(source, "script");
+  // The component's own <style> and <script> sit AFTER the template. A
+  // captured page can carry its own <style> inside the markup (an SVG icon's
+  // <defs><style>), and taking the first one in the file handed the component
+  // that three-line icon rule instead of its real styles -- no font, no fit
+  // (measured on audience-person-detail: every word in the fallback serif).
+  const end = source.search(/<\/template>/i);
+  const tail = end === -1 ? source : source.slice(end);
+  const style = extractSection(tail, "style") ?? extractSection(source, "style");
+  const script = extractSection(tail, "script") ?? extractSection(source, "script");
   const schema = extractSchema(source);
 
   if (!template) {

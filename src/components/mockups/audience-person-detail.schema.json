@@ -1,0 +1,189 @@
+{
+  "type": "audience-person-detail",
+  "label": "Quotient Audience — Person",
+  "category": "mockups",
+  "description": "Quotient's person page (a real capture, anonymized: 'Sarah Chen', sarah@northwind.co at Northwind): Overview stats (Last Activity, Total Clicks, Total Emails Opened), the Recent Activity feed grouped by day, and the Details column (Name, Email, Company, Job Title, Location, Lead Score, Lists, custom properties). THE ACTIVITY FEED IS SCRIPTABLE: data.activity (or {action:'activity'} rows in data.script) lands new events at their `at` -- each row is cloned from a real row, filled in, and inserted at the top of the day group its date belongs to (a new day gets its own header, in date order). Every event type: email_sent, email_delivered, email_opened, email_clicked, email_replied, email_bounced, unsubscribed, page_view, form_submitted, signup, meeting_booked, deal_stage_changed, crm_event, lead_score_changed, list_added, property_updated, flow_entered, product_event, custom. Signals from anywhere read as one timeline: a page view (source 'Website'), a deal stage change (detail 'Qualified -> Proposal', source 'HubSpot'), a product event (name 'First campaign sent', source 'Product'), the email Quotient sent back. data.focus 'feed' fills the box with the feed (top aligned, where new rows land) -- use it for a split's top half; 'details' the right column; default shows the whole page. Set person_name/person_email (avatar initials follow) and data.details {\"Company\": \"Acme\", \"Lead Score\": \"65\"}. The capture verbs (highlight, click, set-text, count-up, scroll) target visible text: count-up {text:'40', to:'65'} moves the lead score.",
+  "capture": {
+    "source_url": "https://www.getquotient.ai (Quotient app; people anonymized)",
+    "captured_at": "2026-09-23",
+    "width": 2307,
+    "height": 1247
+  },
+  "data": {
+    "person_name": {
+      "type": "string",
+      "label": "Person name",
+      "optional": true,
+      "placeholder": "Sarah Chen"
+    },
+    "person_email": {
+      "type": "string",
+      "label": "Person email",
+      "optional": true,
+      "placeholder": "sarah@northwind.co"
+    },
+    "avatar": {
+      "type": "string",
+      "label": "Avatar image URL",
+      "optional": true
+    },
+    "activities": {
+      "type": "array",
+      "label": "Rewrite existing rows' actions (most recent first)",
+      "optional": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "focus": {
+      "type": "string",
+      "label": "Focus",
+      "optional": true,
+      "enum": [
+        "full",
+        "feed",
+        "details"
+      ],
+      "placeholder": "full (default) | feed | details"
+    },
+    "today": {
+      "type": "string",
+      "label": "Today (for 'today' dates)",
+      "optional": true,
+      "placeholder": "2026-09-23 (default: render date)"
+    },
+    "activity": {
+      "type": "array",
+      "label": "New activity (lands in the feed, grouped by day)",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number",
+            "label": "At (s)"
+          },
+          "type": {
+            "type": "string",
+            "label": "Event type",
+            "enum": [
+              "email_sent",
+              "email_delivered",
+              "email_opened",
+              "email_clicked",
+              "email_replied",
+              "email_bounced",
+              "unsubscribed",
+              "page_view",
+              "form_submitted",
+              "signup",
+              "meeting_booked",
+              "deal_stage_changed",
+              "crm_event",
+              "lead_score_changed",
+              "list_added",
+              "property_updated",
+              "flow_entered",
+              "product_event",
+              "custom"
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "label": "Actor",
+            "placeholder": "default: this page's person"
+          },
+          "detail": {
+            "type": "string",
+            "label": "Detail line",
+            "placeholder": "email subject, /pricing, Qualified → Proposal"
+          },
+          "name": {
+            "type": "string",
+            "label": "Event name",
+            "placeholder": "custom / product / CRM: First campaign sent"
+          },
+          "source": {
+            "type": "string",
+            "label": "Source pill",
+            "placeholder": "HubSpot | Product | Website"
+          },
+          "date": {
+            "type": "string",
+            "label": "Date",
+            "placeholder": "today | yesterday | -3 | 2026-09-23"
+          },
+          "time": {
+            "type": "string",
+            "label": "Time",
+            "placeholder": "Just now | 10:41 AM"
+          },
+          "verb": {
+            "type": "string",
+            "label": "Verb (override)",
+            "placeholder": "viewed the pricing page"
+          },
+          "title": {
+            "type": "string",
+            "label": "Whole line (override)"
+          }
+        }
+      }
+    },
+    "details": {
+      "type": "object",
+      "label": "Details values (label -> value)",
+      "optional": true
+    },
+    "entrance": {
+      "type": "string",
+      "label": "Entrance",
+      "optional": true,
+      "placeholder": "settled (default) | rise"
+    },
+    "accent": {
+      "type": "string",
+      "label": "Accent color",
+      "optional": true,
+      "placeholder": "#393bf5"
+    },
+    "script": {
+      "type": "array",
+      "label": "Performance script (capture verbs + activity)",
+      "optional": true,
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "script_actions": [
+    {
+      "action": "highlight",
+      "description": "Underline/box/spotlight a phrase: {text, style?: underline|box|spotlight, color?, at, duration?}"
+    },
+    {
+      "action": "click",
+      "description": "The film's cursor travels to the element containing {text} and clicks"
+    },
+    {
+      "action": "type",
+      "description": "Type into the input containing/near {text|selector}: {text_input? via selector, text, speed?}"
+    },
+    {
+      "action": "set-text",
+      "description": "Swap visible copy: {text: current, to: replacement, at}"
+    },
+    {
+      "action": "count-up",
+      "description": "Animate a number: {text: current value, to, duration?, at}"
+    },
+    {
+      "action": "scroll",
+      "description": "Scroll the capture to an element or offset: {to: text|y, at}"
+    },
+    {
+      "action": "activity",
+      "description": "A new event lands in the activity feed, grouped under its day: {at, type: email_sent|email_delivered|email_opened|email_clicked|email_replied|email_bounced|unsubscribed|page_view|form_submitted|signup|meeting_booked|deal_stage_changed|crm_event|lead_score_changed|list_added|property_updated|flow_entered|product_event|custom, actor?, verb?, title?, detail? (subject, page, 'Qualified -> Proposal'), name? (custom/product/CRM event name), date?: YYYY-MM-DD|today|yesterday|-N, time? (default 'Just now'), source? (pill: HubSpot, Product, Website), highlight?: false}"
+    }
+  ]
+}
