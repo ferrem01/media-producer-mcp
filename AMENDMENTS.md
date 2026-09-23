@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — Plan is where a board opens; cutaways read as cutaways
+
+- Studio opens an unbuilt film on **Plan** (Marc: "can you make plan the
+  default tab"). Another film resets to Plan; the same film keeps the view
+  you were in, so a revision's reload does not bounce you off the board.
+- The Plan's shot reading missed creator-cut **cutaways**: the first draft of
+  the Quotient Email reel (proj_4dfaa63e) cast Claude/Slack/Quotient as
+  one-second `enter:{effect:"cut"}` flashes inside speaker scenes and every
+  row read "Speaker". A proof that cuts in on a word now reads
+  **Speaker + cutaway**.
+- `shot` is now required on the writer's add_scene tool: the first live
+  board after the Plan shipped wrote none (every cell fell back to the
+  visual notes); the redraft that asked for them explicitly wrote them all.
+
+---
+
 ## 2026-09-23 — The PLAN view: the film as one table (replaces Script)
 
 Marc, looking at a beat-by-beat table drafted in chat for the Quotient Email

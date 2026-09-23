@@ -2719,6 +2719,9 @@ ${QUOTIENT_CSS}
       var dvScenes = project.scenes && project.scenes.length;
       var dvSb = project.storyboard && project.storyboard.scenes && project.storyboard.scenes.length;
       if (!dvScenes && dvSb) {
+        // Another film opens on its plan; the same film keeps the view you
+        // were in (a revision reloads it, and should not bounce you out).
+        if (draftModeFor !== project.project_id) { draftMode = 'plan'; draftModeFor = project.project_id; }
         renderDraftView(project);
         return;
       }
@@ -4221,9 +4224,11 @@ ${QUOTIENT_CSS}
   // iterate-round-and-round loop lives HERE, not only in the MCP.
   var draftBuild = { job: null, timer: null, kind: null };
   var draftSel = 0;
-  // 'board' = a scene at a time, with its frame. 'plan' = the whole film as
-  // one table (beat, time, shot, line). Same store either way.
-  var draftMode = 'board';
+  // 'plan' = the whole film as one table (beat, time, shot, line) -- where a
+  // film opens, because it is what two people react to first. 'board' = a
+  // scene at a time, with its frame. Same store either way.
+  var draftMode = 'plan';
+  var draftModeFor = null;
   // ── This scene needs ──
   // A scene's needs (assets[] with status needed/provided) -- the camera
   // take when it has lines, and on a creator-cut film the proof the claim
