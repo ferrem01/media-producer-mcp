@@ -63,6 +63,20 @@ ${QUOTIENT_CSS}
   .header-controls {
     display: flex; align-items: center; gap: 8px; margin-left: auto;
   }
+  /* The film's name, renamed in place: plain text until you click it, then
+     the same focus ring as a Plan cell. It replaced the project picker --
+     switching films is Home's job (the Films arrow). */
+  .hdr-sep { color: var(--content-tertiary); font-size: 14px; margin: 0 -8px; }
+  .hdr-name {
+    font: 500 14px/20px var(--font-sans); color: var(--content-primary); letter-spacing: -0.01em;
+    min-width: 40px; max-width: 44vw; padding: 3px 6px; border-radius: 6px; outline: none; cursor: text;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hdr-name:hover { background: var(--surface-secondary); }
+  .hdr-name:focus { background: var(--surface-primary); box-shadow: 0 0 0 1.5px var(--accent-blue); text-overflow: clip; }
+  .hdr-name:empty::before { content: attr(data-ph); color: var(--content-tertiary); }
+  .hdr-name.saving { opacity: .6; }
+  .hdr-name.failed { box-shadow: 0 0 0 1.5px #dc2626; }
   .header-controls label { font-size: 12px; font-weight: 500; color: var(--content-secondary); }
   .header-controls input, .header-controls select {
     height: 32px; background: var(--surface-primary); border: 1px solid var(--input); color: var(--content-primary);
@@ -1217,9 +1231,9 @@ ${QUOTIENT_CSS}
   <header>
     <a class="btn btn-secondary" id="library-btn" style="text-decoration:none;" title="All the films in this tenant">&#8592; Films</a>
     <h1>Studio</h1>
+    <span class="hdr-sep">/</span>
+    <div id="project-name" class="hdr-name" contenteditable="plaintext-only" spellcheck="false" title="Click to rename this film" data-ph="Loading&#8230;"></div>
     <div class="header-controls">
-      <label>Project</label>
-      <select id="project-select" disabled><option value="">Loading&#8230;</option></select>
       <button class="btn btn-secondary" id="project-delete-btn" style="display:none;" title="Delete this project &#8212; scenes, assets and rendered MP4. Asks first; cannot be undone.">&#128465;</button>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
@@ -1379,7 +1393,7 @@ ${QUOTIENT_CSS}
 
   // DOM refs
   var els = {
-    projectSelect: document.getElementById('project-select'),
+    projectName: document.getElementById('project-name'),
     sceneList: document.getElementById('scene-list'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
@@ -2412,41 +2426,61 @@ ${QUOTIENT_CSS}
   // Auto-load tenant from URL -- handled at end of init (see bottom)
 
   // Load projects for tenant
+  // ── The film's name, renamed in place ──
+  function showProjectName(project) {
+    var el = els.projectName;
+    if (!el || document.activeElement === el) return;
+    el.textContent = project.name || project.project_id;
+    el.setAttribute('data-ph', 'Untitled film');
+    document.title = (project.name || project.project_id) + ' \u00b7 Studio';
+  }
+  function wireProjectName() {
+    var el = els.projectName;
+    if (!el) return;
+    el.addEventListener('focus', function() {
+      el.dataset.was = el.textContent;
+      // Select it all: a rename usually replaces the name.
+      try { var r = document.createRange(); r.selectNodeContents(el); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); } catch (e) {}
+    });
+    el.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+      if (e.key === 'Escape') { el.textContent = el.dataset.was || ''; el.blur(); }
+    });
+    el.addEventListener('blur', function() {
+      el.scrollLeft = 0;
+      var p = state.currentProject;
+      var name = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!p) return;
+      if (!name) { el.textContent = p.name || p.project_id; return; }
+      if (name === (p.name || '')) { el.textContent = name; return; }
+      el.textContent = name;
+      el.classList.remove('failed');
+      el.classList.add('saving');
+      api('PATCH', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { name: name }).then(function(res) {
+        el.classList.remove('saving');
+        p.name = (res && res.name) || name;
+        document.title = p.name + ' \u00b7 Studio';
+        // The page titles in the Plan and on the board read the same name.
+        document.querySelectorAll('.pv-title, .dv-title').forEach(function(t) { t.textContent = p.name; });
+      }).catch(function(err) {
+        el.classList.remove('saving');
+        el.classList.add('failed');
+        el.textContent = el.dataset.was || p.name || '';
+        studioStatus('Could not rename: ' + (err.message || err), 'err');
+      });
+    });
+  }
+
   function loadProjects() {
     // tenantId comes from the session (/auth/me) or a share-link param --
     // there is no tenant field to read.
     if (!state.tenantId) return;
 
-    api('/projects/' + state.tenantId).then(function(projects) {
-      state.projects = projects || [];
-      els.projectSelect.innerHTML = '';
-      if (!state.projects.length) {
-        els.projectSelect.innerHTML = '<option value="">No projects found</option>';
-        els.projectSelect.disabled = true;
-        return;
-      }
-      state.projects.forEach(function(p) {
-        var opt = document.createElement('option');
-        opt.value = p.project_id;
-        var label = p.name || p.project_id;
-        if (p.scene_count != null) label += ' (' + p.scene_count + ' scenes)';
-        if (p.format) label += ' [' + p.format + ']';
-        opt.textContent = label;
-        els.projectSelect.appendChild(opt);
-      });
-      els.projectSelect.disabled = false;
-
-      var urlProject = new URLSearchParams(window.location.search).get('project');
-      if (urlProject) {
-        els.projectSelect.value = urlProject;
-        if (els.projectSelect.value === urlProject) {
-          loadProject(urlProject);
-          return;
-        }
-      }
-    }).catch(function() {
-      els.projectSelect.innerHTML = '<option value="">Failed to load</option>';
-    });
+    // No picker: Studio opens the film named in the URL, and Home is where
+    // you choose one. A bare /studio has nothing to show, so it goes home.
+    var urlProject = new URLSearchParams(window.location.search).get('project');
+    if (!urlProject) { window.location.href = homeHref(); return; }
+    loadProject(urlProject);
   }
 
   // Preload all scene HTML into cache
@@ -2686,6 +2720,7 @@ ${QUOTIENT_CSS}
     if (!projectId || !state.tenantId) return;
     api('/projects/' + state.tenantId + '/' + projectId).then(function(project) {
       state.currentProject = project;
+      showProjectName(project);
       liveSync.known = project.updated_at || null;
       liveSync.suppressUntil = 0;
       state.currentSceneIndex = -1;
@@ -2750,6 +2785,7 @@ ${QUOTIENT_CSS}
       startCompositePreview(project);
     }).catch(function() {
       els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
+      if (els.projectName) { els.projectName.textContent = ''; els.projectName.setAttribute('data-ph', 'Film not found'); }
     });
   }
 
@@ -8448,10 +8484,7 @@ ${QUOTIENT_CSS}
   }
 
   // Events
-  els.projectSelect.addEventListener('change', function() {
-    var val = els.projectSelect.value;
-    if (val) loadProject(val);
-  });
+  wireProjectName();
   els.playBtn.addEventListener('click', togglePlay);
   els.slider.addEventListener('input', function() { scrub(parseFloat(els.slider.value)); });
   if (els.volSlider) {

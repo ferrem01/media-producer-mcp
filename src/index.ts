@@ -53,7 +53,7 @@ import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, updateProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
 import { searchLibrary, forgetProject } from "./core/library.js";
 import { planRows, reorderBoard } from "./core/film-plan.js";
 import { getLibraryHtml } from "./preview-app/library-app.js";
@@ -1594,6 +1594,20 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           return;
         }
         jsonResponse(res, 200, project);
+        return;
+      }
+
+      // ── API: Rename a film (Studio's header name, edited in place) ──
+      // PATCH /api/projects/{t}/{p} {name}. A name is not an edit to the
+      // film: updated_at stays put, so a rename never marks a render stale.
+      if (getMatch && method === "PATCH") {
+        const [, tenantId, projectId] = getMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const name = typeof body.name === "string" ? body.name.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+        if (!name) { jsonResponse(res, 400, { error: "name is required" }); return; }
+        const updated = await updateProject(tenantId, projectId, { name });
+        if (!updated) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        jsonResponse(res, 200, { ok: true, project_id: projectId, name: updated.name });
         return;
       }
 

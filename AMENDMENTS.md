@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — Studio: the film's name, renamed in place (the picker is gone)
+
+Marc: "remove the giant project dropdown and replace it with an editable
+inline project name that only shows it editable when you click on it like
+with the plan fields." The header now reads `Studio / <film name>`; the name
+is plain text until clicked, then takes the Plan cell's focus ring. Enter
+saves, Escape reverts, an empty name reverts. It writes through a new
+`PATCH /api/projects/{t}/{p} {name}`, which leaves `updated_at` alone so a
+rename never marks a render stale. The Plan and board titles and the tab
+title follow. Choosing a film is Home's job now (the Films arrow): Studio
+opens the film in the URL, and a bare /studio goes home.
+
+---
+
 ## 2026-09-23 — A storyboard redraft no longer leaves a scratch film behind
 
 Marc: "why is there 2 projects now?" A redraft (generate mode=storyboard +

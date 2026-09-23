@@ -105,6 +105,7 @@ describe("the plan view in Studio", () => {
     const project = board();
     const patches: Array<{ url: string; body: any }> = [];
     const orders: any[] = [];
+    const renames: any[] = [];
     const html = getPreviewHtml();
     const server = http.createServer((req, res) => {
       const url = req.url || "/";
@@ -115,6 +116,12 @@ describe("the plan view in Studio", () => {
         const path = url.split("?")[0];
         if (path === "/auth/me") return json({ email: "m@x.ai", tenant_id: "t1" });
         if (path === "/api/projects/t1") return json([{ project_id: "p1", name: project.name, status: "storyboard" }]);
+        if (path === "/api/projects/t1/p1" && req.method === "PATCH") {
+          const body = JSON.parse(raw || "{}");
+          renames.push(body);
+          project.name = body.name;
+          return json({ ok: true, project_id: "p1", name: body.name });
+        }
         if (path === "/api/projects/t1/p1") return json(project);
         if (path === "/api/storyboard/t1/p1/plan") return json({ rows: planRows(project) });
         if (path === "/api/storyboard/t1/p1/order" && req.method === "POST") {
@@ -190,6 +197,24 @@ describe("the plan view in Studio", () => {
       expect(orders[0]).toEqual([2, 0, 1]);
       await page.waitForFunction(() => document.querySelector('.pv-beat[data-i="0"]')?.textContent === "Handled");
       expect(await page.$$eval(".pv-beat", (b) => b.map((x) => x.textContent))).toEqual(["Handled", "Hook", "Start anywhere"]);
+      // The film's name sits in the header as text, renamed in place. The
+      // project picker is gone: Home is where you choose a film.
+      expect(await page.$("#project-select")).toBeNull();
+      expect(await page.textContent("#project-name")).toBe("Quotient Email Ad");
+      await page.click("#project-name");
+      await page.keyboard.type("Quotient Email \u2014 IG Reel");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => renames.length).toBe(1);
+      expect(renames[0]).toEqual({ name: "Quotient Email \u2014 IG Reel" });
+      await page.waitForFunction(() => document.querySelector(".pv-title")?.textContent === "Quotient Email \u2014 IG Reel");
+      expect(await page.title()).toBe("Quotient Email \u2014 IG Reel \u00b7 Studio");
+      // Escape puts it back without saving.
+      await page.click("#project-name");
+      await page.keyboard.type("nope");
+      await page.keyboard.press("Escape");
+      expect(await page.textContent("#project-name")).toBe("Quotient Email \u2014 IG Reel");
+      expect(renames).toHaveLength(1);
+
       // # opens that scene on the board; Plan is one click back.
       await page.click('.pv-open[data-i="1"]');
       await page.waitForSelector(".dv-card");
