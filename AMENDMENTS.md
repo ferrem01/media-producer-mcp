@@ -12,13 +12,29 @@ Marc, on Descript's script editor: the viewer hears one voice, so writing the
 talk track in twelve separate boxes hides how it flows. A second view of the
 storyboard, not a second store.
 
-- Studio's draft view gets a **Board | Script** toggle. Script renders every
-  scene's `voiceover_text` as ONE document: thin scene markers (number, label,
-  fit) with the lines running straight through, set in a serif at reading size.
-- **One store.** The script is a projection of the scenes; editing a block
-  writes back through the SAME route the board card uses
-  (`PATCH /storyboard/{t}/{p}/scenes/{i}` with `voiceover_text`), one scene at a
-  time. A copy would have meant two sources of truth and a sync problem forever.
+- Studio's draft view gets a **Board | Script** toggle (sat on the title line
+  at first, which read as part of scene one -- it belongs opposite the title,
+  where a view switcher lives).
+- **ONE TEXT FIELD**, second pass. The first build was a textarea per scene,
+  which LOOKED like a document but was not one: you could not select across a
+  boundary or paste a whole speech in. Marc: "it's just one solid text area and
+  I'm just writing my speech." It is now a single field where a line starting
+  with `##` opens a scene. Placing a scene, renaming one, and moving a sentence
+  across a boundary are all just typing. A speech pasted with no markers stays
+  one block rather than being lost.
+- A **ledger** beside the field reads the film back out of the text -- number,
+  name, speech against duration -- and highlights the scene the cursor is in,
+  so the fit signal survives without cluttering the writing surface.
+- **One store.** The script is a projection of the scenes; saving writes back
+  through the SAME route the board card uses (`PATCH /storyboard/{t}/{p}/scenes/{i}`),
+  one scene at a time -- and that route already takes `label`, so renaming a
+  scene from its marker line came free. A copy would have meant two sources of
+  truth and a sync problem forever.
+- **Structure is not silently changed.** Adding or removing a `##` splits or
+  merges scenes, which is a board operation (durations, components, camera
+  moves), not a text one. The view counts the breaks, names exactly what
+  changed, and refuses to save rather than guessing at the mapping. Deterministic
+  board split/merge routes are the next step if this view earns them.
 - **The fit signal**, which is the reason to look at it: narration runs about
   2.6 words a second (~155 wpm), so each scene shows "3.5s of speech in 3s" and
   goes amber when the words do not fit the cut. The board's own beat convention

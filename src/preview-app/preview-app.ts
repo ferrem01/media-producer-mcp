@@ -1110,6 +1110,33 @@ ${QUOTIENT_CSS}
   .sv-title { font: 600 18px/24px var(--font-sans); letter-spacing: -0.01em; }
   .sv-sub { font-size: 13px; color: var(--content-secondary); margin-top: 4px; }
   .sv-sub b { color: var(--content-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+  /* One field, and a ledger beside it that reads the film out of the text. */
+  .sv-split { display: flex; gap: 22px; align-items: flex-start; }
+  .sv-field {
+    flex: 1; min-height: 60vh; border: none; outline: none; resize: none;
+    background: transparent; color: var(--content-primary);
+    font: 400 17px/1.8 var(--font-serif, Georgia, 'Times New Roman', serif);
+    padding: 4px 0 40px;
+  }
+  .sv-field::placeholder { color: var(--content-tertiary); font-style: italic; }
+  .sv-ledger {
+    flex: none; width: 210px; position: sticky; top: 12px;
+    border-left: 1px solid var(--border-secondary); padding-left: 14px;
+  }
+  .sv-row {
+    display: flex; align-items: baseline; gap: 7px; padding: 4px 6px; margin: 0 -6px;
+    border-radius: 6px; font-size: 12px; color: var(--content-secondary);
+  }
+  .sv-row.on { background: var(--surface-tertiary); color: var(--content-primary); }
+  .sv-row.new .sv-rfit { color: var(--accent-blue); }
+  .sv-rnum { font-variant-numeric: tabular-nums; color: var(--content-tertiary); font-size: 11px; }
+  .sv-rlab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sv-rfit { font-variant-numeric: tabular-nums; font-size: 11px; color: var(--content-tertiary); }
+  .sv-rfit.over { color: #b45309; font-weight: 600; }
+  .sv-bar code {
+    font: 11px ui-monospace, SFMono-Regular, monospace; background: var(--surface-tertiary);
+    padding: 1px 5px; border-radius: 4px;
+  }
   .sv-doc { border-top: 1px solid var(--border-secondary); }
   .sv-scene { position: relative; }
   .sv-marker {
@@ -4681,45 +4708,54 @@ ${QUOTIENT_CSS}
     return scenes.some(function(s) { return String(s.voiceover_text || '').trim(); });
   }
 
+  // The script is ONE text field. Scene breaks are lines that start with ##,
+  // so placing a scene, renaming one, or moving a sentence across a boundary
+  // are all just typing -- which is the whole reason to have this view.
+  var SCRIPT_MARK = '## ';
+  function scriptFromScenes(scenes) {
+    return scenes.map(function(s, i) {
+      return SCRIPT_MARK + (s.label || ('Scene ' + (i + 1))) + '\\n' + String(s.voiceover_text || '').trim();
+    }).join('\\n\\n') + '\\n';
+  }
+  // Text -> blocks. A marker line opens a block; anything before the first one
+  // belongs to the opening scene, so pasting a bare speech in still works.
+  function scriptToBlocks(text) {
+    var blocks = [];
+    var cur = null;
+    String(text || '').split('\\n').forEach(function(line) {
+      if (line.indexOf(SCRIPT_MARK) === 0 || line.trim() === '##') {
+        cur = { label: line.slice(2).trim(), lines: [] };
+        blocks.push(cur);
+        return;
+      }
+      if (!cur) { cur = { label: null, lines: [] }; blocks.push(cur); }
+      cur.lines.push(line);
+    });
+    return blocks.map(function(b) {
+      return { label: b.label, text: b.lines.join('\\n').trim() };
+    });
+  }
+
   function renderScriptView(project) {
     var dv = document.getElementById('draft-view');
     var sb = project.storyboard || {};
     var scenes = sb.scenes || [];
-    var filmSecs = 0, spokenSecs = 0;
-    scenes.forEach(function(s) {
-      filmSecs += Number(s.duration_seconds) || 0;
-      spokenSecs += speechSeconds(s.voiceover_text);
-    });
     var h = '<div class="sv-wrap"><div class="sv-head">' +
       '<div class="sv-title">' + escHtml(project.name || project.project_id) + '</div>' +
-      '<div class="sv-sub"><b>' + scenes.length + '</b> scenes \u00b7 the film runs <b>' + clockOf(filmSecs) +
-        '</b> \u00b7 <b>' + clockOf(spokenSecs) + '</b> of speech</div></div>' + draftModesHtml();
+      '<div class="sv-sub" id="sv-sub"></div></div>' + draftModesHtml();
     if (!filmHasVoice(project, scenes)) {
       h += '<div class="sv-note">This film\u2019s argument is carried on screen, not by a voice \u2014 ' +
-        'its grammar has no continuous talk track. You can still write lines here; they become the narration if you add one.</div>';
+        'its grammar has no continuous talk track. You can still write the script here.</div>';
     }
-    h += '<div class="sv-doc">';
-    scenes.forEach(function(s, i) {
-      var dur = Number(s.duration_seconds) || 0;
-      var says = speechSeconds(s.voiceover_text);
-      var over = says > dur + 0.25 && dur > 0;
-      h += '<div class="sv-scene' + (i === draftSel ? ' on' : '') + '" data-i="' + i + '">' +
-        '<div class="sv-marker" data-pick="' + i + '">' +
-          '<span class="sv-num">' + String(i + 1).padStart(2, '0') + '</span>' +
-          '<span class="sv-mlabel">' + escHtml(s.label || ('Scene ' + (i + 1))) + '</span>' +
-          '<span class="sv-rule"></span>' +
-          '<span class="sv-fit' + (over ? ' over' : '') + '">' +
-            (says > 0 ? fitSecs(says) + ' of speech in ' + dur + 's' : dur + 's \u00b7 silent') +
-          '</span>' +
-        '</div>' +
-        '<textarea class="sv-lines" data-scene="' + i + '" rows="1" ' +
-          'placeholder="' + (i === 0 ? 'Write the opening line\u2026' : 'Nothing said here') + '">' +
-          escHtml(s.voiceover_text || '') + '</textarea>' +
-      '</div>';
-    });
-    h += '</div>';
+    h += '<div class="sv-split">' +
+      '<textarea id="sv-field" class="sv-field" spellcheck="true" ' +
+        'placeholder="Write the whole thing. Start a scene with ## and its name.">' +
+        escHtml(scriptFromScenes(scenes)) + '</textarea>' +
+      '<div class="sv-ledger" id="sv-ledger"></div>' +
+    '</div>';
     h += '<div class="sv-bar"><button class="dv-btn" id="sv-save" disabled>Save script</button>' +
-      '<span id="sv-status">Edits save to each scene\u2019s lines \u00b7 one sentence per line \u00b7 a line that says only (pause) holds a beat</span></div>';
+      '<span id="sv-status">A line starting with <code>##</code> begins a scene \u00b7 ' +
+        'one sentence per line \u00b7 a line that says only (pause) holds a beat</span></div>';
     h += '</div>';
     dv.innerHTML = h;
     wireDraftModes(project);
@@ -4727,90 +4763,105 @@ ${QUOTIENT_CSS}
   }
 
   function wireScriptView(project) {
-    var dirty = Object.create(null);
+    var scenes = (project.storyboard || {}).scenes || [];
+    var field = document.getElementById('sv-field');
+    var ledger = document.getElementById('sv-ledger');
+    var sub = document.getElementById('sv-sub');
     var saveBtn = document.getElementById('sv-save');
     var status = document.getElementById('sv-status');
-    var boxes = document.querySelectorAll('.sv-lines');
+    var original = field.value;
 
-    function grow(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; }
-    function retotal() {
-      var scenes = (project.storyboard || {}).scenes || [];
-      var spoken = 0;
-      scenes.forEach(function(s, i) {
-        var box = document.querySelector('.sv-lines[data-scene="' + i + '"]');
-        var text = box ? box.value : (s.voiceover_text || '');
-        spoken += speechSeconds(text);
-        var fit = document.querySelectorAll('.sv-fit')[i];
-        var dur = Number(s.duration_seconds) || 0;
-        var says = speechSeconds(text);
-        if (fit) {
-          fit.textContent = says > 0 ? fitSecs(says) + ' of speech in ' + dur + 's' : dur + 's \u00b7 silent';
-          fit.classList.toggle('over', says > dur + 0.25 && dur > 0);
-        }
-      });
-      var sub = document.querySelector('.sv-sub');
-      if (sub) {
-        var film = 0;
-        scenes.forEach(function(s) { film += Number(s.duration_seconds) || 0; });
-        sub.innerHTML = '<b>' + scenes.length + '</b> scenes \u00b7 the film runs <b>' + clockOf(film) +
-          '</b> \u00b7 <b>' + clockOf(spoken) + '</b> of speech';
-      }
+    function caretBlock() {
+      var upto = field.value.slice(0, field.selectionStart || 0);
+      var n = -1;
+      upto.split('\\n').forEach(function(l) { if (l.indexOf(SCRIPT_MARK) === 0 || l.trim() === '##') n++; });
+      return Math.max(0, n);
     }
 
-    boxes.forEach(function(box) {
-      grow(box);
-      box.addEventListener('input', function() {
-        grow(box);
-        dirty[box.getAttribute('data-scene')] = box.value;
-        saveBtn.disabled = false;
-        status.textContent = Object.keys(dirty).length + ' scene' + (Object.keys(dirty).length === 1 ? '' : 's') + ' edited';
-        retotal();
-      });
-      box.addEventListener('focus', function() {
-        draftSel = Number(box.getAttribute('data-scene')) || 0;
-        document.querySelectorAll('.sv-scene').forEach(function(n, i) { n.classList.toggle('on', i === draftSel); });
-      });
-    });
+    function refresh() {
+      var blocks = scriptToBlocks(field.value);
+      var filmSecs = 0;
+      scenes.forEach(function(s) { filmSecs += Number(s.duration_seconds) || 0; });
+      var spoken = 0;
+      blocks.forEach(function(b) { spoken += speechSeconds(b.text); });
+      sub.innerHTML = '<b>' + blocks.length + '</b> scene' + (blocks.length === 1 ? '' : 's') +
+        ' \u00b7 the film runs <b>' + clockOf(filmSecs) + '</b> \u00b7 <b>' + clockOf(spoken) + '</b> of speech';
 
-    document.querySelectorAll('[data-pick]').forEach(function(m) {
-      m.addEventListener('click', function() {
-        var i = Number(m.getAttribute('data-pick')) || 0;
-        var box = document.querySelector('.sv-lines[data-scene="' + i + '"]');
-        if (box) box.focus();
+      var here = caretBlock();
+      var rows = blocks.map(function(b, i) {
+        var scene = scenes[i];
+        var dur = scene ? (Number(scene.duration_seconds) || 0) : 0;
+        var says = speechSeconds(b.text);
+        var over = scene && says > dur + 0.25 && dur > 0;
+        return '<div class="sv-row' + (i === here ? ' on' : '') + (scene ? '' : ' new') + '">' +
+          '<span class="sv-rnum">' + String(i + 1).padStart(2, '0') + '</span>' +
+          '<span class="sv-rlab">' + escHtml(b.label || (scene && scene.label) || 'Untitled') + '</span>' +
+          '<span class="sv-rfit' + (over ? ' over' : '') + '">' +
+            (scene ? fitSecs(says) + ' / ' + dur + 's' : 'new scene') + '</span>' +
+        '</div>';
+      }).join('');
+      ledger.innerHTML = rows || '<div class="sv-row">nothing yet</div>';
+
+      // What the save can and cannot do. Adding or removing a ## changes the
+      // film's STRUCTURE, which is a board operation, not a text one.
+      var diff = blocks.length - scenes.length;
+      if (diff !== 0) {
+        saveBtn.disabled = true;
+        status.innerHTML = '<b>' + Math.abs(diff) + ' scene break ' + (diff > 0 ? 'added' : 'removed') +
+          '</b> \u2014 splitting or merging scenes changes the board, which this view cannot do yet. ' +
+          'Put the breaks back to save your words (' + scenes.length + ' expected, ' + blocks.length + ' found).';
+        return;
+      }
+      var dirty = blocks.some(function(b, i) {
+        var s = scenes[i];
+        return String(b.text || '').trim() !== String(s.voiceover_text || '').trim() ||
+          (b.label && b.label !== s.label);
       });
-    });
+      saveBtn.disabled = !dirty;
+      status.innerHTML = dirty ? 'Edited \u2014 unsaved'
+        : 'A line starting with <code>##</code> begins a scene \u00b7 one sentence per line \u00b7 a line that says only (pause) holds a beat';
+    }
+
+    field.addEventListener('input', refresh);
+    field.addEventListener('keyup', refresh);
+    field.addEventListener('click', refresh);
 
     saveBtn.addEventListener('click', function() {
-      var idx = Object.keys(dirty);
-      if (!idx.length) return;
+      var blocks = scriptToBlocks(field.value);
+      if (blocks.length !== scenes.length) return;
       saveBtn.disabled = true;
       status.textContent = 'Saving\u2026';
-      // The SAME write the board card uses, one scene at a time: the script
-      // is a view of the scenes, never a second copy of the words.
-      var chain = Promise.resolve();
-      idx.forEach(function(i) {
+      var chain = Promise.resolve(), saved = 0;
+      blocks.forEach(function(b, i) {
+        var s = scenes[i];
+        var body = {};
+        if (String(b.text || '').trim() !== String(s.voiceover_text || '').trim()) body.voiceover_text = b.text;
+        if (b.label && b.label !== s.label) body.label = b.label;
+        if (!Object.keys(body).length) return;
         chain = chain.then(function() {
+          // The same per-scene write the board card uses: one store.
           return api('PATCH', '/storyboard/' + encodeURIComponent(state.tenantId) + '/' +
-            encodeURIComponent(project.project_id) + '/scenes/' + i, { voiceover_text: dirty[i] })
-            .then(function() {
-              var sc = (project.storyboard || {}).scenes || [];
-              if (sc[i]) sc[i].voiceover_text = dirty[i];
+            encodeURIComponent(project.project_id) + '/scenes/' + i, body).then(function() {
+              saved++;
+              if (body.voiceover_text !== undefined) s.voiceover_text = body.voiceover_text;
+              if (body.label) s.label = body.label;
             });
         });
       });
       chain.then(function() {
-        status.textContent = 'Saved ' + idx.length + ' scene' + (idx.length === 1 ? '' : 's');
-        dirty = Object.create(null);
+        original = field.value;
+        status.textContent = 'Saved ' + saved + ' scene' + (saved === 1 ? '' : 's');
+        refresh();
       }).catch(function(e) {
         saveBtn.disabled = false;
         status.textContent = 'Save failed: ' + (e.message || e);
       });
     });
+
+    refresh();
+    field.focus();
   }
-  // The selected scene's card, full size in the main window: the frame
-  // (photographed at the settled moment, camera at rest), then the record
-  // -- purpose, VO, timecoded beats, camera copy, component scripts --
-  // and a feedback box aimed at this scene. "A visual plus text."
+
   function renderDraftCard(project) {
     var dv = document.getElementById('draft-view');
     var sb = project.storyboard || {};

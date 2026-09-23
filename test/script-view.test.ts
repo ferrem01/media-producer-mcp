@@ -53,7 +53,46 @@ describe("the script view", () => {
 
   it("writes through the same route the board card uses, never a second copy", () => {
     const html = getPreviewHtml();
-    // One store: each scene's voiceover_text, saved scene by scene.
-    expect(html).toMatch(/api\('PATCH', '\/storyboard\/' \+ encodeURIComponent\(state\.tenantId\)[\s\S]{0,200}voiceover_text: dirty\[i\]/);
+    // One store: each scene's voiceover_text (and label), saved scene by scene
+    // through the board's own PATCH.
+    expect(html).toMatch(/api\('PATCH', '\/storyboard\/' \+ encodeURIComponent\(state\.tenantId\)/);
+    expect(html).toMatch(/body\.voiceover_text = b\.text;/);
+    expect(html).toMatch(/body\.label = b\.label;/);
+  });
+
+  it("is ONE text field: scene breaks are lines in the script", () => {
+    const html = getPreviewHtml();
+    // Everything from the marker constant to the renderer: both helpers, not
+    // just the first one a lazy match happens to end on.
+    const from = html.indexOf("var SCRIPT_MARK");
+    const to = html.indexOf("function renderScriptView", from);
+    expect(from, "the script serialiser must exist").toBeGreaterThan(0);
+    expect(to).toBeGreaterThan(from);
+    const src = html.slice(from, to);
+    expect(src, "the script serialiser must exist").toContain("scriptFromScenes");
+    const io = new Function(`${src}\nreturn { scriptFromScenes, scriptToBlocks };`)() as {
+      scriptFromScenes: (s: unknown[]) => string;
+      scriptToBlocks: (t: string) => Array<{ label: string | null; text: string }>;
+    };
+    const scenes = [
+      { label: "Cold open", voiceover_text: "You just had one of the best calls of your life." },
+      { label: "The turn", voiceover_text: "And then it dies in a folder nobody opens." },
+    ];
+    const text = io.scriptFromScenes(scenes);
+    expect(text.startsWith("## Cold open\n")).toBe(true);
+    // Round trip: what comes out is what went in.
+    expect(io.scriptToBlocks(text)).toEqual([
+      { label: "Cold open", text: scenes[0].voiceover_text },
+      { label: "The turn", text: scenes[1].voiceover_text },
+    ]);
+    // A whole speech pasted in with no markers is still one block, not a loss.
+    expect(io.scriptToBlocks("Just some words.\nMore words.")).toEqual([
+      { label: null, text: "Just some words.\nMore words." },
+    ]);
+    // Renaming a scene is just editing its marker line.
+    expect(io.scriptToBlocks("## Renamed\nA line.")[0].label).toBe("Renamed");
+    // Adding a marker adds a block -- which the view reports as a structural
+    // change it cannot apply, rather than silently mangling the mapping.
+    expect(io.scriptToBlocks(text + "\n## A new scene\nAnd a line.")).toHaveLength(3);
   });
 });
