@@ -6,6 +6,41 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — The SCRIPT view: the film as one continuous talk track
+
+Marc, on Descript's script editor: the viewer hears one voice, so writing the
+talk track in twelve separate boxes hides how it flows. A second view of the
+storyboard, not a second store.
+
+- Studio's draft view gets a **Board | Script** toggle. Script renders every
+  scene's `voiceover_text` as ONE document: thin scene markers (number, label,
+  fit) with the lines running straight through, set in a serif at reading size.
+- **One store.** The script is a projection of the scenes; editing a block
+  writes back through the SAME route the board card uses
+  (`PATCH /storyboard/{t}/{p}/scenes/{i}` with `voiceover_text`), one scene at a
+  time. A copy would have meant two sources of truth and a sync problem forever.
+- **The fit signal**, which is the reason to look at it: narration runs about
+  2.6 words a second (~155 wpm), so each scene shows "3.5s of speech in 3s" and
+  goes amber when the words do not fit the cut. The board's own beat convention
+  is honoured -- a line that says only `(pause)` holds 0.6s of silence, not
+  words. Totals live in the header and move as you type.
+- **Not offered blindly.** A voice-led grammar (speaker, screencast,
+  creator-cut, launch-film, editorial) or a board that already has lines gets
+  the view plainly; on a tempo-cut, where on-screen TYPE is the voiceover, it
+  says so rather than inventing a talk track the film does not have.
+- Duration is deliberately NOT retimed from the text. For a film with a take
+  the measured spine could do it honestly; for everything else duration is
+  authored, and silently recutting a film because someone typed a sentence
+  would be worse than the problem.
+- THE ESCAPING TAX, twice in one sitting (CLAUDE.md's standing gotcha): this
+  file is one template literal, so `split('\n')` emitted a raw newline and broke
+  the page, then `/^\(pause\)$/` emitted `/^(pause)$/` and `\s+` emitted `s+` --
+  a word splitter that split on the letter S. Both PARSED fine and quietly
+  produced nonsense (12 words costed at 1.2s). `test/script-view.test.ts` now
+  asserts the regexes survive into the page, because the failure is invisible.
+
+---
+
 ## 2026-09-23 — A built film kept being called a board
 
 Marc: "some films that are fully built out and even rendered still have the
