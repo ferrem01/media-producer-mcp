@@ -148,12 +148,29 @@
     const pick = srcs.find((s) => s.format.includes("woff2")) || srcs.find((s) => s.format.includes("woff")) || srcs[0];
     let abs;
     try { abs = new URL(pick.url, baseHref).href; } catch (e) { return null; }
+    // Which characters this file covers. Sites split one family into
+    // per-script files (Google-hosted and next/font Inter list Cyrillic
+    // first); taking the first file per weight baked a Cyrillic-only Inter
+    // into a capture and every English word fell back to serif.
+    const range = (block.match(/unicode-range\s*:\s*([^;}]+)/i) || [])[1];
     return {
       family: fam[1].trim(),
       weight: (weight || "normal").trim(),
       style: (style || "normal").trim(),
       url: abs,
+      latin: coversLatin(range),
     };
+  }
+  /** Does a unicode-range cover basic Latin letters (U+0041)? No range = all. */
+  function coversLatin(range) {
+    if (!range) return true;
+    return range.split(",").some((tok) => {
+      const m = tok.trim().match(/^U\+([0-9A-F?]+)(?:-([0-9A-F]+))?$/i);
+      if (!m) return false;
+      const lo = parseInt(m[1].replace(/\?/g, "0"), 16);
+      const hi = m[2] ? parseInt(m[2], 16) : parseInt(m[1].replace(/\?/g, "F"), 16);
+      return lo <= 0x41 && hi >= 0x41;
+    });
   }
   async function collectFonts(familyStacks) {
     const wanted = new Set();
@@ -191,6 +208,8 @@
     const out = [];
     const seen = new Set();
     const missing = new Set(wanted);
+    // The Latin file first: it is the one English text renders with.
+    candidates.sort((a, b) => (b.latin ? 1 : 0) - (a.latin ? 1 : 0));
     for (const f of candidates) {
       if (!wanted.has(f.family.toLowerCase())) continue;
       const key = f.family.toLowerCase() + "|" + f.weight + "|" + f.style;

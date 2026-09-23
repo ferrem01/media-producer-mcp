@@ -2474,7 +2474,7 @@ export async function loadSharedUtilities(): Promise<string> {
   const thisDir = path.dirname(fileURLToPath(import.meta.url));
   const sharedDir = path.join(thisDir, "..", "components", "shared");
 
-  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js", "motion-physics.js", "capture-performance.js"];
+  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js", "motion-physics.js", "capture-performance.js", "activity-feed.js"];
   const sources: string[] = [];
 
   for (const file of sharedFiles) {

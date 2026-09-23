@@ -1,0 +1,60 @@
+{
+  "type": "audience-people-list",
+  "label": "Quotient Audience — People",
+  "category": "mockups",
+  "description": "Quotient's People list (a real capture, anonymized): search, Email Subscription / Shopify Customer filters, Columns, and the table -- ID, Person (initials avatar, name over email), Email Subscription Status (Subscribed / Not Subscribed pills), Connections, Date Added, Last Active -- with pagination ('Showing Person 1 to 50 of 2,418'). Script it with the capture verbs: highlight a row by name, count-up the total, click Import People.",
+  "capture": {
+    "source_url": "https://www.getquotient.ai (Quotient app; people anonymized)",
+    "captured_at": "2026-09-23",
+    "width": 2305,
+    "height": 1245
+  },
+  "data": {
+    "entrance": {
+      "type": "string",
+      "label": "Entrance",
+      "optional": true,
+      "placeholder": "settled (default) | rise"
+    },
+    "accent": {
+      "type": "string",
+      "label": "Accent color",
+      "optional": true,
+      "placeholder": "#393bf5"
+    },
+    "script": {
+      "type": "array",
+      "label": "Performance script",
+      "optional": true,
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "script_actions": [
+    {
+      "action": "highlight",
+      "description": "Underline/box/spotlight a phrase: {text, style?: underline|box|spotlight, color?, at, duration?}"
+    },
+    {
+      "action": "click",
+      "description": "The film's cursor travels to the element containing {text} and clicks"
+    },
+    {
+      "action": "type",
+      "description": "Type into the input containing/near {text|selector}: {text_input? via selector, text, speed?}"
+    },
+    {
+      "action": "set-text",
+      "description": "Swap visible copy: {text: current, to: replacement, at}"
+    },
+    {
+      "action": "count-up",
+      "description": "Animate a number: {text: current value, to, duration?, at}"
+    },
+    {
+      "action": "scroll",
+      "description": "Scroll the capture to an element or offset: {to: text|y, at}"
+    }
+  ]
+}

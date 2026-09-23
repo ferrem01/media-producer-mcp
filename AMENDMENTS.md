@@ -6,6 +6,56 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-23 — Quotient audience pages in the house library; the activity feed moves
+
+Marc captured three Quotient pages into his tenant (audience-person-detail,
+audience-company-details, audience-people-list) and asked for them as shared
+components, with the detail pages' activity feeds scriptable ("new activities
+entering the feed... grouped like you see in the component... all event
+types, including custom product and CRM events"), and the person page's
+details column fixed (it ran off the right edge).
+
+- **`shared/activity-feed.js`** (inlined like capture-performance.js):
+  `data.activity` (or `{action:"activity"}` rows in `data.script`, which the
+  capture verbs no longer trip over) lands events at `at`. Each row is CLONED
+  from a real row and inserted at the top of the day group its `date` belongs
+  to; a new day is cloned from an existing group and slotted in date order.
+  19 event types (email sent/delivered/opened/clicked/replied/bounced,
+  unsubscribed, page view, form, signup, meeting, deal stage, CRM event, lead
+  score, list, property, flow, product event, custom) with `detail`, `name`,
+  `source` pill, `date` (ISO | today | yesterday | -N against `data.today`),
+  `time` (default "Just now"). Captures freeze every box's height, so the
+  feed frees its groups' heights -- otherwise new rows were squashed into the
+  old box and a cloned day kept its template's height (both seen in renders).
+- **`data.focus`**: full (default, contained and centered) | feed | details.
+  A named region fills the box's width or its height, whichever is bigger,
+  top aligned and left aligned -- a split's top half never ends in an empty band.
+- **Person page off the right edge**: it had been hand-edited to a
+  right-anchored "cover" scale with `justify-content:flex-end`; it now uses
+  the standard contained fit.
+- **Every word was in serif** on all three, for two reasons, both fixed at
+  the root: (1) `parseComponent` took the FIRST `<style>` in the file -- a
+  LinkedIn icon's SVG `<defs><style>` inside the captured markup -- so the
+  component's real styles (font, fit) never applied; style and script now
+  come from after `</template>`. (2) The capture extension embedded Inter's
+  CYRILLIC file (157 glyphs, no Latin): it took the first @font-face per
+  weight and ignored `unicode-range`. It now reads the range and prefers the
+  file covering Latin (extension 0.33.4). The three components carry the
+  Latin variable Inter (48 KB).
+- **Shared means anonymized.** House components reach every tenant; the
+  captures carried a real customer (name, email, photo, workspace id), the
+  Odin company's people, and twelve real subscribers' personal emails. All
+  replaced with demo people (Sarah Chen at Northwind; the people list
+  replaced by position, never by matching names -- matching missed four rows
+  the broken layout had hidden). The one photo (75 KB, embedded 51 times,
+  3.8 MB of a 4.2 MB file) is an initials SVG; the person page is 453 KB.
+- **People list layout**: nested `<a>` in the capture re-parented on parse
+  (avatar at the bottom, each email in the row below). The Person cell is
+  rebuilt clean: initials, name over email.
+- The Plan reads `audience-*` as a Screen.
+
+---
+
 ## 2026-09-23 — Hotfix: renaming a film turned every "s" into a space
 
 Marc: typing "Customer" into the header name saved "Cu tomer". The rename's
