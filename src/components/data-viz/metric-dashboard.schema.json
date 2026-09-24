@@ -6,7 +6,7 @@
   "data": {
     "metrics": {
       "type": "array",
-      "label": "Array of metric data",
+      "label": "Metrics: [{ label, value, prefix?, suffix?, change? (percent, drives the arrow), good? ('down' when a fall is good news, e.g. unsubscribes), chart_data? (numbers for a sparkline) }]",
       "required": true,
       "items": {
         "type": "object",

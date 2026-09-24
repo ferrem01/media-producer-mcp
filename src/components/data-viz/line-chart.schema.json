@@ -2,41 +2,81 @@
   "type": "line-chart",
   "label": "Line Chart",
   "category": "data-viz",
-  "description": "A line chart that draws itself left to right with an area fill and glowing dots at the points (a trend over time).",
+  "description": "A trend told as a draw: gridlines settle, each series draws left to right with its area wiping in, a dot rides the tip, and the final value lands big at the end of the line. Up to 4 series with a legend (us vs them, this year vs last); a highlight marks the moment that matters with a pill. Themed from the ground; type sized for video.",
   "data": {
+    "series": {
+      "type": "array",
+      "label": "Series: [{ name, color?, points: [numbers] or [{ y, label? }] }] -- up to 4. Use this for two lines (e.g. 'With Quotient' vs 'Before').",
+      "optional": true
+    },
     "points": {
       "type": "array",
-      "label": "Array of x,y data points",
-      "required": true,
-      "items": {
-        "type": "object",
-        "properties": {
-          "x": {
-            "type": "number"
-          },
-          "y": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "x",
-          "y"
-        ]
-      }
+      "label": "Single-series shorthand: [{ x, y }] or [{ label, y }]",
+      "optional": true
+    },
+    "x_labels": {
+      "type": "array",
+      "label": "Category labels along the bottom (e.g. ['Jan','Feb',...])",
+      "optional": true
     },
     "title": {
       "type": "string",
-      "label": "Chart title",
+      "label": "Title",
+      "optional": true
+    },
+    "subtitle": {
+      "type": "string",
+      "label": "Subtitle under the title",
+      "optional": true
+    },
+    "prefix": {
+      "type": "string",
+      "label": "Value prefix (e.g. $)",
+      "optional": true
+    },
+    "suffix": {
+      "type": "string",
+      "label": "Value suffix (e.g. % or ' leads')",
+      "optional": true
+    },
+    "format": {
+      "type": "string",
+      "label": "'percent' adds % to values",
+      "optional": true
+    },
+    "highlight": {
+      "type": "object",
+      "label": "{ index or label, text?, at? } -- a dashed marker and a pill at that point",
+      "optional": true
+    },
+    "y_min": {
+      "type": "number",
+      "label": "Force the axis minimum (default 0 or the lowest value)",
+      "optional": true
+    },
+    "area": {
+      "type": "boolean",
+      "label": "Area fill under the lines (default on)",
+      "optional": true
+    },
+    "draw": {
+      "type": "number",
+      "label": "Seconds each line takes to draw (default 1.6)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the chart starts (seconds or \"@word\")",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "'light' | 'dark' (default: from the brand background)",
       "optional": true
     },
     "color": {
       "type": "string",
-      "label": "Line color",
-      "optional": true
-    },
-    "labels": {
-      "type": "object",
-      "label": "Axis labels",
+      "label": "Line color for the single-series shorthand",
       "optional": true
     }
   }

@@ -2,7 +2,7 @@
   "type": "bar-chart",
   "label": "Bar Chart",
   "category": "data-viz",
-  "description": "A bar chart that grows bar by bar with value labels (e.g. leads by week). For a few categories compared at a glance.",
+  "description": "A bar chart that grows bar by bar, each value counting up, in the brand color: the bar that matters (highlight; default the tallest) at full strength, the rest muted. For a few categories compared at a glance (leads by week, channels by conversions).",
   "data": {
     "bars": {
       "type": "array",
@@ -35,6 +35,26 @@
     "max_value": {
       "type": "number",
       "label": "Override max value for scale",
+      "optional": true
+    },
+    "highlight": {
+      "type": "string",
+      "label": "The bar to emphasize: an index or a label (default the tallest; false for none)",
+      "optional": true
+    },
+    "palette": {
+      "type": "string",
+      "label": "'brand' (default) or 'rainbow' (a different gradient per bar)",
+      "optional": true
+    },
+    "prefix": {
+      "type": "string",
+      "label": "Value prefix (e.g. $)",
+      "optional": true
+    },
+    "suffix": {
+      "type": "string",
+      "label": "Value suffix (e.g. %)",
       "optional": true
     }
   }
