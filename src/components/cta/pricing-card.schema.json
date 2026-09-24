@@ -2,7 +2,7 @@
   "type": "pricing-card",
   "label": "Pricing Card",
   "category": "cta",
-  "description": "A pricing tier card: name, price and period, a feature list that staggers in, an optional highlight and CTA button.",
+  "description": "A pricing tier card at video scale: tier name with a badge, a price that counts up, a feature list with check marks that builds in row by row, and a CTA button (filled when highlighted, outline otherwise). Place two or three side by side for a plan comparison.",
   "data": {
     "name": {
       "type": "string",
@@ -35,6 +35,40 @@
     "cta": {
       "type": "string",
       "label": "CTA button text",
+      "optional": true
+    },
+    "description": {
+      "type": "string",
+      "label": "One line under the tier name",
+      "optional": true
+    },
+    "badge": {
+      "type": "string",
+      "label": "Badge text (default 'Most popular' when highlighted; '' for none)",
+      "optional": true
+    },
+    "compare_price": {
+      "type": "string",
+      "label": "Struck-through old price before the price (e.g. $79)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Card theme; omit to follow the scene ground (a dark ground gets a dark card)",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene the card enters (default 0.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
       "optional": true
     }
   }

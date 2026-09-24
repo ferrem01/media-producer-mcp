@@ -1,186 +1,157 @@
 <template>
-  <div class="cta-card-wrapper">
+  <div class="cta-root">
     <div class="cta-card">
-      <h2 class="cta-headline">{{headline}}</h2>
-      <p class="cta-description">{{description}}</p>
-      <div class="cta-button-wrap">
-        <div class="cta-button-glow"></div>
-        <div class="cta-button">{{button_text}}</div>
+      <div class="cta-eyebrow"></div>
+      <h2 class="cta-headline"></h2>
+      <p class="cta-description"></p>
+      <div class="cta-actions">
+        <div class="cta-button"><span class="cta-label"></span><span class="cta-arrow">&rarr;</span><span class="cta-shine"></span></div>
+        <div class="cta-secondary"></div>
       </div>
+      <div class="cta-url"></div>
     </div>
   </div>
 </template>
 
 <style scoped>
-  .cta-card-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
-    padding: 80px;
-    box-sizing: border-box;
+  /* One design unit (--u) sized from the slot, so the card reads at video
+     scale in any box: the audit measured the old card at 16px button type in
+     a full frame, and a 40%-wide slot showed a small card lost in the middle. */
+  .cta-root {
+    --u: 1px; --pad: 40px;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    max-width: none;
   }
+  /* The theme is measured from the scene ground (light / dark) or asked for
+     (brand); the card's ink follows its OWN surface, never the scene's text
+     var (measured: white text on a lavender surface on a dark-scene film). */
+  .cta-root.t-light { --s-bg: #ffffff; --s-ink: var(--mp-color-on-light, #17171c); --s-muted: color-mix(in srgb, var(--mp-color-on-light, #17171c) 64%, #ffffff); --s-line: rgba(20, 20, 40, 0.09); --s-acc: var(--mp-color-primary, #393bf5); --b-bg: var(--mp-color-primary, #393bf5); --b-ink: var(--mp-color-on-primary, #ffffff); }
+  .cta-root.t-dark { --s-bg: #16171d; --s-ink: #ffffff; --s-muted: rgba(255, 255, 255, 0.72); --s-line: rgba(255, 255, 255, 0.10); --s-acc: color-mix(in srgb, var(--mp-color-primary, #393bf5) 55%, #ffffff); --b-bg: var(--mp-color-primary, #393bf5); --b-ink: var(--mp-color-on-primary, #ffffff); }
+  .cta-root.t-brand { --s-bg: linear-gradient(135deg, var(--mp-color-primary, #393bf5) 0%, color-mix(in srgb, var(--mp-color-primary, #393bf5) 72%, #ffffff) 100%); --s-ink: var(--mp-color-on-primary, #ffffff); --s-muted: color-mix(in srgb, var(--mp-color-on-primary, #ffffff) 80%, transparent); --s-line: rgba(255, 255, 255, 0.22); --s-acc: var(--mp-color-on-primary, #ffffff); --b-bg: var(--mp-color-on-primary, #ffffff); --b-ink: var(--mp-color-primary, #393bf5); }
 
-  /* Theme-aware: a SOLID brand surface (not translucent-white glass, which is
-     invisible on a light brand) + a neutral hairline border that reads on both
-     light and dark, and a soft neutral shadow for separation. */
   .cta-card {
-    background: var(--mp-color-surface, #ffffff);
-    border: 1px solid var(--mp-color-border, rgba(127, 127, 127, 0.2));
-    border-radius: 24px;
-    padding: 64px 72px;
-    max-width: 620px;
-    width: 100%;
-    text-align: center;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
     position: relative;
+    box-sizing: border-box;
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    padding: calc(var(--u) * 56) calc(var(--u) * 64);
+    background: var(--s-bg);
+    border: 1px solid var(--s-line);
+    border-radius: calc(var(--u) * 28);
+    box-shadow: 0 calc(var(--pad) * 0.06) calc(var(--pad) * 0.16) rgba(20, 20, 60, 0.06), 0 calc(var(--pad) * 0.25) calc(var(--pad) * 0.7) rgba(20, 20, 60, 0.12);
     overflow: hidden;
   }
-
+  .cta-root.surface-none .cta-card { background: none; border: 0; box-shadow: none; }
+  .cta-eyebrow {
+    font-size: calc(var(--u) * 17); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--s-acc); margin-bottom: calc(var(--u) * 18);
+  }
   .cta-headline {
-    font-size: 48px;
-    font-weight: 700;
-    color: var(--mp-color-text, #0f172a);
-    margin: 0 0 20px 0;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
+    margin: 0; max-width: 18em;
+    font-size: calc(var(--u) * 64); font-weight: 600; line-height: 1.06; letter-spacing: -0.025em;
+    color: var(--s-ink); text-wrap: balance;
   }
-
-  /* Brand muted text, not a hardcoded light gray that vanishes on a light card. */
   .cta-description {
-    font-size: 20px;
-    color: var(--mp-color-text-muted, #64748b);
-    margin: 0 0 40px 0;
-    line-height: 1.5;
-    letter-spacing: 0.005em;
+    margin: calc(var(--u) * 22) 0 0; max-width: 30em;
+    font-size: calc(var(--u) * 24); line-height: 1.4; color: var(--s-muted); text-wrap: balance;
   }
-
-  .cta-description:empty {
-    display: none;
+  .cta-actions { display: flex; align-items: center; gap: calc(var(--u) * 26); margin-top: calc(var(--u) * 40); }
+  .cta-button {
+    position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; gap: calc(var(--u) * 12);
+    height: calc(var(--u) * 68); padding: 0 calc(var(--u) * 38);
+    border-radius: 999px;
+    background: var(--b-bg); color: var(--b-ink);
+    font-size: calc(var(--u) * 24); font-weight: 600; letter-spacing: -0.005em; white-space: nowrap;
+    box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 26) color-mix(in srgb, var(--mp-color-primary, #393bf5) 32%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   }
-
-  .cta-button-wrap {
-    display: inline-block;
-    position: relative;
-  }
-
-  .cta-button-glow {
-    position: absolute;
-    inset: -8px;
-    border-radius: 22px;
-    background: var(--mp-color-cta, var(--mp-color-primary, #6366f1));
-    filter: blur(20px);
-    opacity: 0.25;
+  .cta-arrow { display: inline-block; font-weight: 500; }
+  .cta-shine {
+    position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+    background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%);
     pointer-events: none;
   }
-
-  /* A CTA button is a saturated brand color with WHITE text -- never the brand
-     text color (which is dark on a light brand -> low-contrast on the button),
-     and never --mp-color-accent alone (can resolve light -> invisible fill). */
-  .cta-button {
-    position: relative;
-    display: inline-block;
-    font-size: 16px;
-    font-weight: 600;
-    color: #ffffff;
-    background: var(--mp-color-cta, var(--mp-color-primary, #6366f1));
-    height: 56px;
-    line-height: 56px;
-    padding: 0 48px;
-    border-radius: 14px;
-    letter-spacing: -0.01em;
-    box-shadow:
-      0 0 30px rgba(167, 139, 250, 0.25),
-      0 8px 24px rgba(167, 139, 250, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  }
-
-  .cta-button:empty {
-    display: none;
-  }
+  .cta-secondary { font-size: calc(var(--u) * 22); font-weight: 600; color: var(--s-ink); white-space: nowrap; }
+  .cta-url { margin-top: calc(var(--u) * 22); font-size: calc(var(--u) * 19); font-weight: 500; color: var(--s-muted); letter-spacing: 0.01em; }
+  .cta-eyebrow:empty, .cta-description:empty, .cta-secondary:empty, .cta-url:empty { display: none; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var card = el.querySelector('.cta-card');
-    var headline = el.querySelector('.cta-headline');
-    var desc = el.querySelector('.cta-description');
-    var button = el.querySelector('.cta-button');
-    var buttonGlow = el.querySelector('.cta-button-glow');
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.cta-root'), card = q('.cta-card');
+    var DUR = (ctx && ctx.duration) || 5;
+    function txt(sel, v) { q(sel).textContent = v === undefined || v === null ? '' : String(v); }
+    txt('.cta-eyebrow', data.eyebrow);
+    txt('.cta-headline', data.headline);
+    txt('.cta-description', data.description);
+    txt('.cta-label', data.button_text);
+    txt('.cta-secondary', data.secondary_text);
+    txt('.cta-url', data.url);
+    var btn = q('.cta-button');
+    if (!data.button_text) btn.style.display = 'none';
+    if (data.arrow === false) q('.cta-arrow').style.display = 'none';
 
-    if (data.button_color) {
-      // button_color may be a plain hex (#6366f1) OR a CSS var()/named color.
-      // Only the hex form can have an alpha suffix appended; doing 'var(--x)cc'
-      // produces INVALID CSS and drops the whole background -> a no-fill button.
-      var bc = String(data.button_color).trim();
-      var isHex = /^#[0-9a-fA-F]{6}$/.test(bc);
-      button.style.background = isHex
-        ? 'linear-gradient(135deg, ' + bc + ' 0%, ' + bc + 'cc 100%)'
-        : bc; // var()/named -> solid fill
-      buttonGlow.style.background = bc;
-      button.style.boxShadow = isHex
-        ? '0 0 30px ' + bc + '40, 0 8px 24px ' + bc + '25, inset 0 1px 0 rgba(255,255,255,0.15)'
-        : '0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15)';
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    var theme = data.theme === 'dark' || data.theme === 'light' || data.theme === 'brand' ? data.theme
+      : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light');
+    root.classList.add('t-' + theme);
+    if (data.surface === 'none') root.classList.add('surface-none');
+    if (data.button_color) btn.style.background = String(data.button_color);
+
+    // SIZE: the card fills the slot (a landscape card never wider than ~1.9:1),
+    // type from the box, then shrink until the content fits.
+    // A margin keeps the shadow in the slot and the card off the frame edge.
+    var W0 = el.clientWidth || 900, H0 = el.clientHeight || 520, pad = Math.round(Math.min(W0, H0) * 0.06);
+    // Shadows are sized from this margin so the slot (which clips) never cuts them.
+    root.style.setProperty('--pad', pad + 'px');
+    // A full-frame slot overhangs the frame (the camera layer is larger than
+    // the canvas; measured: cards 9px from the edge), so the margin is kept
+    // inside what is SEEN.
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var W = W0 - 2 * (pad + ox), H = H0 - 2 * (pad + oy);
+    var cw = Math.min(W, H * 1.9);
+    card.style.width = cw + 'px'; card.style.height = 'auto'; card.style.maxHeight = H + 'px';
+    // Start generous (the type should own the card), shrink until it fits;
+    // the card then hugs its content instead of framing empty space.
+    var u = Math.min(cw / 540, H / 300);
+    for (var i = 0; i < 30; i++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      if (card.scrollHeight <= H + 1 && card.scrollWidth <= card.clientWidth + 1) break;
+      u *= 0.95;
     }
 
-    var speed = ctx.motion === 'minimal' ? 0.45 : ctx.motion === 'punchy' ? 0.6 : 0.75;
-
-    // Card entrance with scale + blur
-    gsap.set(card, { autoAlpha: 0, y: 50, scale: 1.06, filter: 'blur(5px)' });
-    gsap.set(buttonGlow, { autoAlpha: 0, scale: 0.5 });
-
-    tl.to(card, {
-      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
-      duration: speed,
-      ease: 'power3.out'
-    }, 0.3);
-
-    // Button glow appears
-    tl.to(buttonGlow, {
-      autoAlpha: 0.3, scale: 1,
-      duration: speed * 0.6,
-      ease: 'power2.out'
-    }, 0.3 + speed * 0.5);
-
-    // Breathing glow pulse on the button
-    if (button && button.textContent.trim()) {
-      tl.to(buttonGlow, {
-        scale: 1.3,
-        autoAlpha: 0.15,
-        duration: 1.2,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: -1
-      }, 0.3 + speed + 0.2);
-
-      tl.to(button, {
-        scale: 1.02,
-        duration: 1.2,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: -1
-      }, 0.3 + speed + 0.2);
+    // MOTION: the card rises, lines rise in reading order, the button lands
+    // last and a single shine crosses it. No pops, no blur (house type rules).
+    var AT = Number(data.at) || 0.2;
+    gsap.set(card, { autoAlpha: 0, y: 28 });
+    tl.to(card, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, AT);
+    var lines = ['.cta-eyebrow', '.cta-headline', '.cta-description'].map(q).filter(function (x) { return x && x.textContent; });
+    if (window.mpLineRise) mpLineRise(tl, lines, AT + 0.2, { stagger: 0.12, duration: 0.4, rise: 14 });
+    var act = [btn, q('.cta-secondary')].filter(function (x) { return x && x.textContent && x.style.display !== 'none'; });
+    var bAt = AT + 0.35 + lines.length * 0.12;
+    if (act.length) {
+      gsap.set(act, { autoAlpha: 0, y: 12 });
+      tl.to(act, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.1, ease: 'power3.out' }, bAt);
+      // The shine parks off the button's left edge and crosses to past the right (it is 40% wide).
+      gsap.set(q('.cta-shine'), { xPercent: -110 });
+      tl.to(q('.cta-shine'), { xPercent: 260, duration: 0.9, ease: 'power2.inOut' }, bAt + 0.5);
+      tl.fromTo(q('.cta-arrow'), { x: 0 }, { x: 6, duration: 0.35, ease: 'power2.out', yoyo: true, repeat: 1, immediateRender: false }, bAt + 0.55);
     }
-
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.7;
-      tl.to([buttonGlow], {
-        autoAlpha: 0,
-        duration: 0.3,
-        ease: 'power2.in'
-      }, exitAt);
-      tl.to(card, {
-        autoAlpha: 0, y: -25, scale: 0.97,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt + 0.05);
+    var url = q('.cta-url');
+    if (url.textContent) { gsap.set(url, { autoAlpha: 0 }); tl.to(url, { autoAlpha: 1, duration: 0.4 }, bAt + 0.3); }
+    if (data.press_at !== undefined && data.press_at !== null && data.button_text) {
+      var pa = Number(data.press_at);
+      tl.to(btn, { scale: 0.96, duration: 0.09, ease: 'power2.in' }, pa);
+      tl.to(btn, { scale: 1, duration: 0.18, ease: 'power2.out' }, pa + 0.09);
     }
-
+    // A closing card HOLDS; the cut is the exit. Opt in to a fade with exit:true.
+    if (data.exit === true && DUR > 2) tl.to(card, { autoAlpha: 0, y: -16, duration: 0.4, ease: 'power2.in' }, DUR - 0.5);
     return tl;
   }
 </script>

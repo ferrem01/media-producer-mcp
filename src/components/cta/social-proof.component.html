@@ -1,157 +1,131 @@
 <template>
-  <div class="social-proof">
-    <h2 class="sp-title">{{title}}</h2>
-    <div class="sp-grid"></div>
+  <div class="sp-root">
+    <div class="sp-wrap">
+      <div class="sp-title"></div>
+      <div class="sp-grid"></div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-  .social-proof {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
-    padding: 80px;
-    box-sizing: border-box;
+  /* One design unit (--u) from the slot: the audit measured the old stats
+     at 20px in a full frame -- proof numbers the size of body copy. */
+  .sp-root {
+    --u: 1px; --un: 1px; --pad: 40px;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    max-width: none;
   }
+  .sp-root.t-light { --g-ink: var(--mp-color-on-light, #17171c); --s-bg: #ffffff; --s-ink: var(--mp-color-on-light, #17171c); --s-muted: color-mix(in srgb, var(--mp-color-on-light, #17171c) 64%, #ffffff); --s-line: rgba(20, 20, 40, 0.09); --s-acc: var(--mp-color-primary, #393bf5); }
+  .sp-root.t-dark { --g-ink: #ffffff; --s-bg: #16171d; --s-ink: #ffffff; --s-muted: rgba(255, 255, 255, 0.72); --s-line: rgba(255, 255, 255, 0.10); --s-acc: color-mix(in srgb, var(--mp-color-primary, #393bf5) 55%, #ffffff); }
 
+  .sp-wrap { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
   .sp-title {
-    font-size: 36px;
-    font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
-    margin: 0 0 44px 0;
-    text-align: center;
-    letter-spacing: -0.02em;
-    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
+    font-size: calc(var(--u) * 46); font-weight: 600; letter-spacing: -0.025em; line-height: 1.1;
+    color: var(--g-ink); text-align: center; text-wrap: balance; max-width: 22em;
+    margin-bottom: calc(var(--u) * 40);
   }
-
-  .sp-title:empty {
-    display: none;
-  }
-
-  .sp-grid {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 20px;
-    width: 100%;
-    max-width: 960px;
-  }
-
-  .sp-grid.layout-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  }
-
+  .sp-title:empty { display: none; }
+  .sp-grid { display: grid; gap: calc(var(--u) * 22); width: 100%; }
   .sp-item {
-    background: var(--mp-color-surface, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--mp-color-border, rgba(127,127,127,0.2));
-    border-radius: 16px;
-    padding: 32px 36px;
-    text-align: center;
-    flex: 1;
-    min-width: 180px;
-    max-width: 280px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.2),
-      0 0 0 1px rgba(255, 255, 255, 0.03);
+    position: relative; overflow: hidden; box-sizing: border-box; min-width: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: calc(var(--u) * 34) calc(var(--u) * 30) calc(var(--u) * 30);
+    background: var(--s-bg); color: var(--s-ink);
+    border: 1px solid var(--s-line); border-radius: calc(var(--u) * 22);
+    box-shadow: 0 calc(var(--pad) * 0.06) calc(var(--pad) * 0.16) rgba(20, 20, 60, 0.06), 0 calc(var(--pad) * 0.25) calc(var(--pad) * 0.7) rgba(20, 20, 60, 0.12);
   }
-
-  .sp-text {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-  }
-
-  .sp-subtext {
-    font-size: 14px;
-    font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
-    margin-top: 10px;
-    line-height: 1.5;
-    letter-spacing: 0.005em;
-  }
-
-  .sp-subtext:empty {
-    display: none;
-  }
+  .sp-root.style-plain .sp-item { background: none; border: 0; box-shadow: none; }
+  .sp-root.style-plain .sp-item { color: var(--g-ink); }
+  .sp-bar { position: absolute; left: 0; top: 0; right: 0; height: calc(var(--u) * 5); background: var(--s-acc); transform-origin: 0 50%; }
+  .sp-root.style-plain .sp-bar { display: none; }
+  .sp-text { font-size: calc(var(--un) * 30); font-weight: 600; line-height: 1.15; letter-spacing: -0.015em; white-space: nowrap; }
+  .sp-item.stat .sp-text { font-size: calc(var(--un) * 76); letter-spacing: -0.035em; line-height: 1; color: var(--s-acc); font-variant-numeric: tabular-nums; }
+  .sp-item.quote .sp-text { font-size: calc(var(--un) * 26); font-weight: 500; white-space: normal; line-height: 1.3; }
+  .sp-item.logo .sp-text { color: var(--s-muted); font-weight: 700; letter-spacing: -0.02em; }
+  .sp-sub { margin-top: calc(var(--u) * 12); font-size: calc(var(--u) * 22); line-height: 1.35; color: var(--s-muted); }
+  .sp-item img { max-height: calc(var(--un) * 56); max-width: 100%; width: auto; display: block; object-fit: contain; }
+  .sp-root.align-center .sp-item { align-items: center; text-align: center; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var grid = el.querySelector('.sp-grid');
-    var title = el.querySelector('.sp-title');
-    var items = data.items || [];
-    var layout = data.layout || 'row';
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.sp-root'), wrap = q('.sp-wrap'), grid = q('.sp-grid');
+    var DUR = (ctx && ctx.duration) || 5;
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    var theme = data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light');
+    root.classList.add('t-' + theme, 'style-' + (data.style === 'plain' ? 'plain' : 'cards'));
+    if (data.align !== 'left') root.classList.add('align-center');
+    q('.sp-title').textContent = data.title ? String(data.title) : '';
 
-    if (layout === 'grid') {
-      grid.classList.add('layout-grid');
-    }
-
-    items.forEach(function(item) {
-      var div = document.createElement('div');
-      div.className = 'sp-item';
-
-      var text = document.createElement('div');
-      text.className = 'sp-text';
-      text.textContent = item.text;
-      div.appendChild(text);
-
-      if (item.subtext) {
-        var sub = document.createElement('div');
-        sub.className = 'sp-subtext';
-        sub.textContent = item.subtext;
-        div.appendChild(sub);
-      }
-
-      grid.appendChild(div);
+    // Each item is read for what it IS: a figure (counts up, large, accent),
+    // a logo image, a short name (wordmark), or a line of praise.
+    var items = Array.isArray(data.items) ? data.items : [];
+    var cards = items.map(function (it) {
+      if (typeof it === 'string') it = { text: it };
+      it = it || {};
+      var card = document.createElement('div'); card.className = 'sp-item';
+      var text = String(it.text || '');
+      var kind = it.logo ? 'logo' : (/\d/.test(text) && text.length <= 12 ? 'stat' : (text.length > 40 ? 'quote' : 'logo'));
+      card.classList.add(kind);
+      card.innerHTML = '<div class="sp-bar"></div>';
+      if (it.logo) { var img = document.createElement('img'); img.src = String(it.logo); img.alt = text; card.appendChild(img); }
+      else { var t = document.createElement('div'); t.className = 'sp-text'; t.textContent = text; card.appendChild(t); }
+      if (it.subtext) { var s = document.createElement('div'); s.className = 'sp-sub'; s.textContent = String(it.subtext); card.appendChild(s); }
+      grid.appendChild(card);
+      return { el: card, kind: kind, text: text };
     });
+    var n = Math.max(1, cards.length);
+    var cols = data.layout === 'grid' ? (n <= 4 ? Math.min(2, n) : 3) : Math.min(n, 5);
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
 
-    var cards = grid.querySelectorAll('.sp-item');
-    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.6;
-    var stagger = ctx.motion === 'minimal' ? 0.08 : 0.12;
-
-    // Title entrance
-    if (title && title.textContent.trim()) {
-      gsap.set(title, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
-      tl.to(title, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.2);
+    // SIZE: type from the box, shrink until the title and every card fit
+    // (a figure never wraps or spills out of its card).
+    var W0 = el.clientWidth || 900, H0 = el.clientHeight || 520, pad = Math.round(Math.min(W0, H0) * 0.06);
+    // Shadows are sized from this margin so the slot (which clips) never cuts them.
+    root.style.setProperty('--pad', pad + 'px');
+    // A full-frame slot overhangs the frame (the camera layer is larger than
+    // the canvas; measured: cards 9px from the edge), so the margin is kept
+    // inside what is SEEN.
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var W = W0 - 2 * (pad + ox), H = H0 - 2 * (pad + oy);
+    wrap.style.width = W + 'px';
+    // Two scales: --u for the whole block (fits the height), --un for each
+    // card's figure or name (fits its card's width), so one wide figure
+    // shrinks only the figures, never the labels under them.
+    var rows = Math.ceil(n / cols);
+    var u = Math.min(W / (cols * 240), H / (rows * 150 + (data.title ? 100 : 20))), k = 1;
+    // The figure line itself is measured: overflow into the card's padding never shows in the card's scrollWidth.
+    function wide() { for (var c = 0; c < cards.length; c++) { var e = cards[c].el.querySelector('.sp-text') || cards[c].el; if (e.scrollWidth > e.clientWidth + 1) return true; } return false; }
+    for (var i = 0; i < 60; i++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      root.style.setProperty('--un', (u * k).toFixed(3) + 'px');
+      if (wide()) { k *= 0.95; continue; }
+      if (wrap.scrollHeight > H + 1) { u *= 0.95; continue; }
+      break;
     }
 
-    // Cards with scale + blur entrance
-    gsap.set(cards, { autoAlpha: 0, y: 25, scale: 1.06, filter: 'blur(5px)' });
-
-    tl.to(cards, {
-      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
-      duration: speed,
-      stagger: stagger,
-      ease: ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out'
-    }, 0.5);
-
-    // Glow after entrance
-    tl.to(cards, {
-      boxShadow: '0 0 24px rgba(167, 139, 250, 0.05), 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.04)',
-      duration: 0.4,
-      stagger: stagger * 0.5
-    }, '-=0.2');
-
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
-      tl.to(el.querySelector('.social-proof'), {
-        autoAlpha: 0,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
-    }
-
+    // MOTION: the title rises, cards land one after another, each accent bar
+    // draws and each figure counts up to its value.
+    var AT = Number(data.at) || 0.2;
+    var title = q('.sp-title');
+    if (title.textContent && window.mpLineRise) mpLineRise(tl, title, AT, { duration: 0.45, rise: 14 });
+    var cAt = AT + (title.textContent ? 0.35 : 0), each = Math.min(0.16, 1.2 / n);
+    cards.forEach(function (c, k) {
+      var at = cAt + k * each;
+      gsap.set(c.el, { autoAlpha: 0, y: 18 });
+      tl.to(c.el, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power3.out' }, at);
+      var bar = c.el.querySelector('.sp-bar');
+      gsap.set(bar, { scaleX: 0 });
+      tl.to(bar, { scaleX: 1, duration: 0.5, ease: 'power2.inOut' }, at + 0.15);
+      var tx = c.el.querySelector('.sp-text');
+      if (c.kind === 'stat' && tx && window.mpCountUp) mpCountUp(tl, tx, at + 0.1, { to: c.text, duration: 1.0 });
+    });
+    if (data.exit === true && DUR > 2) tl.to(wrap, { autoAlpha: 0, y: -16, duration: 0.4, ease: 'power2.in' }, DUR - 0.5);
     return tl;
   }
 </script>

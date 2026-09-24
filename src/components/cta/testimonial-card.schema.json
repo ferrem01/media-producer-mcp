@@ -2,7 +2,7 @@
   "type": "testimonial-card",
   "label": "Testimonial Card",
   "category": "cta",
-  "description": "Customer testimonial with quote, avatar, name, company, and optional star rating.",
+  "description": "A customer testimonial at video scale: a brand quote glyph, the quote rising line by line with an optional highlighted phrase swept in, gold stars, and the person (photo or initials, name, role) with the company wordmark or logo.",
   "data": {
     "quote": {
       "type": "string",
@@ -26,13 +26,55 @@
     },
     "avatar_color": {
       "type": "string",
-      "label": "Avatar Color",
-      "optional": true,
-      "default": "#A78BFA"
+      "label": "Initials circle color (default: the brand primary)",
+      "optional": true
     },
     "rating": {
       "type": "number",
       "label": "Star Rating (1-5)",
+      "optional": true
+    },
+    "highlight": {
+      "type": "string",
+      "label": "A phrase copied exactly from the quote to sweep a highlight across",
+      "optional": true
+    },
+    "avatar": {
+      "type": "string",
+      "label": "Photo URL (brand-kit headshot); initials when absent",
+      "optional": true
+    },
+    "company_logo": {
+      "type": "string",
+      "label": "Company logo image URL (replaces the company wordmark)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Card theme; omit to follow the scene ground (a dark ground gets a dark card)",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "surface": {
+      "type": "string",
+      "label": "'none' drops the card plate",
+      "optional": true,
+      "enum": [
+        "card",
+        "none"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene the card enters (default 0.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
       "optional": true
     }
   }

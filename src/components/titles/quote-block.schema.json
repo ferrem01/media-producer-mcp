@@ -2,7 +2,7 @@
   "type": "quote-block",
   "label": "Quote Block",
   "category": "titles",
-  "description": "Styled pull quote with large quotation marks and optional attribution.",
+  "description": "An editorial pull quote at display size: a brand quote glyph, the quote rising line by line (a highlighted phrase takes the brand color), a drawn rule and the attribution. Sits on the scene ground by default; surface 'card' puts it on a card.",
   "data": {
     "quote": {
       "type": "string",
@@ -19,6 +19,53 @@
       "label": "Author Role",
       "optional": true,
       "placeholder": "CEO, Acme Corp"
+    },
+    "highlight": {
+      "type": "string",
+      "label": "A phrase copied exactly from the quote to set in the brand color",
+      "optional": true
+    },
+    "avatar": {
+      "type": "string",
+      "label": "Photo URL beside the attribution",
+      "optional": true
+    },
+    "surface": {
+      "type": "string",
+      "label": "none (default: on the ground) | card",
+      "optional": true,
+      "enum": [
+        "none",
+        "card"
+      ]
+    },
+    "align": {
+      "type": "string",
+      "label": "center (default) | left",
+      "optional": true,
+      "enum": [
+        "center",
+        "left"
+      ]
+    },
+    "theme": {
+      "type": "string",
+      "label": "Card theme; omit to follow the scene ground (a dark ground gets a dark card)",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene the card enters (default 0.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
+      "optional": true
     }
   }
 }

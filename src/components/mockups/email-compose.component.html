@@ -1,278 +1,189 @@
 <template>
-  <div class="email-compose-wrap">
-    <div class="email-client">
-      <div class="email-toolbar">
-        <div class="toolbar-dots">
-          <span class="tb-dot tb-close"></span>
-          <span class="tb-dot tb-min"></span>
-          <span class="tb-dot tb-max"></span>
-        </div>
-        <span class="toolbar-title">New Message</span>
-        <div class="toolbar-spacer"></div>
+  <div class="ec-root">
+    <div class="ec-win">
+      <div class="ec-head">
+        <span class="ec-title">New message</span>
+        <span class="ec-ctl"><i></i><i></i><i></i></span>
       </div>
-      <div class="email-fields">
-        <div class="email-row">
-          <span class="email-label">From</span>
-          <span class="email-value from-value"></span>
-        </div>
-        <div class="email-row">
-          <span class="email-label">To</span>
-          <span class="email-value to-value"></span>
-        </div>
-        <div class="email-row">
-          <span class="email-label">Subject</span>
-          <span class="email-value subject-value"></span>
-        </div>
-      </div>
-      <div class="email-body-area">
-        <div class="body-text"></div>
-      </div>
-      <div class="email-footer">
-        <button class="send-button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-          Send
-        </button>
+      <div class="ec-row"><span class="ec-lab">From</span><span class="ec-val ec-from" data-target="from-field"></span></div>
+      <div class="ec-row"><span class="ec-lab">To</span><span class="ec-val ec-to" data-target="to-field"></span></div>
+      <div class="ec-row ec-subj-row"><span class="ec-val ec-subj" data-target="subject-field"></span></div>
+      <div class="ec-body" data-target="body-field" data-anchor="body"></div>
+      <div class="ec-attach"></div>
+      <div class="ec-foot">
+        <button class="ec-send" data-target="send-button" data-anchor="send"><span>Send</span><b></b></button>
+        <span class="ec-tools"><i>B</i><i class="it">I</i><i class="u">U</i><i>&#x1F517;</i><i>&#x2261;</i><i>&#x1F4CE;</i></span>
       </div>
     </div>
+    <div class="ec-toast"><span class="ec-check">&#x2713;</span> <span class="ec-toast-t">Sent</span></div>
   </div>
 </template>
 
 <style scoped>
-  .email-compose-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    padding: 80px;
-    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
-  }
-
-  .email-client {
-    width: 520px;
-    max-width: 72vw;
-    border-radius: 14px;
-    overflow: hidden;
-    background: #1a1a22;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow:
-      0 30px 80px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.04);
-  }
-
-  .email-toolbar {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    background: linear-gradient(180deg, #28282f 0%, #22222a 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    gap: 12px;
-  }
-
-  .toolbar-dots {
-    display: flex;
-    gap: 7px;
-  }
-
-  .tb-dot {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-  }
-
-  .tb-close { background: #ff5f57; }
-  .tb-min { background: #febc2e; }
-  .tb-max { background: #28c840; }
-
-  .toolbar-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: #94a3b8;
-  }
-
-  .toolbar-spacer { flex: 1; }
-
-  .email-fields {
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  }
-
-  .email-row {
-    display: flex;
-    align-items: center;
-    padding: 8px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    min-height: 36px;
-  }
-
-  .email-row:last-child {
-    border-bottom: none;
-  }
-
-  .email-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: #8b93a3;
-    width: 60px;
-    flex-shrink: 0;
-  }
-
-  .email-value {
-    font-size: 14px;
-    /* The card is HARDCODED dark (#1a1a22), so its ink must be too: riding
-       the brand text token painted #17171c on #1a1a22 for light brands --
-       1.03:1, measured on proj_b75ca862's every address line. */
-    color: #f4f4f6;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .email-body-area {
-    padding: 20px;
-    min-height: 140px;
-  }
-
-  .body-text {
-    font-size: 14px;
-    color: #cbd5e1;
-    line-height: 1.6;
-    white-space: pre-wrap;
-  }
-
-  .email-cursor {
-    display: inline-block;
-    width: 2px;
-    height: 15px;
-    background: var(--mp-color-accent, #A78BFA);
-    margin-left: 1px;
-    vertical-align: text-bottom;
-    animation: blink 0.8s step-end infinite;
-  }
-
-  @keyframes blink {
-    50% { opacity: 0; }
-  }
-
-  .email-footer {
-    display: flex;
-    padding: 12px 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    /* Solid fill: a 10%-alpha wash reads as NO fill to the ghost-panel gate
-       (and to the eye) once the card floats over a light page. */
-    background: #15151c;
-  }
-
-  .send-button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(167, 139, 250, 0.15);
-    color: var(--mp-color-accent, #A78BFA);
-    border: 1px solid rgba(167, 139, 250, 0.2);
-    border-radius: 8px;
-    padding: 8px 20px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
+  /* EMAIL COMPOSE: a modern mail compose window, sized for video -- From,
+     To chips, a bold subject, the body typing in, a formatting bar, the
+     brand's Send button; on send the window lifts away and a "Sent" toast
+     lands. Scripts drive it through data-target hooks (to-field,
+     subject-field, body-field, send-button); a scripted click on Send plays
+     the send. Themed from the brand background. */
+  .ec-root, .ec-root * { max-width: none; box-sizing: border-box; }
+  .ec-root { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); --ec-fs: 22px; }
+  .ec-win { position: relative; width: 94%; height: 90%; display: flex; flex-direction: column; border-radius: 16px; overflow: hidden;
+    background: var(--ec-bg); color: var(--ec-ink); box-shadow: 0 30px 80px rgba(15, 15, 40, 0.18), 0 0 0 1px var(--ec-line); }
+  .ec-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0.7em 1.1em; font-size: var(--ec-fs);
+    background: var(--ec-bar); font-weight: 600; }
+  .ec-ctl { display: flex; gap: 0.5em; }
+  .ec-ctl i { width: 0.6em; height: 0.6em; border-radius: 50%; background: var(--ec-mute); opacity: 0.45; display: block; }
+  .ec-row { flex: none; display: flex; align-items: center; gap: 0.8em; padding: 0.55em 1.1em; font-size: var(--ec-fs); border-bottom: 1px solid var(--ec-line); min-height: 2.4em; }
+  .ec-lab { color: var(--ec-mute); width: 3.4em; flex: none; }
+  .ec-val { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ec-to { display: flex; gap: 0.4em; flex-wrap: nowrap; }
+  .ec-chip { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.12em 0.7em 0.12em 0.2em; border-radius: 999px; background: var(--ec-chip); font-size: 0.9em; white-space: nowrap; }
+  .ec-av { width: 1.4em; height: 1.4em; border-radius: 50%; color: #fff; font-size: 0.72em; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+  .ec-subj { font-weight: 700; }
+  .ec-subj:empty::before { content: 'Subject'; color: var(--ec-mute); font-weight: 400; }
+  .ec-body { flex: 1; min-height: 0; overflow: hidden; padding: 0.9em 1.1em; font-size: var(--ec-fs); line-height: 1.6; white-space: pre-wrap; }
+  .ec-body span, .ec-subj span { display: none; }
+  .ec-ai { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.72em; font-weight: 600; color: var(--ec-acc); background: var(--ec-acc-soft);
+    padding: 0.25em 0.8em; border-radius: 999px; margin-bottom: 0.8em; }
+  .ec-caret { display: inline-block; width: 2px; height: 1.1em; background: var(--ec-acc); vertical-align: -0.2em; margin-left: 1px; }
+  .ec-attach { flex: none; display: flex; gap: 0.6em; padding: 0 1.1em 0.6em; font-size: calc(var(--ec-fs) * 0.8); }
+  .ec-attach:empty { display: none; }
+  .ec-file { display: inline-flex; align-items: center; gap: 0.5em; padding: 0.4em 0.8em; border: 1px solid var(--ec-line); border-radius: 10px; }
+  .ec-file b { width: 1.4em; height: 1.6em; border-radius: 3px; background: var(--ec-acc-soft); display: inline-block; }
+  .ec-foot { flex: none; display: flex; align-items: center; gap: 1.2em; padding: 0.8em 1.1em; font-size: var(--ec-fs); border-top: 1px solid var(--ec-line); }
+  .ec-send { display: inline-flex; align-items: center; gap: 0.6em; border: 0; border-radius: 999px; padding: 0.55em 1.3em; font: inherit; font-weight: 700;
+    color: #fff; background: var(--ec-acc); box-shadow: 0 6px 18px var(--ec-acc-soft); }
+  .ec-send b { display: inline-block; width: 0; height: 0; border-left: 0.35em solid transparent; border-right: 0.35em solid transparent; border-top: 0.45em solid rgba(255,255,255,0.85); }
+  .ec-tools { display: flex; gap: 1em; color: var(--ec-mute); font-weight: 700; font-size: 0.85em; }
+  .ec-tools i { font-style: normal; }
+  .ec-tools .it { font-style: italic; }
+  .ec-tools .u { text-decoration: underline; }
+  .ec-toast { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 0.5em; visibility: hidden;
+    font-size: calc(var(--ec-fs) * 1.4); font-weight: 700; padding: 0.6em 1.3em; border-radius: 999px; background: var(--ec-ink); color: var(--ec-bg); }
+  .ec-check { display: inline-flex; width: 1.4em; height: 1.4em; border-radius: 50%; align-items: center; justify-content: center; background: #22c55e; color: #fff; font-size: 0.8em; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var client = el.querySelector('.email-client');
-    var fromEl = el.querySelector('.from-value');
-    var toEl = el.querySelector('.to-value');
-    var subjectEl = el.querySelector('.subject-value');
-    var bodyEl = el.querySelector('.body-text');
-    var sendBtn = el.querySelector('.send-button');
+    data = data || {};
+    ctx = ctx || {};
+    var DUR = ctx.duration || 6;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.ec-root'), win = q('.ec-win');
+    var cs = getComputedStyle(el);
 
-    var fromText = data.from || 'you@company.com';
-    var toText = data.to || 'team@company.com';
-    var subjectText = data.subject || 'Quick Update';
-    var bodyText = data.body || 'Hey team,\n\nJust wanted to share a quick update on the project.';
+    // ---- Theme from the ground ----
+    var lum = function (c) {
+      var m = String(c || '').trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      if (!m) return null;
+      var h = m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1];
+      return (0.2126 * parseInt(h.slice(0, 2), 16) + 0.7152 * parseInt(h.slice(2, 4), 16) + 0.0722 * parseInt(h.slice(4, 6), 16)) / 255;
+    };
+    var g = lum(cs.getPropertyValue('--mp-color-background'));
+    var dark = data.theme === 'dark' || (data.theme !== 'light' && g !== null && g < 0.45);
+    var ACC = data.accent || cs.getPropertyValue('--mp-color-primary').trim() || '#393bf5';
+    var T = dark
+      ? { bg: '#16161d', bar: '#1f1f28', ink: '#f2f2f6', mute: 'rgba(242,242,246,0.55)', line: 'rgba(255,255,255,0.08)', chip: 'rgba(255,255,255,0.08)' }
+      : { bg: '#ffffff', bar: '#f4f4f8', ink: '#17171c', mute: 'rgba(23,23,28,0.5)', line: 'rgba(23,23,28,0.08)', chip: '#eef0f6' };
+    root.style.setProperty('--ec-bg', T.bg); root.style.setProperty('--ec-bar', T.bar); root.style.setProperty('--ec-ink', T.ink);
+    root.style.setProperty('--ec-mute', T.mute); root.style.setProperty('--ec-line', T.line); root.style.setProperty('--ec-chip', T.chip);
+    root.style.setProperty('--ec-acc', ACC); root.style.setProperty('--ec-acc-soft', 'color-mix(in srgb, ' + ACC + ' 16%, transparent)');
+    var W = el.clientWidth || 1000, H = el.clientHeight || 700;
+    root.style.setProperty('--ec-fs', Math.round(Math.max(14, Math.min(W / 50, H / 27))) + 'px');
 
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    // ---- Fields ----
+    var from = String(data.from || 'you@company.com');
+    q('.ec-from').textContent = from;
+    var colors = [ACC, '#12a594', '#e8590c', '#b45cf0'];
+    String(data.to || 'team@company.com').split(/\s*[,;]\s*/).filter(Boolean).slice(0, 3).forEach(function (addr, i) {
+      var chip = document.createElement('span'); chip.className = 'ec-chip';
+      var av = document.createElement('span'); av.className = 'ec-av'; av.style.background = colors[i % colors.length];
+      av.textContent = (addr.replace(/[^A-Za-z]/g, '')[0] || '?').toUpperCase();
+      chip.appendChild(av); chip.appendChild(document.createTextNode(addr));
+      q('.ec-to').appendChild(chip);
+    });
+    (Array.isArray(data.attachments) ? data.attachments : []).slice(0, 3).forEach(function (a) {
+      var f = document.createElement('span'); f.className = 'ec-file'; f.innerHTML = '<b></b>'; f.appendChild(document.createTextNode(String(a))); q('.ec-attach').appendChild(f);
+    });
 
-    // Initial state
-    gsap.set(client, { autoAlpha: 0, scale: 0.92, y: 30, filter: 'blur(4px)' });
+    // A scripted type into a field is the script's to perform; the component
+    // types the fields the script leaves alone.
+    var script = Array.isArray(data.script) ? data.script : [];
+    var scripted = {};
+    script.forEach(function (a) { if (a && a.action === 'type' && a.target) scripted[a.target] = true; });
+    var sendClick = script.filter(function (a) { return a && a.action === 'click' && a.target === 'send-button'; })[0];
 
-    // Client entrance
-    tl.to(client, {
-      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
-      duration: speed,
-      ease: 'power3.out'
-    }, 0.3);
+    // Pre-laid characters revealed by tl.set: seek-exact typing.
+    function lay(host, text) {
+      var spans = [];
+      for (var i = 0; i < text.length; i++) { var sp = document.createElement('span'); sp.textContent = text[i]; host.appendChild(sp); spans.push(sp); }
+      return spans;
+    }
+    var caret = document.createElement('span'); caret.className = 'ec-caret';
+    var AT = num(data.at, 0.3);
+    gsap.set(win, { autoAlpha: 0, y: 24, scale: 0.97 });
+    tl.to(win, { autoAlpha: 1, y: 0, scale: 1, duration: 0.55, ease: 'power3.out' }, AT);
+    var t = AT + 0.5;
+    var subj = String(data.subject || '');
+    var body = String(data.body || '');
+    var CPS = num(data.type_speed, 38);
+    // A known send moment is the typing deadline: the draft finishes before Send.
+    var sendAt = data.send_at !== undefined && data.send_at !== null && data.send_at !== '' ? num(data.send_at, -1)
+      : sendClick ? num(sendClick.at, -1) : (data.send === true ? -2 : -1);
+    if (subj && !scripted['subject-field']) {
+      var ss = lay(q('.ec-subj'), subj);
+      var step = Math.min(1 / CPS, 1.0 / ss.length);
+      ss.forEach(function (sp, i) { tl.set(sp, { display: 'inline' }, t + i * step); });
+      t += ss.length * step + 0.2;
+    }
+    if (data.ai) {
+      var ai = document.createElement('div'); ai.className = 'ec-ai';
+      ai.textContent = '✦ ' + (typeof data.ai === 'string' ? data.ai : 'Drafted with Quotient');
+      q('.ec-body').appendChild(ai); q('.ec-body').appendChild(document.createElement('br'));
+      gsap.set(ai, { autoAlpha: 0, y: 6 });
+      tl.to(ai, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'back.out(2)' }, t);
+      t += 0.25;
+    }
+    if (body && !scripted['body-field']) {
+      var bs = lay(q('.ec-body'), body);
+      q('.ec-body').appendChild(caret);
+      // The body types fast and never runs past the scene (an AI draft pours in).
+      var deadline = sendAt >= 0 ? sendAt - 0.35 : DUR * 0.85;
+      var bstep = Math.min(1 / (CPS * 1.6), Math.max(0.004, (deadline - t) / bs.length));
+      bs.forEach(function (sp, i) { tl.set(sp, { display: 'inline' }, t + i * bstep); });
+      t += bs.length * bstep + 0.2;
+    }
+    // FIT the body: the finished email must fit its area (measured: a
+    // three-paragraph body showed only "Hi there," -- the rest overflowed).
+    var bodyEl = q('.ec-body');
+    var hidden = Array.prototype.slice.call(bodyEl.querySelectorAll('span')).filter(function (x) { return x.style.display !== 'inline' && x !== caret; });
+    hidden.forEach(function (x) { x.style.display = 'inline'; });
+    var bfs = parseFloat(getComputedStyle(bodyEl).fontSize) || 22;
+    for (var fi = 0; fi < 16 && bodyEl.scrollHeight > bodyEl.clientHeight + 2 && bfs > 11; fi++) { bfs *= 0.92; bodyEl.style.fontSize = bfs.toFixed(1) + 'px'; }
+    hidden.forEach(function (x) { x.style.display = ''; });
+    gsap.set(caret, { autoAlpha: 0 });
+    tl.set(caret, { autoAlpha: 1 }, AT + 0.5);
+    tl.set(caret, { autoAlpha: 0 }, t);
 
-    // Helper: type text into element
-    function typeField(element, text, startTime, charDelay) {
-      var cursor = document.createElement('span');
-      cursor.className = 'email-cursor';
-
-      tl.call(function() {
-        element.textContent = '';
-        element.appendChild(cursor);
-      }, null, startTime);
-
-      for (var c = 0; c < text.length; c++) {
-        (function(charIdx) {
-          tl.call(function() {
-            element.textContent = text.substring(0, charIdx + 1);
-            element.appendChild(cursor);
-          }, null, startTime + 0.1 + charIdx * charDelay);
-        })(c);
-      }
-
-      var endTime = startTime + 0.1 + text.length * charDelay + 0.15;
-      tl.call(function() {
-        if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
-      }, null, endTime);
-
-      return endTime;
+    // ---- Send: the button presses, the window lifts away, "Sent" lands ----
+    if (sendAt === -2) sendAt = Math.min(DUR - 1.2, t + 0.5);
+    var btn = q('.ec-send');
+    if (sendAt >= 0) {
+      tl.to(btn, { scale: 0.92, duration: 0.08, ease: 'power2.in' }, sendAt);
+      tl.to(btn, { scale: 1, duration: 0.14, ease: 'power2.out' }, sendAt + 0.08);
+      tl.to(win, { y: -40, scale: 0.9, autoAlpha: 0, duration: 0.45, ease: 'power2.in' }, sendAt + 0.22);
+      var toast = q('.ec-toast');
+      if (data.sent_label) q('.ec-toast-t').textContent = String(data.sent_label);
+      tl.fromTo(toast, { autoAlpha: 0, scale: 0.8 }, { autoAlpha: 1, scale: 1, duration: 0.35, ease: 'back.out(2.2)', immediateRender: false }, sendAt + 0.55);
+    } else if (DUR > 2.5) {
+      tl.to(win, { autoAlpha: 0, y: -12, duration: 0.4, ease: 'power2.in' }, DUR - 0.55);
     }
 
-    // Type fields sequentially
-    var t = 0.3 + speed + 0.2;
-    t = typeField(fromEl, fromText, t, 0.03);
-    t = typeField(toEl, toText, t + 0.15, 0.03);
-    t = typeField(subjectEl, subjectText, t + 0.15, 0.04);
-    t = typeField(bodyEl, bodyText, t + 0.2, 0.03);
-
-    // Send button glow at the end
-    tl.to(sendBtn, {
-      boxShadow: '0 0 24px rgba(167, 139, 250, 0.4), 0 0 48px rgba(167, 139, 250, 0.15)',
-      background: 'rgba(167, 139, 250, 0.25)',
-      duration: 0.5,
-      ease: 'power2.out'
-    }, t + 0.3);
-
-    tl.to(sendBtn, {
-      boxShadow: '0 0 12px rgba(167, 139, 250, 0.2)',
-      duration: 0.8,
-      yoyo: true,
-      repeat: 1,
-      ease: 'sine.inOut'
-    }, t + 0.8);
-
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
-      tl.to(client, {
-        autoAlpha: 0, scale: 0.95, y: -15,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
-    }
-
-
-    // Run interactive script if provided
-    if (data.script && data.script.length > 0) {
-      runScript(tl, el, data.script, data.cursor_targets || {}, ctx);
-    }
-
+    if (script.length && typeof runScript === 'function') runScript(tl, el, script, data.cursor_targets || {}, ctx);
     return tl;
   }
 </script>
