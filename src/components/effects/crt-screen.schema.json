@@ -1,0 +1,19 @@
+{
+  "type": "crt-screen",
+  "label": "CRT screen — the old TV",
+  "category": "effects",
+  "description": "An old CRT television, full-frame: curved glass (a real barrel bulge), phosphor pixel triad and scanlines, a rolling bright band, bloom, a power-on that springs open from a bright line, timed glitches (a horizontal jolt and flash) and a power-off that collapses to a line and a dot. Shows a big WORD ('2008', 'Over-') in white, green or amber phosphor, or an IMAGE (a cutout, a screenshot). Use it for anything old, legacy, stuck in the past -- the tool 'from 2008', the email platform that is 'about a hundred years old'. Every `at` takes a word anchor.",
+  "data": {
+    "text": { "type": "string", "label": "Word on the screen", "optional": true, "placeholder": "2008" },
+    "image": { "type": "string", "label": "Image on the screen (URL)", "optional": true },
+    "phosphor": { "type": "string", "label": "Phosphor", "optional": true, "placeholder": "white | green | amber" },
+    "color": { "type": "string", "label": "Custom phosphor color", "optional": true },
+    "size": { "type": "number", "label": "Word size (fraction of the screen's height, 0.42)", "optional": true },
+    "curve": { "type": "number", "label": "Glass curve (0.55)", "optional": true },
+    "power_on": { "type": "boolean", "label": "Power-on animation (default true)", "optional": true },
+    "power_on_at": { "type": "number", "label": "Power on at (s or @word)", "optional": true },
+    "power_off_at": { "type": "number", "label": "Power off at (s or @word)", "optional": true },
+    "glitches": { "type": "array", "label": "Glitch times (s or @word)", "optional": true, "items": { "type": "number" } },
+    "background": { "type": "string", "label": "Room around the set (CSS)", "optional": true }
+  }
+}

@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — card-cascade and crt-screen (from the Bundance spec ad)
+
+Two effects Marc picked from the X posts he sent:
+- **card-cascade** (props): overwhelm as a long 3D row of cards standing up
+  one after the next like dominoes, the camera sliding along; a cursor
+  hovers cards and tags pop ("???"); on the word the row and its ground
+  drain to grey. `style` product (image/emoji, name, stars, price) or email
+  (sender, subject, preview lines -- "the same email, to everyone"). CSS 3D
+  (the card text stays crisp); the grey ground is its own layer (GSAP cannot
+  tween background-image).
+- **crt-screen** (effects): the old TV -- curved glass (an SVG displacement
+  map computed once), phosphor triad, scanlines, rolling band, bloom,
+  power-on from a line, glitches, power-off to a dot; a word ("2008") or an
+  image (the Old Chimp on the set). It FITS its box (covering a tall box
+  cropped the bezel).
+
+Tests: `test/card-cascade.test.ts`, `test/crt-screen.test.ts`.
+
+---
+
 ## 2026-09-24 — speaker-3d: captions that live in the room with the person
 
 After the camera-3d-captions demo Marc sent (jake11moran / HyperFrames): a

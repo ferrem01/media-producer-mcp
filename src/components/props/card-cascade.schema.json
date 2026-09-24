@@ -1,0 +1,46 @@
+{
+  "type": "card-cascade",
+  "label": "Card cascade — too many choices (dominoes)",
+  "category": "props",
+  "description": "Overwhelm as an image: a long 3D row of cards standing up one after the next like dominoes, receding diagonally into the distance while the camera slides along it (more keep coming). A cursor hovers cards and tags pop beside them ('???', 'Sneakers'); on the word (`grey_at`) the whole row and its ground drain to grey -- 'overwhelming', 'the same email, to everyone'. style 'product' (image/emoji, name, stars, price) or 'email' (sender, subject, preview lines). Cards given are repeated to fill `count` so the row reads as endless. Every `at` takes a word anchor. Full-frame.",
+  "data": {
+    "style": { "type": "string", "label": "Card style", "optional": true, "placeholder": "product | email" },
+    "cards": {
+      "type": "array",
+      "label": "Cards (repeated to fill count)",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "label": "Product: name" },
+          "price": { "type": "string", "label": "Product: price" },
+          "emoji": { "type": "string", "label": "Product: emoji" },
+          "image": { "type": "string", "label": "Product: image URL" },
+          "from": { "type": "string", "label": "Email: sender" },
+          "subject": { "type": "string", "label": "Email: subject" },
+          "color": { "type": "string", "label": "Email: avatar color" }
+        }
+      }
+    },
+    "count": { "type": "number", "label": "How many cards in the row (18)", "optional": true },
+    "enter_at": { "type": "number", "label": "Cascade starts (s or @word)", "optional": true },
+    "pace": { "type": "number", "label": "Seconds between cards standing up (0.07)", "optional": true },
+    "hovers": {
+      "type": "array",
+      "label": "Cursor hovers",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": { "type": "number", "label": "At (s or @word)" },
+          "card": { "type": "number", "label": "Card index (0-based)" },
+          "tag": { "type": "string", "label": "Tag that pops beside it", "placeholder": "???" },
+          "until": { "type": "number", "label": "Tag leaves at" }
+        }
+      }
+    },
+    "grey_at": { "type": "number", "label": "Drain to grey at (s or @word)", "optional": true },
+    "background": { "type": "string", "label": "Ground (CSS background)", "optional": true },
+    "angle": { "type": "number", "label": "Row yaw in degrees (-32)", "optional": true }
+  }
+}
