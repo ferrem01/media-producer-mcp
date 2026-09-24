@@ -15,6 +15,7 @@
  */
 import type { Project, StoryboardScene } from "./types.js";
 import { personCarries } from "./take-needs.js";
+import { soundSummary } from "./scene-sfx.js";
 
 export type ShotKind = "speaker" | "cutaway" | "split" | "screen" | "footage" | "image" | "graphic";
 
@@ -90,6 +91,8 @@ export interface PlanRow {
   /** true when the sentence is the writer's own `shot` line, not derived. */
   shot_written: boolean;
   line: string;
+  /** The scene's sound cues, short: "ding ×3, thud" ("" when none). */
+  sounds: string;
 }
 
 function round1(n: number): number {
@@ -113,6 +116,7 @@ export function planRows(project: Project): PlanRow[] {
       shot: shotText(s),
       shot_written: !!String((s as any).shot || "").trim(),
       line: String(s.voiceover_text || "").trim(),
+      sounds: soundSummary((s as any).sfx),
     };
     t += d;
     return row;
@@ -134,7 +138,7 @@ export function planMarkdown(project: Project): string {
   if (!rows.length) return "";
   const out = ["| # | Beat | Time | Shot | Line |", "|---|---|---|---|---|"];
   for (const r of rows) {
-    const shot = `**${r.shot_label}**${r.shot ? ": " + r.shot : ""}`;
+    const shot = `**${r.shot_label}**${r.shot ? ": " + r.shot : ""}${r.sounds ? ` \u{1F514} ${r.sounds}` : ""}`;
     const line = r.line ? `“${r.line}”` : "—";
     out.push(`| ${r.index + 1} | ${cell(r.beat)} | ${secs(r.start)}–${secs(r.end)}s | ${cell(shot)} | ${cell(line)} |`);
   }

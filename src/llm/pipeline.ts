@@ -10,6 +10,7 @@
  * the decision.
  */
 
+import { normalizeSoundCues } from "../core/scene-sfx.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -2284,6 +2285,8 @@ function storyboardToSaved(
       assets: Array.isArray(s.assets) ? s.assets : [],
       visual_notes: s.visual_notes || "",
       ...(typeof s.shot === "string" && s.shot.trim() ? { shot: s.shot.trim() } : {}),
+      // The sounds, carried: planned on the board, re-timed with the words.
+      ...(Array.isArray(s.sfx) && s.sfx.length ? { sfx: normalizeSoundCues(s.sfx) } : {}),
       components: s.components || [],
       broll_query: s.broll_query,
       hero_image: s.hero_image,
