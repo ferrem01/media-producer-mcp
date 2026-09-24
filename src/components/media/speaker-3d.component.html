@@ -1,0 +1,223 @@
+<template>
+  <div class="s3d-root">
+    <div class="s3d-plate"><div class="s3d-plate-in"></div></div>
+    <div class="s3d-back"></div>
+    <div class="s3d-person"><div class="s3d-person-in"></div></div>
+    <div class="s3d-front"></div>
+    <div class="s3d-wipes"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* THE SPEAKER IN 3D: captions that live in the room with the person.
+     A big word stands BEHIND the head (the person's cut-out covers it), small
+     words build in the open air in front, a ring of text wraps around the
+     head -- far arc behind, near arc in front -- and one camera moves it all,
+     the text layers at their own depths (parallax). Stack, bottom to top:
+     the room (the raw take), the back words, the person (the alpha copy,
+     locked to the room: the room copy holds the person too), the front
+     words, the silhouette wipes. Before a take exists the captions still
+     perform, over whatever lies beneath. */
+  .s3d-root, .s3d-root * { max-width: none; }
+  .s3d-root { position: absolute; inset: 0; overflow: hidden; }
+  .s3d-plate, .s3d-person, .s3d-back, .s3d-front, .s3d-wipes { position: absolute; inset: 0; transform-origin: 50% 45%; }
+  .s3d-plate-in, .s3d-person-in { position: absolute; inset: 0; }
+  .s3d-plate-in video, .s3d-person-in video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .s3d-word { position: absolute; white-space: nowrap; line-height: 1; will-change: transform, opacity, filter; }
+  .s3d-small { font-family: var(--mp-font-family, Inter), Inter, sans-serif; font-weight: 500; letter-spacing: -0.01em; color: #fff; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45); }
+  .s3d-small span { display: inline-block; margin-right: 0.26em; }
+  .s3d-big { font-weight: 800; letter-spacing: -0.035em; }
+  .s3d-big.serif { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; letter-spacing: -0.02em; }
+  .s3d-big span { display: inline-block; }
+  .s3d-ring { position: absolute; inset: 0; overflow: visible; }
+  .s3d-ring text { font-weight: 700; letter-spacing: 0.02em; }
+  .s3d-wipe { position: absolute; inset: 0; transform-origin: 50% 60%; visibility: hidden; }
+  .s3d-wipe-sil { position: absolute; inset: 0; filter: brightness(0); }
+  .s3d-wipe-sil video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .s3d-wipe-blob { position: absolute; left: 25%; top: 10%; width: 50%; height: 110%; border-radius: 45% 45% 20% 20%; background: #000; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var DUR = (ctx && ctx.duration) || 6;
+    var root = el.querySelector('.s3d-root');
+    var plate = el.querySelector('.s3d-plate'), plateIn = el.querySelector('.s3d-plate-in');
+    var person = el.querySelector('.s3d-person'), personIn = el.querySelector('.s3d-person-in');
+    var back = el.querySelector('.s3d-back'), front = el.querySelector('.s3d-front');
+    var wipesEl = el.querySelector('.s3d-wipes');
+    var SVGNS = 'http://www.w3.org/2000/svg';
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var W = el.clientWidth || 1920, H = el.clientHeight || 1080;
+    var ACC = data.accent || 'var(--mp-color-primary, #393bf5)';
+    var serif = data.font === 'serif';
+
+    // ---- The take: the room (raw) and the person (alpha cut-out). Bound
+    // at assembly (core/speaker-layer.ts): src is the alpha copy when one
+    // exists (data.alpha), room_src the raw take. No take: no plate. ----
+    var personSrc = data.alpha && data.src ? data.src : '';
+    var roomSrc = data.room_src || (!data.alpha && data.src ? data.src : '');
+    var roomAt = num(data.room_start_at, num(data.start_at, 0));
+    var personAt = num(data.start_at, 0);
+    function addVideo(box, src, at) {
+      if (!src || typeof loadVideoForCapture !== 'function') return null;
+      return loadVideoForCapture(box, src, { style: 'width:100%;height:100%;object-fit:cover;display:block;', startAt: at });
+    }
+    addVideo(plateIn, roomSrc, roomAt);
+    addVideo(personIn, personSrc, personAt);
+
+    // ---- Lines: small (word by word, in front), big (a key word behind
+    // the head), ring (around the head). Each shows from `at` until `until`,
+    // else until the next line of its kind, else the end. ----
+    var lines = (Array.isArray(data.lines) ? data.lines : []).filter(function (l) { return l && typeof l === 'object' && String(l.text || '').trim(); })
+      .map(function (l, i) { return { l: l, i: i, at: num(l.at, 0.2 + i * 1.2), kind: l.kind === 'big' || l.kind === 'ring' ? l.kind : 'small' }; })
+      .sort(function (a, b) { return a.at - b.at || a.i - b.i; });
+    lines.forEach(function (x, k) {
+      if (x.l.until !== undefined && x.l.until !== '' && isFinite(Number(x.l.until))) { x.until = Number(x.l.until); return; }
+      var next = null;
+      for (var j = k + 1; j < lines.length; j++) if (lines[j].kind === x.kind) { next = lines[j]; break; }
+      x.until = next ? next.at : DUR;
+    });
+    var pct = function (v, total, d) {
+      if (v === undefined || v === null || v === '') return d;
+      var s = String(v);
+      return s.slice(-1) === '%' ? (parseFloat(s) / 100) * total : (parseFloat(s) || 0);
+    };
+
+    var bigN = 0;
+    lines.forEach(function (x, idx) {
+      var l = x.l, at = x.at, until = Math.max(at + 0.3, x.until);
+      var layer = l.layer === 'front' || l.layer === 'back' ? l.layer : (x.kind === 'big' ? 'back' : 'front');
+      var host = layer === 'back' ? back : front;
+      var color = l.color || (x.kind === 'small' ? '#ffffff' : ACC);
+      if (x.kind === 'ring') { ring(l, at, until, color); return; }
+      var w = document.createElement('div');
+      w.className = 's3d-word ' + (x.kind === 'big' ? 's3d-big' + (serif ? ' serif' : '') : 's3d-small');
+      var size = num(l.size, x.kind === 'big' ? 0.2 : 0.042) * H;
+      w.style.fontSize = size + 'px';
+      w.style.color = color;
+      if (x.kind === 'big') w.style.fontFamily = serif ? '' : 'var(--mp-font-family, Inter), Inter, sans-serif';
+      String(l.text).split(/(\s+)/).forEach(function (tok) {
+        if (!tok.trim()) return;
+        if (x.kind === 'big') {
+          tok.split('').forEach(function (ch) { var s = document.createElement('span'); s.textContent = ch; w.appendChild(s); });
+          var sp = document.createElement('span'); sp.innerHTML = '&nbsp;'; w.appendChild(sp);
+        } else {
+          var s = document.createElement('span'); s.textContent = tok; w.appendChild(s);
+        }
+      });
+      if (x.kind === 'big' && w.lastChild) w.removeChild(w.lastChild);
+      host.appendChild(w);
+      // Placement: big words centre on the head's height by default (the
+      // head covers their middle -- the point); small words sit beside it.
+      var side = l.side || (x.kind === 'big' ? (bigN === 0 ? 'center' : (bigN % 2 ? 'right' : 'left')) : (idx % 2 ? 'right' : 'left'));
+      if (x.kind === 'big') bigN++;
+      var bw = w.offsetWidth || size * String(l.text).length * 0.55;
+      // A centred big word must be WIDER than a head, or the person hides
+      // it whole (measured: "feel" vanished behind the cut-out). Scale it up
+      // to ~42% of the frame's width, within a cap.
+      if (x.kind === 'big' && side === 'center' && l.size === undefined && bw < W * 0.42) {
+        var k = Math.min((W * 0.42) / bw, (H * 0.36) / size);
+        size = size * k; w.style.fontSize = size + 'px'; bw = w.offsetWidth || bw * k;
+      }
+      var defX, defY;
+      if (x.kind === 'big') {
+        defX = side === 'center' ? (W - bw) / 2 : (side === 'right' ? W * 0.56 : W * 0.44 - bw);
+        defY = side === 'center' ? H * 0.16 : H * 0.5;
+      } else {
+        // Beside the face, clear of a centred big word (it spans the top).
+        defX = side === 'right' ? W * 0.64 : W * 0.07;
+        defY = side === 'right' ? H * 0.58 : H * 0.6;
+      }
+      w.style.left = pct(l.x, W, defX) + 'px';
+      w.style.top = pct(l.y, H, defY) + 'px';
+      var parts = w.children;
+      if (x.kind === 'big') {
+        gsap.set(parts, { autoAlpha: 0, yPercent: 30, scale: 1.25, filter: 'blur(14px)' });
+        tl.to(parts, { autoAlpha: 1, yPercent: 0, scale: 1, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out', stagger: 0.03 }, at);
+        tl.to(w, { x: size * 0.12, duration: Math.max(0.3, until - at), ease: 'none' }, at);
+      } else {
+        var pace = num(l.pace, 0.13);
+        gsap.set(parts, { autoAlpha: 0, y: size * 0.45, filter: 'blur(6px)' });
+        tl.to(parts, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.32, ease: 'power2.out', stagger: pace }, at);
+      }
+      if (until < DUR) tl.to(w, { autoAlpha: 0, filter: 'blur(10px)', duration: 0.3, ease: 'power2.in' }, until - 0.15);
+    });
+
+    // ---- The ring: one ellipse around the head, drawn twice. The far arc
+    // (top) lives behind the person, the near arc (bottom) in front; the
+    // text turns along it. ----
+    var ringN = 0;
+    function ring(l, at, until, color) {
+      // Around the NECK by default: the far arc passes behind the head, the
+      // near arc across the chest (measured: at head height it crossed the mouth).
+      var cx = pct(l.x, W, W * 0.5), cy = pct(l.y, H, H * 0.56);
+      var rx = num(l.radius, 0.22) * W, ry = rx * num(l.tilt, 0.3);
+      var size = num(l.size, 0.05) * H;
+      var id = 's3dring' + (ringN++) + Math.round(at * 100);
+      var d = 'M ' + (cx - rx) + ',' + cy + ' a ' + rx + ',' + ry + ' 0 1,0 ' + (2 * rx) + ',0 a ' + rx + ',' + ry + ' 0 1,0 ' + (-2 * rx) + ',0';
+      var text = String(l.text).trim();
+      var reps = Math.max(1, Math.round((Math.PI * (rx + ry)) / (text.length * size * 0.62 + size)));
+      var full = Array(reps + 1).join(text + ' · ');
+      [['back', back, 0, cy], ['front', front, cy, H]].forEach(function (part) {
+        var svg = document.createElementNS(SVGNS, 'svg');
+        svg.setAttribute('class', 's3d-ring'); svg.setAttribute('width', W); svg.setAttribute('height', H);
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+        var defs = document.createElementNS(SVGNS, 'defs');
+        var path = document.createElementNS(SVGNS, 'path'); path.setAttribute('id', id + part[0]); path.setAttribute('d', d);
+        var clip = document.createElementNS(SVGNS, 'clipPath'); clip.setAttribute('id', id + part[0] + 'c');
+        var rect = document.createElementNS(SVGNS, 'rect'); rect.setAttribute('x', 0); rect.setAttribute('y', part[2]);
+        rect.setAttribute('width', W); rect.setAttribute('height', part[3] - part[2]);
+        clip.appendChild(rect); defs.appendChild(path); defs.appendChild(clip); svg.appendChild(defs);
+        var t = document.createElementNS(SVGNS, 'text');
+        t.setAttribute('font-size', size); t.setAttribute('fill', color); t.setAttribute('clip-path', 'url(#' + id + part[0] + 'c)');
+        t.setAttribute('font-family', serif ? "Georgia, 'Times New Roman', serif" : 'var(--mp-font-family, Inter), Inter, sans-serif');
+        if (part[0] === 'back') t.setAttribute('opacity', '0.78');
+        var tp = document.createElementNS(SVGNS, 'textPath'); tp.setAttribute('href', '#' + id + part[0]);
+        tp.setAttribute('startOffset', '0%'); tp.textContent = full;
+        t.appendChild(tp); svg.appendChild(t); part[1].appendChild(svg);
+        gsap.set(svg, { autoAlpha: 0, scale: 0.9, transformOrigin: cx + 'px ' + cy + 'px' });
+        tl.to(svg, { autoAlpha: 1, scale: 1, duration: 0.45, ease: 'power2.out' }, at);
+        tl.fromTo(tp, { attr: { startOffset: '0%' } }, { attr: { startOffset: '-' + num(l.turn, 18) + '%' }, duration: Math.max(0.5, until - at + 0.3), ease: 'none', immediateRender: false }, at);
+        if (until < DUR) tl.to(svg, { autoAlpha: 0, duration: 0.3 }, until - 0.15);
+      });
+    }
+
+    // ---- The camera: one move over every layer. The room and the person
+    // move as one (the room copy holds the person); the back words sit a
+    // little farther (move less), the front words nearer (move more). ----
+    var mode = data.camera === 'orbit' || data.camera === 'still' ? data.camera : 'push';
+    var amt = num(data.camera_amount, 1);
+    if (mode !== 'still') {
+      var push = 0.07 * amt, orbit = mode === 'orbit' ? 0.03 * W * amt : 0.008 * W * amt;
+      var layers = [[plate, 1], [person, 1], [back, 0.85], [front, 1.4]];
+      layers.forEach(function (ly) {
+        var k = ly[1];
+        gsap.set(ly[0], { scale: 1, x: -orbit * k });
+        tl.to(ly[0], { scale: 1 + push * k, x: orbit * k, duration: DUR, ease: 'sine.inOut' }, 0);
+      });
+    }
+
+    // ---- Silhouette wipes: the person as a black cut-out, scaled up,
+    // sweeping across the frame (a blob when there is no cut-out yet). ----
+    (Array.isArray(data.wipes) ? data.wipes : []).filter(Boolean).forEach(function (wp) {
+      var at = num(wp.at, 0); if (at >= DUR) return;
+      var dirR = wp.from !== 'left';
+      var box = document.createElement('div'); box.className = 's3d-wipe';
+      if (personSrc) {
+        var sil = document.createElement('div'); sil.className = 's3d-wipe-sil';
+        box.appendChild(sil); addVideo(sil, personSrc, personAt);
+      } else {
+        var blob = document.createElement('div'); blob.className = 's3d-wipe-blob'; box.appendChild(blob);
+      }
+      wipesEl.appendChild(box);
+      var dur = num(wp.duration, 0.7);
+      gsap.set(box, { autoAlpha: 0, scale: 2.8, xPercent: dirR ? 130 : -130 });
+      tl.set(box, { autoAlpha: 1 }, at);
+      tl.to(box, { xPercent: dirR ? -130 : 130, duration: dur, ease: 'power2.inOut' }, at);
+      tl.set(box, { autoAlpha: 0 }, at + dur);
+    });
+    return tl;
+  }
+</script>

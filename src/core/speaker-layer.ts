@@ -70,14 +70,22 @@ export function isSpeakerData(data: Record<string, any> | null | undefined): boo
   return !!data && (data.src === SPEAKER_SRC || data.src === SPEAKER_ALPHA_SRC || data.speaker_layer === true);
 }
 
-/** True when the component is the person: a video on the speaker token. */
+/** The speaker in 3D (captions behind and in front of the person, one
+ *  camera over both): it IS the person -- it draws the take itself, from the
+ *  room copy and the alpha copy -- so it counts as a speaker layer, always
+ *  on alpha (it is what asks the matte for the cut-out). */
+export const SPEAKER_3D_TYPE = "speaker-3d";
+
+/** True when the component is the person: a video (or speaker-3d) on the
+ *  speaker token. */
 export function isSpeakerLayer(c: Comp | null | undefined): boolean {
-  return !!c && (c.type === "video" || c.type === undefined) && isSpeakerData(c.data);
+  return !!c && (c.type === "video" || c.type === undefined || c.type === SPEAKER_3D_TYPE) && isSpeakerData(c.data);
 }
 
 /** The component's background setting (room when unset). */
 export function speakerBackgroundOf(c: Comp | null | undefined): SpeakerBackground {
   if (!c || !c.data) return "room";
+  if (c.type === SPEAKER_3D_TYPE) return "alpha";
   return asSpeakerBackground(c.data.background) || (c.data.src === SPEAKER_ALPHA_SRC ? "alpha" : "room");
 }
 
@@ -282,15 +290,20 @@ export function missingSpeakerCopies(project: ProjectLike, take: TakeLike): { bl
 export function bindSpeakerLayerData(
   data: Record<string, any>,
   speaker: { alphaUrl?: string; alphaOffset?: number; url?: string; offset?: number } | null | undefined,
+  opts: { type?: string } = {},
 ): Record<string, any> | null {
   if (!isSpeakerData(data)) return data;
   if (data.src !== SPEAKER_SRC && data.src !== SPEAKER_ALPHA_SRC) return data;
-  const background = asSpeakerBackground(data.background) || (data.src === SPEAKER_ALPHA_SRC ? "alpha" : "room");
+  const is3d = opts.type === SPEAKER_3D_TYPE;
+  const background = is3d ? "alpha" : (asSpeakerBackground(data.background) || (data.src === SPEAKER_ALPHA_SRC ? "alpha" : "room"));
   const useAlpha = background === "alpha" && !!speaker?.alphaUrl;
   const src = useAlpha ? speaker!.alphaUrl : speaker?.url;
-  if (!src) return null;
+  // speaker-3d still performs its captions before a take exists.
+  if (!src) return is3d ? { ...data, src: "", background } : null;
   const offset = useAlpha ? (speaker!.alphaOffset ?? speaker!.offset) : speaker!.offset;
   const out: Record<string, any> = { ...data, src, start_at: Math.max(0, Number(offset) || 0), background };
+  // speaker-3d draws the ROOM too (the raw take under the cut-out).
+  if (is3d && speaker?.url) { out.room_src = speaker.url; out.room_start_at = Math.max(0, Number(speaker.offset) || 0); }
   delete out.speaker_layer;
   // `alpha` tells the video component not to paint under the clip;
   // `speaker_opaque` says the clip is the plain take standing in.

@@ -1,0 +1,47 @@
+{
+  "type": "speaker-3d",
+  "label": "Speaker in 3D — captions behind and in front",
+  "category": "media",
+  "description": "THE PERSON with captions living in the room around them (speaker and creator-cut films): a BIG key word stands BEHIND the head (the person's cut-out covers its middle, the letters peek out either side), SMALL words build word by word in the open air beside the face, a RING of text wraps around the person at neck height (far arc behind the head, near arc across the chest, turning), one CAMERA push/orbit moves it all with the text at its own depths (parallax), and SILHOUETTE WIPES sweep the person's black cut-out across the frame between thoughts. It IS the speaker layer: src 'speaker' (it draws the take itself -- the room copy under the alpha cut-out, which it asks the matte for). Every `at` takes a word anchor (\"@forget\"). Use it for the beats where the WORDS are the point -- a line with one word worth feeling. Before the take exists the captions still perform. One per scene; do not also cast a video speaker in the same scene.",
+  "data": {
+    "src": { "type": "string", "label": "Always \"speaker\"", "placeholder": "speaker" },
+    "lines": {
+      "type": "array",
+      "label": "Caption lines, in time order",
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": { "type": "number", "label": "At (s or @word)" },
+          "until": { "type": "number", "label": "Until (default: the next line of its kind)" },
+          "kind": { "type": "string", "label": "Kind", "placeholder": "small | big | ring" },
+          "text": { "type": "string", "label": "Text", "placeholder": "forget" },
+          "layer": { "type": "string", "label": "Layer (default: big behind, small in front)", "placeholder": "back | front" },
+          "side": { "type": "string", "label": "Side", "placeholder": "center | left | right" },
+          "color": { "type": "string", "label": "Color (default: accent for big/ring, white for small)" },
+          "size": { "type": "number", "label": "Size (fraction of frame height; big 0.2, small 0.042, ring 0.05)" },
+          "x": { "type": "string", "label": "X (px or %)" },
+          "y": { "type": "string", "label": "Y (px or %)" },
+          "radius": { "type": "number", "label": "Ring: radius (fraction of width, 0.22)" },
+          "tilt": { "type": "number", "label": "Ring: tilt (0.3 = a flat ellipse)" }
+        }
+      }
+    },
+    "font": { "type": "string", "label": "Big-word face", "optional": true, "placeholder": "sans (brand, heavy) | serif (italic)" },
+    "accent": { "type": "string", "label": "Accent color", "optional": true },
+    "camera": { "type": "string", "label": "Camera", "optional": true, "placeholder": "push (default) | orbit | still" },
+    "camera_amount": { "type": "number", "label": "Camera strength (1)", "optional": true },
+    "wipes": {
+      "type": "array",
+      "label": "Silhouette wipes (the person's black cut-out sweeping across)",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": { "type": "number", "label": "At (s or @word)" },
+          "from": { "type": "string", "label": "From", "placeholder": "right | left" },
+          "duration": { "type": "number", "label": "Seconds (0.7)" }
+        }
+      }
+    }
+  }
+}

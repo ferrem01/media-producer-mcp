@@ -6,6 +6,36 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — speaker-3d: captions that live in the room with the person
+
+After the camera-3d-captions demo Marc sent (jake11moran / HyperFrames): a
+big key word stands BEHIND the head, small words build in front, a ring of
+text wraps around the person, one camera moves it all, silhouette wipes
+between thoughts. We already had the hard part -- the take's alpha copy
+(core/take-matte.ts) -- so it is one component that draws the take itself:
+the room (raw take) under the back words under the person (alpha cut-out)
+under the front words under the wipes.
+- **It IS the speaker layer.** `isSpeakerLayer` counts `speaker-3d` (src
+  "speaker"); `speakerBackgroundOf` is always alpha, so the scene renders
+  inside (never the base fast path) and `missingSpeakerCopies` asks the
+  matte for the cut-out when the take lands. `bindSpeakerLayerData` gives it
+  both copies (`src` = alpha, `room_src` = raw) and, unlike a plain video
+  speaker, keeps it before any take exists (the captions still perform).
+- **The room and the person move as one.** The room copy holds the person,
+  so offsetting the two shows a double; depth comes from the text layers
+  (back 0.85x, front 1.4x the camera move) -- as the demo does.
+- **Defaults that survive the cut-out.** A centred big word narrower than a
+  head vanished whole behind it (measured: "feel"); it now scales to ~42% of
+  the frame (capped), later big words alternate to the sides. The ring sits
+  at the neck (at head height its near arc crossed the mouth).
+- The silhouette wipe is the alpha copy under a `brightness(0)` WRAPPER
+  (the capture swaps each <video> for a still and does not carry `filter`).
+
+Test: `test/speaker-3d.test.ts` (speaker rules, both copies, no-take
+captions, layer stack, ring halves, big-word width, anchors).
+
+---
+
 ## 2026-09-24 — Playground cleanup: the app's skin, the session's tenant, every component opens
 
 Marc: reskin the playground to match home and Studio; drop the tenant field;
