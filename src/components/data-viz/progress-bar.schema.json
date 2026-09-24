@@ -2,27 +2,57 @@
   "type": "progress-bar",
   "label": "Progress Bar",
   "category": "data-viz",
-  "description": "One labelled progress bar that fills to its value with a count-up (e.g. 'Average open rate 41%'). A single metric, stated plainly.",
+  "description": "One number shown as a shape that fills: a labelled progress bar (default), a hairline RING gauge that draws round while the number counts up ('98% deliverability'), or a STAR rating whose gold fill sweeps to a fractional score ('4.8 on G2'). Pick the shape with style.",
   "data": {
     "value": {
       "type": "number",
-      "label": "Current value",
+      "label": "Current value (a percent of max for bar/ring; the rating for stars, e.g. 4.8)",
       "required": true
     },
     "max": {
       "type": "number",
-      "label": "Maximum value",
+      "label": "Maximum value (default 100; 5 for stars)",
       "optional": true,
       "default": 100
     },
     "label": {
       "type": "string",
-      "label": "Label above the bar",
+      "label": "Label (above the bar; under the ring or stars, e.g. 'on G2 \u00b7 1,200 reviews')",
       "optional": true
     },
     "color": {
       "type": "string",
       "label": "Fill color",
+      "optional": true
+    },
+    "style": {
+      "type": "string",
+      "label": "'bar' (default) | 'ring' (arc gauge, value counts up in the centre) | 'stars' (rating out of max, default 5)",
+      "optional": true
+    },
+    "sublabel": {
+      "type": "string",
+      "label": "ring: a small line under the number inside the ring",
+      "optional": true
+    },
+    "suffix": {
+      "type": "string",
+      "label": "ring: suffix on the number (default %)",
+      "optional": true
+    },
+    "prefix": {
+      "type": "string",
+      "label": "ring: prefix on the number",
+      "optional": true
+    },
+    "decimals": {
+      "type": "number",
+      "label": "Decimals shown while counting (ring 0, stars 1)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "ring/stars: when it starts (seconds or \"@word\")",
       "optional": true
     }
   }

@@ -163,7 +163,9 @@
 
       if (m.change !== undefined) {
         var changeDiv = document.createElement('div');
-        changeDiv.className = 'metric-change ' + (m.change >= 0 ? 'positive' : 'negative');
+        // good:'down' -- a falling number that is good news (unsubscribes, cost) reads green.
+        var goodNews = m.good === 'down' ? m.change <= 0 : m.change >= 0;
+        changeDiv.className = 'metric-change ' + (goodNews ? 'positive' : 'negative');
         var arrow = document.createElement('span');
         arrow.className = 'trend-arrow';
         arrow.textContent = m.change >= 0 ? '▲' : '▼';
@@ -196,7 +198,7 @@
           points.push(x + ',' + y);
         }
 
-        var strokeColor = (m.change !== undefined && m.change < 0) ? '#f87171' : '#A78BFA';
+        var strokeColor = (m.change !== undefined && (m.good === 'down' ? m.change > 0 : m.change < 0)) ? '#f87171' : (getComputedStyle(el).getPropertyValue('--mp-color-primary').trim() || '#A78BFA');
 
         var fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         fillPath.setAttribute('class', 'spark-fill');
@@ -245,7 +247,8 @@
         duration: 0.9,
         ease: 'power2.out',
         onUpdate: function() {
-          var display = target % 1 !== 0 ? counter.val.toFixed(1) : Math.round(counter.val);
+          // Thousands separators while counting: 12,480 reads; 12480 does not.
+          var display = target % 1 !== 0 ? counter.val.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : Math.round(counter.val).toLocaleString('en-US');
           ve.textContent = prefix + display + suffix;
         }
       }, 0.5 + i * 0.1);

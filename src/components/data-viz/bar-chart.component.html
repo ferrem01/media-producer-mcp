@@ -118,7 +118,7 @@
   }
 
   .bar-label {
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 500;
     color: #94a3b8;
     margin-top: 12px;
@@ -157,20 +157,35 @@
       gridLines.appendChild(line);
     }
 
+    // THE BRAND, NOT A RAINBOW: every bar in the primary, the one that
+    // matters (data.highlight -- an index or label; default the tallest) at
+    // full strength, the rest muted. palette:"rainbow" keeps the old look.
+    var rainbow = data.palette === 'rainbow';
+    var hi = -1;
+    if (data.highlight !== undefined && data.highlight !== null && data.highlight !== false) {
+      hi = typeof data.highlight === 'number' ? data.highlight : bars.map(function (b) { return String(b.label); }).indexOf(String(data.highlight));
+    }
+    if (hi < 0 && data.highlight !== false) bars.forEach(function (b, i) { if (hi < 0 || b.value > bars[hi].value) hi = i; });
+    var PRE = data.prefix || '', SUF = data.suffix || '';
     bars.forEach(function(bar, i) {
       var group = document.createElement('div');
       group.className = 'bar-group';
 
       var value = document.createElement('div');
       value.className = 'bar-value';
-      value.textContent = bar.value;
+      value.textContent = PRE + Number(bar.value).toLocaleString('en-US') + SUF;
+      value.dataset.to = value.textContent;
 
       var fill = document.createElement('div');
       fill.className = 'bar-fill';
       var grad = defaultGradients[i % defaultGradients.length];
+      var P = 'var(--mp-color-primary, #393bf5)';
       fill.style.background = bar.color
         ? 'linear-gradient(180deg, ' + bar.color + ' 0%, ' + bar.color + 'cc 100%)'
-        : 'linear-gradient(180deg, ' + grad[0] + ' 0%, ' + grad[1] + ' 100%)';
+        : rainbow ? 'linear-gradient(180deg, ' + grad[0] + ' 0%, ' + grad[1] + ' 100%)'
+        : (i === hi ? 'linear-gradient(180deg, ' + P + ' 0%, color-mix(in srgb, ' + P + ' 78%, #000) 100%)'
+          : 'color-mix(in srgb, ' + P + ' 26%, transparent)');
+      if (i === hi && !rainbow) value.style.fontWeight = '800';
       var targetH = Math.max(8, (bar.value / maxVal) * maxHeight);
       fill.style.height = '0px';
       fill.dataset.targetHeight = targetH + 'px';
@@ -215,8 +230,9 @@
       }, 0.7 + i * stagger);
     });
 
-    // Values and labels
-    tl.to(values, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 1.0);
+    // Values and labels: each value counts up as its bar grows.
+    tl.to(values, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 0.7);
+    if (window.mpCountUp) values.forEach(function (v, i) { mpCountUp(tl, v, 0.7 + i * stagger, { to: v.dataset.to, duration: 0.7 }); });
     tl.to(labels, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 1.0);
 
     // Exit

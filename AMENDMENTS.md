@@ -6,6 +6,33 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Component polish audit, part 3: data-viz
+
+- **line-chart rebuilt.** It was a dark-world card (white title, 3%-white
+  panel -- a blank card on light brands) with no axes, and a fixed
+  `lineGrad` id that clashed between two charts. Now: themed from the
+  brand background, real pixels (type sized for video), nice-rounded grid
+  and tick labels, up to 4 series with a legend, each drawing left to
+  right with its area wiping in under a clip, a dot keyframed along the
+  curve so it rides the tip at every seek, the end value landing big, and a
+  `highlight` pill at the moment that matters.
+- **progress-bar `style`**: `ring` -- a hairline arc gauge that draws round
+  (a tip riding the arc) while the number counts up in the centre ("98%
+  deliverability"); `stars` -- five outlines and a gold fill sweeping to a
+  fractional rating ("4.8 on G2"). The audit's two missing proof shapes.
+- **bar-chart in the brand**: a rainbow of pink/orange/green gradients read
+  as clip-art; bars are the primary now, the one that matters (`highlight`,
+  default the tallest) at full strength, the rest muted; values count up
+  with separators; labels at video size. `palette: "rainbow"` keeps the old
+  look.
+- **metric-dashboard**: separators while counting, the brand color on
+  sparklines, and `good: "down"` for a fall that is good news
+  (unsubscribes) so it reads green.
+
+Test: `test/data-viz-upgrade.test.ts`.
+
+---
+
 ## 2026-09-24 — Component polish audit, part 2: the fit box
 
 The older widget family (charts, cards, email/chat/calendar mocks, post
