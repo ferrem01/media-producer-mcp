@@ -91,6 +91,23 @@ describe("sound cues in Studio", () => {
       await page.click("#sfx-save");
       await expect.poll(() => posts.length).toBe(2);
       expect(posts[1].sfx).toHaveLength(3);
+
+      // Clicking an EMPTY spot on the Effects row: the playhead goes there and
+      // the Sound editor opens in the scene under it (scene 2 starts at 4s).
+      const lane = (await page.$("#fx-lane"))!;
+      const lb = (await lane.boundingBox())!;
+      await page.mouse.click(lb.x + lb.width * (5.5 / 7), lb.y + lb.height / 2);
+      await page.waitForSelector("#sfx-save");
+      expect(await page.textContent("#sfx-save")).toBe("Add sound");
+      expect(await page.textContent(".sp-title")).toContain("scene 2");
+      await page.click("#sfx-save");
+      await expect.poll(() => posts.length).toBe(3);
+      expect(posts[2].scene_index).toBe(1);
+      expect(posts[2].sfx[0].at).toBeGreaterThan(1);
+      expect(posts[2].sfx[0].at).toBeLessThan(2);
+
+      // The zoom/pan popup offers it too (scene and element selections).
+      expect(html.match(/id="rv-pop-sound"/g)?.length).toBe(2);
       expect(errors).toEqual([]);
     } finally {
       await browser.close();

@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Adding a sound where you would look for it
+
+Marc, after the Effects-lane sounds shipped: "is there a way to click on the
+row in the timeline and have it come up... or maybe just add it to the popup
+we are using for zoom/pan." The only way in was the lane's unlabeled gutter
+icon. Now:
+- **Click an empty spot on the Effects row**: the playhead goes there and the
+  Sound editor opens at that moment, in the scene under it (blocks keep their
+  own clicks). The row shows a copy cursor and says so on hover.
+- **"🔔 Add sound" in the preview-click popup**, beside Zoom / Pan / Rotate /
+  Add text (scene and element selections): a sound at the playhead.
+The gutter icon still works.
+
+---
+
 ## 2026-09-24 — Sound cues: a sound effect is an EFFECT
 
 Marc: "do we treat sound effects like other effects like zoom or pan?... these
