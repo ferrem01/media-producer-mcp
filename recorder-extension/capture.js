@@ -63,8 +63,15 @@
   // ── Per-tag default probe (hidden iframe with a virgin document) ──
   let probeDoc = null;
   const probeCache = new Map();
-  function probeDefaults(tag) {
-    if (probeCache.has(tag)) return probeCache.get(tag);
+  // SVG elements probe AS SVG: document.createElement("svg") makes an HTML
+  // unknown element (overflow visible), while the replica parses a real
+  // <svg> (UA overflow:hidden). Diffing against the wrong default skipped
+  // React Flow's overflow:visible on its edge <svg>s -- each clipped to the
+  // 300x150 default box and every connector line vanished.
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function probeDefaults(tag, svg) {
+    const key = (svg ? "svg:" : "") + tag;
+    if (probeCache.has(key)) return probeCache.get(key);
     if (!probeDoc) {
       const f = document.createElement("iframe");
       f.style.cssText = "position:fixed;width:10px;height:10px;left:-9999px;top:-9999px;visibility:hidden;";
@@ -72,18 +79,23 @@
       probeDoc = f.contentDocument;
       window.__qcProbeFrame = f;
     }
-    let el;
-    try { el = probeDoc.createElement(tag); } catch (e) { el = probeDoc.createElement("div"); }
+    let el, holder = null;
+    if (svg) {
+      el = probeDoc.createElementNS(SVG_NS, tag);
+      if (tag !== "svg") { holder = probeDoc.createElementNS(SVG_NS, "svg"); holder.appendChild(el); }
+    } else {
+      try { el = probeDoc.createElement(tag); } catch (e) { el = probeDoc.createElement("div"); }
+    }
     // An <a> without href gets NO UA underline/blue, which would make the
     // probe defaults lie (a site's text-decoration:none would look like the
     // default and be skipped -- replica links turn blue underlined).
-    if (tag === "a") el.setAttribute("href", "#");
-    probeDoc.body.appendChild(el);
+    if (tag === "a" && !svg) el.setAttribute("href", "#");
+    probeDoc.body.appendChild(holder || el);
     const cs = probeDoc.defaultView.getComputedStyle(el);
     const out = {};
     for (const p of STYLE_PROPS) out[p] = cs.getPropertyValue(p);
-    el.remove();
-    probeCache.set(tag, out);
+    (holder || el).remove();
+    probeCache.set(key, out);
     return out;
   }
 
@@ -254,6 +266,36 @@
   // and the top window's getComputedStyle is not defined for them.
   const csOf = (el) => el.ownerDocument.defaultView.getComputedStyle(el);
 
+  // An element's OWN translation, in px: a pure-translate transform matrix
+  // (badges: matrix(1,0,0,1,-8,-8)) plus the standalone translate property
+  // (Tailwind v4 centers dialogs with translate:-50% -50%, which computes
+  // as percentages of the element's own box).
+  function ownTranslate(o, cs) {
+    let tx = 0, ty = 0;
+    const tm = cs.transform && cs.transform.startsWith("matrix(")
+      ? cs.transform.slice(7, -1).split(",").map(parseFloat) : null;
+    if (tm && tm.length === 6 && tm[0] === 1 && tm[1] === 0 && tm[2] === 0 && tm[3] === 1) { tx += tm[4]; ty += tm[5]; }
+    const tr = cs.translate;
+    if (tr && tr !== "none") {
+      const r = o.getBoundingClientRect();
+      const w = o.offsetWidth != null ? o.offsetWidth : r.width;
+      const h = o.offsetHeight != null ? o.offsetHeight : r.height;
+      const res = (v, size) => (!v ? 0 : v.endsWith("%") ? (parseFloat(v) / 100) * size : parseFloat(v) || 0);
+      const [a, b] = tr.trim().split(/\s+/);
+      tx += res(a, w); ty += res(b, h);
+    }
+    return [tx, ty];
+  }
+  // Does this element carry any transform (and so contain absolute kids)?
+  const transformed = (cs) => (cs.transform && cs.transform !== "none") ||
+    (cs.translate && cs.translate !== "none") || (cs.scale && cs.scale !== "none") || (cs.rotate && cs.rotate !== "none");
+  // Props the capture ROOT never bakes: where it sat on the page (its
+  // offsets, margins, and the translate that centered it) is the page's
+  // business, not the component's. The root lands at 0,0 of its box; any
+  // visual scale on it is reproduced by the root scaler below.
+  const ROOT_DROP = new Set(["top", "right", "bottom", "left", "margin-top", "margin-right", "margin-bottom", "margin-left",
+    "transform", "translate", "scale", "rotate", "position"]);
+
   async function serialize(root, shotImg, depth) {
     depth = depth || 0;
     if (!depth) substitutions.length = 0;
@@ -270,7 +312,9 @@
       if (tag === "script" || tag === "iframe" || tag === "object" || tag === "embed") continue; // server kills them anyway
       const cs = csOf(o);
       if (cs.display === "none" || cs.visibility === "hidden") { c.remove(); continue; }
-      const defaults = probeDefaults(tag);
+      const isSvg = o.namespaceURI === SVG_NS;
+      const isRoot = o === root;
+      const defaults = probeDefaults(tag, isSvg);
       const parts = [];
       const pos = cs.position;
       // GRID FREEZE (see STYLE_PROPS note): a grid CONTAINER becomes a plain
@@ -290,6 +334,7 @@
       }
       const parentCS = o === root ? null : csOf(o.parentElement || o);
       for (const p of STYLE_PROPS) {
+        if (isRoot && ROOT_DROP.has(p) && (depth === 0 || !p.startsWith("margin"))) continue;
         // Offsets are a TRAP for positioned elements: getComputedStyle
         // resolves auto top/left/right/bottom to USED page coordinates
         // (top:56px means 56px from the ORIGINAL viewport), which flings
@@ -332,7 +377,15 @@
         parts.push("display:" + (cs.display === "inline-grid" ? "inline-block" : "block"));
         if (pos === "static") parts.push("position:relative");
       }
-      if (gridParent && cs.display !== "contents" && pos !== "absolute" && pos !== "fixed") {
+      if (isRoot) {
+        // THE ROOT sits at 0,0 of its box. It used to be positioned like any
+        // absolute element -- measured against the nearest positioned
+        // ancestor OUTSIDE the pick (a dialog's full-screen overlay) and
+        // re-shifted by its own centering translate -- which flung a
+        // centered dialog (the Quotient flow editor) out of the replica
+        // entirely: a blank panel.
+        parts.push("position:relative", "top:0px", "left:0px");
+      } else if (gridParent && cs.display !== "contents" && pos !== "absolute" && pos !== "fixed") {
         // Pin the item where the grid put it (relative to the container's
         // padding box; absolute offsets are measured from inside the border).
         const gr = gridParent.getBoundingClientRect();
@@ -354,27 +407,44 @@
         // relative too). Walked by hand rather than via offsetParent: SVG
         // elements have no offsetParent, which used to drop badges/icons to
         // the coarse root-relative path.
+        // A TRANSFORMED ancestor is a containing block too (the transform is
+        // baked, so it is one in the replica as well).
         let anchor = null;
         let ap = o.parentElement;
         while (ap && ap !== root) {
           const apc = csOf(ap);
-          if (apc.position !== "static" && apc.display !== "contents") { anchor = ap; break; }
+          if ((apc.position !== "static" || transformed(apc)) && apc.display !== "contents") { anchor = ap; break; }
           ap = ap.parentElement;
         }
         const base = anchor || root;
-        const bcs = csOf(base);
-        const br = base.getBoundingClientRect();
-        const er = o.getBoundingClientRect();
-        let topV = er.top - br.top - (parseFloat(bcs.borderTopWidth) || 0);
-        let leftV = er.left - br.left - (parseFloat(bcs.borderLeftWidth) || 0);
-        // The rect already INCLUDES the element's own transform; the baked
-        // transform will apply AGAIN in the replica. Subtract a pure
-        // translate so it lands once, not twice (badges use matrix(...,-8,-8)).
-        const tm = cs.transform && cs.transform.startsWith("matrix(")
-          ? cs.transform.slice(7, -1).split(",").map(parseFloat) : null;
-        if (tm && tm.length === 6 && tm[0] === 1 && tm[1] === 0 && tm[2] === 0 && tm[3] === 1) {
-          leftV -= tm[4]; topV -= tm[5];
+        let topV, leftV;
+        if (o.offsetParent === base && typeof o.offsetLeft === "number" && !transformed(csOf(base))) {
+          // LAYOUT offsets straight from the engine: pre-transform, in the
+          // containing block's own px -- exactly what top/left mean.
+          topV = o.offsetTop; leftV = o.offsetLeft;
+        } else {
+          // Measured rects are VISUAL. Inside a zoomed canvas (React Flow's
+          // viewport: translate + scale 0.55) a visual gap is the layout gap
+          // times the zoom, and the replica applies the baked zoom AGAIN --
+          // flows came out squashed by zoom squared. Convert to the
+          // containing block's layout px first.
+          const bcs = csOf(base);
+          const br = base.getBoundingClientRect();
+          const er = o.getBoundingClientRect();
+          const bw = base.offsetWidth, bh = base.offsetHeight;
+          const kx = bw ? br.width / bw : 1, ky = bh ? br.height / bh : 1;
+          topV = (er.top - br.top) / (ky || 1) - (parseFloat(bcs.borderTopWidth) || 0);
+          leftV = (er.left - br.left) / (kx || 1) - (parseFloat(bcs.borderLeftWidth) || 0);
+          // The rect already INCLUDES the element's own translation; the
+          // baked one applies AGAIN in the replica. Subtract it so it lands
+          // once, not twice (badges use matrix(...,-8,-8); dialogs use
+          // translate:-50% -50%).
+          const [tx, ty] = ownTranslate(o, cs);
+          leftV -= tx; topV -= ty;
         }
+        // top/left place the MARGIN edge; the baked margins add on top.
+        leftV -= parseFloat(cs.marginLeft) || 0;
+        topV -= parseFloat(cs.marginTop) || 0;
         parts.push("position:absolute", "top:" + Math.round(topV) + "px", "left:" + Math.round(leftV) + "px", "right:auto", "bottom:auto");
       } else if (pos === "sticky") {
         // Sticky offsets are meaningless in a frozen replica.
@@ -384,16 +454,16 @@
       // resolves to px and DEFAULTS to the element's center, so a replica
       // that drops it scales/rotates about the wrong point -- an app's
       // origin-0 zoom wrapper shifts its whole subtree right and down.
-      if ((cs.transform && cs.transform !== "none") ||
+      if (!isRoot && ((cs.transform && cs.transform !== "none") ||
           (cs.scale && cs.scale !== "none") ||
-          (cs.rotate && cs.rotate !== "none")) parts.push("transform-origin:" + cs.transformOrigin);
+          (cs.rotate && cs.rotate !== "none"))) parts.push("transform-origin:" + cs.transformOrigin);
       fontFamilies.add(cs.fontFamily);
       c.removeAttribute("class");
-      c.removeAttribute("id");
+      // SVG keeps its ids: gradients, patterns, clip paths and arrowhead
+      // markers are referenced by url(#id) -- strip the id and the paint
+      // (or the arrow) is gone.
+      if (!isSvg) c.removeAttribute("id");
       c.setAttribute("style", parts.join(";"));
-      // The clone root must BE a containing block so root-pinned absolute
-      // descendants land where they lived.
-      if (i === 0 && pos === "static") c.setAttribute("style", parts.join(";") + ";position:relative");
       // Freeze live form state into attributes.
       if (tag === "input") { c.setAttribute("value", o.value || ""); if (o.checked) c.setAttribute("checked", ""); }
       if (tag === "textarea") c.textContent = o.value || "";

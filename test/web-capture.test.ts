@@ -430,6 +430,104 @@ describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quo
   }, 300_000);
 });
 
+describe("extension serializer: a flow editor in a centered dialog (the Quotient flows bug)", () => {
+  // Marc's capture of a Quotient flow came back BLANK. The flow editor is a
+  // dialog centered with translate:-50% -50% (Tailwind v4's standalone
+  // property) holding a React Flow canvas. Four faults, one per fixture
+  // piece: the ROOT was positioned against the overlay OUTSIDE the pick and
+  // re-shifted by a translate the serializer never subtracted (flung off
+  // the replica); nodes inside the zoomed viewport were placed in VISUAL px
+  // and zoomed again (squashed by zoom squared); edge <svg>s were diffed
+  // against HTML defaults, lost overflow:visible and clipped every line;
+  // and marker ids were stripped, so url(#arrow) pointed nowhere.
+  it("keeps the dialog in its box, the zoomed layout, the edges and their markers", async () => {
+    const node = (id: string, x: number, y: number) =>
+      `<div class="node" id="${id}" style="transform:translate(${x}px,${y}px)">${id}</div>`;
+    const pageHtml = `<!doctype html><html><head><style>
+        *, ::before, ::after { box-sizing: border-box; border: 0 solid #e5e7eb; }
+        body { margin: 0; font-family: Arial; }
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); }
+        .dialog { position: fixed; left: 50%; top: 50%; translate: -50% -50%; width: 900px; height: 600px;
+                  background: #fff; display: flex; overflow: hidden; }
+        .side { width: 300px; padding: 20px; }
+        .flow { flex: 1; position: relative; overflow: hidden; }
+        .viewport { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+                    transform: translate(100px, 40px) scale(0.5); transform-origin: 0 0; }
+        .edges { position: absolute; overflow: visible; }
+        .node { position: absolute; left: 0; top: 0; width: 200px; height: 60px; border: 1px solid #ccc; background: #fff; }
+      </style></head><body><div class="overlay"><div class="dialog" id="dlg">
+        <div class="side" id="side"><h3 id="trig">Trigger</h3></div>
+        <div class="flow"><div class="viewport">
+          <svg class="edges"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker></defs>
+            <path id="edge" d="M500 60 L500 400" stroke="#555" stroke-width="4" fill="none" marker-end="url(#arrow)"/></svg>
+          ${node("a", 400, 0)}${node("b", 400, 400)}
+        </div></div>
+      </div></div></body></html>`;
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-flow-"));
+    const pageFile = path.join(dir, "page.html");
+    await fs.writeFile(pageFile, pageHtml);
+    const captureJs = await fs.readFile(path.resolve(__dirname, "../recorder-extension/capture.js"), "utf-8");
+
+    let browser: Browser | null = null;
+    try {
+      browser = await chromium.launch({
+        ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+      });
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await page.goto(`file://${pageFile}`, { waitUntil: "load" });
+      await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = { sendMessage: async () => ({ ok: false }) };`);
+      await page.evaluate(captureJs);
+      // Hover the panel, widen one step to the dialog.
+      const box = await page.locator("#side").boundingBox();
+      await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height - 20);
+      await page.mouse.wheel(0, -1);
+      await page.keyboard.press("c");
+      await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
+      const bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+      expect(bundle.width).toBe(900);
+      expect(bundle.height).toBe(600);
+
+      const replica = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await replica.setContent(`<body style="margin:0"><div id="root" style="width:900px">${bundle.html}</div></body>`);
+      const m = await replica.evaluate(() => {
+        const root = document.getElementById("root")!.firstElementChild!.getBoundingClientRect();
+        const h3 = [...document.querySelectorAll("h3")].find((e) => e.textContent === "Trigger")!.getBoundingClientRect();
+        const nodes = [...document.querySelectorAll("div")].filter((d) => d.textContent === "a" || d.textContent === "b")
+          .map((d) => d.getBoundingClientRect());
+        const svg = document.querySelector("svg")!;
+        const edge = svg.querySelector("path[marker-end]")!.getBoundingClientRect();
+        return {
+          root: { x: root.left, y: root.top },
+          h3: { x: h3.left - root.left, y: h3.top - root.top },
+          nodeGap: nodes.length === 2 ? nodes[1].top - nodes[0].top : -1,
+          nodeX: nodes.length ? nodes[0].left - root.left : -1,
+          svgOverflow: getComputedStyle(svg).overflow,
+          edgeH: edge.height,
+          markerKept: !!document.getElementById("arrow"),
+        };
+      });
+      await replica.close();
+      // The dialog sits in its box, not flung by the overlay or its translate.
+      expect(Math.abs(m.root.x)).toBeLessThan(1);
+      expect(Math.abs(m.root.y)).toBeLessThan(1);
+      expect(m.h3.x).toBeGreaterThan(15);
+      expect(m.h3.x).toBeLessThan(25);
+      // 400 layout px apart at zoom 0.5 = 200 on screen (zoom squared gave 100).
+      expect(m.nodeGap).toBeGreaterThan(195);
+      expect(m.nodeGap).toBeLessThan(205);
+      // 300 (panel) + 100 (pan) + 400 * 0.5 = 600.
+      expect(m.nodeX).toBeGreaterThan(595);
+      expect(m.nodeX).toBeLessThan(605);
+      expect(m.svgOverflow, "edge svg clips its lines").toBe("visible");
+      expect(m.edgeH).toBeGreaterThan(150);
+      expect(m.markerKept, "arrowhead marker id stripped").toBe(true);
+    } finally {
+      if (browser) await browser.close();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 300_000);
+});
+
 describe("extension serializer: positioned layout survives (the LinkedIn header bug)", () => {
   // getComputedStyle resolves auto offsets on absolute elements to USED page
   // coordinates (top:56px = 56px from the ORIGINAL viewport). Baking those
