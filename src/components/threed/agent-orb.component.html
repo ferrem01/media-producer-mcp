@@ -1,0 +1,194 @@
+<template>
+  <div class="orb-root">
+    <canvas class="orb-canvas"></canvas>
+  </div>
+</template>
+
+<style scoped>
+  /* AGENT ORB: a glossy, lit gradient sphere -- the AI agent as a recurring
+     character. It pops in, flies an arcing path of stops on the words
+     (squashing and stretching with its speed, a soft glow trail behind),
+     lands on each with a squash and a pulse ring, and bobs while it waits.
+     A transparent overlay: stops are % of the frame, so it lands on any word
+     or UI element under it. three.js; every frame is a pure function of time. */
+  .orb-root, .orb-root * { max-width: none; }
+  .orb-root { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .orb-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var DUR = (ctx && ctx.duration) || 5;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var canvas = el.querySelector('.orb-canvas');
+    if (typeof THREE === 'undefined' || !canvas) return tl;
+
+    function cssColor(name, fb) { try { var v = getComputedStyle(el).getPropertyValue(name).trim(); return v || fb; } catch (e) { return fb; } }
+    // Raw sRGB triples: the shaders write them straight out (no color management).
+    function rgb(hex, fb) {
+      var h = String(hex || '').trim().replace('#', '');
+      if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+      if (!/^[0-9a-f]{6}$/i.test(h)) return rgb(fb, '#ffffff');
+      return new THREE.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255);
+    }
+    var cols = Array.isArray(data.colors) ? data.colors : [];
+    var C1 = rgb(cols[0] || cssColor('--mp-color-primary', '#393bf5'), '#393bf5');
+    var C2 = rgb(cols[1] || '#ff6fb5', '#ff6fb5');
+    var C3 = rgb(cols[2] || '#ffd36e', '#ffd36e');
+    var GLOW = num(data.glow, 1);
+
+    var W = el.clientWidth || 1920, H = el.clientHeight || 1080;
+    try {
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(W, H, false);
+      renderer.setClearColor(0x000000, 0);
+      var scene = new THREE.Scene();
+      // Pixel-space camera: world units are frame pixels, origin at centre.
+      var camera = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, -2000, 2000);
+      camera.position.z = 1000;
+
+      // ---- The sphere: a swirling three-color gradient, lit (diffuse +
+      // a hard specular + a soft second highlight) with a fresnel rim ----
+      var orbMat = new THREE.ShaderMaterial({
+        uniforms: { c1: { value: C1 }, c2: { value: C2 }, c3: { value: C3 }, time: { value: 0 } },
+        vertexShader: [
+          'varying vec3 vN; varying vec3 vP;',
+          'void main(){ vP = position; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }'
+        ].join('\n'),
+        fragmentShader: [
+          'uniform vec3 c1; uniform vec3 c2; uniform vec3 c3; uniform float time;',
+          'varying vec3 vN; varying vec3 vP;',
+          'void main(){',
+          '  vec3 n = normalize(vN);',
+          '  float s = -vP.y * 0.85 + 0.32 * sin(vP.x * 3.1 + time * 1.4) + 0.22 * sin(vP.z * 3.7 - time * 1.1) + 0.12 * sin((vP.x + vP.y) * 5.0 + time * 0.7);',
+          '  float k = clamp(s * 0.5 + 0.5, 0.0, 1.0);',
+          '  vec3 base = k < 0.5 ? mix(c1, c2, k * 2.0) : mix(c2, c3, (k - 0.5) * 2.0);',
+          '  vec3 L = normalize(vec3(-0.45, 0.6, 0.66));',
+          '  float diff = 0.74 + 0.26 * max(dot(n, L), 0.0);',
+          '  float spec = pow(max(dot(n, normalize(L + vec3(0.0, 0.0, 1.0))), 0.0), 70.0) * 0.95;',
+          '  float spec2 = pow(max(dot(n, normalize(vec3(0.55, -0.5, 0.67))), 0.0), 14.0) * 0.22;',
+          '  float fres = pow(1.0 - max(n.z, 0.0), 2.4);',
+          '  vec3 col = base * diff + vec3(spec + spec2) + fres * mix(c2, vec3(1.0), 0.45) * 0.55;',
+          '  gl_FragColor = vec4(min(col, vec3(1.0)), 1.0);',
+          '}'
+        ].join('\n')
+      });
+      var orb = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), orbMat);
+      orb.renderOrder = 10;
+
+      // ---- Soft sprites: the glow halo, the trail, the landing ring ----
+      var SPRITE_FS = [
+        'uniform vec3 color; uniform float alpha; uniform float ring; varying vec2 vUv;',
+        'void main(){',
+        '  float r = length(vUv - 0.5) * 2.0;',
+        '  float a = ring > 0.0 ? smoothstep(0.12, 0.0, abs(r - 0.88)) : pow(clamp(1.0 - r, 0.0, 1.0), 2.2);',
+        '  gl_FragColor = vec4(color, a * alpha);',
+        '}'
+      ].join('\n');
+      var SPRITE_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }';
+      function sprite(color, ring, order) {
+        var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+          uniforms: { color: { value: color }, alpha: { value: 0 }, ring: { value: ring ? 1 : 0 } },
+          vertexShader: SPRITE_VS, fragmentShader: SPRITE_FS, transparent: true, depthTest: false, depthWrite: false
+        }));
+        m.renderOrder = order; scene.add(m); return m;
+      }
+      var halo = sprite(C2.clone().lerp(new THREE.Vector3(1, 1, 1), 0.2), false, 5);
+      var TRAIL = 14, trail = [];
+      for (var j = 0; j < TRAIL; j++) trail.push(sprite(j % 2 ? C3 : C2, false, 4));
+      var rings = [];
+      scene.add(orb);
+
+      // ---- The path: stops on the words ----
+      var stops = (Array.isArray(data.stops) ? data.stops : []).filter(Boolean).map(function (s) {
+        return { at: num(s.at, 0), x: num(s.x, 50) / 100, y: num(s.y, 50) / 100, size: num(s.size, NaN) };
+      }).sort(function (a, b) { return a.at - b.at; });
+      if (!stops.length) stops = [{ at: 0.2, x: 0.5, y: 0.5, size: NaN }];
+      var SIZE = num(data.size, 0.11);
+      stops.forEach(function (s) { if (!isFinite(s.size)) s.size = SIZE; });
+      stops.forEach(function (s, i) { if (i) rings.push({ at: s.at, m: sprite(C2, true, 3) }); });
+      var TRAVEL = num(data.travel, 0.85);
+      var ENTER = num(data.enter_at, stops[0].at);
+      var EXIT = data.exit_at === undefined || data.exit_at === null || data.exit_at === '' ? Infinity : num(data.exit_at, Infinity);
+      var ARC = num(data.arc, 0.22);
+
+      var ease = function (u) { return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; };
+      // Position (frame px, y down) and diameter at a time: parked on a stop,
+      // or on the arc between two.
+      function pathAt(time) {
+        var i = 0;
+        while (i < stops.length - 1 && stops[i + 1].at <= time) i++;
+        var a = stops[i], b = stops[i + 1];
+        if (!b) return { x: a.x * W, y: a.y * H, d: a.size * H, moving: 0 };
+        var travel = Math.min(TRAVEL, (b.at - a.at) * 0.85);
+        var start = b.at - travel;
+        if (time <= start) return { x: a.x * W, y: a.y * H, d: a.size * H, moving: 0 };
+        var u = ease(Math.min(1, (time - start) / travel));
+        var ax = a.x * W, ay = a.y * H, bx = b.x * W, by = b.y * H;
+        var dx = bx - ax, dy = by - ay, len = Math.sqrt(dx * dx + dy * dy) || 1;
+        // Arc: a quadratic bend off the straight line, alternating sides
+        // per leg, always lifting a little (it flies, it does not slide).
+        var side = i % 2 ? -1 : 1;
+        var cx = (ax + bx) / 2 - dy / len * len * ARC * side, cy = (ay + by) / 2 + dx / len * len * ARC * side - len * 0.08;
+        var q = 1 - u;
+        return { x: q * q * ax + 2 * q * u * cx + u * u * bx, y: q * q * ay + 2 * q * u * cy + u * u * by,
+          d: (a.size + (b.size - a.size) * u) * H, moving: 1 };
+      }
+      function place(m, x, y, sx, sy) { m.position.set(x - W / 2, H / 2 - y, 0); m.scale.set(sx, sy, 1); }
+
+      var st = { t: 0 };
+      function apply(t) {
+        var time = t * DUR;
+        var p = pathAt(time);
+        // Hover: a slow bob while parked, faded out in flight.
+        var bob = (1 - p.moving) * p.d;
+        var x = p.x + Math.sin(time * 1.3) * bob * 0.03, y = p.y + Math.sin(time * 2.1) * bob * 0.06;
+        // Pop in (back-out) and shrink away on exit.
+        var kin = Math.max(0, Math.min(1, (time - ENTER) / 0.5)), pop = kin <= 0 ? 0 : 1 + 2.70158 * Math.pow(kin - 1, 3) + 1.70158 * Math.pow(kin - 1, 2);
+        var kout = Math.max(0, Math.min(1, (time - EXIT) / 0.35)), shrink = 1 - kout * kout;
+        var S = pop * shrink;
+        // Squash and stretch: along the velocity in flight, a damped squash
+        // on each landing.
+        var p0 = pathAt(time - 0.02), p1 = pathAt(time + 0.02);
+        var vx = (p1.x - p0.x) / 0.04, vy = (p1.y - p0.y) / 0.04, v = Math.sqrt(vx * vx + vy * vy);
+        var stretch = Math.min(0.32, v / (p.d * 22 + 1));
+        var land = 0;
+        for (var n = 1; n < stops.length; n++) { var dt = time - stops[n].at; if (dt >= 0 && dt < 0.6) land = 0.22 * Math.exp(-dt * 7) * Math.cos(dt * 24); }
+        var r = p.d / 2 * S;
+        orb.position.set(x - W / 2, H / 2 - y, 0);
+        orb.rotation.set(0, 0, v > 1 ? Math.atan2(-vy, vx) : 0);
+        orb.scale.set(r * (1 + stretch - land * 0.6), r * (1 - stretch * 0.5 + land), r);
+        orb.visible = S > 0.001;
+        orbMat.uniforms.time.value = time;
+        halo.material.uniforms.alpha.value = 0.55 * GLOW * Math.min(1, S);
+        place(halo, x, y, r * 4.2, r * 4.2);
+        // Trail: the orb's own recent path, fading, only while it moves.
+        trail.forEach(function (m, k) {
+          var q = pathAt(time - (k + 1) * 0.028), f = 1 - (k + 1) / (TRAIL + 1);
+          var vis = q.moving;
+          m.material.uniforms.alpha.value = 0.5 * GLOW * f * vis * shrink * (kin >= 1 ? 1 : 0);
+          place(m, q.x, q.y, q.d * 1.2 * f, q.d * 1.2 * f);
+        });
+        // Landing rings: out from the stop, fading.
+        rings.forEach(function (o, k) {
+          var dt = time - o.at, s = stops[k + 1];
+          var k2 = dt < 0 ? 0 : Math.min(1, dt / 0.7);
+          o.m.material.uniforms.alpha.value = dt < 0 || k2 >= 1 ? 0 : 0.8 * GLOW * (1 - k2) * shrink;
+          var R = s.size * H * (1 + k2 * 1.6);
+          place(o.m, s.x * W, s.y * H, R, R);
+        });
+        renderer.render(scene, camera);
+      }
+      // One proxy tween drives everything (the webgl-backdrop pattern): the
+      // frame is a pure function of the timeline time.
+      tl.to(st, { t: 1, duration: DUR, ease: 'none', onUpdate: function () { apply(st.t); } }, 0);
+      apply(0);
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[agent-orb] WebGL failed:', e && e.message);
+    }
+    return tl;
+  }
+</script>

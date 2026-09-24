@@ -1,0 +1,189 @@
+<template>
+  <div class="scl-root">
+    <canvas class="scl-canvas"></canvas>
+    <div class="scl-imgs"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* SCREEN CLOUD: real product screens floating at depth in a soft field,
+     the camera drifting through them with a real depth of field -- the far
+     and near screens soft, the one in focus crisp -- and focus pulls from
+     screen to screen on the words. three.js; the blur is computed per
+     screen from its true distance to the focus plane (mipmap-biased
+     sampling in the shader, rounded corners and a soft shadow drawn there
+     too). Screens are images (captures, screenshots); with none it draws
+     UI mock screens in the brand's colors. */
+  .scl-root, .scl-root * { max-width: none; }
+  .scl-root { position: absolute; inset: 0; overflow: hidden; }
+  .scl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .scl-imgs { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var DUR = (ctx && ctx.duration) || 6;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var root = el.querySelector('.scl-root'), canvas = el.querySelector('.scl-canvas'), imgsEl = el.querySelector('.scl-imgs');
+    root.style.background = data.background || 'radial-gradient(120% 90% at 50% 30%, #ffffff 0%, #f1ebff 45%, #d9c8ff 100%)';
+    if (typeof THREE === 'undefined' || !canvas) return tl;
+
+    // Seeded placement: the same cloud every render, no randomness.
+    function hash(i, k) { var x = Math.sin((i + 1) * 127.1 + k * 311.7 + num(data.seed, 7) * 74.7) * 43758.5453; return x - Math.floor(x); }
+
+    var W = el.clientWidth || 1920, H = el.clientHeight || 1080;
+    try {
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(W, H, false);
+      renderer.setClearColor(0x000000, 0);
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
+
+      // ---- Screens: images (loaded through <img> so the capture waits for
+      // them), else UI mocks drawn on canvases ----
+      var given = (Array.isArray(data.screens) ? data.screens : []).map(function (s) { return typeof s === 'string' ? { src: s } : s; }).filter(function (s) { return s && s.src; });
+      var count = Math.max(given.length || 0, Math.min(16, num(data.count, given.length ? given.length : 9)));
+      var ACC = data.accent || '#393bf5';
+      function mockCanvas(i) {
+        var c = document.createElement('canvas'); c.width = 800; c.height = 500;
+        var g = c.getContext('2d');
+        var dark = i % 3 === 1;
+        g.fillStyle = dark ? '#16152b' : '#ffffff'; g.fillRect(0, 0, 800, 500);
+        g.fillStyle = dark ? '#23213f' : '#f4f4f8'; g.fillRect(0, 0, 800, 54);
+        g.fillStyle = ACC; g.fillRect(28, 18, 90, 18);
+        for (var n = 0; n < 4; n++) { g.fillStyle = dark ? '#3b3860' : '#dcdce6'; g.fillRect(470 + n * 76, 22, 56, 10); }
+        g.fillStyle = dark ? '#ffffff' : '#17171c'; g.font = 'bold 44px sans-serif';
+        g.fillText(['Boost your pipeline', 'One flow, every signal', 'Welcome, Sarah', 'Campaign report', 'Your audience', 'Send it smarter'][i % 6], 40, 130);
+        for (var r = 0; r < 3; r++) { g.fillStyle = dark ? '#2e2c52' : '#ececf3'; g.fillRect(40, 160 + r * 26, 380 - r * 60, 12); }
+        var cards = i % 2 ? 3 : 2;
+        for (var k = 0; k < cards; k++) {
+          var cw = (720 - (cards - 1) * 20) / cards;
+          g.fillStyle = dark ? '#23213f' : '#f7f6fc'; g.fillRect(40 + k * (cw + 20), 260, cw, 200);
+          g.fillStyle = k === 0 ? ACC : (dark ? '#4a4780' : '#c9c6e8');
+          for (var b = 0; b < 6; b++) { var bh = 30 + ((i * 7 + k * 13 + b * 17) % 110); g.fillRect(60 + k * (cw + 20) + b * (cw - 40) / 6, 440 - bh, (cw - 40) / 6 - 8, bh); }
+        }
+        return c;
+      }
+      var VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }';
+      var FS = [
+        'uniform sampler2D map; uniform float bias; uniform float opacity; uniform float radius; uniform float aspect; uniform float shadow;',
+        'varying vec2 vUv;',
+        'float rbox(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q,0.0)) + min(max(q.x,q.y),0.0) - r; }',
+        'void main(){',
+        '  vec2 p = (vUv - 0.5) * vec2(aspect, 1.0);',
+        '  float d = rbox(p, vec2(aspect*0.5, 0.5), radius);',
+        '  if (shadow > 0.5) { float sd = rbox(p, vec2(aspect*0.5, 0.5) * 0.86, radius + 0.03); float a = 1.0 - smoothstep(-0.06, 0.07, sd); gl_FragColor = vec4(0.12,0.08,0.3, a*0.22*opacity); return; }',
+        '  float edge = 1.0 - smoothstep(-0.004, 0.004, d);',
+        // A 12-tap disc at a mip-biased level: a real lens blur, not just
+        // a softer texture (measured: mip bias alone barely read as depth).
+        '  vec4 c = texture2D(map, vUv, bias);',
+        '  if (bias > 0.05) {',
+        '    float rr = bias * 0.0065;',
+        '    for (int k = 0; k < 12; k++) { float a = float(k) * 0.5236; float m = mod(float(k), 2.0) < 0.5 ? 1.0 : 0.55;',
+        '      c += texture2D(map, vUv + vec2(cos(a), sin(a) * aspect) * rr * m, bias); }',
+        '    c /= 13.0;',
+        '  }',
+        '  gl_FragColor = vec4(c.rgb, edge * opacity);',
+        '}'
+      ].join('\n');
+      var planes = [];
+      for (var i = 0; i < count; i++) {
+        var s = given.length ? given[i % given.length] : null;
+        var tex, img = null;
+        if (s) {
+          img = document.createElement('img');
+          if (/^https?:/i.test(String(s.src)) && String(s.src).indexOf(location.origin) !== 0) img.crossOrigin = 'anonymous';
+          img.alt = ''; img.src = String(s.src);
+          imgsEl.appendChild(img);
+          tex = new THREE.Texture(img);
+        } else {
+          tex = new THREE.CanvasTexture(mockCanvas(i));
+        }
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+        var aspect = num(s && s.aspect, 1.6);
+        var hgt = num(s && s.size, 1) * (i === 0 ? 1.25 : 0.8 + hash(i, 3) * 0.5);
+        var geo = new THREE.PlaneGeometry(hgt * aspect, hgt);
+        var mat = new THREE.ShaderMaterial({ uniforms: { map: { value: tex }, bias: { value: 0 }, opacity: { value: 1 }, radius: { value: 0.04 }, aspect: { value: aspect }, shadow: { value: 0 } },
+          vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false });
+        var smat = mat.clone(); smat.uniforms.shadow.value = 1; smat.uniforms.map.value = tex;
+        var mesh = new THREE.Mesh(geo, mat), sh = new THREE.Mesh(new THREE.PlaneGeometry(hgt * aspect * 1.12, hgt * 1.16), smat);
+        var g = new THREE.Group(); g.add(sh); g.add(mesh);
+        sh.position.set(0.05, -0.09, -0.02);
+        // The hero (index 0) sits in the middle; the rest scatter around it
+        // at depth, leaving the centre clear for it.
+        // Angles are spread evenly (jittered) so the ring never bunches on
+        // one side; measured: pure hashing left half the cloud off-frame.
+        var ang = (i / Math.max(1, count - 1)) * Math.PI * 2 + (hash(i, 1) - 0.5) * 0.9;
+        var z = i === 0 ? 0 : -3.2 + hash(i, 4) * 4.4;
+        // Screens nearer than the hero stay wide of it so they never cover it.
+        var rad = i === 0 ? 0 : 1.4 + hash(i, 2) * 1.3 + (z > 0 ? 0.8 : 0);
+        g.position.set(Math.cos(ang) * rad * 1.45, Math.sin(ang) * rad * 0.72, z);
+        g.rotation.set((hash(i, 5) - 0.5) * 0.35, (hash(i, 6) - 0.5) * 0.7, (hash(i, 7) - 0.5) * 0.18);
+        if (i === 0) g.rotation.set(-0.04, -0.12, 0.02);
+        scene.add(g);
+        planes.push({ g: g, mat: mat, smat: smat, tex: tex, img: img, ok: !img, h: hgt });
+      }
+      planes.forEach(function (p) { p.g.renderOrder = 0; });
+
+      // ---- Camera path + focus: drift in; focus holds on a screen and
+      // pulls to the next on its `at` ----
+      var focus = (Array.isArray(data.focus) ? data.focus : []).filter(Boolean)
+        .map(function (f) { return { at: num(f.at, 0), i: Math.max(0, Math.min(count - 1, Math.round(num(f.screen, 0)))) }; })
+        .sort(function (a, b) { return a.at - b.at; });
+      if (!focus.length || focus[0].at > 0) focus.unshift({ at: 0, i: 0 });
+      var STRENGTH = num(data.blur, 1);
+      var tmp = new THREE.Vector3();
+      var st = { t: 0 };
+      function focusAt(time) {
+        // Which screen and how far into the pull (0.6s eased pulls).
+        var cur = focus[0], prev = focus[0], k = 1;
+        for (var j = 0; j < focus.length; j++) if (focus[j].at <= time) { prev = cur; cur = focus[j]; }
+        if (cur !== prev) { k = Math.min(1, (time - cur.at) / 0.6); k = k * k * (3 - 2 * k); }
+        return { a: planes[prev.i].g.position, b: planes[cur.i].g.position, ha: planes[prev.i].h, hb: planes[cur.i].h, k: k };
+      }
+      function apply(t) {
+        var time = t * DUR, e = t * t * (3 - 2 * t);
+        var f = focusAt(time);
+        var target = tmp.copy(f.a).lerp(f.b, f.k);
+        // The camera sits off the focused screen and drifts across and in;
+        // it looks straight at it, so a pull lands that screen centred.
+        // Distance follows the focused screen's size, so every pull frames
+        // its screen at about half the frame height.
+        var DIST = (f.ha + (f.hb - f.ha) * f.k) * 3.4 * num(data.distance, 1);
+        camera.position.set(target.x + 0.5 - 1.0 * e, target.y + 0.12, target.z + DIST - 0.7 * e);
+        camera.lookAt(target.x, target.y, target.z);
+        var fd = camera.position.distanceTo(target);
+        var ENTER = num(data.enter_at, 0);
+        planes.forEach(function (p, n) {
+          // Entrance: the screens fade up out of the haze, a beat apart.
+          var k = Math.max(0, Math.min(1, (time - ENTER - n * 0.05) / 0.6)); k = 1 - (1 - k) * (1 - k);
+          p.mat.uniforms.opacity.value = k; p.smat.uniforms.opacity.value = k;
+          if (!p.ok && p.img && p.img.complete && p.img.naturalWidth) { p.tex.needsUpdate = true; p.ok = true; }
+          p.g.visible = p.ok;
+          var d = Math.abs(camera.position.distanceTo(p.g.position) - fd);
+          var b = Math.min(4, d * 1.05 * STRENGTH);
+          p.mat.uniforms.bias.value = b; p.smat.uniforms.bias.value = b;
+        });
+        // Far-to-near draw order so soft edges blend over what is behind.
+        planes.slice().sort(function (a, c) { return camera.position.distanceTo(c.g.position) - camera.position.distanceTo(a.g.position); })
+          .forEach(function (p, n) { p.g.children[0].renderOrder = n * 2; p.g.children[1].renderOrder = n * 2 + 1; });
+        renderer.render(scene, camera);
+      }
+
+      // One proxy tween drives entrance + camera + blur + render, so every
+      // frame is a pure function of the timeline time (the webgl-backdrop
+      // pattern). The entrance lives in apply() too: separate opacity tweens
+      // starting after 0 sort AFTER this tween in the timeline, and the
+      // render drew their stale values (measured: only the hero showed).
+      tl.to(st, { t: 1, duration: DUR, ease: 'none', onUpdate: function () { apply(st.t); } }, 0);
+      apply(0);
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[screen-cloud] WebGL failed:', e && e.message);
+    }
+    return tl;
+  }
+</script>

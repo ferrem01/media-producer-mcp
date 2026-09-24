@@ -6,6 +6,71 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — rainbow rim on edge-lit-slab, crack mode on shatter
+
+FX6 from the X posts.
+- **edge-lit-slab `rim: "rainbow"`**: a neon ring of every hue running round
+  the pane (a conic gradient masked to a border, its angle tweened on the
+  timeline with a finite turn count) plus its own blurred bloom; the pane's
+  thickness goes pale violet so it does not fight it, and the ambient pool
+  turns multi-hue (masked radial, so it fades instead of showing an ellipse).
+- **shatter `mode: "crack"`**: the glass cracks and HOLDS over whatever is
+  behind -- jagged rays race out from the impact (`x`, `y`, `at`, anchors
+  work), branch, and web together in rings as the front passes; a crushed
+  star of chips and a flash at the impact; nothing falls. First pass looked
+  like lightning (too much wobble, too many branches) -- straighter rays and
+  more rings read as glass.
+- **shatter is now seeded**: the shard break used `Math.random`, so each page
+  load (each render worker) broke different glass. `seed` picks the pattern.
+
+Test: `test/crack-and-rainbow.test.ts`.
+
+---
+
+## 2026-09-24 — agent-orb: the AI agent as a recurring character
+
+FX5 from the X posts (the glowing orb in the Bundance ad). **agent-orb**
+(threed, three.js): a glossy sphere with a swirling three-color gradient
+(brand primary -> pink -> gold by default), lit with a hard specular, a soft
+second highlight and a fresnel rim. It pops in, flies an arcing path of
+`stops` (`{ at, x%, y%, size }`, word anchors work), squashes and stretches
+along its velocity, leaves a glow trail, lands on each stop with a damped
+squash and a pulse ring, bobs while parked, and shrinks away on `exit_at`.
+A transparent full-frame overlay, so it lands on any word or UI under it --
+the same orb in every ad, pairing with the flow's path dot.
+
+Measured on the way: a canvas made with `premultipliedAlpha: false` drew the
+glow, trail and ring grey (three writes premultiplied color either way).
+
+Test: `test/agent-orb.test.ts` (lands on each stop, arcs between, shrinks
+away, seeks back exactly).
+
+---
+
+## 2026-09-24 — screen-cloud: product screens at depth, a real depth of field
+
+FX4 from the X posts (the screenshot cloud). **screen-cloud** (threed,
+three.js): captures or screenshots float at depth around a hero (screen 0);
+the camera drifts through and `focus` pulls from screen to screen on words
+(`{ at, screen }`, anchors work), each pull framing its screen centred at
+about half the frame height. The blur is per screen from its true distance to
+the focus plane: a 12-tap disc at a mip-biased level in the shader (mip bias
+alone barely read as depth), rounded corners and a soft shadow drawn there too.
+No screens -> UI mocks in the accent color.
+
+Measured on the way:
+- Only the hero showed. GSAP renders a timeline's children in start order,
+  so opacity tweens starting after 0 ran AFTER the proxy render tween and it
+  drew their stale (zero) values. The entrance now lives inside the one
+  render pass (`apply(t)`), so every frame is a pure function of time.
+- Pure-hash angles bunched half the cloud off-frame; angles are now spread
+  evenly with jitter, and screens nearer than the hero stay wide of it.
+
+Test: `test/screen-cloud.test.ts` (every region of the frame gets a screen,
+the pull reframes, seeks back exactly).
+
+---
+
 ## 2026-09-24 — card-cascade and crt-screen (from the Bundance spec ad)
 
 Two effects Marc picked from the X posts he sent:

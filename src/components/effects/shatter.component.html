@@ -18,6 +18,15 @@
     backface-visibility: hidden;
     will-change: transform, opacity;
   }
+
+  /* mode "crack": the glass cracks and HOLDS -- lines race out from the
+     impact, branch, web together, and stay over whatever is behind. */
+  .shatter-crack { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .shatter-crack path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .shatter-crack .sc-shadow { stroke: rgba(0, 0, 0, 0.38); }
+  .shatter-crack .sc-chip { stroke: none; }
+  .shatter-flash { position: absolute; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 30%, rgba(255,255,255,0) 70%); }
 </style>
 
 <script>
@@ -31,6 +40,12 @@
 
     var w = ctx.canvas.width;
     var h = ctx.canvas.height;
+
+    // Seeded: every render worker breaks the same glass.
+    var seed = Math.abs(Math.round(Number(data.seed) || 11)) % 2147483646 + 1;
+    var rnd = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+    if (String(data.mode || '').toLowerCase() === 'crack') return crack(tl, container, data, el.clientWidth || w, el.clientHeight || h, rnd, intensity);
 
     // Build a Voronoi-ish set of triangular shards around a fracture origin.
     // Cols/rows scale a little with intensity for denser breaks.
@@ -48,8 +63,8 @@
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         // Jitter the grid corners for an irregular glass look.
-        var jx = (Math.random() - 0.5) * (100 / cols) * 0.5;
-        var jy = (Math.random() - 0.5) * (100 / rows) * 0.5;
+        var jx = (rnd() - 0.5) * (100 / cols) * 0.5;
+        var jy = (rnd() - 0.5) * (100 / rows) * 0.5;
 
         var x0 = (c / cols) * 100;
         var x1 = ((c + 1) / cols) * 100;
@@ -92,8 +107,8 @@
     // Tiny pre-break tremor.
     shards.forEach(function (s) {
       tl.to(s.el, {
-        x: (Math.random() - 0.5) * 4,
-        y: (Math.random() - 0.5) * 4,
+        x: (rnd() - 0.5) * 4,
+        y: (rnd() - 0.5) * 4,
         duration: 0.12,
         ease: 'rough({ strength: 2, points: 6, clamp: false })',
         repeat: 3,
@@ -109,27 +124,119 @@
       var nx = dx / dist;
       var ny = dy / dist;
 
-      var push = (0.4 + Math.random() * 0.9) * intensity;
-      var flyX = nx * w * 0.6 * push + (Math.random() - 0.5) * 120;
-      var flyY = ny * h * 0.4 * push + (Math.random() - 0.5) * 100;
+      var push = (0.4 + rnd() * 0.9) * intensity;
+      var flyX = nx * w * 0.6 * push + (rnd() - 0.5) * 120;
+      var flyY = ny * h * 0.4 * push + (rnd() - 0.5) * 100;
       // Gravity pulls shards down as they scatter.
-      var fallY = flyY + h * 0.7 * (0.5 + Math.random());
+      var fallY = flyY + h * 0.7 * (0.5 + rnd());
 
-      var spin = (Math.random() - 0.5) * 220 * intensity;
-      var dur = 1.4 + Math.random() * 1.0;
+      var spin = (rnd() - 0.5) * 220 * intensity;
+      var dur = 1.4 + rnd() * 1.0;
       var stag = breakAt + dist * 0.004;
 
       tl.to(s.el, {
         x: flyX,
         y: fallY,
         rotation: spin,
-        scale: 0.6 + Math.random() * 0.3,
+        scale: 0.6 + rnd() * 0.3,
         opacity: 0,
         duration: dur,
         ease: 'power2.in'
       }, stag);
     });
 
+    return tl;
+  }
+  // ---- mode "crack" ----
+  function crack(tl, container, data, W, H, rnd, intensity) {
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var AT = num(data.at, 0.3);
+    var ox = num(data.x, 50) / 100 * W, oy = num(data.y, 50) / 100 * H;
+    var color = data.color || 'rgba(255,255,255,0.92)';
+    var SPEED = num(data.speed, 1);
+    var reach = Math.sqrt(W * W + H * H) * 0.62 * Math.min(1.4, intensity);
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'shatter-crack');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    container.appendChild(svg);
+    var paths = [];
+    function add(pts, width, t0, dur) {
+      var d = 'M' + pts.map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' L');
+      var len = 0;
+      for (var i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      [['sc-shadow', width + 2.2, 1.2], ['sc-line', width, 0]].forEach(function (k) {
+        var pe = document.createElementNS(NS, 'path');
+        pe.setAttribute('class', k[0]); pe.setAttribute('d', d);
+        pe.setAttribute('stroke-width', k[1].toFixed(2));
+        if (k[0] === 'sc-line') pe.setAttribute('stroke', color);
+        if (k[2]) pe.setAttribute('transform', 'translate(' + k[2] + ' ' + k[2] + ')');
+        pe.style.strokeDasharray = (len + 1).toFixed(1);
+        pe.style.strokeDashoffset = (len + 1).toFixed(1);
+        svg.appendChild(pe);
+        tl.to(pe, { strokeDashoffset: 0, duration: dur, ease: 'power2.out' }, t0);
+        paths.push(pe);
+      });
+    }
+    // A jagged ray from a point: short segments, each turning a little.
+    function ray(x, y, ang, length, segs, wobble) {
+      var pts = [[x, y]], step = length / segs;
+      for (var i = 0; i < segs; i++) {
+        ang += (rnd() - 0.5) * wobble;
+        x += Math.cos(ang) * step * (0.7 + rnd() * 0.6); y += Math.sin(ang) * step * (0.7 + rnd() * 0.6);
+        pts.push([x, y]);
+      }
+      return pts;
+    }
+    var N = Math.max(6, Math.round(num(data.cracks, 11) * Math.min(1.5, intensity)));
+    var rays = [];
+    var speed = reach / (0.55 / SPEED); // px per second the crack front travels
+    for (var i = 0; i < N; i++) {
+      var ang = (i / N) * Math.PI * 2 + (rnd() - 0.5) * (Math.PI * 2 / N) * 0.8;
+      var L = reach * (0.45 + rnd() * 0.55);
+      var pts = ray(ox, oy, ang, L, 6 + Math.round(rnd() * 3), 0.2);
+      rays.push(pts);
+      add(pts, 1.5 + rnd() * 1.2, AT, L / speed);
+      // Branches off the ray, starting when the front passes them.
+      for (var b = 2; b < pts.length - 1; b++) {
+        if (rnd() > 0.28) continue;
+        var bd = Math.hypot(pts[b][0] - ox, pts[b][1] - oy);
+        var bang = ang + (rnd() < 0.5 ? -1 : 1) * (0.35 + rnd() * 0.5);
+        var bl = L * (0.15 + rnd() * 0.25);
+        add(ray(pts[b][0], pts[b][1], bang, bl, 2 + Math.round(rnd() * 2), 0.3), 0.9 + rnd() * 0.6, AT + bd / speed, bl / speed);
+      }
+    }
+    // The web: rings joining neighbouring rays at a few radii, drawn when the
+    // front has passed both ends.
+    [1, 2, 3, 5].forEach(function (k, ri) {
+      for (var i = 0; i < rays.length; i++) {
+        var a = rays[i], c = rays[(i + 1) % rays.length];
+        if (a.length <= k || c.length <= k || rnd() < 0.12 + ri * 0.14) continue;
+        var p0 = a[k], p1 = c[k];
+        var mid = [(p0[0] + p1[0]) / 2 + (rnd() - 0.5) * 30, (p0[1] + p1[1]) / 2 + (rnd() - 0.5) * 30];
+        var dd = Math.max(Math.hypot(p0[0] - ox, p0[1] - oy), Math.hypot(p1[0] - ox, p1[1] - oy));
+        add([p0, mid, p1], 1.0 + rnd() * 0.6, AT + dd / speed, 0.12);
+      }
+    });
+    // The impact: a crushed star of tiny chips and a flash.
+    for (var j = 0; j < 7; j++) {
+      var a0 = rnd() * Math.PI * 2, r0 = 6 + rnd() * 16 * intensity;
+      var chip = document.createElementNS(NS, 'path');
+      chip.setAttribute('class', 'sc-chip');
+      chip.setAttribute('d', 'M' + ox.toFixed(1) + ' ' + oy.toFixed(1) + ' L' + (ox + Math.cos(a0) * r0).toFixed(1) + ' ' + (oy + Math.sin(a0) * r0).toFixed(1) + ' L' + (ox + Math.cos(a0 + 0.5) * r0 * 0.8).toFixed(1) + ' ' + (oy + Math.sin(a0 + 0.5) * r0 * 0.8).toFixed(1) + 'Z');
+      chip.setAttribute('fill', color);
+      chip.style.opacity = 0;
+      svg.appendChild(chip);
+      tl.to(chip, { opacity: 0.35 + rnd() * 0.4, duration: 0.05 }, AT);
+    }
+    var fl = document.createElement('div');
+    fl.className = 'shatter-flash';
+    var FS = Math.min(W, H) * 0.5;
+    fl.style.cssText = 'left:' + (ox - FS / 2) + 'px;top:' + (oy - FS / 2) + 'px;width:' + FS + 'px;height:' + FS + 'px;opacity:0';
+    container.appendChild(fl);
+    tl.fromTo(fl, { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: 0.06, immediateRender: false }, AT);
+    tl.to(fl, { opacity: 0, duration: 0.35, ease: 'power2.out' }, AT + 0.06);
     return tl;
   }
 </script>

@@ -23,6 +23,12 @@
       "optional": true,
       "placeholder": "#393bf5"
     },
+    "rim": {
+      "type": "string",
+      "label": "Rim style: \"light\" (the brand-color edge light, default) or \"rainbow\" (a neon ring of every hue running round the pane, with its bloom)",
+      "optional": true,
+      "default": "light"
+    },
     "caption": {
       "type": "string",
       "label": "Optional lower caption that fades in late",

@@ -1,0 +1,16 @@
+{
+  "type": "agent-orb",
+  "label": "Agent Orb",
+  "category": "threed",
+  "description": "A glossy, lit gradient sphere: the AI agent as a recurring character. It pops in, flies an arcing path of stops on the words (squash and stretch with its speed, a soft glow trail), lands on each with a squash and a pulse ring, and bobs while it waits. A transparent overlay (full frame, above the content): stops are % of the frame, so it lands on any word or UI element under it. three.js; deterministic under seek.",
+  "data": {
+    "stops": { "type": "array", "label": "Stops: { at (seconds or \"@word\"), x (% of frame width), y (% of frame height), size (diameter as a fraction of frame height, optional) }. It arrives at each stop at its time.", "optional": true },
+    "size": { "type": "number", "label": "Default diameter as a fraction of frame height", "optional": true, "default": 0.11 },
+    "colors": { "type": "array", "label": "Three gradient colors (default brand primary, pink, gold)", "optional": true },
+    "travel": { "type": "number", "label": "Flight time between stops (seconds)", "optional": true, "default": 0.85 },
+    "arc": { "type": "number", "label": "How far each flight bends off the straight line", "optional": true, "default": 0.22 },
+    "glow": { "type": "number", "label": "Glow, trail and ring strength (0 = none)", "optional": true, "default": 1 },
+    "enter_at": { "type": "number", "label": "When it pops in (seconds or \"@word\"; default the first stop)", "optional": true },
+    "exit_at": { "type": "number", "label": "When it shrinks away (seconds or \"@word\")", "optional": true }
+  }
+}
