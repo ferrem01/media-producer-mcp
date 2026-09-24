@@ -48,6 +48,10 @@ export const FIT_RANGES: Record<string, [number, number, number?]> = {
   "app-store-card": [520, 900, 320], "linkedin-post-card": [560, 900], "reddit-post-card": [560, 900], "x-post-card": [560, 900],
   // titles
   "text-list": [520, 1000],
+  // house mocks, when staged full-frame instead of in the shell's slots
+  // (measured: quotient-chat full-frame was a 1960px panel of 11px type).
+  // In their shell slots they sit inside the range and lay out 1:1.
+  "quotient-chat": [480, 760], "quotient-campaign": [1000, 1300],
 };
 
 function toPx(v: string | number | undefined, total: number, dflt: number): number {

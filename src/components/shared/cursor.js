@@ -188,6 +188,11 @@ function elementTarget(container, name) {
   var nodes = container.querySelectorAll(sel);
   if (!nodes || !nodes.length) return null;
   var c = container.getBoundingClientRect();
+  // Screen px -> the component box's own px: the cursor lives INSIDE the box,
+  // so under a scale (the fit box's design box, Studio's scaled stage) a
+  // screen-px aim lands off target (measured: 41px on a fitted campaign mock).
+  var z = container.offsetWidth ? c.width / container.offsetWidth : 1;
+  if (!z || !isFinite(z)) z = 1;
   // Last match wins: in a scrolling log the MOST RECENT thing wearing that
   // name is the one a film means. A node with no box (hidden until its
   // reveal) is not a place the cursor can go -- the component can publish a
@@ -196,8 +201,8 @@ function elementTarget(container, name) {
     var r = nodes[i].getBoundingClientRect();
     if (!r.width && !r.height) continue;
     return {
-      x: (r.left - c.left) + r.width / 2, y: (r.top - c.top) + r.height / 2,
-      w: r.width, h: r.height,
+      x: ((r.left - c.left) + r.width / 2) / z, y: ((r.top - c.top) + r.height / 2) / z,
+      w: r.width / z, h: r.height / z,
     };
   }
   return null;

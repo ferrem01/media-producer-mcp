@@ -6,6 +6,39 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Full-frame house mocks: fit box, visible-frame fit, capped anchor zoom
+
+Found by rendering the test film `proj_74e69eff` in full context. The new
+components passed; the Quotient house mocks did not. The writer staged
+quotient-chat and quotient-campaign FULL-FRAME (they are a side panel and a
+centre well in the shell), then zoomed 1.4x on their full-width anchors
+(`tpl_artifact.messages`, `.tasks`). The result was a huge, near-empty
+window of 11px type, with every transcript line and task name cut off at
+the left edge.
+
+- **Capped anchored zoom (`cameraMovesScript`).** An anchored zoom never
+  scales an anchor past the frame's width
+  (`sc <= 0.96 * CW / anchor width`). Framing a full-width anchor can only
+  crop it, so the zoom now becomes a no-op instead.
+- **Fit box for the two mocks.** quotient-chat [480, 760] and
+  quotient-campaign [1000, 1300]. In their shell slots they fall inside the
+  range and lay out 1:1; full-frame, they lay out at panel size and scale up.
+- **The fit box fits the VISIBLE slot.** A full-frame slot is the camera
+  layer, 20px wider than the frame on each side. Measured: a full-frame
+  quotient-chat's first letters sat at -3px. When a slot overhangs the frame
+  (the scene frame in the composite, the viewport in a scene document), the
+  runtime fit now translates and scales the design box into the visible
+  region, with a 2% margin.
+- **Cursor aim under a scale (`cursor.js` `elementTarget`).** Fitting the
+  house mocks broke their scripted clicks: a fitted campaign mock's pointer
+  missed by 41px (`cursor-aim.test.ts`). The target was measured in screen
+  px, but the cursor lives inside the component box. It is now divided by
+  the box's own scale, which also fixes aiming in Studio's scaled stage.
+
+Test: `test/camera-anchor-cap.test.ts`.
+
+---
+
 ## 2026-09-24 — Writer guidance from the first live board with the new components
 
 The first real board (`proj_74e69eff`, a test film) cast the rebuilt funnel

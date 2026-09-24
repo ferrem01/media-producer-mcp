@@ -1239,6 +1239,11 @@ export function cameraMovesScript(
             if (!a) return { scale: 1, x: 0, y: 0 };
             var sc = m.scale;
             if (!sc) sc = Math.max(1.05, Math.min(5, Math.min(CW / (a.w * 1.5), CH / (a.h * 1.5))));
+            // Never zoom an anchor past the frame's width: framing it can
+            // only crop it (measured: a 1.4x zoom on quotient-chat's
+            // full-width transcript cut every line off at the left edge).
+            // A full-width anchor makes the zoom a no-op, not a crop.
+            sc = Math.max(1, Math.min(sc, (CW * 0.96) / a.w));
             // Cover-clamp: the camera never frames outside the canvas. An
             // edge-hugging anchor (a sidebar, a top-aligned transcript) would
             // otherwise drag the rig past the frame, cropping content and
@@ -2367,7 +2372,24 @@ export function buildComponentScript(
       // its container, which can be wider than the canvas -- the camera's bleed).
       var __slot = el; el = el.firstElementChild;
       var __sw = __slot.clientWidth, __sh = __slot.clientHeight, __dw = el.clientWidth;
-      if (__sw && __sh && __dw) { var __s = __sw / __dw; el.style.height = (__sh / __s) + 'px'; el.style.transform = 'scale(' + __s + ')'; }
+      if (__sw && __sh && __dw) {
+        // Lay out in the VISIBLE part of the slot: a full-frame slot is the
+        // camera layer, 20px wider than the frame on every side (measured: a
+        // full-frame quotient-chat's first letters sat at -3px). When the slot
+        // overhangs, the design box scales into the frame with a small margin.
+        var __x0 = 0, __y0 = 0, __x1 = __sw, __y1 = __sh;
+        try {
+          var __r = __slot.getBoundingClientRect(), __z = __r.width / __sw || 1;
+          var __fe = __slot.closest('.mp-scene[data-scene-id]'), __f = __fe ? __fe.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+          __x0 = Math.max(0, (__f.left - __r.left) / __z); __y0 = Math.max(0, (__f.top - __r.top) / __z);
+          __x1 = Math.min(__sw, (__f.right - __r.left) / __z); __y1 = Math.min(__sh, (__f.bottom - __r.top) / __z);
+          if (__x0 > 0.5 || __y0 > 0.5 || __x1 < __sw - 0.5 || __y1 < __sh - 0.5) { var __m = Math.min(__x1 - __x0, __y1 - __y0) * 0.02; __x0 += __m; __y0 += __m; __x1 -= __m; __y1 -= __m; }
+          if (__x1 - __x0 < 10 || __y1 - __y0 < 10) { __x0 = 0; __y0 = 0; __x1 = __sw; __y1 = __sh; }
+        } catch (__e) {}
+        var __s = (__x1 - __x0) / __dw;
+        el.style.height = ((__y1 - __y0) / __s) + 'px';
+        el.style.transform = 'translate(' + __x0 + 'px,' + __y0 + 'px) scale(' + __s + ')';
+      }
     }
     var data = ${JSON.stringify(comp.data)};
     var ctx = {
