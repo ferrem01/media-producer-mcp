@@ -6,6 +6,45 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — A Quotient flow that builds itself (quotient-flow, quotient-flow-panel)
+
+Marc captured the flow editor (diagram + step panel, after the capture fix
+above) and asked for components: the diagram unfurling node by node,
+highlighted nodes that twinkle, a path through the flow, all scripted; the
+panel separately, to assemble beside the diagram in another video.
+
+- **`quotient-flow`** (mockups): not the frozen capture -- a flow drawn from
+  a list of `steps` (trigger, event, agent, conditional, email, slack, http,
+  notify, update, delay, end), in the look measured off the capture (192px
+  cards, 10px radius, the two-layer shadow, grey bezier connectors, True/False
+  pills, trigger tab, Quotient mark on AI steps, the dotted canvas). It lays
+  itself out: rows by longest path, branches side by side (a tree over
+  single-parent edges), a step with two `after`s centered under what it
+  merges -- the product's own shape. Unfurl: row by row, branches together,
+  each connector draws in and its step pops; a step's own `at` overrides.
+  Script: `highlight` (glow + finite-repeat twinkle), `path` (a dot runs
+  through a list of steps, an accent trail on each connector, each step
+  pulses and stays lit; curves sampled analytically, no DOM measuring),
+  `focus`/`fit` camera moves. Word anchors everywhere.
+  With no data it shows Marc's onboarding flow, anonymized.
+- **The ride-in camera**: three branches on a 9x16 fit at UI size put text
+  at ~15px on a 1080 frame. A path now rides in close (zoom 2.2) whenever the
+  fitted flow is too small to read (fit zoom < 1.5), unless the board pins
+  `camera: "fit"`; `camera: "follow"` also rides the unfurl.
+- **`quotient-flow-panel`** (mockups): the step settings panel (Edit /
+  Analytics / History tabs, sections of select / input / note / radio
+  fields), default = the real trigger panel. Script: `type` (caret,
+  character by character as timeline sets -- seeks both ways), `select`
+  (dropdown swaps; a radio found by the option named), `highlight` (ring).
+- Gotcha recorded: the scene's `.mp-component * { max-width: 100% }`
+  squeezes anything inside a zero-width positioned layer (the flow's world);
+  both components opt out, as captured components do.
+
+Tests: `test/quotient-flow.test.ts` (layout, unfurl order, script: glow,
+twinkle, lit path only, trail, ride-in; anchors; panel type/select/seek-back).
+
+---
+
 ## 2026-09-24 — Capturing a flow editor (extension 0.33.5)
 
 Marc's capture of a Quotient flow (a React Flow canvas in a centered dialog)

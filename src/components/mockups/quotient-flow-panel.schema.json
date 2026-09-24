@@ -1,0 +1,54 @@
+{
+  "type": "quotient-flow-panel",
+  "label": "Quotient flow — step settings panel",
+  "category": "mockups",
+  "description": "The Quotient flow editor's side panel: a selected step's settings, in the product's look (Edit / Analytics / History tabs, sections of labelled fields: dropdowns, text fields, notes, radio choices). Pair it with quotient-flow -- panel beside the diagram reads as the editor -- to show HOW a step is set up: the trigger type picked, the audience chosen, an email chosen for a branch. Scriptable: `type` a value into a field (a caret, character by character), `select` an option (dropdown value swaps, radio moves), `highlight` a field with a ring. Every `at` takes a word anchor. With no sections it shows the real trigger panel. Designed 350 wide; give it a tall narrow box (about 350x580 proportions).",
+  "data": {
+    "tab": { "type": "string", "label": "Active tab", "optional": true, "placeholder": "Edit | Analytics | History" },
+    "sections": {
+      "type": "array",
+      "label": "Sections",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "label": "Section title", "placeholder": "Trigger" },
+          "fields": {
+            "type": "array",
+            "label": "Fields",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "label": "Kind", "placeholder": "select | input | note | radio" },
+                "label": { "type": "string", "label": "Label (script targets fields by it)", "placeholder": "Trigger Type" },
+                "value": { "type": "string", "label": "Value (select / input)", "placeholder": "Programmatic" },
+                "icon": { "type": "string", "label": "Icon", "placeholder": "play | zap | mail | clock | eye" },
+                "copy": { "type": "boolean", "label": "Copy button" },
+                "text": { "type": "string", "label": "Note text" },
+                "link": { "type": "string", "label": "Note link text" },
+                "options": { "type": "array", "label": "Radio options", "items": { "type": "string" } },
+                "selected": { "type": "number", "label": "Radio selected (index)" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "accent": { "type": "string", "label": "Ring / caret color", "optional": true, "placeholder": "#2b63e3" },
+    "script": {
+      "type": "array",
+      "label": "Script",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": { "type": "number", "label": "At (s or @word)" },
+          "action": { "type": "string", "label": "Action", "placeholder": "type | select | highlight" },
+          "field": { "type": "string", "label": "Field label (omit for a radio: the option names it)" },
+          "value": { "type": "string", "label": "Value to type / option to select" },
+          "until": { "type": "number", "label": "Highlight ends at" }
+        }
+      }
+    }
+  }
+}
