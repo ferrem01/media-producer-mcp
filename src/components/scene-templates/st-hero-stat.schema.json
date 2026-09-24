@@ -2,7 +2,7 @@
   "type": "st-hero-stat",
   "label": "Scene Template: Hero Stat",
   "category": "scene-template",
-  "description": "WHOLE-SCENE template: one number carries the scene. Set sunburst:true for the celebration variant (pale rotating rays + confetti behind the numeral) on the film's payoff figure. Locked composition -- left text column (kicker + masked headline + supporting), oversized count-up numeral right-of-center with a ghost echo, item tags along the lower third, wordmark + scene index anchors. Codegen fills slots only; bespoke additions go in the .st-overlay region.",
+  "description": "WHOLE-SCENE template: one number carries the scene. Set sunburst:true for the celebration variant (pale rotating rays + confetti behind the numeral) on the film's payoff figure. Locked composition -- left text column (kicker + masked headline + supporting), oversized count-up numeral right-of-center with a ghost echo, item tags along the lower third, wordmark + scene index anchors. Codegen fills slots only; bespoke additions go in the .st-overlay region. count:'roll' spins each digit into place like an odometer -- use it when the brief asks for rolling / ticking digits.",
   "data": {
     "kicker": {
       "type": "string",

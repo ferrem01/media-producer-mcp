@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Writer guidance from the first live board with the new components
+
+The first real board (`proj_74e69eff`, a test film) cast the rebuilt funnel
+with a stage LARGER than the one above: Impressions 48,200 → Conversions
+187 → New Signups 2,410, with a "+1,189%" step. The payoff number had been
+folded into the funnel. The notes also asked for "digits rolling like an
+odometer", but no component was given `count: "roll"`.
+
+- The funnel schema now says the stages must narrow, and that a payoff number
+  belongs in its own stat beat.
+- stat-card, st-hero-stat and number-counter-row name `count: "roll"` for
+  "rolling / ticking digits".
+
+Also observed: for the Quotient tenant the writer prefers the house mocks
+(quotient-chat, quotient-campaign, quotient-social) over the generic
+streaming-answer and screen-carousel. That is right for a brand with real
+mocks, so no change was made for it.
+
+---
+
 ## 2026-09-24 — Streaming AI answer and rolling digits (HyperFrames audit)
 
 - **streaming-answer** (new, ui-mocks). It covers the audit's Streaming Text

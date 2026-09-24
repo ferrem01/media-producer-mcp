@@ -2,11 +2,11 @@
   "type": "funnel-chart",
   "label": "Funnel Chart",
   "category": "data-viz",
-  "description": "A conversion funnel of one audience narrowing: centred bands on a log scale (small stages stay readable) joined by tapering necks, one brand hue deepening to the money row, values counting up inside the bands, each step's conversion beside it and the end-to-end rate closing. Sits on the scene ground; type sized from the box.",
+  "description": "A conversion funnel of one audience narrowing: centred bands on a log scale (small stages stay readable) joined by tapering necks, one brand hue deepening to the money row, values counting up inside the bands, each step's conversion beside it and the end-to-end rate closing. Sits on the scene ground; type sized from the box. STAGES MUST NARROW: each stage is a subset of the one above (never larger). A payoff number that is not a stage of this audience (new signups, revenue) belongs in its own stat beat (stat-card / st-hero-stat with count:'roll'), not as a last stage.",
   "data": {
     "stages": {
       "type": "array",
-      "label": "Funnel stages top-to-bottom. Bars draw in sequence with count-ups; each stage after the first shows its conversion from the previous stage; the LAST stage is styled as the money number.",
+      "label": "Funnel stages top-to-bottom, each SMALLER than the one above (a subset of it). Bands open in sequence with count-ups; each stage after the first shows its conversion from the previous; the LAST stage is the money row.",
       "required": true,
       "items": {
         "type": "object",
