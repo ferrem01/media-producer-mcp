@@ -6,6 +6,38 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Capturing a flow editor (extension 0.33.5)
+
+Marc's capture of a Quotient flow (a React Flow canvas in a centered dialog)
+came back with a blank replica. Reproduced with real React Flow in a
+Tailwind-v4-style dialog; four serializer faults in `recorder-extension/capture.js`:
+
+- **The root was flung out of its box.** It was positioned like any absolute
+  element: measured against a positioned ancestor OUTSIDE the pick (the
+  dialog's full-screen overlay), then shifted again by the `translate:-50% -50%`
+  that centered it (the standalone property, which only `transform` matrices
+  were subtracted for). The root now always sits at 0,0 of its box
+  (position/offsets/margins/transforms not baked; any visual scale is still
+  reproduced by the root scaler).
+- **Zoomed layouts squashed by zoom squared.** Absolute elements inside a
+  scaled container (React Flow's viewport: translate + scale) were placed in
+  VISUAL px and the baked scale applied again. They are now placed in layout
+  px: `offsetLeft/Top` when the containing block is the offset parent, else
+  the rect difference divided by the containing block's scale, minus the
+  element's own translate (matrix or standalone, % resolved) and its margins.
+  Transformed ancestors now count as containing blocks.
+- **Connector lines vanished.** SVG elements were diffed against HTML probe
+  defaults (`createElement("svg")` is an HTML unknown element), so the edge
+  `<svg>`'s `overflow:visible` was skipped and every line clipped to the
+  300x150 default box. SVG now probes as SVG.
+- **Arrowheads and gradients pointed nowhere.** Ids were stripped from SVG
+  elements that `url(#id)` references. SVG keeps its ids.
+
+Test: `web-capture.test.ts` "a flow editor in a centered dialog" (fails on
+the old serializer: dialog 260px off).
+
+---
+
 ## 2026-09-24 — The captions follow the lines
 
 Trimming three beats of the signals ad (proj_de974ad1) left their caption
