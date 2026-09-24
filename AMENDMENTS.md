@@ -6,6 +6,27 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — rainbow rim on edge-lit-slab, crack mode on shatter
+
+FX6 from the X posts.
+- **edge-lit-slab `rim: "rainbow"`**: a neon ring of every hue running round
+  the pane (a conic gradient masked to a border, its angle tweened on the
+  timeline with a finite turn count) plus its own blurred bloom; the pane's
+  thickness goes pale violet so it does not fight it, and the ambient pool
+  turns multi-hue (masked radial, so it fades instead of showing an ellipse).
+- **shatter `mode: "crack"`**: the glass cracks and HOLDS over whatever is
+  behind -- jagged rays race out from the impact (`x`, `y`, `at`, anchors
+  work), branch, and web together in rings as the front passes; a crushed
+  star of chips and a flash at the impact; nothing falls. First pass looked
+  like lightning (too much wobble, too many branches) -- straighter rays and
+  more rings read as glass.
+- **shatter is now seeded**: the shard break used `Math.random`, so each page
+  load (each render worker) broke different glass. `seed` picks the pattern.
+
+Test: `test/crack-and-rainbow.test.ts`.
+
+---
+
 ## 2026-09-24 — agent-orb: the AI agent as a recurring character
 
 FX5 from the X posts (the glowing orb in the Bundance ad). **agent-orb**

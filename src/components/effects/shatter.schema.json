@@ -2,8 +2,16 @@
   "type": "shatter",
   "label": "Glass Shatter",
   "category": "effects",
-  "description": "A full-frame glass break: the frame fractures into triangular shards that fly outward and fall away to reveal what is behind. Use as a transition overlay.",
+  "description": "A full-frame glass break. mode \"break\" (default): the frame fractures into triangular shards that fly outward and fall away to reveal what is behind -- a transition overlay. mode \"crack\": the glass cracks and HOLDS -- lines race out from an impact point (x/y), branch, web together and stay over whatever is behind (a word, a stat, a screen); nothing falls.",
   "data": {
+    "mode": { "type": "string", "label": "\"break\" (shards fall away) or \"crack\" (cracks spread and stay)", "optional": true, "default": "break" },
+    "at": { "type": "number", "label": "crack: the impact time (seconds or \"@word\")", "optional": true, "default": 0.3 },
+    "x": { "type": "number", "label": "crack: impact point, % of width", "optional": true, "default": 50 },
+    "y": { "type": "number", "label": "crack: impact point, % of height", "optional": true, "default": 50 },
+    "cracks": { "type": "number", "label": "crack: how many main cracks", "optional": true, "default": 11 },
+    "color": { "type": "string", "label": "crack: line color", "optional": true },
+    "speed": { "type": "number", "label": "crack: how fast the cracks spread (1 = about half a second to the edge)", "optional": true, "default": 1 },
+    "seed": { "type": "number", "label": "Pattern seed (vary for a different break)", "optional": true },
     "intensity": {
       "type": "number",
       "label": "Shatter Intensity",

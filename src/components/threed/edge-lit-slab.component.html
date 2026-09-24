@@ -177,6 +177,33 @@
     /* height set inline by the script to match the slab */
   }
 
+  /* rim: "rainbow" -- a neon ring of every hue running round the pane (a
+     conic gradient masked to a border, turned by a tweened angle) and its
+     own blurred bloom behind. */
+  .els-rainbow, .els-rainbow-bloom {
+    position: absolute;
+    pointer-events: none;
+    background: conic-gradient(from var(--els-rb-a, 0deg), #ff3b6b, #ff9a3b, #ffe53b, #4dff8a, #3bd8ff, #5b6bff, #c23bff, #ff3b6b);
+  }
+  .els-rainbow {
+    inset: -4px;
+    padding: 4px;
+    border-radius: inherit;
+    z-index: 4;
+    transform: translateZ(0.3px);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  .els-rainbow-bloom {
+    inset: -18px;
+    border-radius: inherit;
+    z-index: 0;
+    filter: blur(34px);
+    opacity: 0.85;
+    transform: translateZ(-30px);
+  }
+
   .els-caption {
     position: absolute;
     left: 0;
@@ -235,7 +262,10 @@
     }
 
     var brandPrimary = (getComputedStyle(root).getPropertyValue('--mp-color-primary') || '').trim();
-    var glowHex = (data.glow_color && String(data.glow_color).trim()) || brandPrimary || '#393bf5';
+    var RAINBOW = String(data.rim || '').toLowerCase() === 'rainbow';
+    // The rainbow rim carries the color; the pane's own thickness goes a
+    // pale violet so it does not fight it.
+    var glowHex = (data.glow_color && String(data.glow_color).trim()) || (RAINBOW ? '#b9a8ff' : '') || brandPrimary || '#393bf5';
     var crestHex = lighten(glowHex, 0.78);
     if (root) {
       root.style.setProperty('--els-glow', glowHex);
@@ -263,6 +293,17 @@
     slab.style.height = Math.round(h) + 'px';
     if (face) face.style.borderRadius = radius + 'px';
     if (rim) rim.style.borderRadius = radius + 'px';
+    var rainbow = null, bloom = null;
+    if (RAINBOW) {
+      slab.style.borderRadius = (radius + 4) + 'px';
+      bloom = document.createElement('div'); bloom.className = 'els-rainbow-bloom';
+      rainbow = document.createElement('div'); rainbow.className = 'els-rainbow';
+      slab.insertBefore(bloom, slab.firstChild);
+      slab.appendChild(rainbow);
+      if (rim) rim.style.borderColor = 'rgba(255,255,255,0.55)';
+      if (glow) glow.style.background = 'conic-gradient(from 40deg, rgba(255,59,107,0.45), rgba(255,229,59,0.35), rgba(59,216,255,0.45), rgba(194,59,255,0.45), rgba(255,59,107,0.45))';
+      if (glow) { glow.style.webkitMaskImage = glow.style.maskImage = 'radial-gradient(closest-side, #000 15%, transparent 100%)'; }
+    }
 
     // ── Build the extruded thickness (stacked Z-offset frames) ──
     var DEPTH = 26;          // total thickness in px
@@ -355,6 +396,14 @@
     }, settleAt);
     if (specular) {
       tl.to(specular, { xPercent: 28, duration: 3.4, ease: 'sine.inOut', yoyo: true, repeat: -1 }, settleAt);
+    }
+
+    // The rainbow runs round the rim for the whole scene (a finite turn
+    // count, so the timeline has an end).
+    if (rainbow) {
+      var total = (ctx.duration || 6.5);
+      var turns = Math.max(1, Math.round(total / 2.4));
+      tl.fromTo([rainbow, bloom], { '--els-rb-a': '0deg' }, { '--els-rb-a': (360 * turns) + 'deg', duration: total, ease: 'none', immediateRender: true }, 0);
     }
 
     // Caption arrives late, like a signature
