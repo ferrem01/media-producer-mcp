@@ -100,8 +100,9 @@ const animationSchema = z.object({
   effect: z.string(),
   // Scene-local start time (seconds). Enter defaults to 0; exit defaults to
   // scene end minus duration. The assembler has always honored this -- the
-  // schema just used to strip it.
-  at: z.number().optional(),
+  // schema just used to strip it. A word ("@acts") lands it on the script:
+  // resolved on the board when the cast is set (retimeScene).
+  at: z.union([z.number(), z.string()]).optional().describe("Seconds, or a word anchor like \"@acts\" (lands on the spoken word)."),
   duration: z.number().optional(),
   stagger: z.number().optional(),
   ease: z.string().optional(),
@@ -1497,10 +1498,12 @@ export function createMcpServer(): McpServer {
         // every word time resolves against the new words and a caption lane
         // that no longer matches them is recast (core/captions.ts).
         for (const u of params.storyboard?.scenes || []) {
-          if (u.index === undefined || (u.sfx === undefined && u.voiceover_text === undefined)) continue;
+          if (u.index === undefined || (u.sfx === undefined && u.voiceover_text === undefined && u.components === undefined)) continue;
           const sb: any = project.storyboard?.scenes?.[u.index];
           const linesEdited = u.voiceover_text !== undefined;
-          if (linesEdited || sb?.sfx?.some((c: any) => c.anchor)) { try { await retimeScene(project, u.index, config.dataDir); } catch { /* the words resolve at the next re-time */ } }
+          // Components set directly carry word times ("@acts") too: resolve
+          // them now, or they sit at 0 until something else re-times the scene.
+          if (linesEdited || u.components !== undefined || sb?.sfx?.some((c: any) => c.anchor)) { try { await retimeScene(project, u.index, config.dataDir); } catch { /* the words resolve at the next re-time */ } }
           const bs: any = project.scenes?.[u.index];
           if (bs && u.sfx !== undefined && sb?.sfx) bs.sfx = JSON.parse(JSON.stringify(sb.sfx));
         }

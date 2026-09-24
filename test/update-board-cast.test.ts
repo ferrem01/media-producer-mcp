@@ -120,4 +120,18 @@ describe("update tool: storyboard scenes[].components sets a board scene's cast"
     expect(sc[2].components.map((c: any) => c.type)).toEqual(["cursor-performer"]);
     expect(sc[2].duration_seconds).toBe(4);
   });
+
+  it("word times on a cast set directly resolve at once (\"@acts\" is not left at 0)", async () => {
+    let r = await callUpdate({ project_id: projectId, storyboard: { scenes: [{ index: 1, voiceover_text: "Quotient brings them together, and acts on them." }] } });
+    expect(r.isError, r.text).toBe(false);
+    const flow = { type: "quotient-flow", enter: { effect: "cut", at: "@together" }, data: { unfurl_at: "@together", script: [{ at: "@acts", action: "path", steps: ["a", "b"] }] } };
+    r = await callUpdate({ project_id: projectId, storyboard: { scenes: [{ index: 1, components: [flow] }] } });
+    expect(r.isError, r.text).toBe(false);
+    const p = await loadProject(TENANT, projectId);
+    const c: any = (p!.storyboard!.scenes[1] as any).components[0];
+    expect(Object.keys(c.anchors).sort()).toEqual(["data.script[0].at", "enter.at", "unfurl_at"].map((k) => k.replace(/^data\./, "")).sort());
+    expect(c.data.unfurl_at).toBeGreaterThan(0);
+    expect(c.data.script[0].at).toBeGreaterThan(c.data.unfurl_at);
+    expect(c.enter.at).toBe(c.data.unfurl_at);
+  });
 });

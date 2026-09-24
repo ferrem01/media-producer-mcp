@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Word times on a cast set directly; the flow holds before it rides
+
+Putting quotient-flow on beat 3 of the signals ad through the update tool:
+- `update` re-timed a board scene only when its lines or sounds changed,
+  so a cast set directly with `"@together"`/`"@acts"` kept those times at 0.
+  A `components` edit now re-times the scene (anchors extracted, resolved).
+- `enter.at`/`exit.at` were typed number-only, so a cut on a word bounced
+  off the schema; they take a word anchor now, like component data.
+- quotient-flow's camera pre-rolled into its first move: in a 3.3s beat the
+  push-in began while the flow was still unfurling and the whole shape never
+  showed. Without `camera: "follow"`, the first move now starts on its
+  word.
+
+---
+
 ## 2026-09-24 — A Quotient flow that builds itself (quotient-flow, quotient-flow-panel)
 
 Marc captured the flow editor (diagram + step panel, after the capture fix

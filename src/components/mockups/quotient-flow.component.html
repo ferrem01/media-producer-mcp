@@ -562,7 +562,10 @@
     keys.sort(function (a, b) { return a.t - b.t; });
     var start = mode === 'follow' && keys.length ? keys[0].v : FIT;
     gsap.set(cam, { x: start.x, y: start.y, scale: start.scale, transformOrigin: '0 0' });
-    var prevT = 0, prevV = start;
+    // No pre-roll into the first move: the whole flow holds until the
+    // script asks for the camera (a path that rides in starts ON its word,
+    // not while the flow is still unfurling).
+    var prevT = mode === 'follow' || !keys.length ? 0 : keys[0].t, prevV = start;
     keys.forEach(function (k) {
       var same = Math.abs(k.v.x - prevV.x) < 2 && Math.abs(k.v.y - prevV.y) < 2 && Math.abs(k.v.scale - prevV.scale) < 0.005;
       if (same) { prevT = Math.max(prevT, k.t); return; }
