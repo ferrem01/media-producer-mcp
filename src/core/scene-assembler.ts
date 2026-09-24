@@ -13,6 +13,7 @@
  * - window.__MP_TIMELINE and window.__MP_READY for the capture loop
  */
 
+import { fitBoxFor, wrapInFitBox } from "./fit-box.js";
 import { bindSpeakerLayerData, isSpeakerLayer, speakerRendersInside } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { resolveComponentTags, transformComponentTagData, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
@@ -265,7 +266,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
       `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""}${isFixedToFrame(comp.type) || isSplitWrapper(comp) ? ` data-mp-fixed="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
-      `    ${boundHtml}\n` +
+      `    ${wrapInFitBox(boundHtml, fitBoxFor(comp as any, canvas))}\n` +
       `  </div>`
     );
 
@@ -2348,6 +2349,14 @@ export function buildComponentScript(
   return `  // ── ${comp.type} (${comp.id}) ──
   (function() {
     var el = document.querySelector('[data-cid="${comp.id}"]');
+    // A legacy widget lays out in its design box (core/fit-box.ts): that box is its el.
+    if (el && el.firstElementChild && el.firstElementChild.classList.contains('mp-fit')) {
+      // Exact scale from the slot's real layout size (a % slot resolves against
+      // its container, which can be wider than the canvas -- the camera's bleed).
+      var __slot = el; el = el.firstElementChild;
+      var __sw = __slot.clientWidth, __sh = __slot.clientHeight, __dw = el.clientWidth;
+      if (__sw && __sh && __dw) { var __s = __sw / __dw; el.style.height = (__sh / __s) + 'px'; el.style.transform = 'scale(' + __s + ')'; }
+    }
     var data = ${JSON.stringify(comp.data)};
     var ctx = {
       duration: ${ctxDuration},
