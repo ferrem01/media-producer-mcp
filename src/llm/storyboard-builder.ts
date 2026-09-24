@@ -123,6 +123,19 @@ const SCENE_TOOL_SCHEMA = {
     broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image/gen_video)" },
     hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query/gen_video)" },
     gen_video: { type: "string", description: "AI-generated video clip prompt -- ONLY for moving shots stock footage cannot plausibly contain (mutually exclusive with broll_query/hero_image)" },
+    sfx: {
+      type: "array",
+      description: "SOUND CUES -- point sounds on moments the viewer SEES land (optional, 0-4 per scene): a ding as a notification drops, a thud as a stamp hits, a pop as a card appears, a whoosh on a fast swap. Tie each to the word it lands on (\"@emails\") or scene seconds. Never a bed or music (those are the film's audio). House sounds: ding, thud, pop, click, tick, whoosh-soft, whoosh-fast, swell, riser, deflate, camera-shutter, keyboard, paper-drop.",
+      items: {
+        type: "object",
+        properties: {
+          at: { type: "string", description: "\"@word\" it lands on, or scene seconds" },
+          id: { type: "string", description: "house sound name, e.g. ding | thud | pop | whoosh-fast" },
+          volume: { type: "number", description: "0-1 (default 0.8)" },
+        },
+        required: ["at", "id"],
+      },
+    },
     camera_moves: {
       type: "array",
       description: "Stage-camera moves on this scene (the ONE camera). Three forms: {at, type:'zoom', anchor:'componentId.anchorName', scale?, duration?} -- anchors come from performable components' CAMERA ANCHORS (e.g. slack-workspace publishes composer, messages, thread-panel -- 'tpl_artifact.composer'); {at, type:'pan', x, y, duration?} -- a TRAVEL to a point on the frame, x/y as percent of the canvas (0-100), pure translation at whatever zoom the camera holds (a pan at 1x has nowhere to go, so pan with a zoom, not instead of one); and {at, type:'reset', duration?}. Zoom in while the surface performs, reset before the next thought. Max 4 per scene.",

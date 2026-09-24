@@ -43,6 +43,8 @@ import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
 import { planMarkdown } from "./core/film-plan.js";
+import { normalizeSoundCues, ensureSoundFiles } from "./core/scene-sfx.js";
+import { retimeScene } from "./core/measured-spine.js";
 import { forgetProject } from "./core/library.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
 import { castBoardStandIns } from "./core/board-standins.js";
@@ -1306,6 +1308,11 @@ export function createMcpServer(): McpServer {
           duration_seconds: z.number().optional(),
           visual_notes: z.string().optional(),
           shot: z.string().optional().describe("The plan table's one line for this scene: what fills the frame, in plain words. Empty string hands the cell back to the visual notes."),
+          sfx: z.array(z.object({
+            at: z.union([z.number(), z.string(), z.object({ word: z.string(), occurrence: z.number().optional(), edge: z.enum(["start", "end"]).optional(), offset: z.number().optional() })]).describe("Scene seconds, or the word it lands on: \"@emails\" / {word, edge, offset}"),
+            id: z.string().describe("A sound: a house name (ding, thud, pop, whoosh-soft, whoosh-fast, click, tick, swell, riser, deflate, camera-shutter, keyboard, paper-drop) or an id from action='search_sfx'"),
+            volume: z.number().optional().describe("0-1, default 0.8"),
+          })).optional().describe("Replace this scene's SOUND CUES: point sounds tied to moments on screen (a ding as a notification lands, a thud as a stamp hits), on the Effects lane beside the camera moves; they re-time with the words. Pass [] to clear. Beds (music, room tone) stay on the audio tracks."),
           components: z.array(z.object({
             type: z.string().describe("A library component type (see the catalog), e.g. kinetic-text, card-fan, checklist-toggles"),
             data: z.record(z.unknown()).optional(),
@@ -1403,6 +1410,14 @@ export function createMcpServer(): McpServer {
                 if (sceneUpdate.voiceover_text !== undefined) existing.voiceover_text = sceneUpdate.voiceover_text;
                 if (sceneUpdate.duration_seconds !== undefined) existing.duration_seconds = sceneUpdate.duration_seconds;
                 if (sceneUpdate.visual_notes !== undefined) existing.visual_notes = sceneUpdate.visual_notes;
+                if (sceneUpdate.sfx !== undefined) {
+                  const cues = normalizeSoundCues(sceneUpdate.sfx);
+                  if (cues.length) existing.sfx = cues; else delete existing.sfx;
+                  // The built scene plays the same sounds (a board edit on a
+                  // built film is heard without a rebuild).
+                  const builtSc: any = project.scenes?.[sceneUpdate.index];
+                  if (builtSc) { if (cues.length) builtSc.sfx = JSON.parse(JSON.stringify(cues)); else delete builtSc.sfx; }
+                }
                 if (sceneUpdate.shot !== undefined) {
                   if (sceneUpdate.shot.trim()) existing.shot = sceneUpdate.shot.trim(); else delete existing.shot;
                 }
@@ -1476,6 +1491,16 @@ export function createMcpServer(): McpServer {
         // world:"sky" beside a scenes edit did nothing).
         if (params.world !== undefined) await applyWorldPin(project, params.tenant_id, params.world);
         try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
+        // Sound cues: word times resolved against the scene's words, files
+        // copied in, so the board's sounds play in Studio right away.
+        for (const u of params.storyboard?.scenes || []) {
+          if (u.sfx === undefined || u.index === undefined) continue;
+          const sb: any = project.storyboard?.scenes?.[u.index];
+          if (sb?.sfx?.some((c: any) => c.anchor)) { try { await retimeScene(project, u.index, config.dataDir); } catch { /* the words resolve at the next re-time */ } }
+          const bs: any = project.scenes?.[u.index];
+          if (bs && sb?.sfx) bs.sfx = JSON.parse(JSON.stringify(sb.sfx));
+        }
+        try { await ensureSoundFiles(project, (id) => resolveSfxChoice(id, projectAssetsDir(params.tenant_id, project.project_id))); } catch (e: any) { console.warn(`  sound cues: ${e?.message || e}`); }
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         // The stills must follow the data: a direct board edit re-photographs

@@ -206,8 +206,9 @@ describe("the clip need", () => {
     expect(tracks[1]).toMatchObject({ type: "voiceover", volume: 0.8, startTime: 8.3, trimStart: 0.5, duration: 5 });
     const render = await read("src/core/render.ts");
     // Both render paths mix the clips and run the mix when clips alone exist; the ducking triggers include them.
-    expect(render.match(/if \(\(project\.audio && project\.audio\.tracks\.length > 0\) \|\| clipTracks\.length > 0\) \{/g)?.length).toBe(2);
-    expect(render.match(/audioTracks\.push\(\.\.\.clipTracks\);/g)?.length).toBe(2);
+    // (Each also carries the scenes' sound cues -- core/scene-sfx.ts.)
+    expect(render.match(/if \(\(project\.audio && project\.audio\.tracks\.length > 0\) \|\| clipTracks\.length > 0( \|\| \w+\.length > 0)?\) \{/g)?.length).toBe(2);
+    expect(render.match(/audioTracks\.push\(\.\.\.clipTracks(, \.\.\.\w+)?\);/g)?.length).toBe(2);
     expect(render.match(/duckUnderClips\(resolveDucking\(project\), clipTracks\)/g)?.length).toBe(2);
     expect(render).toMatch(/clipAudioTracks\(project, \(i\) => contentStarts\[i\] \+ insertedBefore\(contentStarts\[i\]\)\)/);
     expect(render).toMatch(/clipAudioTracks\(project, \(i\) => sceneStartTimes\[i\] \|\| 0\)/);

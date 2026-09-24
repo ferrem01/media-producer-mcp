@@ -24,7 +24,7 @@ import { provideAsset, openAssetNeeds, recastProvidedNeed, isScreenSlate } from 
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
 import { listMusicOptions, resolveMusicChoice, musicLocalPath, musicAssetUrl } from "./audio/music.js";
-import { listSfxOptions, SFX_DIR } from "./audio/sfx.js";
+import { resolveSfxChoice, listSfxOptions, SFX_DIR } from "./audio/sfx.js";
 import { ensureFoleyLibrary } from "./audio/foley.js";
 import { qrSvg } from "./core/qr.js";
 import type { Take, Project, AssetRequirement } from "./core/types.js";
@@ -47,7 +47,7 @@ import { normalizeBeats } from "./core/beats.js";
 import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
-import { projectOutputDir } from "./persistence/paths.js";
+import { projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp, reshootStoryboardCardsSoon } from "./server.js";
 import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits } from "./core/web-capture.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
@@ -56,6 +56,7 @@ import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js"
 import { listProjects, loadProject, saveProject, updateProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
 import { searchLibrary, forgetProject } from "./core/library.js";
 import { planRows, reorderBoard } from "./core/film-plan.js";
+import { normalizeSoundCues, ensureSoundFiles } from "./core/scene-sfx.js";
 import { getLibraryHtml } from "./preview-app/library-app.js";
 import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
@@ -1199,7 +1200,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -3944,6 +3945,37 @@ Rules:
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         jsonResponse(res, 200, { ok: true, scene_id: sceneId, camera_moves: (scene as any).camera_moves || [] });
+        return;
+      }
+
+      // ── API: A scene's SOUND CUES (Studio's Effects lane) ──
+      // POST /api/scene-sfx/{t}/{p} {scene_index, sfx: [{at, id, volume?}]}
+      // The whole list replaces the scene's; [] clears it. Written to the
+      // built scene AND the board (a rebuild keeps them), word times resolved
+      // against the scene's words, each sound's file copied in once
+      // (core/scene-sfx.ts).
+      const sceneSfxMatch = urlPath.match(/^\/api\/scene-sfx\/([^/]+)\/([^/]+)$/);
+      if (sceneSfxMatch && method === "POST") {
+        const [, tenantId, projectId] = sceneSfxMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const idx = Number(body.scene_index);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scene: any = project.scenes?.[idx];
+        if (!Number.isInteger(idx) || !scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        if (!Array.isArray(body.sfx)) { jsonResponse(res, 400, { error: "sfx must be an array ([] clears)" }); return; }
+        const cues = normalizeSoundCues(body.sfx);
+        if (cues.length) scene.sfx = cues; else delete scene.sfx;
+        const sb: any = ensureStoryboardScene(project, idx);
+        if (cues.length) sb.sfx = JSON.parse(JSON.stringify(cues)); else delete sb.sfx;
+        if (cues.some((c) => c.anchor)) {
+          try { await retimeScene(project, idx, config.dataDir); } catch (e: any) { console.warn(`  sound cues: re-time skipped: ${e?.message || e}`); }
+        }
+        try { await ensureSoundFiles(project, (id) => resolveSfxChoice(id, projectAssetsDir(tenantId, projectId))); }
+        catch (e: any) { jsonResponse(res, 502, { error: `Could not fetch the sound: ${e?.message || e}` }); return; }
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        jsonResponse(res, 200, { ok: true, scene_index: idx, sfx: scene.sfx || [] });
         return;
       }
 

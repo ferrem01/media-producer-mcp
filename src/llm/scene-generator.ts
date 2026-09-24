@@ -6,6 +6,7 @@
  * - Custom components: each gets its own LLM call to generate .component.html.
  */
 
+import { normalizeSoundCues } from "../core/scene-sfx.js";
 import type { LLMConfig } from "./client.js";
 import { generateSceneAgentic, type CodegenSession } from "./agentic-codegen.js";
 import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
@@ -289,6 +290,16 @@ if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
  * Generate a single scene with mixed library, custom, or template components.
  */
 export async function generateScene(opts: SceneGeneratorOpts): Promise<GeneratedScene> {
+  var generated = await generateSceneBody(opts);
+  // THE SCENE'S SOUNDS: whichever path built it (template, authored, codegen),
+  // the board's sound cues ride onto the built scene -- one place, not one
+  // per builder (core/scene-sfx.ts).
+  var cues = normalizeSoundCues((opts.scene as any).sfx);
+  if (cues.length && generated && generated.scene && !(generated.scene as any).sfx) (generated.scene as any).sfx = cues;
+  return generated;
+}
+
+async function generateSceneBody(opts: SceneGeneratorOpts): Promise<GeneratedScene> {
   var draft = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
   // ── Scene-template instantiation (no codegen) ──

@@ -9,6 +9,7 @@
  * - GSAP-powered transitions rendered as mini HTML scenes
  */
 
+import { sceneSfxTracks } from "./scene-sfx.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fork, execFile, type ChildProcess } from "node:child_process";
@@ -262,11 +263,14 @@ async function renderAudioOnly(
     + inserted.reduce((s, tr) => s + tr.seconds, 0);
 
   // ── Audio mixing ──
-  if (project.audio && project.audio.tracks.length > 0) {
-    console.log(`  Mixing ${project.audio.tracks.length} audio track(s)...`);
+  const aoStarts: number[] = [];
+  project.scenes.reduce((acc, s) => { aoStarts.push(acc); return acc + s.duration_seconds; }, 0);
+  const aoSfx = sceneSfxTracks(project, (i) => aoStarts[i] + insertedBefore(aoStarts[i]), resolveVideoPath);
+  if ((project.audio && project.audio.tracks.length > 0) || aoSfx.length > 0) {
+    console.log(`  Mixing ${project.audio?.tracks.length || 0} audio track(s)${aoSfx.length ? ` + ${aoSfx.length} sound cue(s)` : ""}...`);
 
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
-    const audioTracks: AudioTrackInput[] = project.audio.tracks.map((t) => ({
+    const audioTracks: AudioTrackInput[] = (project.audio?.tracks || []).map((t) => ({
       path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
@@ -276,6 +280,7 @@ async function renderAudioOnly(
       fadeOut: t.fade_out,
       loop: t.loop,
     }));
+    audioTracks.push(...aoSfx);
 
     const duckingOpts = resolveDucking(project);
 
@@ -838,7 +843,8 @@ async function renderVideoWithSpeakerTrack(
     // ── 7. Audio mixing (project-level background music / voiceover) ──
   const totalProjectDuration = scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
   const clipTracks = clipAudioTracks(project, (i) => sceneStartTimes[i] || 0);
-  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0) {
+  const spSfx = sceneSfxTracks(project, (i) => sceneStartTimes[i] || 0, resolveVideoPath);
+  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0 || spSfx.length > 0) {
     console.log(`
 [speaker-track] Mixing ${project.audio?.tracks.length || 0} audio track(s)${clipTracks.length ? ` + ${clipTracks.length} clip(s) on scenes` : ""}...`);
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
@@ -852,7 +858,7 @@ async function renderVideoWithSpeakerTrack(
       fadeOut: t.fade_out,
       loop: t.loop,
     }));
-    audioTracks.push(...clipTracks);
+    audioTracks.push(...clipTracks, ...spSfx);
 
     const duckingOpts = duckUnderClips(resolveDucking(project), clipTracks);
 
@@ -1251,7 +1257,9 @@ async function renderVideo(
   const contentStarts: number[] = [];
   project.scenes.reduce((acc, s) => { contentStarts.push(acc); return acc + s.duration_seconds; }, 0);
   const clipTracks = clipAudioTracks(project, (i) => contentStarts[i] + insertedBefore(contentStarts[i]));
-  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0) {
+  // The scenes' sound cues (core/scene-sfx.ts), on the same film clock.
+  const sfxTracks = sceneSfxTracks(project, (i) => contentStarts[i] + insertedBefore(contentStarts[i]), resolveVideoPath);
+  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0 || sfxTracks.length > 0) {
     onProgress?.(96, "mixing audio");
     console.log(`\n  Mixing ${project.audio?.tracks.length || 0} audio track(s)${clipTracks.length ? ` + ${clipTracks.length} clip(s) on scenes` : ""}...`);
     if (totalInserted > 0) {
@@ -1270,7 +1278,7 @@ async function renderVideo(
       loop: t.loop,
     }));
 
-    audioTracks.push(...clipTracks);
+    audioTracks.push(...clipTracks, ...sfxTracks);
 
     // Resolve ducking track IDs to file paths (mixer matches by path)
     const duckingOpts = duckUnderClips(resolveDucking(project), clipTracks);

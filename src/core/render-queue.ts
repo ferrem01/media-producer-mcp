@@ -6,7 +6,9 @@
 
 import { renderProject as renderProjectCore, type RenderOptions } from "./render.js";
 import { loadProject, saveProject } from "../persistence/project.js";
-import { projectDir, projectOutputDir } from "../persistence/paths.js";
+import { projectDir, projectOutputDir, projectAssetsDir } from "../persistence/paths.js";
+import { ensureSoundFiles } from "./scene-sfx.js";
+import { resolveSfxChoice } from "../audio/sfx.js";
 import { config } from "../config.js";
 import { llmConfigFromEnv } from "../llm/client.js";
 import path from "node:path";
@@ -144,6 +146,13 @@ async function runRender(
       job.completedAt = Date.now();
       return;
     }
+
+    // The scenes' sound cues get their files before the render mixes them
+    // (a cue planned on the board has an id; the file is copied in once).
+    try {
+      const assets = projectAssetsDir(job.tenantId, projectId);
+      await ensureSoundFiles(project, (id) => resolveSfxChoice(id, assets));
+    } catch (e: any) { console.warn(`  sound cues: ${e?.message || e}`); }
 
     // Update project status
     project.status = "rendering";

@@ -6,6 +6,41 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Sound cues: a sound effect is an EFFECT
+
+Marc: "do we treat sound effects like other effects like zoom or pan?... these
+do not feel like they should be on the music track, these feel like
+effects." They were not: a sound effect was a film-level audio track at an
+absolute film time, placed from Studio's picker after the build -- it
+drifted whenever a scene re-timed (a take, a trim), sat on the audio lane
+with the music, and the storyboard could not plan one.
+
+- **`scene.sfx: [{at, id, volume}]`** (core/scene-sfx.ts), beside
+  `camera_moves`, on the board and the built scene. `at` is scene seconds or
+  a word ("@emails" / {word, edge, offset}) resolved by the same spine as
+  every component time -- applySpine now resolves sound cues too, so a take
+  re-times them. `id` accepts the house short names ("thud" -> house-thud).
+  Files are copied into the project once (ensureSoundFiles): on an update,
+  on a Studio save, and before every render.
+- **Render**: each cue is an sfx track at the scene's start + at on the
+  film clock (transitions included), in all three mix paths, next to the
+  clips. Carried board -> build at the one choke point (generateScene) and
+  in storyboardToSaved.
+- **Writers**: the update tool takes `scenes[].sfx`; the storyboard writer
+  has an `sfx` field (0-4 point sounds on moments the viewer SEES land;
+  never beds). The Plan shows them: "🔔 ding ×3, thud".
+- **Studio**: sound blocks on the EFFECTS lane (amber, named, a readable
+  minimum width), not the audio lane; clicking one opens the camera-move
+  style editor (sound with a ▶ preview, on a word or at a time, volume,
+  delete); the Effects lane's gutter icon adds a sound at the playhead (the
+  lane now shows on every built film -- it is where effects are added). The
+  preview plays cues at scene start + at. Saved via
+  `POST /api/scene-sfx/{t}/{p}` (built scene + board, re-timed, files in).
+- Beds (room tone, a riser under a montage) and existing hand-placed sfx
+  tracks stay on the audio lane, untouched.
+
+---
+
 ## 2026-09-23 — phone-lockscreen: the consequence beat
 
 The signals ad's beat 2 ("their clicks live in one tool, their deal in

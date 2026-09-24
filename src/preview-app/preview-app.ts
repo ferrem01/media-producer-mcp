@@ -307,6 +307,11 @@ ${QUOTIENT_CSS}
   .lane-bed.music:hover { background: rgb(45 99 225 / 0.08); border-color: rgb(45 99 225 / 0.3); }
   .audio-lane-seg.music { cursor: pointer; }
   #lane-gutter .lg-ic.lg-music { cursor: pointer; }
+  #lane-gutter .lg-ic.lg-fx { cursor: pointer; }
+  #lane-gutter .lg-ic.lg-fx:hover { color: var(--purple-500); }
+  /* A sound is a moment, not a span: its block keeps a readable minimum so
+     the name shows, whatever the zoom. */
+  .fx-seg.fx-sfx { background: #fef3c7; color: #92400e; box-shadow: inset 0 0 0 1px rgba(217,119,6,0.35); min-width: 58px; }
   .lane-bed.comps { background: transparent; border: none; }
   /* Components band: every scene's cast as lane-packed micro-bars, always
      visible (no click-into-scene needed). Rows cap at 4; a "+N" chip covers
@@ -2222,13 +2227,23 @@ ${QUOTIENT_CSS}
     destroyAudio();
     state.musicStarted = false;
     var p = state.currentProject;
-    if (!p || !p.audio || !p.audio.tracks || !p.audio.tracks.length) {
+    // The scenes' sound cues play as sfx elements at the scene's start + at
+    // (flagged _cue: they draw on the Effects lane, not the audio lane).
+    var cueTracks = [];
+    ((p && p.scenes) || []).forEach(function(sc, si) {
+      (sc.sfx || []).forEach(function(cue) {
+        if (!cue || !cue.src) return;
+        cueTracks.push({ source: cue.src, type: 'sfx', id: 'cue:' + cue.id, volume: cue.volume != null ? cue.volume : 0.8,
+          start_time: sceneOffset(si) + (Number(cue.at) || 0), _cue: true });
+      });
+    });
+    if (!p || ((!p.audio || !p.audio.tracks || !p.audio.tracks.length) && !cueTracks.length)) {
       els.audioIndicator.innerHTML = '';
       els.audioIndicator.className = 'audio-indicator';
       return;
     }
 
-    var tracks = p.audio.tracks;
+    var tracks = ((p.audio && p.audio.tracks) || []).concat(cueTracks);
     var count = 0;
     tracks.forEach(function(track) {
       var url = resolveAudioUrl(track.source);
@@ -2248,6 +2263,7 @@ ${QUOTIENT_CSS}
       // When on the global timeline this track begins (voiceover clips are
       // staggered per scene). Looping music spans the whole timeline.
       audio._startTime = typeof track.start_time === 'number' ? track.start_time : 0;
+      audio._cue = !!track._cue;
 
       // Kick off buffering now (on project load) so the first clip is decoded
       // well before the user hits play -- avoids a cold-start garble on scene 1.
@@ -2288,6 +2304,7 @@ ${QUOTIENT_CSS}
     var hasSpkLane = laneLayout().speaker >= 0;
     state.audioElements.forEach(function(audio) {
       if (hasSpkLane && audio._trackType === 'voiceover') return;
+      if (audio._cue) return; // a sound cue draws on the Effects lane
       var start = audio._startTime || 0;
       var dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : 0;
       // Looping music covers from its start to the end of the film.
@@ -6007,6 +6024,16 @@ ${QUOTIENT_CSS}
             function(el2) { coPopOpen(si, comp.id, ci, el2); });
         });
       });
+      // Sound cues: a block from the moment it plays, as long as it rings.
+      (scene.sfx || []).forEach(function(cue, ci) {
+        var from = sceneStart + (Number(cue.at) || 0);
+        var len = Math.max(0.35, Number(cue.duration) || 0.5);
+        block(from, Math.min(from + len, sceneStart + dur + len), 'fx-sfx',
+          '\u{1F514} ' + sfxName(cue.id),
+          'Scene ' + (si + 1) + ': ' + sfxName(cue.id) + ' @' + (Number(cue.at) || 0).toFixed(1) + 's' +
+            (cue.anchor && cue.anchor.word ? ' (on \u201c' + cue.anchor.word + '\u201d)' : '') + '. Click to change, move or delete.',
+          function(el2) { sfxPopOpen(si, ci, el2); });
+      });
       // Chapter cards: title overlays from the narration-track component.
       // The spine drafts them; these blocks are how the user OWNS them.
       (scene.components || []).forEach(function(comp) {
@@ -6023,6 +6050,140 @@ ${QUOTIENT_CSS}
       });
     });
     placeSegs();
+  }
+
+  // ── SOUND CUES on the Effects lane (core/scene-sfx.ts) ──
+  // A ding as a notification lands, a thud as a stamp hits: point sounds tied
+  // to a moment, edited like the zooms beside them. Saved per scene through
+  // /api/scene-sfx (built scene + board), word times resolved server-side.
+  var sfxOptionsCache = null;
+  function sfxOptions() {
+    if (sfxOptionsCache) return Promise.resolve(sfxOptionsCache);
+    var p = state.currentProject;
+    return api('/sfx-options/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id)).then(function(r) {
+      sfxOptionsCache = ((r && r.house) || []).concat((r && r.freesound) || []);
+      return sfxOptionsCache;
+    });
+  }
+  function sfxName(id) { return String(id || '').replace(/^house-/, '').replace(/^freesound-/, 'sound '); }
+  function sceneWords(si) {
+    var p = state.currentProject;
+    var s = p && p.scenes && p.scenes[si];
+    var sb = p && p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si];
+    var text = (sb && sb.voiceover_text) || (s && s.audio_hints && s.audio_hints.voiceover_text) || '';
+    return String(text).replace(/\\(pause\\)/gi, ' ').split(/\\s+/).map(function(w) {
+      return w.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9']+$/g, '');
+    }).filter(Boolean);
+  }
+  function sceneIndexAt(t) {
+    var p = state.currentProject;
+    var n = (p && p.scenes || []).length, hit = 0;
+    for (var i = 0; i < n; i++) if (sceneStartFor(i) <= t + 0.001) hit = i;
+    return hit;
+  }
+  function saveSceneSfx(si, next) {
+    var p = state.currentProject;
+    studioStatus('Saving sound…');
+    return api('POST', '/scene-sfx/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id),
+      { scene_index: si, sfx: next }).then(function(r) {
+      if (r && Array.isArray(r.sfx)) {
+        if (r.sfx.length) p.scenes[si].sfx = r.sfx; else delete p.scenes[si].sfx;
+      }
+      initAudio();
+      renderCamPills();
+      applyLaneLayout(laneLayout());
+      studioStatus('Sound saved', 'ok');
+    }).catch(function(e) { studioStatus('Could not save the sound: ' + (e.message || e), 'err'); });
+  }
+  function sfxPopOpen(si, ci, anchorEl, atGuess) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    var pop = document.getElementById('cam-pop');
+    if (!scene || !pop) return;
+    camPopClose();
+    rvPopClose();
+    if (anchorEl && anchorEl.classList) anchorEl.classList.add('active');
+    var list = (scene.sfx || []).slice();
+    var isNew = ci < 0;
+    var cue = isNew ? { at: Math.max(0, Math.round((atGuess || 0) * 10) / 10), id: 'house-ding', volume: 0.8 } : list[ci];
+    var sdur = scene.duration_seconds || 5;
+    var words = sceneWords(si);
+    var wordSel = cue.anchor && cue.anchor.word ? cue.anchor.word : '';
+    var vol = Math.round(((cue.volume != null ? cue.volume : 0.8)) * 100);
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title"><b>\u{1F514} Sound</b> — scene ' + (si + 1) + '</span>' +
+      '<button class="sp-x" id="sfx-x" title="Close (Esc)">✕</button></div>' +
+      '<div class="sp-fields"><label style="flex:1;">sound <select id="sfx-id" style="width:100%;"><option>Loading…</option></select></label>' +
+        '<button class="rv-go secondary" id="sfx-play" style="flex:0 0 auto;width:40px;padding:0;" title="Hear it">▶</button></div>' +
+      '<div class="sp-fields">' +
+        '<label>on word <select id="sfx-word"><option value="">(a time)</option>' +
+          words.map(function(w) { return '<option' + (w === wordSel ? ' selected' : '') + '>' + escHtml(w) + '</option>'; }).join('') +
+        '</select></label>' +
+        '<label>at <input id="sfx-at" type="number" min="0" max="' + escAttr(String(sdur)) + '" step="0.1" value="' + escAttr(String(cue.at || 0)) + '">s</label>' +
+      '</div>' +
+      '<div class="sp-fields"><label style="flex:1;">volume <input id="sfx-vol" type="range" min="0" max="100" step="5" value="' + vol + '" style="width:100%;"></label></div>' +
+      '<div class="sp-row">' +
+        (isNew ? '' : '<button class="rv-go secondary" id="sfx-del" style="flex:0 0 auto;color:var(--destructive);border-color:var(--red-300);">Delete</button>') +
+        '<button class="rv-go" id="sfx-save" style="flex:1;">' + (isNew ? 'Add sound' : 'Save') + '</button></div>';
+    pop.style.display = 'block';
+    var pr = anchorEl && anchorEl.getBoundingClientRect ? anchorEl.getBoundingClientRect() : { left: window.innerWidth / 2, width: 0, top: window.innerHeight / 2, bottom: window.innerHeight / 2 };
+    var pw = pop.offsetWidth || 300, ph = pop.offsetHeight || 200;
+    pop.style.left = Math.max(8, Math.min(pr.left + pr.width / 2 - pw / 2, window.innerWidth - pw - 8)) + 'px';
+    var py = pr.top - ph - 10;
+    pop.style.top = (py < 8 ? pr.bottom + 10 : py) + 'px';
+    var sel = document.getElementById('sfx-id');
+    var opts = [];
+    sfxOptions().then(function(list2) {
+      opts = list2 || [];
+      sel.innerHTML = opts.map(function(o) {
+        return '<option value="' + escAttr(o.id) + '"' + (o.id === cue.id ? ' selected' : '') + '>' + escHtml(o.title || sfxName(o.id)) + '</option>';
+      }).join('');
+      if (!opts.some(function(o) { return o.id === cue.id; })) {
+        sel.insertAdjacentHTML('afterbegin', '<option value="' + escAttr(cue.id) + '" selected>' + escHtml(sfxName(cue.id)) + '</option>');
+      }
+    }).catch(function() { sel.innerHTML = '<option value="' + escAttr(cue.id) + '">' + escHtml(sfxName(cue.id)) + '</option>'; });
+    document.getElementById('sfx-x').addEventListener('click', camPopClose);
+    var preview = null;
+    document.getElementById('sfx-play').addEventListener('click', function() {
+      var o = opts.filter(function(x) { return x.id === sel.value; })[0];
+      var url = (o && o.preview_url) || cue.src;
+      if (!url) return;
+      try { if (preview) preview.pause(); preview = new Audio(resolveAudioUrl(url)); preview.volume = parseInt(document.getElementById('sfx-vol').value, 10) / 100; preview.play(); } catch (e) {}
+    });
+    document.getElementById('sfx-word').addEventListener('change', function() {
+      document.getElementById('sfx-at').disabled = !!this.value;
+    });
+    document.getElementById('sfx-at').disabled = !!wordSel;
+    document.getElementById('sfx-save').addEventListener('click', function() {
+      var w = document.getElementById('sfx-word').value;
+      var atV = parseFloat(document.getElementById('sfx-at').value);
+      var next = { id: sel.value, volume: parseInt(document.getElementById('sfx-vol').value, 10) / 100 };
+      next.at = w ? '@' + w : Math.max(0, Math.min(sdur, isNaN(atV) ? 0 : atV));
+      var out = list.map(function(c) {
+        var keep = { id: c.id, volume: c.volume, at: c.anchor ? { word: c.anchor.word, occurrence: c.anchor.occurrence, edge: c.anchor.edge, offset: c.anchor.offset } : c.at };
+        if (keep.at && typeof keep.at === 'object') Object.keys(keep.at).forEach(function(k) { if (keep.at[k] == null) delete keep.at[k]; });
+        return keep;
+      });
+      if (isNew) out.push(next); else out[ci] = next;
+      camPopClose();
+      saveSceneSfx(si, out);
+    });
+    var delBtn = document.getElementById('sfx-del');
+    if (delBtn) delBtn.addEventListener('click', function() {
+      var out = list.filter(function(_, k) { return k !== ci; }).map(function(c) {
+        return { id: c.id, volume: c.volume, at: c.anchor ? { word: c.anchor.word } : c.at };
+      });
+      camPopClose();
+      saveSceneSfx(si, out);
+    });
+  }
+  // The Effects lane's own add: a sound at the playhead.
+  function sfxAddAtPlayhead(anchorEl) {
+    var p = state.currentProject;
+    if (!p || !p.scenes || !p.scenes.length) return;
+    var t = state.masterTime || 0;
+    var si = sceneIndexAt(t);
+    sfxPopOpen(si, -1, anchorEl, t - sceneStartFor(si));
   }
 
   // ── Callout editor popover (opens from a scrubber pill) ──
@@ -6561,8 +6722,8 @@ ${QUOTIENT_CSS}
     var hasOpenMedia = openNeeds.some(function(n) { return n.need.type !== 'camera_video' || n.need.use === 'clip'; });
     // Roomy bands with real gaps between beds: squeezing speaker + music
     // against the bottom edge made them read as one smudge.
-    var hasFx = ((p || {}).scenes || []).some(function(s2) {
-      if ((s2.camera_moves || []).length) return true;
+    var hasFx = ((p || {}).scenes || []).length > 0 || ((p || {}).scenes || []).some(function(s2) {
+      if ((s2.camera_moves || []).length || (s2.sfx || []).length) return true;
       return (s2.components || []).some(function(c2) {
         if (c2.type === 'screencast-frame' && c2.data && Array.isArray(c2.data.callouts) && c2.data.callouts.length) return true;
         return c2.type === 'narration-track' && c2.data && Array.isArray(c2.data.chapters) && c2.data.chapters.length;
@@ -6704,13 +6865,15 @@ ${QUOTIENT_CSS}
     // vertically centered on its bed.
     if (gut) {
       var html = '';
-      if (y.fx >= 0) html += '<span class="lg-ic" style="top:' + (y.fx + y.fxH / 2 - 7) + 'px" title="EFFECTS \u2014 zooms, pans, rotates and callouts. Click a block to edit it.">' + LG_ICONS.fx + '</span>';
+      if (y.fx >= 0) html += '<span class="lg-ic lg-fx" style="top:' + (y.fx + y.fxH / 2 - 7) + 'px" title="EFFECTS \u2014 zooms, pans, rotates, callouts and sounds. Click a block to edit it; click here to add a sound at the playhead.">' + LG_ICONS.fx + '</span>';
       if (y.film >= 0) html += '<span class="lg-ic" style="top:' + (y.film + y.filmH / 2 - 8) + 'px" title="FILM \u2014 every scene\\'s poster frame. Click to jump to the scene.">' + LG_ICONS.film + '</span>';
       if (y.comps >= 0) html += '<span class="lg-ic" style="top:' + (y.comps + y.compsH / 2 - 8) + 'px" title="COMPONENTS \u2014 every scene\\'s cast. Click a bar to inspect it; double-click to edit its timing.">' + LG_ICONS.comps + '</span>';
       if (y.screen >= 0) html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="SCREEN \u2014 your recording. Click a block to split, speed up or remove footage.">' + LG_ICONS.screen + '</span>';
       if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="SPEAKER \u2014 your voice (and camera). Click a piece to play, split or remove talk.">' + LG_ICONS.speaker + '</span>';
       if (y.music >= 0) html += '<span class="lg-ic lg-music" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="MUSIC \u2014 the bed under the film, ducked while you speak. Click to change it.">' + LG_ICONS.music + '</span>';
       gut.innerHTML = html;
+      var lgf = gut.querySelector('.lg-fx');
+      if (lgf) lgf.addEventListener('click', function(ev) { ev.stopPropagation(); sfxAddAtPlayhead(lgf); });
       var lgm = gut.querySelector('.lg-music');
       if (lgm) lgm.addEventListener('click', function(ev) { ev.stopPropagation(); if (state.currentProject) openMusicCard(state.currentProject); });
     }

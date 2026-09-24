@@ -114,13 +114,13 @@ export function resolveAnchor(spine: Spine, a: WordAnchor): number | null {
 
 export type AnchorMap = Record<string, WordAnchor>;
 
-function isAnchorObject(v: unknown): v is WordAnchor {
+export function isAnchorObject(v: unknown): v is WordAnchor {
   return !!v && typeof v === "object" && !Array.isArray(v) && typeof (v as any).word === "string"
     && Object.keys(v as object).every((k) => ["word", "occurrence", "edge", "offset"].includes(k));
 }
 
 /** "@dashboard", "@dashboard+0.3", "@dashboard-0.2", "@dashboard#2" (2nd occurrence), "@dashboard$" (end). */
-function parseShorthand(s: string): WordAnchor | null {
+export function parseShorthand(s: string): WordAnchor | null {
   const m = String(s).match(/^@([^\s#$+-][^#$+-]*?)(#(\d+))?(\$)?([+-]\d+(?:\.\d+)?)?$/);
   if (!m) return null;
   const a: WordAnchor = { word: m[1].trim() };
@@ -208,13 +208,25 @@ export function resolveComponent(component: { id?: string; type?: string; data?:
 }
 
 /** Extract + resolve every component of a scene against a spine. */
-export function applySpine(scene: { components?: any[]; spine?: Spine }, spine: Spine): ResolveReport {
+export function applySpine(scene: { components?: any[]; spine?: Spine; sfx?: any[] }, spine: Spine): ResolveReport {
   const report: ResolveReport = { resolved: 0, unresolved: [] };
   for (const c of scene.components || []) {
     if (!c || typeof c !== "object") continue;
     extractAnchors(c);
     const r = resolveComponent(c, spine);
     report.resolved += r.resolved; report.unresolved.push(...r.unresolved);
+  }
+  // The scene's sound cues ride the same words (core/scene-sfx.ts).
+  for (const cue of scene.sfx || []) {
+    if (!cue || typeof cue !== "object") continue;
+    if (!cue.anchor) {
+      if (isAnchorObject(cue.at)) { cue.anchor = { ...cue.at }; cue.at = 0; }
+      else if (typeof cue.at === "string") { const a = parseShorthand(cue.at); if (a) { cue.anchor = a; cue.at = 0; } }
+    }
+    if (!cue.anchor) continue;
+    const t = resolveAnchor(spine, cue.anchor);
+    if (t == null) { report.unresolved.push({ component: "sfx", path: String(cue.id), word: cue.anchor.word }); continue; }
+    cue.at = t; report.resolved++;
   }
   scene.spine = spine;
   return report;

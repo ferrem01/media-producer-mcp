@@ -387,6 +387,9 @@ export interface Scene {
   components: SceneComponent[];
   /** Direct-manipulation camera moves (zoom/pan/rotate the whole scene). */
   camera_moves?: CameraMove[];
+  /** Sound cues: point sounds tied to moments in the scene, on the Effects
+   *  lane beside the camera moves (core/scene-sfx.ts). */
+  sfx?: import("./scene-sfx.js").SceneSoundCue[];
   /** Source-maps for the scene's media elements: condense a long screencast
    *  (cut waiting, timelapse dead air, speed sections) without touching the
    *  scene's own clock or the speaker track. Key = media target selector. */
@@ -570,6 +573,9 @@ export interface StoryboardScene {
    *  storyboard rebuilds with the camera the reviewer saw -- without it the
    *  moves existed only on the built scenes and a rebuild dropped them. */
   camera_moves?: CameraMove[];
+  /** Sound cues the board plans (a ding on a notification, a thud on a
+   *  stamp), carried onto the built scene (core/scene-sfx.ts). */
+  sfx?: import("./scene-sfx.js").SceneSoundCue[];
   /** Voiceover script */
   voiceover_text?: string;
   /** Words the writer marked for emphasis in the line (creator-cut): the
