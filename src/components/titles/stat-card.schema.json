@@ -31,6 +31,15 @@
       "label": "Decimal Places",
       "optional": true,
       "default": 0
+    },
+    "count": {
+      "type": "string",
+      "label": "count (default: the number counts up) | roll (odometer: each digit spins into place -- prices, metrics)",
+      "optional": true,
+      "enum": [
+        "count",
+        "roll"
+      ]
     }
   }
 }

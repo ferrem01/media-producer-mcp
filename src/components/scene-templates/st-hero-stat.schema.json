@@ -4,19 +4,70 @@
   "category": "scene-template",
   "description": "WHOLE-SCENE template: one number carries the scene. Set sunburst:true for the celebration variant (pale rotating rays + confetti behind the numeral) on the film's payoff figure. Locked composition -- left text column (kicker + masked headline + supporting), oversized count-up numeral right-of-center with a ghost echo, item tags along the lower third, wordmark + scene index anchors. Codegen fills slots only; bespoke additions go in the .st-overlay region.",
   "data": {
-    "kicker": { "type": "string", "label": "Kicker (small caps intro line)" },
-    "headline": { "type": "string", "label": "Headline; use | for the line break" },
-    "supporting": { "type": "string", "label": "Supporting sentence", "optional": true },
-    "stat_value": { "type": "number", "label": "The number (counts up)" },
-    "stat_label": { "type": "string", "label": "Label under the number" },
-    "items": { "type": "object", "label": "Array of item labels (max 6)", "optional": true },
-    "sunburst": { "type": "boolean", "label": "Celebration variant: pale rotating rays + a confetti burst behind the numeral (for the film's payoff number)", "optional": true },
-    "sunburst_at": { "type": "number", "label": "When the rays fire (seconds, default 0.35)", "optional": true },
-    "logo_url": { "type": "string", "label": "Wordmark image URL", "optional": true },
-    "scene_index": { "type": "string", "label": "Scene index text e.g. 01 / 04", "optional": true }
+    "kicker": {
+      "type": "string",
+      "label": "Kicker (small caps intro line)"
+    },
+    "headline": {
+      "type": "string",
+      "label": "Headline; use | for the line break"
+    },
+    "supporting": {
+      "type": "string",
+      "label": "Supporting sentence",
+      "optional": true
+    },
+    "stat_value": {
+      "type": "number",
+      "label": "The number (counts up)"
+    },
+    "stat_label": {
+      "type": "string",
+      "label": "Label under the number"
+    },
+    "items": {
+      "type": "object",
+      "label": "Array of item labels (max 6)",
+      "optional": true
+    },
+    "sunburst": {
+      "type": "boolean",
+      "label": "Celebration variant: pale rotating rays + a confetti burst behind the numeral (for the film's payoff number)",
+      "optional": true
+    },
+    "sunburst_at": {
+      "type": "number",
+      "label": "When the rays fire (seconds, default 0.35)",
+      "optional": true
+    },
+    "logo_url": {
+      "type": "string",
+      "label": "Wordmark image URL",
+      "optional": true
+    },
+    "scene_index": {
+      "type": "string",
+      "label": "Scene index text e.g. 01 / 04",
+      "optional": true
+    },
+    "count": {
+      "type": "string",
+      "label": "count (default: the number counts up) | roll (odometer: each digit spins into place -- prices, metrics)",
+      "optional": true,
+      "enum": [
+        "count",
+        "roll"
+      ]
+    }
   },
   "match": {
-    "entry": { "x": 0.75, "y": 0.38 },
-    "exit": { "x": 0.75, "y": 0.38 }
+    "entry": {
+      "x": 0.75,
+      "y": 0.38
+    },
+    "exit": {
+      "x": 0.75,
+      "y": 0.38
+    }
   }
 }

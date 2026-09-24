@@ -171,6 +171,11 @@
         var prefix = valEl.getAttribute('data-prefix') || '';
         var suffix = valEl.getAttribute('data-suffix') || '';
         var obj = { val: 0 };
+        if (data.count === 'roll' && window.mpRollDigits) {
+          var fin = target >= 1000 ? (target / 1000).toFixed(1) + 'K' : target % 1 !== 0 ? target.toFixed(1) : String(Math.round(target));
+          mpRollDigits(tl, valEl, 0.3 + idx * stagger, { to: prefix + fin + suffix, duration: speed * 1.5 });
+          return;
+        }
 
         tl.to(obj, {
           val: target,

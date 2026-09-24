@@ -1,0 +1,18 @@
+{
+  "type": "streaming-answer",
+  "label": "Streaming AI Answer",
+  "category": "ui-mocks",
+  "description": "An AI answer arriving the way it really does: the ask is typed into a composer, a beat of 'Thinking', then the answer streams in token bursts -- each word landing grey and settling to ink, a caret riding the tip. Full-frame type (default), or device 'phone': the keyboard rises for the ask, it sends as a bubble, the keyboard drops and the answer streams into the agent's bubble. Supports paragraphs, '- ' bullets and **bold** (brand color). Sized so the finished answer fits.",
+  "data": {
+    "prompt": { "type": "string", "label": "The ask, typed first (omit to start at the answer)", "optional": true },
+    "answer": { "type": "string", "label": "The answer. New lines are paragraphs; '- ' starts a bullet; **bold** is set in the brand color", "required": true },
+    "agent_name": { "type": "string", "label": "Name beside the agent orb (default 'Quotient'; '' hides)", "optional": true },
+    "device": { "type": "string", "label": "full (default: type on the scene) | phone", "optional": true, "enum": ["full", "phone"] },
+    "thinking": { "type": "boolean", "label": "A 'Thinking' beat before the stream (default true)", "optional": true },
+    "words_per_second": { "type": "number", "label": "Stream speed (default: the answer finishes by ~85% of the scene)", "optional": true },
+    "type_speed": { "type": "number", "label": "Characters per second for the ask (default 24)", "optional": true },
+    "seed": { "type": "number", "label": "Token-burst rhythm seed (film-stable)", "optional": true },
+    "theme": { "type": "string", "label": "Ink theme; omit to follow the measured scene ground", "optional": true, "enum": ["light", "dark"] },
+    "at": { "type": "number", "label": "Seconds into the scene it starts (default 0.2)", "optional": true }
+  }
+}

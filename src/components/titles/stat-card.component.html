@@ -198,9 +198,11 @@
       ease: ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out'
     }, 0.3);
 
-    // Count up animation
+    // Count up animation (count: "roll" spins odometer reels instead)
     var counter = { val: 0 };
-    tl.to(counter, {
+    if (data.count === 'roll' && window.mpRollDigits) {
+      mpRollDigits(tl, numberEl, 0.3, { to: decimals > 0 ? Number(targetValue).toFixed(decimals) : Math.round(targetValue).toLocaleString(), duration: speed * 1.8 });
+    } else tl.to(counter, {
       val: targetValue,
       duration: speed * 1.8,
       ease: 'power2.out',

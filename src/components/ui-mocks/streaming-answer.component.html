@@ -1,0 +1,246 @@
+<template>
+  <div class="sa-root">
+    <div class="sa-wrap">
+      <div class="sa-ask"><span class="sa-ask-text"></span><span class="sa-ask-caret"></span><span class="sa-send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      <div class="sa-agent"><span class="sa-orb"></span><span class="sa-name"></span><span class="sa-think">Thinking<i>.</i><i>.</i><i>.</i></span></div>
+      <div class="sa-answer"></div>
+    </div>
+    <div class="sa-phone">
+      <div class="sa-screen">
+        <div class="sa-head"><span class="sa-orb"></span><span class="sa-name"></span></div>
+        <div class="sa-thread">
+          <div class="sa-me"></div>
+          <div class="sa-them"><div class="sa-dots"><i></i><i></i><i></i></div><div class="sa-answer"></div></div>
+        </div>
+        <div class="sa-compose"><div class="sa-field"><span class="sa-ask-text"></span><span class="sa-ask-caret"></span></div><span class="sa-send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+        <div class="sa-kb"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* STREAMING ANSWER: an AI answer arriving the way it really does -- the
+     ask is typed, a beat of "Thinking", then the words stream in token
+     bursts, each landing grey and settling to ink, a caret riding the tip.
+     Bullets and **bold** (in the brand color) come through. Full-frame type,
+     or a phone: the keyboard rises for the ask, the ask sends as a bubble,
+     the keyboard drops and the answer streams into the agent's bubble.
+     Sized from the box so the FINISHED answer fits. */
+  .sa-root, .sa-root * { max-width: none; box-sizing: border-box; }
+  .sa-root { --u: 1px; position: absolute; inset: 0; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .sa-root.t-light { --ink: var(--mp-color-on-light, #17171c); --mute: color-mix(in srgb, var(--mp-color-on-light, #17171c) 30%, #ffffff); --soft: color-mix(in srgb, var(--mp-color-on-light, #17171c) 58%, #ffffff); --pill: #ffffff; --line: rgba(20, 20, 40, 0.10); }
+  .sa-root.t-dark { --ink: #ffffff; --mute: rgba(255, 255, 255, 0.32); --soft: rgba(255, 255, 255, 0.66); --pill: #1d1e26; --line: rgba(255, 255, 255, 0.12); }
+  .sa-acc { color: var(--mp-color-primary, #393bf5); }
+  .sa-root.t-dark .sa-acc { color: color-mix(in srgb, var(--mp-color-primary, #393bf5) 55%, #ffffff); }
+
+  /* full frame */
+  .sa-wrap { position: absolute; display: flex; flex-direction: column; }
+  .sa-root.dev-phone .sa-wrap, .sa-root:not(.dev-phone) .sa-phone { display: none; }
+  .sa-ask { align-self: flex-start; display: flex; align-items: center; gap: calc(var(--u) * 14); max-width: 100%;
+    padding: calc(var(--u) * 16) calc(var(--u) * 16) calc(var(--u) * 16) calc(var(--u) * 26); border-radius: calc(var(--u) * 20);
+    background: var(--pill); border: 1px solid var(--line); box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 28) rgba(20, 20, 60, 0.10);
+    font-size: calc(var(--u) * 28); font-weight: 500; color: var(--ink); line-height: 1.3; }
+  .sa-ask-text { white-space: pre-wrap; }
+  .sa-ask-caret { display: inline-block; width: calc(var(--u) * 3); height: 1.1em; background: var(--mp-color-primary, #393bf5); margin-left: calc(var(--u) * -8); }
+  .sa-send { flex: 0 0 auto; width: calc(var(--u) * 44); height: calc(var(--u) * 44); border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff); margin-left: auto; }
+  .sa-send svg { width: 56%; height: 56%; }
+  .sa-agent { display: flex; align-items: center; gap: calc(var(--u) * 12); margin: calc(var(--u) * 40) 0 calc(var(--u) * 18); font-size: calc(var(--u) * 22); font-weight: 600; color: var(--soft); }
+  .sa-orb { width: calc(var(--u) * 26); height: calc(var(--u) * 26); border-radius: 50%; flex: 0 0 auto;
+    background: radial-gradient(circle at 35% 30%, #ffffff 0%, color-mix(in srgb, var(--mp-color-primary, #393bf5) 55%, #ffffff) 30%, var(--mp-color-primary, #393bf5) 75%);
+    box-shadow: 0 0 calc(var(--u) * 16) color-mix(in srgb, var(--mp-color-primary, #393bf5) 45%, transparent); }
+  .sa-name:empty { display: none; }
+  .sa-think { font-weight: 500; }
+  .sa-answer { font-size: calc(var(--u) * 44); font-weight: 500; line-height: 1.32; letter-spacing: -0.015em; color: var(--ink); }
+  .sa-p { margin: 0 0 0.55em; }
+  .sa-li { position: relative; padding-left: 1.1em; margin: 0 0 0.35em; }
+  .sa-li::before { content: ''; position: absolute; left: 0.2em; top: 0.55em; width: 0.32em; height: 0.32em; border-radius: 50%; background: var(--mp-color-primary, #393bf5); opacity: var(--dot, 0); }
+  .sa-w { white-space: pre-wrap; }
+  .sa-w.b { font-weight: 700; }
+  /* The caret takes no width: it rides the tip without reflowing the text. */
+  .sa-tip { display: inline-block; position: relative; width: 0; height: 0.95em; vertical-align: -0.12em; }
+  .sa-tip::after { content: ''; position: absolute; left: 0.02em; top: 0; width: 0.5em; height: 100%; border-radius: 0.08em; background: var(--mp-color-primary, #393bf5); }
+
+  /* phone */
+  .sa-phone { position: absolute; border-radius: calc(var(--u) * 56); background: #111116; padding: calc(var(--u) * 12);
+    box-shadow: 0 calc(var(--u) * 30) calc(var(--u) * 70) rgba(20, 20, 60, 0.28); }
+  .sa-screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--u) * 44); overflow: hidden; background: var(--pill); display: flex; flex-direction: column; }
+  .sa-head { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 10); padding: calc(var(--u) * 56) 0 calc(var(--u) * 16);
+    font-size: calc(var(--u) * 22); font-weight: 700; color: var(--ink); border-bottom: 1px solid var(--line); }
+  .sa-thread { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--u) * 14); padding: calc(var(--u) * 18); overflow: hidden; }
+  .sa-me { align-self: flex-end; max-width: 80%; padding: calc(var(--u) * 14) calc(var(--u) * 18); border-radius: calc(var(--u) * 22) calc(var(--u) * 22) calc(var(--u) * 6) calc(var(--u) * 22);
+    background: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff); font-size: calc(var(--u) * 24); line-height: 1.3; }
+  .sa-them { align-self: flex-start; max-width: 90%; padding: calc(var(--u) * 16) calc(var(--u) * 20); border-radius: calc(var(--u) * 22) calc(var(--u) * 22) calc(var(--u) * 22) calc(var(--u) * 6);
+    background: color-mix(in srgb, var(--ink) 7%, var(--pill)); }
+  .sa-them .sa-answer { font-size: calc(var(--u) * 24); line-height: 1.38; letter-spacing: -0.005em; }
+  .sa-dots { display: flex; gap: calc(var(--u) * 6); padding: calc(var(--u) * 6) 0; }
+  .sa-dots i { width: calc(var(--u) * 10); height: calc(var(--u) * 10); border-radius: 50%; background: var(--soft); display: block; }
+  .sa-compose { display: flex; align-items: center; gap: calc(var(--u) * 10); padding: calc(var(--u) * 12) calc(var(--u) * 16) calc(var(--u) * 26); border-top: 1px solid var(--line); background: var(--pill); position: relative; z-index: 2; }
+  .sa-field { flex: 1; min-height: calc(var(--u) * 48); display: flex; align-items: center; padding: calc(var(--u) * 10) calc(var(--u) * 18); border-radius: 999px; border: 1px solid var(--line);
+    font-size: calc(var(--u) * 22); color: var(--ink); }
+  .sa-compose .sa-send { width: calc(var(--u) * 44); height: calc(var(--u) * 44); margin: 0; }
+  .sa-kb { position: absolute; left: 0; right: 0; bottom: 0; height: 34%; z-index: 1; display: flex; flex-direction: column; justify-content: space-evenly;
+    padding: calc(var(--u) * 8) calc(var(--u) * 6) calc(var(--u) * 26); background: color-mix(in srgb, var(--ink) 9%, var(--pill)); }
+  .sa-kr { display: flex; justify-content: center; gap: calc(var(--u) * 6); }
+  .sa-kr b { flex: 0 0 8.6%; height: calc(var(--u) * 42); border-radius: calc(var(--u) * 7); background: var(--pill); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+    display: flex; align-items: center; justify-content: center; font-size: calc(var(--u) * 19); font-weight: 400; color: var(--ink); }
+  .sa-kr b.sp { flex-basis: 48%; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.sa-root');
+    var DUR = (ctx && ctx.duration) || 8;
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    root.classList.add('t-' + (data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light')));
+    var W0 = el.clientWidth || 1200, H0 = el.clientHeight || 700;
+    var phone = data.device === 'phone';
+    if (phone) root.classList.add('dev-phone');
+    var scope = phone ? q('.sa-phone') : q('.sa-wrap');
+    var ask = String(data.prompt || '');
+    var name = data.agent_name === '' ? '' : String(data.agent_name || 'Quotient');
+    Array.prototype.forEach.call(el.querySelectorAll('.sa-name'), function (n) { n.textContent = name; });
+    if (!ask) { var a0 = q('.sa-ask'); if (a0) a0.style.display = 'none'; }
+
+    // ---- The answer as words: paragraphs, "- " bullets, **bold** in the brand color ----
+    var host = scope.querySelector('.sa-answer');
+    var words = [], lis = [];
+    String(data.answer || '').split(/\n/).forEach(function (line) {
+      if (!line.trim()) return;
+      var bullet = /^\s*([-*•])\s+/.test(line);
+      var block = document.createElement('div');
+      block.className = bullet ? 'sa-li' : 'sa-p';
+      if (bullet) lis.push({ el: block, first: words.length });
+      var body = bullet ? line.replace(/^\s*([-*•])\s+/, '') : line;
+      body.split(/(\*\*[^*]+\*\*)/).forEach(function (seg) {
+        if (!seg) return;
+        var bold = /^\*\*[^*]+\*\*$/.test(seg);
+        (bold ? seg.slice(2, -2) : seg).split(/(\s+)/).forEach(function (w) {
+          if (!w) return;
+          if (/^\s+$/.test(w)) { if (words.length) words[words.length - 1].el.textContent += w; return; }
+          var s = document.createElement('span'); s.className = 'sa-w' + (bold ? ' b sa-acc' : ''); s.textContent = w;
+          block.appendChild(s); words.push({ el: s, bold: bold, block: block });
+        });
+      });
+      host.appendChild(block);
+    });
+    var tip = document.createElement('span'); tip.className = 'sa-tip';
+    if (phone) {
+      var kb = q('.sa-kb');
+      ['qwertyuiop', 'asdfghjkl', 'zxcvbnm', ' '].forEach(function (row) {
+        var r = document.createElement('div'); r.className = 'sa-kr';
+        row.split('').forEach(function (ch) { var b = document.createElement('b'); if (ch === ' ') { b.className = 'sp'; b.textContent = 'space'; } else b.textContent = ch; r.appendChild(b); });
+        kb.appendChild(r);
+      });
+    }
+
+    // ---- SIZE: lay out, then shrink until the FINISHED answer fits ----
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc + W0 * 0.05, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc + H0 * 0.06;
+    var W = W0 - 2 * ox, H = H0 - 2 * oy;
+    var u;
+    if (phone) {
+      var ph = Math.min(H, W * 2.05), pw = ph / 2.05;
+      var P = q('.sa-phone');
+      P.style.cssText = 'left:' + (ox + (W - pw) / 2) + 'px;top:' + (oy + (H - ph) / 2) + 'px;width:' + pw + 'px;height:' + ph + 'px';
+      u = pw / 420;
+      q('.sa-me').textContent = ask;
+      q('.sa-phone .sa-ask-text').textContent = '';
+    } else {
+      var wrap = q('.sa-wrap');
+      wrap.style.cssText = 'left:' + ox + 'px;top:' + oy + 'px;width:' + W + 'px;height:' + H + 'px;justify-content:center';
+      q('.sa-wrap .sa-ask-text').textContent = ask;
+      u = Math.min(W / 1300, H / 700) * 1.25;
+    }
+    function tooTall() {
+      // A bottom-anchored thread overflows UPWARD, which scrollHeight never
+      // reports (measured: the ask bubble cut off the top), so add it up.
+      if (phone) { var th = q('.sa-thread'), cs = getComputedStyle(th); return q('.sa-me').offsetHeight + q('.sa-them').offsetHeight + parseFloat(cs.rowGap || 0) + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) > th.clientHeight + 1; }
+      return q('.sa-wrap').scrollHeight > H + 1;
+    }
+    // Measure with the keyboard gone (the answer streams after it drops).
+    for (var i = 0; i < 40; i++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      if (!tooTall()) break;
+      u *= 0.95;
+    }
+    if (!phone) {
+      // Pin the ask pill at its finished size, so typing never reflows the answer below it.
+      var pill = q('.sa-ask');
+      if (ask) { pill.style.width = pill.offsetWidth + 'px'; pill.style.minHeight = pill.offsetHeight + 'px'; }
+      q('.sa-wrap .sa-ask-text').textContent = '';
+    }
+
+    // ---- TIMING: type the ask, think, then stream in seeded token bursts ----
+    var seed = Number(data.seed) || 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+    var AT = Number(data.at) || 0.2;
+    var cps = Number(data.type_speed) || 24;
+    var typeDur = ask ? Math.min(2.2, ask.length / cps) : 0;
+    var tSend = AT + 0.4 + typeDur + (ask ? 0.25 : 0);
+    var tStream = tSend + (data.thinking === false ? 0.1 : 0.8);
+    var tEnd = Math.max(tStream + 0.6, DUR * 0.85 - 0.3);
+    var chunks = [], k = 0;
+    while (k < words.length) { var c = 1 + Math.floor(rnd() * 3); chunks.push([k, Math.min(words.length, k + c)]); k += c; }
+    var per = (tEnd - tStream) / Math.max(1, chunks.length);
+    var wps = Number(data.words_per_second);
+    if (wps > 0) per = Math.max(0.05, (words.length / wps) / Math.max(1, chunks.length));
+    chunks.forEach(function (ch, ci) { for (var j = ch[0]; j < ch[1]; j++) words[j].t = tStream + ci * per + (rnd() - 0.5) * per * 0.3; });
+    var lastT = words.length ? words[words.length - 1].t : tStream;
+
+    var st = { t: 0 };
+    var askEls = el.querySelectorAll(phone ? '.sa-phone .sa-ask-text' : '.sa-wrap .sa-ask-text');
+    var caretEls = el.querySelectorAll(phone ? '.sa-phone .sa-ask-caret' : '.sa-wrap .sa-ask-caret');
+    function apply() {
+      var t = st.t;
+      // The ask types, its caret blinks while it types.
+      var nch = ask ? Math.max(0, Math.min(ask.length, Math.floor((t - AT - 0.4) / Math.max(0.001, typeDur) * ask.length))) : 0;
+      var typed = phone ? (t < tSend ? ask.slice(0, nch) : '') : ask.slice(0, nch);
+      Array.prototype.forEach.call(askEls, function (e) { if (e.textContent !== typed) e.textContent = typed; });
+      Array.prototype.forEach.call(caretEls, function (c) { c.style.opacity = (t > AT + 0.3 && t < tSend && Math.floor(t * 2.4) % 2 === 0) ? 1 : 0; });
+      // Words: invisible, then grey on arrival, settling to ink over 0.45s.
+      var tipAt = -1;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i], d = t - w.t;
+        // Full frame keeps the finished layout (nothing reflows); a chat
+        // bubble GROWS as the words arrive.
+        if (d < 0) { w.el.style.opacity = 0; if (phone) w.el.style.display = 'none'; continue; }
+        if (phone) w.el.style.display = '';
+        var f = Math.min(1, d / 0.45);
+        w.el.style.opacity = Math.min(1, 0.35 + d / 0.12);
+        if (!w.bold) w.el.style.color = f >= 1 ? '' : 'color-mix(in srgb, var(--ink) ' + Math.round(30 + 70 * f) + '%, transparent)';
+        tipAt = i;
+      }
+      if (phone) Array.prototype.forEach.call(host.children, function (b) { var first = words.filter(function (w) { return w.block === b; })[0]; b.style.display = first && t >= first.t ? '' : 'none'; });
+      // Bullet dots land with their first word.
+      lis.forEach(function (li) { li.el.style.setProperty('--dot', words[li.first] && t >= words[li.first].t ? 1 : 0); });
+      // The caret rides the tip while streaming, then goes.
+      if (tipAt >= 0 && t < lastT + 0.6) { if (tip.previousSibling !== words[tipAt].el) words[tipAt].el.after(tip); tip.style.opacity = 1; }
+      else tip.style.opacity = 0;
+      var thinking = t >= tSend && t < tStream && tipAt < 0;
+      Array.prototype.forEach.call(el.querySelectorAll('.sa-think'), function (e) { e.style.opacity = thinking ? 1 : 0; });
+      Array.prototype.forEach.call(el.querySelectorAll('.sa-think i'), function (e, j) { e.style.opacity = Math.floor(t * 3) % 3 >= j ? 1 : 0.2; });
+      if (phone) {
+        var kbUp = Math.max(0, Math.min(1, (t - AT - 0.1) / 0.35)) * (1 - Math.max(0, Math.min(1, (t - tSend) / 0.35)));
+        q('.sa-kb').style.transform = 'translateY(' + ((1 - kbUp) * 100).toFixed(1) + '%)';
+        q('.sa-compose').style.transform = 'translateY(' + (-kbUp * q('.sa-kb').offsetHeight).toFixed(1) + 'px)';
+        var me = q('.sa-me'), them = q('.sa-them');
+        var mv = ask ? Math.max(0, Math.min(1, (t - tSend) / 0.3)) : 0;
+        me.style.display = ask && t >= tSend ? '' : 'none'; me.style.opacity = mv; me.style.transform = 'translateY(' + ((1 - mv) * 14).toFixed(1) + 'px)';
+        them.style.display = t >= tSend + 0.15 ? '' : 'none';
+        q('.sa-dots').style.display = thinking ? '' : 'none';
+        Array.prototype.forEach.call(el.querySelectorAll('.sa-dots i'), function (e, j) { e.style.opacity = Math.floor(t * 3) % 3 === j ? 1 : 0.35; });
+      }
+    }
+    // Entrance of the surface itself.
+    gsap.set(scope, { autoAlpha: 0, y: 20 });
+    tl.to(scope, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, AT);
+    tl.to(st, { t: DUR, duration: DUR, ease: 'none' }, 0);
+    tl.eventCallback('onUpdate', apply);
+    apply();
+    return tl;
+  }
+</script>

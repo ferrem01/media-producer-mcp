@@ -6,6 +6,41 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Streaming AI answer and rolling digits (HyperFrames audit)
+
+- **streaming-answer** (new, ui-mocks). It covers the audit's Streaming Text
+  and AI Chat Reveal.
+  - The ask is typed into a composer pill, followed by a "Thinking" beat.
+    Then the answer streams in seeded token bursts: each word lands grey
+    and settles to ink, and a caret rides the tip.
+  - Paragraphs, `- ` bullets (whose dot lands with the first word) and
+    `**bold**` (in the brand color) are supported.
+  - Full frame keeps the finished layout, so nothing reflows. The ask pill
+    is pinned at its final size.
+  - `device: "phone"`: the keyboard rises for the ask, which sends as a
+    bubble. The keyboard then drops and the answer's bubble GROWS as words
+    arrive.
+  - Everything is one pure function of time.
+  - Measured along the way:
+    - The caret took width and left a gap in the text; it is now
+      zero-width.
+    - A bottom-anchored thread overflows UPWARD, which `scrollHeight` never
+      reports, so the fit check now adds up the bubbles.
+- **Rolling digits.** The shared helper is
+  `mpRollDigits(tl, el, at, { to })` in `atmosphere.js`. Each digit is a
+  reel of 0-9 that spins into place. The last digit spins two turns and each
+  lands a beat after the one to its left. Separators, prefix and suffix hold
+  still, and each reel is a soft-edged window.
+  - Gradient type (`background-clip: text`) does not reach glyphs inside
+    transformed reels: stat-card showed only its comma. So each glyph now
+    carries the gradient itself.
+  - Wired as `count: "roll"` on stat-card, number-counter-row, st-hero-stat
+    and dashboard-kpi.
+
+Test: `test/streaming-and-roll.test.ts`.
+
+---
+
 ## 2026-09-24 — Product flow and before/after (HyperFrames audit, batches 3 and 4)
 
 Three new media components, for the audit's highest-value gaps that the ads

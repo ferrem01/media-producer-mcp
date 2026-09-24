@@ -348,6 +348,61 @@
     return tl;
   };
 
+  // ODOMETER: the number's FINAL text laid out as reels -- each digit a
+  // strip of 0-9 that spins into place (right-hand digits spin more and land
+  // a beat later, like a real counter); separators, prefix and suffix hold
+  // still. Every cell has the same box, so the line never jitters, and the
+  // strips are tweened on the timeline (seek-exact).
+  //   mpRollDigits(tl, el, at, { to: '12,410', duration: 1.4 })
+  window.mpRollDigits = function (tl, el, at, opts) {
+    opts = opts || {};
+    var text = String(opts.to !== undefined ? opts.to : (el.textContent || '')).trim();
+    if (!/\d/.test(text)) return tl;
+    // A reel is taller than the line (negative margins keep the line box)
+    // and fades at top and bottom, so digits roll in and out of a soft
+    // window; a settled digit sits inside the unfaded middle.
+    var H = '1.4em';
+    // Gradient type (background-clip: text) does not reach glyphs inside
+    // transformed reels (measured: stat-card showed only its comma), so each
+    // glyph carries the gradient itself.
+    var ecs = getComputedStyle(el);
+    var clip = (ecs.webkitBackgroundClip || ecs.backgroundClip) === 'text' && ecs.backgroundImage !== 'none' ? ecs.backgroundImage : null;
+    function paint(g) { if (!clip) return; g.style.backgroundImage = clip; g.style.webkitBackgroundClip = 'text'; g.style.backgroundClip = 'text'; g.style.webkitTextFillColor = 'transparent'; g.style.color = 'transparent'; }
+    el.textContent = '';
+    el.style.fontVariantNumeric = 'tabular-nums';
+    var reels = [];
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      var cell = document.createElement('span');
+      cell.style.cssText = 'display:inline-block;height:' + H + ';line-height:' + H + ';overflow:hidden;vertical-align:top;margin:-0.14em 0;' +
+        (/\d/.test(ch) ? '-webkit-mask-image:linear-gradient(transparent 0%,#000 17%,#000 83%,transparent 100%);mask-image:linear-gradient(transparent 0%,#000 17%,#000 83%,transparent 100%);' : '');
+      if (/\d/.test(ch)) {
+        var strip = document.createElement('span');
+        strip.style.cssText = 'display:block;';
+        // Two full turns before the target digit.
+        var seq = [];
+        for (var r = 0; r < 2; r++) for (var d = 0; d < 10; d++) seq.push(d);
+        for (var d2 = 0; d2 <= +ch; d2++) seq.push(d2);
+        seq.forEach(function (n) { var s = document.createElement('span'); s.style.cssText = 'display:block;height:' + H + ';'; s.textContent = n; paint(s); strip.appendChild(s); });
+        cell.appendChild(strip);
+        reels.push({ strip: strip, len: seq.length });
+      } else {
+        cell.textContent = ch === ' ' ? '\u00a0' : ch;
+        paint(cell);
+      }
+      el.appendChild(cell);
+    }
+    var dur = opts.duration || 1.4, n = reels.length;
+    reels.forEach(function (rl, k) {
+      // The last digit spins two turns, the rest one; each lands a beat after the one to its left.
+      var skip = k < n - 1 ? 10 : 0;
+      var from = -(skip / rl.len) * 100, to = -((rl.len - 1) / rl.len) * 100;
+      gsap.set(rl.strip, { yPercent: from });
+      tl.to(rl.strip, { yPercent: to, duration: dur * (0.7 + 0.3 * (k + 1) / n), ease: 'power3.out' }, at);
+    });
+    return tl;
+  };
+
   // Character-by-character type-on with a blinking cursor. The reveal is
   // one tween on a counter, so it tracks timeline seeks exactly.
   //   mpTypeIn(tl, el, at, { cps, cursor: 'hold'?, duration })

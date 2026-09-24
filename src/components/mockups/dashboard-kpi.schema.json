@@ -59,6 +59,15 @@
       "type": "string",
       "label": "'focus' = skeleton/blur everything except the KPI values (directs the eye)",
       "optional": true
+    },
+    "count": {
+      "type": "string",
+      "label": "count (default: the number counts up) | roll (odometer: each digit spins into place -- prices, metrics)",
+      "optional": true,
+      "enum": [
+        "count",
+        "roll"
+      ]
     }
   },
   "script_actions": [
