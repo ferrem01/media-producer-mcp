@@ -2,11 +2,11 @@
   "type": "email-compose",
   "label": "Email Compose",
   "category": "mockups",
-  "description": "Email being composed in a dark mail client mockup with typing animation and send button glow.",
+  "description": "A modern email compose window sized for video: From, To as recipient chips, a bold subject and the body typing in, a formatting bar and the brand's Send button. On send (send_at, send:true, or a scripted click on send-button) the button presses, the window lifts away and a 'Sent' toast lands. ai adds a 'Drafted with Quotient' chip over the body. Themed from the brand background.",
   "data": {
     "to": {
       "type": "string",
-      "label": "To",
+      "label": "To: one or more addresses or list names, comma separated (shown as chips)",
       "optional": true,
       "placeholder": "team@company.com"
     },
@@ -25,6 +25,46 @@
     "body": {
       "type": "string",
       "label": "Body",
+      "optional": true
+    },
+    "ai": {
+      "type": "string",
+      "label": "Show an AI-drafted chip over the body: true, or its text (default 'Drafted with Quotient')",
+      "optional": true
+    },
+    "send": {
+      "type": "boolean",
+      "label": "Send when the body has finished typing",
+      "optional": true
+    },
+    "send_at": {
+      "type": "number",
+      "label": "When Send is pressed (seconds or \"@word\")",
+      "optional": true
+    },
+    "sent_label": {
+      "type": "string",
+      "label": "Toast text after sending (default 'Sent')",
+      "optional": true
+    },
+    "attachments": {
+      "type": "array",
+      "label": "Attachment names shown under the body",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "'light' | 'dark' (default: from the brand background)",
+      "optional": true
+    },
+    "type_speed": {
+      "type": "number",
+      "label": "Typing speed, characters per second (default 38)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the window appears (seconds or \"@word\")",
       "optional": true
     }
   },

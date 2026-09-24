@@ -2,11 +2,11 @@
   "type": "social-proof",
   "label": "Social Proof",
   "category": "cta",
-  "description": "A row or grid of proof items (logos, quotes, ratings, stats) that land one after another under a title.",
+  "description": "Proof at video scale: a title over a row or grid of cards; figures count up large in the brand color, names set as wordmarks, logos as images, each card's accent bar drawing in as it lands. Figures size independently so one wide number never shrinks the labels.",
   "data": {
     "items": {
       "type": "array",
-      "label": "Array of social proof items",
+      "label": "Proof items: a figure ('3.2x', '41%' -- counts up), a name ('Northwind' -- set as a wordmark), a logo image (logo: URL), or a line of praise; subtext under each",
       "required": true,
       "items": {
         "type": "object",
@@ -15,6 +15,9 @@
             "type": "string"
           },
           "subtext": {
+            "type": "string"
+          },
+          "logo": {
             "type": "string"
           }
         },
@@ -37,6 +40,43 @@
         "grid"
       ],
       "default": "row"
+    },
+    "style": {
+      "type": "string",
+      "label": "cards (default) | plain (no plates, type on the scene)",
+      "optional": true,
+      "enum": [
+        "cards",
+        "plain"
+      ]
+    },
+    "align": {
+      "type": "string",
+      "label": "center (default) | left, inside each card",
+      "optional": true,
+      "enum": [
+        "center",
+        "left"
+      ]
+    },
+    "theme": {
+      "type": "string",
+      "label": "Card theme; omit to follow the scene ground (a dark ground gets a dark card)",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene the card enters (default 0.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
+      "optional": true
     }
   }
 }

@@ -6,6 +6,58 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Component polish audit, part 4: email-compose and the CTA / proof cards
+
+- **email-compose rebuilt.** The old one had no `data-target` hooks, so a
+  scripted click on Send silently did nothing. Now:
+  - `data-target`s on from, to, subject, body and send. To shows recipient
+    chips with initials. The subject and body type seek-exact.
+  - An optional "Drafted with Quotient" chip (`ai`), attachments, and a Send
+    moment (`send_at`, `send: true`, or a scripted click on `send-button`).
+    On Send the button presses, the window lifts away and a "Sent" toast
+    lands.
+  - The body auto-fits: a three-paragraph body showed only "Hi there,"
+    before. Typing always finishes before a known Send.
+- **cta-card, pricing-card, testimonial-card, social-proof, quote-block
+  rebuilt at video scale.** Measured before:
+  - 16px button type in a full frame;
+  - 13px pricing features;
+  - a 15px grey italic testimonial;
+  - 20px proof figures;
+  - quote-block as a 3%-white ghost card;
+  - a green or black CTA, because `--mp-color-cta` is the accent, and
+    Quotient's accent is near-black.
+
+  All five now share one recipe:
+  - **The card fills its slot.** Type is sized from the box: start generous,
+    shrink until it fits, then hug the content.
+  - **The theme is measured** (`mpGroundLum`): a dark ground gets a dark
+    card. The ink follows the card's OWN surface, never the scene text var.
+  - **Buttons and accents use the brand primary.**
+  - **Motion follows the house rules.** Lines rise, numbers count up, rules
+    draw, a single shine crosses the CTA. No blur, no pops. Cards HOLD by
+    default; `exit: true` opts into a fade.
+  - **Shadows are sized from the margin.** The slot clips (`overflow:
+    hidden`), so a larger shadow was cut into a visible box.
+  - **The margin is kept inside what is SEEN.** A full-frame slot overhangs
+    the frame by the camera layer's extra 20px per side, and the camera push
+    zooms in further. Measured: cards 9px from the edge.
+
+  New per-card fields:
+  - cta `eyebrow`, `secondary_text`, `url`, `press_at`, and `theme: brand`
+    (a primary-colored card);
+  - pricing `badge`, `compare_price`, and a price that counts up;
+  - testimonial `highlight` (a marker sweep), `avatar` and `company_logo`;
+  - social-proof reads each item as a figure, name, logo or line of praise;
+    figures scale on their own unit, so one wide "$1.2M" never shrinks the
+    labels;
+  - quote-block sits on the ground by default, `highlight` takes the brand
+    color, `surface: card` optional.
+
+Test: `test/proof-cards-upgrade.test.ts`.
+
+---
+
 ## 2026-09-24 — Component polish audit, part 3: data-viz
 
 - **line-chart rebuilt.** It was a dark-world card (white title, 3%-white

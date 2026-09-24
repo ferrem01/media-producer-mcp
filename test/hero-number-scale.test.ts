@@ -104,10 +104,11 @@ describe("a hardcoded-dark mock pins its own ink", () => {
   it("email-compose does not paint the brand text token on its dark card", async () => {
     // proj_b75ca862: every address line at 1.03:1 -- the card is #1a1a22 and
     // .email-value rode var(--mp-color-text), which is dark ink on light brands.
+    // The rebuilt window (polish audit part 4) themes itself: every ink comes
+    // from its own --ec-* vars, never the scene text token.
     const src = await read("../src/components/mockups/email-compose.component.html");
-    const emailValue = src.split(".email-value {")[1]?.split("}")[0] || "";
-    expect(emailValue).not.toMatch(/--mp-color-text/);
-    expect(emailValue).toMatch(/#f4f4f6/);
+    expect(src).not.toMatch(/--mp-color-text/);
+    expect(src).toMatch(/--ec-ink/);
   });
 });
 

@@ -1,218 +1,133 @@
 <template>
-  <div class="quote-block">
-    <div class="quote-card">
-      <div class="accent-line"></div>
-      <div class="quote-mark open">&ldquo;</div>
-      <blockquote class="quote-text">{{quote}}</blockquote>
-      <div class="quote-mark close">&rdquo;</div>
-      <div class="attribution">
-        <div class="attr-divider"></div>
-        <span class="author">{{author}}</span>
-        <span class="role">{{role}}</span>
+  <div class="qb-root">
+    <div class="qb-card">
+      <svg class="qb-glyph" viewBox="0 0 64 48" aria-hidden="true"><path d="M0 48V29.3C0 12.6 8.4 2.9 25.2 0l2.6 6.6C19.9 9 15.9 13.8 15.2 21.2H27V48H0zm37 0V29.3C37 12.6 45.4 2.9 62.2 0l2.6 6.6c-7.9 2.4-11.9 7.2-12.6 14.6H64V48H37z" fill="var(--s-acc)"/></svg>
+      <blockquote class="qb-quote"></blockquote>
+      <div class="qb-attr">
+        <div class="qb-rule"></div>
+        <div class="qb-avatar"></div>
+        <div class="qb-who"><div class="qb-author"></div><div class="qb-role"></div></div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-  .quote-block {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    width: 100%;
-    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
-    padding: 80px;
+  /* An editorial pull quote: display-size type on the scene ground by
+     default. The audit measured the old block as a 3%-white card that was
+     the page itself (a ghost panel) with pale quote marks. */
+  .qb-root {
+    --u: 1px; --pad: 40px;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    max-width: none;
   }
+  .qb-root.t-light { --s-bg: #ffffff; --s-ink: var(--mp-color-on-light, #17171c); --s-muted: color-mix(in srgb, var(--mp-color-on-light, #17171c) 64%, #ffffff); --s-line: rgba(20, 20, 40, 0.09); --s-acc: var(--mp-color-primary, #393bf5); }
+  .qb-root.t-dark { --s-bg: #16171d; --s-ink: #ffffff; --s-muted: rgba(255, 255, 255, 0.72); --s-line: rgba(255, 255, 255, 0.10); --s-acc: color-mix(in srgb, var(--mp-color-primary, #393bf5) 55%, #ffffff); }
 
-  .quote-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    max-width: 85%;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 24px;
-    padding: 64px 72px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow:
-      0 25px 60px rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
-    position: relative;
-    overflow: hidden;
+  .qb-card { position: relative; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; text-align: center; color: var(--s-ink); }
+  .qb-root.align-left .qb-card { align-items: flex-start; text-align: left; }
+  .qb-root.surface-card .qb-card {
+    padding: calc(var(--u) * 56) calc(var(--u) * 64);
+    background: var(--s-bg); border: 1px solid var(--s-line); border-radius: calc(var(--u) * 28);
+    box-shadow: 0 calc(var(--pad) * 0.06) calc(var(--pad) * 0.16) rgba(20, 20, 60, 0.06), 0 calc(var(--pad) * 0.25) calc(var(--pad) * 0.7) rgba(20, 20, 60, 0.12);
   }
-
-  .accent-line {
-    position: absolute;
-    top: 0;
-    left: 10%;
-    right: 10%;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(167, 139, 250, 0.4) 30%,
-      rgba(139, 92, 246, 0.6) 50%,
-      rgba(167, 139, 250, 0.4) 70%,
-      transparent
-    );
-  }
-
-  .quote-mark {
-    font-size: 100px;
-    font-weight: 700;
-    color: var(--mp-color-accent, #A78BFA);
-    opacity: 0.2;
-    line-height: 0.5;
-    user-select: none;
-    text-shadow: 0 0 40px rgba(167, 139, 250, 0.25);
-  }
-
-  .quote-mark.open {
-    align-self: flex-start;
-    margin-bottom: 12px;
-  }
-
-  .quote-mark.close {
-    align-self: flex-end;
-    margin-top: 12px;
-  }
-
-  .quote-text {
-    font-size: 36px;
-    font-weight: 500;
-    font-style: italic;
-    color: var(--mp-color-text, #ffffff);
-    text-align: center;
-    line-height: 1.4;
-    margin: 0;
-    max-width: 90%;
-    letter-spacing: -0.01em;
-    text-shadow: 0 0 40px rgba(167, 139, 250, 0.08);
-  }
-
-  .attribution {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 36px;
-    gap: 8px;
-  }
-
-  .attr-divider {
-    width: 40px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.3), transparent);
-    margin-bottom: 8px;
-  }
-
-  .author {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
-    letter-spacing: -0.01em;
-  }
-
-  .author:empty {
-    display: none;
-  }
-
-  .role {
-    font-size: 16px;
-    font-weight: 400;
-    color: #cbd5e1;
-    letter-spacing: 0.005em;
-  }
-
-  .role:empty {
-    display: none;
-  }
+  .qb-glyph { width: calc(var(--u) * 72); height: auto; display: block; margin-bottom: calc(var(--u) * 30); }
+  .qb-quote { margin: 0; font-size: calc(var(--u) * 60); font-weight: 500; line-height: 1.16; letter-spacing: -0.025em; }
+  .qb-line { display: block; }
+  .qb-w.hl { color: var(--s-acc); }
+  .qb-attr { display: flex; align-items: center; gap: calc(var(--u) * 18); margin-top: calc(var(--u) * 40); text-align: left; }
+  .qb-rule { width: calc(var(--u) * 44); height: calc(var(--u) * 3); border-radius: 2px; background: var(--s-acc); transform-origin: 0 50%; }
+  .qb-avatar { width: calc(var(--u) * 60); height: calc(var(--u) * 60); border-radius: 50%; overflow: hidden; flex: 0 0 auto; }
+  .qb-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .qb-avatar:empty { display: none; }
+  .qb-author { font-size: calc(var(--u) * 26); font-weight: 600; letter-spacing: -0.01em; }
+  .qb-role { margin-top: calc(var(--u) * 4); font-size: calc(var(--u) * 21); color: var(--s-muted); }
+  .qb-role:empty { display: none; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.qb-root'), card = q('.qb-card');
+    var DUR = (ctx && ctx.duration) || 5;
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    var surface = data.surface === 'card' ? 'card' : 'none';
+    // On the bare ground the ink follows the MEASURED ground; on a card, the card.
+    var theme = data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light');
+    root.classList.add('t-' + theme, 'surface-' + surface);
+    if (data.align === 'left') root.classList.add('align-left');
 
-    var card = el.querySelector('.quote-card');
-    var accentLine = el.querySelector('.accent-line');
-    var openMark = el.querySelector('.quote-mark.open');
-    var closeMark = el.querySelector('.quote-mark.close');
-    var quoteText = el.querySelector('.quote-text');
-    var attribution = el.querySelector('.attribution');
-    var attrDivider = el.querySelector('.attr-divider');
-
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.75;
-    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
-
-    // The card's 3% wash is effectively the page, so the role line sits on
-    // the PAGE ground: hardcoded #cbd5e1 measured 1.38:1 on white (cert,
-    // 16px needs 4.5:1). Pick muted ink from the measured ground.
-    var roleEl = el.querySelector('.role');
-    var groundLum = window.mpGroundLum ? mpGroundLum() : null;
-    if (roleEl && typeof groundLum === 'number') {
-      roleEl.style.color = groundLum < 0.18 ? '#e6e9f2' : '#4d5461';
+    // Quote as word spans (the highlight phrase takes the accent: emphasis is color only).
+    var quote = String(data.quote || '').replace(/^["“]|["”]$/g, '');
+    var hi = String(data.highlight || '').trim();
+    var hs = hi ? quote.toLowerCase().indexOf(hi.toLowerCase()) : -1;
+    var qEl = q('.qb-quote');
+    var words = [], pos = 0;
+    quote.split(/(\s+)/).forEach(function (part) {
+      if (!part) return;
+      if (/^\s+$/.test(part)) { if (words.length) words[words.length - 1].textContent += part; pos += part.length; return; }
+      var w = document.createElement('span'); w.className = 'qb-w'; w.textContent = part;
+      if (hs >= 0 && pos >= hs && pos < hs + hi.length) w.classList.add('hl');
+      qEl.appendChild(w); words.push(w); pos += part.length;
+    });
+    q('.qb-author').textContent = String(data.author || '');
+    q('.qb-role').textContent = String(data.role || '');
+    if (!data.author && !data.role) q('.qb-attr').style.display = 'none';
+    if (data.avatar) {
+      var img = document.createElement('img'); img.src = String(data.avatar); img.alt = '';
+      img.onerror = function () { img.remove(); };
+      q('.qb-avatar').appendChild(img);
     }
 
-    // Initial states
-    gsap.set(card, { autoAlpha: 0, y: 40, scale: 1.05, filter: 'blur(5px)' });
-    gsap.set(accentLine, { scaleX: 0 });
-    gsap.set(openMark, { autoAlpha: 0, scale: 0.6 });
-    gsap.set(closeMark, { autoAlpha: 0, scale: 0.6 });
-    gsap.set(quoteText, { autoAlpha: 0, y: 20 });
-    gsap.set(attribution, { autoAlpha: 0, y: 15 });
-
-    // Card entrance
-    tl.to(card, {
-      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
-      duration: speed,
-      ease: ease
-    }, 0.2);
-
-    // Accent line wipes in
-    tl.to(accentLine, {
-      scaleX: 1,
-      duration: speed * 0.8,
-      ease: 'power2.inOut'
-    }, 0.2 + speed * 0.3);
-
-    // Quote marks
-    tl.to(openMark, {
-      autoAlpha: 0.2, scale: 1,
-      duration: speed * 0.7,
-      ease: ease
-    }, 0.3 + speed * 0.3);
-
-    // Quote text
-    tl.to(quoteText, {
-      autoAlpha: 1, y: 0,
-      duration: speed * 0.8,
-      ease: ease
-    }, 0.3 + speed * 0.4);
-
-    tl.to(closeMark, {
-      autoAlpha: 0.2, scale: 1,
-      duration: speed * 0.7,
-      ease: ease
-    }, 0.3 + speed * 0.5);
-
-    // Attribution
-    tl.to(attribution, {
-      autoAlpha: 1, y: 0,
-      duration: speed * 0.6,
-      ease: 'power2.out'
-    }, 0.3 + speed * 0.7);
-
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.7;
-      tl.to(card, {
-        autoAlpha: 0, y: -20, scale: 0.97,
-        duration: 0.45,
-        ease: 'power2.in'
-      }, exitAt);
+    // SIZE: display type from the box, shrink until the whole quote fits.
+    var W0 = el.clientWidth || 900, H0 = el.clientHeight || 520, pad = Math.round(Math.min(W0, H0) * 0.06);
+    // Shadows are sized from this margin so the slot (which clips) never cuts them.
+    root.style.setProperty('--pad', pad + 'px');
+    // A full-frame slot overhangs the frame (the camera layer is larger than
+    // the canvas; measured: cards 9px from the edge), so the margin is kept
+    // inside what is SEEN.
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var W = W0 - 2 * (pad + ox), H = H0 - 2 * (pad + oy);
+    card.style.maxWidth = W + 'px';
+    card.style.width = W + 'px';
+    var u = Math.min(W / 760, H / 400);
+    for (var i = 0; i < 34; i++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      if (card.scrollHeight <= H + 1 && card.scrollWidth <= card.clientWidth + 1) break;
+      u *= 0.95;
     }
+    // Balance the lines (same count, even lengths) before grouping them.
+    qEl.style.textWrap = 'balance';
+    var lines = [], lastTop = null;
+    words.forEach(function (w) { var t = w.offsetTop; if (lastTop === null || Math.abs(t - lastTop) > 2) { lines.push([]); lastTop = t; } lines[lines.length - 1].push(w); });
+    var lineEls = lines.map(function (ws) {
+      var ln = document.createElement('span'); ln.className = 'qb-line';
+      qEl.insertBefore(ln, ws[0]); ws.forEach(function (w) { ln.appendChild(w); });
+      return ln;
+    });
 
+    // MOTION: glyph lands, lines rise in reading order, the rule draws,
+    // the attribution lands. The card (if any) rises first.
+    var AT = Number(data.at) || 0.2;
+    if (surface === 'card') {
+      gsap.set(card, { autoAlpha: 0, y: 28 });
+      tl.to(card, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, AT);
+      AT += 0.15;
+    }
+    gsap.set(q('.qb-glyph'), { autoAlpha: 0, y: 10 });
+    tl.to(q('.qb-glyph'), { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power3.out' }, AT);
+    if (window.mpLineRise) mpLineRise(tl, lineEls, AT + 0.15, { stagger: 0.12, duration: 0.42, rise: 14 });
+    var t = AT + 0.35 + lineEls.length * 0.12;
+    gsap.set(q('.qb-rule'), { scaleX: 0 });
+    tl.to(q('.qb-rule'), { scaleX: 1, duration: 0.4, ease: 'power2.inOut' }, t);
+    var who = [q('.qb-avatar'), q('.qb-who')];
+    gsap.set(who, { autoAlpha: 0, x: -8 });
+    tl.to(who, { autoAlpha: 1, x: 0, duration: 0.4, stagger: 0.06, ease: 'power3.out' }, t + 0.2);
+    if (data.exit === true && DUR > 2) tl.to(card, { autoAlpha: 0, y: -16, duration: 0.4, ease: 'power2.in' }, DUR - 0.5);
     return tl;
   }
 </script>

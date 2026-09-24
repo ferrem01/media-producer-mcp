@@ -1,218 +1,149 @@
 <template>
-  <div class="pricing-card-wrapper">
-    <div class="pricing-card">
-      <div class="pricing-name">{{name}}</div>
-      <div class="pricing-price-row">
-        <span class="pricing-price">{{price}}</span>
-        <span class="pricing-period">{{period}}</span>
-      </div>
-      <div class="pricing-features"></div>
-      <div class="pricing-cta">{{cta}}</div>
+  <div class="pc-root">
+    <div class="pc-card">
+      <div class="pc-head"><span class="pc-name"></span><span class="pc-badge"></span></div>
+      <div class="pc-desc"></div>
+      <div class="pc-price-row"><span class="pc-compare"></span><span class="pc-price"></span><span class="pc-period"></span></div>
+      <div class="pc-rule"></div>
+      <div class="pc-features"></div>
+      <div class="pc-cta"></div>
     </div>
   </div>
 </template>
 
 <style scoped>
-  .pricing-card-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
-    padding: 80px;
-    box-sizing: border-box;
+  /* One design unit (--u) from the slot: the audit measured the old card at
+     13px feature type, a small card lost in a 40%-wide slot. */
+  .pc-root {
+    --u: 1px; --pad: 40px;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    max-width: none;
   }
+  .pc-root.t-light { --s-bg: #ffffff; --s-ink: var(--mp-color-on-light, #17171c); --s-muted: color-mix(in srgb, var(--mp-color-on-light, #17171c) 64%, #ffffff); --s-line: rgba(20, 20, 40, 0.09); --s-acc: var(--mp-color-primary, #393bf5); --s-tint: color-mix(in srgb, var(--mp-color-primary, #393bf5) 12%, #ffffff); }
+  .pc-root.t-dark { --s-bg: #16171d; --s-ink: #ffffff; --s-muted: rgba(255, 255, 255, 0.72); --s-line: rgba(255, 255, 255, 0.10); --s-acc: color-mix(in srgb, var(--mp-color-primary, #393bf5) 55%, #ffffff); --s-tint: color-mix(in srgb, var(--mp-color-primary, #393bf5) 30%, #16171d); }
 
-  .pricing-card {
-    background: var(--mp-color-surface, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--mp-color-border, rgba(127,127,127,0.2));
-    border-radius: 24px;
-    padding: 56px 64px;
-    max-width: 480px;
-    width: 100%;
-    text-align: center;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow:
-      0 25px 60px rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
+  .pc-card {
+    position: relative; box-sizing: border-box;
+    display: flex; flex-direction: column;
+    padding: calc(var(--u) * 44) calc(var(--u) * 44) calc(var(--u) * 40);
+    background: var(--s-bg); color: var(--s-ink);
+    border: 1px solid var(--s-line);
+    border-radius: calc(var(--u) * 28);
+    box-shadow: 0 calc(var(--pad) * 0.06) calc(var(--pad) * 0.16) rgba(20, 20, 60, 0.06), 0 calc(var(--pad) * 0.25) calc(var(--pad) * 0.7) rgba(20, 20, 60, 0.12);
   }
-
-  .pricing-card.highlighted {
-    border-color: rgba(167, 139, 250, 0.25);
-    box-shadow:
-      0 25px 60px rgba(0, 0, 0, 0.4),
-      0 0 40px rgba(167, 139, 250, 0.1),
-      0 0 0 1px rgba(167, 139, 250, 0.15);
+  .pc-card.hl {
+    border: calc(var(--u) * 2.5) solid var(--mp-color-primary, #393bf5);
+    box-shadow: 0 calc(var(--pad) * 0.06) calc(var(--pad) * 0.16) rgba(20, 20, 60, 0.06), 0 calc(var(--pad) * 0.25) calc(var(--pad) * 0.7) color-mix(in srgb, var(--mp-color-primary, #393bf5) 26%, transparent);
   }
-
-  .pricing-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--mp-color-accent, #a78bfa);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 20px;
+  .pc-head { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 16); }
+  .pc-name { font-size: calc(var(--u) * 26); font-weight: 600; letter-spacing: -0.01em; }
+  .pc-badge {
+    font-size: calc(var(--u) * 15); font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
+    padding: calc(var(--u) * 7) calc(var(--u) * 14); border-radius: 999px;
+    background: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff);
   }
-
-  .pricing-price-row {
-    margin-bottom: 36px;
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 4px;
+  .pc-desc { margin-top: calc(var(--u) * 10); font-size: calc(var(--u) * 18); line-height: 1.4; color: var(--s-muted); }
+  .pc-price-row { display: flex; align-items: baseline; gap: calc(var(--u) * 10); margin-top: calc(var(--u) * 26); }
+  .pc-price { font-size: calc(var(--u) * 84); font-weight: 600; letter-spacing: -0.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .pc-period { font-size: calc(var(--u) * 22); color: var(--s-muted); font-weight: 500; }
+  .pc-compare { font-size: calc(var(--u) * 30); color: var(--s-muted); text-decoration: line-through; text-decoration-thickness: calc(var(--u) * 2.5); }
+  .pc-rule { height: 1px; background: var(--s-line); margin: calc(var(--u) * 28) 0 calc(var(--u) * 24); transform-origin: 0 50%; }
+  .pc-features { display: flex; flex-direction: column; gap: calc(var(--u) * 16); }
+  .pc-feat { display: flex; align-items: center; gap: calc(var(--u) * 14); font-size: calc(var(--u) * 21); line-height: 1.3; }
+  .pc-check {
+    flex: 0 0 auto; width: calc(var(--u) * 28); height: calc(var(--u) * 28); border-radius: 50%;
+    background: var(--s-tint); display: flex; align-items: center; justify-content: center;
   }
-
-  .pricing-price {
-    font-size: 64px;
-    font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
-    letter-spacing: -0.02em;
-    text-shadow:
-      0 0 60px rgba(167, 139, 250, 0.15),
-      0 0 20px rgba(167, 139, 250, 0.08);
+  .pc-check svg { width: 58%; height: 58%; display: block; }
+  .pc-cta {
+    margin-top: calc(var(--u) * 34);
+    height: calc(var(--u) * 62); border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(var(--u) * 21); font-weight: 600; white-space: nowrap;
+    border: calc(var(--u) * 2) solid var(--s-ink); color: var(--s-ink);
   }
-
-  .pricing-period {
-    font-size: 18px;
-    font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
-    letter-spacing: 0.005em;
+  .pc-card.hl .pc-cta {
+    border-color: transparent;
+    background: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff);
+    box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 24) color-mix(in srgb, var(--mp-color-primary, #393bf5) 32%, transparent);
   }
-
-  .pricing-period:empty {
-    display: none;
-  }
-
-  .pricing-features {
-    text-align: left;
-    margin-bottom: 40px;
-  }
-
-  .pricing-feature {
-    font-size: 16px;
-    color: var(--mp-color-text-muted, #cbd5e1);
-    padding: 12px 0;
-    border-bottom: 1px solid var(--mp-color-border, rgba(127,127,127,0.2));
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    line-height: 1.5;
-    letter-spacing: 0.005em;
-  }
-
-  .pricing-feature:last-child {
-    border-bottom: none;
-  }
-
-  .feature-check {
-    color: var(--mp-color-accent, #a78bfa);
-    font-weight: 600;
-    font-size: 16px;
-    text-shadow: 0 0 12px rgba(167, 139, 250, 0.3);
-  }
-
-  .pricing-cta {
-    display: inline-block;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--mp-color-text, #ffffff);
-    background: var(--mp-color-accent, #A78BFA);
-    padding: 16px 44px;
-    border-radius: 14px;
-    letter-spacing: 0.02em;
-    box-shadow:
-      0 0 24px rgba(167, 139, 250, 0.2),
-      0 8px 24px rgba(167, 139, 250, 0.12);
-  }
-
-  .pricing-cta:empty {
-    display: none;
-  }
+  .pc-badge:empty, .pc-desc:empty, .pc-compare:empty, .pc-period:empty, .pc-cta:empty { display: none; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var card = el.querySelector('.pricing-card');
-    var featuresContainer = el.querySelector('.pricing-features');
-    var ctaBtn = el.querySelector('.pricing-cta');
-    var priceRow = el.querySelector('.pricing-price-row');
-    var name = el.querySelector('.pricing-name');
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.pc-root'), card = q('.pc-card');
+    var DUR = (ctx && ctx.duration) || 5;
+    function txt(sel, v) { q(sel).textContent = v === undefined || v === null ? '' : String(v); }
+    txt('.pc-name', data.name);
+    txt('.pc-desc', data.description);
+    txt('.pc-price', data.price);
+    txt('.pc-period', data.period);
+    txt('.pc-compare', data.compare_price);
+    txt('.pc-cta', data.cta);
+    var hl = !!data.highlighted;
+    if (hl) card.classList.add('hl');
+    txt('.pc-badge', data.badge !== undefined ? data.badge : (hl ? 'Most popular' : ''));
 
-    if (data.highlighted) {
-      card.classList.add('highlighted');
-    }
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    var theme = data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light');
+    root.classList.add('t-' + theme);
 
-    // Build features
-    var features = data.features || [];
-    features.forEach(function(f) {
-      var row = document.createElement('div');
-      row.className = 'pricing-feature';
-
-      var check = document.createElement('span');
-      check.className = 'feature-check';
-      check.textContent = '\u2713';
-
-      var text = document.createElement('span');
-      text.textContent = f;
-
-      row.appendChild(check);
-      row.appendChild(text);
-      featuresContainer.appendChild(row);
+    var box = q('.pc-features');
+    var rows = (Array.isArray(data.features) ? data.features : []).map(function (f) {
+      var row = document.createElement('div'); row.className = 'pc-feat';
+      row.innerHTML = '<span class="pc-check"><svg viewBox="0 0 16 16"><path d="M3.5 8.4l2.9 2.9 6.1-6.6" fill="none" stroke="var(--s-acc)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="pc-ft"></span>';
+      row.querySelector('.pc-ft').textContent = String(f && typeof f === 'object' ? (f.text || '') : f);
+      box.appendChild(row);
+      return row;
     });
 
-    var featureRows = featuresContainer.querySelectorAll('.pricing-feature');
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
-
-    // Card entrance with scale + blur
-    gsap.set(card, { autoAlpha: 0, y: 50, scale: 1.06, filter: 'blur(5px)' });
-    gsap.set(featureRows, { autoAlpha: 0, x: -15 });
-    gsap.set(ctaBtn, { autoAlpha: 0, scale: 0.9 });
-
-    tl.to(card, {
-      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
-      duration: speed,
-      ease: 'power3.out'
-    }, 0.3);
-
-    // Features stagger in
-    tl.to(featureRows, {
-      autoAlpha: 1, x: 0,
-      duration: 0.4,
-      stagger: 0.08,
-      ease: 'power2.out'
-    }, 0.3 + speed * 0.5);
-
-    // CTA button
-    if (ctaBtn && ctaBtn.textContent.trim()) {
-      tl.to(ctaBtn, {
-        autoAlpha: 1, scale: 1,
-        duration: 0.45,
-        ease: ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out'
-      }, 0.3 + speed * 0.5 + features.length * 0.08 + 0.1);
-
-      // Subtle pulse glow on CTA
-      tl.to(ctaBtn, {
-        boxShadow: '0 0 36px rgba(167, 139, 250, 0.3), 0 8px 32px rgba(167, 139, 250, 0.18)',
-        duration: 0.5,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: 2
-      }, '-=0.1');
+    // SIZE: a portrait card that fills the slot's height (never wider than
+    // ~0.9:1), type from the box, shrink until the content fits, hug it.
+    var W0 = el.clientWidth || 600, H0 = el.clientHeight || 800, pad = Math.round(Math.min(W0, H0) * 0.06);
+    // Shadows are sized from this margin so the slot (which clips) never cuts them.
+    root.style.setProperty('--pad', pad + 'px');
+    // A full-frame slot overhangs the frame (the camera layer is larger than
+    // the canvas; measured: cards 9px from the edge), so the margin is kept
+    // inside what is SEEN.
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var W = W0 - 2 * (pad + ox), H = H0 - 2 * (pad + oy);
+    var cw = Math.min(W, H * 0.9);
+    card.style.width = cw + 'px';
+    var u = Math.min(cw / 480, H / 640);
+    for (var i = 0; i < 30; i++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      if (card.scrollHeight <= H + 1 && card.scrollWidth <= card.clientWidth + 1) break;
+      u *= 0.95;
     }
 
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
-      tl.to(card, {
-        autoAlpha: 0, y: -20, scale: 0.97,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
+    // MOTION: card rises, head lines rise, the price counts up, the rule
+    // draws, features build in one at a time, the CTA lands last.
+    var AT = Number(data.at) || 0.2;
+    gsap.set(card, { autoAlpha: 0, y: 28 });
+    tl.to(card, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, AT);
+    var head = [q('.pc-head'), q('.pc-desc'), q('.pc-price-row')].filter(function (x) { return x.textContent; });
+    if (window.mpLineRise) mpLineRise(tl, head, AT + 0.2, { stagger: 0.1, duration: 0.4, rise: 12 });
+    var price = q('.pc-price');
+    if (window.mpCountUp && /\d/.test(price.textContent)) mpCountUp(tl, price, AT + 0.35, { to: String(data.price), duration: 0.9 });
+    gsap.set(q('.pc-rule'), { scaleX: 0 });
+    tl.to(q('.pc-rule'), { scaleX: 1, duration: 0.5, ease: 'power2.inOut' }, AT + 0.5);
+    var fAt = AT + 0.7, each = Math.min(0.14, 1.4 / Math.max(1, rows.length));
+    rows.forEach(function (r, k) {
+      gsap.set(r, { autoAlpha: 0, y: 10 });
+      tl.to(r, { autoAlpha: 1, y: 0, duration: 0.32, ease: 'power3.out' }, fAt + k * each);
+    });
+    var cta = q('.pc-cta');
+    if (cta.textContent) {
+      gsap.set(cta, { autoAlpha: 0, y: 10 });
+      tl.to(cta, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power3.out' }, fAt + rows.length * each + 0.1);
     }
-
+    if (data.exit === true && DUR > 2) tl.to(card, { autoAlpha: 0, y: -16, duration: 0.4, ease: 'power2.in' }, DUR - 0.5);
     return tl;
   }
 </script>

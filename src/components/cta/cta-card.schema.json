@@ -2,7 +2,7 @@
   "type": "cta-card",
   "label": "Cta Card",
   "category": "cta",
-  "description": "The closing call-to-action card: a headline, a line of support and a brand-colored button. Ends a film or a section.",
+  "description": "The closing call-to-action card at video scale: an eyebrow, a headline, a line of support, a brand pill button (a shine crosses it) with an optional secondary link and URL. Fills its slot; type sizes from the box. theme 'brand' paints the card in the primary color.",
   "data": {
     "headline": {
       "type": "string",
@@ -21,7 +21,61 @@
     },
     "button_color": {
       "type": "string",
-      "label": "Button background color",
+      "label": "Button color override (default: the brand primary)",
+      "optional": true
+    },
+    "eyebrow": {
+      "type": "string",
+      "label": "Small label above the headline",
+      "optional": true
+    },
+    "secondary_text": {
+      "type": "string",
+      "label": "Secondary action beside the button (e.g. 'See pricing')",
+      "optional": true
+    },
+    "url": {
+      "type": "string",
+      "label": "URL line under the button",
+      "optional": true
+    },
+    "arrow": {
+      "type": "boolean",
+      "label": "Arrow in the button (default true)",
+      "optional": true
+    },
+    "press_at": {
+      "type": "number",
+      "label": "Seconds: the button presses (pair with a cursor click)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Card theme: light | dark | brand (primary-colored card); omit to follow the scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark",
+        "brand"
+      ]
+    },
+    "surface": {
+      "type": "string",
+      "label": "'none' drops the card plate: type straight on the scene",
+      "optional": true,
+      "enum": [
+        "card",
+        "none"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene the card enters (default 0.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
       "optional": true
     }
   }
