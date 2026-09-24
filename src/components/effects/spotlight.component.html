@@ -2,114 +2,127 @@
   <div class="spotlight-effect">
     <div class="spotlight-glow"></div>
     <div class="spotlight-overlay"></div>
-    <svg class="noise-overlay" width="100%" height="100%">
-      <filter id="noiseFilter">
-        <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
-        <feColorMatrix type="saturate" values="0"/>
-      </filter>
-      <rect width="100%" height="100%" filter="url(#noiseFilter)" opacity="0.04"/>
-    </svg>
+    <div class="spot-hole"><div class="spot-pulse"></div></div>
   </div>
 </template>
 
 <style scoped>
-  .spotlight-effect {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .spotlight-glow {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-
-  .spotlight-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-  }
-
-  .noise-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 2;
-    pointer-events: none;
-    mix-blend-mode: overlay;
-    opacity: 0.04;
-  }
+  /* SPOTLIGHT: dim the frame and open a feathered window on the part of the
+     screen that matters. With `targets` the window GLIDES from target to
+     target on the words (rounded rect or circle, a thin accent ring, a pulse
+     on each arrival, an optional label chip). Without targets it is the
+     original round spotlight. */
+  .spotlight-effect, .spotlight-effect * { max-width: none; }
+  .spotlight-effect { width: 100%; height: 100%; position: relative; overflow: hidden; pointer-events: none; }
+  .spotlight-glow, .spotlight-overlay { position: absolute; inset: 0; pointer-events: none; }
+  .spot-hole { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; box-sizing: border-box; }
+  .spot-pulse { position: absolute; inset: 0; border-radius: inherit; border: 2px solid var(--mp-color-primary, #393bf5); opacity: 0; }
+  .spot-label { position: absolute; z-index: 2; left: 0; top: 0; visibility: hidden; white-space: nowrap;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); font-weight: 600; font-size: 22px; letter-spacing: -0.01em;
+    padding: 9px 16px; border-radius: 999px; color: #ffffff; background: var(--mp-color-primary, #393bf5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
+    data = data || {};
+    ctx = ctx || {};
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var DUR = ctx.duration || 5;
     var overlay = el.querySelector('.spotlight-overlay');
     var glow = el.querySelector('.spotlight-glow');
+    var targets = (Array.isArray(data.targets) ? data.targets : []).filter(Boolean);
 
-    var x = data.x || 50;
-    var y = data.y || 50;
-    var radius = data.radius || 20;
-    var color = data.color || 'rgba(167, 139, 250, 0.08)';
-
-    function setSpotlight(cx, cy, r) {
-      overlay.style.background = 'radial-gradient(circle at ' + cx + '% ' + cy + '%, ' +
-        'transparent ' + r + '%, rgba(0,0,0,0.7) ' + (r + 18) + '%)';
-      glow.style.background = 'radial-gradient(circle at ' + cx + '% ' + cy + '%, ' +
-        color + ' 0%, transparent ' + (r + 10) + '%)';
-    }
-
-    // Start with dark overlay, no glow
-    overlay.style.background = 'rgba(0,0,0,0.7)';
-    glow.style.background = 'transparent';
-
-    var state = { cx: x, cy: y, r: 0 };
-
-    // Smooth spotlight open
-    tl.to(state, {
-      r: radius,
-      duration: 0.9,
-      ease: 'power2.out',
-      onUpdate: function() {
-        setSpotlight(state.cx, state.cy, state.r);
+    if (!targets.length) {
+      // ---- The original round spotlight (unchanged look; the drift is now
+      // fixed, not random, so every render matches) ----
+      var x = data.x || 50, y = data.y || 50, radius = data.radius || 20;
+      var color = data.color || 'rgba(167, 139, 250, 0.08)';
+      var setSpotlight = function (cx, cy, r) {
+        overlay.style.background = 'radial-gradient(circle at ' + cx + '% ' + cy + '%, transparent ' + r + '%, rgba(0,0,0,0.7) ' + (r + 18) + '%)';
+        glow.style.background = 'radial-gradient(circle at ' + cx + '% ' + cy + '%, ' + color + ' 0%, transparent ' + (r + 10) + '%)';
+      };
+      overlay.style.background = 'rgba(0,0,0,0.7)';
+      glow.style.background = 'transparent';
+      var state = { cx: x, cy: y, r: 0 };
+      tl.to(state, { r: radius, duration: 0.9, ease: 'power2.out', onUpdate: function () { setSpotlight(state.cx, state.cy, state.r); } }, 0.3);
+      if (DUR > 4) {
+        tl.to(state, { cx: x + (x < 50 ? 5 : -5), cy: y + (y < 50 ? 3 : -3), duration: DUR - 2.5, ease: 'sine.inOut',
+          onUpdate: function () { setSpotlight(state.cx, state.cy, state.r); } }, 1.2);
       }
-    }, 0.3);
-
-    // Optional slow drift
-    if (ctx.duration > 4) {
-      var driftDuration = ctx.duration - 2.5;
-      tl.to(state, {
-        cx: x + (Math.random() > 0.5 ? 5 : -5),
-        cy: y + (Math.random() > 0.5 ? 3 : -3),
-        duration: driftDuration,
-        ease: 'sine.inOut',
-        onUpdate: function() {
-          setSpotlight(state.cx, state.cy, state.r);
-        }
-      }, 1.2);
+      if (DUR > 3) tl.to(state, { r: 0, duration: 0.6, ease: 'power2.in', onUpdate: function () { setSpotlight(state.cx, state.cy, state.r); } }, DUR - 0.7);
+      return tl;
     }
 
-    // Smooth close
-    if (ctx.duration > 3) {
-      tl.to(state, {
-        r: 0,
-        duration: 0.6,
-        ease: 'power2.in',
-        onUpdate: function() {
-          setSpotlight(state.cx, state.cy, state.r);
-        }
-      }, ctx.duration - 0.7);
-    }
+    // ---- The gliding window ----
+    var W = el.clientWidth || (ctx.canvas && ctx.canvas.width) || 1920;
+    var H = el.clientHeight || (ctx.canvas && ctx.canvas.height) || 1080;
+    var hole = el.querySelector('.spot-hole'), pulse = el.querySelector('.spot-pulse');
+    var DIM = Math.max(0, Math.min(0.92, num(data.dim, 0.58)));
+    var FEATHER = num(data.feather, 26);
+    var PAD = num(data.padding, 14);
+    var ACC = data.color || '';
+    // The dim IS the window's shadow: one huge spread, its blur feathers the
+    // window's edge. One element, so the whole look moves as one.
+    hole.style.boxShadow = '0 0 ' + FEATHER + 'px 300vmax rgba(8, 8, 16, ' + DIM + ')';
+    if (data.ring !== false) hole.style.border = '2px solid ' + (ACC || 'var(--mp-color-primary, #393bf5)');
+    if (ACC) pulse.style.borderColor = ACC;
 
+    var boxes = targets.map(function (t) {
+      var w = num(t.w, 20) / 100 * W + PAD * 2, h = num(t.h, 14) / 100 * H + PAD * 2;
+      var circle = t.shape === 'circle' || (data.shape === 'circle' && t.shape !== 'rect');
+      if (circle) { w = h = Math.max(w, h); }
+      return { at: num(t.at, 0.3), left: num(t.x, 50) / 100 * W - w / 2, top: num(t.y, 50) / 100 * H - h / 2, width: w, height: h,
+        borderRadius: circle ? w / 2 : num(t.radius, num(data.radius_px, 18)), label: t.label ? String(t.label) : '' };
+    }).sort(function (a, b) { return a.at - b.at; });
+
+    var GLIDE = num(data.glide, 0.7);
+    var first = boxes[0];
+    // Enter: the dim fades up as the window closes in onto the first target.
+    gsap.set(hole, { left: first.left - first.width * 0.3, top: first.top - first.height * 0.3, width: first.width * 1.6, height: first.height * 1.6,
+      borderRadius: first.borderRadius, autoAlpha: 0 });
+    tl.to(hole, { autoAlpha: 1, duration: 0.35, ease: 'power1.out' }, first.at);
+    tl.to(hole, { left: first.left, top: first.top, width: first.width, height: first.height, duration: 0.6, ease: 'power3.out' }, first.at);
+
+    function arrive(b, t) {
+      tl.fromTo(pulse, { scale: 1, opacity: 0.9 }, { scale: 1.18, opacity: 0, duration: 0.6, ease: 'power2.out', immediateRender: false }, t);
+    }
+    var labels = [];
+    function showLabel(b, t, until) {
+      if (!b.label) return;
+      var chip = document.createElement('div');
+      chip.className = 'spot-label';
+      chip.textContent = b.label;
+      if (ACC) chip.style.background = ACC;
+      el.querySelector('.spotlight-effect').appendChild(chip);
+      labels.push(chip);
+      // Under the window, or above it when the window sits low; centred on
+      // it, kept inside the frame.
+      var cw = chip.offsetWidth || b.label.length * 13 + 32, ch = chip.offsetHeight || 44;
+      var below = b.top + b.height + ch + 30 < H;
+      var lx = Math.max(12, Math.min(W - 12 - cw, b.left + b.width / 2 - cw / 2));
+      var ly = below ? b.top + b.height + 16 : b.top - ch - 16;
+      gsap.set(chip, { left: lx, top: ly });
+      tl.fromTo(chip, { autoAlpha: 0, y: below ? -8 : 8, scale: 0.92 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: false }, t);
+      if (until !== null) tl.to(chip, { autoAlpha: 0, duration: 0.18, ease: 'power1.in' }, until);
+    }
+    arrive(first, first.at + 0.5);
+    boxes.forEach(function (b, i) {
+      var next = boxes[i + 1];
+      if (i > 0) {
+        // Glide: starts on the word, lands a beat later.
+        tl.to(hole, { left: b.left, top: b.top, width: b.width, height: b.height, borderRadius: b.borderRadius, duration: GLIDE, ease: 'power3.inOut' }, b.at);
+        arrive(b, b.at + GLIDE - 0.05);
+      }
+      var landed = i > 0 ? b.at + GLIDE : first.at + 0.5;
+      showLabel(b, landed, next ? next.at : null);
+    });
+
+    var exitAt = data.exit_at !== undefined && data.exit_at !== null && data.exit_at !== '' ? num(data.exit_at, DUR - 0.5) : DUR - 0.5;
+    if (exitAt > first.at) {
+      tl.to([hole].concat(labels), { autoAlpha: 0, duration: 0.35, ease: 'power1.in' }, exitAt);
+    }
     return tl;
   }
 </script>

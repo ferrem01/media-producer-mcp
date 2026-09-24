@@ -2,11 +2,11 @@
   "type": "chat-simulator",
   "label": "Chat Simulator",
   "category": "mockups",
-  "description": "Slack/Discord/iMessage style chat interface. Messages appear one by one with typing indicators. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong. CAMERA ANCHORS: publishes data-anchor regions (composer, messages) -- target them from scene camera_moves as {anchor: 'componentId.anchorName'}; the ONE stage camera does all zooming (never zoom inside the component).",
+  "description": "Slack/Discord-style desktop chat window (dark workspace, channels, avatars). Messages appear one by one with typing indicators. For a PHONE iMessage/SMS conversation use imessage-thread instead -- this component draws the same desktop window for every platform value. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong. CAMERA ANCHORS: publishes data-anchor regions (composer, messages) -- target them from scene camera_moves as {anchor: 'componentId.anchorName'}; the ONE stage camera does all zooming (never zoom inside the component).",
   "data": {
     "platform": {
       "type": "string",
-      "label": "Platform",
+      "label": "Platform (styling hint; for a real iPhone Messages thread use the imessage-thread component)",
       "optional": true,
       "enum": [
         "slack",

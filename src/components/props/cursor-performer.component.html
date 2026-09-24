@@ -15,6 +15,13 @@
      doing this", a cast says "a team is already in here". Steal from the
      Remotion Shipper film; it belongs on takeover/social-proof beats. ── */
   .curp { position: absolute; inset: 0; pointer-events: none; }
+  /* pointer:"touch" -- a phone has no arrow: a contact dot lands, presses,
+     ripples and lifts (iOS screen-recording touches). */
+  .curp-touch { position: absolute; left: 0; top: 0; border-radius: 50%; visibility: hidden; z-index: 95;
+    background: rgba(255, 255, 255, 0.55); border: 2px solid rgba(20, 20, 30, 0.35);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 0 12px rgba(255, 255, 255, 0.6); }
+  .curp-ripple { position: absolute; left: 0; top: 0; border-radius: 50%; visibility: hidden; z-index: 94;
+    border: 3px solid rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 1px rgba(20, 20, 30, 0.25); }
 </style>
 
 <script>
@@ -37,6 +44,53 @@
     };
 
     var size = Number(data.size) > 0 ? Number(data.size) : 30;
+
+    if (data.pointer === 'touch') {
+      // ---- Touch: taps and drags, no hover travel. The finger is only
+      // visible while it is ON the glass. ----
+      var tpath = isPath(data.path) ? data.path : [{ at: 0.4, x: '50%', y: '60%', tap: true }];
+      // A fingertip, not a pointer: ~44pt on a phone screen.
+      var D = Math.round(size * 2.6);
+      var dot = document.createElement('div');
+      dot.className = 'curp-touch';
+      dot.style.width = dot.style.height = D + 'px';
+      dot.style.marginLeft = dot.style.marginTop = (-D / 2) + 'px';
+      if (isColor(data.color)) dot.style.borderColor = data.color;
+      host.appendChild(dot);
+      var W = host.clientWidth || el.clientWidth || 1080, H = host.clientHeight || el.clientHeight || 1920;
+      var px = function (v, total) { var s2 = String(v === undefined ? '50%' : v); return /%$/.test(s2) ? parseFloat(s2) / 100 * total : parseFloat(s2); };
+      tpath.forEach(function (pt, i) {
+        var at = Math.max(0, Number(pt.at) || 0);
+        var x = px(pt.x, W), y = px(pt.y, H);
+        var prev = tpath[i - 1];
+        if (pt.drag && prev) {
+          // Contact from the previous point to this one: a swipe.
+          var t0 = Math.max(0, Number(prev.at) || 0);
+          var px0 = px(prev.x, W), py0 = px(prev.y, H);
+          tl.set(dot, { x: px0, y: py0 }, t0);
+          tl.fromTo(dot, { autoAlpha: 0, scale: 1.3 }, { autoAlpha: 1, scale: 0.92, duration: 0.1, immediateRender: false }, t0);
+          tl.to(dot, { x: x, y: y, duration: Math.max(0.15, at - t0), ease: 'power2.inOut' }, t0 + 0.08);
+          tl.to(dot, { autoAlpha: 0, scale: 1.15, duration: 0.14, ease: 'power1.out' }, at + 0.1);
+          return;
+        }
+        if (!(pt.tap || pt.click)) return;
+        // Land, press, ripple, lift.
+        tl.set(dot, { x: x, y: y }, at - 0.12);
+        tl.fromTo(dot, { autoAlpha: 0, scale: 1.35 }, { autoAlpha: 1, scale: 1, duration: 0.12, ease: 'power2.out', immediateRender: false }, at - 0.12);
+        tl.to(dot, { scale: 0.82, duration: 0.08, ease: 'power2.in' }, at);
+        tl.to(dot, { scale: 1, duration: 0.12, ease: 'power2.out' }, at + 0.08);
+        var rip = document.createElement('div');
+        rip.className = 'curp-ripple';
+        rip.style.width = rip.style.height = D + 'px';
+        rip.style.marginLeft = rip.style.marginTop = (-D / 2) + 'px';
+        host.appendChild(rip);
+        gsap.set(rip, { x: x, y: y });
+        tl.fromTo(rip, { autoAlpha: 0.9, scale: 0.9 }, { autoAlpha: 0, scale: 2.6, duration: 0.5, ease: 'power2.out', immediateRender: false }, at + 0.02);
+        var hold = Math.max(0, Number(pt.hold) || 0);
+        tl.to(dot, { autoAlpha: 0, scale: 1.2, duration: 0.16, ease: 'power1.out' }, at + 0.22 + hold);
+      });
+      return tl;
+    }
 
     // The cast is the multi-cursor form; `path` alone stays the single
     // protagonist hand (every existing scene keeps working untouched).

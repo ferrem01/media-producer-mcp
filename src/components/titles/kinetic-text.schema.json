@@ -6,7 +6,7 @@
   "data": {
     "text": {
       "type": "string",
-      "label": "Text. Wrap key words in *stars* to accent them in brand color.",
+      "label": "Text. Wrap key words in *stars* to accent them in brand color. Write ~~old=>new~~ to strike a word and bring its replacement in after it (\"Reports take ~~hours=>minutes~~\"); ~~old~~ alone just strikes it.",
       "required": true
     },
     "color": {
@@ -112,6 +112,26 @@
       "label": "Motion blur on the travel: a word in flight streaks along its axis and lands sharp (assemble entrance, smear-up exit). Default true; false for a clean transform.",
       "optional": true,
       "default": true
+    },
+    "mark": {
+      "type": "string",
+      "label": "Hand-drawn mark on the *starred* words once the line lands: highlight | underline | scribble | circle | box",
+      "optional": true
+    },
+    "mark_at": {
+      "type": "number",
+      "label": "When the mark draws (seconds or \"@word\"; default just after the line lands)",
+      "optional": true
+    },
+    "mark_color": {
+      "type": "string",
+      "label": "Ink color for marks and strikes (default the brand secondary)",
+      "optional": true
+    },
+    "strike_at": {
+      "type": "number",
+      "label": "When the ~~strike~~ draws (seconds or \"@word\"; default just after the line lands)",
+      "optional": true
     }
   }
 }

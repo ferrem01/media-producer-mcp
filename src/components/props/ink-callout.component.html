@@ -1,0 +1,166 @@
+<template>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap">
+  <div class="icl-root">
+    <svg class="icl-ink" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+</template>
+
+<style scoped>
+  /* INK CALLOUT: the explainer's hand-drawn annotation over a product
+     screen -- a marker note ("this is where it happens") writes on, an arrow
+     swoops from it to the thing, and the thing gets circled / boxed /
+     underlined. Several callouts, each on its word. A transparent overlay:
+     targets are % of the frame, so it points at any UI under it. */
+  .icl-root, .icl-root * { max-width: none; }
+  .icl-root { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .icl-ink { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+  .icl-ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .icl-label { position: absolute; white-space: nowrap; font-family: 'Caveat', 'Segoe Print', cursive; font-weight: 700;
+    line-height: 1; transform-origin: 0 50%; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    ctx = ctx || {};
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var DUR = ctx.duration || 5;
+    var root = el.querySelector('.icl-root'), svg = el.querySelector('.icl-ink');
+    var W = el.clientWidth || (ctx.canvas && ctx.canvas.width) || 1920;
+    var H = el.clientHeight || (ctx.canvas && ctx.canvas.height) || 1080;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    var S = Math.min(W, H) / 1080;
+    var INK = data.color || 'var(--mp-color-secondary, var(--mp-color-primary, #e8590c))';
+    var STROKE = num(data.stroke, 5) * S;
+    var FS = num(data.font_size, 58) * S;
+    var NS = 'http://www.w3.org/2000/svg';
+    var seed = 1;
+    var rnd = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+    function pen(d, w) {
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', d);
+      p.setAttribute('stroke', INK);
+      p.setAttribute('stroke-width', (w || STROKE).toFixed(1));
+      svg.appendChild(p);
+      var len = 400;
+      try { len = p.getTotalLength() || len; } catch (e) {}
+      // Hidden until its stroke starts: a round cap on an empty dash prints a dot.
+      gsap.set(p, { strokeDasharray: len + 2, strokeDashoffset: len + 2, opacity: 0 });
+      return p;
+    }
+    function draw(p, t, dur, ease) {
+      tl.set(p, { opacity: 1 }, t);
+      tl.to(p, { strokeDashoffset: 0, duration: dur, ease: ease || 'power2.inOut' }, t);
+    }
+    var f = function (v) { return v.toFixed(1); };
+
+    var list = (Array.isArray(data.callouts) ? data.callouts : []).filter(Boolean);
+    var all = [], placed = [];
+    var KEEP = data.keep === true;
+    list.forEach(function (c, i) {
+      seed = 7 + i * 131;
+      var at = num(c.at, 0.4 + i * 1.2);
+      var t = c.target || {};
+      var tx = num(t.x, 50) / 100 * W, ty = num(t.y, 50) / 100 * H;
+      var tw = num(t.w, 12) / 100 * W, th = num(t.h, 8) / 100 * H;
+      var mark = String(c.mark || 'circle').toLowerCase();
+      var parts = [];
+
+      // ---- The label: marker handwriting, placed off the target toward
+      // the roomier side unless told where ----
+      var lab = document.createElement('div');
+      lab.className = 'icl-label';
+      lab.textContent = String(c.label || '');
+      lab.style.fontSize = FS.toFixed(1) + 'px';
+      lab.style.color = INK;
+      root.appendChild(lab);
+      var lw = lab.offsetWidth || String(c.label || '').length * FS * 0.42, lh = lab.offsetHeight || FS;
+      var lx, ly;
+      if (c.label_at && c.label_at.x !== undefined) {
+        lx = num(c.label_at.x, 50) / 100 * W - lw / 2; ly = num(c.label_at.y, 20) / 100 * H - lh / 2;
+      } else {
+        var dirX = tx < W / 2 ? 1 : -1, dirY = ty > H * 0.35 ? -1 : 1;
+        lx = tx + dirX * (tw / 2 + W * 0.09) - (dirX < 0 ? lw : 0);
+        ly = ty + dirY * (th / 2 + H * 0.12) - lh / 2;
+      }
+      lx = Math.max(W * 0.02, Math.min(W * 0.98 - lw, lx));
+      ly = Math.max(H * 0.03, Math.min(H * 0.97 - lh, ly));
+      // Never on top of a note that is still up: step clear of it.
+      for (var tries = 0; tries < 8; tries++) {
+        var hit = placed.filter(function (r) { return r.alive && lx < r.x + r.w + 20 && lx + lw + 20 > r.x && ly < r.y + r.h + 10 && ly + lh + 10 > r.y; })[0];
+        if (!hit) break;
+        ly = hit.y + hit.h + 14 * S;
+        if (ly + lh > H * 0.97) ly = Math.max(H * 0.03, hit.y - lh - 14 * S);
+      }
+      var tilt = (rnd() - 0.5) * 6;
+      gsap.set(lab, { left: lx, top: ly, rotation: tilt, clipPath: 'inset(-20% 100% -20% -2%)' });
+      tl.to(lab, { clipPath: 'inset(-20% -2% -20% -2%)', duration: Math.min(0.7, 0.25 + String(c.label || '').length * 0.025), ease: 'none' }, at);
+      parts.push(lab);
+
+      // ---- The arrow: from the label's nearest edge to the target's edge,
+      // bowed, with a two-stroke head ----
+      var lcx = lx + lw / 2, lcy = ly + lh / 2;
+      var ux = tx - lcx, uy = ty - lcy, ul = Math.sqrt(ux * ux + uy * uy) || 1;
+      ux /= ul; uy /= ul;
+      var sx = lcx + ux * (Math.abs(ux) * lw / 2 + Math.abs(uy) * lh / 2 + 10 * S);
+      var sy = lcy + uy * (Math.abs(ux) * lw / 2 + Math.abs(uy) * lh / 2 + 10 * S);
+      var pad = mark === 'none' || mark === 'arrow' ? 0 : 14 * S;
+      var rx = tw / 2 + pad, ry = th / 2 + pad;
+      var ex = tx - ux * rx * 1.02, ey = ty - uy * ry * 1.02;
+      var dx = ex - sx, dy = ey - sy, dl = Math.sqrt(dx * dx + dy * dy) || 1;
+      var bow = (i % 2 ? -1 : 1) * dl * (0.18 + rnd() * 0.1);
+      var cx = (sx + ex) / 2 - dy / dl * bow, cy = (sy + ey) / 2 + dx / dl * bow;
+      var shaft = pen('M ' + f(sx) + ' ' + f(sy) + ' Q ' + f(cx) + ' ' + f(cy) + ' ' + f(ex) + ' ' + f(ey));
+      var ang = Math.atan2(ey - cy, ex - cx), hl = 26 * S;
+      var head = pen('M ' + f(ex - Math.cos(ang - 0.5) * hl) + ' ' + f(ey - Math.sin(ang - 0.5) * hl) + ' L ' + f(ex) + ' ' + f(ey)
+        + ' L ' + f(ex - Math.cos(ang + 0.5) * hl) + ' ' + f(ey - Math.sin(ang + 0.5) * hl));
+      var arrowAt = at + 0.2;
+      draw(shaft, arrowAt, Math.min(0.55, 0.22 + dl / W * 0.6), 'power2.in');
+      draw(head, arrowAt + Math.min(0.55, 0.22 + dl / W * 0.6), 0.12, 'none');
+      parts.push(shaft, head);
+
+      // ---- The mark on the target ----
+      var mAt = arrowAt + 0.45;
+      var m = null;
+      if (mark === 'circle') {
+        var a0 = Math.atan2(sy - ty, sx - tx) + 0.4, d = '', steps = 28;
+        for (var k = 0; k <= steps + 3; k++) {
+          var a = a0 + k / steps * Math.PI * 2 + 0.25;
+          var wob = 1 + (rnd() - 0.5) * 0.06 + (k > steps ? 0.08 : 0);
+          d += (k ? ' L ' : 'M ') + f(tx + Math.cos(a) * rx * wob) + ' ' + f(ty + Math.sin(a) * ry * wob);
+        }
+        m = pen(d);
+        draw(m, mAt, 0.55, 'power1.inOut');
+      } else if (mark === 'box') {
+        var j = function () { return (rnd() - 0.5) * 8 * S; };
+        m = pen('M ' + f(tx - rx + j()) + ' ' + f(ty - ry + j()) + ' L ' + f(tx + rx + j()) + ' ' + f(ty - ry + j()) + ' L ' + f(tx + rx + j()) + ' ' + f(ty + ry + j())
+          + ' L ' + f(tx - rx + j()) + ' ' + f(ty + ry + j()) + ' L ' + f(tx - rx + j()) + ' ' + f(ty - ry - 6 * S));
+        draw(m, mAt, 0.55, 'power1.inOut');
+      } else if (mark === 'underline') {
+        m = pen('M ' + f(tx - tw / 2) + ' ' + f(ty + th / 2 + 8 * S) + ' Q ' + f(tx) + ' ' + f(ty + th / 2 + 16 * S) + ' ' + f(tx + tw / 2 + 6 * S) + ' ' + f(ty + th / 2 + 4 * S));
+        draw(m, mAt, 0.35, 'power2.out');
+      }
+      if (m) parts.push(m);
+
+      // One note at a time by default: it clears as the next one starts.
+      var next = list[i + 1];
+      var until = c.until !== undefined && c.until !== null && c.until !== '' ? num(c.until, null)
+        : (!KEEP && next ? num(next.at, at + 1.2) - 0.05 : null);
+      placed.push({ x: lx, y: ly, w: lw, h: lh, alive: until === null });
+      if (until !== null && until > at) tl.to(parts, { opacity: 0, duration: 0.25, ease: 'power1.in' }, until);
+      all = all.concat(parts);
+    });
+
+    // The hand-drawn boil: the ink shimmers on the cut-out frame rate, so
+    // it reads drawn, not vector.
+    if (data.boil !== false && typeof mpInkBoil === 'function') mpInkBoil(tl, [svg], { duration: DUR, scale: 0.9, seed: 11 });
+
+    var exitAt = data.exit_at !== undefined && data.exit_at !== null && data.exit_at !== '' ? num(data.exit_at, DUR - 0.4) : DUR - 0.4;
+    if (all.length && exitAt > 0) tl.to(all, { opacity: 0, duration: 0.3, ease: 'power1.in' }, exitAt);
+    return tl;
+  }
+</script>

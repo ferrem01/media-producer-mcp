@@ -1,0 +1,18 @@
+{
+  "type": "imessage-thread",
+  "label": "iMessage Thread",
+  "category": "mockups",
+  "description": "A real iPhone Messages conversation, fitted to its box (use full-frame on 9x16, or inside a phone): blue (or green SMS) bubbles on the right, grey on the left, tails on the last bubble of each run, big standalone emoji, photos, link-preview cards, tapback reactions, typing dots before each reply, 'Delivered' under your latest, and the thread scrolls to keep the newest message above the bar. keyboard:true raises the keyboard and TYPES your messages key by key before sending them -- the 'customer texts you' / 'ask the agent' hook.",
+  "data": {
+    "messages": { "type": "array", "label": "Messages in order: { from: \"me\" | \"them\", text, emoji (big, no bubble), image (URL or true for a placeholder), link: { title, domain, image }, reaction (a tapback like \"❤️\" or \"‼️\"), reaction_at, at (seconds or \"@word\"; default in sequence) }", "required": true },
+    "contact": { "type": "object", "label": "{ name, initials, photo (URL) } shown in the header", "optional": true },
+    "keyboard": { "type": "boolean", "label": "Raise the keyboard and type your side key by key (default off)", "optional": true },
+    "type_speed": { "type": "number", "label": "Typing speed, characters per second", "optional": true, "default": 16 },
+    "service": { "type": "string", "label": "\"imessage\" (blue, default) or \"sms\" (green)", "optional": true },
+    "theme": { "type": "string", "label": "\"light\" (default) or \"dark\"", "optional": true },
+    "timestamp": { "type": "string", "label": "Day label above the thread (default \"Today\"); false hides it", "optional": true },
+    "time": { "type": "string", "label": "Time beside the day label", "optional": true, "default": "9:41 AM" },
+    "start_at": { "type": "number", "label": "When the first message lands (default 0.5)", "optional": true },
+    "status_bar": { "type": "boolean", "label": "Show the 9:41 status bar (default on)", "optional": true }
+  }
+}
