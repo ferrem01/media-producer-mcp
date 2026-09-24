@@ -33,7 +33,7 @@ describe("fitBoxFor", () => {
     expect(f.h).toBeGreaterThanOrEqual(600);
   });
   it("leaves unlisted types and data.fit === false alone", () => {
-    expect(fitBoxFor({ type: "quotient-campaign" }, C)).toBeNull();
+    expect(fitBoxFor({ type: "quotient-home" }, C)).toBeNull();
     expect(fitBoxFor({ type: "progress-bar", data: { fit: false }, position: { x: 0, y: 0, width: "90%", height: "90%" } }, C)).toBeNull();
   });
 });
