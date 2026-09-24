@@ -1,0 +1,77 @@
+{
+  "type": "screen-carousel",
+  "label": "Screen Carousel",
+  "category": "media",
+  "description": "A product flow as a rail of 2-6 app screens: the centre screen primary, neighbours receded to the sides; on each cue the rail advances one screen and the caption under it swaps (title + line), with progress dots. Screens sit in a browser window, a phone (auto on a tall box) or bare. For 'step 1, step 2, step 3' walkthroughs.",
+  "data": {
+    "screens": {
+      "type": "array",
+      "label": "Screens in order: {src, title, caption, url, at}",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "Screenshot / image URL (brand-kit screenshot, upload, capture)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Feature name, shown as the caption headline"
+          },
+          "caption": {
+            "type": "string",
+            "description": "One line under the title"
+          },
+          "url": {
+            "type": "string",
+            "description": "Address shown in the browser bar"
+          },
+          "at": {
+            "type": "number",
+            "description": "Seconds this screen takes over (default: evenly through the scene)"
+          }
+        }
+      }
+    },
+    "device": {
+      "type": "string",
+      "label": "browser | phone | none (default: phone on a tall box, else browser)",
+      "optional": true,
+      "enum": [
+        "browser",
+        "phone",
+        "none"
+      ]
+    },
+    "url": {
+      "type": "string",
+      "label": "Browser-bar address for every screen",
+      "optional": true
+    },
+    "aspect": {
+      "type": "number",
+      "label": "Screen width/height (default 16:10.5 browser, 9:19.5 phone)",
+      "optional": true
+    },
+    "dots": {
+      "type": "boolean",
+      "label": "Progress dots (default true)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Ink theme; omit to follow the measured scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}

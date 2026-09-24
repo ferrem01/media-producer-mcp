@@ -1,0 +1,81 @@
+{
+  "type": "screen-swap",
+  "label": "Screen Swap",
+  "category": "media",
+  "description": "One pinned product window that swaps through feature screens while a list beside it walks the features: the active feature in full ink with a bar filling for its time on screen, the rest quiet. On a tall frame the list collapses to the active feature under the window. For 'one product, four features' tours.",
+  "data": {
+    "screens": {
+      "type": "array",
+      "label": "Features in order: {src, title, caption, at}",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "Screenshot / image URL (brand-kit screenshot, upload, capture)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Feature name, shown as the caption headline"
+          },
+          "caption": {
+            "type": "string",
+            "description": "One line under the title"
+          },
+          "url": {
+            "type": "string",
+            "description": "Address shown in the browser bar"
+          },
+          "at": {
+            "type": "number",
+            "description": "Seconds this screen takes over (default: evenly through the scene)"
+          }
+        }
+      }
+    },
+    "device": {
+      "type": "string",
+      "label": "browser (default) | phone | none (bare screenshot)",
+      "optional": true,
+      "enum": [
+        "browser",
+        "phone",
+        "none"
+      ]
+    },
+    "list_side": {
+      "type": "string",
+      "label": "left (default) | right -- where the feature list sits",
+      "optional": true,
+      "enum": [
+        "left",
+        "right"
+      ]
+    },
+    "url": {
+      "type": "string",
+      "label": "Browser-bar address",
+      "optional": true
+    },
+    "aspect": {
+      "type": "number",
+      "label": "Screen width/height (default 16:10.5)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Ink theme; omit to follow the measured scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}

@@ -6,6 +6,42 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Product flow and before/after (HyperFrames audit, batches 3 and 4)
+
+Three new media components, for the audit's highest-value gaps that the ads
+would use:
+
+- **before-after-wipe** covers the audit's Before After Wipe and Comparison
+  Split.
+  - Two full-bleed layers, with a divider that sweeps most of the way to
+    show the after, then settles at `split`.
+  - A knob sits on the line and each side has a label chip that fades as
+    its side closes.
+  - The layers are images (`before_src` / `after_src`) or statements:
+    `before_text` on a muted grey ground vs `after_text` on the brand
+    ground.
+  - `sweeps: [{at, to, duration}]` scripts the divider;
+    `direction: vertical` is supported.
+- **screen-carousel** (Screen Flow Carousel): a rail of 2-6 app screens.
+  - The centre screen is primary; its neighbours recede, desaturated.
+  - On each cue (`screens[i].at`, else evenly) the rail advances one screen
+    while the caption under it swaps, with progress dots.
+  - Screens sit in a browser window, a phone (auto on a tall box), or bare.
+- **screen-swap** (Sticky Mock Swap): one pinned window that cross-fades
+  through feature screens.
+  - A feature list beside it lights the active feature, and its bar fills
+    for the feature's time on screen.
+  - On a tall frame the list collapses to the active feature, centred under
+    the window.
+
+All three render from ONE timeline `onUpdate` (the single-renderer rule), so
+a seek in any direction lands on the same frame. All are laid out inside the
+visible frame, and their type follows the frame, not the screen.
+
+Test: `test/product-flow.test.ts`.
+
+---
+
 ## 2026-09-24 — Component polish audit, part 5: floating-pills, funnel-chart, flowchart
 
 The three most-used legacy components left after part 4 (18, 13 and 5 of

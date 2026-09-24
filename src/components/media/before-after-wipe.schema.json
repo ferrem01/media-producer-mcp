@@ -1,0 +1,95 @@
+{
+  "type": "before-after-wipe",
+  "label": "Before / After Wipe",
+  "category": "media",
+  "description": "Two full-bleed layers -- the old way and the new way -- and a divider that sweeps across and rests at a split, a knob on the line and a label on each side. Layers are images (screenshots, photos: before_src / after_src) or statements (before_text on a muted grey ground vs after_text on the brand ground). Script the divider with sweeps.",
+  "data": {
+    "before_src": {
+      "type": "string",
+      "label": "Before image URL",
+      "optional": true
+    },
+    "after_src": {
+      "type": "string",
+      "label": "After image URL",
+      "optional": true
+    },
+    "before_text": {
+      "type": "string",
+      "label": "Before statement (used when there is no image), e.g. '14 tabs, 6 tools'",
+      "optional": true
+    },
+    "after_text": {
+      "type": "string",
+      "label": "After statement, e.g. 'One prompt'",
+      "optional": true
+    },
+    "before_label": {
+      "type": "string",
+      "label": "Chip on the before side (default 'Before'; '' hides)",
+      "optional": true
+    },
+    "after_label": {
+      "type": "string",
+      "label": "Chip on the after side (default 'After'; '' hides)",
+      "optional": true
+    },
+    "split": {
+      "type": "number",
+      "label": "Where the divider rests, 0..1 from the before edge (default 0.5)",
+      "optional": true
+    },
+    "direction": {
+      "type": "string",
+      "label": "horizontal (left/right, default) | vertical (top/bottom)",
+      "optional": true,
+      "enum": [
+        "horizontal",
+        "vertical"
+      ]
+    },
+    "sweep_at": {
+      "type": "number",
+      "label": "Seconds the sweep starts (default just after entry)",
+      "optional": true
+    },
+    "sweeps": {
+      "type": "array",
+      "label": "Script the divider: [{at, to (0..1), duration}] -- overrides the default reveal-then-settle",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "to": {
+            "type": "number"
+          },
+          "duration": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "fit": {
+      "type": "string",
+      "label": "cover (default) | contain",
+      "optional": true,
+      "enum": [
+        "cover",
+        "contain"
+      ]
+    },
+    "bleed": {
+      "type": "boolean",
+      "label": "Fill the slot edge to edge (no rounded frame)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}
