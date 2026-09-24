@@ -2,7 +2,7 @@
   "type": "phone-lockscreen",
   "label": "Phone lock screen — notifications",
   "category": "mockups",
-  "description": "A phone's lock screen, full-frame on a 9x16 (designed at 1080 wide, scaled to the box): date + big clock, then NOTIFICATIONS that land one by one (newest on top, older ones slide down -- the way a phone stacks them), and an optional STAMP that slams onto the newest one with a jolt. The consequence beat: show what the viewer's customer actually receives -- 'CRM: Deal moved -> Proposal' lands, then 'Mail: Welcome! Start your free trial' lands under... and the stamp says WRONG EMAIL. Each notification's `at` and the stamp's `at` take word anchors (\"@tool\") so they land on the spoken words. Pair each landing with a 'ding' and the stamp with a 'thud' on the film's sound effects.",
+  "description": "A phone's lock screen, full-frame on a 9x16 (designed at 1080 wide, scaled to the box): date + big clock, then NOTIFICATIONS that land one by one (newest on top, older ones slide down -- the way a phone stacks them), and an optional STAMP that slams onto the newest one with a jolt. The consequence beat: show what the viewer's customer actually receives -- 'CRM: Deal moved -> Proposal' lands, then 'Mail: Welcome! Start your free trial' lands under... and the stamp says WRONG EMAIL. Each notification's `at` and the stamp's `at` take word anchors (\"@tool\") so they land on the spoken words. Pair each landing with a 'ding' and the stamp with a 'thud' on the film's sound effects. Two phones side by side (each ~45% wide) compare two experiences of the same moment: give each a `label` (\"Company A\" / \"Company B\").",
   "data": {
     "time": {
       "type": "string",
@@ -15,6 +15,18 @@
       "label": "Date line",
       "optional": true,
       "placeholder": "Wednesday, September 23"
+    },
+    "label": {
+      "type": "string",
+      "label": "Big label over the phone (whose phone: \"Company A\") -- for two phones side by side",
+      "optional": true,
+      "placeholder": "Company A"
+    },
+    "label_color": {
+      "type": "string",
+      "label": "Label color",
+      "optional": true,
+      "placeholder": "#ffffff"
     },
     "notifications": {
       "type": "array",
