@@ -1,0 +1,15 @@
+{
+  "type": "ink-callout",
+  "label": "Ink Callout",
+  "category": "props",
+  "description": "The explainer's hand-drawn annotation over a product screen: a marker note writes on (\"this is where it happens\"), an arrow swoops from it to the thing, and the thing gets circled, boxed or underlined -- each callout on its word, the ink gently boiling like it was drawn. A transparent full-frame overlay ABOVE the screen it points at: targets are % of the frame.",
+  "data": {
+    "callouts": { "type": "array", "label": "Callouts: { at (seconds or \"@word\"), label (short note), target: { x, y (CENTRE, % of frame), w, h (% of frame) }, mark (\"circle\" | \"box\" | \"underline\" | \"arrow\" = arrow only), label_at: { x, y } (optional; default placed off the target toward open space), until (optional: when this one fades) }", "optional": true },
+    "keep": { "type": "boolean", "label": "Keep every callout up (default: each one clears as the next begins)", "optional": true },
+    "color": { "type": "string", "label": "Ink color (default the brand secondary)", "optional": true },
+    "font_size": { "type": "number", "label": "Handwriting size in px at 1080p", "optional": true, "default": 58 },
+    "stroke": { "type": "number", "label": "Pen width in px at 1080p", "optional": true, "default": 5 },
+    "boil": { "type": "boolean", "label": "Hand-drawn shimmer on the ink (default on)", "optional": true },
+    "exit_at": { "type": "number", "label": "When all the ink fades (seconds or \"@word\"; default near the end)", "optional": true }
+  }
+}

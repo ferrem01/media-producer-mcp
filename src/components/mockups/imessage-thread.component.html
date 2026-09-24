@@ -1,0 +1,294 @@
+<template>
+  <div class="imt-root">
+    <div class="imt-screen">
+      <div class="imt-status"><span class="imt-clock">9:41</span><span class="imt-icons"><i class="imt-sig"></i><i class="imt-wifi"></i><i class="imt-bat"></i></span></div>
+      <div class="imt-head">
+        <div class="imt-back">&#x2039;</div>
+        <div class="imt-contact"><div class="imt-avatar"></div><div class="imt-name"></div></div>
+      </div>
+      <div class="imt-view"><div class="imt-col"></div></div>
+      <div class="imt-bar">
+        <div class="imt-plus">+</div>
+        <div class="imt-field"><span class="imt-draft"></span><span class="imt-caret"></span><span class="imt-ph">iMessage</span></div>
+        <div class="imt-send">&#x2191;</div>
+      </div>
+      <div class="imt-kb"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* IMESSAGE THREAD: a real phone conversation, drawn at iPhone scale
+     (390pt wide) and fitted to its box. Bubbles group with a tail on the
+     last of each run; big emoji stand alone; images and link cards; typing
+     dots before their replies; "Delivered" under your latest; a tapback
+     reaction; the thread scrolls to keep the newest message above the bar.
+     keyboard:true raises the keyboard and TYPES your side, key by key. */
+  .imt-root, .imt-root * { max-width: none; box-sizing: border-box; }
+  .imt-root { position: absolute; inset: 0; overflow: hidden; }
+  .imt-screen { position: absolute; left: 0; top: 0; width: 390px; transform-origin: 0 0; overflow: hidden;
+    font-family: -apple-system, 'SF Pro Text', system-ui, 'Inter', sans-serif; -webkit-font-smoothing: antialiased;
+    background: #ffffff; color: #000000; display: flex; flex-direction: column; }
+  .imt-dark .imt-screen { background: #000000; color: #ffffff; }
+  .imt-status { height: 50px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 14px 32px 0 40px;
+    font-weight: 600; font-size: 17px; }
+  .imt-icons { display: flex; gap: 6px; align-items: center; }
+  .imt-icons i { display: block; background: currentColor; border-radius: 2px; }
+  .imt-sig { width: 18px; height: 11px; clip-path: polygon(0 100%, 100% 0, 100% 100%); }
+  .imt-wifi { width: 16px; height: 11px; clip-path: polygon(50% 100%, 0 25%, 20% 0, 80% 0, 100% 25%); border-radius: 50% 50% 0 0 !important; }
+  .imt-bat { width: 26px; height: 12px; border-radius: 3.5px !important; }
+  .imt-head { flex: none; height: 96px; position: relative; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 8px;
+    background: rgba(249, 249, 249, 0.94); border-bottom: 0.5px solid rgba(0, 0, 0, 0.18); }
+  .imt-dark .imt-head { background: rgba(22, 22, 24, 0.94); border-bottom-color: rgba(255, 255, 255, 0.14); }
+  .imt-back { position: absolute; left: 12px; top: 18px; font-size: 44px; line-height: 1; color: #0a84ff; font-weight: 300; }
+  .imt-contact { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .imt-avatar { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 600; font-size: 21px; background: linear-gradient(180deg, #a5abb8, #858994); background-size: cover; background-position: center; }
+  .imt-name { font-size: 12px; font-weight: 500; opacity: 0.92; }
+  .imt-name::after { content: ' \203A'; opacity: 0.5; }
+  .imt-view { flex: 1; position: relative; overflow: hidden; }
+  .imt-col { position: absolute; left: 0; right: 0; top: 0; padding: 14px 16px 10px; display: flex; flex-direction: column; }
+  .imt-ts { align-self: center; font-size: 11px; color: #8a8a8e; margin: 4px 0 10px; font-weight: 500; }
+  .imt-ts b { font-weight: 600; }
+  .imt-msg { display: flex; flex-direction: column; margin-top: 2px; }
+  .imt-msg.gap { margin-top: 12px; }
+  .imt-msg.me { align-items: flex-end; }
+  .imt-msg.them { align-items: flex-start; }
+  .imt-b { position: relative; max-width: 74%; padding: 8px 13px 9px; border-radius: 19px; font-size: 17px; line-height: 1.26; letter-spacing: -0.2px;
+    word-wrap: break-word; transform-origin: 100% 100%; }
+  .imt-msg.them .imt-b { transform-origin: 0 100%; }
+  .me .imt-b { background: #0b84fe; color: #fff; }
+  .imt-sms .me .imt-b { background: #34c759; }
+  .them .imt-b { background: #e9e9eb; color: #000; }
+  .imt-dark .them .imt-b { background: #26252a; color: #fff; }
+  /* The tail: only on the last bubble of a run. */
+  .imt-b.tail::before, .imt-b.tail::after { content: ''; position: absolute; bottom: 0; height: 20px; }
+  .me .imt-b.tail::before { right: -7px; width: 20px; background: inherit; border-bottom-left-radius: 16px 14px; }
+  .me .imt-b.tail::after { right: -26px; width: 26px; background: var(--imt-bg, #fff); border-bottom-left-radius: 10px; }
+  .them .imt-b.tail::before { left: -7px; width: 20px; background: inherit; border-bottom-right-radius: 16px 14px; }
+  .them .imt-b.tail::after { left: -26px; width: 26px; background: var(--imt-bg, #fff); border-bottom-right-radius: 10px; }
+  .imt-b.emoji { background: none !important; font-size: 52px; line-height: 1.08; padding: 0 2px; }
+  .imt-b.emoji::before, .imt-b.emoji::after { display: none; }
+  .imt-b.media { padding: 0; overflow: hidden; background: none; }
+  .imt-img { width: 230px; height: 170px; border-radius: 18px; background: linear-gradient(135deg, #c7d2fe, #fbcfe8) center/cover; }
+  .imt-link { width: 262px; border-radius: 18px; overflow: hidden; background: #e9e9eb; color: #000; }
+  .imt-dark .imt-link { background: #26252a; color: #fff; }
+  .imt-link-img { height: 138px; background: linear-gradient(135deg, #393bf5, #9b8cff) center/cover; }
+  .imt-link-t { padding: 8px 13px 1px; font-size: 15px; font-weight: 600; line-height: 1.25; }
+  .imt-link-d { padding: 0 13px 9px; font-size: 13px; color: #8a8a8e; }
+  .imt-react { position: absolute; top: -18px; width: 34px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; background: #e9e9eb; border: 2.5px solid var(--imt-bg, #fff); color: #0b84fe; }
+  .me .imt-react { left: -20px; }
+  .them .imt-react { right: -20px; background: #0b84fe; color: #fff; }
+  .imt-rcpt { font-size: 11px; color: #8a8a8e; font-weight: 500; margin: 3px 4px 0 0; height: 0; opacity: 0; }
+  .imt-typing { display: flex; gap: 4px; padding: 13px 15px; background: #e9e9eb; border-radius: 19px; }
+  .imt-dark .imt-typing { background: #26252a; }
+  .imt-typing i { width: 8px; height: 8px; border-radius: 50%; background: #9b9ba0; display: block; }
+  .imt-bar { flex: none; position: relative; display: flex; align-items: flex-end; gap: 8px; padding: 6px 12px 10px; }
+  .imt-plus { width: 34px; height: 34px; border-radius: 50%; background: #e9e9eb; color: #8a8a8e; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 300; }
+  .imt-dark .imt-plus { background: #26252a; }
+  .imt-field { flex: 1; min-height: 36px; border: 1px solid #c6c6c8; border-radius: 18px; padding: 7px 40px 7px 13px; font-size: 17px; position: relative; line-height: 1.26; }
+  .imt-dark .imt-field { border-color: #3a3a3c; }
+  .imt-ph { color: #b8b8bc; }
+  .imt-caret { display: inline-block; width: 2px; height: 20px; background: #0a84ff; vertical-align: -4px; margin-left: 1px; opacity: 0; }
+  .imt-send { position: absolute; right: 16px; bottom: 13px; width: 29px; height: 29px; border-radius: 50%; background: #0b84fe; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; transform: scale(0); }
+  .imt-sms .imt-send { background: #34c759; }
+  .imt-kb { flex: none; height: 0; overflow: hidden; background: #d1d3d9; padding: 8px 3px 0; }
+  .imt-dark .imt-kb { background: #2b2b2e; }
+  .imt-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 11px; }
+  .imt-key { height: 43px; min-width: 32px; flex: 0 0 32px; border-radius: 5px; background: #fff; color: #000; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); }
+  .imt-dark .imt-key { background: #6b6b6e; color: #fff; }
+  .imt-key.wide { flex: 0 0 43px; background: #acb0bb; font-size: 16px; }
+  .imt-dark .imt-key.wide { background: #464649; }
+  .imt-key.space { flex: 0 0 190px; font-size: 16px; }
+  .imt-key.ret { flex: 0 0 88px; background: #acb0bb; font-size: 16px; }
+  .imt-dark .imt-key.ret { background: #464649; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    ctx = ctx || {};
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var DUR = ctx.duration || 8;
+    var root = el.querySelector('.imt-root'), scr = el.querySelector('.imt-screen');
+    var DARK = data.theme === 'dark';
+    if (DARK) root.classList.add('imt-dark');
+    if (data.service === 'sms') root.classList.add('imt-sms');
+    scr.style.setProperty('--imt-bg', DARK ? '#000000' : '#ffffff');
+
+    // ---- Fit: iPhone points (390 wide), as tall as the box allows ----
+    var BW = el.clientWidth || 1080, BH = el.clientHeight || 1920;
+    var K = BW / 390;
+    var SH = BH / K;
+    scr.style.height = SH + 'px';
+    scr.style.transform = 'scale(' + K + ')';
+    if (data.status_bar === false) el.querySelector('.imt-status').style.display = 'none';
+
+    // ---- Contact ----
+    var c = data.contact || {};
+    var cname = String(c.name || 'Sarah');
+    el.querySelector('.imt-name').textContent = cname;
+    var av = el.querySelector('.imt-avatar');
+    if (c.photo) av.style.backgroundImage = 'url("' + String(c.photo).replace(/"/g, '%22') + '")';
+    else av.textContent = String(c.initials || cname.split(/\s+/).filter(function (w) { return /^[A-Za-z0-9]/.test(w); }).map(function (w) { return w[0]; }).join('').slice(0, 2)).toUpperCase();
+
+    // ---- Keyboard (built only when asked) ----
+    var KB = data.keyboard === true;
+    var kb = el.querySelector('.imt-kb'), keys = {};
+    var KBH = 291;
+    if (KB) {
+      ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].forEach(function (r, ri) {
+        var row = document.createElement('div'); row.className = 'imt-row';
+        if (ri === 2) { var sh = document.createElement('div'); sh.className = 'imt-key wide'; sh.innerHTML = '&#x21E7;'; row.appendChild(sh); }
+        r.split('').forEach(function (ch) { var k = document.createElement('div'); k.className = 'imt-key'; k.textContent = ch; keys[ch] = k; row.appendChild(k); });
+        if (ri === 2) { var bk = document.createElement('div'); bk.className = 'imt-key wide'; bk.innerHTML = '&#x232B;'; row.appendChild(bk); }
+        kb.appendChild(row);
+      });
+      var last = document.createElement('div'); last.className = 'imt-row';
+      last.innerHTML = '<div class="imt-key wide">123</div><div class="imt-key wide">&#x1F600;</div>';
+      var sp = document.createElement('div'); sp.className = 'imt-key space'; sp.textContent = 'space'; keys[' '] = sp; last.appendChild(sp);
+      var rt = document.createElement('div'); rt.className = 'imt-key ret'; rt.textContent = 'return'; last.appendChild(rt);
+      kb.appendChild(last);
+    }
+
+    // ---- Messages ----
+    var col = el.querySelector('.imt-col'), view = el.querySelector('.imt-view');
+    if (data.timestamp !== false) {
+      var ts = document.createElement('div'); ts.className = 'imt-ts';
+      ts.innerHTML = '<b>' + String(data.timestamp || 'Today') + '</b> ' + String(data.time || '9:41 AM');
+      col.appendChild(ts);
+    }
+    var msgs = (Array.isArray(data.messages) ? data.messages : []).filter(Boolean).map(function (m) {
+      return { from: m.from === 'them' || m.from === 'contact' ? 'them' : 'me', text: m.text ? String(m.text) : '', emoji: m.emoji ? String(m.emoji) : '',
+        image: m.image, link: m.link, reaction: m.reaction ? String(m.reaction) : '', at: m.at, reaction_at: m.reaction_at };
+    });
+    var isEmojiOnly = function (t) { return t && t.length <= 8 && !/[A-Za-z0-9]/.test(t); };
+    msgs.forEach(function (m, i) {
+      var next = msgs[i + 1], prev = msgs[i - 1];
+      var wrap = document.createElement('div');
+      wrap.className = 'imt-msg ' + m.from + (prev && prev.from !== m.from ? ' gap' : '');
+      var b = document.createElement('div');
+      b.className = 'imt-b';
+      var txt = m.emoji || m.text;
+      if (m.image) {
+        b.className += ' media';
+        var im = document.createElement('div'); im.className = 'imt-img';
+        if (typeof m.image === 'string' && m.image !== 'true') im.style.backgroundImage = 'url("' + m.image.replace(/"/g, '%22') + '")';
+        b.appendChild(im);
+      } else if (m.link) {
+        b.className += ' media';
+        var L = typeof m.link === 'object' ? m.link : { title: String(m.link) };
+        var card = document.createElement('div'); card.className = 'imt-link';
+        var li = document.createElement('div'); li.className = 'imt-link-img';
+        if (L.image) li.style.backgroundImage = 'url("' + String(L.image).replace(/"/g, '%22') + '")';
+        var lt = document.createElement('div'); lt.className = 'imt-link-t'; lt.textContent = L.title || '';
+        var ld = document.createElement('div'); ld.className = 'imt-link-d'; ld.textContent = L.domain || '';
+        card.appendChild(li); card.appendChild(lt); card.appendChild(ld); b.appendChild(card);
+      } else if (m.emoji || isEmojiOnly(txt)) {
+        b.className += ' emoji'; b.textContent = txt;
+      } else {
+        b.textContent = txt;
+        if (!next || next.from !== m.from) b.className += ' tail';
+      }
+      wrap.appendChild(b);
+      if (m.reaction) {
+        var rx = document.createElement('div'); rx.className = 'imt-react'; rx.textContent = m.reaction; b.appendChild(rx); m.rx = rx;
+      }
+      if (m.from === 'me') { var rc = document.createElement('div'); rc.className = 'imt-rcpt'; rc.textContent = 'Delivered'; wrap.appendChild(rc); m.rc = rc; }
+      col.appendChild(wrap);
+      m.wrap = wrap; m.b = b;
+    });
+    // Their replies each get typing dots, in the reply's own slot.
+    msgs.forEach(function (m) {
+      if (m.from !== 'them') return;
+      var ty = document.createElement('div');
+      ty.className = 'imt-msg them' + (m.wrap.classList.contains('gap') ? ' gap' : '');
+      ty.innerHTML = '<div class="imt-typing"><i></i><i></i><i></i></div>';
+      ty.style.display = 'none'; // measured without it: the reply takes its slot
+      col.insertBefore(ty, m.wrap);
+      m.typing = ty;
+    });
+    // Layout once, everything present: where each message's bottom sits.
+    msgs.forEach(function (m) { m.bottom = m.wrap.offsetTop + m.wrap.offsetHeight + (m.rc ? 16 : 0); });
+    var headH = el.querySelector('.imt-status').offsetHeight + el.querySelector('.imt-head').offsetHeight;
+    var barH = el.querySelector('.imt-bar').offsetHeight;
+    var viewH = SH - headH - barH - (KB ? KBH : 0);
+
+    // ---- Timing: each message on its `at`, else in sequence ----
+    var CPS = num(data.type_speed, 16);
+    var t = num(data.start_at, 0.5);
+    if (KB) {
+      gsap.set(kb, { height: 0 });
+      tl.to(kb, { height: KBH, duration: 0.35, ease: 'power3.out' }, Math.max(0, t - 0.3));
+    }
+    var draft = el.querySelector('.imt-draft'), ph = el.querySelector('.imt-ph'), caret = el.querySelector('.imt-caret'), send = el.querySelector('.imt-send');
+    var lastRc = null, scrollY = 0;
+    gsap.set(msgs.map(function (m) { return m.wrap; }), { autoAlpha: 0 });
+    function scrollTo(bottom, at) {
+      var want = Math.max(0, bottom - viewH + 10);
+      if (want > scrollY + 1) { tl.to(col, { y: -want, duration: 0.35, ease: 'power2.out' }, at); scrollY = want; }
+    }
+    msgs.forEach(function (m, i) {
+      var start = m.at !== undefined && m.at !== null && m.at !== '' ? num(m.at, t) : t;
+      var shown;
+      if (m.from === 'them') {
+        // Typing dots first (in the reply's slot), then the reply pops from its corner.
+        var tt = Math.max(0, start - 0.9), typing = m.typing, dots = typing.querySelectorAll('i');
+        tl.set(typing, { display: 'flex' }, tt);
+        tl.fromTo(typing, { autoAlpha: 0, scale: 0.7, transformOrigin: '0% 100%' }, { autoAlpha: 1, scale: 1, duration: 0.18, immediateRender: false }, tt);
+        for (var d = 0; d < 3; d++) {
+          tl.to(dots[d], { keyframes: [{ y: -3, opacity: 1, duration: 0.15 }, { y: 0, opacity: 0.5, duration: 0.15 }] }, tt + 0.1 + d * 0.1);
+          tl.to(dots[d], { keyframes: [{ y: -3, opacity: 1, duration: 0.15 }, { y: 0, opacity: 0.5, duration: 0.15 }] }, tt + 0.5 + d * 0.1);
+        }
+        // Scroll to the DOTS (the top of the reply's slot), not the reply
+        // yet to come -- measured: the view overshot past your last message.
+        scrollTo(m.wrap.offsetTop + 46, tt);
+        tl.set(typing, { display: 'none' }, start);
+        shown = start;
+        tl.fromTo(m.wrap, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01, immediateRender: false }, shown);
+        tl.fromTo(m.b, { scale: 0.6 }, { scale: 1, duration: 0.32, ease: 'back.out(1.8)', immediateRender: false }, shown);
+      } else {
+        var body = m.emoji || m.text;
+        shown = start;
+        if (KB && body && !m.image && !m.link) {
+          // Types into the field, key by key, then sends.
+          var chars = body.split('');
+          var step = 1 / CPS;
+          tl.set(ph, { display: 'none' }, start);
+          tl.set(caret, { opacity: 1 }, start);
+          tl.to(send, { scale: 1, duration: 0.15, ease: 'back.out(2)' }, start + step);
+          chars.forEach(function (ch, k) {
+            var at = start + k * step;
+            tl.set(draft, { textContent: body.slice(0, k + 1) }, at);
+            var key = keys[ch.toLowerCase()];
+            if (key) { tl.set(key, { backgroundColor: DARK ? '#9a9a9e' : '#c9ccd4' }, at); tl.set(key, { backgroundColor: '' }, at + step * 0.8); }
+          });
+          shown = start + chars.length * step + 0.25;
+          tl.to(send, { scale: 0.85, duration: 0.06 }, shown - 0.08);
+          tl.set(draft, { textContent: '' }, shown);
+          tl.set(ph, { display: 'inline' }, shown);
+          tl.set(caret, { opacity: 0 }, shown);
+          tl.to(send, { scale: 0, duration: 0.12 }, shown);
+        }
+        tl.fromTo(m.wrap, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01, immediateRender: false }, shown);
+        tl.fromTo(m.b, { y: 26, scale: 0.92 }, { y: 0, scale: 1, duration: 0.3, ease: 'power3.out', immediateRender: false }, shown);
+        // "Delivered" rides under your latest message only.
+        if (lastRc) tl.to(lastRc, { opacity: 0, height: 0, duration: 0.15 }, shown);
+        tl.to(m.rc, { opacity: 1, height: 14, duration: 0.2 }, shown + 0.35);
+        lastRc = m.rc;
+      }
+      scrollTo(m.bottom, shown);
+      if (m.rx) {
+        var ra = m.reaction_at !== undefined ? num(m.reaction_at, shown + 1) : shown + 0.9;
+        tl.fromTo(m.rx, { scale: 0, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.3, ease: 'back.out(2.4)', immediateRender: false }, ra);
+      }
+      t = shown + (m.from === 'them' ? 1.6 : 1.2);
+    });
+    gsap.set(kb.querySelectorAll('.imt-key'), { backgroundColor: '' });
+    return tl;
+  }
+</script>

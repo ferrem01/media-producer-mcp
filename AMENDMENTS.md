@@ -6,6 +6,52 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Pointing at UI and mobile demos (HyperFrames audit, batches 1 and 2)
+
+The audit's high-value gaps, built into what we have where they fit.
+
+**Pointing at UI**
+- **kinetic-text** `mark`: highlight | underline | scribble | circle | box on the
+  *starred* words once the line lands (or `mark_at`). `~~old=>new~~` in the
+  text strikes a word and brings its replacement in after it ("Reports take
+  ~~hours=>minutes~~"). The ink is drawn in real pixels measured off the word:
+  a stretched viewBox with a non-scaling stroke dashes in screen units, so the
+  pen line broke into segments. Adjacent starred words in type-on/assemble
+  (one span per word) are ONE run, one mark. The scene's `max-width:100%`
+  clamp squeezed a phrase's circle to its first word -- the ink opts out.
+- **spotlight** `targets`: the frame dims and a feathered window glides from
+  target to target on the words, with a thin ring, a pulse on arrival and a
+  label chip per target. The old round spotlight is kept for data without
+  targets; its drift is fixed instead of `Math.random`. Its schema was in the
+  old JSON-schema shape (no `data` block) -- rewritten in the house format.
+- **ink-callout** (props, new): a marker note writes on (Caveat), an arrow
+  swoops to the target, and the target gets circled / boxed / underlined,
+  the ink boiling like it was drawn. One callout at a time by default (each
+  clears as the next begins; `keep` holds them); labels step clear of each
+  other.
+
+**Mobile**
+- **cursor-performer** `pointer: "touch"`: a fingertip for phone UI -- no
+  arrow, no hover travel; a contact dot lands, presses, ripples and lifts;
+  `drag` holds contact from the previous point (a swipe).
+- **imessage-thread** (mockups, new): `chat-simulator` accepted
+  `platform: "imessage"` and drew its dark Slack window anyway. A real iPhone
+  thread now: bubble runs with tails, standalone big emoji, photos, link
+  cards, tapbacks, typing dots in each reply's slot, "Delivered" under your
+  latest, auto-scroll that keeps the newest above the bar, and `keyboard`
+  that raises the keyboard and types your side key by key. chat-simulator's
+  schema now points phone threads here.
+
+**Fonts first (scene-assembler).** Scenes built every timeline the moment
+the page script ran, before web fonts arrived -- so any component measuring
+its words measured the fallback face (a marker circle sized to the wrong
+word). The boot now waits for the page's Google fonts (brand kit + any a
+component links), capped at 3s.
+
+Test: `test/pointing-and-mobile.test.ts`.
+
+---
+
 ## 2026-09-24 — rainbow rim on edge-lit-slab, crack mode on shatter
 
 FX6 from the X posts.

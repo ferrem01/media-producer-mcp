@@ -406,7 +406,34 @@ ${buildContentRegionWrapper(scene, componentBlocks)}
 </div>
 
 <script>
-(function() {
+// FONTS FIRST. Components measure their words while their timelines build
+// (marks, labels, fitted headlines), so the build waits for the page's web
+// fonts -- the brand kit's and any a component links (a handwriting face) --
+// capped at 3s. Built before the font landed, every measurement was the
+// fallback face's (measured: a marker circle sized to the wrong word).
+function __mpAfterFonts(boot) {
+  var done = false;
+  function go() { if (done) return; done = true; boot(); }
+  try {
+    if (!document.fonts || !document.fonts.load) return go();
+    var loads = [];
+    document.querySelectorAll('link[href*="fonts.googleapis.com/css"]').forEach(function (l) {
+      (l.getAttribute('href') || '').split(/[?&]family=/).slice(1).forEach(function (f) {
+        f = decodeURIComponent(f.split('&')[0]);
+        var name = f.split(':')[0].replace(/\\+/g, ' ');
+        (f.split('@')[1] || '400').split(';').forEach(function (w) {
+          loads.push(document.fonts.load(w.split(',').pop() + ' 32px "' + name + '"').catch(function () {}));
+        });
+      });
+    });
+    if (!loads.length) return go();
+    loads.push(document.fonts.ready);
+    Promise.race([Promise.all(loads), new Promise(function (r) { setTimeout(r, 3000); })]).then(go, go);
+  } catch (e) { go(); }
+}
+</script>
+<script>
+__mpAfterFonts(function() {
   const master = gsap.timeline({ paused: true });
   window.__MP_LOGODEV_TOKEN = ${JSON.stringify(config.logoDevToken)};
 
@@ -454,7 +481,7 @@ ${motionPhysicsScript(scene.motion_physics, scene.duration_seconds)}
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${scene.duration_seconds};
   window.__MP_READY = true;
-})();
+});
 </script>
 </body>
 </html>`;
@@ -1604,7 +1631,34 @@ ${tagResult.html}
 </div>
 
 <script>
-(function() {
+// FONTS FIRST. Components measure their words while their timelines build
+// (marks, labels, fitted headlines), so the build waits for the page's web
+// fonts -- the brand kit's and any a component links (a handwriting face) --
+// capped at 3s. Built before the font landed, every measurement was the
+// fallback face's (measured: a marker circle sized to the wrong word).
+function __mpAfterFonts(boot) {
+  var done = false;
+  function go() { if (done) return; done = true; boot(); }
+  try {
+    if (!document.fonts || !document.fonts.load) return go();
+    var loads = [];
+    document.querySelectorAll('link[href*="fonts.googleapis.com/css"]').forEach(function (l) {
+      (l.getAttribute('href') || '').split(/[?&]family=/).slice(1).forEach(function (f) {
+        f = decodeURIComponent(f.split('&')[0]);
+        var name = f.split(':')[0].replace(/\\+/g, ' ');
+        (f.split('@')[1] || '400').split(';').forEach(function (w) {
+          loads.push(document.fonts.load(w.split(',').pop() + ' 32px "' + name + '"').catch(function () {}));
+        });
+      });
+    });
+    if (!loads.length) return go();
+    loads.push(document.fonts.ready);
+    Promise.race([Promise.all(loads), new Promise(function (r) { setTimeout(r, 3000); })]).then(go, go);
+  } catch (e) { go(); }
+}
+</script>
+<script>
+__mpAfterFonts(function() {
   const master = gsap.timeline({ paused: true });
   window.__MP_LOGODEV_TOKEN = ${JSON.stringify(config.logoDevToken)};
 
@@ -1681,7 +1735,7 @@ ${motionPhysicsScript(options.motionPhysics, duration)}
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${duration};
   window.__MP_READY = true;
-})();
+});
 </script>
 </body>
 </html>`;

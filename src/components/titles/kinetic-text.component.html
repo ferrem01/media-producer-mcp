@@ -42,6 +42,10 @@
     max-width: 92%;
   }
 
+  /* Ink hangs outside the word it marks: the scene's max-width:100% clamp
+     squeezed a phrase's circle to its first word (measured). */
+  .kinetic-text .kt-ink { max-width: none; }
+
   .text-container .kt-accent {
     color: var(--mp-color-primary, #4f46e5);
   }
@@ -66,6 +70,16 @@
       container.style.maxWidth = '100%';
     }
     var text = String(data.text || '');
+    // ~~old=>new~~ strikes a word and brings its replacement in after it
+    // ("Reports take ~~hours=>minutes~~"); ~~old~~ alone just strikes. The
+    // pair rides through every entrance as one placeholder token, swapped
+    // for its real elements once the entrance has built the line.
+    var strikes = [];
+    text = text.replace(/~~([^~]+?)~~/g, function (_, body) {
+      var p = body.split('=>');
+      strikes.push({ old: p[0].trim(), neu: (p[1] || '').trim() });
+      return '\u2063S' + (strikes.length - 1) + '\u2063';
+    });
 
     if (data.color) container.style.color = data.color;
     // Over live pixels (a camera take, b-roll) no single ink is safe: the
@@ -222,6 +236,174 @@
         gsap.set(container, { autoAlpha: 0, y: 10 });
         tl.to(container, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.25);
       }
+    }
+
+    // ---- Marks and strikes: hand-drawn ink on the finished line ----
+    var entranceEnd = tl.duration() || 0.6;
+    var fontPx = parseFloat(getComputedStyle(container).fontSize) || 60;
+    var inkW = Math.max(2, fontPx * 0.055);
+    var INK = data.mark_color || 'var(--mp-color-secondary, var(--mp-color-primary, #f59e0b))';
+    var hash = function (i, k) { var v = Math.sin((i + 1) * 91.7 + k * 47.3) * 43758.5453; return v - Math.floor(v); };
+    container.style.isolation = 'isolate'; // a highlight sits behind the ink, above any plate
+    // Ink is drawn in real pixels, measured off the word: a stretched
+    // viewBox with a non-scaling stroke dashes in SCREEN units, so the pen
+    // line broke into segments (measured). Paths are written on a 0..100
+    // grid and scaled into the box here.
+    var measured = null;
+    function sizeOf(host) {
+      if (!measured) {
+        // Hidden type-on words take no space until their beat: show them
+        // for one measure pass so every word has its real box.
+        measured = new Map();
+        var hidden = Array.prototype.slice.call(container.querySelectorAll('span')).filter(function (x) { return x.style.display === 'none'; });
+        hidden.forEach(function (x) { x.style.display = 'inline'; });
+        Array.prototype.slice.call(container.querySelectorAll('.kt-accent, .kt-old')).forEach(function (x) { measured.set(x, { w: x.offsetWidth, h: x.offsetHeight }); });
+        hidden.forEach(function (x) { x.style.display = 'none'; });
+      }
+      return measured.get(host) || { w: host.offsetWidth || fontPx * 2, h: host.offsetHeight || fontPx };
+    }
+    function inkSvg(host, box, d, size) {
+      var hs = size || sizeOf(host);
+      var L = box.l * hs.w, T = box.t * hs.h, W = Math.max(4, box.w * hs.w), H = Math.max(4, box.h);
+      var k = 0;
+      var pd = d.replace(/-?\d+(\.\d+)?/g, function (n) { var v = (k++ % 2 === 0 ? Number(n) * W : Number(n) * H) / 100; return v.toFixed(1); });
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + W.toFixed(1) + ' ' + H.toFixed(1));
+      svg.setAttribute('class', 'kt-ink');
+      svg.style.cssText = 'position:absolute;overflow:visible;pointer-events:none;left:' + L.toFixed(1) + 'px;top:' + T.toFixed(1) + 'px;width:' + W.toFixed(1) + 'px;height:' + H.toFixed(1) + 'px;';
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', pd);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', INK);
+      path.setAttribute('stroke-width', inkW.toFixed(1));
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(path);
+      host.appendChild(svg);
+      var len = W + H;
+      try { len = path.getTotalLength() || len; } catch (eL) {}
+      // Hidden until its stroke starts: a round cap on an empty dash still
+      // prints a dot (measured).
+      gsap.set(path, { strokeDasharray: len + 2, strokeDashoffset: len + 2, opacity: 0 });
+      return path;
+    }
+    function draw(path, t0, dur, ease) {
+      tl.set(path, { opacity: 1 }, t0);
+      tl.to(path, { strokeDashoffset: 0, duration: dur, ease: ease }, t0);
+    }
+    function wob(i, k, amt) { return ((hash(i, k) - 0.5) * amt).toFixed(1); }
+
+    // Strikes: swap each placeholder for the struck word + its replacement.
+    var strikeEls = [];
+    if (strikes.length) {
+      var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      var tnodes = [];
+      while (walker.nextNode()) tnodes.push(walker.currentNode);
+      tnodes.forEach(function (n) {
+        var parts = n.nodeValue.split(/\u2063S(\d+)\u2063/);
+        if (parts.length < 2) return;
+        var frag = document.createDocumentFragment();
+        parts.forEach(function (part, k) {
+          if (k % 2 === 0) { if (part) frag.appendChild(document.createTextNode(part)); return; }
+          var st = strikes[Number(part)];
+          var oldEl = document.createElement('span');
+          oldEl.className = 'kt-old';
+          oldEl.textContent = st.old;
+          oldEl.style.position = 'relative';
+          oldEl.style.whiteSpace = 'nowrap';
+          frag.appendChild(oldEl);
+          var newEl = null;
+          if (st.neu) {
+            newEl = document.createElement('span');
+            newEl.className = 'kt-new';
+            newEl.style.display = 'none';
+            newEl.style.whiteSpace = 'pre';
+            newEl.appendChild(document.createTextNode(' '));
+            var w = document.createElement('span');
+            w.className = 'kt-accent';
+            w.textContent = st.neu;
+            w.style.display = 'inline-block';
+            newEl.appendChild(w);
+            frag.appendChild(newEl);
+          }
+          strikeEls.push({ old: oldEl, neu: newEl });
+        });
+        n.parentNode.replaceChild(frag, n);
+      });
+    }
+    var strikeAt = data.strike_at !== undefined ? Number(data.strike_at) : entranceEnd + 0.2;
+    strikeEls.forEach(function (o, i) {
+      var t0 = strikeAt + i * 0.5;
+      // A quick, slightly rising pen line through the middle of the word.
+      var line = inkSvg(o.old, { l: -0.04, t: 0.4, w: 1.08, h: fontPx * 0.22 },
+        'M 0 ' + (62 + +wob(i, 1, 10)) + ' C 30 ' + (48 + +wob(i, 2, 14)) + ', 70 ' + (56 + +wob(i, 3, 14)) + ', 100 ' + (36 + +wob(i, 4, 10)));
+      draw(line, t0, 0.28, 'power2.in');
+      tl.to(o.old, { opacity: 0.42, duration: 0.25, ease: 'power1.out' }, t0 + 0.2);
+      if (o.neu) {
+        var w = o.neu.lastChild;
+        tl.set(o.neu, { display: 'inline' }, t0 + 0.34);
+        tl.fromTo(w, { y: '0.35em', opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.42, ease: 'back.out(2.2)', immediateRender: false }, t0 + 0.34);
+      }
+    });
+
+    // Marks on the *starred* words: highlight | underline | scribble |
+    // circle | box -- drawn once the line has landed (or on mark_at).
+    var MARK = String(data.mark || '').toLowerCase();
+    if (MARK) {
+      var markAt = data.mark_at !== undefined ? Number(data.mark_at) : entranceEnd + 0.15 + (strikeEls.length ? 0.4 + strikeEls.length * 0.5 : 0);
+      var targets = Array.prototype.slice.call(container.querySelectorAll('.kt-accent')).filter(function (a) { return !a.closest('.kt-new'); });
+      // Adjacent starred words (type-on/assemble build one span per word)
+      // are ONE phrase: one mark around the run, if it sits on one line.
+      var groups = [];
+      targets.forEach(function (a) {
+        var g = groups[groups.length - 1];
+        var prev = g && g[g.length - 1];
+        if (prev && prev.nextElementSibling === a && prev.parentNode === a.parentNode) g.push(a); else groups.push([a]);
+      });
+      sizeOf(targets[0] || container);
+      var runs = [];
+      groups.forEach(function (g) {
+        var hidden = g.filter(function (x) { return x.style.display === 'none'; });
+        hidden.forEach(function (x) { x.style.display = 'inline'; });
+        var sameLine = g.every(function (x) { return Math.abs(x.offsetTop - g[0].offsetTop) < 2; });
+        var span = g[g.length - 1].offsetLeft + g[g.length - 1].offsetWidth - g[0].offsetLeft;
+        // A leading joining space belongs to the gap, not the word.
+        var lead = /^\s/.test(g[0].textContent || '') ? fontPx * 0.26 : 0;
+        hidden.forEach(function (x) { x.style.display = 'none'; });
+        if (sameLine && g.length > 1) runs.push({ host: g[0], lead: lead, size: { w: span - lead, h: sizeOf(g[0]).h }, text: g.map(function (x) { return x.textContent; }).join('') });
+        else g.forEach(function (x) { var ld = /^\s/.test(x.textContent || '') ? fontPx * 0.26 : 0; var sz = sizeOf(x); runs.push({ host: x, lead: ld, size: { w: sz.w - ld, h: sz.h }, text: x.textContent }); });
+      });
+      runs.forEach(function (r, i) {
+        var a = r.host;
+        var t0 = markAt + i * 0.22;
+        a.style.position = 'relative';
+        if (MARK === 'highlight') {
+          var hl = document.createElement('span');
+          hl.className = 'kt-ink';
+          hl.style.cssText = 'position:absolute;left:' + (r.lead - fontPx * 0.12).toFixed(1) + 'px;width:' + (r.size.w + fontPx * 0.24).toFixed(1) + 'px;top:18%;bottom:6%;z-index:-1;border-radius:0.14em 0.3em 0.18em 0.34em;'
+            + 'background:' + INK + ';opacity:0.34;transform-origin:0 50%;transform:skewX(-8deg) scaleX(0);';
+          a.appendChild(hl);
+          tl.to(hl, { scaleX: 1, duration: 0.42, ease: 'power2.out' }, t0);
+        } else if (MARK === 'underline') {
+          var u = inkSvg(a, { l: -0.03 + r.lead / r.size.w, t: 0.9, w: 1.06, h: fontPx * 0.2 },
+            'M 0 ' + (40 + +wob(i, 5, 20)) + ' C 30 ' + (70 + +wob(i, 6, 20)) + ', 65 ' + (30 + +wob(i, 7, 20)) + ', 100 ' + (55 + +wob(i, 8, 20)), r.size);
+          draw(u, t0, 0.4, 'power2.inOut');
+        } else if (MARK === 'scribble') {
+          var n = Math.max(5, Math.min(16, Math.round((r.text || '').length * 0.9)));
+          var d = 'M 0 50';
+          for (var k = 1; k <= n; k++) d += ' Q ' + ((k - 0.5) / n * 100).toFixed(1) + ' ' + (k % 2 ? 0 : 100) + ' ' + (k / n * 100).toFixed(1) + ' 50';
+          var sc = inkSvg(a, { l: -0.02 + r.lead / r.size.w, t: 0.88, w: 1.04, h: fontPx * 0.2 }, d, r.size);
+          draw(sc, t0, 0.55, 'power1.inOut');
+        } else if (MARK === 'circle') {
+          var c = inkSvg(a, { l: -0.1 + r.lead / r.size.w, t: -0.28, w: 1.2, h: r.size.h * 1.56 },
+            'M 10 ' + (54 + +wob(i, 9, 8)) + ' C 6 20, 40 4, 64 7 C 90 10, 99 32, 95 55 C 91 84, 56 97, 30 93 C 9 89, 1 66, 14 44 L 22 34', r.size);
+          draw(c, t0, 0.6, 'power2.inOut');
+        } else if (MARK === 'box') {
+          var bx = inkSvg(a, { l: -0.06 + r.lead / r.size.w, t: -0.1, w: 1.12, h: r.size.h * 1.2 },
+            'M 4 ' + (8 + +wob(i, 10, 6)) + ' L 97 4 L ' + (96 + +wob(i, 11, 4)) + ' 95 L 3 97 L 5 1', r.size);
+          draw(bx, t0, 0.6, 'power1.inOut');
+        }
+      });
     }
 
     // Accent override: *starred* words take this color instead of the brand

@@ -1,9 +1,72 @@
 {
-  "type": "object",
-  "properties": {
-    "x": { "type": "number", "default": 50, "description": "Spotlight center X (0-100%)" },
-    "y": { "type": "number", "default": 50, "description": "Spotlight center Y (0-100%)" },
-    "radius": { "type": "number", "default": 20, "description": "Spotlight radius (%)" },
-    "color": { "type": "string", "description": "Spotlight color" }
+  "type": "spotlight",
+  "label": "Spotlight",
+  "category": "effects",
+  "description": "Dim the frame and open a feathered window on the part of the screen that matters. With targets, the window GLIDES from target to target on the words (rounded rect or circle, a thin accent ring, a pulse on each arrival, an optional label chip) -- point at the button, then the chart, then the result. Place it full-frame ABOVE the screen it points at. Without targets it is a plain round spotlight at x/y.",
+  "data": {
+    "targets": {
+      "type": "array",
+      "label": "Targets: { at (seconds or \"@word\"), x, y (CENTRE, % of frame), w, h (% of frame), label (optional chip text), shape (\"rect\" | \"circle\") }. The window lands on the first at its time and glides to each next one on its word.",
+      "optional": true
+    },
+    "dim": {
+      "type": "number",
+      "label": "How dark the rest of the frame goes (0-0.92)",
+      "optional": true,
+      "default": 0.58
+    },
+    "feather": {
+      "type": "number",
+      "label": "Edge softness in px",
+      "optional": true,
+      "default": 26
+    },
+    "padding": {
+      "type": "number",
+      "label": "Room around each target in px",
+      "optional": true,
+      "default": 14
+    },
+    "shape": {
+      "type": "string",
+      "label": "\"rect\" (rounded, default) or \"circle\" for every target",
+      "optional": true
+    },
+    "ring": {
+      "type": "boolean",
+      "label": "Thin accent ring on the window (default on)",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Accent for the ring, pulse and label (default brand primary); legacy mode: glow color",
+      "optional": true
+    },
+    "glide": {
+      "type": "number",
+      "label": "Seconds each glide takes",
+      "optional": true,
+      "default": 0.7
+    },
+    "exit_at": {
+      "type": "number",
+      "label": "When it fades away (seconds or \"@word\"; default near the end)",
+      "optional": true
+    },
+    "x": {
+      "type": "number",
+      "label": "Legacy round spotlight: centre X %",
+      "optional": true
+    },
+    "y": {
+      "type": "number",
+      "label": "Legacy round spotlight: centre Y %",
+      "optional": true
+    },
+    "radius": {
+      "type": "number",
+      "label": "Legacy round spotlight: radius %",
+      "optional": true
+    }
   }
 }
