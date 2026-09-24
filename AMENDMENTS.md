@@ -6,6 +6,30 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — screen-cloud: product screens at depth, a real depth of field
+
+FX4 from the X posts (the screenshot cloud). **screen-cloud** (threed,
+three.js): captures or screenshots float at depth around a hero (screen 0);
+the camera drifts through and `focus` pulls from screen to screen on words
+(`{ at, screen }`, anchors work), each pull framing its screen centred at
+about half the frame height. The blur is per screen from its true distance to
+the focus plane: a 12-tap disc at a mip-biased level in the shader (mip bias
+alone barely read as depth), rounded corners and a soft shadow drawn there too.
+No screens -> UI mocks in the accent color.
+
+Measured on the way:
+- Only the hero showed. GSAP renders a timeline's children in start order,
+  so opacity tweens starting after 0 ran AFTER the proxy render tween and it
+  drew their stale (zero) values. The entrance now lives inside the one
+  render pass (`apply(t)`), so every frame is a pure function of time.
+- Pure-hash angles bunched half the cloud off-frame; angles are now spread
+  evenly with jitter, and screens nearer than the hero stay wide of it.
+
+Test: `test/screen-cloud.test.ts` (every region of the frame gets a screen,
+the pull reframes, seeks back exactly).
+
+---
+
 ## 2026-09-24 — card-cascade and crt-screen (from the Bundance spec ad)
 
 Two effects Marc picked from the X posts he sent:

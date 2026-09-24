@@ -1,0 +1,17 @@
+{
+  "type": "screen-cloud",
+  "label": "Screen Cloud",
+  "category": "threed",
+  "description": "Real product screens floating at depth in a soft field, the camera drifting through them with a real depth of field (near and far screens soft, the one in focus crisp), and focus pulls from screen to screen on the words. Screens are images (captures, screenshots); screen 0 is the hero in the middle. With no screens it draws UI mock screens in the accent color. three.js; deterministic under seek.",
+  "data": {
+    "screens": { "type": "array", "label": "Screens: image URLs, or { src, aspect (w/h, default 1.6), size (default 1) }. Screen 0 is the hero.", "optional": true },
+    "focus": { "type": "array", "label": "Focus pulls: { at (seconds or \"@word\"), screen (index) }. Starts on screen 0.", "optional": true },
+    "count": { "type": "number", "label": "Number of screens when none are given (mocks), max 16", "optional": true, "default": 9 },
+    "blur": { "type": "number", "label": "Depth-of-field strength (0 = everything sharp)", "optional": true, "default": 1 },
+    "distance": { "type": "number", "label": "Camera distance multiplier (smaller = closer)", "optional": true, "default": 1 },
+    "enter_at": { "type": "number", "label": "When the screens fade up (seconds or \"@word\")", "optional": true, "default": 0 },
+    "accent": { "type": "string", "label": "Accent color for mock screens", "optional": true },
+    "background": { "type": "string", "label": "CSS background behind the cloud", "optional": true },
+    "seed": { "type": "number", "label": "Layout seed (vary for a different arrangement)", "optional": true }
+  }
+}
