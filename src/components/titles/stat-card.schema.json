@@ -2,7 +2,7 @@
   "type": "stat-card",
   "label": "Stat Card",
   "category": "titles",
-  "description": "Animated number counter with label. Number counts up from 0 to the target value.",
+  "description": "Animated number counter with label. Number counts up from 0 to the target value. count:'roll' spins each digit into place like an odometer -- use it when the brief asks for rolling / ticking digits.",
   "data": {
     "value": {
       "type": "number",

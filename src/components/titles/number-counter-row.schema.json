@@ -2,7 +2,7 @@
   "type": "number-counter-row",
   "label": "Number Counter Row",
   "category": "titles",
-  "description": "Multiple stats side by side with animated count-up numbers and glass dividers.",
+  "description": "Multiple stats side by side with animated count-up numbers and glass dividers. count:'roll' spins each digit into place like an odometer -- use it when the brief asks for rolling / ticking digits.",
   "data": {
     "stats": {
       "type": "array",
