@@ -12,6 +12,7 @@
  * - Transport clock driven playback (GSAP as puppet)
  */
 
+import { fitBoxFor, wrapInFitBox } from "./fit-box.js";
 import { bindSpeakerLayerData, isSpeakerLayer, speakerRendersInside } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
@@ -222,7 +223,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
 
       componentBlocks.push(
         `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""}${isCutInProof(comp) ? ' data-mp-cutaway="1"' : ""}${isFixedToFrame(comp.type) || isSplitWrapper(comp) ? ' data-mp-fixed="1"' : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
-        `      ${boundHtml}\n` +
+        `      ${wrapInFitBox(boundHtml, fitBoxFor(comp as any, canvas))}\n` +
         `    </div>`
       );
 

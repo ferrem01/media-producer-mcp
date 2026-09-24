@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Component polish audit, part 2: the fit box
+
+The older widget family (charts, cards, email/chat/calendar mocks, post
+cards) was built like web UI: fixed 12-16px type, layouts in % of whatever
+box it got. On Marc's real films that failed two ways: a big slot showed a
+small card with web-size type; the writer's narrow 14%-wide panels reflowed
+email-compose / chat-simulator / calendar-view into strips (a subject line
+one letter per line).
+
+**core/fit-box.ts**: for listed legacy types the assembler (render AND the
+Studio composite) wraps the template in a design box -- width = the slot
+width clamped to the widget's [min, max], the slot's aspect -- scaled to the
+slot, and the component's `el` becomes that box. Big slots scale the widget
+up (type grows with it); narrow slots keep a sane layout and scale it down.
+Two measured refinements: a wide, short slot scaled bar-chart's box so short
+its title fell off the top, so a minimum design height caps the scale-UP;
+and that floor never pushes a widget below 1:1 (short 80%x40% slots had
+shrunk cards that fit fine). `data.fit: false` opts an instance out.
+
+Test: `test/fit-box.test.ts`.
+
+---
+
 ## 2026-09-24 — Component polish audit, part 1: bug fixes
 
 The audit rendered all 205 components on real data from Marc's 256 films.
