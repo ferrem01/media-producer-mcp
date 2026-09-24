@@ -235,7 +235,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     // alpha) at the take's trim; with no take at all it is left out (a
     // black window would bury the ground).
     if (isSpeakerLayer(comp) && !speakerRendersInside(scene)) continue;
-    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: options.speakerAlphaUrl, alphaOffset: options.speakerAlphaOffset, url: speakerUrl, offset: options.speakerOffset });
+    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: options.speakerAlphaUrl, alphaOffset: options.speakerAlphaOffset, url: speakerUrl, offset: options.speakerOffset }, { type: comp.type });
     if (!layerData) continue;
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol

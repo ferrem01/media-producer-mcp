@@ -165,7 +165,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       // scene's alpha copy at its trim; with no take the layer is left out.
       if (isSpeakerLayer(comp) && !speakerRendersInside(scene)) continue;
       const ref = options.speakerRefs && options.speakerRefs[scene.id];
-      const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: ref?.alpha, url: ref?.url || speakerUrl, offset: ref ? ref.offset : sceneStarts[si] });
+      const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: ref?.alpha, url: ref?.url || speakerUrl, offset: ref ? ref.offset : sceneStarts[si] }, { type: comp.type });
       if (!layerData) continue;
       const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData({ ...comp, data: layerData });
       // Same assembly-time hook as the render path: the accent's animation

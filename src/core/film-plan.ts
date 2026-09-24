@@ -38,7 +38,7 @@ function compTypes(scene: StoryboardScene): string[] {
 }
 
 function hasSpeakerComponent(scene: StoryboardScene): boolean {
-  return (scene.components || []).some((c: any) => c && typeof c === "object" && c.type === "video" && c.data?.src === "speaker");
+  return (scene.components || []).some((c: any) => c && typeof c === "object" && (c.type === "video" || c.type === "speaker-3d") && c.data?.src === "speaker");
 }
 
 /** What fills the frame, read off the scene's data. */
