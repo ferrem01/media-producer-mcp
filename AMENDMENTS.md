@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — agent-orb: the AI agent as a recurring character
+
+FX5 from the X posts (the glowing orb in the Bundance ad). **agent-orb**
+(threed, three.js): a glossy sphere with a swirling three-color gradient
+(brand primary -> pink -> gold by default), lit with a hard specular, a soft
+second highlight and a fresnel rim. It pops in, flies an arcing path of
+`stops` (`{ at, x%, y%, size }`, word anchors work), squashes and stretches
+along its velocity, leaves a glow trail, lands on each stop with a damped
+squash and a pulse ring, bobs while parked, and shrinks away on `exit_at`.
+A transparent full-frame overlay, so it lands on any word or UI under it --
+the same orb in every ad, pairing with the flow's path dot.
+
+Measured on the way: a canvas made with `premultipliedAlpha: false` drew the
+glow, trail and ring grey (three writes premultiplied color either way).
+
+Test: `test/agent-orb.test.ts` (lands on each stop, arcs between, shrinks
+away, seeks back exactly).
+
+---
+
 ## 2026-09-24 — screen-cloud: product screens at depth, a real depth of field
 
 FX4 from the X posts (the screenshot cloud). **screen-cloud** (threed,
