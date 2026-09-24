@@ -171,15 +171,36 @@
     // ---- Graph: steps + a pill node on every labelled branch edge ----
     var G = {}, order = [];
     var prevId = null;
+    // A kind the component does not know ("action", "ai" -- measured: the
+    // writer invents them) is read off the title, so "Send Slack Message"
+    // still gets the Slack mark and "Update Person" the person icon.
+    function kindOf(s) {
+      var kd = String(s.kind || '').toLowerCase();
+      if (KIND[kd]) return KIND[kd];
+      var t = String(s.title || s.subtitle || '').toLowerCase();
+      if (/slack/.test(t)) return KIND.slack;
+      if (/crm/.test(t)) return KIND.crm;
+      if (/lead score/.test(t)) return KIND['lead-score'];
+      if (/http|webhook|\bpost\b/.test(t)) return KIND.http;
+      if (/notify|alert|heads-up/.test(t)) return KIND.notify;
+      if (/update person|owner|assign/.test(t)) return KIND.update;
+      if (/delay|wait/.test(t)) return KIND.delay;
+      if (/condition|branch|split|which|\bif\b/.test(t)) return KIND.conditional;
+      if (/agent|enrich|research/.test(t)) return KIND.agent;
+      if (/mail|newsletter|welcome|follow-up|followup|onboarding|thank/.test(t)) return /ai/.test(kd) ? KIND['ai-email'] : KIND.email;
+      if (/^end$/.test(t)) return KIND.end;
+      if (/trigger|sign|event|visit|view|start|hit|becom|refer|invite/.test(t)) return KIND.event;
+      return /ai/.test(kd) ? KIND.agent : KIND.email;
+    }
     rawSteps.forEach(function (s, i) {
       var id = String(s.id || ('s' + i));
-      var k = KIND[s.kind] || KIND.email;
+      var k = kindOf(s);
       var parents;
       if (s.after === undefined) parents = prevId ? [prevId] : [];
       else if (Array.isArray(s.after)) parents = s.after.map(String);
       else parents = (s.after === null || s.after === '') ? [] : [String(s.after)];
       var n = {
-        id: id, type: s.kind === 'end' ? 'end' : 'step', step: s, kind: k, parents: parents,
+        id: id, type: k === KIND.end ? 'end' : 'step', step: s, kind: k, parents: parents,
         title: s.title || k.title, subtitle: s.subtitle || '', icon: s.icon || k.icon,
         chip: s.chip !== undefined ? s.chip : k.chip, at: s.at
       };

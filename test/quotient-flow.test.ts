@@ -160,6 +160,23 @@ describe("quotient-flow", () => {
   });
 });
 
+describe("quotient-flow: a kind it does not know is read off the title", () => {
+  it("\"action\" steps still get their product icons (Slack mark, person, CRM)", async () => {
+    const { page, close } = await open({ unfurl: false, steps: [
+      { id: "t", kind: "trigger", title: "Person Signs Up" },
+      { id: "a", kind: "action", title: "Send Slack Message" },
+      { id: "b", kind: "action", title: "Update Person" },
+      { id: "c", kind: "ai", title: "Send Targeted Pricing Email" },
+    ] }, 1080, 1920);
+    try {
+      const icons = await page.evaluate(() => [...document.querySelectorAll(".qf-card .qf-hd")].map((h) => h.querySelector(".qf-ic")!.innerHTML));
+      expect(icons[1]).toContain("#E01E5A"); // the Slack mark
+      expect(icons[2]).toContain("m14.305 16.53"); // the person-cog
+      expect(icons[3]).toContain("<img"); // AI email: the Quotient mark
+    } finally { await close(); }
+  }, 60000);
+});
+
 describe("quotient-flow-panel", () => {
   const PANEL_SRC = path.resolve(__dirname, "../src/components/mockups/quotient-flow-panel.component.html");
   it("types into a field, swaps a dropdown, moves a radio -- and seeks back", async () => {
