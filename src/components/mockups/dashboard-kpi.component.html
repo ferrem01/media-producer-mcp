@@ -360,6 +360,11 @@
     for (var k = 0; k < counterObjs.length; k++) {
       (function(obj, idx) {
         var counter = { val: 0 };
+        if (data.count === 'roll' && window.mpRollDigits) {
+          var fin = obj.target >= 1000 ? Math.round(obj.target).toLocaleString() : obj.target % 1 !== 0 ? obj.target.toFixed(1) : String(Math.round(obj.target));
+          mpRollDigits(tl, obj.el, 0.5 + idx * stagger, { to: obj.prefix + fin + obj.suffix, duration: speed * 1.5 });
+          return;
+        }
         tl.to(counter, {
           val: obj.target,
           duration: speed * 1.5,

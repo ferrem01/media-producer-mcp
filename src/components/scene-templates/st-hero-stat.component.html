@@ -187,7 +187,9 @@
     });
 
     // Count-up locked to the stat's entrance.
-    if (num) {
+    if (num && data.count === 'roll' && window.mpRollDigits) {
+      mpRollDigits(tl, num, 0.95, { to: String(Math.round(statValue)), duration: 1.3 });
+    } else if (num) {
       var counter = { v: 0 };
       tl.to(counter, {
         v: statValue, duration: 1.1, ease: 'power2.out',
