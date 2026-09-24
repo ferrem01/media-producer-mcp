@@ -1,0 +1,127 @@
+<template>
+  <div class="baw-root">
+    <div class="baw-frame">
+      <div class="baw-layer baw-after"><div class="baw-text"></div></div>
+      <div class="baw-layer baw-before"><div class="baw-text"></div></div>
+      <div class="baw-chip baw-chip-before"></div>
+      <div class="baw-chip baw-chip-after"></div>
+      <div class="baw-divider"><div class="baw-knob"><svg viewBox="0 0 24 24"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* BEFORE / AFTER WIPE: two full-bleed layers and a divider that sweeps
+     across and rests at a split -- the old way on one side, the new way on
+     the other. Layers are images (screenshots, photos) or statements (big
+     type on a muted ground vs. the brand ground). */
+  .baw-root, .baw-root * { max-width: none; }
+  .baw-root { --u: 1px; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .baw-frame { position: relative; overflow: hidden; border-radius: calc(var(--u) * 22);
+    box-shadow: 0 calc(var(--pad, 30px) * 0.25) calc(var(--pad, 30px) * 0.7) rgba(20, 20, 60, 0.14); }
+  .baw-root.bleed .baw-frame { border-radius: 0; box-shadow: none; }
+  .baw-layer { position: absolute; inset: 0; background-size: cover; background-position: center top; display: flex; align-items: center; justify-content: center; }
+  .baw-before { background-color: #e9e9ee; color: #3b3b45; }
+  .baw-after { background-color: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff); }
+  .baw-layer.has-img .baw-text { display: none; }
+  .baw-text { box-sizing: border-box; width: 50%; padding: 0 calc(var(--u) * 40); text-align: center;
+    font-size: calc(var(--u) * 56); font-weight: 700; letter-spacing: -0.025em; line-height: 1.08; text-wrap: balance; }
+  .baw-before .baw-text { margin-right: 50%; }
+  .baw-after .baw-text { margin-left: 50%; }
+  .baw-root.vertical .baw-text { width: 100%; margin: 0; }
+  .baw-root.vertical .baw-before .baw-text { margin-bottom: 50%; }
+  .baw-root.vertical .baw-after .baw-text { margin-top: 50%; }
+  .baw-chip { position: absolute; top: calc(var(--u) * 22); padding: calc(var(--u) * 9) calc(var(--u) * 18); border-radius: 999px;
+    font-size: calc(var(--u) * 20); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+    background: rgba(18, 18, 24, 0.72); color: #ffffff; backdrop-filter: blur(6px); }
+  .baw-chip-before { left: calc(var(--u) * 22); }
+  .baw-chip-after { right: calc(var(--u) * 22); background: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff); }
+  .baw-root.vertical .baw-chip-after { top: auto; bottom: calc(var(--u) * 22); }
+  .baw-chip:empty { display: none; }
+  .baw-divider { position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--u) * 4); margin-left: calc(var(--u) * -2); background: #ffffff;
+    box-shadow: 0 0 calc(var(--u) * 16) rgba(0, 0, 0, 0.25); }
+  .baw-root.vertical .baw-divider { top: 0; left: 0; right: 0; bottom: auto; width: auto; height: calc(var(--u) * 4); margin: calc(var(--u) * -2) 0 0 0; }
+  .baw-knob { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * 64); height: calc(var(--u) * 64); margin: calc(var(--u) * -32) 0 0 calc(var(--u) * -32);
+    border-radius: 50%; background: #ffffff; color: #17171c; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 20) rgba(0, 0, 0, 0.25); }
+  .baw-root.vertical .baw-knob { transform: rotate(90deg); }
+  .baw-knob svg { width: 56%; height: 56%; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.baw-root'), frame = q('.baw-frame'), before = q('.baw-before'), after = q('.baw-after');
+    var DUR = (ctx && ctx.duration) || 5;
+    var vertical = data.direction === 'vertical';
+    if (vertical) root.classList.add('vertical');
+    if (data.bleed === true) root.classList.add('bleed');
+    function side(layer, src, text) {
+      if (src) { layer.style.backgroundImage = 'url("' + String(src).replace(/"/g, '%22') + '")'; layer.classList.add('has-img'); if (data.fit === 'contain') { layer.style.backgroundSize = 'contain'; layer.style.backgroundRepeat = 'no-repeat'; layer.style.backgroundPosition = 'center'; } }
+      layer.querySelector('.baw-text').textContent = text ? String(text) : '';
+    }
+    side(before, data.before_src, data.before_text);
+    side(after, data.after_src, data.after_text);
+    // Preload so the capture waits for both (it waits on document images).
+    [data.before_src, data.after_src].forEach(function (s) { if (s) { var im = new Image(); im.src = String(s); im.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0'; root.appendChild(im); } });
+    q('.baw-chip-before').textContent = data.before_label === '' ? '' : String(data.before_label || 'Before');
+    q('.baw-chip-after').textContent = data.after_label === '' ? '' : String(data.after_label || 'After');
+
+    // SIZE: fill the slot inside the visible frame (a bleed fills it all).
+    var W0 = el.clientWidth || 900, H0 = el.clientHeight || 520;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var pad = data.bleed === true ? 0 : Math.round(Math.min(W0, H0) * 0.04);
+    root.style.setProperty('--pad', pad + 'px');
+    var W = W0 - 2 * (pad + (data.bleed === true ? 0 : ox)), H = H0 - 2 * (pad + (data.bleed === true ? 0 : oy));
+    frame.style.width = W + 'px'; frame.style.height = H + 'px';
+    var u = Math.min(W / 1100, H / 620);
+    root.style.setProperty('--u', u.toFixed(3) + 'px');
+    // Statements shrink until they fit their half.
+    Array.prototype.forEach.call(el.querySelectorAll('.baw-text'), function (t) {
+      if (!t.textContent) return;
+      var fs = 56 * u;
+      for (var i = 0; i < 20 && (t.scrollHeight > (vertical ? H / 2 : H) * 0.8 || t.scrollWidth > t.clientWidth + 1); i++) { fs *= 0.93; t.style.fontSize = fs.toFixed(1) + 'px'; }
+    });
+
+    // MOTION: the frame rises; the divider enters from the before edge,
+    // sweeps most of the way to show the after, and settles at the split.
+    // `sweeps` scripts it instead: [{at, to, duration}] with to in 0..1.
+    var split = Math.max(0.05, Math.min(0.95, Number(data.split) || 0.5));
+    var AT = Number(data.at) || 0.2;
+    var st = { p: 1 };
+    var sweeps = Array.isArray(data.sweeps) && data.sweeps.length ? data.sweeps
+      : [{ at: Number(data.sweep_at) || AT + 0.5, to: 0.1, duration: 1.0 }, { to: split, duration: 0.8 }];
+    function apply() {
+      var p = st.p;
+      if (vertical) {
+        before.style.clipPath = 'inset(0 0 ' + ((1 - p) * 100).toFixed(3) + '% 0)';
+        q('.baw-divider').style.transform = 'translateY(' + (p * H).toFixed(2) + 'px)';
+      } else {
+        before.style.clipPath = 'inset(0 ' + ((1 - p) * 100).toFixed(3) + '% 0 0)';
+        q('.baw-divider').style.transform = 'translateX(' + (p * W).toFixed(2) + 'px)';
+      }
+      // A label fades as its side closes (it would sit on the other layer).
+      q('.baw-chip-before').style.opacity = Math.max(0, Math.min(1, (p - 0.14) / 0.1)) * st.chips;
+      q('.baw-chip-after').style.opacity = Math.max(0, Math.min(1, (0.86 - p) / 0.1)) * st.chips;
+    }
+    st.chips = 0;
+    gsap.set(frame, { autoAlpha: 0, y: 24 });
+    tl.to(frame, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, AT);
+    tl.to(st, { chips: 1, duration: 0.3 }, AT + 0.3);
+    var t = AT;
+    sweeps.forEach(function (s) {
+      var at = s.at !== undefined ? Number(s.at) : t;
+      var d = Number(s.duration) || 0.8;
+      tl.to(st, { p: Math.max(0, Math.min(1, Number(s.to))), duration: d, ease: 'power3.inOut' }, at);
+      t = at + d;
+    });
+    tl.to({}, { duration: 0.01 }, DUR - 0.01);
+    tl.eventCallback('onUpdate', apply);
+    apply();
+    if (data.exit === true && DUR > 2) tl.to(frame, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, DUR - 0.5);
+    return tl;
+  }
+</script>

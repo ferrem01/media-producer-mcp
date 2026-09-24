@@ -1,0 +1,152 @@
+<template>
+  <div class="ssw-root">
+    <div class="ssw-list"></div>
+    <div class="ssw-stage"><div class="ssw-dev"><div class="ssw-bar"><i></i><i></i><i></i><b></b></div><div class="ssw-shots"></div></div></div>
+  </div>
+</template>
+
+<style scoped>
+  /* SCREEN SWAP: one pinned product window that swaps through feature
+     screens while a list beside it walks the features -- the active one in
+     full ink with a progress bar filling for its time on screen, the rest
+     quiet. On a tall frame the list collapses to the active feature, under
+     the window. Sized from the box, themed from the ground. */
+  .ssw-root, .ssw-root * { max-width: none; }
+  .ssw-root { --u: 1px; position: absolute; inset: 0; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .ssw-root.t-light { --ink: var(--mp-color-on-light, #17171c); --mute: color-mix(in srgb, var(--mp-color-on-light, #17171c) 55%, #ffffff); --chrome: #ffffff; --chrome-line: rgba(20, 20, 40, 0.10); --bar: #f1f1f5; --track: rgba(20, 20, 40, 0.08); }
+  .ssw-root.t-dark { --ink: #ffffff; --mute: rgba(255, 255, 255, 0.55); --chrome: #1d1e26; --chrome-line: rgba(255, 255, 255, 0.10); --bar: #26272f; --track: rgba(255, 255, 255, 0.12); }
+  .ssw-list { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: calc(var(--u) * 30); }
+  .ssw-item { position: relative; padding-left: calc(var(--u) * 26); }
+  .ssw-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--u) * 5); border-radius: 3px; background: var(--track); }
+  .ssw-fill { position: absolute; left: 0; top: 0; width: calc(var(--u) * 5); border-radius: 3px; background: var(--mp-color-primary, #393bf5); height: 0; }
+  .ssw-item h4 { margin: 0; font-size: calc(var(--u) * 42); font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; color: var(--ink); }
+  .ssw-item p { margin: calc(var(--u) * 8) 0 0; font-size: calc(var(--u) * 26); line-height: 1.35; color: var(--mute); }
+  .ssw-item p:empty { display: none; }
+  .ssw-stage { position: absolute; }
+  .ssw-dev { position: relative; width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; background: var(--chrome);
+    border: 1px solid var(--chrome-line); border-radius: calc(var(--u) * 18);
+    box-shadow: 0 calc(var(--u) * 4) calc(var(--u) * 10) rgba(20, 20, 60, 0.08), 0 calc(var(--u) * 24) calc(var(--u) * 56) rgba(20, 20, 60, 0.16); }
+  .ssw-bar { height: calc(var(--u) * 40); background: var(--bar); display: flex; align-items: center; gap: calc(var(--u) * 8); padding: 0 calc(var(--u) * 16); border-bottom: 1px solid var(--chrome-line); }
+  .ssw-bar i { width: calc(var(--u) * 12); height: calc(var(--u) * 12); border-radius: 50%; background: #d4d4dc; display: block; }
+  .ssw-bar b { margin-left: calc(var(--u) * 14); flex: 1; max-width: 50%; height: calc(var(--u) * 22); border-radius: 999px; background: var(--chrome); border: 1px solid var(--chrome-line);
+    font-size: calc(var(--u) * 13); font-weight: 500; color: var(--mute); display: flex; align-items: center; padding: 0 calc(var(--u) * 12); white-space: nowrap; overflow: hidden; }
+  .ssw-shots { position: absolute; left: 0; right: 0; bottom: 0; top: calc(var(--u) * 40); overflow: hidden; background: var(--bar); }
+  .ssw-shot { position: absolute; inset: 0; background-size: cover; background-position: center top; display: flex; align-items: center; justify-content: center; }
+  .ssw-ph { font-size: calc(var(--u) * 40); font-weight: 700; color: var(--mute); text-align: center; padding: 0 8%; }
+  .ssw-root.dev-phone .ssw-dev { border-radius: calc(var(--u) * 46); border: calc(var(--u) * 10) solid #111116; }
+  .ssw-root.dev-phone .ssw-bar { display: none; }
+  .ssw-root.dev-phone .ssw-shots { top: 0; border-radius: calc(var(--u) * 36); }
+  .ssw-root.dev-none .ssw-bar { display: none; }
+  .ssw-root.dev-none .ssw-shots { top: 0; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.ssw-root'), list = q('.ssw-list'), stage = q('.ssw-stage'), shotsEl = q('.ssw-shots');
+    var DUR = (ctx && ctx.duration) || 8;
+    var screens = (Array.isArray(data.screens) ? data.screens : []).map(function (s) { return typeof s === 'string' ? { src: s } : (s || {}); }).slice(0, 6);
+    if (!screens.length) return tl;
+    var n = screens.length;
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    root.classList.add('t-' + (data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light')));
+    var W0 = el.clientWidth || 1200, H0 = el.clientHeight || 700;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc + W0 * 0.03, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc + H0 * 0.04;
+    var W = W0 - 2 * ox, H = H0 - 2 * oy;
+    var tall = H > W * 1.05;
+    var device = data.device === 'phone' || data.device === 'none' || data.device === 'browser' ? data.device : 'browser';
+    root.classList.add('dev-' + device);
+    var aspect = Number(data.aspect) || (device === 'phone' ? 9 / 19.5 : 16 / 10.5);
+    q('.ssw-bar b').textContent = data.url || '';
+    if (!data.url) q('.ssw-bar b').style.visibility = 'hidden';
+
+    // LAYOUT: list beside the window (list_side left | right), or the
+    // active feature under it on a tall frame.
+    var listW, sw, sh, sx, sy, lx, ly, lh;
+    if (!tall) {
+      listW = W * (device === 'phone' ? 0.5 : 0.34);
+      var gap = W * 0.05;
+      sw = Math.min(W - listW - gap, H * aspect); sh = sw / aspect;
+      var left = data.list_side === 'right' ? 'screen' : 'list';
+      var total = listW + gap + sw, x0 = ox + (W - total) / 2;
+      if (left === 'list') { lx = x0; sx = x0 + listW + gap; } else { sx = x0; lx = x0 + sw + gap; }
+      sy = oy + (H - sh) / 2; ly = oy; lh = H;
+    } else {
+      sw = Math.min(W, H * 0.66 * aspect); sh = sw / aspect;
+      sx = ox + (W - sw) / 2; sy = oy + H * 0.02;
+      listW = W; lx = ox; ly = sy + sh + H * 0.04; lh = oy + H - ly;
+    }
+    stage.style.cssText = 'left:' + sx + 'px;top:' + sy + 'px;width:' + sw + 'px;height:' + sh + 'px';
+    list.style.cssText = 'left:' + lx + 'px;top:' + ly + 'px;width:' + listW + 'px;height:' + lh + 'px';
+    if (tall) list.style.justifyContent = 'flex-start';
+    // Type follows the frame (a narrow list column still reads).
+    var u = tall ? W / 760 : Math.min(W / 1500, H / 850);
+
+    var shots = screens.map(function (s, i) {
+      var d = document.createElement('div'); d.className = 'ssw-shot';
+      if (s.src) {
+        d.style.backgroundImage = 'url("' + String(s.src).replace(/"/g, '%22') + '")';
+        var im = new Image(); im.src = String(s.src); im.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0'; d.appendChild(im);
+      } else { var ph = document.createElement('div'); ph.className = 'ssw-ph'; ph.textContent = s.title || ('Feature ' + (i + 1)); d.appendChild(ph); }
+      shotsEl.appendChild(d);
+      return d;
+    });
+    var rows = screens.map(function (s) {
+      var r = document.createElement('div'); r.className = 'ssw-item';
+      r.innerHTML = '<div class="ssw-fill"></div><h4></h4><p></p>';
+      r.querySelector('h4').textContent = s.title || '';
+      r.querySelector('p').textContent = s.caption || '';
+      list.appendChild(r);
+      return r;
+    });
+    if (tall) rows.forEach(function (r) { r.style.position = 'absolute'; r.style.left = '0'; r.style.right = '0'; r.style.top = '0'; });
+    // Type shrinks until the list fits its column (or the tallest active row fits under the window).
+    for (var k = 0; k < 30; k++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      var fits = tall ? rows.every(function (r) { return r.offsetHeight <= lh * 0.95; }) : list.scrollHeight <= lh + 1;
+      if (fits) break;
+      u *= 0.94;
+    }
+
+    // A tall frame centres the window and the active feature as one group.
+    if (tall) {
+      var rowsH = Math.max.apply(null, rows.map(function (r) { return r.offsetHeight; }));
+      var gapT = H * 0.035, total = sh + gapT + rowsH;
+      sy = oy + Math.max(0, (H - total) / 2);
+      stage.style.top = sy + 'px'; list.style.top = (sy + sh + gapT) + 'px'; list.style.height = rowsH + 'px';
+    }
+
+    // MOTION: the window and list rise; each feature takes its slot of the
+    // scene -- its screen crossfades in with a small settle, its row lights
+    // and its bar fills for its time on screen.
+    var AT = Number(data.at) || 0.2;
+    var st = { a: 0 };
+    var starts = screens.map(function (s, i) { return s.at !== undefined ? Number(s.at) : AT + 0.3 + ((DUR - AT - 0.6) * i) / n; });
+    var slot = screens.map(function (s, i) { return { v: i === 0 ? 1 : 0, f: 0 }; });
+    tl.to(st, { a: 1, duration: 0.55, ease: 'power3.out' }, AT);
+    starts.forEach(function (t0, i) {
+      var end = i < n - 1 ? starts[i + 1] : DUR - 0.2;
+      if (i > 0) {
+        tl.to(slot[i], { v: 1, duration: 0.55, ease: 'power2.inOut' }, t0);
+        tl.to(slot[i - 1], { v: 0, duration: 0.55, ease: 'power2.inOut' }, t0);
+      }
+      tl.to(slot[i], { f: 1, duration: Math.max(0.3, end - t0 - 0.1), ease: 'none' }, t0);
+    });
+    function apply() {
+      gsap.set([stage, list], { autoAlpha: st.a, y: (1 - st.a) * 24 });
+      shots.forEach(function (d, i) { var v = slot[i].v; d.style.opacity = v; d.style.transform = 'scale(' + (1.04 - 0.04 * v).toFixed(4) + ')'; d.style.zIndex = v > 0.5 ? 2 : 1; });
+      rows.forEach(function (r, i) {
+        var v = slot[i].v;
+        r.querySelector('.ssw-fill').style.height = (slot[i].f * 100).toFixed(2) + '%';
+        if (tall) { r.style.opacity = v; r.style.transform = 'translateY(' + ((1 - v) * 10).toFixed(1) + 'px)'; }
+        else r.style.opacity = (0.45 + 0.55 * v).toFixed(3);
+      });
+    }
+    tl.to({}, { duration: 0.01 }, DUR - 0.01);
+    tl.eventCallback('onUpdate', apply);
+    apply();
+    return tl;
+  }
+</script>
