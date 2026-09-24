@@ -184,3 +184,47 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
 }
 
 function round(n: number): number { return Math.round(n * 100) / 100; }
+
+/** The words a caption lane shows, as tokens (stars and punctuation off). */
+function laneTokens(lane: { data?: Record<string, unknown> }): string[] {
+  const phrases = Array.isArray(lane?.data?.phrases) ? (lane.data!.phrases as unknown[]) : [];
+  return phrases
+    .map((p) => (typeof p === "string" ? p : (p && typeof p === "object" ? String((p as any).text || "") : "")))
+    .join(" ").split(/\s+/).map(normalizeToken).filter(Boolean);
+}
+
+/**
+ * THE CAPTIONS FOLLOW THE LINES. A scene's caption lane is cast once, from
+ * the words of its lines; an edit to the lines left the old words on screen
+ * (measured live, proj_de974ad1: three beats trimmed, their captions still
+ * read the original sentences -- the render would have shown words the take
+ * never says). Called on every re-time: when the lane's words no longer
+ * match the spine's, its phrases and anchors are recast from the spine,
+ * keeping the lane's own look (scatter or plated, scrim, fonts, position).
+ * A lane that still matches is left alone. Returns how many lanes changed.
+ */
+export function recaptionIfStale(
+  scene: { components?: any[]; voiceover_text?: string; emphasis?: string[]; audio_hints?: { voiceover_text?: string } },
+  spine: Spine,
+): number {
+  const want = (spine.words || []).map((w) => normalizeToken(w.text)).filter(Boolean);
+  if (!want.length) return 0;
+  let changed = 0;
+  for (const lane of scene.components || []) {
+    if (!lane || typeof lane !== "object" || lane.type !== "reel-caption-lane") continue;
+    const have = laneTokens(lane);
+    if (have.length === want.length && have.every((t, i) => t === want[i])) continue;
+    const lines = String(scene.voiceover_text || scene.audio_hints?.voiceover_text || "");
+    const marked = emphasisFromLines(lines).emphasis;
+    const kept = (Array.isArray(scene.emphasis) ? scene.emphasis.map(String) : []).filter((e) => want.includes(normalizeToken(e)));
+    const fresh = captionLane(spine, marked.length ? marked : kept, {
+      style: String(lane.data?.mode || "") === "scatter" ? "scatter" : "",
+      maxFont: typeof lane.data?.max_font === "number" ? lane.data.max_font : undefined,
+    });
+    if (!fresh) continue;
+    lane.data = { ...(lane.data || {}), phrases: fresh.data.phrases };
+    lane.anchors = fresh.anchors;
+    changed++;
+  }
+  return changed;
+}

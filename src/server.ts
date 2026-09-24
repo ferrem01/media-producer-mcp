@@ -1493,13 +1493,18 @@ export function createMcpServer(): McpServer {
         try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
         // Sound cues: word times resolved against the scene's words, files
         // copied in, so the board's sounds play in Studio right away.
+        // Edited lines re-time the scene too, as the board's own edit does:
+        // every word time resolves against the new words and a caption lane
+        // that no longer matches them is recast (core/captions.ts).
         for (const u of params.storyboard?.scenes || []) {
-          if (u.sfx === undefined || u.index === undefined) continue;
+          if (u.index === undefined || (u.sfx === undefined && u.voiceover_text === undefined)) continue;
           const sb: any = project.storyboard?.scenes?.[u.index];
-          if (sb?.sfx?.some((c: any) => c.anchor)) { try { await retimeScene(project, u.index, config.dataDir); } catch { /* the words resolve at the next re-time */ } }
+          const linesEdited = u.voiceover_text !== undefined;
+          if (linesEdited || sb?.sfx?.some((c: any) => c.anchor)) { try { await retimeScene(project, u.index, config.dataDir); } catch { /* the words resolve at the next re-time */ } }
           const bs: any = project.scenes?.[u.index];
-          if (bs && sb?.sfx) bs.sfx = JSON.parse(JSON.stringify(sb.sfx));
+          if (bs && u.sfx !== undefined && sb?.sfx) bs.sfx = JSON.parse(JSON.stringify(sb.sfx));
         }
+        if ((params.storyboard?.scenes || []).some((u: any) => u.voiceover_text !== undefined)) ensureSpeakerNeeds(project);
         try { await ensureSoundFiles(project, (id) => resolveSfxChoice(id, projectAssetsDir(params.tenant_id, project.project_id))); } catch (e: any) { console.warn(`  sound cues: ${e?.message || e}`); }
         project.updated_at = new Date().toISOString();
         await saveProject(project);
