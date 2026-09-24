@@ -1,0 +1,178 @@
+<template>
+  <div class="cc-root">
+    <div class="cc-grey"></div>
+    <div class="cc-stage">
+      <div class="cc-world">
+        <div class="cc-row"></div>
+      </div>
+      <div class="cc-tags"></div>
+      <svg class="cc-cursor" viewBox="0 0 24 24"><path d="M4 2 L20 12 L12.5 13.5 L16.5 21 L13.5 22.5 L9.5 15 L4 19 Z" fill="#111" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* CARD CASCADE: too many choices, as a long 3D row of cards standing up
+     like dominoes into the distance -- a cursor hovers, tags pop, and on the
+     word the whole row drains to grey ("overwhelming"). Products (image,
+     name, stars, price) or emails (sender, subject, preview lines: "the same
+     email, to everyone"). Designed at 1920x1080, scaled to cover its box. */
+  .cc-root, .cc-root * { max-width: none; }
+  .cc-root { position: absolute; inset: 0; overflow: hidden; }
+  .cc-grey { position: absolute; inset: 0; background: #b9b9bd; opacity: 0; }
+  .cc-stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden;
+    font-family: var(--mp-font-family, Inter), Inter, -apple-system, sans-serif; }
+  .cc-world { position: absolute; inset: 0; perspective: 1500px; perspective-origin: 40% 40%; }
+  .cc-row { position: absolute; left: 520px; top: 330px; transform-style: preserve-3d; }
+  .cc-card {
+    position: absolute; left: 0; top: 0; width: 300px; height: 380px; border-radius: 26px; box-sizing: border-box;
+    background: #fff; box-shadow: 0 30px 50px rgba(40, 30, 90, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08);
+    padding: 22px; transform-origin: 50% 100%; backface-visibility: hidden;
+    display: flex; flex-direction: column; color: #17171c;
+  }
+  .cc-img { flex: 1; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 120px; line-height: 1; overflow: hidden; }
+  .cc-img img { width: 100%; height: 100%; object-fit: cover; }
+  .cc-name { font-size: 22px; font-weight: 600; margin-top: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cc-meta { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; }
+  .cc-price { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .cc-stars { color: #f5b93a; font-size: 18px; letter-spacing: 1px; }
+  .cc-mail-hd { display: flex; align-items: center; gap: 10px; }
+  .cc-av { width: 42px; height: 42px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 18px; }
+  .cc-from { font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cc-subj { font-size: 24px; font-weight: 700; line-height: 1.2; margin-top: 18px; }
+  .cc-line { height: 12px; border-radius: 6px; background: #ecebf2; margin-top: 12px; }
+  .cc-tags { position: absolute; inset: 0; pointer-events: none; }
+  .cc-tag {
+    position: absolute; padding: 8px 16px; border-radius: 10px; font-size: 24px; font-weight: 600; white-space: nowrap;
+    background: rgba(255, 186, 214, 0.92); color: #b0165c; box-shadow: 0 8px 20px rgba(176, 22, 92, 0.18); visibility: hidden;
+  }
+  .cc-cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; visibility: hidden; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.25)); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var DUR = (ctx && ctx.duration) || 6;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var root = el.querySelector('.cc-root'), stage = el.querySelector('.cc-stage');
+    var row = el.querySelector('.cc-row'), tagsEl = el.querySelector('.cc-tags'), cursor = el.querySelector('.cc-cursor');
+
+    // ---- Ground: a soft lavender field (or any CSS background) ----
+    var bgColor = data.background || 'linear-gradient(135deg, #b7a6f2 0%, #d9d2fb 55%, #eef0ff 100%)';
+    root.style.background = bgColor;
+
+    // ---- Cards: given, repeated to fill `count` (a row that reads as
+    // endless is the point) ----
+    var style = data.style === 'email' ? 'email' : 'product';
+    var DEFAULTS = style === 'email' ? [
+      { from: 'Acme Weekly', subject: 'Our biggest sale of the year!', color: '#6366f1' },
+      { from: 'Acme Weekly', subject: "Don't miss out: 20% off", color: '#6366f1' },
+      { from: 'Acme Weekly', subject: 'Last chance!', color: '#6366f1' },
+      { from: 'Acme Weekly', subject: 'Just checking in', color: '#6366f1' }
+    ] : [
+      { name: 'Toy Car', price: '$21.50', emoji: '🚗' }, { name: 'Fiddle Leaf', price: '$34.00', emoji: '🪴' },
+      { name: 'Desk Lamp', price: '$48.00', emoji: '💡' }, { name: 'Sneakers', price: '$89.00', emoji: '👟' },
+      { name: 'Gift Box', price: '$15.00', emoji: '🎁' }, { name: 'Headphones', price: '$129', emoji: '🎧' }
+    ];
+    var given = (Array.isArray(data.cards) && data.cards.length ? data.cards : DEFAULTS).filter(function (c) { return c && typeof c === 'object'; });
+    var count = Math.max(given.length, Math.min(40, num(data.count, 18)));
+    var TINTS = ['#fde7ef', '#e6f0ff', '#e9f8ee', '#fff3dc', '#efe9ff', '#e8f7f8'];
+    var cards = [];
+    for (var i = 0; i < count; i++) {
+      var c = given[i % given.length];
+      var card = document.createElement('div'); card.className = 'cc-card';
+      if (style === 'email') {
+        var hd = document.createElement('div'); hd.className = 'cc-mail-hd';
+        var av = document.createElement('div'); av.className = 'cc-av'; av.style.background = c.color || '#6366f1';
+        av.textContent = String(c.from || '?').charAt(0).toUpperCase();
+        var fr = document.createElement('div'); fr.className = 'cc-from'; fr.textContent = c.from || '';
+        hd.appendChild(av); hd.appendChild(fr); card.appendChild(hd);
+        var sj = document.createElement('div'); sj.className = 'cc-subj'; sj.textContent = c.subject || ''; card.appendChild(sj);
+        [0.95, 0.8, 0.9, 0.6, 0.85].forEach(function (w) { var ln = document.createElement('div'); ln.className = 'cc-line'; ln.style.width = (w * 100) + '%'; card.appendChild(ln); });
+      } else {
+        var img = document.createElement('div'); img.className = 'cc-img'; img.style.background = c.tint || TINTS[i % TINTS.length];
+        if (c.image) { var im = document.createElement('img'); im.src = c.image; im.alt = ''; img.appendChild(im); }
+        else img.textContent = c.emoji || c.icon || '';
+        card.appendChild(img);
+        var nm = document.createElement('div'); nm.className = 'cc-name'; nm.textContent = c.name || ''; card.appendChild(nm);
+        var mt = document.createElement('div'); mt.className = 'cc-meta';
+        var pr = document.createElement('div'); pr.className = 'cc-price'; pr.textContent = c.price || '';
+        var st = document.createElement('div'); st.className = 'cc-stars'; st.textContent = '★★★★☆';
+        mt.appendChild(pr); mt.appendChild(st); card.appendChild(mt);
+      }
+      row.appendChild(card);
+      cards.push(card);
+    }
+
+    // ---- Scale the 1920x1080 design to cover the box ----
+    var fit = function () {
+      var w = el.clientWidth || 1920, h = el.clientHeight || 1080;
+      var s = Math.max(w / 1920, h / 1080);
+      stage.style.transform = 'translate(' + ((w - 1920 * s) / 2) + 'px,' + ((h - 1080 * s) / 2) + 'px) scale(' + s + ')';
+    };
+    fit();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(el);
+
+    // ---- The row in 3D: cards stand along a diagonal into depth, each
+    // turned toward the camera like a domino in a line ----
+    var GAP = num(data.gap, 118);
+    var yaw = num(data.angle, -32);
+    gsap.set(row, { rotationY: yaw, rotationX: 12 });
+    cards.forEach(function (card, k) {
+      gsap.set(card, { x: k * GAP, z: -k * 26, rotationY: 34 });
+    });
+
+    // ---- Domino entrance: each card stands up from flat, one after the
+    // next (the first few land where the eye is) ----
+    var enterAt = num(data.enter_at, 0.1), pace = num(data.pace, 0.07);
+    cards.forEach(function (card, k) {
+      gsap.set(card, { rotationX: -92, autoAlpha: 0 });
+      tl.to(card, { rotationX: 0, autoAlpha: 1, duration: 0.5, ease: 'back.out(1.5)' }, enterAt + k * pace);
+    });
+
+    // ---- The camera slides along the row (more cards keep coming) ----
+    var travel = num(data.travel, Math.min(count * GAP * 0.55, 1300));
+    tl.fromTo(row, { x: 0 }, { x: -travel, duration: DUR, ease: 'sine.inOut', immediateRender: false }, 0);
+
+    // ---- Hover: the cursor comes to a card and a tag pops beside it ----
+    var hovers = (Array.isArray(data.hovers) ? data.hovers : []).filter(Boolean);
+    if (hovers.length) {
+      gsap.set(cursor, { autoAlpha: 0, x: 1100, y: 900 });
+      tl.to(cursor, { autoAlpha: 1, duration: 0.2 }, Math.max(0, num(hovers[0].at, 0.8) - 0.4));
+    }
+    hovers.forEach(function (h, hi) {
+      var at = num(h.at, 0.8 + hi * 0.9);
+      var idx = Math.max(0, Math.min(count - 1, Math.round(num(h.card, hi))));
+      // Where that card will be at `at` (the row keeps sliding): measure by
+      // stepping the timeline there, then come back.
+      var t0 = tl.time();
+      tl.time(at + 0.35, true);
+      var r = cards[idx].getBoundingClientRect(), sr = stage.getBoundingClientRect();
+      var sc = sr.width / 1920 || 1;
+      var cx = (r.left - sr.left) / sc + (r.width / sc) * 0.55, cy = (r.top - sr.top) / sc + (r.height / sc) * 0.62;
+      tl.time(t0, true);
+      tl.to(cursor, { x: cx, y: cy, duration: 0.4, ease: 'power2.inOut' }, at);
+      tl.to(cards[idx], { y: -18, duration: 0.25, ease: 'power2.out' }, at + 0.3);
+      if (h.tag) {
+        var tag = document.createElement('div'); tag.className = 'cc-tag'; tag.textContent = h.tag;
+        tag.style.left = (cx - 30) + 'px'; tag.style.top = (cy + 70) + 'px';
+        tagsEl.appendChild(tag);
+        gsap.set(tag, { autoAlpha: 0, scale: 0.6, transformOrigin: '0% 0%' });
+        tl.to(tag, { autoAlpha: 1, scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 0.35);
+        var until = num(h.until, (hovers[hi + 1] ? num(hovers[hi + 1].at, at + 0.9) : at + 1.2));
+        if (until < DUR) tl.to(tag, { autoAlpha: 0, duration: 0.2 }, until);
+      }
+      tl.to(cards[idx], { y: 0, duration: 0.3, ease: 'power2.inOut' }, num(h.until, at + 0.85));
+    });
+
+    // ---- The grey-out: the whole row, and the ground, drain of color ----
+    if (data.grey_at !== undefined && data.grey_at !== null && data.grey_at !== '') {
+      var ga = num(data.grey_at, DUR);
+      tl.to(stage, { filter: 'grayscale(1) contrast(0.92) brightness(0.98)', duration: 0.6, ease: 'power2.inOut' }, ga);
+      tl.to(el.querySelector('.cc-grey'), { opacity: 1, duration: 0.6, ease: 'power2.inOut' }, ga);
+      tl.to(cursor, { autoAlpha: 0, duration: 0.3 }, ga);
+    }
+    return tl;
+  }
+</script>
