@@ -1,0 +1,52 @@
+{
+  "type": "quotient-flow",
+  "label": "Quotient flow — builds itself",
+  "category": "mockups",
+  "description": "A Quotient flow (automation) diagram in the product's own look -- white step cards with icons, grey curved connectors, green True / red False branch pills, the dotted canvas -- drawn from a list of STEPS and laid out automatically (branches spread side by side, a step with two `after`s merges them). It UNFURLS: row by row, each connector draws in and its step pops, branches together (`pace` seconds per row, or a step's own `at`). Then a SCRIPT performs on it: `highlight` (blue glow + a twinkle of sparkles), `path` (a lit dot runs through a list of steps, lighting each connector and pulsing each step it reaches -- 'this is what happened for Sarah'), `focus` (camera pushes in on a step) and `fit` (back out). Every `at` takes a word anchor (\"@acts\"). With no steps it shows a real onboarding flow. Use it full-frame for 'Quotient acts on it' beats: the logic building itself, then one customer's path through it. On a 9x16 frame keep it to 2-3 branches and 4-6 rows, or use camera \"follow\": UI-size text is small when a wide flow fits a phone.",
+  "data": {
+    "steps": {
+      "type": "array",
+      "label": "Steps (in order; each follows the previous unless `after` says otherwise)",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "label": "Id (for after / script)", "placeholder": "pricing" },
+          "kind": { "type": "string", "label": "Kind", "placeholder": "trigger | event | agent | conditional | email | slack | http | notify | update | delay | end" },
+          "title": { "type": "string", "label": "Title (defaults per kind)", "placeholder": "Send Email" },
+          "subtitle": { "type": "string", "label": "Detail line", "placeholder": "Pricing follow-up" },
+          "after": { "type": "string", "label": "After (step id, or a list of ids to merge)", "placeholder": "cond" },
+          "branch": { "type": "string", "label": "Branch label on the connector in", "placeholder": "True | False | Viewed pricing" },
+          "icon": { "type": "string", "label": "Icon override", "placeholder": "play | zap | branch | mail | slack | webhook | bell | user | clock | eye | sparkles | trending | briefcase | message | file | target | flag | quotient" },
+          "ai": { "type": "boolean", "label": "AI badge (Quotient mark after the title)" },
+          "chip": { "type": "string", "label": "Label tab above the card (triggers: \"Trigger\")" },
+          "at": { "type": "number", "label": "Appears at (s or @word; default: its row's slot)" }
+        }
+      }
+    },
+    "unfurl": { "type": "boolean", "label": "Unfurl (false = the whole flow is already there)", "optional": true },
+    "unfurl_at": { "type": "number", "label": "Unfurl starts at (s or @word)", "optional": true, "placeholder": "0.15" },
+    "pace": { "type": "number", "label": "Seconds per row", "optional": true, "placeholder": "0.16" },
+    "camera": { "type": "string", "label": "Camera", "optional": true, "placeholder": "fit (whole flow) | follow (rides the unfurl and the path)" },
+    "zoom": { "type": "number", "label": "Follow zoom", "optional": true, "placeholder": "1.35" },
+    "accent": { "type": "string", "label": "Highlight / path color", "optional": true, "placeholder": "#2b63e3" },
+    "script": {
+      "type": "array",
+      "label": "Script (performs on the flow)",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": { "type": "number", "label": "At (s or @word)" },
+          "action": { "type": "string", "label": "Action", "placeholder": "highlight | path | focus | fit" },
+          "step": { "type": "string", "label": "Step id (highlight / focus)" },
+          "steps": { "type": "array", "label": "Step ids (path: in order; highlight: several)", "items": { "type": "string" } },
+          "until": { "type": "number", "label": "Highlight ends at (default: scene end)" },
+          "twinkle": { "type": "boolean", "label": "Sparkles on a highlight (default true)" },
+          "hop": { "type": "number", "label": "Path: seconds per step", "placeholder": "0.42" },
+          "zoom": { "type": "number", "label": "Focus zoom", "placeholder": "1.8" }
+        }
+      }
+    }
+  }
+}
