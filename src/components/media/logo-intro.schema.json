@@ -1,7 +1,18 @@
 {
-  "type": "object",
-  "properties": {
-    "text": { "type": "string", "description": "Logo/brand text" },
-    "tagline": { "type": "string", "description": "Tagline below logo" }
+  "type": "logo-intro",
+  "label": "Logo Intro",
+  "category": "media",
+  "description": "The brand's opening: the logo (image or wordmark text) resolves in with an ambient ring, a tagline under it.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Logo/brand text",
+      "optional": true
+    },
+    "tagline": {
+      "type": "string",
+      "label": "Tagline below logo",
+      "optional": true
+    }
   }
 }

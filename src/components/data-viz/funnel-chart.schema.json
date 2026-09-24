@@ -1,23 +1,52 @@
 {
-  "type": "object",
-  "properties": {
+  "type": "funnel-chart",
+  "label": "Funnel Chart",
+  "category": "data-viz",
+  "description": "A conversion funnel: stages top to bottom (e.g. Sent > Opened > Clicked > Converted), bars drawing in sequence with count-ups, each stage showing its conversion from the one above, the last stage styled as the money number.",
+  "data": {
     "stages": {
       "type": "array",
+      "label": "Funnel stages top-to-bottom. Bars draw in sequence with count-ups; each stage after the first shows its conversion from the previous stage; the LAST stage is styled as the money number.",
+      "required": true,
       "items": {
         "type": "object",
         "properties": {
-          "label": { "type": "string", "description": "Stage name (e.g. Sent, Delivered, Opened, Clicked)" },
-          "value": { "type": "number", "description": "Stage count -- bars scale to the largest stage" },
-          "display": { "type": "string", "description": "Override the final displayed value (e.g. \"1.9K\")" },
-          "retention": { "type": "string", "description": "Override the computed step-conversion badge (e.g. \"57%\")" },
-          "color": { "type": "string", "description": "Override the bar color" }
+          "label": {
+            "type": "string",
+            "description": "Stage name (e.g. Sent, Delivered, Opened, Clicked)"
+          },
+          "value": {
+            "type": "number",
+            "description": "Stage count -- bars scale to the largest stage"
+          },
+          "display": {
+            "type": "string",
+            "description": "Override the final displayed value (e.g. \"1.9K\")"
+          },
+          "retention": {
+            "type": "string",
+            "description": "Override the computed step-conversion badge (e.g. \"57%\")"
+          },
+          "color": {
+            "type": "string",
+            "description": "Override the bar color"
+          }
         },
-        "required": ["label", "value"]
-      },
-      "description": "Funnel stages top-to-bottom. Bars draw in sequence with count-ups; each stage after the first shows its conversion from the previous stage; the LAST stage is styled as the money number."
+        "required": [
+          "label",
+          "value"
+        ]
+      }
     },
-    "title": { "type": "string", "description": "Chart title" },
-    "show_retention": { "type": "boolean", "description": "Show step-conversion badges (default true)" }
-  },
-  "required": ["stages"]
+    "title": {
+      "type": "string",
+      "label": "Chart title",
+      "optional": true
+    },
+    "show_retention": {
+      "type": "boolean",
+      "label": "Show step-conversion badges (default true)",
+      "optional": true
+    }
+  }
 }

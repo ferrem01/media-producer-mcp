@@ -1,10 +1,29 @@
 {
-  "type": "object",
-  "properties": {
-    "value": { "type": "number", "description": "Current value" },
-    "max": { "type": "number", "default": 100, "description": "Maximum value" },
-    "label": { "type": "string", "description": "Label above the bar" },
-    "color": { "type": "string", "description": "Fill color" }
-  },
-  "required": ["value"]
+  "type": "progress-bar",
+  "label": "Progress Bar",
+  "category": "data-viz",
+  "description": "One labelled progress bar that fills to its value with a count-up (e.g. 'Average open rate 41%'). A single metric, stated plainly.",
+  "data": {
+    "value": {
+      "type": "number",
+      "label": "Current value",
+      "required": true
+    },
+    "max": {
+      "type": "number",
+      "label": "Maximum value",
+      "optional": true,
+      "default": 100
+    },
+    "label": {
+      "type": "string",
+      "label": "Label above the bar",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Fill color",
+      "optional": true
+    }
+  }
 }

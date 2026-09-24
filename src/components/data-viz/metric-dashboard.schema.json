@@ -1,22 +1,44 @@
 {
-  "type": "object",
-  "properties": {
+  "type": "metric-dashboard",
+  "label": "Metric Dashboard",
+  "category": "data-viz",
+  "description": "A grid of KPI cards, each counting up to its value with a label, change and a mini sparkline.",
+  "data": {
     "metrics": {
       "type": "array",
+      "label": "Array of metric data",
+      "required": true,
       "items": {
         "type": "object",
         "properties": {
-          "value": { "type": "number" },
-          "label": { "type": "string" },
-          "prefix": { "type": "string" },
-          "suffix": { "type": "string" },
-          "change": { "type": "number", "description": "Percentage change indicator" }
+          "value": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "suffix": {
+            "type": "string"
+          },
+          "change": {
+            "type": "number",
+            "description": "Percentage change indicator"
+          }
         },
-        "required": ["value", "label"]
-      },
-      "description": "Array of metric data"
+        "required": [
+          "value",
+          "label"
+        ]
+      }
     },
-    "columns": { "type": "number", "description": "Number of grid columns", "default": 3 }
-  },
-  "required": ["metrics"]
+    "columns": {
+      "type": "number",
+      "label": "Number of grid columns",
+      "optional": true,
+      "default": 3
+    }
+  }
 }

@@ -31,6 +31,10 @@
 
 <script>
   function createTimeline(el, data, ctx) {
+    // Seeded, not Math.random: every render worker (and every seek after a
+    // reload) builds the same layout. data.seed picks another one.
+    var __seed = Math.abs(Math.round(Number(data && data.seed) || 7)) % 2147483646 + 1;
+    var __rnd = function () { __seed = (__seed * 16807) % 2147483647; return (__seed - 1) / 2147483646; };
     var tl = gsap.timeline();
     var svg = el.querySelector('.particle-canvas');
     var count = data.count || 30;
@@ -46,9 +50,9 @@
     // Create particles
     var particles = [];
     for (var i = 0; i < count; i++) {
-      var cx = Math.random() * w;
-      var cy = Math.random() * h;
-      var r = 1.5 + Math.random() * 2.5;
+      var cx = __rnd() * w;
+      var cy = __rnd() * h;
+      var r = 1.5 + __rnd() * 2.5;
       var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', cx);
       circle.setAttribute('cy', cy);
@@ -83,16 +87,16 @@
     // Animate each particle with slow random drift
     for (var j = 0; j < particles.length; j++) {
       var p = particles[j];
-      var driftX = (Math.random() - 0.5) * 80 * speed;
-      var driftY = (Math.random() - 0.5) * 60 * speed;
-      var dur = (3 + Math.random() * 4) / speed;
+      var driftX = (__rnd() - 0.5) * 80 * speed;
+      var driftY = (__rnd() - 0.5) * 60 * speed;
+      var dur = (3 + __rnd() * 4) / speed;
       tl.to(p.el, {
         attr: { cx: '+=' + driftX, cy: '+=' + driftY },
         duration: dur,
         ease: 'sine.inOut',
         yoyo: true,
         repeat: -1
-      }, Math.random() * 2);
+      }, __rnd() * 2);
     }
 
     return tl;

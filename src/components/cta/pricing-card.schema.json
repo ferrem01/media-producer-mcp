@@ -1,16 +1,41 @@
 {
-  "type": "object",
-  "properties": {
-    "name": { "type": "string", "description": "Tier name" },
-    "price": { "type": "string", "description": "Price display (e.g. $49)" },
-    "period": { "type": "string", "description": "Billing period (e.g. /month)" },
+  "type": "pricing-card",
+  "label": "Pricing Card",
+  "category": "cta",
+  "description": "A pricing tier card: name, price and period, a feature list that staggers in, an optional highlight and CTA button.",
+  "data": {
+    "name": {
+      "type": "string",
+      "label": "Tier name",
+      "required": true
+    },
+    "price": {
+      "type": "string",
+      "label": "Price display (e.g. $49)",
+      "required": true
+    },
+    "period": {
+      "type": "string",
+      "label": "Billing period (e.g. /month)",
+      "optional": true
+    },
     "features": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "List of feature strings"
+      "label": "List of feature strings",
+      "required": true,
+      "items": {
+        "type": "string"
+      }
     },
-    "highlighted": { "type": "boolean", "description": "Whether to highlight the card" },
-    "cta": { "type": "string", "description": "CTA button text" }
-  },
-  "required": ["name", "price", "features"]
+    "highlighted": {
+      "type": "boolean",
+      "label": "Whether to highlight the card",
+      "optional": true
+    },
+    "cta": {
+      "type": "string",
+      "label": "CTA button text",
+      "optional": true
+    }
+  }
 }

@@ -99,12 +99,15 @@
       step = Math.max(0.012, (available - speed) / Math.max(1, charEls.length - 1));
     }
 
-    function randGlyph() {
-      return glyphs.charAt(Math.floor(Math.random() * glyphs.length));
+    // The scramble is a pure function of (character, progress step) -- a
+    // seek lands on the same glyph every time (it was Math.random per frame).
+    function randGlyph(ci, p) {
+      var v = Math.sin((ci + 1) * 78.233 + Math.floor(p * 24) * 12.9898) * 43758.5453;
+      return glyphs.charAt(Math.floor((v - Math.floor(v)) * glyphs.length));
     }
 
     for (var i = 0; i < charEls.length; i++) {
-      (function (cel, at) {
+      (function (cel, at, i2) {
         var scramble = { p: 0 };
         var finalCh = cel.getAttribute('data-final');
         tl.set(cel, { autoAlpha: 1 }, at);
@@ -116,7 +119,7 @@
           onStart: function () { cel.classList.add('scrambling'); },
           onUpdate: function () {
             if (scramble.p < 0.92) {
-              cel.textContent = randGlyph();
+              cel.textContent = randGlyph(i2, scramble.p);
             } else {
               cel.textContent = finalCh;
             }
@@ -126,7 +129,7 @@
             cel.classList.remove('scrambling');
           }
         }, at);
-      })(charEls[i], startAt + i * step);
+      })(charEls[i], startAt + i * step, i);
     }
 
     if (ctx.duration > 2) {
