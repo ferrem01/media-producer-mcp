@@ -128,3 +128,72 @@ describe("the playground page's client script", () => {
     expect(html).toContain("\\bdata\\.([a-zA-Z_]");
   });
 });
+
+// Cleanup (Marc): the playground wears the app's skin, knows its tenant like
+// Studio does, and every library component opens.
+describe("playground cleanup", () => {
+  const html = getPlaygroundHtml();
+
+  it("wears the app theme (quotient-theme tokens), not the old dark slate", () => {
+    expect(html).toContain("--surface-primary");
+    expect(html).toContain("var(--content-primary)");
+    expect(html).not.toMatch(/background:\s*#0f172a/);
+    expect(html).not.toMatch(/#1e293b|#334155/);
+  });
+
+  it("has no tenant field: the tenant comes from ?tenant= or the login session (/auth/me)", () => {
+    expect(html).not.toContain('id="tenant-input"');
+    expect(html).toContain("'/auth/me'");
+    expect(html).toContain("/auth/google/login?return_to=");
+  });
+
+  it("asks for a library component by its FOLDER, not its schema category", () => {
+    expect(html).toContain("c.dir || cat");
+  });
+});
+
+describe("library files resolve by folder, whatever the schema calls its category", async () => {
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const { findLibraryFile, buildComponentCatalog } = await import("../src/llm/catalog.js");
+  const lib = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/components");
+
+  it("finds every scene template and mock the Library lists (\"Component source not found\" was every one)", async () => {
+    const catalog = await buildComponentCatalog(lib);
+    const misfiled = catalog.filter((c) => c.dir && c.dir !== c.category);
+    expect(misfiled.length).toBeGreaterThan(0); // scene-template lives in scene-templates/
+    for (const c of catalog) {
+      const byCategory = await findLibraryFile(lib, c.category, `${c.type}.component.html`);
+      expect(byCategory, `${c.category}/${c.type}`).toBeTruthy();
+      const byDir = await findLibraryFile(lib, c.dir!, `${c.type}.component.html`);
+      expect(byDir, `${c.dir}/${c.type}`).toBeTruthy();
+    }
+  });
+
+  it("one MOCKUPS section: no schema says \"mockup\" (singular) any more", async () => {
+    const catalog = await buildComponentCatalog(lib);
+    expect(catalog.filter((c) => c.category === "mockup").map((c) => c.type)).toEqual([]);
+  });
+
+  it("never leaves the library", async () => {
+    expect(await findLibraryFile(lib, "..", "package.json")).toBeNull();
+    expect(await findLibraryFile(lib, "mockups", "../../package.json")).toBeNull();
+  });
+});
+
+describe("the preview page previews in the brand, light by default", async () => {
+  const { buildPlaygroundPreview } = await import("../src/playground-app/preview-builder.js");
+  const base = { boundHtml: "<div></div>", scopedCSS: "", gsapSource: "", sharedSource: "", script: "function createTimeline(){return {}}", data: {} };
+  it("defaults to dark text on white (the old white-text default blanked every scene template)", () => {
+    const html = buildPlaygroundPreview(base);
+    expect(html).toContain("--mp-color-text: #17171c");
+    expect(html).not.toContain("--mp-color-text: #ffffff");
+    expect(html).toContain("width: 100vw; height: 100vh"); // tall canvases lay out tall
+  });
+  it("uses the tenant's brand CSS and fonts when given", () => {
+    const html = buildPlaygroundPreview({ ...base, brandCss: ":root { --mp-color-text: #123456; }", fontLinks: "<link rel=\"stylesheet\" href=\"x\">", background: "#fafafa" });
+    expect(html).toContain("--mp-color-text: #123456");
+    expect(html).toContain('<link rel="stylesheet" href="x">');
+    expect(html).toContain("background: #fafafa");
+  });
+});

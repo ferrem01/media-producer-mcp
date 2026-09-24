@@ -1,7 +1,7 @@
 {
   "type": "quotient-blog",
   "label": "Quotient Blog (document view)",
-  "category": "mockup",
+  "category": "mockups",
   "description": "The Quotient blog DOCUMENT surface, matched to the real app and CHROMELESS like quotient-social/quotient-campaign: doc header row (Last updated, campaign chip, Threads, Draft/Published status pill), hero image, title + dek, Authors/Slug/Tags/Publish Date meta rows, word count, and body prose. App chrome comes from quotient-app-shell -- stage this in its content region (or inset on its own for a full-frame doc beat). The 'publish-blog' script action flips the header pill from Draft to the green rocket Published state -- the blog's money beat. Also scroll-doc and highlight-hero.",
   "data": {
     "title": {

@@ -32,7 +32,7 @@ import { retimeScene, attachTakeAcrossScenes, primeTakeWords, deAirTake, type Re
 import { clearAnchorsFor } from "./core/word-anchors.js";
 import { detectFace } from "./core/face-band.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
-import { buildComponentCatalog } from "./llm/catalog.js";
+import { buildComponentCatalog, findLibraryFile } from "./llm/catalog.js";
 import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-track.js";
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
@@ -62,7 +62,7 @@ import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
-import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
+import { assembleSceneAuto, loadSharedUtilities, generateBrandCSS, generateFontLinks, type ComponentSource } from "./core/scene-assembler.js";
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
 import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
@@ -1975,8 +1975,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       const sourceMatch = urlPath.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/source$/);
       if (sourceMatch && method === "GET") {
         const [, category, type] = sourceMatch.map(decodeURIComponent);
-        const filePath = path.join(config.componentLibDir, category, `${type}.component.html`);
+        const filePath = await findLibraryFile(config.componentLibDir, category, `${type}.component.html`);
         try {
+          if (!filePath) throw new Error("missing");
           const source = await fs.readFile(filePath, "utf-8");
           res.writeHead(200, {
             "Content-Type": "text/plain; charset=utf-8",
@@ -1993,8 +1994,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       const schemaMatch = urlPath.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/schema$/);
       if (schemaMatch && method === "GET") {
         const [, category, type] = schemaMatch.map(decodeURIComponent);
-        const filePath = path.join(config.componentLibDir, category, `${type}.schema.json`);
+        const filePath = await findLibraryFile(config.componentLibDir, category, `${type}.schema.json`);
         try {
+          if (!filePath) throw new Error("missing");
           const raw = await fs.readFile(filePath, "utf-8");
           const schema = JSON.parse(raw);
           jsonResponse(res, 200, schema);
@@ -2008,8 +2010,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       const defaultsMatch = urlPath.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/defaults$/);
       if (defaultsMatch && method === "GET") {
         const [, dCategory, dType] = defaultsMatch.map(decodeURIComponent);
-        const schemaPath = path.join(config.componentLibDir, dCategory, dType + ".schema.json");
+        const schemaPath = await findLibraryFile(config.componentLibDir, dCategory, dType + ".schema.json");
         try {
+          if (!schemaPath) throw new Error("missing");
           const raw = await fs.readFile(schemaPath, "utf-8");
           const schema = JSON.parse(raw);
           const defaults = generateDefaultsFromSchema(schema);
@@ -2054,6 +2057,21 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
             sharedSource = await loadSharedUtilities();
           } catch { /* non-fatal */ }
 
+          // Preview in the tenant's brand, as a build would (colors, text
+          // on the right ground, fonts); light defaults when there is none.
+          let brandCss: string | undefined, fontLinks: string | undefined, background: string | undefined;
+          const pvTenant = typeof body.tenant_id === "string" ? body.tenant_id : "";
+          if (pvTenant) {
+            try {
+              const kit = await loadBrandKit(pvTenant);
+              if (kit) {
+                background = kit.colors?.background || "#ffffff";
+                brandCss = generateBrandCSS(kit, background, true).css;
+                fontLinks = generateFontLinks(kit);
+              }
+            } catch { /* no kit: defaults */ }
+          }
+
           const html = buildPlaygroundPreview({
             boundHtml,
             scopedCSS,
@@ -2061,6 +2079,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
             sharedSource,
             script: parsed.script,
             data,
+            brandCss,
+            fontLinks,
+            background,
           });
 
           res.writeHead(200, {
