@@ -1,0 +1,71 @@
+{
+  "type": "media-grid",
+  "label": "Media Grid",
+  "category": "media",
+  "description": "2-6 screenshots or clips as one composed spread: 2-up, hero + 2, 2x2, 3x2 (auto by count; a tall frame stacks). Rounded tiles with a hairline, a slow push inside each frame, a caption chip per tile; tiles land one after another; highlight dims the rest and rings the one that matters. For 'here's all of it at once' proof beats.",
+  "data": {
+    "items": {
+      "type": "array",
+      "label": "Tiles: {src (image or .mp4/.webm clip), caption, position (object-position, e.g. 'center top'), video, start_at}",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string"
+          },
+          "video": {
+            "type": "boolean"
+          },
+          "start_at": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "layout": {
+      "type": "string",
+      "label": "auto (default: 2-up, hero+2, 2x2, 3x2 by count) | row (all in one row)",
+      "optional": true,
+      "enum": [
+        "auto",
+        "row"
+      ]
+    },
+    "highlight": {
+      "type": "number",
+      "label": "Index of the tile to ring (others dim)",
+      "optional": true
+    },
+    "highlight_at": {
+      "type": "number",
+      "label": "Seconds the highlight lands",
+      "optional": true
+    },
+    "push": {
+      "type": "boolean",
+      "label": "Slow push inside each tile (default true)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Ink theme; omit to follow the measured scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}

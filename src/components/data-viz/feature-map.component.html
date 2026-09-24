@@ -1,0 +1,143 @@
+<template>
+  <div class="fm-root">
+    <svg class="fm-lines" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="fm-nodes"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* FEATURE MAP: one hub (the product) and the things it connects to --
+     integrations, features, channels -- set round it. The hub lands, the
+     connectors draw out one by one, each node lights as its line arrives,
+     then signal pulses run hub -> nodes. Sized from the visible box. */
+  .fm-root, .fm-root * { max-width: none; box-sizing: border-box; }
+  .fm-root { --u: 1px; position: absolute; inset: 0; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .fm-root.t-light { --n-bg: #ffffff; --n-ink: var(--mp-color-on-light, #17171c); --n-mute: color-mix(in srgb, var(--mp-color-on-light, #17171c) 60%, #ffffff); --n-line: rgba(20, 20, 40, 0.10); }
+  .fm-root.t-dark { --n-bg: #1b1c24; --n-ink: #ffffff; --n-mute: rgba(255, 255, 255, 0.66); --n-line: rgba(255, 255, 255, 0.12); }
+  .fm-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .fm-node { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: calc(var(--u) * 12);
+    padding: calc(var(--u) * 12) calc(var(--u) * 20) calc(var(--u) * 12) calc(var(--u) * 12); border-radius: 999px;
+    background: var(--n-bg); color: var(--n-ink); border: 1px solid var(--n-line); white-space: nowrap;
+    font-size: calc(var(--u) * 24); font-weight: 600; letter-spacing: -0.01em;
+    box-shadow: 0 calc(var(--u) * 4) calc(var(--u) * 10) rgba(20, 20, 60, 0.06), 0 calc(var(--u) * 14) calc(var(--u) * 30) rgba(20, 20, 60, 0.10); }
+  .fm-node.lit { border-color: color-mix(in srgb, var(--mp-color-primary, #393bf5) 55%, transparent); }
+  .fm-ic { flex: 0 0 auto; width: calc(var(--u) * 40); height: calc(var(--u) * 40); border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: color-mix(in srgb, var(--mp-color-primary, #393bf5) 12%, var(--n-bg)); color: var(--mp-color-primary, #393bf5); font-size: calc(var(--u) * 18); font-weight: 700; }
+  .fm-ic img { width: 72%; height: 72%; object-fit: contain; }
+  .fm-sub { display: block; font-size: calc(var(--u) * 16); font-weight: 500; color: var(--n-mute); margin-top: calc(var(--u) * 2); }
+  .fm-hub { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    border-radius: 50%; background: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff);
+    font-size: calc(var(--u) * 30); font-weight: 700; letter-spacing: -0.02em; padding: calc(var(--u) * 16);
+    box-shadow: 0 0 0 calc(var(--u) * 12) color-mix(in srgb, var(--mp-color-primary, #393bf5) 14%, transparent), 0 calc(var(--u) * 20) calc(var(--u) * 50) color-mix(in srgb, var(--mp-color-primary, #393bf5) 35%, transparent); }
+  .fm-hub img { max-width: 70%; max-height: 50%; object-fit: contain; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.fm-root'), svg = q('.fm-lines'), layer = q('.fm-nodes');
+    var NS = 'http://www.w3.org/2000/svg';
+    var DUR = (ctx && ctx.duration) || 6;
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    root.classList.add('t-' + (data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light')));
+    var nodes = (Array.isArray(data.nodes) ? data.nodes : []).map(function (x) { return typeof x === 'string' ? { label: x } : (x || {}); }).slice(0, 12);
+    var hubD = typeof data.hub === 'string' ? { label: data.hub } : (data.hub || { label: 'Quotient' });
+
+    var W0 = el.clientWidth || 1200, H0 = el.clientHeight || 700;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var X = ox, Y = oy, W = W0 - 2 * ox, H = H0 - 2 * oy;
+    svg.setAttribute('viewBox', '0 0 ' + W0 + ' ' + H0);
+    var cx = X + W / 2, cy = Y + H / 2;
+    var u = Math.min(W / 1400, H / 800) * 1.15;
+
+    var hub = document.createElement('div'); hub.className = 'fm-hub';
+    if (hubD.logo) { var hi = document.createElement('img'); hi.src = String(hubD.logo); hi.alt = ''; hub.appendChild(hi); }
+    if (hubD.label) { var hl = document.createElement('div'); hl.textContent = String(hubD.label); hub.appendChild(hl); }
+    layer.appendChild(hub);
+    var els = nodes.map(function (nd) {
+      var b = document.createElement('div'); b.className = 'fm-node';
+      var ic = document.createElement('span'); ic.className = 'fm-ic';
+      if (nd.logo) { var im = document.createElement('img'); im.src = String(nd.logo); im.alt = ''; ic.appendChild(im); }
+      else ic.textContent = String(nd.icon || (nd.label || '?').trim()[0] || '?').toUpperCase();
+      b.appendChild(ic);
+      var t = document.createElement('span'); t.textContent = String(nd.label || '');
+      if (nd.sub) { var s = document.createElement('span'); s.className = 'fm-sub'; s.textContent = String(nd.sub); t.appendChild(s); }
+      b.appendChild(t);
+      layer.appendChild(b);
+      return b;
+    });
+
+    // SIZE + PLACE: nodes on an ellipse round the hub; shrink until no node
+    // leaves the box or touches a neighbour or the hub.
+    var n = els.length;
+    var place = [];
+    for (var it = 0; it < 30; it++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      var hs = Math.min(W, H) * 0.24;
+      hub.style.width = hs + 'px'; hub.style.height = hs + 'px';
+      hub.style.left = (cx - hs / 2) + 'px'; hub.style.top = (cy - hs / 2) + 'px';
+      var maxW = 0, maxH = 0;
+      els.forEach(function (b) { maxW = Math.max(maxW, b.offsetWidth); maxH = Math.max(maxH, b.offsetHeight); });
+      var rx = W / 2 - maxW / 2 - W * 0.02, ry = H / 2 - maxH / 2 - H * 0.03;
+      var start = n % 2 ? -Math.PI / 2 : -Math.PI / 2 + Math.PI / n;
+      place = els.map(function (b, i) {
+        var a = start + (i / n) * Math.PI * 2;
+        var x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
+        return { x: x, y: y, w: b.offsetWidth, h: b.offsetHeight };
+      });
+      var ok = rx > hs * 0.75 && ry > hs * 0.6;
+      for (var i = 0; i < place.length && ok; i++) for (var j = i + 1; j < place.length && ok; j++) {
+        var a1 = place[i], b1 = place[j];
+        if (Math.abs(a1.x - b1.x) < (a1.w + b1.w) / 2 + 8 && Math.abs(a1.y - b1.y) < (a1.h + b1.h) / 2 + 8) ok = false;
+      }
+      if (ok) break;
+      u *= 0.93;
+    }
+    els.forEach(function (b, i) { b.style.left = (place[i].x - place[i].w / 2) + 'px'; b.style.top = (place[i].y - place[i].h / 2) + 'px'; });
+
+    // Connectors: a gentle curve from the hub's edge to each node.
+    var hr = parseFloat(hub.style.width) / 2;
+    var lines = place.map(function (p) {
+      var dx = p.x - cx, dy = p.y - cy, d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var sx = cx + dx / d * hr * 1.05, sy = cy + dy / d * hr * 1.05;
+      var mx = (sx + p.x) / 2 - dy / d * d * 0.08, my = (sy + p.y) / 2 + dx / d * d * 0.08;
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', 'M' + sx + ' ' + sy + ' Q' + mx + ' ' + my + ' ' + p.x + ' ' + p.y);
+      path.setAttribute('fill', 'none'); path.setAttribute('stroke-width', Math.max(2, u * 3)); path.setAttribute('stroke-linecap', 'round');
+      path.style.stroke = 'color-mix(in srgb, var(--mp-color-primary, #393bf5) 45%, transparent)';
+      svg.appendChild(path);
+      var len = path.getTotalLength();
+      path.style.strokeDasharray = len; path.style.strokeDashoffset = len;
+      return { path: path, len: len };
+    });
+
+    // MOTION: hub, then each connector draws and its node lights on arrival;
+    // then pulses run out along every line until the scene ends.
+    var AT = Number(data.at) || 0.2;
+    gsap.set(hub, { autoAlpha: 0, scale: 0.9 });
+    tl.to(hub, { autoAlpha: 1, scale: 1, duration: 0.55, ease: 'power3.out' }, AT);
+    var t0 = AT + 0.45, each = Math.min(0.28, 2.2 / Math.max(1, n));
+    lines.forEach(function (ln, i) {
+      var t = t0 + i * each;
+      tl.to(ln.path.style, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, t);
+      gsap.set(els[i], { autoAlpha: 0, y: 8 });
+      tl.to(els[i], { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, t + 0.38);
+    });
+    var built = t0 + n * each + 0.4;
+    els.forEach(function (b) { tl.set(b, { className: 'fm-node lit' }, built); });
+    if (data.pulses !== false && built < DUR - 0.8) {
+      lines.forEach(function (ln, i) {
+        var dot = document.createElementNS(NS, 'circle'); dot.setAttribute('r', Math.max(4, u * 6)); dot.style.fill = 'var(--mp-color-primary, #393bf5)';
+        svg.appendChild(dot);
+        var st = { p: 0 };
+        var put = function () { var pt = ln.path.getPointAtLength(st.p * ln.len); dot.setAttribute('cx', pt.x); dot.setAttribute('cy', pt.y); dot.style.opacity = st.p > 0.02 && st.p < 0.98 ? 1 : 0; };
+        put();
+        var reps = Math.max(0, Math.floor((DUR - built - 0.3) / 1.4) - 1);
+        tl.to(st, { p: 1, duration: 0.9, ease: 'power1.inOut', repeat: reps, repeatDelay: 0.5, onUpdate: put }, built + (i % 4) * 0.15);
+      });
+    }
+    return tl;
+  }
+</script>

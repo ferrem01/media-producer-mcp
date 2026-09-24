@@ -1,0 +1,80 @@
+<template>
+  <div class="sb-root"><div class="sb-bubble"><div class="sb-name"></div><div class="sb-text"></div><svg class="sb-tail" viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M0 0 H40 L6 30 Z"/></svg></div></div>
+</template>
+
+<style scoped>
+  /* SPEECH BUBBLE: what someone says, placed where they are -- a rounded
+     bubble with a tail pointing at the speaker (bottom-left by default),
+     sized from its box, words appearing in reading order (or timed to the
+     voice with word_times). Light, dark, or brand. */
+  .sb-root, .sb-root * { max-width: none; box-sizing: border-box; }
+  .sb-root { --u: 1px; position: absolute; inset: 0; display: flex; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .sb-bubble { position: relative; align-self: flex-start; padding: calc(var(--u) * 26) calc(var(--u) * 34); border-radius: calc(var(--u) * 34);
+    background: var(--b-bg); color: var(--b-ink); box-shadow: 0 calc(var(--u) * 14) calc(var(--u) * 34) rgba(20, 20, 60, 0.16); }
+  .sb-root.t-light { --b-bg: #ffffff; --b-ink: var(--mp-color-on-light, #17171c); --b-mute: color-mix(in srgb, var(--mp-color-on-light, #17171c) 55%, #ffffff); }
+  .sb-root.t-dark { --b-bg: #17181f; --b-ink: #ffffff; --b-mute: rgba(255, 255, 255, 0.62); }
+  .sb-root.t-brand { --b-bg: var(--mp-color-primary, #393bf5); --b-ink: var(--mp-color-on-primary, #ffffff); --b-mute: color-mix(in srgb, var(--mp-color-on-primary, #ffffff) 75%, transparent); }
+  .sb-name { font-size: calc(var(--u) * 18); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--b-mute); margin-bottom: calc(var(--u) * 8); }
+  .sb-name:empty { display: none; }
+  .sb-text { font-size: calc(var(--u) * 44); font-weight: 600; line-height: 1.2; letter-spacing: -0.02em; text-wrap: balance; }
+  .sb-tail { position: absolute; width: calc(var(--u) * 46); height: calc(var(--u) * 34); fill: var(--b-bg); overflow: visible; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.sb-root'), bub = q('.sb-bubble'), tail = q('.sb-tail'), txt = q('.sb-text');
+    var DUR = (ctx && ctx.duration) || 5;
+    var theme = data.theme === 'dark' || data.theme === 'brand' || data.theme === 'light' ? data.theme : null;
+    // Default: a white bubble over a dark ground or over the camera (no
+    // measurable ground); on a light ground white-on-white vanishes, so brand.
+    if (!theme) { var gl = window.mpGroundLum ? mpGroundLum() : null; theme = typeof gl === 'number' && gl >= 0.18 ? 'brand' : 'light'; }
+    root.classList.add('t-' + theme);
+    q('.sb-name').textContent = data.name ? String(data.name) : '';
+    var words = String(data.text || '').split(/(\s+)/).filter(function (w) { return w.length; });
+    var spans = [];
+    words.forEach(function (w) {
+      if (/^\s+$/.test(w)) { txt.appendChild(document.createTextNode(w)); return; }
+      var s = document.createElement('span'); s.textContent = w; txt.appendChild(s); spans.push(s);
+    });
+
+    // Tail side: bottom-left (default) | bottom-right | top-left | top-right | left | right.
+    var side = String(data.tail || 'bottom-left');
+    var W = el.clientWidth || 700, H = el.clientHeight || 300;
+    var u = Math.min(W / 700, H / 260);
+    bub.style.maxWidth = (W * 0.98) + 'px';
+    for (var i = 0; i < 30; i++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      if (bub.offsetHeight <= H * 0.86 && bub.scrollWidth <= W) break;
+      u *= 0.94;
+    }
+    // Hug the text; align the bubble toward the tail side.
+    root.style.justifyContent = /right/.test(side) ? 'flex-end' : 'flex-start';
+    root.style.alignItems = /^top/.test(side) ? 'flex-end' : 'flex-start';
+    bub.style.alignSelf = /^top/.test(side) ? 'flex-end' : 'flex-start';
+    var tw = 46 * u, th = 34 * u;
+    var tailCss = { 'bottom-left': 'left:' + (40 * u) + 'px;bottom:' + (-th + 2) + 'px;', 'bottom-right': 'right:' + (40 * u) + 'px;bottom:' + (-th + 2) + 'px;transform:scaleX(-1);',
+      'top-left': 'left:' + (40 * u) + 'px;top:' + (-th + 2) + 'px;transform:scaleY(-1);', 'top-right': 'right:' + (40 * u) + 'px;top:' + (-th + 2) + 'px;transform:scale(-1,-1);',
+      'left': 'left:' + (-tw + 8) + 'px;top:' + (30 * u) + 'px;transform:rotate(90deg) scaleX(-1);', 'right': 'right:' + (-tw + 8) + 'px;top:' + (30 * u) + 'px;transform:rotate(-90deg);' };
+    tail.style.cssText += tailCss[side] || tailCss['bottom-left'];
+    bub.style.transformOrigin = (/right/.test(side) ? '85%' : '15%') + ' ' + (/^top/.test(side) ? '0%' : '100%');
+
+    // MOTION: the bubble grows from its tail; words appear in reading order
+    // (or on word_times, seconds per word, to sit on the voice).
+    var AT = Number(data.at) || 0.2;
+    gsap.set(bub, { autoAlpha: 0, scale: 0.9 });
+    tl.to(bub, { autoAlpha: 1, scale: 1, duration: 0.4, ease: 'back.out(1.6)' }, AT);
+    var times = Array.isArray(data.word_times) ? data.word_times.map(Number) : null;
+    var step = Math.min(0.12, Math.max(0.04, (DUR * 0.45) / Math.max(1, spans.length)));
+    if (data.entrance !== 'whole') {
+      spans.forEach(function (s, k) {
+        gsap.set(s, { opacity: 0 });
+        var at = times && isFinite(times[k]) ? times[k] : AT + 0.2 + k * step;
+        tl.to(s, { opacity: 1, duration: 0.12, ease: 'none' }, at);
+      });
+    }
+    if (data.exit_at !== undefined && Number(data.exit_at) > AT) tl.to(bub, { autoAlpha: 0, scale: 0.94, duration: 0.3, ease: 'power2.in' }, Number(data.exit_at));
+    return tl;
+  }
+</script>

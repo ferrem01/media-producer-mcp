@@ -6,6 +6,49 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — The last seven HyperFrames-audit gaps
+
+These are the audit's remaining high-value items. All 29 are now covered.
+
+- **media-grid** (new). 2-6 screenshots or clips as one spread: 2-up,
+  hero + 2, 2x2 or 3x2 by count, and a tall frame stacks.
+  - Rounded tiles, each with a caption chip and a slow push inside the
+    frame.
+  - Tiles land one after another; `highlight` dims the rest and rings the
+    one that matters.
+  - The push rides a wrapper, not the `<video>`: the capture swaps videos
+    for frame stills, so a tween on the video would stop driving anything.
+- **video `fill: "blur"`**. Off-aspect footage (a 16:9 clip in a 9:16
+  frame) sits whole in the middle, over a blurred, scaled-up copy of itself.
+  - There are no black bars and no crop.
+  - Both copies are `<video>`s the capture seeks, so they stay in step.
+- **feature-map** (new). A hub with 3-12 nodes on an ellipse.
+  - Connectors draw out one by one, and each node lights as its line
+    arrives. Signal pulses then run hub -> nodes.
+  - The type shrinks until no node touches another or the hub.
+- **donut-chart** (new). Segments sweep round in turn while their shares
+  count up in the legend.
+  - The centre shows the total or the highlighted share.
+  - Colors come from the brand hue family; the highlight quiets the rest.
+- **speech-bubble** (new). A bubble with a tail pointing at the speaker, on
+  any of six sides.
+  - Words appear in reading order, or on `word_times` to sit on the voice.
+  - White over the camera or a dark ground; brand color on a light ground.
+- **device-dive** (new). A phone, then a push THROUGH its screen until the
+  screen covers the frame.
+  - The push scales about the screen centre and carries it to the frame
+    centre.
+  - `after_src` then takes over, with cards floating in at their depths.
+- **page-scroll** (new). A full-page screenshot in a browser window.
+  - It glides and settles between `stops`, with a scrollbar and a caption
+    per stop.
+  - The scroll range is measured from the loaded page on each frame. The
+    capture waits for images before the first seek.
+
+Test: `test/audit-last-seven.test.ts`.
+
+---
+
 ## 2026-09-24 — Full-frame house mocks: fit box, visible-frame fit, capped anchor zoom
 
 Found by rendering the test film `proj_74e69eff` in full context. The new

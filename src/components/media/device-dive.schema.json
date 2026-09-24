@@ -1,0 +1,71 @@
+{
+  "type": "device-dive",
+  "label": "Device Dive",
+  "category": "media",
+  "description": "A phone showing the product, then the camera pushes THROUGH its screen until the screen is the frame (the bezel sweeps past the edges) and the full-size product (after_src) takes over, with optional cards floating in at different depths. 'From the phone in your pocket to the whole platform' in one continuous move.",
+  "data": {
+    "src": {
+      "type": "string",
+      "label": "Screen image on the phone (a mobile screenshot)",
+      "optional": true
+    },
+    "after_src": {
+      "type": "string",
+      "label": "Full-frame image once inside (a desktop screenshot / the full UI)",
+      "optional": true
+    },
+    "dive_at": {
+      "type": "number",
+      "label": "Seconds the push starts (default ~40% in)",
+      "optional": true
+    },
+    "dive_duration": {
+      "type": "number",
+      "label": "Seconds the push takes (default 1.2)",
+      "optional": true
+    },
+    "layers": {
+      "type": "array",
+      "label": "Cards floating in after arrival: {src or text, x, y (% of frame), w (% width, images), depth (0.5-1.5)}",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "w": {
+            "type": "number"
+          },
+          "depth": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "x": {
+      "type": "number",
+      "label": "Phone centre x, % of frame (default 50)",
+      "optional": true
+    },
+    "y": {
+      "type": "number",
+      "label": "Phone centre y, % of frame (default 50)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}
