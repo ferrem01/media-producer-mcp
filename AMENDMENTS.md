@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Two phones side by side (phone-lockscreen at half width, label)
+
+The "Same customer, two companies" board puts two lock screens side by
+side. At half width the component broke: the scene's `.mp-component * {
+max-width: 100% }` squeezed its 1080-wide design stage to the box before
+the scale applied (sliver notifications, the clock off-center) -- every
+earlier use was full-frame, so it never showed. The component opts out, as
+quotient-flow and the captured components do. New `label` (+ `label_color`):
+a big name over the phone ("Company A"), the clock stepping down for it.
+
+---
+
 ## 2026-09-24 — Series review fixes: flow kinds read off titles; a board beat can be voice-only
 
 Reviewing the ten series boards (problem-first ads, one per product area)

@@ -80,4 +80,42 @@ describe("phone-lockscreen", () => {
     expect(extractAnchors(comp)).toBe(4);
     expect(Object.keys(comp.anchors).sort()).toEqual(["notifications[0].at", "notifications[1].at", "notifications[2].at", "stamp.at"]);
   });
+
+  it("two phones side by side: each scales whole into its half (no squeezed stage) and wears its label", async () => {
+    const phone = (x: string, label: string) => ({ type: "phone-lockscreen", position: { x, y: "20%", width: "45%", height: "45%" },
+      data: { label, notifications: [{ at: 0.2, app: "Mail", title: label, body: "A notification long enough to wrap across the card" }] } });
+    const html = await assembleScene({
+      scene: { id: "s", label: "s", duration_seconds: 2, background: "#fff",
+        components: [{ id: "a", ...phone("3%", "Company A") }, { id: "b", ...phone("52%", "Company B") }] } as any,
+      components: [{ type: "phone-lockscreen", source: await fs.readFile(SRC, "utf-8") }],
+      brandKit: { colors: {}, fonts: [] } as any, canvas: { width: 1080, height: 1920 } as any,
+      gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+    } as any);
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "pls2-"));
+    const file = path.join(dir, "s.html");
+    await fs.writeFile(file, html);
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+      await page.goto(`file://${file}`);
+      await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 30000 });
+      await page.evaluate(() => { (window as any).__MP_TIMELINE.time(1.5); });
+      const m = await page.evaluate(() => [...document.querySelectorAll(".pls-root")].map((r) => {
+        const box = r.getBoundingClientRect();
+        const card = r.querySelector(".pls-card-in")!.getBoundingClientRect();
+        const label = r.querySelector(".pls-label") as HTMLElement;
+        return { boxW: box.width, cardW: card.width, label: label.textContent, labelShown: getComputedStyle(label).display !== "none" };
+      }));
+      expect(m.length).toBe(2);
+      for (const p of m) {
+        expect(p.cardW / p.boxW).toBeGreaterThan(0.85); // squeezed: ~0.2
+        expect(p.labelShown).toBe(true);
+      }
+      expect(m.map((p) => p.label)).toEqual(["Company A", "Company B"]);
+    } finally {
+      await browser.close();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 60000);
 });
+
