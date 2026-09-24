@@ -134,4 +134,13 @@ describe("update tool: storyboard scenes[].components sets a board scene's cast"
     expect(c.data.script[0].at).toBeGreaterThan(c.data.unfurl_at);
     expect(c.enter.at).toBe(c.data.unfurl_at);
   });
+
+  it("a board scene can be made a full graphic beat (the person's voice over it) and back", async () => {
+    let r = await callUpdate({ project_id: projectId, storyboard: { scenes: [{ index: 1, transparent_background: false }] } });
+    expect(r.isError, r.text).toBe(false);
+    expect(((await loadProject(TENANT, projectId))!.storyboard!.scenes[1] as any).transparent_background).toBe(false);
+    r = await callUpdate({ project_id: projectId, storyboard: { scenes: [{ index: 1, transparent_background: "true" }] } });
+    expect(((await loadProject(TENANT, projectId))!.storyboard!.scenes[1] as any).transparent_background).toBe(true);
+  });
 });
+

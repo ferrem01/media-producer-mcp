@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Series review fixes: flow kinds read off titles; a board beat can be voice-only
+
+Reviewing the ten series boards (problem-first ads, one per product area)
+turned up two gaps:
+- The writer gave quotient-flow steps kinds it does not know ("action",
+  "ai"), so Slack / Update Person / CRM steps all fell back to the mail
+  icon. An unknown kind is now read off the step's title (Slack, CRM, lead
+  score, HTTP, notify, owner/person, delay, conditional, agent/enrich,
+  email vs AI email, events).
+- `update` could set a built scene's `transparent_background` but not a
+  board scene's, so a split of two phones (or a full-screen flow) could not
+  be made a full graphic beat with the person's voice over it. The board
+  scene edit takes it now.
+
+---
+
 ## 2026-09-24 — The step picker joins the panel (flows-add-step)
 
 Marc captured the flow editor's "add step" picker and asked for it in a core

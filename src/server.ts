@@ -1325,6 +1325,7 @@ export function createMcpServer(): McpServer {
             pose: poseObject.optional().describe("3D pose: the standing tilt and, with from, the arrival it eases in from"),
           })).optional().describe("Replace this scene's CAST on the board, deterministically: the full list of components in stack order (type + data; a position is honored by the build, an unplaced component is laid out by it). Omit to keep the cast; pass [] to clear it. Works before any build -- a built film is rebuilt from the board with generate mode='full'. A scene template on the scene is dropped unless scene_template is passed too."),
           scene_template: z.object({ type: z.string(), data: z.record(z.unknown()).optional() }).nullable().optional().describe("Set the scene's template (a full-frame card such as st-logo-close) or pass null to drop it."),
+          transparent_background: z.union([z.boolean(), z.enum(["true", "false"])]).transform((v) => v === true || v === "true").optional().describe("Person films: false makes this a full graphic beat -- the person's VOICE carries on over it but the picture is the cast (a split of two phones, a full-screen flow); true (the default on a person film) puts the cast over the person."),
           transition_in: transitionSchema.describe("The cut INTO this scene, kept on the board so a rebuild keeps it: a named transition with duration_seconds, or type 'none' for a hard cut (the render's default is a half-second crossfade)."),
           assets: z.array(z.object({
             type: z.enum(["screenshot", "screen_recording", "stock_footage", "mockup", "illustration", "camera_video"]),
@@ -1434,6 +1435,7 @@ export function createMcpServer(): McpServer {
                   else existing.scene_template = { type: sceneUpdate.scene_template.type, data: sceneUpdate.scene_template.data || {} };
                 }
                 if (sceneUpdate.transition_in !== undefined) existing.transition_in = sceneUpdate.transition_in as any;
+                if (sceneUpdate.transparent_background !== undefined) (existing as any).transparent_background = sceneUpdate.transparent_background;
                 // The needs, set directly: what the scene asks for is the
                 // caller's list, whole; [] means the cast is the plan.
                 if (sceneUpdate.assets !== undefined) {
