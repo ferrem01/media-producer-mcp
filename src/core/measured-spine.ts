@@ -5,6 +5,7 @@
  * lane is) and re-times a scene against it -- at attach, and again at build.
  */
 
+import { recaptionIfStale } from "./captions.js";
 import path from "node:path";
 import type { Project, Take } from "./types.js";
 import { getTranscript, whisperAvailable, snapLeadingWords, snapWordsOutOfSilences } from "./transcribe.js";
@@ -174,10 +175,13 @@ export function retimeSceneWith(project: Project, sceneIndex: number, spine: Spi
   let sbReport: ResolveReport | null = null, builtReport: ResolveReport | null = null;
   if (sb) {
     if (spine.source === "measured" && spine.duration > 0) sb.duration_seconds = round2(spine.duration);
+    // The captions follow the lines (an edited line recasts a stale lane).
+    recaptionIfStale(sb, spine);
     sbReport = applySpine(sb, spine);
   }
   if (built) {
     if (spine.source === "measured" && spine.duration > 0) built.duration_seconds = round2(spine.duration);
+    recaptionIfStale(built, spine);
     builtReport = applySpine(built, spine);
   }
   return { spine, duration, storyboard: sbReport, built: builtReport };

@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — The captions follow the lines
+
+Trimming three beats of the signals ad (proj_de974ad1) left their caption
+lanes reading the ORIGINAL sentences ("Your customers are telling you
+exactly what they need", "right email, right then"): a lane is cast once
+from the scene's words and nothing rebuilt it, so the render would have put
+words on screen the take never says. `recaptionIfStale` (core/captions.ts)
+now runs on every re-time (retimeSceneWith, board and built scene): a lane
+whose words no longer match the spine's is recast from them -- phrases and
+anchors -- keeping its look (scatter/plated, scrim, fonts, position); a
+matching lane is untouched. The update tool now re-times a scene whose
+lines it edits (as the board's own edit route already did), so the same
+follows there, and the take need's lines follow too.
+
+---
+
 ## 2026-09-24 — Adding a sound where you would look for it
 
 Marc, after the Effects-lane sounds shipped: "is there a way to click on the

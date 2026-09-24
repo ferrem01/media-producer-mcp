@@ -88,3 +88,34 @@ describe("sound cues", () => {
     expect(q).toMatch(/ensureSoundFiles\(project, \(id\) => resolveSfxChoice\(id, assets\)\)/);
   });
 });
+
+describe("the captions follow the lines", () => {
+  it("recasts a lane whose words no longer match, keeps one that does, keeps its look", async () => {
+    const { recaptionIfStale } = await import("../src/core/captions.js");
+    const { assertedSpine } = await import("../src/core/word-anchors.js");
+    const lines = "Sarah checks pricing.\nShe gets the right email.";
+    const spine = assertedSpine(lines, 4);
+    const scene: any = { voiceover_text: lines, components: [
+      { id: "captions", type: "reel-caption-lane", data: { phrases: [{ text: "Sarah checks pricing *twice.*", start: 0.2, end: 2.9 }, { text: "*right* *then.*", start: 4.8, end: 6.1 }], scrim: "plate", max_font: 84 } },
+    ] };
+    expect(recaptionIfStale(scene, spine)).toBe(1);
+    const lane = scene.components[0];
+    const text = lane.data.phrases.map((p: any) => p.text.replace(/\*/g, "")).join(" ");
+    expect(text).toBe("Sarah checks pricing. She gets the right email.");
+    expect(lane.data.scrim).toBe("plate");
+    expect(Object.keys(lane.anchors).length).toBe(lane.data.phrases.length * 2);
+    // Matching words: left alone.
+    expect(recaptionIfStale(scene, spine)).toBe(0);
+    // A writer's plain-string lane is recast too (the signals ad's beat 1).
+    const s2: any = { voiceover_text: "Your customers are sending signals.", components: [{ type: "reel-caption-lane", data: { phrases: ["Your customers are telling you exactly what they *need*."] } }] };
+    expect(recaptionIfStale(s2, assertedSpine(s2.voiceover_text, 3))).toBe(1);
+    expect(s2.components[0].data.phrases.map((p: any) => p.text.replace(/\*/g, "")).join(" ")).toBe("Your customers are sending signals.");
+  });
+
+  it("runs on every re-time and on an update-tool line edit", async () => {
+    const ms = await fs.readFile(path.resolve(__dirname, "../src/core/measured-spine.ts"), "utf-8");
+    expect(ms.match(/recaptionIfStale\((sb|built), spine\);/g)?.length).toBe(2);
+    const server = await fs.readFile(path.resolve(__dirname, "../src/server.ts"), "utf-8");
+    expect(server).toMatch(/const linesEdited = u\.voiceover_text !== undefined;/);
+  });
+});
