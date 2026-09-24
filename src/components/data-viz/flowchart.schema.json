@@ -2,7 +2,7 @@
   "type": "flowchart",
   "label": "Flowchart",
   "category": "data-viz",
-  "description": "An animated flowchart whose boxed nodes pop in and arrowed connectors draw on in sequence, laid out left-to-right or top-down from nodes and edges.",
+  "description": "An animated flowchart laid out in layers from the edges (branches fan out, chains run straight), sized from the box so labels read at video scale. Built layer by layer: nodes rise, connectors draw, each arrowhead lands with its line. Roots are tinted, the final layer is filled in the brand primary; a node color makes a sticky-note chip.",
   "data": {
     "nodes": {
       "type": "array",
@@ -26,7 +26,7 @@
     },
     "edges": {
       "type": "array",
-      "label": "Edges",
+      "label": "Edges {from, to}; omit for a chain in node order",
       "optional": true,
       "items": {
         "type": "object",
@@ -42,7 +42,7 @@
     },
     "direction": {
       "type": "string",
-      "label": "Direction",
+      "label": "horizontal (left to right) | vertical (top down)",
       "optional": true,
       "enum": [
         "horizontal",
@@ -54,7 +54,31 @@
       "type": "string",
       "label": "Edge Color",
       "optional": true,
-      "description": "Optional connector/arrow color (defaults to brand accent). Use a dark neutral on light whiteboard-style backdrops."
+      "description": "Connector color (default: the brand primary). A dark neutral suits whiteboard-style colored chips."
+    },
+    "flow": {
+      "type": "boolean",
+      "label": "After the build, a dot runs along each connector (a process that keeps running)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Ink theme; omit to follow the measured scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene the build starts (default 0.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
+      "optional": true
     }
   }
 }

@@ -2,14 +2,14 @@
   "type": "floating-pills",
   "label": "Floating Data Pills",
   "category": "props",
-  "description": "Data made physical: small labeled chips drifting in faux-3D around a hero stat or headline (the '+340 h' orbit move). Place its box over the region containing the hero (e.g. the full stage over a number-counter scene) at a HIGH z_index; pills scatter in a ring around the center, entrance-staggered, drifting continuously. 4-7 items max.",
+  "description": "Data made physical: chips drifting in faux-3D. ORBIT (a big box over a hero stat or headline): chips scatter round the centre and keep clear of the scene's type, measured once every component is built. STRIP (a wide, short box, e.g. a band under a speaker): chips sit in one or two jittered rows -- the 'too many tools' look. Chips are sized from the box, never overlap each other, never leave the frame. 3-12 items.",
   "data": {
     "items": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "label": "Chip labels, e.g. [\"+340 h\", \"+128 h\"]",
+      "label": "Chip labels, e.g. [\"+340 h\", \"+128 h\"] or tool names; 3-12",
       "required": true
     },
     "color": {
@@ -19,7 +19,7 @@
     },
     "font_size": {
       "type": "string",
-      "label": "Chip text size (default 24px)",
+      "label": "Chip text size floor (the size comes from the slot; a smaller value is ignored)",
       "optional": true
     },
     "seed": {
@@ -34,8 +34,17 @@
     },
     "scale": {
       "type": "number",
-      "label": "Size multiplier for the whole prop (a tall speaker frame sets 1.8 so fixed-pixel type reads on a phone)",
+      "label": "Size multiplier on the slot-derived size",
       "optional": true
+    },
+    "layout": {
+      "type": "string",
+      "label": "orbit | strip (default: strip when the box is wider than ~3:1)",
+      "optional": true,
+      "enum": [
+        "orbit",
+        "strip"
+      ]
     }
   }
 }

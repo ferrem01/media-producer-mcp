@@ -478,6 +478,12 @@ ${wrapperChoreoScript(scene.components, scene.duration_seconds, "", canvas.width
     });
   } catch (e) {}
 ${motionPhysicsScript(scene.motion_physics, scene.duration_seconds)}
+  // POST-BUILD hooks: a component that lays out against its SIBLINGS (which
+  // may build after it -- floating-pills keeps clear of the headline) runs
+  // here: every component built, nothing seeked yet, so the measurement is
+  // the same in every render worker.
+  (window.__mpAfterBuild || []).forEach(function (fn) { try { fn(); } catch (e) { console.warn('after-build hook failed: ' + e.message); } });
+  window.__mpAfterBuild = [];
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${scene.duration_seconds};
@@ -1732,6 +1738,12 @@ __mpAfterFonts(function() {
     });
   } catch (e) {}
 ${motionPhysicsScript(options.motionPhysics, duration)}
+  // POST-BUILD hooks: a component that lays out against its SIBLINGS (which
+  // may build after it -- floating-pills keeps clear of the headline) runs
+  // here: every component built, nothing seeked yet, so the measurement is
+  // the same in every render worker.
+  (window.__mpAfterBuild || []).forEach(function (fn) { try { fn(); } catch (e) { console.warn('after-build hook failed: ' + e.message); } });
+  window.__mpAfterBuild = [];
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${duration};

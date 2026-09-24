@@ -2,7 +2,7 @@
   "type": "funnel-chart",
   "label": "Funnel Chart",
   "category": "data-viz",
-  "description": "A conversion funnel: stages top to bottom (e.g. Sent > Opened > Clicked > Converted), bars drawing in sequence with count-ups, each stage showing its conversion from the one above, the last stage styled as the money number.",
+  "description": "A conversion funnel of one audience narrowing: centred bands on a log scale (small stages stay readable) joined by tapering necks, one brand hue deepening to the money row, values counting up inside the bands, each step's conversion beside it and the end-to-end rate closing. Sits on the scene ground; type sized from the box.",
   "data": {
     "stages": {
       "type": "array",
@@ -46,6 +46,35 @@
     "show_retention": {
       "type": "boolean",
       "label": "Show step-conversion badges (default true)",
+      "optional": true
+    },
+    "subtitle": {
+      "type": "string",
+      "label": "Line under the title",
+      "optional": true
+    },
+    "show_total": {
+      "type": "boolean",
+      "label": "Close with the end-to-end conversion (default true for 3+ stages)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Ink theme; omit to follow the measured scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene the build starts (default 0.2)",
+      "optional": true
+    },
+    "exit": {
+      "type": "boolean",
+      "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
       "optional": true
     }
   }

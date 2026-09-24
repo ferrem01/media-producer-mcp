@@ -6,6 +6,56 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Component polish audit, part 5: floating-pills, funnel-chart, flowchart
+
+The three most-used legacy components left after part 4 (18, 13 and 5 of
+Marc's films), rebuilt and checked in their real scenes.
+
+- **floating-pills.** It had four measured problems:
+  - 12-24px chips in a 1080p frame;
+  - chips stacked on each other;
+  - chips on the headline ("Designer" over "Five people");
+  - chips cut off by the slot and by the frame.
+
+  Now the chips are sized from the slot and placed by seeded best-of-N
+  sampling. Each chip clears every other chip, the scene's MEASURED type and
+  the visible frame, drift included. If they cannot all fit, the type steps
+  down and it retries. A wide, short box lays the chips out as a strip, in
+  one or two jittered rows. A writer's small `font_size` is a floor, not
+  the size.
+- **Post-build hook (`window.__mpAfterBuild`).** Keeping clear of the
+  headline means measuring a sibling that may be built after the pills. The
+  scene boot now runs queued hooks once every component is built and before
+  any seek, so the measurement is the same in every render worker. This is
+  wired into both scene boots and the composite.
+- **funnel-chart.**
+  - **Log scale.** A linear scale drew 3,184 of 48,200 as a 7% stub, so the
+    funnel vanished after the first row. Stages are now centred bands on a
+    log scale, never narrower than 36%, joined by tapering necks.
+  - **Color.** One brand hue deepens down to the money row.
+  - **Numbers.** Values count up inside the bands, each step's conversion
+    sits beside it, and the end-to-end rate closes.
+  - **Placement and sizing.** It sits on the ground and its type is sized
+    from the box.
+- **flowchart.**
+  - **Layout.** Layers come from the longest path, each layer ordered by its
+    parents' mean position (fewer crossings).
+  - **Sizing.** Labels are sized from the cells and stay on one line while
+    the type stays above ~70% of its start. Measured before: "Follow-up"
+    split at its hyphen.
+  - **Frame.** The chart is laid out inside the visible frame.
+  - **Arrowheads.** Each is its own shape that lands when its line does;
+    `marker-end` showed the heads before the lines drew.
+  - **Edge bug fixed.** The edge list was indexed by position while skipped
+    edges shifted it, so the wrong connectors drew.
+  - **Motion.** The infinite pulse and the default exit are gone.
+  - **New.** `flow: true` runs a dot along each connector. `direction: "LR"`
+    and `"TB"` are accepted.
+
+Test: `test/pills-funnel-flow.test.ts`.
+
+---
+
 ## 2026-09-24 — Component polish audit, part 4: email-compose and the CTA / proof cards
 
 - **email-compose rebuilt.** The old one had no `data-target` hooks, so a

@@ -1,411 +1,153 @@
 <template>
-  <div class="funnel-chart">
-    <h2 class="funnel-title">{{title}}</h2>
-    <div class="funnel-card">
-      <div class="funnel-rows"></div>
-    </div>
+  <div class="fn-root">
+    <div class="fn-head"><div class="fn-title"></div><div class="fn-sub"></div></div>
+    <div class="fn-rows"></div>
+    <div class="fn-total"></div>
   </div>
 </template>
 
 <style scoped>
-  .funnel-chart {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
-    padding: 80px;
-    box-sizing: border-box;
-  }
-
-  .funnel-title {
-    font-size: 36px;
-    font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
-    margin: 0 0 32px 0;
-    text-align: center;
-    letter-spacing: -0.02em;
-    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
-  }
-
-  .funnel-title:empty {
-    display: none;
-  }
-
-  .funnel-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 40px 48px;
-    width: 100%;
-    flex: 1;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 25px 60px rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
-    display: flex;
-    align-items: center;
-  }
-
-  .funnel-rows {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 20px;
-    width: 100%;
-    height: 100%;
-  }
-
-  .funnel-row {
-    display: grid;
-    grid-template-columns: 170px 1fr 100px;
-    align-items: center;
-    gap: 20px;
-    flex: 1;
-    min-height: 48px;
-    max-height: 118px;
-  }
-
-  .funnel-label {
-    font-size: 19px;
-    font-weight: 600;
-    /* Dark-world design ink. The light branch below takes FULL ink instead
-       of the token: a real kit's text_muted (#8f8f9f here) measures 3.2:1
-       on white -- better than the 2.18:1 this used to hardcode, still short
-       of the 4.5:1 a 19px label owes. Hierarchy comes from size and the
-       bar, not from a washed-out label. */
-    color: var(--mp-color-text-muted, #94a3b8);
-    text-align: right;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    letter-spacing: 0.01em;
-  }
-
-  .funnel-track {
-    position: relative;
-    height: 76%;
-    display: flex;
-    align-items: center;
-  }
-
-  .funnel-bar {
-    height: 100%;
-    border-radius: 10px;
-    min-width: 8px;
-    position: relative;
-    display: flex;
-    align-items: center;
-    box-shadow: 0 0 20px rgba(167, 139, 250, 0.1);
-  }
-
-  .funnel-bar::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 50%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
-    border-radius: 10px 10px 0 0;
-    pointer-events: none;
-  }
-
-  .funnel-value {
-    font-size: 26px;
-    font-weight: 700;
-    /* This number rides INSIDE the bar, so its ground is the brand fill --
-       not the scene. --mp-color-on-primary is picked from that fill's
-       luminance, so it clears contrast on a violet bar and on a pale one.
-       (--mp-color-text is the SCENE's ink: near-black on a light brand,
-       which measured ~2.1:1 against the blue bar.) */
-    color: var(--mp-color-on-primary, #ffffff);
-    padding-left: 18px;
-    white-space: nowrap;
-    position: relative;
-    z-index: 1;
-    /* The bar is a flex row; without this the number is allowed to shrink
-       below its own text and clips (measured: "2,412" lost 26px). */
-    flex: 0 0 auto;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
-  }
-
-  /* When a bar is too short to hold its number, the value sits OUTSIDE it --
-     on the SCENE's ground, so it takes the scene's ink, not the fill's. */
-  .funnel-value.outside {
-    position: absolute;
-    left: 100%;
-    padding-left: 14px;
-    /* Absolutely positioned at left:100%, the box has ZERO available space
-       to its right, so its width collapsed to the bar's and the number
-       clipped its own box (measured 25-42px lost on the short stages).
-       `width: max-content` does NOT fix it -- Chrome still clamps it to the
-       available space (measured: 71.23px against a 96px max-content). A
-       min-width floor is not clampable, so it does. */
-    min-width: max-content;
-    color: var(--mp-color-text, #ffffff);
-    text-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
-  }
-
-  .funnel-retention {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--mp-color-accent, #a78bfa);
-    background: rgba(167, 139, 250, 0.1);
-    border: 1px solid rgba(167, 139, 250, 0.22);
-    border-radius: 999px;
-    padding: 5px 12px;
-    text-align: center;
-    white-space: nowrap;
-    justify-self: start;
-  }
-
-  .funnel-retention:empty {
-    display: none;
-  }
-
-  .funnel-row.is-money .funnel-bar {
-    box-shadow: 0 0 34px rgba(167, 139, 250, 0.35);
-  }
-
-  .funnel-row.is-money .funnel-value {
-    font-size: 32px;
-  }
-
-  /* ── The light world ──
-     Everything above is dark-first: a glass card lit from inside, violet
-     glows, shadows tuned for a near-black ground. Dropped onto the plain
-     brand-white world those read as a smudge (the card vanishes, the drop
-     shadow greys the page, the accent pill sits at ~2.4:1). The .is-light
-     branch re-grounds them; the script sets the class from the world's own
-     ink, so no schema slot is needed. */
-  .funnel-chart.is-light .funnel-card {
-    /* OPAQUE, not glass. The dark-first card is a 3%-white pane meant to be
-       lit from behind by a dark world; the first light-world pass kept that
-       idea and merely flipped the tint, which was invisible-but-harmless on
-       a flat white ground. The moment the scene gained a mesh backdrop the
-       gradient showed straight THROUGH the chart. A figure needs its own
-       paper: solid white, and a real shadow so it sits ON the world the way
-       every other mock in the kit does. */
-    background: #ffffff;
-    border: 1px solid rgba(15, 23, 42, 0.07);
-    box-shadow:
-      0 10px 32px rgba(23, 23, 28, 0.16),
-      0 1px 2px rgba(23, 23, 28, 0.06);
-  }
-
-  /* The blur is only meaningful behind a translucent pane. */
-  .funnel-chart.is-light .funnel-card {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-
-  .funnel-chart.is-light .funnel-label {
-    color: var(--mp-color-text, #0f172a);
-  }
-
-  .funnel-chart.is-light .funnel-title,
-  .funnel-chart.is-light .funnel-value.outside {
-    text-shadow: none;
-  }
-
-  .funnel-chart.is-light .funnel-bar {
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.10);
-  }
-
-  .funnel-chart.is-light .funnel-row.is-money .funnel-bar {
-    box-shadow: 0 8px 26px rgba(15, 23, 42, 0.18);
-  }
-
-  /* The accent is the brand's warm secondary in most kits -- readable on
-     near-black, ~2.4:1 on white. Primary is the ink-side brand color. */
-  .funnel-chart.is-light .funnel-retention {
-    color: var(--mp-color-primary, #4f46e5);
-    background: rgba(15, 23, 42, 0.04);
-    border: 1px solid rgba(15, 23, 42, 0.10);
-  }
+  /* FUNNEL: one audience narrowing. Each stage is a centred band on a LOG
+     scale (a linear scale drew 3,184 of 48,200 as a 7% stub -- the funnel
+     vanished after the first row), joined to the next by a tapering neck.
+     The value counts up inside its band, the step conversion sits beside it,
+     the money row lands deepest, the end-to-end rate closes. On the ground,
+     type sized from the box (--u). */
+  .fn-root, .fn-root * { max-width: none; }
+  .fn-root { --u: 1px; position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;
+    padding: calc(var(--u) * 28) calc(var(--u) * 32);
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); color: var(--fn-ink); }
+  .fn-root.t-light { --fn-ink: var(--mp-color-on-light, #17171c); --fn-mute: color-mix(in srgb, var(--mp-color-on-light, #17171c) 62%, #ffffff); --fn-chip: color-mix(in srgb, var(--mp-color-primary, #393bf5) 12%, #ffffff); --fn-chip-ink: color-mix(in srgb, var(--mp-color-primary, #393bf5) 80%, #000000); --fn-neck: color-mix(in srgb, var(--mp-color-primary, #393bf5) 14%, transparent); }
+  .fn-root.t-dark { --fn-ink: #ffffff; --fn-mute: rgba(255, 255, 255, 0.68); --fn-chip: color-mix(in srgb, var(--mp-color-primary, #393bf5) 30%, #16171d); --fn-chip-ink: #ffffff; --fn-neck: color-mix(in srgb, var(--mp-color-primary, #393bf5) 30%, transparent); }
+  .fn-head { margin-bottom: calc(var(--u) * 26); }
+  .fn-title { font-size: calc(var(--u) * 40); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .fn-sub { margin-top: calc(var(--u) * 8); font-size: calc(var(--u) * 20); color: var(--fn-mute); }
+  .fn-title:empty, .fn-sub:empty, .fn-total:empty { display: none; }
+  .fn-rows { display: flex; flex-direction: column; }
+  .fn-row { display: grid; grid-template-columns: var(--fn-cols); align-items: center; column-gap: calc(var(--u) * 18); }
+  .fn-label { text-align: right; font-size: calc(var(--u) * 22); font-weight: 600; line-height: 1.15; color: var(--fn-mute); }
+  .fn-row.money .fn-label { color: var(--fn-ink); }
+  .fn-lane { position: relative; height: calc(var(--u) * 66); display: flex; justify-content: center; }
+  .fn-band { height: 100%; border-radius: calc(var(--u) * 12); display: flex; align-items: center; justify-content: center;
+    color: #ffffff; font-size: calc(var(--u) * 28); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap;
+    box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 18) color-mix(in srgb, var(--mp-color-primary, #393bf5) 22%, transparent); }
+  .fn-row.money .fn-band { font-size: calc(var(--u) * 32); }
+  .fn-neck { height: calc(var(--u) * 16); display: grid; grid-template-columns: var(--fn-cols); column-gap: calc(var(--u) * 18); }
+  .fn-neck i { grid-column: 2; display: block; background: var(--fn-neck); }
+  .fn-rate { justify-self: start; white-space: nowrap; font-size: calc(var(--u) * 19); font-weight: 700; font-variant-numeric: tabular-nums;
+    padding: calc(var(--u) * 6) calc(var(--u) * 12); border-radius: 999px; background: var(--fn-chip); color: var(--fn-chip-ink); }
+  .fn-rate:empty { visibility: hidden; }
+  .fn-total { margin-top: calc(var(--u) * 24); text-align: center; font-size: calc(var(--u) * 22); color: var(--fn-mute); }
+  .fn-total b { color: var(--fn-ink); font-weight: 700; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var root = el.querySelector('.funnel-chart') || el;
-    var card = el.querySelector('.funnel-card');
-    var rowsEl = el.querySelector('.funnel-rows');
-    var title = el.querySelector('.funnel-title');
-    var stages = data.stages || [];
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.fn-root'), rowsEl = q('.fn-rows');
+    var DUR = (ctx && ctx.duration) || 5;
+    var stages = (Array.isArray(data.stages) ? data.stages : []).filter(function (s) { return s && isFinite(Number(s.value)); });
     if (!stages.length) return tl;
 
-    // WHICH WORLD ARE WE ON? The assembler sets --mp-color-text to #ffffff
-    // on a dark scene and to the brand's ink on a light one, so the ink's
-    // own luminance is the answer -- no schema slot, no guessing from the
-    // backdrop component (the plain world has none).
-    (function () {
-      var ink = getComputedStyle(root).getPropertyValue('--mp-color-text').trim();
-      var rgb = window.mpParseColor ? mpParseColor(ink) : null;
-      if (!rgb) {
-        var m6 = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(ink);
-        var m3 = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(ink);
-        var mr = /rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(ink);
-        if (m6) rgb = { r: parseInt(m6[1], 16), g: parseInt(m6[2], 16), b: parseInt(m6[3], 16) };
-        else if (m3) rgb = { r: parseInt(m3[1] + m3[1], 16), g: parseInt(m3[2] + m3[2], 16), b: parseInt(m3[3] + m3[3], 16) };
-        else if (mr) rgb = { r: +mr[1], g: +mr[2], b: +mr[3] };
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    var theme = data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light');
+    root.classList.add('t-' + theme);
+    q('.fn-title').textContent = data.title ? String(data.title) : '';
+    q('.fn-sub').textContent = data.subtitle ? String(data.subtitle) : '';
+    var showRate = data.show_retention !== false;
+
+    // Band widths on a log scale between the mouth and the money row, never
+    // narrower than 36% of the lane (the value must fit inside).
+    var vals = stages.map(function (s) { return Math.max(1e-9, Number(s.value)); });
+    var vmax = Math.max.apply(null, vals), vmin = Math.min.apply(null, vals);
+    var span = Math.log(vmax / vmin) || 1;
+    var widths = vals.map(function (v) { return vmax === vmin ? 1 : 0.36 + 0.64 * (Math.log(v / vmin) / span); });
+    var fmt = function (v) { return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+    var pct = function (a, b) { var p = (a / b) * 100; return (p >= 10 ? Math.round(p) : p >= 1 ? p.toFixed(1) : p.toFixed(2)) + '%'; };
+    var n = stages.length;
+
+    var rows = [], necks = [];
+    stages.forEach(function (s, i) {
+      if (i > 0) {
+        var nk = document.createElement('div'); nk.className = 'fn-neck';
+        var shape = document.createElement('i');
+        var a = (1 - widths[i - 1]) * 50, b = (1 - widths[i]) * 50;
+        shape.style.clipPath = 'polygon(' + a + '% 0, ' + (100 - a) + '% 0, ' + (100 - b) + '% 100%, ' + b + '% 100%)';
+        nk.innerHTML = '<span></span>'; nk.appendChild(shape);
+        rowsEl.appendChild(nk); necks.push(nk);
       }
-      if (!rgb) return;
-      // Dark ink means a light ground.
-      if (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b < 140) root.classList.add('is-light');
-    })();
-
-    var maxVal = Math.max.apply(null, stages.map(function (s) { return Number(s.value) || 0; })) || 1;
-
-    // ── THE FUNNEL IS ONE HUE, RAMPED BY DEPTH ──
-    // The old ramp walked the whole palette (secondary -> primary -> accent
-    // -> pink -> amber). On a real brand kit that renders as five unrelated
-    // bars -- orange, blue, near-black, pink -- when what the chart means is
-    // ONE audience narrowing. Stages now tint the brand primary from light
-    // at the mouth to deep at the money row, so the color itself carries the
-    // narrowing. The light end stops at 18% toward white because the value
-    // rides ON the bar in white: past that it drops under 4.5:1.
-    var brandPrimary = (function () {
-      var raw = getComputedStyle(root).getPropertyValue('--mp-color-primary').trim();
-      var rgb = window.mpParseColor ? mpParseColor(raw) : null;
-      if (!rgb) {
-        var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(raw);
-        if (m) rgb = { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
-      }
-      return rgb || { r: 99, g: 102, b: 241 };
-    })();
-    function rampStop(f) {
-      // f in [0,1]: 0 = mouth (lightened 18% toward white), 1 = money row
-      // (deepened 40% toward ink). Linear in between.
-      var t = -0.18 + f * 0.58;
-      var mixR, mixG, mixB, k;
-      if (t < 0) { k = -t; mixR = 255; mixG = 255; mixB = 255; }
-      else { k = t; mixR = 11; mixG = 11; mixB = 46; }
-      return 'rgb(' + Math.round(brandPrimary.r * (1 - k) + mixR * k) + ',' +
-        Math.round(brandPrimary.g * (1 - k) + mixG * k) + ',' +
-        Math.round(brandPrimary.b * (1 - k) + mixB * k) + ')';
-    }
-
-    var showRetention = data.show_retention !== false;
-    var counters = [];
-
-    stages.forEach(function (stage, i) {
       var row = document.createElement('div');
-      row.className = 'funnel-row' + (i === stages.length - 1 ? ' is-money' : '');
-
-      var label = document.createElement('div');
-      label.className = 'funnel-label';
-      label.textContent = stage.label || '';
-
-      var track = document.createElement('div');
-      track.className = 'funnel-track';
-
-      var bar = document.createElement('div');
-      bar.className = 'funnel-bar';
-      var span = Math.max(1, stages.length - 1);
-      bar.style.background = stage.color
-        ? 'linear-gradient(180deg, ' + stage.color + ' 0%, ' + stage.color + 'cc 100%)'
-        : 'linear-gradient(90deg, ' + rampStop(i / span) + ' 0%, ' + rampStop(Math.min(1, (i + 0.6) / span)) + ' 100%)';
-      var val = Number(stage.value) || 0;
-      var pct = Math.max(4, (val / maxVal) * 100);
-      bar.style.width = '0%';
-      bar.dataset.targetWidth = pct + '%';
-
-      var value = document.createElement('div');
-      value.className = 'funnel-value' + (pct < 22 ? ' outside' : '');
-      value.textContent = '0';
-
-      var retention = document.createElement('div');
-      retention.className = 'funnel-retention';
-      if (showRetention && i > 0) {
-        var prev = Number(stages[i - 1].value) || 0;
-        var r = stage.retention != null
-          ? stage.retention
-          : (prev > 0 ? Math.round((val / prev) * 100) + '%' : '');
-        retention.textContent = r ? String(r) : '';
-      }
-
-      // Outside values anchor to the bar's right edge, so they ride the draw.
-      bar.appendChild(value);
-      track.appendChild(bar);
-      row.appendChild(label);
-      row.appendChild(track);
-      row.appendChild(retention);
+      row.className = 'fn-row' + (i === n - 1 && n > 1 ? ' money' : '');
+      row.innerHTML = '<div class="fn-label"></div><div class="fn-lane"><div class="fn-band"></div></div><div class="fn-rate"></div>';
+      row.querySelector('.fn-label').textContent = String(s.label || '');
+      var band = row.querySelector('.fn-band');
+      band.style.width = (widths[i] * 100).toFixed(2) + '%';
+      // One hue, deepening as the audience narrows (a stage color overrides).
+      var f = n > 1 ? i / (n - 1) : 1;
+      band.style.background = s.color ? String(s.color)
+        : 'linear-gradient(180deg, color-mix(in srgb, var(--mp-color-primary, #393bf5) ' + Math.round(80 + f * 12) + '%, ' + (f < 0.5 ? '#ffffff' : '#0b0b2e') + '), color-mix(in srgb, var(--mp-color-primary, #393bf5) ' + Math.round(88 - f * 6) + '%, #0b0b2e))';
+      band.textContent = s.display ? String(s.display) : fmt(vals[i]);
+      if (showRate && i > 0) row.querySelector('.fn-rate').textContent = s.retention ? String(s.retention) : pct(vals[i], vals[i - 1]);
       rowsEl.appendChild(row);
-
-      counters.push({ el: value, to: val, display: stage.display, bar: bar, retention: retention, row: row });
+      rows.push({ row: row, band: band, label: row.querySelector('.fn-label'), rate: row.querySelector('.fn-rate') });
     });
-
-    var rows = rowsEl.querySelectorAll('.funnel-row');
-    var labels = rowsEl.querySelectorAll('.funnel-label');
-    var retentions = rowsEl.querySelectorAll('.funnel-retention');
-
-    gsap.set(labels, { autoAlpha: 0, x: -10 });
-    gsap.set(retentions, { autoAlpha: 0, scale: 0.7 });
-
-    // Title entrance
-    if (title && title.textContent.trim()) {
-      gsap.set(title, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
-      tl.to(title, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' }, 0.2);
+    var total = q('.fn-total');
+    if (n >= 3 && data.show_total !== false) {
+      total.innerHTML = '<b></b> end to end';
+      total.querySelector('b').textContent = pct(vals[n - 1], vals[0]);
     }
 
-    // Card entrance
-    gsap.set(card, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(4px)' });
-    tl.to(card, {
-      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
-      duration: 0.6, ease: 'power3.out'
-    }, 0.3);
-
-    // Rows draw top-to-bottom: label in, bar sweeps, number rides the count,
-    // then the retention badge pops. The last stage (the money number) lands
-    // with a touch more drama.
-    var step = ctx.motion === 'minimal' ? 0.22 : 0.34;
-    counters.forEach(function (c, i) {
-      var at = 0.7 + i * step;
-      var isMoney = i === counters.length - 1;
-      var drawDur = isMoney ? 0.85 : 0.65;
-
-      tl.to(labels[i], { autoAlpha: 1, x: 0, duration: 0.3, ease: 'power2.out' }, at);
-      tl.to(c.bar, {
-        width: c.bar.dataset.targetWidth,
-        duration: drawDur,
-        ease: isMoney ? 'power4.out' : 'power3.out'
-      }, at + 0.05);
-
-      var prox = { n: 0 };
-      tl.to(prox, {
-        n: c.to, duration: drawDur, ease: 'power2.out',
-        onUpdate: function () {
-          c.el.textContent = c.display != null && prox.n >= c.to
-            ? String(c.display)
-            : Math.round(prox.n).toLocaleString('en-US');
-        }
-      }, at + 0.05);
-
-      if (c.retention.textContent) {
-        tl.to(retentions[i], { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2)' }, at + drawDur * 0.8);
+    // SIZE: columns and type from the box, shrink until everything fits
+    // (rows fit the height, each value fits inside its band).
+    var W = el.clientWidth || 900, H = el.clientHeight || 600;
+    var labelFrac = W < 700 ? 0.3 : 0.24, rateFrac = showRate ? (W < 700 ? 0.19 : 0.14) : 0;
+    root.style.setProperty('--fn-cols', labelFrac * 100 + '% 1fr ' + (rateFrac ? rateFrac * 100 + '%' : '0'));
+    var u = Math.min(W / 480, H / (140 + n * 100));
+    function spills() {
+      if (root.scrollHeight > H + 1) return true;
+      for (var k = 0; k < rows.length; k++) {
+        var r = rows[k];
+        if (r.band.scrollWidth > r.band.clientWidth + 1 || r.label.scrollWidth > r.label.clientWidth + 1 || r.rate.scrollWidth > r.rate.clientWidth + 1) return true;
       }
-      if (isMoney) {
-        tl.fromTo(c.row, { scale: 1 }, { scale: 1.03, duration: 0.18, ease: 'power2.out' }, at + drawDur);
-        tl.to(c.row, { scale: 1, duration: 0.25, ease: 'power2.inOut' }, at + drawDur + 0.18);
-      }
-    });
-
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.7;
-      tl.to(el.querySelector('.funnel-chart'), {
-        autoAlpha: 0,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
+      return false;
+    }
+    for (var it = 0; it < 40; it++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      if (!spills()) break;
+      u *= 0.95;
     }
 
+    // MOTION: the title rises; stage by stage the band opens from its
+    // centre while its value counts up, the neck fills in, the step rate
+    // lands; the end-to-end rate closes. Built by ~60% of the scene.
+    var AT = Number(data.at) || 0.2;
+    var head = [q('.fn-title'), q('.fn-sub')].filter(function (x) { return x.textContent; });
+    if (head.length && window.mpLineRise) mpLineRise(tl, head, AT, { duration: 0.45, rise: 12 });
+    var t0 = AT + (head.length ? 0.3 : 0);
+    var step = Math.max(0.14, Math.min(0.5, (DUR * 0.6 - t0 - 0.6) / n));
+    rows.forEach(function (r, i) {
+      var t = t0 + i * step;
+      gsap.set(r.label, { autoAlpha: 0, y: 8 });
+      tl.to(r.label, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, t);
+      gsap.set(r.band, { scaleX: 0.04, autoAlpha: 0 });
+      tl.to(r.band, { scaleX: 1, autoAlpha: 1, duration: 0.55, ease: 'power3.out' }, t);
+      if (!stages[i].display && window.mpCountUp) mpCountUp(tl, r.band, t + 0.05, { to: fmt(vals[i]), duration: Math.min(0.9, step * 2 + 0.3) });
+      if (i > 0) {
+        var nk = necks[i - 1];
+        gsap.set(nk, { autoAlpha: 0 });
+        tl.to(nk, { autoAlpha: 1, duration: 0.3, ease: 'power1.out' }, t - 0.05);
+      }
+      if (r.rate.textContent) {
+        gsap.set(r.rate, { autoAlpha: 0, x: -8 });
+        tl.to(r.rate, { autoAlpha: 1, x: 0, duration: 0.35, ease: 'power3.out' }, t + 0.3);
+      }
+    });
+    if (total.textContent) {
+      gsap.set(total, { autoAlpha: 0, y: 8 });
+      tl.to(total, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power3.out' }, t0 + n * step + 0.3);
+    }
+    if (data.exit === true && DUR > 2) tl.to(root, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, DUR - 0.5);
     return tl;
   }
 </script>
