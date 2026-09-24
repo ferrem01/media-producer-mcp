@@ -1,25 +1,42 @@
 {
-  "type": "object",
-  "properties": {
+  "type": "social-proof",
+  "label": "Social Proof",
+  "category": "cta",
+  "description": "A row or grid of proof items (logos, quotes, ratings, stats) that land one after another under a title.",
+  "data": {
     "items": {
       "type": "array",
+      "label": "Array of social proof items",
+      "required": true,
       "items": {
         "type": "object",
         "properties": {
-          "text": { "type": "string" },
-          "subtext": { "type": "string" }
+          "text": {
+            "type": "string"
+          },
+          "subtext": {
+            "type": "string"
+          }
         },
-        "required": ["text"]
-      },
-      "description": "Array of social proof items"
+        "required": [
+          "text"
+        ]
+      }
     },
-    "title": { "type": "string", "description": "Section title" },
+    "title": {
+      "type": "string",
+      "label": "Section title",
+      "optional": true
+    },
     "layout": {
       "type": "string",
-      "enum": ["row", "grid"],
-      "default": "row",
-      "description": "Layout mode"
+      "label": "Layout mode",
+      "optional": true,
+      "enum": [
+        "row",
+        "grid"
+      ],
+      "default": "row"
     }
-  },
-  "required": ["items"]
+  }
 }

@@ -1,14 +1,36 @@
 {
-  "type": "object",
-  "properties": {
-    "src": { "type": "string", "description": "Image URL or path" },
-    "alt": { "type": "string", "description": "Alt text, shown as placeholder if no src" },
+  "type": "image-showcase",
+  "label": "Image Showcase",
+  "category": "media",
+  "description": "One image presented as a hero: framed, lifted with a soft shadow and glow, an optional caption under it.",
+  "data": {
+    "src": {
+      "type": "string",
+      "label": "Image URL or path",
+      "optional": true
+    },
+    "alt": {
+      "type": "string",
+      "label": "Alt text, shown as placeholder if no src",
+      "optional": true
+    },
     "effect": {
       "type": "string",
-      "enum": ["ken-burns", "reveal-left", "reveal-right", "zoom-in", "fade"],
-      "default": "ken-burns",
-      "description": "Animation effect"
+      "label": "Animation effect",
+      "optional": true,
+      "enum": [
+        "ken-burns",
+        "reveal-left",
+        "reveal-right",
+        "zoom-in",
+        "fade"
+      ],
+      "default": "ken-burns"
     },
-    "caption": { "type": "string", "description": "Caption text below image" }
+    "caption": {
+      "type": "string",
+      "label": "Caption text below image",
+      "optional": true
+    }
   }
 }

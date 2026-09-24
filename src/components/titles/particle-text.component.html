@@ -23,6 +23,10 @@
 
 <script>
   function createTimeline(el, data, ctx) {
+    // Seeded, not Math.random: every render worker (and every seek after a
+    // reload) builds the same layout. data.seed picks another one.
+    var __seed = Math.abs(Math.round(Number(data && data.seed) || 7)) % 2147483646 + 1;
+    var __rnd = function () { __seed = (__seed * 16807) % 2147483647; return (__seed - 1) / 2147483646; };
     var tl = gsap.timeline();
     var canvas = el.querySelector('.particle-canvas');
     var cCtx = canvas.getContext('2d');
@@ -65,9 +69,9 @@
           particles.push({
             targetX: x,
             targetY: y,
-            x: x + (Math.random() - 0.5) * W * 1.5,
-            y: y + (Math.random() - 0.5) * H * 1.5,
-            size: 2 + Math.random() * 1.5,
+            x: x + (__rnd() - 0.5) * W * 1.5,
+            y: y + (__rnd() - 0.5) * H * 1.5,
+            size: 2 + __rnd() * 1.5,
             alpha: 0
           });
         }
@@ -106,7 +110,8 @@
         var part = particles[i];
         var cx = part.x + (part.targetX - part.x) * p;
         var cy = part.y + (part.targetY - part.y) * p;
-        var alpha = p * (0.6 + Math.random() * 0.4);
+        // Shimmer as a pure function of (particle, progress): seeks repeat.
+        var alpha = p * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(i * 12.9898 + p * 37.0)));
 
         cCtx.beginPath();
         cCtx.arc(cx, cy, part.size, 0, Math.PI * 2);

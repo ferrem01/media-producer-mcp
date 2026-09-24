@@ -3,11 +3,19 @@
 </template>
 
 <style scoped>
+  /* Light has no edge: the glow fades out toward the box's sides, so the
+     scene's clip at the component box never prints a straight line through
+     a lit patch (measured on a 96%-wide box). */
+  .light-leak, .light-leak * { max-width: none; }
   .light-leak {
     position: absolute;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+    mask-composite: intersect;
   }
 
   .leak-blob {
@@ -15,8 +23,9 @@
     border-radius: 50%;
     mix-blend-mode: screen;
     pointer-events: none;
-    will-change: transform, opacity;
-    filter: blur(60px);
+    /* No filter blur: Chromium clipped the blurred, blended layer to its
+       bounds and printed a hard-edged square (measured). The radial gradient
+       is the softness. */
   }
 </style>
 
@@ -37,7 +46,7 @@
     leaks.forEach(function(cfg, i) {
       var blob = document.createElement('div');
       blob.className = 'leak-blob';
-      blob.style.background = 'radial-gradient(circle, ' + color + ' 0%, transparent 70%)';
+      blob.style.background = 'radial-gradient(closest-side, ' + color + ' 0%, color-mix(in srgb, ' + color + ' 45%, transparent) 40%, transparent 100%)';
       blob.style.width = cfg.size;
       blob.style.height = cfg.size;
       blob.style.left = cfg.x;

@@ -6,6 +6,43 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Component polish audit, part 1: bug fixes
+
+The audit rendered all 205 components on real data from Marc's 256 films.
+Rendering each component ALONE produced false positives: st-logo-close's
+"invisible" tagline, st-quote and st-swarm all sit on a sibling dark
+backdrop (webgl-backdrop via `backdrop_active`) in every real scene, so
+they are fine; narration-track reads fine over its screencast. Re-rendered
+in their full real scenes, the real defects were:
+
+- **typewriter** (46 scenes): a finished text taller than its box was cut
+  off the top (the flex centre pushes overflow both ways). It now steps the
+  type down until the finished block fits.
+- **light-leak**: a 60px filter blur on a blended layer was clipped by
+  Chromium to its bounds (a hard square), and the component box cut the
+  glow in a straight line. Blur removed (the radial gradient is the
+  softness); the leak feathers out toward its box edges.
+- **Determinism**: 10 components called `Math.random` (captions glitch /
+  matrix-decode / particle-burst / emoji-pop, particle-field, particle-text,
+  magnetic, portal, grid-pixelate-wipe, liquid-glass-media-controls), so two
+  render workers could build different frames. Build-time randomness is a
+  seeded generator (`data.seed`); per-frame randomness (particle-text's
+  shimmer, matrix-decode's scramble) is a pure function of item and time.
+  caption-particle-burst created its sparks in a `tl.call` with
+  free-running tweens -- no seek could repeat them; they are built up front
+  and flown on the timeline now.
+- **Schemas**: 12 were in the old JSON-schema shape (no `data`, no
+  description), so the catalog handed the writer funnel-chart, progress-bar,
+  cta-card, bar-chart, line-chart, metric-dashboard, pricing-card,
+  social-proof, logo-intro/outro, screenshot-zoom and image-showcase with an
+  EMPTY description. Converted, with descriptions.
+
+Test: `test/audit-bugfixes.test.ts` (two loads build the same DOM for every
+formerly-random component, no component calls Math.random, typewriter fits,
+every schema is in the house shape).
+
+---
+
 ## 2026-09-24 — Pointing at UI and mobile demos (HyperFrames audit, batches 1 and 2)
 
 The audit's high-value gaps, built into what we have where they fit.

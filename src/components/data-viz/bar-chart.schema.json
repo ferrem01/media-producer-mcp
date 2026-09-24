@@ -1,21 +1,41 @@
 {
-  "type": "object",
-  "properties": {
+  "type": "bar-chart",
+  "label": "Bar Chart",
+  "category": "data-viz",
+  "description": "A bar chart that grows bar by bar with value labels (e.g. leads by week). For a few categories compared at a glance.",
+  "data": {
     "bars": {
       "type": "array",
+      "label": "Array of bar data",
+      "required": true,
       "items": {
         "type": "object",
         "properties": {
-          "label": { "type": "string" },
-          "value": { "type": "number" },
-          "color": { "type": "string" }
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          }
         },
-        "required": ["label", "value"]
-      },
-      "description": "Array of bar data"
+        "required": [
+          "label",
+          "value"
+        ]
+      }
     },
-    "title": { "type": "string", "description": "Chart title" },
-    "max_value": { "type": "number", "description": "Override max value for scale" }
-  },
-  "required": ["bars"]
+    "title": {
+      "type": "string",
+      "label": "Chart title",
+      "optional": true
+    },
+    "max_value": {
+      "type": "number",
+      "label": "Override max value for scale",
+      "optional": true
+    }
+  }
 }

@@ -1,8 +1,23 @@
 {
-  "type": "object",
-  "properties": {
-    "text": { "type": "string", "description": "Logo/brand text" },
-    "tagline": { "type": "string", "description": "Tagline text" },
-    "cta": { "type": "string", "description": "Call-to-action text" }
+  "type": "logo-outro",
+  "label": "Logo Outro",
+  "category": "media",
+  "description": "The brand's sign-off: logo, tagline and a call-to-action line, settling to end the film.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Logo/brand text",
+      "optional": true
+    },
+    "tagline": {
+      "type": "string",
+      "label": "Tagline text",
+      "optional": true
+    },
+    "cta": {
+      "type": "string",
+      "label": "Call-to-action text",
+      "optional": true
+    }
   }
 }

@@ -51,6 +51,10 @@
 
 <script>
   function createTimeline(el, data, ctx) {
+    // Seeded, not Math.random: every render worker (and every seek after a
+    // reload) builds the same layout. data.seed picks another one.
+    var __seed = Math.abs(Math.round(Number(data && data.seed) || 7)) % 2147483646 + 1;
+    var __rnd = function () { __seed = (__seed * 16807) % 2147483647; return (__seed - 1) / 2147483646; };
     var tl = gsap.timeline();
     var stage = el.querySelector('.cap-burst');
     var textEl = el.querySelector('.cap-burst-text');
@@ -106,34 +110,27 @@
         ease: 'back.out(1.8)'
       }, at);
 
-      // Particles fly inward toward the word.
+      // Particles fly inward toward the word. Built NOW and flown ON the
+      // timeline: they used to be created by a tl.call with free-running
+      // tweens, so no seek (and no second render) could repeat them.
       (function (wordEl, sparkAt) {
-        tl.call(function () {
-          var sr = wordEl.getBoundingClientRect();
-          var pr = stage.getBoundingClientRect();
-          var cx = sr.left - pr.left + sr.width / 2;
-          var cy = sr.top - pr.top + sr.height / 2;
-          for (var s = 0; s < sparkCount; s++) {
-            var spark = document.createElement('div');
-            spark.className = 'cap-burst-spark';
-            stage.appendChild(spark);
-            var ang = (Math.PI * 2 * s) / sparkCount + Math.random() * 0.6;
-            var dist = 90 + Math.random() * 110;
-            gsap.set(spark, {
-              left: cx + Math.cos(ang) * dist,
-              top: cy + Math.sin(ang) * dist,
-              scale: 0.4 + Math.random() * 0.8,
-              autoAlpha: 0
-            });
-            gsap.to(spark, { autoAlpha: 1, duration: 0.12, ease: 'power1.out' });
-            gsap.to(spark, {
-              left: cx, top: cy, scale: 0, autoAlpha: 0,
-              duration: speed * 0.9,
-              ease: 'power2.in',
-              onComplete: function () { if (this.targets()[0].parentNode) this.targets()[0].parentNode.removeChild(this.targets()[0]); }
-            });
-          }
-        }, null, sparkAt);
+        var sr = wordEl.getBoundingClientRect();
+        var pr = stage.getBoundingClientRect();
+        // Centre is transform-safe: the word's entrance scale is about its centre.
+        var cx = sr.left - pr.left + sr.width / 2;
+        var cy = sr.top - pr.top + sr.height / 2;
+        for (var s = 0; s < sparkCount; s++) {
+          var spark = document.createElement('div');
+          spark.className = 'cap-burst-spark';
+          stage.appendChild(spark);
+          var ang = (Math.PI * 2 * s) / sparkCount + __rnd() * 0.6;
+          var dist = 90 + __rnd() * 110;
+          var sx = cx + Math.cos(ang) * dist, sy = cy + Math.sin(ang) * dist;
+          gsap.set(spark, { left: sx, top: sy, scale: 0.4 + __rnd() * 0.8, autoAlpha: 0 });
+          tl.to(spark, { autoAlpha: 1, duration: 0.12, ease: 'power1.out' }, sparkAt);
+          tl.to(spark, { left: cx, top: cy, scale: 0, duration: speed * 0.9, ease: 'power2.in' }, sparkAt);
+          tl.to(spark, { autoAlpha: 0, duration: speed * 0.3, ease: 'power1.in' }, sparkAt + speed * 0.6);
+        }
       })(wEl, at);
     }
 

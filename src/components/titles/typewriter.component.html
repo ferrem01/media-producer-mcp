@@ -119,6 +119,17 @@
     // offsetWidth is used deliberately -- it is layout px and ignores the
     // .mp-camera Ken Burns transform, which getBoundingClientRect would fold in.
     spans.forEach(function (sp) { sp.style.display = 'inline'; });
+    // FIT: the finished text must fit its box. A block taller than the box
+    // was cut off at the top (the flex centre pushes overflow both ways) --
+    // measured: three lines in a 30%-tall slot lost their first line. Step
+    // the type down until the finished block fits.
+    var cs = getComputedStyle(root);
+    var availH = root.clientHeight - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
+    var fs = parseFloat(getComputedStyle(textArea).fontSize) || 42;
+    for (var fit = 0; fit < 24 && availH > 0 && textArea.offsetHeight > availH && fs > 12; fit++) {
+      fs *= 0.92;
+      textArea.style.fontSize = fs.toFixed(1) + 'px';
+    }
     var reserved = textArea.offsetWidth;
     spans.forEach(function (sp) { sp.style.display = ''; });
     if (reserved) {

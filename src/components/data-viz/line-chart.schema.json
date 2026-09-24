@@ -1,28 +1,43 @@
 {
-  "type": "object",
-  "properties": {
+  "type": "line-chart",
+  "label": "Line Chart",
+  "category": "data-viz",
+  "description": "A line chart that draws itself left to right with an area fill and glowing dots at the points (a trend over time).",
+  "data": {
     "points": {
       "type": "array",
+      "label": "Array of x,y data points",
+      "required": true,
       "items": {
         "type": "object",
         "properties": {
-          "x": { "type": "number" },
-          "y": { "type": "number" }
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
         },
-        "required": ["x", "y"]
-      },
-      "description": "Array of x,y data points"
+        "required": [
+          "x",
+          "y"
+        ]
+      }
     },
-    "title": { "type": "string", "description": "Chart title" },
-    "color": { "type": "string", "description": "Line color" },
+    "title": {
+      "type": "string",
+      "label": "Chart title",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Line color",
+      "optional": true
+    },
     "labels": {
       "type": "object",
-      "properties": {
-        "x": { "type": "string" },
-        "y": { "type": "string" }
-      },
-      "description": "Axis labels"
+      "label": "Axis labels",
+      "optional": true
     }
-  },
-  "required": ["points"]
+  }
 }

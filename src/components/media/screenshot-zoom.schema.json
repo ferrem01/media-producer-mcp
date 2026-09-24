@@ -1,10 +1,36 @@
 {
-  "type": "object",
-  "properties": {
-    "alt": { "type": "string", "description": "Alt text for placeholder" },
-    "zoom_x": { "type": "number", "description": "X position to zoom into (0-100%)", "default": 50 },
-    "zoom_y": { "type": "number", "description": "Y position to zoom into (0-100%)", "default": 50 },
-    "zoom_scale": { "type": "number", "description": "Zoom magnification level", "default": 2 },
-    "label": { "type": "string", "description": "Label shown near zoomed area" }
+  "type": "screenshot-zoom",
+  "label": "Screenshot Zoom",
+  "category": "media",
+  "description": "A product screenshot framed in a window that zooms into one point (zoom_x/zoom_y %) with a focus ring and a label -- 'look here'.",
+  "data": {
+    "alt": {
+      "type": "string",
+      "label": "Alt text for placeholder",
+      "optional": true
+    },
+    "zoom_x": {
+      "type": "number",
+      "label": "X position to zoom into (0-100%)",
+      "optional": true,
+      "default": 50
+    },
+    "zoom_y": {
+      "type": "number",
+      "label": "Y position to zoom into (0-100%)",
+      "optional": true,
+      "default": 50
+    },
+    "zoom_scale": {
+      "type": "number",
+      "label": "Zoom magnification level",
+      "optional": true,
+      "default": 2
+    },
+    "label": {
+      "type": "string",
+      "label": "Label shown near zoomed area",
+      "optional": true
+    }
   }
 }
