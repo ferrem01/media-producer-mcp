@@ -1,0 +1,77 @@
+{
+  "type": "donut-chart",
+  "label": "Donut Chart",
+  "category": "data-viz",
+  "description": "A whole split into its parts, drawn as a sweep: each segment arcs round after the last while its share counts up in the legend; the centre holds the total (or the highlighted share). Brand hue family, not a rainbow; highlight keeps one segment in full color and quiets the rest. Legend beside the ring, or under it in a tall box.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "optional": true
+    },
+    "segments": {
+      "type": "array",
+      "label": "Segments: {label, value, color?, display? (legend text override)}",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ]
+      }
+    },
+    "highlight": {
+      "type": "number",
+      "label": "Index of the segment that matters (the centre shows its share)",
+      "optional": true
+    },
+    "center_value": {
+      "type": "string",
+      "label": "Centre number override (e.g. '$1.2M')",
+      "optional": true
+    },
+    "center_label": {
+      "type": "string",
+      "label": "Centre caption override",
+      "optional": true
+    },
+    "thickness": {
+      "type": "string",
+      "label": "regular (default) | thin",
+      "optional": true,
+      "enum": [
+        "regular",
+        "thin"
+      ]
+    },
+    "theme": {
+      "type": "string",
+      "label": "Ink theme; omit to follow the measured scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}

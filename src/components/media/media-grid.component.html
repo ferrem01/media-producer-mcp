@@ -1,0 +1,103 @@
+<template>
+  <div class="mg-root"></div>
+</template>
+
+<style scoped>
+  /* MEDIA GRID: 2-6 screenshots or clips as one composed spread -- 2-up,
+     hero + 2, 2x2, 3x2 -- rounded tiles with a hairline, a slow push inside
+     each frame, a caption chip per tile. Tiles land one after another; a
+     highlight dims the rest and rings the one that matters. Lays out in the
+     visible frame; a tall frame stacks. */
+  .mg-root, .mg-root * { max-width: none; box-sizing: border-box; }
+  .mg-root { --u: 1px; position: absolute; inset: 0; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .mg-tile { position: absolute; overflow: hidden; border-radius: calc(var(--u) * 20); background: #e9e9ee;
+    box-shadow: 0 0 0 1px rgba(20, 20, 40, 0.08), 0 calc(var(--u) * 14) calc(var(--u) * 34) rgba(20, 20, 60, 0.14); }
+  .mg-root.t-dark .mg-tile { background: #1d1e26; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 calc(var(--u) * 14) calc(var(--u) * 34) rgba(0, 0, 0, 0.4); }
+  .mg-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
+  .mg-ring { position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 calc(var(--u) * 4) var(--mp-color-primary, #393bf5); opacity: 0; pointer-events: none; }
+  .mg-cap { position: absolute; left: calc(var(--u) * 16); bottom: calc(var(--u) * 16); max-width: calc(100% - var(--u) * 32);
+    padding: calc(var(--u) * 9) calc(var(--u) * 16); border-radius: 999px; background: rgba(16, 16, 22, 0.78); color: #ffffff;
+    font-size: calc(var(--u) * 20); font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(6px); }
+  .mg-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--u) * 28); font-weight: 700; color: rgba(20, 20, 40, 0.35); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.mg-root');
+    var DUR = (ctx && ctx.duration) || 6;
+    var items = (Array.isArray(data.items) ? data.items : []).map(function (it) { return typeof it === 'string' ? { src: it } : (it || {}); }).slice(0, 6);
+    if (!items.length) return tl;
+    var n = items.length;
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    root.classList.add('t-' + (data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light')));
+
+    // Visible area of the slot (a full-frame slot overhangs the frame).
+    var W0 = el.clientWidth || 1200, H0 = el.clientHeight || 700;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var pad = Math.round(Math.min(W0, H0) * 0.04);
+    var X = ox + pad, Y = oy + pad, W = W0 - 2 * (ox + pad), H = H0 - 2 * (oy + pad);
+    var u = Math.min(W, H) / 700;
+    root.style.setProperty('--u', u.toFixed(3) + 'px');
+    var g = Math.max(8, Math.round(Math.min(W, H) * 0.025));
+    var tall = H > W * 1.1;
+
+    // LAYOUT: cells as fractions of the area, by count and orientation.
+    var layout = data.layout || 'auto';
+    var cells;
+    function row(k) { var out = []; for (var i = 0; i < k; i++) out.push([i / k, 0, 1 / k, 1]); return out; }
+    function col(k) { var out = []; for (var i = 0; i < k; i++) out.push([0, i / k, 1, 1 / k]); return out; }
+    function grid(c, r) { var out = []; for (var j = 0; j < r; j++) for (var i = 0; i < c; i++) out.push([i / c, j / r, 1 / c, 1 / r]); return out; }
+    if (n === 1) cells = [[0, 0, 1, 1]];
+    else if (n === 2) cells = tall ? col(2) : row(2);
+    else if (n === 3 && layout !== 'row') cells = tall ? [[0, 0, 1, 0.58], [0, 0.58, 0.5, 0.42], [0.5, 0.58, 0.5, 0.42]] : [[0, 0, 0.6, 1], [0.6, 0, 0.4, 0.5], [0.6, 0.5, 0.4, 0.5]];
+    else if (n === 3) cells = tall ? col(3) : row(3);
+    else if (n === 4) cells = layout === 'row' && !tall ? row(4) : grid(2, 2);
+    else cells = tall ? grid(2, 3) : grid(3, 2);
+
+    var tiles = items.map(function (it, i) {
+      var c = cells[i] || cells[cells.length - 1];
+      var t = document.createElement('div'); t.className = 'mg-tile';
+      var x = X + c[0] * (W + g), y = Y + c[1] * (H + g), w = c[2] * (W + g) - g, h = c[3] * (H + g) - g;
+      t.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px';
+      var src = String(it.src || '');
+      var isVideo = it.video === true || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(src);
+      // The push rides a wrapper: the capture swaps a <video> for frame stills,
+      // so a tween on the video element itself would stop driving anything.
+      var inner = document.createElement('div'); inner.style.cssText = 'position:absolute;inset:0;'; t.appendChild(inner);
+      var media = null;
+      if (src && isVideo && typeof loadVideoForCapture === 'function') {
+        media = loadVideoForCapture(inner, src, { style: 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;', startAt: Number(it.start_at) || 0 });
+      } else if (src) {
+        media = document.createElement('img'); media.className = 'mg-media'; media.src = src; media.alt = it.caption || ''; inner.appendChild(media);
+        if (it.position) media.style.objectPosition = String(it.position);
+      } else {
+        var ph = document.createElement('div'); ph.className = 'mg-ph'; ph.textContent = it.caption || ('Shot ' + (i + 1)); t.appendChild(ph);
+      }
+      var ring = document.createElement('div'); ring.className = 'mg-ring'; t.appendChild(ring);
+      if (it.caption && src) { var cap = document.createElement('div'); cap.className = 'mg-cap'; cap.textContent = String(it.caption); t.appendChild(cap); }
+      root.appendChild(t);
+      return { el: t, media: media ? inner : null, ring: ring };
+    });
+
+    // MOTION: tiles rise in one after another; inside each frame a slow push
+    // (1.06 -> 1) runs the whole scene; an optional highlight dims the rest.
+    var AT = Number(data.at) || 0.2;
+    var each = Math.min(0.16, 1.2 / n);
+    tiles.forEach(function (t, i) {
+      gsap.set(t.el, { autoAlpha: 0, y: 26 });
+      tl.to(t.el, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, AT + i * each);
+      if (t.media && data.push !== false) tl.fromTo(t.media, { scale: 1.06 }, { scale: 1, duration: DUR, ease: 'none', immediateRender: true }, 0);
+    });
+    var hi = data.highlight;
+    if (hi !== undefined && hi !== null && tiles[Number(hi)]) {
+      var hAt = data.highlight_at !== undefined ? Number(data.highlight_at) : AT + n * each + 0.8;
+      tiles.forEach(function (t, i) {
+        if (i === Number(hi)) tl.to(t.ring, { opacity: 1, duration: 0.35, ease: 'power2.out' }, hAt);
+        else tl.to(t.el, { opacity: 0.4, duration: 0.45, ease: 'power2.out' }, hAt);
+      });
+    }
+    return tl;
+  }
+</script>

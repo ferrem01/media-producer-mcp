@@ -1,0 +1,54 @@
+{
+  "type": "page-scroll",
+  "label": "Page Scroll",
+  "category": "media",
+  "description": "A long page -- a full-page screenshot of a landing page, a long email, a doc -- scrolled like a reader would: glide, settle on a section, glide on, in a browser window sized to the frame, a scrollbar tracking the position and an optional caption landing at each stop.",
+  "data": {
+    "src": {
+      "type": "string",
+      "label": "Full-page screenshot (tall image)",
+      "required": true
+    },
+    "stops": {
+      "type": "array",
+      "label": "Scroll stops: {at (s), to (0 = top .. 1 = bottom), caption, duration}; default three even stops to the bottom",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "to": {
+            "type": "number"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "url": {
+      "type": "string",
+      "label": "Browser-bar address",
+      "optional": true
+    },
+    "device": {
+      "type": "string",
+      "label": "browser (default) | none (bare page)",
+      "optional": true,
+      "enum": [
+        "browser",
+        "none"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}

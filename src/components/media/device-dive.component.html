@@ -1,0 +1,105 @@
+<template>
+  <div class="dd-root">
+    <div class="dd-phone"><div class="dd-screen"><div class="dd-shot"></div></div><div class="dd-notch"></div></div>
+    <div class="dd-after"></div>
+    <div class="dd-layers"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* DEVICE DIVE: a phone showing the product, then the camera pushes
+     THROUGH its screen until the screen is the frame -- the bezel sweeps
+     past the edges -- and the full-size product (after_src) takes over, with
+     optional cards floating in at different depths. One continuous move:
+     the small thing becomes the whole world. */
+  .dd-root, .dd-root * { max-width: none; box-sizing: border-box; }
+  .dd-root { --u: 1px; position: absolute; inset: 0; overflow: hidden; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .dd-phone { position: absolute; left: 0; top: 0; background: #0f0f14; border-radius: var(--dd-r); transform-origin: 0 0;
+    box-shadow: 0 calc(var(--u) * 30) calc(var(--u) * 70) rgba(20, 20, 60, 0.30), inset 0 0 0 calc(var(--u) * 2) #2a2a33; }
+  .dd-screen { position: absolute; overflow: hidden; background: #e9e9ee; }
+  .dd-shot { position: absolute; inset: 0; background-size: cover; background-position: center top; }
+  .dd-notch { position: absolute; left: 50%; width: 28%; height: calc(var(--u) * 22); transform: translateX(-50%); border-radius: 999px; background: #0f0f14; }
+  .dd-after { position: absolute; inset: 0; background-size: cover; background-position: center top; opacity: 0; }
+  .dd-layers { position: absolute; inset: 0; }
+  .dd-card { position: absolute; border-radius: calc(var(--u) * 18); background: #ffffff; color: var(--mp-color-on-light, #17171c); overflow: hidden;
+    box-shadow: 0 calc(var(--u) * 18) calc(var(--u) * 44) rgba(20, 20, 60, 0.22); font-size: calc(var(--u) * 26); font-weight: 600; letter-spacing: -0.01em; }
+  .dd-card.text { padding: calc(var(--u) * 20) calc(var(--u) * 26); }
+  .dd-card img { display: block; width: 100%; height: auto; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.dd-root'), phone = q('.dd-phone'), screen = q('.dd-screen'), shot = q('.dd-shot'), after = q('.dd-after');
+    var DUR = (ctx && ctx.duration) || 6;
+    function img(src) { var im = new Image(); im.src = String(src); im.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0'; root.appendChild(im); }
+    if (data.src) { shot.style.backgroundImage = 'url("' + String(data.src).replace(/"/g, '%22') + '")'; img(data.src); }
+    if (data.after_src) { after.style.backgroundImage = 'url("' + String(data.after_src).replace(/"/g, '%22') + '")'; img(data.after_src); }
+
+    // The visible frame of the slot.
+    var W0 = el.clientWidth || 1200, H0 = el.clientHeight || 700;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
+    var X = ox, Y = oy, W = W0 - 2 * ox, H = H0 - 2 * oy;
+    after.style.cssText += 'left:' + X + 'px;top:' + Y + 'px;width:' + W + 'px;height:' + H + 'px;right:auto;bottom:auto;';
+
+    // Phone geometry (9:19.5), centred at data.x/y (% of the frame, default centre).
+    var ph = H * 0.86, pw = ph * 9 / 19.5;
+    if (pw > W * 0.9) { pw = W * 0.9; ph = pw * 19.5 / 9; }
+    var u = pw / 420;
+    root.style.setProperty('--u', u.toFixed(3) + 'px');
+    var b = pw * 0.045, rOuter = pw * 0.14, rInner = rOuter - b;
+    root.style.setProperty('--dd-r', rOuter + 'px');
+    var px = X + W * (isFinite(Number(data.x)) ? Number(data.x) / 100 : 0.5) - pw / 2, py = Y + H * (isFinite(Number(data.y)) ? Number(data.y) / 100 : 0.5) - ph / 2;
+    phone.style.width = pw + 'px'; phone.style.height = ph + 'px';
+    screen.style.cssText = 'left:' + b + 'px;top:' + b + 'px;width:' + (pw - 2 * b) + 'px;height:' + (ph - 2 * b) + 'px;border-radius:' + rInner + 'px';
+    q('.dd-notch').style.top = (b + 10 * u) + 'px';
+    // Where the screen must go: its centre to the frame's, scaled to COVER it.
+    var sw = pw - 2 * b, sh = ph - 2 * b;
+    var S = Math.max(W / sw, H / sh) * 1.04;
+    var scx = px + b + sw / 2, scy = py + b + sh / 2, fcx = X + W / 2, fcy = Y + H / 2;
+
+    // Cards floating in after arrival, at depths (parallax drift).
+    var cards = (Array.isArray(data.layers) ? data.layers : []).slice(0, 5).map(function (L, i) {
+      var c = document.createElement('div'); c.className = 'dd-card' + (L.src ? '' : ' text');
+      if (L.src) { var im = document.createElement('img'); im.src = String(L.src); im.alt = ''; c.appendChild(im); } else c.textContent = String(L.text || '');
+      var lx = X + W * (Number(L.x) || [8, 62, 12, 58, 35][i % 5]) / 100, ly = Y + H * (Number(L.y) || [14, 20, 62, 58, 40][i % 5]) / 100;
+      c.style.left = lx + 'px'; c.style.top = ly + 'px';
+      if (L.src) c.style.width = (W * (Number(L.w) || 26) / 100) + 'px';
+      q('.dd-layers').appendChild(c);
+      return { el: c, depth: Number(L.depth) || (0.6 + (i % 3) * 0.35) };
+    });
+
+    // MOTION: the phone rises in and holds; at dive_at the camera pushes
+    // through the screen (accelerating in, settling as the screen becomes the
+    // frame); after_src takes over; cards float in at their depths.
+    var AT = Number(data.at) || 0.2;
+    var diveAt = data.dive_at !== undefined ? Number(data.dive_at) : Math.max(AT + 1.2, DUR * 0.4);
+    var diveDur = Number(data.dive_duration) || 1.2;
+    var st = { a: 0, k: 0, t: 0 };
+    tl.to(st, { a: 1, duration: 0.6, ease: 'power3.out' }, AT);
+    tl.to(st, { k: 1, duration: diveDur, ease: 'power3.inOut' }, diveAt);
+    tl.to(st, { t: DUR, duration: DUR, ease: 'none' }, 0);
+    var arrive = diveAt + diveDur;
+    function apply() {
+      var k = st.k, s = 1 + (S - 1) * k;
+      // Scale about the screen centre, then carry that centre to the frame centre.
+      var tx = scx + (fcx - scx) * k - scx * s, ty = scy + (fcy - scy) * k - scy * s;
+      phone.style.transform = 'translate(' + (tx + px * s).toFixed(2) + 'px,' + (ty + py * s + (1 - st.a) * 40).toFixed(2) + 'px) scale(' + s.toFixed(4) + ')';
+      phone.style.opacity = st.a;
+      screen.style.borderRadius = (rInner * (1 - k)).toFixed(2) + 'px';
+      var af = data.after_src ? Math.max(0, Math.min(1, (st.t - arrive + 0.15) / 0.45)) : 0;
+      after.style.opacity = af;
+      cards.forEach(function (c, i) {
+        var d = st.t - (arrive + 0.2 + i * 0.18);
+        var v = Math.max(0, Math.min(1, d / 0.5));
+        c.el.style.opacity = v;
+        c.el.style.transform = 'translate(' + (-Math.max(0, d) * 10 * c.depth).toFixed(1) + 'px,' + ((1 - v) * 40 * c.depth - Math.max(0, d) * 6 * c.depth).toFixed(1) + 'px) scale(' + (0.9 + 0.1 * v) * (0.85 + 0.15 * c.depth) + ')';
+      });
+    }
+    tl.eventCallback('onUpdate', apply);
+    apply();
+    return tl;
+  }
+</script>

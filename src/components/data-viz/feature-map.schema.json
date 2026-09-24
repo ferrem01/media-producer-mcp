@@ -1,0 +1,62 @@
+{
+  "type": "feature-map",
+  "label": "Feature Map",
+  "category": "data-viz",
+  "description": "One hub (the product) and what it connects to -- integrations, features, channels -- set round it on an ellipse. The hub lands, connectors draw out one by one, each node lights as its line arrives, then signal pulses run hub -> nodes. 'Works with HubSpot, Salesforce, Slack...' or 'one agent, every channel'. 3-12 nodes.",
+  "data": {
+    "hub": {
+      "type": "object",
+      "label": "The centre: {label, logo (image URL)} or a plain string",
+      "optional": true,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "logo": {
+          "type": "string"
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "label": "Nodes: {label, sub (small line), logo (image URL), icon (a letter/emoji when no logo)} or strings",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "sub": {
+            "type": "string"
+          },
+          "logo": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pulses": {
+      "type": "boolean",
+      "label": "Signal dots running out along the lines once built (default true)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Ink theme; omit to follow the measured scene ground",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}

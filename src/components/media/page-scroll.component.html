@@ -1,0 +1,98 @@
+<template>
+  <div class="ps-root">
+    <div class="ps-win">
+      <div class="ps-bar"><i></i><i></i><i></i><b></b></div>
+      <div class="ps-view"><img class="ps-page" alt=""><div class="ps-track"><div class="ps-thumb"></div></div></div>
+    </div>
+    <div class="ps-caps"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* PAGE SCROLL: a long page (a full-page screenshot) scrolled like a
+     reader would -- glide, settle on a section, glide on -- in a browser
+     window sized to the frame. Each stop can carry a caption; a scrollbar
+     tracks the position. For landing pages, long emails, docs. */
+  .ps-root, .ps-root * { max-width: none; box-sizing: border-box; }
+  .ps-root { --u: 1px; position: absolute; inset: 0; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .ps-win { position: absolute; overflow: hidden; background: #ffffff; border-radius: calc(var(--u) * 18); border: 1px solid rgba(20, 20, 40, 0.10);
+    box-shadow: 0 calc(var(--u) * 4) calc(var(--u) * 10) rgba(20, 20, 60, 0.08), 0 calc(var(--u) * 26) calc(var(--u) * 60) rgba(20, 20, 60, 0.18); }
+  .ps-bar { height: calc(var(--u) * 42); background: #f1f1f5; display: flex; align-items: center; gap: calc(var(--u) * 8); padding: 0 calc(var(--u) * 16); border-bottom: 1px solid rgba(20, 20, 40, 0.08); }
+  .ps-bar i { width: calc(var(--u) * 12); height: calc(var(--u) * 12); border-radius: 50%; background: #d4d4dc; display: block; }
+  .ps-bar b { margin-left: calc(var(--u) * 14); flex: 1; max-width: 46%; height: calc(var(--u) * 24); border-radius: 999px; background: #ffffff; border: 1px solid rgba(20, 20, 40, 0.08);
+    font-size: calc(var(--u) * 14); font-weight: 500; color: #6b6b75; display: flex; align-items: center; padding: 0 calc(var(--u) * 12); white-space: nowrap; overflow: hidden; }
+  .ps-root.bare .ps-bar { display: none; }
+  .ps-view { position: absolute; left: 0; right: 0; bottom: 0; top: calc(var(--u) * 42); overflow: hidden; }
+  .ps-root.bare .ps-view { top: 0; }
+  .ps-page { position: absolute; left: 0; top: 0; width: 100%; height: auto; display: block; will-change: transform; }
+  .ps-track { position: absolute; right: calc(var(--u) * 6); top: calc(var(--u) * 6); bottom: calc(var(--u) * 6); width: calc(var(--u) * 6); border-radius: 999px; background: rgba(20, 20, 40, 0.06); }
+  .ps-thumb { position: absolute; left: 0; right: 0; top: 0; border-radius: 999px; background: rgba(20, 20, 40, 0.28); }
+  .ps-caps { position: absolute; }
+  .ps-cap { position: absolute; left: 0; bottom: 0; padding: calc(var(--u) * 14) calc(var(--u) * 24); border-radius: 999px; white-space: nowrap;
+    background: var(--mp-color-primary, #393bf5); color: var(--mp-color-on-primary, #ffffff); font-size: calc(var(--u) * 26); font-weight: 600; letter-spacing: -0.01em;
+    box-shadow: 0 calc(var(--u) * 12) calc(var(--u) * 28) color-mix(in srgb, var(--mp-color-primary, #393bf5) 30%, transparent); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.ps-root'), win = q('.ps-win'), view = q('.ps-view'), page = q('.ps-page'), thumb = q('.ps-thumb'), caps = q('.ps-caps');
+    var DUR = (ctx && ctx.duration) || 8;
+    if (data.device === 'none') root.classList.add('bare');
+    q('.ps-bar b').textContent = data.url ? String(data.url) : '';
+    if (!data.url) q('.ps-bar b').style.visibility = 'hidden';
+    if (data.src) page.src = String(data.src);
+
+    // The window fills the visible frame (landscape-capped at 16:10).
+    var W0 = el.clientWidth || 1200, H0 = el.clientHeight || 700;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc + W0 * 0.03, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc + H0 * 0.04;
+    var W = W0 - 2 * ox, H = H0 - 2 * oy;
+    var ww = Math.min(W, H * 1.6), wh = H;
+    var wx = ox + (W - ww) / 2, wy = oy;
+    win.style.cssText = 'left:' + wx + 'px;top:' + wy + 'px;width:' + ww + 'px;height:' + wh + 'px';
+    var u = Math.min(ww / 1300, wh / 800) * 1.1;
+    root.style.setProperty('--u', u.toFixed(3) + 'px');
+    caps.style.cssText = 'left:' + (wx + 28 * u) + 'px;top:' + (wy + wh - 28 * u) + 'px;';
+
+    // Stops: [{at, to (0..1 down the page), caption}]; default three even stops to the bottom.
+    var AT = Number(data.at) || 0.2;
+    var stops = Array.isArray(data.stops) && data.stops.length ? data.stops.slice(0, 8)
+      : [1, 2, 3].map(function (k) { return { to: k / 3 }; });
+    var span = DUR - AT - 1.0;
+    stops = stops.map(function (s, i) { return { at: s.at !== undefined ? Number(s.at) : AT + 0.6 + (span * i) / stops.length, to: Math.max(0, Math.min(1, Number(s.to))), caption: s.caption || '', dur: Number(s.duration) || 0.95 }; });
+    var capEls = stops.map(function (s) {
+      var c = document.createElement('div'); c.className = 'ps-cap'; c.textContent = String(s.caption);
+      if (!s.caption) c.style.display = 'none';
+      caps.appendChild(c); return c;
+    });
+
+    // MOTION: the window rises; the page glides between stops, settling on
+    // each (a slow ease-out lands the reader on the section).
+    var st = { p: 0, a: 0, t: 0 };
+    tl.to(st, { a: 1, duration: 0.55, ease: 'power3.out' }, AT);
+    stops.forEach(function (s) { tl.to(st, { p: s.to, duration: s.dur, ease: 'power3.inOut' }, s.at); });
+    tl.to(st, { t: DUR, duration: DUR, ease: 'none' }, 0);
+    function apply() {
+      // The page's real height is only known once it has loaded (the capture
+      // waits for images before the first seek, so every frame sees it).
+      var range = Math.max(0, page.offsetHeight - view.clientHeight);
+      page.style.transform = 'translateY(' + (-st.p * range).toFixed(2) + 'px)';
+      var vh = view.clientHeight, ph = page.offsetHeight || vh;
+      var th = Math.max(24, (vh / ph) * (vh - 12));
+      thumb.style.height = th + 'px';
+      thumb.style.transform = 'translateY(' + (st.p * (vh - 12 - th)).toFixed(2) + 'px)';
+      win.style.opacity = st.a; win.style.transform = 'translateY(' + ((1 - st.a) * 24).toFixed(1) + 'px)';
+      capEls.forEach(function (c, i) {
+        var s = stops[i], next = stops[i + 1];
+        var on = st.t >= s.at + s.dur * 0.6 && (!next || st.t < next.at + 0.1);
+        var d = on ? Math.min(1, (st.t - (s.at + s.dur * 0.6)) / 0.3) : 0;
+        c.style.opacity = d; c.style.transform = 'translateY(' + ((1 - d) * 12).toFixed(1) + 'px)';
+      });
+    }
+    tl.eventCallback('onUpdate', apply);
+    apply();
+    return tl;
+  }
+</script>

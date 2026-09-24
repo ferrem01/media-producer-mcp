@@ -1,0 +1,68 @@
+{
+  "type": "speech-bubble",
+  "label": "Speech Bubble",
+  "category": "props",
+  "description": "What someone says, placed where they are: a rounded bubble with a tail pointing at the speaker (place the box beside the person or the avatar; tail says which side they are on). Sized from its box, hugging the text; words appear in reading order, or on word_times to sit on the voice. White over the camera or a dark ground, brand on a light ground.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "What they say",
+      "required": true
+    },
+    "name": {
+      "type": "string",
+      "label": "Small name line above the text",
+      "optional": true
+    },
+    "tail": {
+      "type": "string",
+      "label": "Where the speaker is: bottom-left (default) | bottom-right | top-left | top-right | left | right",
+      "optional": true,
+      "enum": [
+        "bottom-left",
+        "bottom-right",
+        "top-left",
+        "top-right",
+        "left",
+        "right"
+      ]
+    },
+    "theme": {
+      "type": "string",
+      "label": "light | dark | brand (default: light over camera/dark ground, brand on a light ground)",
+      "optional": true,
+      "enum": [
+        "light",
+        "dark",
+        "brand"
+      ]
+    },
+    "entrance": {
+      "type": "string",
+      "label": "words (default: word by word) | whole",
+      "optional": true,
+      "enum": [
+        "words",
+        "whole"
+      ]
+    },
+    "word_times": {
+      "type": "array",
+      "label": "Seconds each word appears (sync to the voice)",
+      "optional": true,
+      "items": {
+        "type": "number"
+      }
+    },
+    "exit_at": {
+      "type": "number",
+      "label": "Seconds the bubble leaves",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds into the scene it enters (default 0.2)",
+      "optional": true
+    }
+  }
+}

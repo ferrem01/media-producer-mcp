@@ -45,6 +45,18 @@
     // time 0 (the take as a layer plays from its trim, on the base's clock).
     var startAt = Number(data.start_at);
     if (!isFinite(startAt) || startAt < 0) startAt = 0;
+    // fill 'blur': off-aspect footage (a 16:9 clip in a 9:16 frame) sits
+    // whole in the middle over a blurred, scaled-up copy of itself filling
+    // the frame -- no black bars, no crop. Both copies ride the capture's
+    // clock (every <video> is seeked), so they stay in step.
+    if (data.fill === 'blur') {
+      loadVideoForCapture(container, data.src, {
+        style: 'position:absolute;inset:-6%;width:112%;height:112%;object-fit:cover;display:block;filter:blur(38px) brightness(0.72) saturate(1.2);',
+        startAt: timed && at > 0 ? -at : startAt,
+      });
+      container.style.overflow = 'hidden'; container.style.position = 'relative';
+      style = 'position:relative;width:100%;height:100%;object-fit:contain;display:block;';
+    }
     var video = loadVideoForCapture(container, data.src, { style: style, startAt: timed && at > 0 ? -at : startAt });
 
     if (timed) {

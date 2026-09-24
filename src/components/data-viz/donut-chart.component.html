@@ -1,0 +1,140 @@
+<template>
+  <div class="dn-root">
+    <div class="dn-head"><div class="dn-title"></div></div>
+    <div class="dn-body">
+      <div class="dn-ring"><svg class="dn-svg" viewBox="0 0 200 200"></svg><div class="dn-center"><div class="dn-big"></div><div class="dn-small"></div></div></div>
+      <div class="dn-legend"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* DONUT: a whole split into its parts, drawn as a sweep -- each segment
+     arcs round after the last, its share counting up in the legend; the
+     centre holds the total or the one share that matters. A highlight keeps
+     one segment in full brand color and quiets the rest. */
+  .dn-root, .dn-root * { max-width: none; box-sizing: border-box; }
+  .dn-root { --u: 1px; position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); color: var(--ink); }
+  .dn-root.t-light { --ink: var(--mp-color-on-light, #17171c); --mute: color-mix(in srgb, var(--mp-color-on-light, #17171c) 60%, #ffffff); --track: rgba(20, 20, 40, 0.07); }
+  .dn-root.t-dark { --ink: #ffffff; --mute: rgba(255, 255, 255, 0.66); --track: rgba(255, 255, 255, 0.10); }
+  .dn-title { font-size: calc(var(--u) * 40); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: calc(var(--u) * 26); }
+  .dn-title:empty { display: none; }
+  .dn-body { display: flex; align-items: center; gap: calc(var(--u) * 56); }
+  .dn-root.stack .dn-body { flex-direction: column; gap: calc(var(--u) * 32); }
+  .dn-ring { position: relative; flex: 0 0 auto; }
+  .dn-svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+  .dn-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .dn-big { font-size: calc(var(--u) * 64); font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .dn-small { margin-top: calc(var(--u) * 8); font-size: calc(var(--u) * 18); color: var(--mute); font-weight: 500; max-width: 60%; }
+  .dn-small:empty { display: none; }
+  .dn-legend { display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+  .dn-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: calc(var(--u) * 14); font-size: calc(var(--u) * 24); }
+  .dn-sw { width: calc(var(--u) * 16); height: calc(var(--u) * 16); border-radius: calc(var(--u) * 5); }
+  .dn-lab { font-weight: 500; color: var(--mute); white-space: nowrap; }
+  .dn-item.hi .dn-lab { color: var(--ink); font-weight: 600; }
+  .dn-pct { font-weight: 700; font-variant-numeric: tabular-nums; padding-left: calc(var(--u) * 20); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.dn-root'), svg = q('.dn-svg'), legend = q('.dn-legend');
+    var NS = 'http://www.w3.org/2000/svg';
+    var DUR = (ctx && ctx.duration) || 6;
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    root.classList.add('t-' + (data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light')));
+    var segs = (Array.isArray(data.segments) ? data.segments : []).filter(function (s) { return s && Number(s.value) > 0; }).slice(0, 7);
+    if (!segs.length) return tl;
+    var total = segs.reduce(function (a, s) { return a + Number(s.value); }, 0);
+    var hiIdx = data.highlight !== undefined && data.highlight !== null ? Number(data.highlight) : -1;
+    q('.dn-title').textContent = data.title ? String(data.title) : '';
+
+    // One hue family: the brand primary deepening, then the secondary, so a
+    // donut reads as the brand, not a rainbow (a highlight quiets the rest).
+    var cs = getComputedStyle(el);
+    var P = cs.getPropertyValue('--mp-color-primary').trim() || '#393bf5', S = cs.getPropertyValue('--mp-color-secondary').trim() || '#d48c34';
+    var ramp = ['color-mix(in srgb, ' + P + ' 100%, #000 0%)', 'color-mix(in srgb, ' + P + ' 62%, #ffffff)', S, 'color-mix(in srgb, ' + P + ' 70%, #0b0b2e)', 'color-mix(in srgb, ' + P + ' 35%, #ffffff)', 'color-mix(in srgb, ' + S + ' 55%, #ffffff)', '#9a9aa8'];
+    var colors = segs.map(function (s, i) { return s.color ? String(s.color) : ramp[i % ramp.length]; });
+
+    // Layout: legend beside the ring, or under it in a tall / narrow box.
+    var W0 = el.clientWidth || 1200, H0 = el.clientHeight || 700;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc + W0 * 0.04, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc + H0 * 0.05;
+    root.style.padding = oy + 'px ' + ox + 'px';
+    var W = W0 - 2 * ox, H = H0 - 2 * oy;
+    var stack = H > W * 0.9;
+    if (stack) root.classList.add('stack');
+    var ring = q('.dn-ring');
+
+    // Segments: stroked circles, each offset to start where the last ended.
+    var R = 80, C = 2 * Math.PI * R, SW = data.thickness === 'thin' ? 14 : 26, GAP = segs.length > 1 ? 1.2 : 0;
+    var track = document.createElementNS(NS, 'circle');
+    track.setAttribute('cx', 100); track.setAttribute('cy', 100); track.setAttribute('r', R); track.setAttribute('fill', 'none');
+    track.setAttribute('stroke-width', SW); track.style.stroke = 'var(--track)';
+    svg.appendChild(track);
+    var acc = 0;
+    var arcs = segs.map(function (s, i) {
+      var frac = Number(s.value) / total, len = Math.max(0, frac * C - GAP);
+      var c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', 100); c.setAttribute('cy', 100); c.setAttribute('r', R); c.setAttribute('fill', 'none'); c.setAttribute('stroke-width', SW);
+      c.style.stroke = colors[i];
+      c.style.strokeDasharray = '0 ' + C;
+      c.style.strokeDashoffset = String(-acc * C);
+      if (hiIdx >= 0 && i !== hiIdx) c.style.opacity = '0.28';
+      svg.appendChild(c);
+      var a = { el: c, len: len, frac: frac };
+      acc += frac;
+      return a;
+    });
+    var fmtPct = function (f) { var p = f * 100; return (p >= 9.95 || p === 0 ? Math.round(p) : p.toFixed(1)) + '%'; };
+    var items = segs.map(function (s, i) {
+      var it = document.createElement('div'); it.className = 'dn-item' + (i === hiIdx ? ' hi' : '');
+      it.innerHTML = '<span class="dn-sw"></span><span class="dn-lab"></span><span class="dn-pct"></span>';
+      it.querySelector('.dn-sw').style.background = colors[i];
+      if (hiIdx >= 0 && i !== hiIdx) it.querySelector('.dn-sw').style.opacity = '0.35';
+      it.querySelector('.dn-lab').textContent = String(s.label || '');
+      it.querySelector('.dn-pct').textContent = s.display ? String(s.display) : fmtPct(arcs[i].frac);
+      legend.appendChild(it);
+      return it;
+    });
+    var big = q('.dn-big'), small = q('.dn-small');
+    var centerBig = data.center_value !== undefined ? String(data.center_value) : (hiIdx >= 0 ? fmtPct(arcs[hiIdx].frac) : Math.round(total).toLocaleString());
+    big.textContent = centerBig;
+    small.textContent = data.center_label !== undefined ? String(data.center_label) : (hiIdx >= 0 ? String(segs[hiIdx].label || '') : 'total');
+
+    // SIZE: the ring from the box; shrink the type until everything fits.
+    var u = Math.min(W / 1100, H / 620) * 1.2;
+    for (var k = 0; k < 30; k++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      var head = q('.dn-head').offsetHeight;
+      var ringD = stack ? Math.min(W * 0.8, (H - head) * 0.55) : Math.min(H - head, W * 0.46);
+      ring.style.width = ringD + 'px'; ring.style.height = ringD + 'px';
+      if (root.scrollHeight <= H0 + 1 && root.scrollWidth <= W0 + 1 && legend.scrollWidth <= legend.clientWidth + 1) break;
+      u *= 0.94;
+    }
+
+    // MOTION: title rises; each segment sweeps round after the last while
+    // its share counts up in the legend; the centre lands when the ring closes.
+    var AT = Number(data.at) || 0.2;
+    if (q('.dn-title').textContent && window.mpLineRise) mpLineRise(tl, q('.dn-title'), AT, { duration: 0.45, rise: 12 });
+    gsap.set([ring, legend], { autoAlpha: 0, y: 14 });
+    tl.to([ring, legend], { autoAlpha: 1, y: 0, duration: 0.5, stagger: 0.1, ease: 'power3.out' }, AT + 0.15);
+    var t = AT + 0.45, span = Math.max(1.0, Math.min(2.2, DUR * 0.35));
+    arcs.forEach(function (a, i) {
+      var d = Math.max(0.18, span * a.frac);
+      var st = { l: 0 };
+      tl.to(st, { l: a.len, duration: d, ease: i === 0 ? 'power2.in' : 'none', onUpdate: function () { a.el.style.strokeDasharray = st.l.toFixed(2) + ' ' + C; } }, t);
+      var pctEl = items[i].querySelector('.dn-pct');
+      if (!segs[i].display && window.mpCountUp) mpCountUp(tl, pctEl, t, { to: pctEl.textContent, duration: Math.max(0.4, d + 0.2) });
+      gsap.set(items[i], { opacity: 0.25 });
+      tl.to(items[i], { opacity: 1, duration: 0.3 }, t);
+      t += d;
+    });
+    gsap.set(q('.dn-center'), { autoAlpha: 0 });
+    tl.to(q('.dn-center'), { autoAlpha: 1, duration: 0.4, ease: 'power2.out' }, t);
+    if (/\d/.test(centerBig) && window.mpCountUp) mpCountUp(tl, big, t, { to: centerBig, duration: 0.8 });
+    return tl;
+  }
+</script>
