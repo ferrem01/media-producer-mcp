@@ -207,4 +207,53 @@ describe("quotient-flow-panel", () => {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   }, 60000);
+
+  it("the add-step view: the picker grid, a pick presses its tile, then the step's settings", async () => {
+    const data = { view: "add-step", script: [
+      { at: 0.5, action: "pick", step: "Send Email" },
+      { at: 1.2, action: "view", view: "settings" },
+    ], sections: [{ title: "Send Email", fields: [{ kind: "select", label: "Email", value: "Pricing follow-up" }] }] };
+    const html = await assembleScene({
+      scene: { id: "s", label: "s", duration_seconds: 2.5, background: "#fff",
+        components: [{ id: "p", type: "quotient-flow-panel", position: { x: "0%", y: "0%", width: "100%", height: "100%" }, data }] } as any,
+      components: [{ type: "quotient-flow-panel", source: await fs.readFile(PANEL_SRC, "utf-8") }],
+      brandKit: { colors: {}, fonts: [] } as any, canvas: { width: 700, height: 1300 } as any,
+      gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+    } as any);
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "qpa-"));
+    const file = path.join(dir, "s.html");
+    await fs.writeFile(file, html);
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+    try {
+      const page = await browser.newPage({ viewport: { width: 700, height: 1300 } });
+      await page.goto(`file://${file}`);
+      await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 30000 });
+      const state = async (t: number) => {
+        await seek(page, t);
+        return page.evaluate(() => {
+          const shown = (e: Element | null) => !!e && (e as HTMLElement).offsetParent !== null && getComputedStyle(e).visibility === "visible" && Number(getComputedStyle(e).opacity) > 0.5;
+          const tiles = [...document.querySelectorAll(".qp-tile")];
+          return {
+            tiles: tiles.filter(shown).map((t) => (t.textContent || "").trim()),
+            ringed: tiles.filter((t) => shown(t.querySelector(".qp-ring"))).map((t) => (t.textContent || "").trim()),
+            settings: shown(document.querySelector(".qp-sec")),
+          };
+        });
+      };
+      const t0 = await state(0.2);
+      expect(t0.tiles).toEqual(["Delay", "Send Email", "Conditional", "AI Email", "Update Person", "Update Lead Score",
+        "Send to CRM", "Notify User", "Send Slack Message", "HTTP Request", "Agent"]);
+      expect(t0.ringed).toEqual([]);
+      expect(t0.settings).toBe(false);
+      expect((await state(1.0)).ringed).toEqual(["Send Email"]);
+      const t2 = await state(2.0);
+      expect(t2.tiles).toEqual([]);
+      expect(t2.settings).toBe(true);
+      expect((await state(0.2)).settings).toBe(false); // seeks back
+    } finally {
+      await browser.close();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 60000);
 });
+

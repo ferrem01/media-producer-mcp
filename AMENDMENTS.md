@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — The step picker joins the panel (flows-add-step)
+
+Marc captured the flow editor's "add step" picker and asked for it in a core
+component. It is the side panel in another mode (342px, the panel's width),
+so it became `quotient-flow-panel`'s second view: `view: "add-step"` shows
+the picker grid (Delay, Send Email, Conditional, AI Email, Update Person,
+Update Lead Score, Send to CRM, Notify User, Send Slack Message, HTTP
+Request, Agent -- 86px tiles, 24px icon over a 14px label, the grey hover
+wash, as measured). Script: `view` switches views (seek-safe), `pick`
+hovers and presses a tile. "Add step -> Send Email -> its settings" is
+view add-step, pick, view settings. `quotient-flow` learned the three
+kinds the picker has and it lacked (ai-email, lead-score, crm), so the two
+share one vocabulary.
+
+---
+
 ## 2026-09-24 — Word times on a cast set directly; the flow holds before it rides
 
 Putting quotient-flow on beat 3 of the signals ad through the update tool:
