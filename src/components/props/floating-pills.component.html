@@ -3,13 +3,17 @@
 </template>
 
 <style scoped>
-  /* ── floating-pills: data made physical -- small chips drifting in faux-3D
-     around a hero stat (the "+340 h" orbit move). Place the box OVER the
-     whole stage region containing the hero; pills scatter inside it. ── */
-  .flpl { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-  .flpl-pill { position: absolute; font-family: var(--mp-font-family, 'Inter', sans-serif);
-    font-weight: 700; font-size: 24px; color: #fff; background: var(--mp-color-secondary, #d48c34);
-    border-radius: 14px; padding: 10px 20px; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+  /* ── floating-pills: data made physical -- chips drifting in faux-3D around
+     a hero (the "+340 h" orbit move), or a strip of tool chips. Sized for
+     video from the slot, placed so no chip overlaps another chip, the
+     scene's type, or the frame edge. ── */
+  .flpl { position: absolute; inset: 0; pointer-events: none; overflow: hidden; max-width: none; }
+  .flpl-pill { position: absolute; left: 0; top: 0; max-width: none; white-space: nowrap;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    font-weight: 600; font-size: var(--flpl-fs, 32px); line-height: 1; letter-spacing: -0.005em;
+    color: #fff; background: var(--mp-color-secondary, #d48c34);
+    border-radius: 999px; padding: 0.46em 0.95em;
+    box-shadow: 0 calc(var(--flpl-fs, 32px) * 0.12) calc(var(--flpl-fs, 32px) * 0.5) rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.18);
     will-change: transform; }
 </style>
 
@@ -17,102 +21,175 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var host = el.querySelector('.flpl');
-    if (Number(data.scale) > 0 && Number(data.scale) !== 1) host.style.zoom = String(Number(data.scale)); // phone scale
     var items = Array.isArray(data.items) && data.items.length ? data.items : ['+1', '+2', '+3'];
-    var seed = Number(data.seed) || 42;
-    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+    var SEED = Number(data.seed) || 42;
+    var DUR = ctx && ctx.duration ? ctx.duration : 8;
 
-    // Seeded scatter that avoids the center (the hero lives there): pills
-    // land in a ring band around the middle.
-    var pills = items.map(function(txt, i) {
+    var pills = items.map(function (txt) {
       var p = document.createElement('div');
       p.className = 'flpl-pill';
       p.textContent = String(txt);
       if (data.color) p.style.background = data.color;
-      if (data.font_size) p.style.fontSize = data.font_size;
-      // The pill paints its OWN surface, so it pins its own ink: hardcoded
-      // white on the token fill measured 1.97:1 light / 2.76:1 dark (cert).
-      // Pick ink from the fill's luminance; either ink clears 3:1 in the
-      // 0.15-0.30 band, so the 0.175 cut always yields a legible pair.
       host.appendChild(p);
+      // The pill paints its OWN surface, so it pins its own ink from the
+      // fill's luminance (either ink clears 3:1 at the 0.175 cut).
       try {
         var fill = window.mpParseColor ? mpParseColor(getComputedStyle(p).backgroundColor) : null;
         if (fill) {
           var ch = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-          var fillLum = 0.2126 * ch(fill.r) + 0.7152 * ch(fill.g) + 0.0722 * ch(fill.b);
-          p.style.color = fillLum >= 0.175 ? '#17171c' : '#ffffff';
+          var fl = 0.2126 * ch(fill.r) + 0.7152 * ch(fill.g) + 0.0722 * ch(fill.b);
+          p.style.color = fl >= 0.175 ? '#17171c' : '#ffffff';
         }
-      } catch (e) { /* unparseable fill: keep the default white ink */ }
-      var angle = (i / items.length) * Math.PI * 2 + rnd() * 0.9;
-      var radius = 0.30 + rnd() * 0.16; // fraction of the half-diagonal
-      var cx = 50 + Math.cos(angle) * radius * 90;
-      var cy = 50 + Math.sin(angle) * radius * 78;
-      p.style.left = Math.max(2, Math.min(88, cx)) + '%';
-      p.style.top = Math.max(4, Math.min(88, cy)) + '%';
-      var depth = 0.7 + rnd() * 0.6; // faux-3D: nearer pills bigger + faster
-      p.style.transform = 'scale(' + depth.toFixed(2) + ')';
-      host.appendChild(p);
-      var amp = 10 + rnd() * 14; // drift amplitude, host px each way
-      // Keep the whole pill inside the FRAME: the scatter picks a left edge,
-      // and a wide label at the right side ran past the canvas (measured:
-      // "Calendar" 51px beyond the box, "Mail" 54px past the frame).
-      try {
-        var hostW = host.clientWidth, hostH = host.clientHeight;
-        // The zoom may be the host's own (data.scale) or the wrapper's
-        // (the phone zoom): real px over layout units gives either.
-        var hr0 = host.getBoundingClientRect();
-        var z = (hr0.width > 0 && host.offsetWidth > 0) ? hr0.width / host.offsetWidth : (Number(host.style.zoom) || 1);
-        // The host's edges are not the frame's: the camera rig bleeds 20px
-        // past the canvas on every side, so a full-width box starts at -20
-        // (measured: a pill clamped to the host edge still ran 8px off the
-        // frame). Work out where the frame is, in host units.
-        var fl = 0, ft = 0, fr = hostW, fb = hostH;
-        var hr = host.getBoundingClientRect(), cw = document.documentElement.clientWidth, chh = document.documentElement.clientHeight;
-        if (hr.width > 0 && cw > 0) { fl = -hr.left / z; fr = (cw - hr.left) / z; ft = -hr.top / z; fb = (chh - hr.top) / z; }
-        // The drift must fit too, so the margin is the drift, not a hairline
-        // (measured: "Calendar" clipped mid-drift). offsetWidth ignores the
-        // depth scale, which grows the pill about its centre: the VISUAL box
-        // is depth x the measured one.
-        var mw = p.offsetWidth, mh = p.offsetHeight, growX = (mw * (depth - 1)) / 2, growY = (mh * (depth - 1)) / 2;
-        // Under CSS zoom GSAP lands the drift at amp x zoom host px
-        // (measured: amp 11.1 at zoom 1.8 moved the pill 20 host px), so
-        // the margin scales with the zoom too.
-        var pw = mw * depth, ph = mh * depth, mx = amp * z + 4, my = amp * 0.8 * z + 4;
-        if (hostW > 0 && mw > 0) {
-          var leftPx = (parseFloat(p.style.left) / 100) * hostW - growX;
-          if (leftPx + pw > fr - mx) p.style.left = Math.max(0, ((fr - mx - pw + growX) / hostW) * 100) + '%';
-          else if (leftPx < fl + mx) p.style.left = ((fl + mx + growX) / hostW) * 100 + '%';
-        }
-        if (hostH > 0 && mh > 0) {
-          var topPx = (parseFloat(p.style.top) / 100) * hostH - growY;
-          if (topPx + ph > fb - my) p.style.top = Math.max(0, ((fb - my - ph + growY) / hostH) * 100) + '%';
-          else if (topPx < ft + my) p.style.top = ((ft + my + growY) / hostH) * 100 + '%';
-        }
-      } catch (e) { /* layout not measurable yet: keep the scatter */ }
-      return { el: p, phase: rnd() * Math.PI * 2, depth: depth, amp: amp };
+      } catch (e) { /* keep white ink */ }
+      return { el: p, x: 0, y: 0, w: 0, h: 0, depth: 1, phase: 0, amp: 0 };
     });
 
-    var at = Math.max(0, Number(data.at) || 0.3);
-    pills.forEach(function(p, i) {
-      gsap.set(p.el, { autoAlpha: 0, scale: p.depth * 0.7 });
-      tl.to(p.el, { autoAlpha: 1, scale: p.depth, duration: 0.45, ease: 'back.out(1.7)' }, at + i * 0.12);
-    });
+    // ---- LAYOUT (run at build, and again once every sibling is built) ----
+    // The audit measured this prop at 12-24px chips in a 1080p frame, chips
+    // stacked on each other, on the headline ("Designer" over "Five
+    // people"), and cut off by the slot and the frame. Now: type sized from
+    // the slot; each chip placed by seeded best-of-N sampling so it clears
+    // every other chip, the scene's type, and the visible frame (drift
+    // included); if they cannot all fit, the type steps down and it retries.
+    function layout() {
+      var seed = SEED;
+      function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+      var HW = host.clientWidth, HH = host.clientHeight;
+      if (!HW || !HH) return;
+      var hr = host.getBoundingClientRect(), z = hr.width / HW || 1;
+      // The visible frame in host units (the camera rig bleeds past the canvas).
+      var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+      var fx0 = Math.max(0, -hr.left / z), fy0 = Math.max(0, -hr.top / z);
+      var fx1 = Math.min(HW, (vw - hr.left) / z), fy1 = Math.min(HH, (vh - hr.top) / z);
+      var W = fx1 - fx0, H = fy1 - fy0;
+      if (W <= 0 || H <= 0) return;
+      var strip = data.layout === 'strip' || (data.layout !== 'orbit' && W / H > 3.2);
 
-    // Parametric drift: pure function of scene time (seek-safe).
-    var proxy = { t: 0 };
-    var dur = ctx && ctx.duration ? ctx.duration : 8;
-    tl.to(proxy, {
-      t: 1, duration: dur, ease: 'none',
-      onUpdate: function() {
-        var d = proxy.t * dur;
-        pills.forEach(function(p) {
-          gsap.set(p.el, {
-            x: Math.sin(d * 0.45 * p.depth + p.phase) * p.amp,
-            y: Math.cos(d * 0.38 * p.depth + p.phase * 1.3) * p.amp * 0.8,
+      // The scene's type, measured: leaf elements with their own text, outside this prop.
+      var keep = [];
+      if (!strip) {
+        var all = document.querySelectorAll('body *');
+        for (var i = 0; i < all.length; i++) {
+          var n = all[i];
+          if (host.contains(n) || n.closest('script,style,template')) continue;
+          var own = false;
+          for (var c = n.firstChild; c; c = c.nextSibling) if (c.nodeType === 3 && c.textContent.trim()) { own = true; break; }
+          if (!own) continue;
+          var r = n.getBoundingClientRect();
+          if (r.width < 4 || r.height < 4) continue;
+          var k = { x0: (r.left - hr.left) / z, y0: (r.top - hr.top) / z, x1: (r.right - hr.left) / z, y1: (r.bottom - hr.top) / z };
+          if (k.x1 < fx0 || k.x0 > fx1 || k.y1 < fy0 || k.y0 > fy1) continue;
+          if ((k.x1 - k.x0) * (k.y1 - k.y0) > W * H * 0.5) continue; // a backdrop, not type
+          keep.push(k);
+        }
+        // No measured hero: keep the centre free for one.
+        if (!keep.length) keep.push({ x0: fx0 + W * 0.28, y0: fy0 + H * 0.34, x1: fx0 + W * 0.72, y1: fy0 + H * 0.66 });
+      }
+
+      var mult = Number(data.scale) > 0 ? Number(data.scale) : 1;
+      var fs = (strip ? Math.min(W / 50, H / 3.4) : Math.min(W / 44, H / 20)) * mult;
+      var asked = parseFloat(data.font_size);
+      if (asked > fs) fs = asked; // a writer's small web size is a floor at most
+      fs = Math.max(14, Math.min(fs, strip ? H / 2.4 : H / 9));
+
+      for (var attempt = 0; attempt < 12; attempt++, fs *= 0.9) {
+        host.style.setProperty('--flpl-fs', fs.toFixed(1) + 'px');
+        seed = SEED;
+        pills.forEach(function (p) {
+          p.depth = 0.9 + rnd() * 0.2;
+          p.phase = rnd() * Math.PI * 2;
+          p.amp = fs * (0.25 + rnd() * 0.2);
+          p.w = p.el.offsetWidth * p.depth; p.h = p.el.offsetHeight * p.depth;
+        });
+        var ok = strip ? placeStrip() : placeOrbit();
+        if (ok) break;
+      }
+      pills.forEach(function (p) {
+        // left/top place the UNSCALED box so its scaled visual centre lands on (x, y).
+        p.el.style.left = (p.x - p.el.offsetWidth / 2) + 'px';
+        p.el.style.top = (p.y - p.el.offsetHeight / 2) + 'px';
+      });
+
+      function hit(a, b, pad) { return a.x0 < b.x1 + pad && a.x1 > b.x0 - pad && a.y0 < b.y1 + pad && a.y1 > b.y0 - pad; }
+      function boxOf(p, x, y) { var mx = p.amp + 6, my = p.amp * 0.8 + 6; return { x0: x - p.w / 2 - mx, y0: y - p.h / 2 - my, x1: x + p.w / 2 + mx, y1: y + p.h / 2 + my }; }
+      function placeOrbit() {
+        var placed = [], cx = fx0 + W / 2, cy = fy0 + H / 2, all = true;
+        pills.forEach(function (p, i) {
+          var best = null, bestScore = -1;
+          for (var s = 0; s < 90; s++) {
+            // Sample round the centre (a ring band), each pill starting at its own angle.
+            var ang = (i / pills.length) * Math.PI * 2 + (rnd() - 0.5) * 1.6;
+            var rad = 0.3 + rnd() * 0.62;
+            var x = cx + Math.cos(ang) * rad * (W / 2 - p.w / 2), y = cy + Math.sin(ang) * rad * (H / 2 - p.h / 2);
+            var b = boxOf(p, x, y);
+            if (b.x0 < fx0 || b.y0 < fy0 || b.x1 > fx1 || b.y1 > fy1) continue;
+            var clash = false;
+            for (var k = 0; k < keep.length && !clash; k++) if (hit(b, keep[k], fs * 0.5)) clash = true;
+            for (var q = 0; q < placed.length && !clash; q++) if (hit(b, placed[q], fs * 0.35)) clash = true;
+            if (clash) continue;
+            // Prefer the spot farthest from the chips already down (an even spread).
+            var dmin = 1e9;
+            placed.forEach(function (o) { var dx = (o.x0 + o.x1) / 2 - x, dy = (o.y0 + o.y1) / 2 - y; dmin = Math.min(dmin, Math.sqrt(dx * dx + dy * dy)); });
+            if (dmin > bestScore) { bestScore = dmin; best = { x: x, y: y, b: b }; }
+            if (!placed.length) break;
+          }
+          if (!best) { all = false; best = { x: cx + (i % 2 ? 1 : -1) * W * 0.4, y: fy0 + H * (0.15 + 0.7 * i / Math.max(1, pills.length - 1)) }; best.b = boxOf(p, best.x, best.y); }
+          p.x = best.x; p.y = best.y; placed.push(best.b);
+        });
+        return all;
+      }
+      function placeStrip() {
+        var gap = fs * 0.9, rows = [[]], rw = 0, maxW = W * 0.94;
+        pills.forEach(function (p) {
+          var need = p.w + p.amp * 2 + gap;
+          if (rw + need > maxW && rows[rows.length - 1].length) { rows.push([]); rw = 0; }
+          rows[rows.length - 1].push(p); rw += need;
+        });
+        var rowH = Math.max.apply(null, pills.map(function (p) { return p.h; })) + fs * 0.9;
+        if (rows.length * rowH > H * 0.96) return false;
+        var top = fy0 + (H - rows.length * rowH) / 2;
+        rows.forEach(function (row, ri) {
+          var tot = row.reduce(function (a, p) { return a + p.w; }, 0);
+          var slack = (maxW - tot) / row.length, x = fx0 + (W - maxW) / 2 + slack / 2;
+          row.forEach(function (p) {
+            p.x = x + p.w / 2 + (rnd() - 0.5) * slack * 0.3;
+            p.y = top + rowH * (ri + 0.5) + (rnd() - 0.5) * Math.max(0, rowH - p.h - p.amp * 1.6);
+            x += p.w + slack;
           });
         });
-      },
-    }, 0);
+        return true;
+      }
+    }
+    layout();
+    (window.__mpAfterBuild = window.__mpAfterBuild || []).push(layout);
+
+    // ---- MOTION: chips rise in one after another, then drift (a pure
+    // function of scene time, seek-safe; nearer chips drift faster). ----
+    var at = Math.max(0, Number(data.at) || 0.3);
+    var each = Math.min(0.12, 1.2 / pills.length);
+    var state = pills.map(function () { return { a: 0 }; });
+    pills.forEach(function (p, i) {
+      tl.to(state[i], { a: 1, duration: 0.5, ease: 'power3.out' }, at + i * each);
+    });
+    var proxy = { t: 0 };
+    function apply() {
+      var d = proxy.t * DUR;
+      pills.forEach(function (p, i) {
+        var a = state[i].a;
+        gsap.set(p.el, {
+          autoAlpha: a,
+          scale: p.depth * (0.92 + 0.08 * a),
+          x: Math.sin(d * 0.45 * p.depth + p.phase) * p.amp,
+          y: Math.cos(d * 0.38 * p.depth + p.phase * 1.3) * p.amp * 0.8 + (1 - a) * 14,
+        });
+      });
+    }
+    // The clock spans the scene; the timeline's OWN onUpdate renders, after
+    // every child tween has moved (a proxy's onUpdate would run before the
+    // later-starting entrance tweens and read them stale).
+    tl.to(proxy, { t: 1, duration: DUR, ease: 'none' }, 0);
+    tl.eventCallback('onUpdate', apply);
+    apply();
     return tl;
   }
 </script>
