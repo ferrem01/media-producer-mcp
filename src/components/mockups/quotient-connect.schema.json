@@ -1,7 +1,7 @@
 {
   "type": "quotient-connect",
   "label": "Quotient MCP Servers (connect an integration)",
-  "category": "mockup",
+  "category": "mockups",
   "description": "Quotient's MCP Servers settings screen, matched to the real app: settings sidebar (MCP Servers active), a Connected section with green/red/orange status pills, and a Marketplace section with logo rows and chevrons. The 'connect' script action performs the real flow: cursor clicks a marketplace row (e.g. Fathom), an OAuth authorize modal appears, cursor clicks Authorize, and the row's chevron flips to a green Connected pill. Use for 'hook up the integration' beats -- showing Quotient gaining access to a recorder, CRM, or tool.",
   "data": {
     "connected": {

@@ -1,7 +1,7 @@
 {
   "type": "video-call",
   "label": "Video Call (Zoom-style meeting)",
-  "category": "mockup",
+  "category": "mockups",
   "description": "A Zoom-style meeting in progress: two participant tiles with alternating active-speaker glow and animated speaking waveforms, meeting chrome (Recording pill, toolbar, timer), an optional caption line, and an AI notetaker bot tile (Fathom-style) with a pulsing REC badge docked in the grid. Use for 'the story starts on a call' beats: sales calls, demos, customer conversations that a recorder is capturing. Script it so the call is alive: speakers alternate, a caption or two lands, the recorder pulses when the story points at it.",
   "data": {
     "title": {

@@ -21,6 +21,9 @@ export interface ComponentCatalogEntry {
     placeholder?: string;
     items?: { type?: string; properties?: Record<string, any> };
   }>;
+  /** The library folder the files live in. `category` is the schema's own
+   *  label, and they differ ("scene-template" lives in scene-templates/). */
+  dir?: string;
   script_actions?: Array<{ action: string; description: string }>;
   default_cursor_targets?: Record<string, { x: string | number; y: string | number }>;
 }
@@ -69,6 +72,7 @@ async function scanDirectory(
           catalog.push({
             type: compType,
             category: schema.category || entry.name,
+            dir: entry.name,
             label: schema.label || compType.split("-").map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" "),
             description: schema.description || "",
             data: schema.data || schema.properties || {},
@@ -166,3 +170,29 @@ export function itemShape(items: { type?: string; properties?: Record<string, an
   }
   return items.type || "any";
 }
+
+/**
+ * A library file by component type: the named folder first, then any
+ * library folder that holds it. The Playground used to ask for
+ * <schema category>/<type>, and a category is not a folder -- every scene
+ * template ("scene-template" in scene-templates/) and the "mockup" mocks
+ * (in mockups/) failed with "Component source not found". Null when absent
+ * or when a name tries to leave the library.
+ */
+export async function findLibraryFile(componentLibDir: string, category: string, file: string): Promise<string | null> {
+  const safe = (x: string) => !!x && !/[\\/]/.test(x) && x !== "." && x !== "..";
+  if (!safe(file)) return null;
+  const tryPath = async (p: string) => { try { await fs.access(p); return p; } catch { return null; } };
+  if (safe(category)) {
+    const direct = await tryPath(path.join(componentLibDir, category, file));
+    if (direct) return direct;
+  }
+  let dirs: string[] = [];
+  try { dirs = (await fs.readdir(componentLibDir, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return null; }
+  for (const d of dirs) {
+    const hit = await tryPath(path.join(componentLibDir, d, file));
+    if (hit) return hit;
+  }
+  return null;
+}
+

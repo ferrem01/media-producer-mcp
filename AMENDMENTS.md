@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-24 — Playground cleanup: the app's skin, the session's tenant, every component opens
+
+Marc: reskin the playground to match home and Studio; drop the tenant field;
+Mockup and Scene Template components fail to load.
+- **Every component opens.** The catalog groups by the schema's `category`,
+  and the Playground asked for `<category>/<type>` -- but a category is not a
+  folder: all 17 scene templates ("scene-template", in `scene-templates/`)
+  and four mocks ("mockup", in `mockups/`) answered "Component source not
+  found". They are live components (boards cast `st-logo-close`, the writer
+  casts the Quotient mocks), so fixed, not deleted: catalog entries carry
+  their real `dir`, the client asks by folder, and `findLibraryFile` (source,
+  schema, defaults routes) resolves either (never outside the library). The
+  four "mockup" schemas say "mockups": one MOCKUPS section.
+- **Previews in the brand.** The preview page's defaults were the old dark
+  slate theme (white text), so scene templates -- which draw their own light
+  backdrop -- previewed white on white. The preview now takes the tenant's
+  brand kit through the assembler's own `generateBrandCSS` / `generateFontLinks`
+  (light defaults without one), and sizes its body to the iframe (1080x1920
+  previews had been laid out landscape).
+- **No tenant field.** The page wears the home rail (Films / Team / Brand /
+  Components, Components on) and boots with the home shell's `bootHome`:
+  a `?tenant=` link wins, else the login session, else sign in.
+- **The app's skin.** quotient-theme tokens throughout (the transparent
+  48px bar, white panels, the near-black primary, Studio's compact buttons);
+  the dark slate palette is gone.
+
+---
+
 ## 2026-09-24 — Two phones side by side (phone-lockscreen at half width, label)
 
 The "Same customer, two companies" board puts two lock screens side by
