@@ -392,7 +392,7 @@ ${QUOTIENT_CSS}
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
   /* Effects lane: zooms/pans/rotates/callouts as DURATION blocks -- how
      long each effect is in force, not just where it starts. */
-  #fx-lane { position: absolute; left: 0; right: 0; height: 32px; pointer-events: none; }
+  #fx-lane { position: absolute; left: 0; right: 0; height: 32px; pointer-events: auto; cursor: copy; }
   .fx-seg { position: absolute; top: 3px; height: 26px; box-sizing: border-box; border-radius: 4px;
     border: 1px solid #fff; background: #ddd6fe; color: var(--purple-500);
     box-shadow: inset 0 0 0 1px rgba(124,58,237,0.28);
@@ -5930,6 +5930,7 @@ ${QUOTIENT_CSS}
     var wrap = document.getElementById('fx-lane');
     if (!wrap) return;
     wrap.innerHTML = '';
+    wireFxLaneAdd();
     var p = state.currentProject;
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
@@ -6175,6 +6176,27 @@ ${QUOTIENT_CSS}
       });
       camPopClose();
       saveSceneSfx(si, out);
+    });
+  }
+  // An empty spot on the Effects row: the playhead goes there and the Sound
+  // editor opens at that moment (blocks keep their own clicks).
+  function wireFxLaneAdd() {
+    var lane = document.getElementById('fx-lane');
+    if (!lane || lane._sfxWired) return;
+    lane._sfxWired = true;
+    lane.title = 'Click an empty spot to add a sound here';
+    lane.addEventListener('click', function(ev) {
+      if (ev.target !== lane) return;
+      var total = state.totalDuration || calcTotalDuration();
+      var r = lane.getBoundingClientRect();
+      if (!(total > 0) || !(r.width > 0)) return;
+      var t = Math.max(0, Math.min(total, (ev.clientX - r.left) / r.width * total));
+      if (els.slider) { els.slider.value = String(Math.round(t / total * 1000)); scrub(parseFloat(els.slider.value)); }
+      var si = sceneIndexAt(t);
+      var mark = document.createElement('span');
+      mark.style.cssText = 'position:absolute;top:0;width:1px;height:100%;left:' + ((t / total) * 100).toFixed(2) + '%';
+      lane.appendChild(mark);
+      sfxPopOpen(si, -1, mark, t - sceneStartFor(si));
     });
   }
   // The Effects lane's own add: a sound at the playhead.
@@ -10116,14 +10138,16 @@ ${QUOTIENT_CSS}
     var camRow;
     if (isScene) {
       camRow = '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1 1 45%;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>' +
-        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pan slides at the camera’s current zoom (zoom in first; a wide camera has nowhere to pan).">↔ Pan (drag)…</button>';
+        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pan slides at the camera’s current zoom (zoom in first; a wide camera has nowhere to pan).">↔ Pan (drag)…</button>' +
+        '<button class="rv-go secondary" id="rv-pop-sound" style="flex:1 1 45%;" title="Add a sound effect (ding, thud, whoosh...) at the playhead -- it lands on the Effects lane beside the zooms.">\u{1F514} Add sound</button>';
     } else {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1 1 45%;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1 1 45%;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
         '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pan slides at the camera’s current zoom (zoom in first; a wide camera has nowhere to pan).">↔ Pan (drag)…</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-pan-inside" style="flex:1 1 45%;" title="Grab ' + escAttr(videoLabelFor(selVideo)) + '’s footage and drag it within its frame — travel across a magnified recording without moving the frame. Needs a Zoom inside… first.">⊕ Pan inside…</button>' : '') +
         '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1 1 45%;" title="Rotate the camera on this element at the playhead. The block edits angle, AXIS (flat spin / 3D book-turn / tilt) and a sideways shift to clear space.">↻ Rotate</button>' +
-        '<button class="rv-go secondary" id="rv-pop-text" style="flex:1 1 45%;" title="Drop type-on brand text at the playhead where you clicked. Click the text afterwards to revise or remove it.">T Add text here</button>';
+        '<button class="rv-go secondary" id="rv-pop-text" style="flex:1 1 45%;" title="Drop type-on brand text at the playhead where you clicked. Click the text afterwards to revise or remove it.">T Add text here</button>' +
+        '<button class="rv-go secondary" id="rv-pop-sound" style="flex:1 1 45%;" title="Add a sound effect (ding, thud, whoosh...) at the playhead -- it lands on the Effects lane beside the zooms.">\u{1F514} Add sound</button>';
     }
     // Speaker bubble selected: direct placement beats prose. Corners + sizes
     // write the component position through the PATCH route -- no LLM, instant.
@@ -10192,6 +10216,8 @@ ${QUOTIENT_CSS}
     if (rb) rb.addEventListener('click', rotateToSelection);
     var tb = document.getElementById('rv-pop-text');
     if (tb) tb.addEventListener('click', addTextAtPlayhead);
+    var sndb = document.getElementById('rv-pop-sound');
+    if (sndb) sndb.addEventListener('click', function() { rvPopClose(); sfxAddAtPlayhead(sndb); });
     var rmb = document.getElementById('rv-pop-remove');
     if (rmb) rmb.addEventListener('click', removeSelectedComponent);
     var db = document.getElementById('rv-pop-draw');
