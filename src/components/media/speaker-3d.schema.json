@@ -2,7 +2,7 @@
   "type": "speaker-3d",
   "label": "Speaker in 3D — captions behind and in front",
   "category": "media",
-  "description": "THE PERSON with captions living in the room around them (speaker and creator-cut films): a BIG key word stands BEHIND the head (the person's cut-out covers its middle, the letters peek out either side), SMALL words build word by word in the open air beside the face, a RING of text wraps around the person at neck height (far arc behind the head, near arc across the chest, turning), one CAMERA push/orbit moves it all with the text at its own depths (parallax), and SILHOUETTE WIPES sweep the person's black cut-out across the frame between thoughts. It IS the speaker layer: src 'speaker' (it draws the take itself -- the room copy under the alpha cut-out, which it asks the matte for). Every `at` takes a word anchor (\"@forget\"). Use it for the beats where the WORDS are the point -- a line with one word worth feeling. Before the take exists the captions still perform. One per scene; do not also cast a video speaker in the same scene.",
+  "description": "THE PERSON with captions living in the room around them (speaker and creator-cut films): a BIG key word stands BEHIND the head (the person's cut-out covers its middle, the letters peek out either side), SMALL words build word by word beside the face and STACK as rows on their side (\"I've learned / that people / what you said\") until a wipe or a big word on that side clears them, a RING carries its phrase once as a smile-curve across the chest (turning; the ends curl behind the person), one CAMERA push/orbit moves it all with the text at its own depths (parallax), and SILHOUETTE WIPES sweep the person's black cut-out across the frame between thoughts. It IS the speaker layer: src 'speaker' (it draws the take itself -- the room copy under the alpha cut-out, which it asks the matte for). Every `at` takes a word anchor (\"@forget\"). Use it for the beats where the WORDS are the point -- a line with one word worth feeling. Before the take exists the captions still perform. One per scene; do not also cast a video speaker in the same scene.",
   "data": {
     "src": { "type": "string", "label": "Always \"speaker\"", "placeholder": "speaker" },
     "lines": {
@@ -12,13 +12,13 @@
         "type": "object",
         "properties": {
           "at": { "type": "number", "label": "At (s or @word)" },
-          "until": { "type": "number", "label": "Until (default: the next line of its kind)" },
+          "until": { "type": "number", "label": "Until (default: the next line of its kind; a wipe clears everything; small lines stay stacked until a wipe, a big word on their side, or three rows)" },
           "kind": { "type": "string", "label": "Kind", "placeholder": "small | big | ring" },
           "text": { "type": "string", "label": "Text", "placeholder": "forget" },
           "layer": { "type": "string", "label": "Layer (default: big behind, small in front)", "placeholder": "back | front" },
           "side": { "type": "string", "label": "Side", "placeholder": "center | left | right" },
           "color": { "type": "string", "label": "Color (default: accent for big/ring, white for small)" },
-          "size": { "type": "number", "label": "Size (fraction of frame height; big 0.2, small 0.042, ring 0.05)" },
+          "size": { "type": "number", "label": "Size (fraction of frame height; big 0.3 -- a centred one scales to ~70% of the width; small 0.046; ring 0.062, fitted to its arc)" },
           "x": { "type": "string", "label": "X (px or %)" },
           "y": { "type": "string", "label": "Y (px or %)" },
           "radius": { "type": "number", "label": "Ring: radius (fraction of width, 0.22)" },
