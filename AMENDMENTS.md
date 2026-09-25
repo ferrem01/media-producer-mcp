@@ -6,6 +6,36 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — Emphasis stars no longer leak through per-beat lines
+
+- **Bug** (measured on the analytics teasers, proj_7adf0eb5 scene 3 and
+  proj_86591051 scene 3): the prompter read `*Quotient*`, and the caption
+  lane doubled the marks (`**automatically*,*`).
+- **Cause.** A writer that narrates per beat leaves the scene's
+  `voiceover_text` empty. The first lift ran on that empty line, then
+  `finalizeBeats` built the line from the beats, stars included.
+- **Fix.** `liftSceneEmphasis` lifts the marks off the scene's line AND
+  every beat's line into `scene.emphasis`. It runs in `normalizeSceneShape`
+  and again after `finalizeBeats` builds the line.
+- **Truncated answers retry once** (`llm/client.ts`). Thinking can use up
+  most of `max_tokens` and leave a partial answer: a one-scene revise at
+  8000 tokens came back as 2201 characters cut off mid-JSON.
+  - The empty-answer self-heal now covers that case too: one retry with 4x
+    the budget, capped at 32768.
+  - The surgical revise also starts at 16000.
+- **A one-scene revise keeps the grammar's casting contract**
+  (`grammarContract` in `llm/storyboard-surgical.ts`).
+  - The surgical prompt only named the grammar, so a creator-cut revise
+    cast two proof mocks with no cut window. Both would have sat over the
+    person for the whole scene (proj_86591051 scene 3).
+  - Creator-cut and speaker now get their cutaway rule in the prompt.
+- **Broken caption marks recast** (`laneMarksBroken` in `core/captions.ts`).
+  - A lane cut from starred lines keeps the same words as the take, so
+    `recaptionIfStale` never recast it.
+  - It now also recasts when a starred token is not exactly `*word*`.
+
+---
+
 ## 2026-09-24 — The last seven HyperFrames-audit gaps
 
 These are the audit's remaining high-value items. All 29 are now covered.

@@ -112,6 +112,23 @@ describe("the captions follow the lines", () => {
     expect(s2.components[0].data.phrases.map((p: any) => p.text.replace(/\*/g, "")).join(" ")).toBe("Your customers are sending signals.");
   });
 
+  it("recasts a lane whose words match but whose star marks are broken", async () => {
+    // proj_86591051 scene 3: the lane was cut from lines that still carried
+    // the writer's stars -- "*Quotient *Analytics*.*" -- same words as the take.
+    const { recaptionIfStale, laneMarksBroken } = await import("../src/core/captions.js");
+    const { assertedSpine } = await import("../src/core/word-anchors.js");
+    expect(laneMarksBroken({ data: { phrases: [{ text: "*Quotient *Analytics*.*" }] } })).toBe(true);
+    expect(laneMarksBroken({ data: { phrases: [{ text: "tracks everything **automatically*,*" }] } })).toBe(true);
+    expect(laneMarksBroken({ data: { phrases: [{ text: "somewhere else *entirely.*" }, { text: "*Quotient* Analytics," }] } })).toBe(false);
+    const lines = "we built Quotient Analytics.";
+    const scene: any = { voiceover_text: lines, emphasis: ["analytics"], components: [
+      { id: "captions", type: "reel-caption-lane", data: { phrases: [{ text: "we built", start: 0.2, end: 1 }, { text: "*Quotient *Analytics*.*", start: 1, end: 3 }] } },
+    ] };
+    expect(recaptionIfStale(scene, assertedSpine(lines, 3))).toBe(1);
+    expect(laneMarksBroken(scene.components[0])).toBe(false);
+    expect(scene.components[0].data.phrases.map((p: any) => p.text).join(" ")).toMatch(/\*Analytics\.?\*/);
+  });
+
   it("runs on every re-time and on an update-tool line edit", async () => {
     const ms = await fs.readFile(path.resolve(__dirname, "../src/core/measured-spine.ts"), "utf-8");
     expect(ms.match(/recaptionIfStale\((sb|built), spine\);/g)?.length).toBe(2);

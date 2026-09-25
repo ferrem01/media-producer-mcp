@@ -184,6 +184,31 @@ export function unescapeLines(text: string): string {
   return String(text).replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\r\n/g, "\n");
 }
 
+/** Lift the writer's `*marks*` off the scene's lines AND its beats' lines
+ *  into scene.emphasis. Runs again once the beats close: a writer that
+ *  narrates per beat leaves the scene's lines empty, and they are derived
+ *  from the (still starred) beats after the first pass -- measured live,
+ *  proj_7adf0eb5 scene 3: the prompter read "*Quotient*" and the caption
+ *  lane doubled the stars. Returns the words lifted. */
+export function liftSceneEmphasis(scene: any): string[] {
+  const found: string[] = [];
+  const lift = (text: unknown): string | undefined => {
+    if (typeof text !== "string" || !text.includes("*")) return undefined;
+    const l = emphasisFromLines(text);
+    if (!l.emphasis.length) return undefined;
+    for (const e of l.emphasis) if (!found.includes(e)) found.push(e);
+    return l.text;
+  };
+  const v = lift(scene.voiceover_text);
+  if (v !== undefined) scene.voiceover_text = v;
+  if (Array.isArray(scene.beats)) for (const b of scene.beats) { const bv = b && lift(b.voiceover_text); if (bv !== undefined) b.voiceover_text = bv; }
+  if (found.length) {
+    const prior = Array.isArray(scene.emphasis) ? scene.emphasis.map(String) : [];
+    scene.emphasis = Array.from(new Set(prior.concat(found)));
+  }
+  return found;
+}
+
 /**
  * The shape every scene the writer returns is held to -- the whole-board
  * builder AND the surgical revise (which skipped all of this and shipped a
@@ -209,15 +234,8 @@ export function normalizeSceneShape(scene: any, validTypes?: Set<string>): strin
   // The writer's emphasis marks (`One *brief*.`) come off the line here, so
   // the prompter, the needs and the spine read the clean sentence and the
   // captions get the words (core/captions.ts).
-  if (typeof scene.voiceover_text === "string" && scene.voiceover_text.includes("*")) {
-    const lifted = emphasisFromLines(scene.voiceover_text);
-    if (lifted.emphasis.length) {
-      scene.voiceover_text = lifted.text;
-      const prior = Array.isArray(scene.emphasis) ? scene.emphasis.map(String) : [];
-      scene.emphasis = Array.from(new Set(prior.concat(lifted.emphasis)));
-      notes.push(`emphasis lifted off the lines: ${lifted.emphasis.join(", ")}`);
-    }
-  }
+  const lifted = liftSceneEmphasis(scene);
+  if (lifted.length) notes.push(`emphasis lifted off the lines: ${lifted.join(", ")}`);
   // Camera moves from the LLM. Extracted so the rules are testable without
   // an LLM round-trip -- see sanitizeCameraMoves.
   if (Array.isArray(scene.camera_moves)) {
@@ -1049,6 +1067,7 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
     scene.beats = beats;
     if (beats) {
       if (!scene.voiceover_text) scene.voiceover_text = beatsVoiceover(beats);
+      liftSceneEmphasis(scene);
     } else if ((scene.duration_seconds || 5) > 10) {
       notes.push(`${scene.duration_seconds}s with no usable beats -- long scenes should carry a beat timeline (>=2 beats)`);
     }

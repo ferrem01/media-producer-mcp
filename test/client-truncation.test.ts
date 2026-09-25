@@ -19,14 +19,28 @@ afterEach(() => {
 });
 
 describe("callLLM truncation detection (Anthropic)", () => {
-  it("throws a clear, specific error when stop_reason is max_tokens", async () => {
-    mockFetchOnce({
+  it("retries a truncated answer once with 4x the budget, then throws a clear, specific error", async () => {
+    const fetchMock = mockFetchOnce({
       content: [{ type: "text", text: '{"scenes": [{"label": "cut off mid' }],
       stop_reason: "max_tokens",
     });
     await expect(
       callLLM(CONFIG, [{ role: "user", content: "hi" }], { maxTokens: 8192 })
-    ).rejects.toThrow(/truncated.*max_tokens.*8192/i);
+    ).rejects.toThrow(/truncated.*max_tokens.*32768/i);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).max_tokens).toBe(32768);
+  });
+
+  it("returns the retry's answer when the grown budget fits it (thinking ate the first budget)", async () => {
+    // Seen live: a one-scene revise at 8000 tokens came back with 2201 chars cut mid-JSON.
+    const replies = [
+      { content: [{ type: "thinking", thinking: "long" }, { type: "text", text: '{"label": "cut' }], stop_reason: "max_tokens" },
+      { content: [{ type: "text", text: '{"label": "whole"}' }], stop_reason: "end_turn" },
+    ];
+    let n = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => sseResponseFromMessage(replies[n++] as any)));
+    await expect(callLLM(CONFIG, [{ role: "user", content: "hi" }], { maxTokens: 8000 })).resolves.toBe('{"label": "whole"}');
+    expect(n).toBe(2);
   });
 
   it("does not throw when stop_reason is end_turn (normal completion)", async () => {

@@ -193,6 +193,19 @@ function laneTokens(lane: { data?: Record<string, unknown> }): string[] {
     .join(" ").split(/\s+/).map(normalizeToken).filter(Boolean);
 }
 
+/** True when a lane's star marks are broken: a starred token must be
+ *  exactly `*word*` (trailing punctuation allowed inside or out). A lane cut
+ *  from lines that still carried the writer's stars came out as `*Quotient`,
+ *  `*Analytics*.*`, `**automatically*,*` -- same words, so the token check
+ *  alone never recast it (measured live, proj_86591051 scene 3). */
+export function laneMarksBroken(lane: { data?: Record<string, unknown> }): boolean {
+  const phrases = Array.isArray(lane?.data?.phrases) ? (lane.data!.phrases as unknown[]) : [];
+  return phrases.some((p) => {
+    const text = typeof p === "string" ? p : (p && typeof p === "object" ? String((p as any).text || "") : "");
+    return text.split(/\s+/).some((t) => t.includes("*") && !/^\*[^*\s]+\*[^\p{L}\p{N}*]*$/u.test(t));
+  });
+}
+
 /**
  * THE CAPTIONS FOLLOW THE LINES. A scene's caption lane is cast once, from
  * the words of its lines; an edit to the lines left the old words on screen
@@ -213,7 +226,7 @@ export function recaptionIfStale(
   for (const lane of scene.components || []) {
     if (!lane || typeof lane !== "object" || lane.type !== "reel-caption-lane") continue;
     const have = laneTokens(lane);
-    if (have.length === want.length && have.every((t, i) => t === want[i])) continue;
+    if (have.length === want.length && have.every((t, i) => t === want[i]) && !laneMarksBroken(lane)) continue;
     const lines = String(scene.voiceover_text || scene.audio_hints?.voiceover_text || "");
     const marked = emphasisFromLines(lines).emphasis;
     const kept = (Array.isArray(scene.emphasis) ? scene.emphasis.map(String) : []).filter((e) => want.includes(normalizeToken(e)));

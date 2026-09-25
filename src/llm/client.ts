@@ -442,6 +442,15 @@ async function callAnthropic(
     // full stop) -- fail loudly and specifically here rather than let it surface
     // hundreds of characters downstream as a mystifying "Invalid JSON" error
     // that has to be reverse-engineered from where the text happens to stop.
+    // Thinking can also eat most of the budget and leave a PARTIAL answer
+    // (seen live: a one-scene revise at 8000 tokens came back with 2201
+    // chars cut mid-JSON). Same self-heal: one retry with 4x the budget.
+    if (data.stop_reason === "max_tokens" && attempt === 0 && maxTokens < 32768) {
+      var grownPartial = Math.min(32768, maxTokens * 4);
+      console.warn(`  [llm] truncated at ${maxTokens} tokens (${result.length} chars) -- retrying once with ${grownPartial}`);
+      maxTokens = grownPartial;
+      continue;
+    }
     if (data.stop_reason === "max_tokens") {
       throw new Error(
         `Anthropic response truncated: hit max_tokens (${maxTokens}) before finishing. ` +
