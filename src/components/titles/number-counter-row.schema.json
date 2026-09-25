@@ -44,6 +44,12 @@
         "count",
         "roll"
       ]
+    },
+    "plate": {
+      "type": "boolean",
+      "label": "Plate: a dark frosted panel behind the row -- use it when the row sits over live picture (a person on camera, footage) so the numbers read on any ground",
+      "optional": true,
+      "default": false
     }
   }
 }

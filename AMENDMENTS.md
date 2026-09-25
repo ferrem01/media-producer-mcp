@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — Built films play their sound cues in Studio; a plate for the number row
+
+- **Cues without files.** Marc (proj_7adf0eb5): "the sound effects are in the
+  effects layer but you can't hear them", and "this happened on the other
+  film too". The build carries the board's cues onto the scenes as ids and
+  times only.
+  - The board's sound editor and the render were the only paths that copied
+    the sound files in (`ensureSoundFiles`).
+  - Studio plays a cue's file and skips a cue with none, so the Effects lane
+    drew the cues and played nothing. Teaser D worked because its cues had
+    gone through the editor.
+  - Fix: Studio's project GET (`/api/projects/{t}/{p}`) gives every cue its
+    file on open, once, without bumping `updated_at`. That also repairs films
+    already built.
+  - Test: `test/scene-sfx.test.ts`.
+- **`number-counter-row` `plate`.** Marc asked for scene 1's numbers above
+  his head. There they sit on his room, where white digits on a bright wall
+  wash out.
+  - `plate: true` adds a dark frosted panel (0.62 alpha, blur, a 28px radius)
+    and tight banner padding.
+  - Test: `test/number-counter-plate.test.ts`, a 4:5 still. The panel is
+    dark, the row fits a 24% banner, and it ends above 27% of the frame.
+  - Test gotcha: `page.evaluate(() => tl.time(t))` returns the GSAP
+    timeline, which is a thenable that never settles while paused, so the
+    test hangs. Seek inside braces.
+
 ## 2026-09-25 — The mix keeps the voice
 
 Found while adding a music bed to Teaser D. `mixAudio` built its output from

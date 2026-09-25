@@ -58,7 +58,7 @@ import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js"
 import { listProjects, loadProject, saveProject, updateProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
 import { searchLibrary, forgetProject } from "./core/library.js";
 import { planRows, reorderBoard } from "./core/film-plan.js";
-import { normalizeSoundCues, ensureSoundFiles } from "./core/scene-sfx.js";
+import { normalizeSoundCues, ensureSoundFiles, hasCueWithoutFile } from "./core/scene-sfx.js";
 import { getLibraryHtml } from "./preview-app/library-app.js";
 import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
@@ -1622,6 +1622,19 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         if (!project) {
           jsonResponse(res, 404, { error: "Project not found" });
           return;
+        }
+        // SOUND CUES WITHOUT FILES: the build carries the board's cues onto
+        // the scenes as ids and times; only the board's sound editor and the
+        // render copied the sounds in. Studio plays a cue's file, so a film
+        // built from the board showed its cues and played none (Marc,
+        // proj_7adf0eb5). Opening the film gives every cue its file -- once
+        // (a cue with a file is left alone). Not an edit: updated_at stays.
+        if (hasCueWithoutFile(project)) {
+          try {
+            const stamp = project.updated_at;
+            const filled = await ensureSoundFiles(project, (id) => resolveSfxChoice(id, projectAssetsDir(tenantId, projectId)));
+            if (filled) { project.updated_at = stamp; await saveProject(project); console.log(`  sound cues: ${projectId} ${filled} cue(s) given their file on open`); }
+          } catch (e: any) { console.warn(`  sound cues: ${e?.message || e}`); }
         }
         jsonResponse(res, 200, project);
         return;
