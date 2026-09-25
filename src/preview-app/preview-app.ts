@@ -1196,6 +1196,8 @@ ${QUOTIENT_CSS}
   .dv-btn:active { transform: translateY(1px); }
   .dv-btn:disabled { opacity: .5; pointer-events: none; }
   .dv-vo-hint { font-size: 11px; color: var(--content-secondary); }
+  .dv-vo-legend code { font: 600 11px/1 ui-monospace, 'SF Mono', Menlo, monospace; background: var(--surface-secondary, #f2f2f6);
+    border: 1px solid rgb(44 51 69 / 0.10); border-radius: 4px; padding: 1px 4px; color: var(--content-primary); }
   .dv-feedback { display: flex; gap: 8px; margin-top: 14px; }
   .dv-feedback textarea { flex: 1; resize: vertical; min-height: 40px; border: 1px solid var(--border-secondary);
     border-radius: var(--radius); padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--content-primary);
@@ -5028,8 +5030,11 @@ ${QUOTIENT_CSS}
     // The spoken lines, editable in place (the same route the phone board
     // uses): one sentence per line; a line that says only (pause) is a beat.
     h += '<div class="dv-vo-edit"><div class="dv-sect">LINES (what is said)</div>' +
-      '<textarea id="dv-vo-text" placeholder="One sentence per line. A line that says only (pause) holds a beat.">' + escHtml(s.voiceover_text || '') + '</textarea>' +
-      '<div class="dv-vo-row"><button class="dv-btn" id="dv-vo-save">Save lines</button><span class="dv-vo-hint">One sentence per line · a line that says only (pause) holds a beat</span></div></div>';
+      // The notation legend: what the prompter and captions read in a line
+      // (Marc: "a small legend that lets the user know how to signify
+      // pauses and emphasis").
+      '<textarea id="dv-vo-text" placeholder="One sentence per line.&#10;Today we\u2019re introducing \u2014 *Quotient Analytics*.&#10;(pause)">' + escHtml(s.voiceover_text || '') + '</textarea>' +
+      '<div class="dv-vo-row"><button class="dv-btn" id="dv-vo-save">Save lines</button><span class="dv-vo-hint dv-vo-legend">One sentence per line · <code>*word*</code> lean on it · <code>\u2014</code> or <code>\u2026</code> short beat · <code>,</code> tiny beat · <code>(pause)</code> on its own line: full stop</span></div></div>';
     h += sceneNeedsHtml(project, draftSel);
     var tpl = (s.scene_template && s.scene_template.type) || s.template;
     if (tpl) h += '<div class="dv-chips"><span class="dv-chip dv-chip-tpl">' + escHtml('template: ' + tpl) + '</span></div>';

@@ -247,6 +247,7 @@ describe("Record stays on screen on a small phone (measured)", () => {
 
 describe("the prompter in a browser (fake camera)", () => {
   it("paces continuously, holds emphasis, beats on punctuation, and Start over re-rolls", async () => {
+    const closers: Array<() => Promise<void>> = [];
     const { chromium, devices } = await import("playwright");
     const os = await import("node:os"); const fs = await import("node:fs/promises");
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "take-"));
@@ -260,8 +261,17 @@ describe("the prompter in a browser (fake camera)", () => {
         storyboard: { scenes: [
           { duration_seconds: 10, voiceover_text: "One brief, every surface.", emphasis: ["brief"] },
           { duration_seconds: 12, voiceover_text: "It ships \u2014 *today*." } ] } };
-      await page.route("**/api/projects/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proj) }));
-      await page.goto("file://" + path.join(dir, "take.html") + "?tenant=t&project=p&token=x");
+      // A real origin (not file://): the page's relative /api fetch must hit
+      // something every Playwright version routes the same way.
+      const http = await import("node:http");
+      const server = http.createServer((req, res) => {
+        if ((req.url || "").startsWith("/api/projects/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(proj)); return; }
+        res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+      closers.push(() => new Promise<void>((r) => server.close(() => r())));
+      const port = (server.address() as any).port;
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x`);
       await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
       // The whole script runs at speaking pace: well under the board's 22s.
       expect(await page.evaluate(() => document.getElementById("subtitle")!.textContent)).toMatch(/about 0:0[2-6] at speaking pace/);
@@ -281,6 +291,6 @@ describe("the prompter in a browser (fake camera)", () => {
       expect(await page.evaluate(() => getComputedStyle(document.getElementById("count")!).display)).toBe("flex");
       await page.waitForFunction(() => document.querySelectorAll("#cue .w").length > 0, null, { timeout: 8000 });
       expect(errors).toEqual([]);
-    } finally { await browser.close(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
+    } finally { await browser.close(); for (const c of closers) await c(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
   }, 90000);
 });

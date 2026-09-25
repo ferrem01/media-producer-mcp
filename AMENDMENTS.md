@@ -23,7 +23,12 @@ pause between scenes, because the talk track is continuous.
   ends on the same 0.3s breath, inside a scene or at its end.
 - **Display:** emphasized words show violet ahead of the highlight and get a
   violet underline when lit. Dashes stay quiet. Stars never show.
-- Test: `test/take-page.test.ts`, a fake-camera browser run covering
+- **The legend.** Studio's LINES editor now spells out the notation under
+  the box: `*word*` lean on it · `—`/`…` short beat · `,` tiny beat ·
+  `(pause)` on its own line. The empty box shows a worked example as its
+  placeholder.
+- Test: `test/take-page.test.ts`, a fake-camera browser run (served over
+  local HTTP; CI's Playwright does not route `file://` fetches) covering
   emphasis from the list and from stars, the dash, continuous pace, and
   Start over.
 
