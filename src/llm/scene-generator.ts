@@ -134,6 +134,15 @@ if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
         : { seed: 3 + opts.sceneIndex * 4 },
     });
   }
+  // ON THE CREAM WORLD every template sits on the same cream sheet as the
+  // authored scenes -- light templates paint no ground of their own, so
+  // without this they fell to the page's brand white at the cut.
+  // (st-statement paints its own cream; speaker templates keep the camera.)
+  if (!stWantsWebgl && opts.world && opts.world.backdrop.component === "cream-ground"
+      && !stSpeakerTemplate && st.type !== "st-statement" && !(stData as any).backdrop_image) {
+    stComponents.unshift({ id: "tpl_bg", type: "cream-ground", z_index: 0,
+      data: opts.world.surface ? { tone: opts.world.surface.tone } : {} });
+  }
   // st-artifact is a SHELL: the artifact (a ui-mock or media component
   // that BUILDS on screen) rides in a sibling instance positioned in the
   // non-editorial zone.
@@ -605,7 +614,7 @@ var GHOST_TYPES = ["ghost-type"];
 /** Backdrop-cast components: in a WORLD film these are redundant -- the
  *  world's one backdrop is already injected, and a second per-scene backdrop
  *  is exactly the deck-of-posters bug. Dropped when a world exists. */
-var BACKDROP_CAST_TYPES = ["mesh-gradient", "webgl-backdrop", "gradient-background", "liquid-background", "paper-ground", "sky-backdrop"];
+var BACKDROP_CAST_TYPES = ["mesh-gradient", "webgl-backdrop", "gradient-background", "liquid-background", "paper-ground", "sky-backdrop", "cream-ground"];
 /** Editorial text roles: captions/annotations must never be stretched into
  *  84% "windows" stacked on a surface (the scene-6 collision bug). They dock
  *  beside or below the surfaces instead. */

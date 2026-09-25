@@ -45,6 +45,14 @@ describe("deriveWorld", () => {
     expect(deriveWorld({ brandKit: LIGHT_KIT, seedSource: "t:x" }).backdrop.component).toBe("mesh-gradient");
   });
 
+  it("cream world: pin only; st-statement's cream under every scene, light theme, never inferred", () => {
+    const w = deriveWorld({ brandKit: DARK_KIT, visualSystem: { world: "cream" }, seedSource: "t:cream" });
+    expect(w.backdrop.component).toBe("cream-ground");
+    expect(w.theme).toBe("light");
+    expect(worldBackground(w)).toBe("#f4efe1");
+    expect(deriveWorld({ brandKit: LIGHT_KIT, treatment: { concept: "warm cream editorial" } as any, seedSource: "t:c2" }).backdrop.component).toBe("mesh-gradient");
+  });
+
   it("seed is stable for the same film and differs across films", () => {
     const a = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "tenant:film-one" });
     const b = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "tenant:film-one" });
@@ -142,5 +150,17 @@ describe("authored composition in a world", () => {
     );
     expect(spec).toContain("THE WORLD");
     expect(spec).toContain("Theme: LIGHT");
+  });
+});
+
+describe("cream world: template scenes sit on the cream too", () => {
+  it("a light template gets the cream ground at z0; st-statement and a dark-pinned template do not", async () => {
+    const { buildTemplateScene } = await import("../src/llm/scene-generator.js");
+    const world = deriveWorld({ brandKit: LIGHT_KIT, visualSystem: { world: "cream" }, seedSource: "t:cream" });
+    const opts: any = { sceneIndex: 0, totalScenes: 1, canvas: { width: 1920, height: 1080 }, tenantId: "t", brandKit: LIGHT_KIT, world };
+    const types = (tpl: any) => (buildTemplateScene("s1", { label: "x", duration_seconds: 3, scene_template: tpl }, opts)!.scene as any).components.map((c: any) => c.type);
+    expect(types({ type: "st-logo-close", data: { tagline: "Live now." } })[0]).toBe("cream-ground");
+    expect(types({ type: "st-statement", data: { text: "Hi." } })).not.toContain("cream-ground");
+    expect(types({ type: "st-logo-close", data: { theme: "dark" } })[0]).toBe("webgl-backdrop");
   });
 });

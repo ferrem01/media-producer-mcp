@@ -21,7 +21,7 @@ import type { Treatment } from "./creative-director.js";
 export interface WorldSpec {
   /** The continuous backdrop system -- ONE recipe for the whole film. */
   backdrop: {
-    component: "mesh-gradient" | "webgl-backdrop" | "paper-ground" | "sky-backdrop" | "none";
+    component: "mesh-gradient" | "webgl-backdrop" | "paper-ground" | "sky-backdrop" | "cream-ground" | "none";
     /** Single seed for the film; scene assembly derives nothing per-scene. */
     seed: number;
     /** Brand-resolved palette anchors (hex), 2-4. */
@@ -78,7 +78,7 @@ export function deriveWorld(opts: {
    *  world and deriveWorld only ever read the treatment. film_grammar has had
    *  this precedence all along (caller > director > inference); this is the
    *  same rule for the look axis. */
-  visualSystem?: { world?: "light" | "dark" | "paper" | "plain" | "sky" } | null;
+  visualSystem?: { world?: "light" | "dark" | "paper" | "plain" | "sky" | "cream" } | null;
   /** Stable identity for the seed (e.g. `${tenantId}:${prompt.slice(0,80)}`). */
   seedSource: string;
 }): WorldSpec {
@@ -92,7 +92,7 @@ export function deriveWorld(opts: {
   // The treatment's TYPED world commitment (visual_system.world -- a caller
   // pin passed through, or the director's own typed choice) wins outright.
   const pinned = (opts.visualSystem?.world
-    ?? (opts.treatment as any)?.visualSystem?.world) as ("light" | "dark" | "paper" | "plain" | "sky" | undefined);
+    ?? (opts.treatment as any)?.visualSystem?.world) as ("light" | "dark" | "paper" | "plain" | "sky" | "cream" | undefined);
 
   // PLAIN WORLD (product-first films): a FLAT brand-background canvas with
   // NO backdrop component at all -- no mesh, no wash, no texture. For films
@@ -104,6 +104,18 @@ export function deriveWorld(opts: {
       backdrop: { component: "none", seed: hash31(opts.seedSource), palette },
       theme: light ? "light" : "dark",
       chapter_slots: 1,
+    };
+  }
+
+  // CREAM WORLD (the editorial statement films, proj_3bb7a076): every scene
+  // on st-statement's warm cream with its soft centre glow -- flat, still,
+  // one sheet from the first cut to the last. Explicit pin only.
+  if (pinned === "cream") {
+    return {
+      backdrop: { component: "cream-ground", seed: hash31(opts.seedSource), palette },
+      theme: "light",
+      chapter_slots: 1,
+      surface: { tone: "#f4efe1", intensity: 0 },
     };
   }
 
@@ -209,6 +221,7 @@ export function deriveMotionPhysics(opts: {
 /** The scene background color the world implies (authored scenes + templates). */
 export function worldBackground(world: WorldSpec): string {
   if (world.backdrop.component === "paper-ground") return world.surface?.tone || "#f2efe7";
+  if (world.backdrop.component === "cream-ground") return world.surface?.tone || "#f4efe1";
   if (world.backdrop.component === "sky-backdrop") return world.surface?.tone || world.backdrop.palette[0] || "#2a8dff";
   if (world.backdrop.component === "none") return world.theme === "light" ? "#ffffff" : "#0c0d12";
   return world.theme === "light" ? "#fafaf8" : "#0c0d12";
@@ -248,6 +261,7 @@ const SCREEN_KIT: WorldMaterials = {
 export const WORLD_MATERIALS: Record<string, WorldMaterials> = {
   "webgl-backdrop": SCREEN_KIT,
   "mesh-gradient": SCREEN_KIT,
+  "cream-ground": SCREEN_KIT,
   "sky-backdrop": {
     types: SCREEN_KIT.types,
     text: [

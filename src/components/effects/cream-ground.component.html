@@ -1,0 +1,22 @@
+<template>
+  <div class="crg"><div class="crg-glow"></div></div>
+</template>
+
+<style scoped>
+  /* CREAM GROUND: the cream world's surface -- the warm editorial cream of
+     st-statement (#f4efe1) with its soft white glow at the centre, and
+     nothing else. Flat and still, so it rides inside the camera rig and
+     the cut between scenes is invisible. */
+  .crg { position: absolute; inset: 0; background: #f4efe1; }
+  .crg-glow { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var root = el.querySelector('.crg');
+    if (data.tone) root.style.background = String(data.tone);
+    if (data.glow === false) el.querySelector('.crg-glow').style.display = 'none';
+    return gsap.timeline();
+  }
+</script>
