@@ -1,6 +1,12 @@
 # SPEC: metamorph — a oner carried by objects, not the camera
 
-Status: DESIGN — drafted 2026-09-25 from Marc's reference, not implemented.
+Status: PHASE 1 SHIPPED (#973: grid-cull, review-deck, verdict-scorecard);
+PHASES 2–3 BACKLOG -- parked by Marc 2026-09-25. Do not start the morph
+runtime, rack focus or the grammar without his go-ahead. Settled in review
+(keep when it resumes): a morph is an ENTRANCE EFFECT with a source (`enter`
++ `from: "componentId.anchor"`), it works INSIDE one scene only (both
+components on the page at once), and between scenes the join is a
+rack-focus TRANSITION.
 Reference film: Runneth Talent launch (x.com/rezakhadjavi/status/2103192804788961502),
 40 s, 16:9, sampled every 0.5 s and at 8 fps around each handoff. The
 shot-change detector finds **zero hard cuts**.
