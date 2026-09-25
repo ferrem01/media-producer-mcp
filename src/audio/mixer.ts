@@ -187,6 +187,16 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
     }
   }
 
+  // THE VIDEO'S OWN SOUND IS A LAYER TOO. A speaker film's composite carries
+  // the voice as its audio; the mix used to be built from the added tracks
+  // alone and mapped over it, so a sound cue or a music bed silently
+  // REPLACED the voice (measured: a 3s voiced clip + one tick -> the tick
+  // and silence). The voice goes in first, untouched.
+  if (await hasAudioStream(opts.videoPath)) {
+    filterParts.push(`[0:a]asetpts=PTS-STARTPTS[vbase]`);
+    trackLabels.unshift(`[vbase]`);
+  }
+
   // Mix all tracks together
   if (trackLabels.length === 1) {
     filterParts.push(`${trackLabels[0]}acopy[aout]`);
@@ -223,4 +233,16 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
 
   console.log(`  Audio mixer: output written to ${opts.outputPath}`);
   return opts.outputPath;
+}
+
+/** Does the file carry an audio stream? (ffmpeg's own report: ffprobe is
+ *  not on every host.) */
+export async function hasAudioStream(file: string): Promise<boolean> {
+  try {
+    await execFileAsync("ffmpeg", ["-hide_banner", "-i", file], { maxBuffer: 4 * 1024 * 1024 });
+    return false;
+  } catch (e: any) {
+    // `ffmpeg -i` with no output always exits non-zero; the stream list is on stderr.
+    return /Stream #\d+:\d+[^\n]*: Audio:/.test(String(e?.stderr || ""));
+  }
 }

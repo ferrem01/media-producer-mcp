@@ -1869,9 +1869,10 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string().optional(),
       project_id: z.string(),
       action: z.enum(["list", "cut", "restore", "look"]),
-      scene_index: z.number().optional().describe("look: 0-based scene whose take to grade"),
+      // coerce: a client holding the tool's older schema sends these as strings.
+      scene_index: z.coerce.number().optional().describe("look: 0-based scene whose take to grade"),
       look: z.enum(["soft", "natural"]).optional().describe("look: the grade"),
-      strength: z.number().min(0).max(1).optional().describe("look: skin smoothing 0-1 (default 0.5)"),
+      strength: z.coerce.number().min(0).max(1).optional().describe("look: skin smoothing 0-1 (default 0.5)"),
       from: z.number().optional().describe("cut: film-time start in seconds"),
       to: z.number().optional().describe("cut: film-time end in seconds"),
       src_start: z.number().optional().describe("restore: the cut's src_start (from action='list')"),
