@@ -105,7 +105,7 @@ export interface ProposeResult {
  */
 export async function proposeSceneCompression(
   scene: Scene,
-  opts?: { idleRate?: number; minIdle?: number; dataDir?: string; targetDuration?: number },
+  opts?: { idleRate?: number; minIdle?: number; dataDir?: string; targetDuration?: number; window?: number },
 ): Promise<ProposeResult> {
   const minIdle = opts?.minIdle ?? 2;
   const applied: ProposeResult["applied"] = [];
@@ -128,13 +128,21 @@ export async function proposeSceneCompression(
         ? { ranges: cached.idle.ranges as Array<{ start: number; end: number }>, duration: cached.idle.duration }
         : await detectIdleRanges(videoPath, minIdle, -40);
       if (!det.ranges.length) continue; // nothing dead to compress
+      // THE WINDOW: a scene whose length the board already set (a built
+      // storyboard scene) has paid for its footage. A recording that fits it
+      // plays as shot -- measured on the dark-mode film: a hand-trimmed 5.6s
+      // clip in a 5.6s beat came back at 1.6s, the menu flying by at 8x. A
+      // longer one is compressed to land ON the window, not below it.
+      const window = !opts?.targetDuration && opts?.window && opts.window > 0.5 ? opts.window : 0;
+      if (window && det.duration <= window + 0.3) continue;
+      const fitTo = opts?.targetDuration || window;
       const idleTotal = det.ranges.reduce((t, r) => t + (r.end - r.start), 0);
       const activeTotal = Math.max(0, det.duration - idleTotal);
-      // Pick the idle rate: fit the output to targetDuration when feasible,
+      // Pick the idle rate: fit the output to the target when feasible,
       // else the default timelapse rate.
       let rate = opts?.idleRate ?? 8;
-      if (opts?.targetDuration && opts.targetDuration > activeTotal + 0.5 && idleTotal > 0.5) {
-        rate = idleTotal / (opts.targetDuration - activeTotal);
+      if (fitTo && fitTo > activeTotal + 0.5 && idleTotal > 0.5) {
+        rate = idleTotal / (fitTo - activeTotal);
         rate = Math.min(16, Math.max(1.2, Math.round(rate * 100) / 100));
       }
       const rate_regions = det.ranges.map((r) => ({ src_start: r.start, src_end: r.end, rate }));
@@ -163,7 +171,8 @@ export async function proposeSceneCompression(
   // Kill the frozen tail: the scene ends when the (primary) compressed video
   // ends -- or exactly on the fit target when we solved for one.
   if (primaryOutput !== null) {
-    const dur = opts?.targetDuration && opts.targetDuration > 0.5 ? opts.targetDuration : primaryOutput;
+    const dur = opts?.targetDuration && opts.targetDuration > 0.5 ? opts.targetDuration
+      : opts?.window && opts.window > 0.5 ? Math.max(opts.window, primaryOutput) : primaryOutput;
     scene.duration_seconds = Math.round(dur * 10) / 10;
     result.scene_duration = scene.duration_seconds;
   }

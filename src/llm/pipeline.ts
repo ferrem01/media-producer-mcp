@@ -4076,6 +4076,8 @@ async function runUnifiedPipeline(
     for (const scene of project.scenes) {
       const res = await proposeSceneCompression(scene as any, {
         targetDuration: targetDuration > 0.5 ? targetDuration : undefined,
+        // The board set this beat's length: footage that fits it plays as shot.
+        window: scene.duration_seconds,
       });
       if (res.applied.length) {
         console.log(`  Auto-compress: "${scene.label}": ${res.applied.map((a) => `${a.source_duration}s->${a.output_duration}s @${a.idle_rate}x`).join(", ")}${res.scene_duration ? ` | scene->${res.scene_duration}s` : ""}`);

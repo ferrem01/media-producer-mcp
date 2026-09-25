@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — auto-compress honors the board's window
+
+The build's auto-compress time-lapsed every screen recording's idle
+stretches at 8x, even when the board had already set the beat's length.
+- Measured on the dark-mode film: a hand-trimmed 5.6s clip in a 5.6s beat
+  came back at 1.6s, with the menu flying by.
+- The pipeline now passes the scene's board duration as `window`. A
+  recording that fits the window plays as shot.
+- A longer recording is compressed to land on the window, not below it.
+- With a narration target the old fit wins. The manual and recorder paths
+  are unchanged.
+
+Test: `test/auto-compress.test.ts`.
+
+---
+
 ## 2026-09-25 — before-after-wipe: `padding`, and a frame that holds still
 
 For the dark-mode launch film Marc asked for "a little space, 10-20px"
