@@ -86,6 +86,11 @@
       "label": "Fill the slot edge to edge (no rounded frame)",
       "optional": true
     },
+    "padding": {
+      "type": "number",
+      "label": "Space around the frame in px at 1080p (e.g. 16); the ground shows in the gap, and the frame holds still against the scene's slow camera drift so the gap stays exact. Default 4% of the slot. Ignored with bleed.",
+      "optional": true
+    },
     "at": {
       "type": "number",
       "label": "Seconds into the scene it enters (default 0.2)",

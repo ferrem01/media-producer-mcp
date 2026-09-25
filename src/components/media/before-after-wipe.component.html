@@ -73,7 +73,12 @@
     var W0 = el.clientWidth || 900, H0 = el.clientHeight || 520;
     var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
     var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
-    var pad = data.bleed === true ? 0 : Math.round(Math.min(W0, H0) * 0.04);
+    // The gap around the frame: `padding` in px at 1080p (Marc: "give it a
+    // little space, 10-20px"), else 4% of the slot. Measured from the
+    // VISIBLE frame edge, so a full-frame slot's overscan does not add to it.
+    var pad = data.bleed === true ? 0 : (isFinite(Number(data.padding)) && data.padding !== '' && data.padding !== null
+      ? Math.max(0, Number(data.padding)) * (Math.min(window.innerWidth, window.innerHeight) / 1080) / sc
+      : Math.round(Math.min(W0, H0) * 0.04));
     root.style.setProperty('--pad', pad + 'px');
     var W = W0 - 2 * (pad + (data.bleed === true ? 0 : ox)), H = H0 - 2 * (pad + (data.bleed === true ? 0 : oy));
     frame.style.width = W + 'px'; frame.style.height = H + 'px';
@@ -94,7 +99,27 @@
     var st = { p: 1 };
     var sweeps = Array.isArray(data.sweeps) && data.sweeps.length ? data.sweeps
       : [{ at: Number(data.sweep_at) || AT + 0.5, to: 0.1, duration: 1.0 }, { to: split, duration: 0.8 }];
+    // PINNED FRAME: with an explicit padding the gap must stay exact, but the
+    // scene's ambient camera (.mp-camera: a slow 3% push + drift on every
+    // scene) grows the frame past it (measured: 16px at the start, -16px by
+    // the end). The root cancels that drift each frame -- the ground behind
+    // keeps drifting, the frame holds. Only the ambient camera; an authored
+    // camera move (the rig) still moves it, as intended.
+    var pinCam = data.bleed !== true && isFinite(Number(data.padding)) && data.padding !== '' && data.padding !== null && data.pin !== false ? el.closest('.mp-camera') : null;
+    var pinK = 1, pinO = null;
+    if (pinCam) {
+      var rr = root.getBoundingClientRect(), cr = pinCam.getBoundingClientRect();
+      pinK = rr.width / (root.offsetWidth || rr.width) || 1;
+      pinO = { x: (cr.left + cr.width / 2 - rr.left) / pinK, y: (cr.top + cr.height / 2 - rr.top) / pinK };
+      root.style.transformOrigin = pinO.x.toFixed(2) + 'px ' + pinO.y.toFixed(2) + 'px';
+    }
+    function pin() {
+      if (!pinCam) return;
+      var s = Number(gsap.getProperty(pinCam, 'scale')) || 1, dx = Number(gsap.getProperty(pinCam, 'x')) || 0, dy = Number(gsap.getProperty(pinCam, 'y')) || 0;
+      root.style.transform = 'translate(' + (-dx / (s * pinK)).toFixed(3) + 'px,' + (-dy / (s * pinK)).toFixed(3) + 'px) scale(' + (1 / s).toFixed(5) + ')';
+    }
     function apply() {
+      pin();
       var p = st.p;
       if (vertical) {
         before.style.clipPath = 'inset(0 0 ' + ((1 - p) * 100).toFixed(3) + '% 0)';
