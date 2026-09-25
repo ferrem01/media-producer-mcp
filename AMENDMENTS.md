@@ -6,6 +6,31 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — The booth: continuous pace, karaoke, Start over
+
+Marc, recording a four-scene take: "reading, then pausing, then reading".
+He also asked for a karaoke-style pace guide and a way to retake without
+leaving the recorder.
+- **Speaking pace only.** A scene's cues ran for max(board seconds, speaking
+  time). On a creator-cut board a 10s scene with 4s of words is 6s of held
+  last line. Cues now run at `words / 2.4 + breaths`, with 0.6s between
+  scenes. The take re-times every scene to the delivered words anyway, so
+  the board's seconds never belonged in the prompter.
+- **Karaoke.** The current line renders as word spans that light up in turn
+  across its spoken time, weighted by word length; a word lights as its turn
+  begins. The next TWO lines show under it, bigger and brighter than the
+  old ghost line.
+- **Start over.** A button beside Stop throws the take away (the recorder
+  stops with its handlers detached) and re-runs the 3-2-1 on the same
+  stream. No review screen, no trip back out, no second camera prompt.
+  The count-in moved into `roll(s)` so both paths share it.
+- Verified end to end with a fake camera: 2 scenes now 9s (the board held
+  them for 22), words light in turn, the next lines cross the scene
+  boundary, and Start over resets and re-rolls. Tests:
+  `test/take-page.test.ts`.
+
+---
+
 ## 2026-09-25 — The booth: Record never leaves the screen
 
 Marc, live on his phone: "I don't see a record button anymore."

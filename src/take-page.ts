@@ -128,10 +128,21 @@ ${QUOTIENT_CSS}
      from the bottom, the eyes look down in every take (Marc). */
   #prompt { position:absolute; left:0; right:0; top: calc(64px + env(safe-area-inset-top)); padding:0 22px; text-align:center; }
   #cue { font-size:30px; line-height:1.28; font-weight:600; color:#fff; text-shadow:0 2px 14px rgba(0,0,0,.7); text-wrap:balance; }
-  #next { margin-top:10px; font-size:17px; line-height:1.3; color:rgba(255,255,255,.55); text-shadow:0 2px 10px rgba(0,0,0,.6); }
+  /* KARAOKE: the line's words light up at the target pace -- spoken words
+     bright, the ones ahead dim -- so the reader sees whether they are ahead
+     or behind (Marc: "something that shows me the pace, like a karaoke
+     machine"). The next two lines sit under it, readable, not ghosted. */
+  #cue .w { color: rgba(255,255,255,.42); transition: color .12s linear; }
+  #cue .w.on { color: #fff; }
+  #next { margin-top:12px; font-size:21px; line-height:1.3; font-weight:500; color:rgba(255,255,255,.78); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
+  #next2 { margin-top:8px; font-size:18px; line-height:1.3; color:rgba(255,255,255,.5); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
   #bar { position:absolute; left:0; right:0; bottom: calc(86px + env(safe-area-inset-bottom)); height:3px; background:rgba(255,255,255,.18); }
   #barFill { height:100%; width:0%; background:#fff; }
-  #stopWrap { position:absolute; left:18px; right:18px; bottom: calc(18px + env(safe-area-inset-bottom)); }
+  #stopWrap { position:absolute; left:18px; right:18px; bottom: calc(18px + env(safe-area-inset-bottom)); display:flex; gap:10px; }
+  #stopWrap .btn { flex:1; }
+  /* Start over: a fumbled line restarts the take right here -- the count-in
+     again, same camera, no trip back out of the recorder (Marc). */
+  .btn.again { background: rgba(255,255,255,.16); color:#fff; flex:0 0 38% !important; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 
   /* ── review ── */
   #play { width: 100%; max-height: 62dvh; border-radius: var(--radius); background: #000; }
@@ -167,9 +178,9 @@ ${QUOTIENT_CSS}
   <div id="top"><span id="timer">0:00</span><div id="meterWrap"><div id="meter"></div></div></div>
   <div id="silent">No sound is reaching the mic — this take is recording nothing.</div>
   <div id="count"></div>
-  <div id="prompt"><div id="cue"></div><div id="next"></div></div>
+  <div id="prompt"><div id="cue"></div><div id="next"></div><div id="next2"></div></div>
   <div id="bar"><div id="barFill"></div></div>
-  <div id="stopWrap"><button class="btn stop" id="stopBtn">Stop</button></div>
+  <div id="stopWrap"><button class="btn again" id="againRecBtn">Start over</button><button class="btn stop" id="stopBtn">Stop</button></div>
 </section>
 
 <section id="review" class="pad">
@@ -302,7 +313,7 @@ ${QUOTIENT_CSS}
   // break is a breath, ~0.3s) and a line that says only (pause) is a held
   // beat (~1s) the prompter shows as "•••". Silences come out of the
   // scene's duration first; the words share what is left.
-  var BREATH_S = 0.3, PAUSE_S = 1.0, PAUSE_GLYPH = '\u2022\u2022\u2022';
+  var BREATH_S = 0.3, PAUSE_S = 1.0, SCENE_BREATH_S = 0.6, PAUSE_GLYPH = '\u2022\u2022\u2022';
   var PAUSE_LINE = /^\\(\\s*pause\\s*\\)[.,!?]*$/i;
   function buildCues(scenes) {
     var out = [];
@@ -322,15 +333,22 @@ ${QUOTIENT_CSS}
       for (var z = items.length - 1; z >= 0; z--) { if (items[z].words) { items[z].gap = 0; break; } }
       var words = items.reduce(function (a, it) { return a + it.words; }, 0) || 1;
       var gaps = items.reduce(function (a, it) { return a + it.gap; }, 0);
-      // The board's number is the CUT, never the mouth: a scene written
-      // with more words than its seconds (measured live, proj_f10e79cf:
-      // 24 words in 4s -- "ripping through the words faster than any human
-      // could speak") prompts at speaking pace and the take re-times the
-      // scene. The pipeline floors the board the same way at build.
-      var dur = Math.max(Number(s.duration_seconds) || 0, Math.max(1.5, words / WORDS_PER_SEC + gaps));
+      // SPEAKING PACE, never the board's seconds. The board's number is the
+      // CUT, never the mouth, in BOTH directions: too few seconds ripped
+      // through the words (measured live, proj_f10e79cf: 24 words in 4s),
+      // and too many held each scene's last line long after it was said --
+      // on a creator-cut board a 10s scene with 4s of words is 6s of
+      // waiting (Marc: "reading, then pausing, then reading"). The take
+      // re-times every scene to the delivered words, so the prompter only
+      // has to keep the voice moving.
+      var dur = Math.max(1.5, words / WORDS_PER_SEC + gaps);
       var speech = Math.max(0.5, dur - gaps);
-      items.forEach(function (it) { out.push({ text: it.text, dur: speech * (it.words / words) + it.gap, beat: i }); });
+      items.forEach(function (it) { out.push({ text: it.text, dur: speech * (it.words / words) + it.gap, gap: it.gap, beat: i }); });
     });
+    // Between scenes: one short breath, no more.
+    for (var q = 0; q < out.length - 1; q++) {
+      if (out[q + 1].beat !== out[q].beat) { out[q].dur += SCENE_BREATH_S; out[q].gap += SCENE_BREATH_S; }
+    }
     return out;
   }
 
@@ -442,18 +460,47 @@ ${QUOTIENT_CSS}
   // the next line and the clock restarts from there, so the prompter can
   // never run ahead of the person reading it.
   var cueIdx = -1, cueTimer = null;
+  var kRaf = 0;
+  function stopKaraoke() { if (kRaf) cancelAnimationFrame(kRaf); kRaf = 0; }
   function showCue(i) {
     if (cueTimer) clearTimeout(cueTimer); cueTimer = null;
+    stopKaraoke();
     cueIdx = i;
-    if (i >= cues.length) { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; return; }
-    $('cue').textContent = cues[i].text;
+    if (i >= cues.length) { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; $('next2').textContent = ''; return; }
+    var c = cues[i];
+    // Each word gets a share of the line's SPOKEN time by its length (long
+    // words take longer to say); the breath after the line stays dark.
+    var cueEl = $('cue'); cueEl.textContent = '';
+    var parts = String(c.text).split(' ').filter(function (w) { return w.length; });
+    var spans = parts.map(function (w, k) {
+      var sp = document.createElement('span'); sp.className = 'w'; sp.textContent = w;
+      cueEl.appendChild(sp); if (k < parts.length - 1) cueEl.appendChild(document.createTextNode(' '));
+      return sp;
+    });
+    var weights = parts.map(function (w) { return Math.max(2, w.length); });
+    var wsum = weights.reduce(function (a, b) { return a + b; }, 0) || 1;
+    var spoken = Math.max(0.3, c.dur - (c.gap || 0));
+    var ends = []; var acc = 0;
+    weights.forEach(function (wt) { acc += spoken * (wt / wsum); ends.push(acc); });
+    var start = performance.now();
+    if (c.text === PAUSE_GLYPH) spans.forEach(function (sp) { sp.classList.add('on'); });
+    else (function paint() {
+      var el = (performance.now() - start) / 1000;
+      for (var k = 0; k < spans.length; k++) {
+        // A word lights as its turn BEGINS, so the eye leads the voice.
+        var begin = k ? ends[k - 1] : 0;
+        if (el >= begin) spans[k].classList.add('on');
+      }
+      if (el < spoken) kRaf = requestAnimationFrame(paint);
+    })();
     $('next').textContent = cues[i + 1] ? cues[i + 1].text : '';
-    cueTimer = setTimeout(function () { showCue(i + 1); }, cues[i].dur * 1000);
+    $('next2').textContent = cues[i + 2] ? cues[i + 2].text : '';
+    cueTimer = setTimeout(function () { showCue(i + 1); }, c.dur * 1000);
   }
   function runPrompter() { $('barFill').style.width = '0%'; showCue(0); }
   function advanceCue() { if (rec && rec.state === 'recording' && cueIdx >= 0 && cueIdx < cues.length) showCue(cueIdx + 1); }
-  function clearPrompter() { if (cueTimer) clearTimeout(cueTimer); cueTimer = null; cueIdx = -1; $('cue').textContent = ''; $('next').textContent = ''; }
-  $('stage').addEventListener('click', function (ev) { if (ev.target && (ev.target.id === 'stopBtn' || ev.target.closest && ev.target.closest('#stopWrap'))) return; advanceCue(); });
+  function clearPrompter() { if (cueTimer) clearTimeout(cueTimer); cueTimer = null; stopKaraoke(); cueIdx = -1; $('cue').textContent = ''; $('next').textContent = ''; $('next2').textContent = ''; }
+  $('stage').addEventListener('click', function (ev) { if (ev.target && (ev.target.id === 'stopBtn' || ev.target.id === 'againRecBtn' || ev.target.closest && ev.target.closest('#stopWrap'))) return; advanceCue(); });
 
   // ── portrait canvas capture ────────────────────────────────────────────
   var capture = 'raw', drawing = false, drawReq = 0;
@@ -505,12 +552,22 @@ ${QUOTIENT_CSS}
       $('timer').textContent = '0:00'; $('timer').classList.remove('rec');
       startMeter(s);
       if (navigator.wakeLock && navigator.wakeLock.request) { navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); }
-      // 3-2-1 count-in, then roll.
+      roll(s);
+    }).catch(function (e) {
+      $('recordBtn').disabled = false;
+      fail('Camera or microphone was not allowed (' + (e.name || e) + '). Allow both for this site and try again.');
+    });
+  });
+
+  // 3-2-1 count-in, then roll. Its own function so Start over can run it
+  // again on the SAME stream, from the stage.
+  var countTimer = null;
+  function roll(s) {
       var n = 3; $('count').style.display = 'flex'; $('count').textContent = String(n);
-      var cd = setInterval(function () {
+      var cd = countTimer = setInterval(function () {
         n -= 1;
         if (n > 0) { $('count').textContent = String(n); return; }
-        clearInterval(cd); $('count').style.display = 'none';
+        clearInterval(cd); countTimer = null; $('count').style.display = 'none';
         mime = pickMime(); ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
         chunks = [];
         // Record the PICTURE ON SCREEN, not the camera track. iOS hands the
@@ -553,10 +610,20 @@ ${QUOTIENT_CSS}
         tickTimer = setInterval(tick, 200);
         runPrompter();
       }, 1000);
-    }).catch(function (e) {
-      $('recordBtn').disabled = false;
-      fail('Camera or microphone was not allowed (' + (e.name || e) + '). Allow both for this site and try again.');
-    });
+  }
+
+  // START OVER: throw the take away and roll again from the count-in --
+  // camera, meter and stage stay up; nothing is uploaded or reviewed.
+  $('againRecBtn').addEventListener('click', function () {
+    if (countTimer) { clearInterval(countTimer); countTimer = null; }
+    if (rec && rec.state !== 'inactive') { rec.onstop = null; rec.ondataavailable = null; try { rec.stop(); } catch (eR) {} }
+    rec = null; chunks = [];
+    stopDraw();
+    if (tickTimer) clearInterval(tickTimer); tickTimer = null;
+    clearPrompter();
+    $('timer').textContent = '0:00'; $('timer').classList.remove('rec'); $('barFill').style.width = '0%';
+    if (stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; })) roll(stream);
+    else { stopAll(); show('ready'); $('recordBtn').disabled = false; }
   });
 
   function stopAll() {

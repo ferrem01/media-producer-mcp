@@ -99,13 +99,22 @@ describe("what the booth does", () => {
     expect(html).toMatch(/duration_seconds/);
     expect(html).toMatch(/WORDS_PER_SEC = 2\.4/);
     expect(html).toMatch(/speech \* \(it\.words \/ words\) \+ it\.gap/);
-    // The board's number is the cut, never the mouth (measured live: 24 words in a 4s scene raced the prompter).
-    expect(html).toMatch(/var dur = Math\.max\(Number\(s\.duration_seconds\) \|\| 0, Math\.max\(1\.5, words \/ WORDS_PER_SEC \+ gaps\)\);/);
+    // The board's number is the cut, never the mouth, BOTH ways: 24 words in a 4s scene raced the prompter,
+    // and a 10s creator-cut scene with 4s of words held its last line (Marc: "reading, then pausing").
+    expect(html).toMatch(/var dur = Math\.max\(1\.5, words \/ WORDS_PER_SEC \+ gaps\);/);
+    expect(html).not.toMatch(/Math\.max\(Number\(s\.duration_seconds\)/);
+    // One short breath between scenes, no more.
+    expect(html).toMatch(/SCENE_BREATH_S = 0\.6/);
+    expect(html).toMatch(/if \(out\[q \+ 1\]\.beat !== out\[q\]\.beat\) \{ out\[q\]\.dur \+= SCENE_BREATH_S;/);
   });
 
   it("shows one cue at a time on its own clock, and a tap on the stage jumps to the next line", () => {
     expect(html).toMatch(/function showCue\(i\) \{/);
-    expect(html).toMatch(/cueTimer = setTimeout\(function \(\) \{ showCue\(i \+ 1\); \}, cues\[i\]\.dur \* 1000\);/);
+    expect(html).toMatch(/cueTimer = setTimeout\(function \(\) \{ showCue\(i \+ 1\); \}, c\.dur \* 1000\);/);
+    // Karaoke: the line's words light at pace; the next TWO lines show under it.
+    expect(html).toMatch(/sp\.className = 'w'/);
+    expect(html).toMatch(/if \(el >= begin\) spans\[k\]\.classList\.add\('on'\);/);
+    expect(html).toMatch(/<div id="prompt"><div id="cue"><\/div><div id="next"><\/div><div id="next2"><\/div><\/div>/);
     expect(html).toMatch(/function advanceCue\(\) \{ if \(rec && rec\.state === 'recording' && cueIdx >= 0 && cueIdx < cues\.length\) showCue\(cueIdx \+ 1\); \}/);
     expect(html).toMatch(/\$\('stage'\)\.addEventListener\('click'/);
     expect(html).toMatch(/Tap the screen to jump to the next line\./);
