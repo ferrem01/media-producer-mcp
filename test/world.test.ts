@@ -160,6 +160,9 @@ describe("cream world: template scenes sit on the cream too", () => {
     const opts: any = { sceneIndex: 0, totalScenes: 1, canvas: { width: 1920, height: 1080 }, tenantId: "t", brandKit: LIGHT_KIT, world };
     const types = (tpl: any) => (buildTemplateScene("s1", { label: "x", duration_seconds: 3, scene_template: tpl }, opts)!.scene as any).components.map((c: any) => c.type);
     expect(types({ type: "st-logo-close", data: { tagline: "Live now." } })[0]).toBe("cream-ground");
+    const sc = buildTemplateScene("s1", { label: "x", duration_seconds: 3, scene_template: { type: "st-screencast", data: { presentation: "float" } } }, opts)!.scene as any;
+    expect(sc.components[0].type).toBe("cream-ground");
+    expect(sc.components.find((c: any) => c.type === "st-screencast").data.backdrop_active).toBe(true);
     expect(types({ type: "st-statement", data: { text: "Hi." } })).not.toContain("cream-ground");
     expect(types({ type: "st-logo-close", data: { theme: "dark" } })[0]).toBe("webgl-backdrop");
   });
