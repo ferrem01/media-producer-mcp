@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — Studio playback: no rewinds at a cut, sound cues audible
+
+Marc (proj_86591051, a screen recording of Studio): "during the zoom and screen
+cross over the studio UI jumps ... not just sound but the whole film", and
+"the sound effects are in the effects layer but you can't hear them".
+- **The rewind.** Frame by frame, the scene 2->3 cut crossfaded, snapped back
+  to scene 2 for about 0.2s, then crossfaded again. The film is one take cut
+  into per-scene windows, so the cut seeks the speaker. While it re-buffered,
+  the wall clock ran the film on; then the clock followed the late speaker
+  back (it accepted a speaker up to 0.75s behind). That put the film behind
+  the cut, which re-cut and re-seeked.
+  - Fix (`animLoop`): a stalled speaker (seeking, or readyState < 3) holds
+    the film, like NLE buffering. The hold is capped at 1.5s
+    (`SPEAKER_STALL_HOLD_MS`), after which the wall clock takes over.
+  - A speaker that reads behind the film holds it until it catches up. The
+    film never runs backwards.
+- **Sound cues.** The house cues are 50-90ms, shorter than `play()`'s own
+  start-up. They were windowed like a voiceover, so the next tick paused
+  them past their window before they sounded (measured: 12ms of a 50ms tick).
+  - A cue now fires when the playhead crosses its start and rings out. It
+    still fires, from the top, when a janky tick steps clean over it.
+  - Only a cue more than 0.6s outside its window (`CUE_RING_S`) is stopped.
+- Test: `test/studio-playback-clock.test.ts`, a browser harness. Its speaker
+  test uses one generated 12s VP9 take with keyframes far apart, so seeks are
+  slow like a phone recording, cut into three windows with overlapping scene
+  starts; the playhead may not run back. Its cue test uses 50-90ms WAVs,
+  each of which must play through. Both failed before the fix (0.364s back;
+  12ms of 50ms).
+
 ## 2026-09-25 — The prompter reads the script's intent
 
 Marc: "Will it understand that I emphasize certain words, that I pause on
