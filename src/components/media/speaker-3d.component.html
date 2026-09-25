@@ -25,7 +25,14 @@
   .s3d-plate-in video, .s3d-person-in video { width: 100%; height: 100%; object-fit: cover; display: block; }
   .s3d-word { position: absolute; white-space: nowrap; line-height: 1; will-change: transform, opacity, filter; }
   .s3d-small { font-family: var(--mp-font-family, Inter), Inter, sans-serif; font-weight: 500; letter-spacing: -0.01em; color: #fff; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45); }
+  .s3d-small.serif { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: 0; }
   .s3d-small span { display: inline-block; margin-right: 0.26em; }
+  /* A stack: small lines on one side pile up as rows (the reference's
+     "I've learned / that people / what you said"), wrapping at a narrow
+     measure, until something clears it. */
+  .s3d-stack { position: absolute; }
+  .s3d-stack .s3d-word { position: relative; display: block; white-space: normal; line-height: 1.2; }
+  .s3d-stack .s3d-word + .s3d-word { margin-top: 0.55em; }
   .s3d-big { font-weight: 800; letter-spacing: -0.035em; }
   .s3d-big.serif { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; letter-spacing: -0.02em; }
   .s3d-big span { display: inline-block; }
@@ -78,6 +85,15 @@
       var next = null;
       for (var j = k + 1; j < lines.length; j++) if (lines[j].kind === x.kind) { next = lines[j]; break; }
       x.until = next ? next.at : DUR;
+      // A ring gives way to the next big word (one hero at a time: the
+      // reference's ring is gone before "feel" lands).
+      if (x.kind === 'ring') for (var q = k + 1; q < lines.length; q++) if (lines[q].kind === 'big') { x.until = Math.min(x.until, lines[q].at); break; }
+      // A silhouette wipe clears the frame: a line still up when one passes
+      // leaves with it (the reference clears everything on the wipe).
+      (Array.isArray(data.wipes) ? data.wipes : []).forEach(function (wp) {
+        var t = wp ? num(wp.at, -1) : -1;
+        if (t > x.at + 0.3 && t < x.until) x.until = t + num(wp.duration, 0.7) * 0.45;
+      });
     });
     var pct = function (v, total, d) {
       if (v === undefined || v === null || v === '') return d;
@@ -85,7 +101,52 @@
       return s.slice(-1) === '%' ? (parseFloat(s) / 100) * total : (parseFloat(s) || 0);
     };
 
-    var bigN = 0;
+    // ---- Small-line stacks. A side's small lines pile up as rows until the
+    // stack clears: a wipe, a big word landing on that side, a full stack
+    // (three rows), or an explicit `until`. A stack opened while a big word
+    // holds its side sits ABOVE it (the reference's "what you did" over the
+    // low "forget"). A line with its own x/y stands alone. ----
+    var wipeTimes = (Array.isArray(data.wipes) ? data.wipes : []).filter(Boolean).map(function (wp) { return num(wp.at, -1); }).filter(function (t) { return t >= 0; });
+    var sideOf = function (x, idx) { return x.l.side || (x.kind === 'big' ? null : (idx % 2 ? 'right' : 'left')); };
+    var bigSides = [];
+    (function () {
+      var n = 0;
+      lines.forEach(function (x) {
+        if (x.kind !== 'big') return;
+        x.side = x.l.side || (n === 0 ? 'center' : (n % 2 ? 'right' : 'left')); n++;
+        bigSides.push({ side: x.side, at: x.at, until: Math.max(x.at + 0.3, x.until) });
+      });
+    })();
+    var stacks = { left: null, right: null }, stackList = [];
+    lines.forEach(function (x, idx) {
+      if (x.kind !== 'small' || x.l.x !== undefined || x.l.y !== undefined) return;
+      var side = sideOf(x, idx) === 'left' ? 'left' : 'right';
+      x.side = side;
+      var st = stacks[side];
+      var cleared = st && (st.rows >= 3 || wipeTimes.some(function (t) { return t > st.last && t <= x.at; }) ||
+        bigSides.some(function (b) { return b.side === side && b.at > st.last && b.at <= x.at; }) || st.end <= x.at);
+      if (!st || cleared) {
+        var above = bigSides.some(function (b) { return b.side === side && b.at <= x.at && b.until > x.at; });
+        st = stacks[side] = { side: side, start: x.at, last: x.at, rows: 0, above: above, members: [], end: DUR };
+        stackList.push(st);
+      }
+      st.rows++; st.last = x.at; st.members.push(x); x.stack = st;
+      if (x.l.until !== undefined && x.l.until !== '' && isFinite(Number(x.l.until))) x.ownUntil = Number(x.l.until);
+    });
+    // A stack ends at the first clearing event after its last line.
+    stackList.forEach(function (st) {
+      var ends = [DUR];
+      wipeTimes.forEach(function (t) { if (t > st.last) ends.push(t); });
+      bigSides.forEach(function (b) { if (b.side === st.side && b.at > st.last) ends.push(b.at); });
+      stackList.forEach(function (o) { if (o !== st && o.side === st.side && o.start > st.last) ends.push(o.start); });
+      st.end = Math.min.apply(null, ends);
+      var box = document.createElement('div'); box.className = 's3d-stack';
+      box.style.width = (W * 0.16) + 'px';
+      box.style.left = (st.side === 'right' ? W * 0.66 : W * 0.07) + 'px';
+      box.style.top = (st.above ? H * 0.24 : H * 0.56) + 'px';
+      front.appendChild(box); st.box = box;
+    });
+
     lines.forEach(function (x, idx) {
       var l = x.l, at = x.at, until = Math.max(at + 0.3, x.until);
       var layer = l.layer === 'front' || l.layer === 'back' ? l.layer : (x.kind === 'big' ? 'back' : 'front');
@@ -93,8 +154,10 @@
       var color = l.color || (x.kind === 'small' ? '#ffffff' : ACC);
       if (x.kind === 'ring') { ring(l, at, until, color); return; }
       var w = document.createElement('div');
-      w.className = 's3d-word ' + (x.kind === 'big' ? 's3d-big' + (serif ? ' serif' : '') : 's3d-small');
-      var size = num(l.size, x.kind === 'big' ? 0.2 : 0.042) * H;
+      w.className = 's3d-word ' + (x.kind === 'big' ? 's3d-big' : 's3d-small') + (serif ? ' serif' : '');
+      // Sizes after the reference: a side big word is a third of the frame
+      // tall ("forget" low right, the gold "feel"); small words read at 4.6%.
+      var size = num(l.size, x.kind === 'big' ? (x.side === 'center' ? 0.3 : 0.3) : 0.046) * H;
       w.style.fontSize = size + 'px';
       w.style.color = color;
       if (x.kind === 'big') w.style.fontFamily = serif ? '' : 'var(--mp-font-family, Inter), Inter, sans-serif';
@@ -108,30 +171,41 @@
         }
       });
       if (x.kind === 'big' && w.lastChild) w.removeChild(w.lastChild);
-      host.appendChild(w);
-      // Placement: big words centre on the head's height by default (the
-      // head covers their middle -- the point); small words sit beside it.
-      var side = l.side || (x.kind === 'big' ? (bigN === 0 ? 'center' : (bigN % 2 ? 'right' : 'left')) : (idx % 2 ? 'right' : 'left'));
-      if (x.kind === 'big') bigN++;
-      var bw = w.offsetWidth || size * String(l.text).length * 0.55;
-      // A centred big word must be WIDER than a head, or the person hides
-      // it whole (measured: "feel" vanished behind the cut-out). Scale it up
-      // to ~42% of the frame's width, within a cap.
-      if (x.kind === 'big' && side === 'center' && l.size === undefined && bw < W * 0.42) {
-        var k = Math.min((W * 0.42) / bw, (H * 0.36) / size);
-        size = size * k; w.style.fontSize = size + 'px'; bw = w.offsetWidth || bw * k;
-      }
-      var defX, defY;
-      if (x.kind === 'big') {
-        defX = side === 'center' ? (W - bw) / 2 : (side === 'right' ? W * 0.56 : W * 0.44 - bw);
-        defY = side === 'center' ? H * 0.16 : H * 0.5;
+      if (x.stack) {
+        // A stacked row: it lives in its side's stack and leaves with it.
+        x.stack.box.appendChild(w);
+        until = x.ownUntil !== undefined ? Math.max(at + 0.3, x.ownUntil) : x.stack.end;
       } else {
-        // Beside the face, clear of a centred big word (it spans the top).
-        defX = side === 'right' ? W * 0.64 : W * 0.07;
-        defY = side === 'right' ? H * 0.58 : H * 0.6;
+        host.appendChild(w);
+        var side = x.side || l.side || (idx % 2 ? 'right' : 'left');
+        var bw = w.offsetWidth || size * String(l.text).length * 0.55;
+        if (x.kind === 'big' && l.size === undefined) {
+          if (side === 'center') {
+            // Centred, the word must be much WIDER than a head: the head
+            // covers its middle and the letters read either side (the
+            // reference's "fo(head)get" spans ~70% of the frame).
+            var k = Math.min((W * 0.7) / bw, (H * 0.42) / size);
+            size = size * k;
+          } else if (bw > W * 0.38) {
+            // A side word keeps to its side of the frame.
+            size = size * (W * 0.38) / bw;
+          }
+          w.style.fontSize = size + 'px'; bw = w.offsetWidth || bw;
+        }
+        var defX, defY;
+        if (x.kind === 'big') {
+          // Side words keep a margin: the camera push scales the front layer
+          // and the word drifts right as it holds (measured: "forget" and
+          // "feel" ran off the right edge).
+          defX = side === 'center' ? (W - bw) / 2 : (side === 'right' ? W * 0.88 - bw - size * 0.12 : W * 0.08);
+          defY = side === 'center' ? H * 0.04 : H * 0.62 - size * 0.5;
+        } else {
+          defX = side === 'right' ? W * 0.66 : W * 0.07;
+          defY = side === 'right' ? H * 0.58 : H * 0.6;
+        }
+        w.style.left = pct(l.x, W, defX) + 'px';
+        w.style.top = pct(l.y, H, defY) + 'px';
       }
-      w.style.left = pct(l.x, W, defX) + 'px';
-      w.style.top = pct(l.y, H, defY) + 'px';
       var parts = w.children;
       if (x.kind === 'big') {
         gsap.set(parts, { autoAlpha: 0, yPercent: 30, scale: 1.25, filter: 'blur(14px)' });
@@ -145,21 +219,23 @@
       if (until < DUR) tl.to(w, { autoAlpha: 0, filter: 'blur(10px)', duration: 0.3, ease: 'power2.in' }, until - 0.15);
     });
 
-    // ---- The ring: one ellipse around the head, drawn twice. The far arc
-    // (top) lives behind the person, the near arc (bottom) in front; the
-    // text turns along it. ----
+    // ---- The ring: one ellipse around the neck, the phrase ONCE on its
+    // near arc (a smile-curve across the chest, the reference's "but
+    // they'll never forget"), sized to fill most of that arc. It turns
+    // slowly; the ends that curl past the sides go behind the person (the
+    // same path is drawn twice, clipped: far half behind, near half in front). ----
     var ringN = 0;
     function ring(l, at, until, color) {
-      // Around the NECK by default: the far arc passes behind the head, the
-      // near arc across the chest (measured: at head height it crossed the mouth).
-      var cx = pct(l.x, W, W * 0.5), cy = pct(l.y, H, H * 0.56);
-      var rx = num(l.radius, 0.22) * W, ry = rx * num(l.tilt, 0.3);
-      var size = num(l.size, 0.05) * H;
+      var cx = pct(l.x, W, W * 0.5), cy = pct(l.y, H, H * 0.6);
+      var rx = num(l.radius, 0.2) * W, ry = rx * num(l.tilt, 0.32);
+      var size = num(l.size, 0.062) * H;
       var id = 's3dring' + (ringN++) + Math.round(at * 100);
+      // From the left point, counter-clockwise on screen: the first half of
+      // the path is the near (bottom) arc, read left to right, upright.
       var d = 'M ' + (cx - rx) + ',' + cy + ' a ' + rx + ',' + ry + ' 0 1,0 ' + (2 * rx) + ',0 a ' + rx + ',' + ry + ' 0 1,0 ' + (-2 * rx) + ',0';
       var text = String(l.text).trim();
-      var reps = Math.max(1, Math.round((Math.PI * (rx + ry)) / (text.length * size * 0.62 + size)));
-      var full = Array(reps + 1).join(text + ' · ');
+      var near = Math.PI * Math.sqrt((rx * rx + ry * ry) / 2); // half the perimeter
+      var turn = num(l.turn, 6);
       [['back', back, 0, cy], ['front', front, cy, H]].forEach(function (part) {
         var svg = document.createElementNS(SVGNS, 'svg');
         svg.setAttribute('class', 's3d-ring'); svg.setAttribute('width', W); svg.setAttribute('height', H);
@@ -173,13 +249,21 @@
         var t = document.createElementNS(SVGNS, 'text');
         t.setAttribute('font-size', size); t.setAttribute('fill', color); t.setAttribute('clip-path', 'url(#' + id + part[0] + 'c)');
         t.setAttribute('font-family', serif ? "Georgia, 'Times New Roman', serif" : 'var(--mp-font-family, Inter), Inter, sans-serif');
-        if (part[0] === 'back') t.setAttribute('opacity', '0.78');
+        if (serif) t.setAttribute('font-style', 'italic');
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('style', 'paint-order: stroke; stroke: rgba(0,0,0,0.18); stroke-width: ' + (size * 0.04).toFixed(1) + 'px');
         var tp = document.createElementNS(SVGNS, 'textPath'); tp.setAttribute('href', '#' + id + part[0]);
-        tp.setAttribute('startOffset', '0%'); tp.textContent = full;
+        tp.setAttribute('startOffset', (25 - turn / 2) + '%'); tp.textContent = text;
         t.appendChild(tp); svg.appendChild(t); part[1].appendChild(svg);
+        // Fit the phrase to ~85% of the near arc (never past it).
+        var len = 0; try { len = t.getComputedTextLength(); } catch (e) {}
+        if (len > 0 && l.size === undefined) {
+          var fs = Math.min(size * 1.25, size * (near * 0.85) / len);
+          t.setAttribute('font-size', fs.toFixed(1));
+        }
         gsap.set(svg, { autoAlpha: 0, scale: 0.9, transformOrigin: cx + 'px ' + cy + 'px' });
         tl.to(svg, { autoAlpha: 1, scale: 1, duration: 0.45, ease: 'power2.out' }, at);
-        tl.fromTo(tp, { attr: { startOffset: '0%' } }, { attr: { startOffset: '-' + num(l.turn, 18) + '%' }, duration: Math.max(0.5, until - at + 0.3), ease: 'none', immediateRender: false }, at);
+        tl.fromTo(tp, { attr: { startOffset: (25 - turn / 2) + '%' } }, { attr: { startOffset: (25 + turn / 2) + '%' }, duration: Math.max(0.5, until - at + 0.3), ease: 'none', immediateRender: false }, at);
         if (until < DUR) tl.to(svg, { autoAlpha: 0, duration: 0.3 }, until - 0.15);
       });
     }

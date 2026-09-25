@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — speaker-3d, measured against the reference side by side
+
+A side-by-side with the camera-3d-captions reference (same quote, a matching
+AI presenter, component defaults) showed that every effect was there and on
+its word, but the typography fell short. Four fixes, all defaults:
+- **Big words at the reference's scale.** A centred word scales to ~70% of
+  the width (capped at 42% of the height), so "fo(head)get" reads either
+  side of the head. A side word is 30% of the height and keeps a margin: the
+  push scales the front layer, and "forget" and "feel" ran off the edge.
+- **Small lines are serif under `font: "serif"` and STACK.**
+  - Rows pile up on their side at a narrow measure.
+  - A stack clears on a wipe, when a big word lands on its side, or when
+    it holds three rows.
+  - A stack opened while a big word holds its side sits above it.
+- **The ring carries its phrase once.** It's a smile-curve across the chest,
+  fitted to ~85% of the near arc and italic under serif. It gives way to the
+  next big word, one hero at a time.
+- **A wipe clears the frame.** Any line still up leaves with it.
+
+Test: `test/speaker-3d.test.ts` ("matches the reference's typography").
+
+---
+
 ## 2026-09-25 — Emphasis stars no longer leak through per-beat lines
 
 - **Bug** (measured on the analytics teasers, proj_7adf0eb5 scene 3 and

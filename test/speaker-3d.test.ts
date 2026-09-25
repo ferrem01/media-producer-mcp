@@ -126,6 +126,50 @@ describe("speaker-3d in the browser", () => {
     } finally { await close(); }
   }, 60000);
 
+  it("matches the reference's typography: huge centred word, stacked serif small lines, the ring phrase once", async () => {
+    // Measured against the camera-3d-captions reference, side by side: the
+    // big words were half its size, small lines replaced each other in sans,
+    // and the ring repeated its phrase round the whole ellipse.
+    const lines = [
+      { at: 0.1, kind: "small", text: "I've learned that people", side: "right" },
+      { at: 0.6, kind: "big", text: "forget" },
+      { at: 0.8, kind: "small", text: "what you said", side: "right" },
+      { at: 1.6, kind: "big", text: "forget", side: "right", layer: "front" },
+      { at: 1.8, kind: "small", text: "what you did", side: "right" },
+      { at: 2.4, kind: "ring", text: "but people will never forget" },
+      { at: 3.2, kind: "big", text: "feel", side: "right", layer: "front" },
+    ];
+    const { page, close } = await open({ src: "speaker", font: "serif", lines }, {});
+    try {
+      const at = async (t: number) => { await page.evaluate((tt) => { (window as any).__MP_TIMELINE.time(tt); }, t); };
+      const shown = (sel: string) => page.evaluate((s) => [...document.querySelectorAll(s)].filter((e) => { const cs = getComputedStyle(e); return cs.visibility !== "hidden" && Number(cs.opacity) > 0.5 && Number(getComputedStyle(e.firstElementChild || e).opacity) > 0.5; }).map((e) => e.textContent), sel);
+      await at(1.4);
+      const m1 = await page.evaluate(() => {
+        const big = document.querySelector(".s3d-big")!.getBoundingClientRect();
+        const stack = document.querySelector(".s3d-stack")!;
+        return { bigW: big.width, rows: stack.querySelectorAll(".s3d-word").length, serif: getComputedStyle(stack.querySelector(".s3d-small")!).fontFamily };
+      });
+      expect(m1.bigW).toBeGreaterThan(1920 * 0.5);
+      expect(m1.rows).toBe(2);
+      expect(m1.serif).toMatch(/Georgia|serif/);
+      expect(await shown(".s3d-stack .s3d-small")).toEqual(["I'velearnedthatpeople", "whatyousaid"]);
+      // A big word landing on the stack's side clears it; the next line opens a new stack.
+      await at(2.2);
+      expect((await shown(".s3d-stack .s3d-small")).length).toBe(1);
+      const side = await page.evaluate(() => { const b = [...document.querySelectorAll(".s3d-big")][1].getBoundingClientRect(); return { r: b.right, l: b.left }; });
+      expect(side.r).toBeLessThan(1920);
+      // The ring carries its phrase once, italic serif.
+      await at(2.9);
+      const ring = await page.evaluate(() => { const t = document.querySelector("svg.s3d-ring text")!; return { text: t.textContent, style: t.getAttribute("font-style") }; });
+      expect(ring.text).toBe("but people will never forget");
+      expect(ring.style).toBe("italic");
+      // One hero at a time: the ring is gone once "feel" lands.
+      await at(3.8);
+      const ringOp = await page.evaluate(() => [...document.querySelectorAll("svg.s3d-ring")].map((s) => Number(getComputedStyle(s).opacity)));
+      expect(Math.max(...ringOp)).toBeLessThan(0.05);
+    } finally { await close(); }
+  }, 60000);
+
   it("is deterministic (no randomness, no per-frame callbacks)", async () => {
     const src = await fs.readFile(SRC, "utf-8");
     expect(src).not.toMatch(/Math\.random|onUpdate|repeat:\s*-1/);
