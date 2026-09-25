@@ -181,8 +181,11 @@
      lit ground and the shadow must suggest weight, not void. */
   .scf-stage.is-float.is-light .scf-frame {
     background: #f4f4f8;
+    /* The slab edge dims WITH the screen during a callout (--scf-dim follows
+       the dim overlay): an undimmed edge under a dimmed screen read as a
+       second screen sticking out from underneath (Marc, dark-mode film). */
     box-shadow:
-      -9px 12px 0 -4px rgba(206, 206, 224, 0.95),
+      -9px 12px 0 -4px color-mix(in srgb, #05050c calc(var(--scf-dim, 0) * 100%), rgba(206, 206, 224, 0.95)),
       -11px 15px 0 -4px rgba(23, 23, 40, 0.10),
       0 30px 80px rgba(23, 23, 40, 0.22), 0 6px 22px rgba(23, 23, 40, 0.14);
     -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 66%, rgba(255,255,255,0.10));
@@ -465,6 +468,7 @@
     var dimEl = null;
     var wrap3d = null;
     if (callouts.length) {
+      gsap.set(frame, { '--scf-dim': 0 });
       dimEl = document.createElement('div');
       dimEl.style.cssText = 'position:absolute;inset:0;background:#05050c;opacity:0;pointer-events:none;z-index:3;border-radius:inherit;';
       frame.appendChild(dimEl);
@@ -666,6 +670,7 @@
       var counterX = 0;
       tl.to(elc.ring, { autoAlpha: 1, scale: 1, duration: 0.4, ease: 'power2.out' }, c.at)
         .to(dimEl, { opacity: 0.42, duration: 0.9, ease: 'power2.inOut' }, c.at + 0.35)
+        .to(frame, { '--scf-dim': 0.42, duration: 0.9, ease: 'power2.inOut' }, c.at + 0.35)
         .fromTo(elc.card,
           { x: fx, y: fy, scale: fs, z: 0, rotateY: 0, rotateX: 0, autoAlpha: 0 },
           { autoAlpha: 1, duration: 0.25, ease: 'power1.out' }, liftAt)
@@ -680,7 +685,8 @@
         .to(elc.card, { x: fx, y: fy, scale: fs, z: 0, duration: travel * 0.78, ease: 'power2.inOut' }, end)
         .to(elc.card, { autoAlpha: 0, duration: 0.25, ease: 'power1.in' }, end + 0.5)
         .to(elc.ring, { autoAlpha: 0, scale: 1.05, duration: 0.4, ease: 'power2.in' }, end + 0.55)
-        .to(dimEl, { opacity: 0, duration: 0.7, ease: 'power2.inOut' }, end + 0.4);
+        .to(dimEl, { opacity: 0, duration: 0.7, ease: 'power2.inOut' }, end + 0.4)
+        .to(frame, { '--scf-dim': 0, duration: 0.7, ease: 'power2.inOut' }, end + 0.4);
     });
 
     // Entrance only -- real footage NEVER fades itself out; the scene or a

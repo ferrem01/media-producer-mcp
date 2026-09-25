@@ -19,6 +19,13 @@ The float presentation lays a frosted glass pane behind the tilted recording
   paint-containment fix did not cure: Chromium's backdrop-filter layers are
   known to paint outside their clip.
 - Test: `test/screencast-frame-glass.test.ts`.
+- **The slab edge dims with the screen.** The light float's solid offset
+  edge (the fake thickness under the tilted plane) stayed light while the
+  callout's overlay dimmed the screen, so it read as a second screen sticking
+  out from underneath.
+  - Its colour is now `color-mix(#05050c var(--scf-dim), edge)`.
+  - `--scf-dim` tweens in lockstep with the dim overlay. It repaints only the
+    shadow, never the video layer; tweening `filter` drops the video to black.
 
 ---
 
