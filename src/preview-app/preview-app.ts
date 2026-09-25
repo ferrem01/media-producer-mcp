@@ -1662,6 +1662,12 @@ ${QUOTIENT_CSS}
   var STRICT_SYNC_THRESHOLD = 0.04;
   var FORCE_SYNC_THRESHOLD = 0.02;
   var STRICT_REQUIRED_SAMPLES = 2;
+  // How long a stalled (seeking/buffering) speaker may hold the film before
+  // the wall clock takes over -- a dead connection must not freeze Studio.
+  var SPEAKER_STALL_HOLD_MS = 1500;
+  // A sound cue keeps ringing this long past its window before it is cut:
+  // play() starts late, and a 50ms tick that starts 150ms late is still due.
+  var CUE_RING_S = 0.6;
 
   // Build/rebuild the media clip registry from current project state.
   // Called once on project load and when composite finishes init.
@@ -2019,6 +2025,31 @@ ${QUOTIENT_CSS}
 
       // ── Audio: global timeline ──
       if (clip.kind === 'audio') {
+        // Sound cues are one-shots, 50-90ms long: shorter than play()'s own
+        // start-up. Windowed like a voiceover, a cue started late and the
+        // next tick paused it past its window -- unheard (Marc, proj_86591051:
+        // "the sound effects are in the effects layer but you can't hear
+        // them"). A cue FIRES when the playhead crosses its start and rings
+        // out; only a cue far outside its window is stopped.
+        if (el._cue) {
+          var prevT = clip._prevTime;
+          clip._prevTime = time;
+          var cueDur = (el.duration && isFinite(el.duration)) ? el.duration : 0.3;
+          var cueLocal = time - (clip.start || 0);
+          if (!playing) { if (!el.paused) el.pause(); continue; }
+          // Crossed its start since the last tick (a janky tick can step
+          // clean over a 90ms cue -- it still fires, from the top), or the
+          // playhead landed inside it by a seek / play.
+          var crossed = (prevT !== undefined && prevT !== null && prevT < clip.start && cueLocal >= 0 && cueLocal < cueDur + CUE_RING_S) ||
+            ((prevT === undefined || prevT === null || prevT > time) && cueLocal >= 0 && cueLocal < cueDur);
+          if (crossed) {
+            try { el.currentTime = cueLocal < cueDur ? cueLocal : 0; } catch (eCq) {}
+            el.play().catch(function() {});
+          } else if (!el.paused && (cueLocal < -0.05 || cueLocal > cueDur + CUE_RING_S)) {
+            el.pause();
+          }
+          continue;
+        }
         var dur = el.duration;
         if (!dur || !isFinite(dur)) continue;
         if (clip.loop) {
@@ -8488,12 +8519,23 @@ ${QUOTIENT_CSS}
     // the film clock -- masterTime reads from its playhead, so camera/voice
     // can never drift from the timeline by construction. Wall clock is the
     // fallback (no speaker track, ended, or mid-scrub repositioning).
+    //
+    // The film never runs BACKWARDS. A cut between windows of one take seeks
+    // the speaker; while it re-buffers the wall clock ran the film on, then
+    // the clock followed the late speaker back up to 0.75s -- behind the cut,
+    // which re-cut and re-seeked: the crossfade played, snapped back, played
+    // again (measured live, proj_86591051 at the scene 2->3 cut, 0.36s back).
+    // So a stalled speaker HOLDS the film (bounded, like any NLE buffering),
+    // and a speaker behind the film holds it until it catches up.
     var spkEl = els.speakerBg;
-    var spkT = (spkEl && !spkEl.paused && spkEl.readyState >= 3 && spkEl.currentTime > 0)
-      ? speakerFilmTime(spkEl.currentTime)
-      : null;
+    var spkRolling = !!(spkEl && !spkEl.paused && spkEl.currentTime > 0);
+    var spkReady = spkRolling && spkEl.readyState >= 3 && !spkEl.seeking;
+    var spkT = spkReady ? speakerFilmTime(spkEl.currentTime) : null;
     if (spkT !== null && spkT > state.masterTime - 0.75 && spkT < state.masterTime + 2) {
-      state.masterTime = spkT;
+      if (spkT > state.masterTime) state.masterTime = spkT;
+      state._spkStallT0 = 0;
+    } else if (spkRolling && !spkReady && (!state._spkStallT0 || now - state._spkStallT0 < SPEAKER_STALL_HOLD_MS)) {
+      if (!state._spkStallT0) state._spkStallT0 = now;
     } else {
       state.masterTime += elapsed;
     }
