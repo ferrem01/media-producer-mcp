@@ -134,6 +134,11 @@ ${QUOTIENT_CSS}
      machine"). The next two lines sit under it, readable, not ghosted. */
   #cue .w { color: rgba(255,255,255,.42); transition: color .12s linear; }
   #cue .w.on { color: #fff; }
+  /* Emphasis: lean on this word -- brand colour, and the highlight holds on
+     it longer (EMPH_K). */
+  #cue .w.em { color: rgba(170, 172, 255, .62); }
+  #cue .w.em.on { color: #fff; text-decoration: underline; text-decoration-color: #8f91ff; text-decoration-thickness: 4px; text-underline-offset: 6px; }
+  #cue .w.dash { color: rgba(255,255,255,.42) !important; }
   #next { margin-top:12px; font-size:21px; line-height:1.3; font-weight:500; color:rgba(255,255,255,.78); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
   #next2 { margin-top:8px; font-size:18px; line-height:1.3; color:rgba(255,255,255,.5); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
   #bar { position:absolute; left:0; right:0; bottom: calc(86px + env(safe-area-inset-bottom)); height:3px; background:rgba(255,255,255,.18); }
@@ -313,42 +318,72 @@ ${QUOTIENT_CSS}
   // break is a breath, ~0.3s) and a line that says only (pause) is a held
   // beat (~1s) the prompter shows as "•••". Silences come out of the
   // scene's duration first; the words share what is left.
-  var BREATH_S = 0.3, PAUSE_S = 1.0, SCENE_BREATH_S = 0.6, PAUSE_GLYPH = '\u2022\u2022\u2022';
+  var BREATH_S = 0.3, PAUSE_S = 1.0, PAUSE_GLYPH = '\u2022\u2022\u2022';
   var PAUSE_LINE = /^\\(\\s*pause\\s*\\)[.,!?]*$/i;
+  // Per-word timing: a word's time is its share of the pace by length;
+  // an EMPHASIZED word (the board's emphasis list, or *word* in the line)
+  // is held EMPH_K longer; punctuation carries its beat AFTER the word --
+  // a comma a small one, a dash or an ellipsis a longer one (Marc: "will it
+  // understand that I emphasize certain words, that I pause on certain
+  // words?"). A scene change adds NOTHING: the talk track is continuous.
+  var EMPH_K = 1.4, COMMA_S = 0.2, DASH_S = 0.4;
+  function wordBeat(w) {
+    var last = w.charAt(w.length - 1);
+    if (w === '-' || w === '–' || w === '—' || last === '—' || last === '–' || last === '…' || w.slice(-3) === '...') return DASH_S;
+    if (last === ',' || last === ';' || last === ':') return COMMA_S;
+    return 0;
+  }
+  function bare(w) { return String(w).toLowerCase().split('').filter(function (ch) { return ch.toLowerCase() !== ch.toUpperCase() || (ch >= '0' && ch <= '9') || ch === "'"; }).join(''); }
+  function timeLine(text, emph) {
+    // Split on spaces; lift *stars* (the writer's emphasis) off each word.
+    var raw = String(text).split(' ').filter(function (w) { return w.length; });
+    var toks = [];
+    var starOpen = false;
+    raw.forEach(function (w) {
+      var open = w.charAt(0) === '*', close = w.length > 1 && (w.charAt(w.length - 1) === '*' || /\\*[.,!?;:…]+$/.test(w));
+      var clean = w.split('*').join('');
+      var marked = open || starOpen || close;
+      if (open && !close) starOpen = true;
+      if (close) starOpen = false;
+      if (!clean) return;
+      var isDash = clean === '-' || clean === '–' || clean === '—';
+      toks.push({ t: clean, emph: !isDash && (marked || emph.indexOf(bare(clean)) >= 0), dash: isDash });
+    });
+    var perWord = 1 / WORDS_PER_SEC;
+    var lens = toks.filter(function (k) { return !k.dash; }).map(function (k) { return Math.max(2, bare(k.t).length || k.t.length); });
+    var avg = lens.length ? lens.reduce(function (a, b) { return a + b; }, 0) / lens.length : 4;
+    var at = 0;
+    toks.forEach(function (k) {
+      k.start = at;
+      if (k.dash) { k.end = at; at += DASH_S; return; }
+      var len = Math.max(2, bare(k.t).length || k.t.length);
+      var t = perWord * (0.55 + 0.45 * len / avg) * (k.emph ? EMPH_K : 1);
+      at += t; k.end = at;
+      at += wordBeat(k.t);
+    });
+    return { toks: toks, spoken: at };
+  }
   function buildCues(scenes) {
     var out = [];
     (scenes || []).forEach(function (s, i) {
       var text = String(s.voiceover_text || '').trim();
       if (!text) return;
-      var items = [];
+      var emph = (Array.isArray(s.emphasis) ? s.emphasis : []).map(bare).filter(Boolean);
       var lines = text.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { return l.trim(); }).filter(Boolean);
       lines.forEach(function (ln) {
-        if (PAUSE_LINE.test(ln)) { items.push({ text: PAUSE_GLYPH, words: 0, gap: PAUSE_S }); return; }
+        if (PAUSE_LINE.test(ln)) { out.push({ text: PAUSE_GLYPH, toks: [], dur: PAUSE_S, gap: PAUSE_S, beat: i }); return; }
         var parts = ln.match(/[^.!?…]+[.!?…]+["')\\]]*|[^.!?…]+$/g) || [ln];
-        parts.forEach(function (p, k) {
-          var t = p.trim(); if (!t) return;
-          items.push({ text: t, words: t.split(/\\s+/).filter(Boolean).length, gap: k === parts.length - 1 ? BREATH_S : 0 });
+        parts.forEach(function (p0, k) {
+          var t = p0.trim(); if (!t) return;
+          var tl = timeLine(t, emph);
+          // Every sentence ends on the same short breath -- inside a scene
+          // or at its end alike (no scene-boundary pause).
+          var gap = k === parts.length - 1 ? BREATH_S : 0;
+          out.push({ text: tl.toks.map(function (x) { return x.t; }).join(' '), toks: tl.toks, dur: Math.max(0.6, tl.spoken + gap), gap: gap, beat: i });
         });
       });
-      for (var z = items.length - 1; z >= 0; z--) { if (items[z].words) { items[z].gap = 0; break; } }
-      var words = items.reduce(function (a, it) { return a + it.words; }, 0) || 1;
-      var gaps = items.reduce(function (a, it) { return a + it.gap; }, 0);
-      // SPEAKING PACE, never the board's seconds. The board's number is the
-      // CUT, never the mouth, in BOTH directions: too few seconds ripped
-      // through the words (measured live, proj_f10e79cf: 24 words in 4s),
-      // and too many held each scene's last line long after it was said --
-      // on a creator-cut board a 10s scene with 4s of words is 6s of
-      // waiting (Marc: "reading, then pausing, then reading"). The take
-      // re-times every scene to the delivered words, so the prompter only
-      // has to keep the voice moving.
-      var dur = Math.max(1.5, words / WORDS_PER_SEC + gaps);
-      var speech = Math.max(0.5, dur - gaps);
-      items.forEach(function (it) { out.push({ text: it.text, dur: speech * (it.words / words) + it.gap, gap: it.gap, beat: i }); });
     });
-    // Between scenes: one short breath, no more.
-    for (var q = 0; q < out.length - 1; q++) {
-      if (out[q + 1].beat !== out[q].beat) { out[q].dur += SCENE_BREATH_S; out[q].gap += SCENE_BREATH_S; }
-    }
+    if (out.length) out[out.length - 1].gap = 0;
     return out;
   }
 
@@ -468,30 +503,22 @@ ${QUOTIENT_CSS}
     cueIdx = i;
     if (i >= cues.length) { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; $('next2').textContent = ''; return; }
     var c = cues[i];
-    // Each word gets a share of the line's SPOKEN time by its length (long
-    // words take longer to say); the breath after the line stays dark.
+    // The line's words, each lit when its own precomputed turn begins
+    // (timeLine: length share, emphasis hold, punctuation beats).
     var cueEl = $('cue'); cueEl.textContent = '';
-    var parts = String(c.text).split(' ').filter(function (w) { return w.length; });
-    var spans = parts.map(function (w, k) {
-      var sp = document.createElement('span'); sp.className = 'w'; sp.textContent = w;
-      cueEl.appendChild(sp); if (k < parts.length - 1) cueEl.appendChild(document.createTextNode(' '));
+    var toks = c.toks || [];
+    var spans = toks.map(function (k, j) {
+      var sp = document.createElement('span'); sp.className = 'w' + (k.emph ? ' em' : '') + (k.dash ? ' dash' : ''); sp.textContent = k.t;
+      cueEl.appendChild(sp); if (j < toks.length - 1) cueEl.appendChild(document.createTextNode(' '));
       return sp;
     });
-    var weights = parts.map(function (w) { return Math.max(2, w.length); });
-    var wsum = weights.reduce(function (a, b) { return a + b; }, 0) || 1;
-    var spoken = Math.max(0.3, c.dur - (c.gap || 0));
-    var ends = []; var acc = 0;
-    weights.forEach(function (wt) { acc += spoken * (wt / wsum); ends.push(acc); });
+    if (!toks.length) cueEl.textContent = c.text;
     var start = performance.now();
-    if (c.text === PAUSE_GLYPH) spans.forEach(function (sp) { sp.classList.add('on'); });
-    else (function paint() {
+    var lastStart = toks.length ? toks[toks.length - 1].start : 0;
+    (function paint() {
       var el = (performance.now() - start) / 1000;
-      for (var k = 0; k < spans.length; k++) {
-        // A word lights as its turn BEGINS, so the eye leads the voice.
-        var begin = k ? ends[k - 1] : 0;
-        if (el >= begin) spans[k].classList.add('on');
-      }
-      if (el < spoken) kRaf = requestAnimationFrame(paint);
+      for (var k = 0; k < spans.length; k++) { if (el >= toks[k].start) spans[k].classList.add('on'); }
+      if (el < lastStart) kRaf = requestAnimationFrame(paint);
     })();
     $('next').textContent = cues[i + 1] ? cues[i + 1].text : '';
     $('next2').textContent = cues[i + 2] ? cues[i + 2].text : '';

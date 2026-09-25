@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — The prompter reads the script's intent
+
+Marc: "Will it understand that I emphasize certain words, that I pause on
+certain words? Or rip through as if every word had equal weight?" And: no
+pause between scenes, because the talk track is continuous.
+- **Per-word timing** (`timeLine`): each word's time is `1/2.4s ×
+  (0.55 + 0.45 × length/avg)`.
+  - **Emphasized** words are held ×1.4 (`EMPH_K`). A word is emphasized if
+    it is in the scene's `emphasis` list (the board already lifts `*word*`
+    there) or starred in the line.
+  - **Beats** fall after a comma, semicolon or colon (0.2s), and after a
+    dash or ellipsis (0.4s).
+  - `(pause)` stays a 1s held line.
+- **No scene-boundary pause** (the 0.6s from #982 is gone). Every sentence
+  ends on the same 0.3s breath, inside a scene or at its end.
+- **Display:** emphasized words show violet ahead of the highlight and get a
+  violet underline when lit. Dashes stay quiet. Stars never show.
+- **The legend.** Studio's LINES editor now spells out the notation under
+  the box: `*word*` lean on it · `—`/`…` short beat · `,` tiny beat ·
+  `(pause)` on its own line. The empty box shows a worked example as its
+  placeholder.
+- Test: `test/take-page.test.ts`, a fake-camera browser run (served over
+  local HTTP; CI's Playwright does not route `file://` fetches) covering
+  emphasis from the list and from stars, the dash, continuous pace, and
+  Start over.
+
+---
+
 ## 2026-09-25 — The booth: continuous pace, karaoke, Start over
 
 Marc, recording a four-scene take: "reading, then pausing, then reading".

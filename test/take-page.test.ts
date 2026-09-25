@@ -50,7 +50,7 @@ describe("what the booth does", () => {
     expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\[\.,!\?\]\*\$\/i/);
     expect(js).toMatch(/BREATH_S = 0\.3, PAUSE_S = 1\.0/);
     expect(js).toMatch(/text\.split\(\/\\r\?\\n\/\)/);
-    expect(js).toMatch(/items\.push\(\{ text: PAUSE_GLYPH, words: 0, gap: PAUSE_S \}\)/);
+    expect(js).toMatch(/out\.push\(\{ text: PAUSE_GLYPH, toks: \[\], dur: PAUSE_S, gap: PAUSE_S, beat: i \}\)/);
     expect(html).toMatch(/\.beat \{[^}]*white-space:pre-line/);
   });
 
@@ -98,22 +98,21 @@ describe("what the booth does", () => {
     expect(html).toMatch(/voiceover_text/);
     expect(html).toMatch(/duration_seconds/);
     expect(html).toMatch(/WORDS_PER_SEC = 2\.4/);
-    expect(html).toMatch(/speech \* \(it\.words \/ words\) \+ it\.gap/);
     // The board's number is the cut, never the mouth, BOTH ways: 24 words in a 4s scene raced the prompter,
     // and a 10s creator-cut scene with 4s of words held its last line (Marc: "reading, then pausing").
-    expect(html).toMatch(/var dur = Math\.max\(1\.5, words \/ WORDS_PER_SEC \+ gaps\);/);
     expect(html).not.toMatch(/Math\.max\(Number\(s\.duration_seconds\)/);
-    // One short breath between scenes, no more.
-    expect(html).toMatch(/SCENE_BREATH_S = 0\.6/);
-    expect(html).toMatch(/if \(out\[q \+ 1\]\.beat !== out\[q\]\.beat\) \{ out\[q\]\.dur \+= SCENE_BREATH_S;/);
+    // A scene change adds nothing: the talk track is continuous (Marc).
+    expect(html).not.toMatch(/SCENE_BREATH/);
+    // Emphasis holds, punctuation beats.
+    expect(html).toMatch(/var EMPH_K = 1\.4, COMMA_S = 0\.2, DASH_S = 0\.4;/);
   });
 
   it("shows one cue at a time on its own clock, and a tap on the stage jumps to the next line", () => {
     expect(html).toMatch(/function showCue\(i\) \{/);
     expect(html).toMatch(/cueTimer = setTimeout\(function \(\) \{ showCue\(i \+ 1\); \}, c\.dur \* 1000\);/);
     // Karaoke: the line's words light at pace; the next TWO lines show under it.
-    expect(html).toMatch(/sp\.className = 'w'/);
-    expect(html).toMatch(/if \(el >= begin\) spans\[k\]\.classList\.add\('on'\);/);
+    expect(html).toMatch(/sp\.className = 'w' \+ \(k\.emph \? ' em' : ''\)/);
+    expect(html).toMatch(/if \(el >= toks\[k\]\.start\) spans\[k\]\.classList\.add\('on'\);/);
     expect(html).toMatch(/<div id="prompt"><div id="cue"><\/div><div id="next"><\/div><div id="next2"><\/div><\/div>/);
     expect(html).toMatch(/function advanceCue\(\) \{ if \(rec && rec\.state === 'recording' && cueIdx >= 0 && cueIdx < cues\.length\) showCue\(cueIdx \+ 1\); \}/);
     expect(html).toMatch(/\$\('stage'\)\.addEventListener\('click'/);
@@ -244,4 +243,54 @@ describe("Record stays on screen on a small phone (measured)", () => {
       }
     } finally { await browser.close(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
   }, 60000);
+});
+
+describe("the prompter in a browser (fake camera)", () => {
+  it("paces continuously, holds emphasis, beats on punctuation, and Start over re-rolls", async () => {
+    const closers: Array<() => Promise<void>> = [];
+    const { chromium, devices } = await import("playwright");
+    const os = await import("node:os"); const fs = await import("node:fs/promises");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "take-"));
+    await fs.writeFile(path.join(dir, "take.html"), getTakeHtml());
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined, args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+    try {
+      const ctx = await browser.newContext({ ...devices["iPhone 13"], permissions: ["camera", "microphone"] });
+      const page = await ctx.newPage();
+      const errors: string[] = []; page.on("pageerror", (e) => errors.push(e.message));
+      const proj = { name: "T", canvas: { width: 1080, height: 1920 }, treatment: { filmGrammar: "creator-cut" }, scenes: [],
+        storyboard: { scenes: [
+          { duration_seconds: 10, voiceover_text: "One brief, every surface.", emphasis: ["brief"] },
+          { duration_seconds: 12, voiceover_text: "It ships \u2014 *today*." } ] } };
+      // A real origin (not file://): the page's relative /api fetch must hit
+      // something every Playwright version routes the same way.
+      const http = await import("node:http");
+      const server = http.createServer((req, res) => {
+        if ((req.url || "").startsWith("/api/projects/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(proj)); return; }
+        res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+      closers.push(() => new Promise<void>((r) => server.close(() => r())));
+      const port = (server.address() as any).port;
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x`);
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      // The whole script runs at speaking pace: well under the board's 22s.
+      expect(await page.evaluate(() => document.getElementById("subtitle")!.textContent)).toMatch(/about 0:0[2-6] at speaking pace/);
+      await page.click("#recordBtn");
+      await page.waitForFunction(() => document.querySelectorAll("#cue .w").length > 0, null, { timeout: 8000 });
+      const first = await page.evaluate(() => ({
+        em: [...document.querySelectorAll("#cue .w.em")].map((e) => e.textContent),
+        next: document.getElementById("next")!.textContent,
+      }));
+      expect(first.em).toEqual(["brief,"]);
+      expect(first.next).toBe("It ships \u2014 today."); // stars lifted, the next scene flows straight on
+      await page.waitForFunction(() => (document.getElementById("cue")!.textContent || "").startsWith("It ships"), null, { timeout: 6000 });
+      const second = await page.evaluate(() => [...document.querySelectorAll("#cue .w")].map((e) => e.className));
+      expect(second.some((c) => c.includes("em"))).toBe(true); // *today*
+      expect(second.some((c) => c.includes("dash"))).toBe(true);
+      await page.click("#againRecBtn");
+      expect(await page.evaluate(() => getComputedStyle(document.getElementById("count")!).display)).toBe("flex");
+      await page.waitForFunction(() => document.querySelectorAll("#cue .w").length > 0, null, { timeout: 8000 });
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); for (const c of closers) await c(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
+  }, 90000);
 });
