@@ -65,6 +65,20 @@ describe("before-after-wipe: padding", () => {
       }
     }, { w: 1920, h: 1080 }, { x: "0%", y: "0%", width: "100%", height: "100%" });
   }, 60000);
+
+  it("paints the gap in the editorial cream when ground is 'cream', edge to edge all scene long", async () => {
+    // Marc: "change the background to be more like" the cream statement beats.
+    await open("before-after-wipe", { before_text: "Light", after_text: "Dark", padding: 16, ground: "cream" }, async (page, seek) => {
+      for (const t of [0.8, 7.9]) {
+        await seek(t);
+        const m = await page.evaluate(() => { const el = document.querySelector(".baw-root") as HTMLElement; const r = el.getBoundingClientRect();
+          return { bg: getComputedStyle(el).backgroundColor, img: getComputedStyle(el).backgroundImage, covers: r.left <= 0 && r.top <= 0 && r.right >= innerWidth && r.bottom >= innerHeight }; });
+        expect(m.bg).toBe("rgb(244, 239, 225)");
+        expect(m.img).toContain("radial-gradient");
+        expect(m.covers, `ground covers the frame at ${t}s`).toBe(true);
+      }
+    }, { w: 1920, h: 1080 }, { x: "0%", y: "0%", width: "100%", height: "100%" });
+  }, 60000);
 });
 
 describe("screen-carousel", () => {

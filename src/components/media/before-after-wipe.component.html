@@ -58,6 +58,16 @@
     var vertical = data.direction === 'vertical';
     if (vertical) root.classList.add('vertical');
     if (data.bleed === true) root.classList.add('bleed');
+    // GROUND: what shows in the gap around the frame. Unset, the scene's own
+    // ground (the film's world) shows through. 'cream' / 'dark' are the
+    // editorial statement grounds (st-statement's canvas and centre glow),
+    // so a wipe can sit on the same paper as the statement beats around it;
+    // any other value is a CSS background.
+    var GROUNDS = {
+      cream: 'radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%), #f4efe1',
+      dark: 'radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.06), rgba(255,255,255,0) 70%), #14131b'
+    };
+    if (data.ground) root.style.background = GROUNDS[String(data.ground)] || String(data.ground);
     function side(layer, src, text) {
       if (src) { layer.style.backgroundImage = 'url("' + String(src).replace(/"/g, '%22') + '")'; layer.classList.add('has-img'); if (data.fit === 'contain') { layer.style.backgroundSize = 'contain'; layer.style.backgroundRepeat = 'no-repeat'; layer.style.backgroundPosition = 'center'; } }
       layer.querySelector('.baw-text').textContent = text ? String(text) : '';

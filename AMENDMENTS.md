@@ -21,6 +21,14 @@ around the wipe.
     it; the frame holds.
   - An authored camera move (the rig) still moves it.
   - `pin: false` opts out.
+- **`ground`** paints the gap. Marc wanted it "more like" the cream statement
+  beats of proj_3bb7a076.
+  - `cream` and `dark` are st-statement's own canvases (`#f4efe1` / `#14131b`,
+    with the soft centre glow).
+  - Any other value is a CSS background.
+  - Unset, the film's world shows through, as before.
+  - Under a world, a backdrop cast on the scene is dropped (one world per
+    film), so the ground has to come from the component itself.
 
 Test: `test/product-flow.test.ts` ("holds an exact gap ... against the
 ambient camera drift").

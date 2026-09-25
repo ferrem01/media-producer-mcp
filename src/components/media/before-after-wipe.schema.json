@@ -86,6 +86,12 @@
       "label": "Fill the slot edge to edge (no rounded frame)",
       "optional": true
     },
+    "ground": {
+      "type": "string",
+      "label": "What shows around the frame: 'cream' or 'dark' (the editorial statement grounds, matching st-statement), or any CSS background. Unset, the film's world shows through.",
+      "optional": true,
+      "placeholder": "cream"
+    },
     "padding": {
       "type": "number",
       "label": "Space around the frame in px at 1080p (e.g. 16); the ground shows in the gap, and the frame holds still against the scene's slow camera drift so the gap stays exact. Default 4% of the slot. Ignored with bleed.",
