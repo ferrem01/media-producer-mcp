@@ -143,6 +143,10 @@ export async function proposeSceneCompression(
       let rate = opts?.idleRate ?? 8;
       if (fitTo && fitTo > activeTotal + 0.5 && idleTotal > 0.5) {
         rate = idleTotal / (fitTo - activeTotal);
+        // Near-fit (measured: the 6.0s scan of a 5.6s clip in a 5.6s beat
+        // solved 1.09x, clamped to 1.2x -- the click it lands on moved half
+        // a second): under the window a nudge is not a timelapse. Play it.
+        if (window && rate < 1.2) continue;
         rate = Math.min(16, Math.max(1.2, Math.round(rate * 100) / 100));
       }
       const rate_regions = det.ranges.map((r) => ({ src_start: r.start, src_end: r.end, rate }));

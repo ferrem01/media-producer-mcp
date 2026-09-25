@@ -18,6 +18,12 @@ Marc wanted a whole film on the cream of proj_3bb7a076's statement beats.
   - st-statement paints its own cream, so it is skipped.
   - Speaker templates keep the camera.
   - A template pinned `theme: "dark"` still gets its webgl ground.
+- A template on the cream gets `backdrop_active`, so its atmosphere runs
+  baseless over the cream. Measured: st-screencast's light base painted white
+  over it.
+- Auto-compress under a window skips a near-fit (a solved rate under 1.2x).
+  Measured: a 6.0s scan of a 5.6s clip clamped to 1.2x and moved the moon
+  click 0.5s ahead of its sound.
 - Tests: `test/world.test.ts` (derivation, and templates on cream);
   `test/naano-props.test.ts` pinned lists widened.
 

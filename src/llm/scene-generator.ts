@@ -142,6 +142,9 @@ if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
       && !stSpeakerTemplate && st.type !== "st-statement" && !(stData as any).backdrop_image) {
     stComponents.unshift({ id: "tpl_bg", type: "cream-ground", z_index: 0,
       data: opts.world.surface ? { tone: opts.world.surface.tone } : {} });
+    // The ground is laid: the template's atmosphere runs baseless over it
+    // (measured: st-screencast's light base painted white over the cream).
+    (stData as any).backdrop_active = true;
   }
   // st-artifact is a SHELL: the artifact (a ui-mock or media component
   // that BUILDS on screen) rides in a sibling instance positioned in the

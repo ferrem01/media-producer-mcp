@@ -76,6 +76,13 @@ describe("proposeSceneCompression", () => {
     expect((scene as any).media_edits?.screencast).toBeUndefined();
   });
 
+  it("a near-fit (under a 1.2x nudge) plays as shot too", async () => {
+    const scene = clip("idle-clip", 5.2); // 5.6s of footage for a 5.2s beat: 1.1x
+    const res = await proposeSceneCompression(scene, { window: 5.2 });
+    expect(res.applied).toEqual([]);
+    expect(scene.duration_seconds).toBe(5.2);
+  });
+
   it("compresses a longer recording to land ON the window, not below it", async () => {
     const scene = clip("idle-clip-long", 8);
     const res = await proposeSceneCompression(scene, { window: 8 });
