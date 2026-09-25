@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { scriptLines, scriptWords, scriptGaps, speakingEstimate, displayScript, PAUSE_GLYPH, LINE_BREATH_S, PAUSE_BEAT_S } from "../src/core/script-lines.js";
 import { assertedSpine, splitByScripts } from "../src/core/word-anchors.js";
-import { unescapeLines, normalizeSceneShape } from "../src/llm/storyboard-builder.js";
+import { unescapeLines, normalizeSceneShape, liftSceneEmphasis } from "../src/llm/storyboard-builder.js";
+import { beatsVoiceover } from "../src/core/beats.js";
 
 const SCRIPT = [
   "Your campaign is live.",
@@ -104,6 +105,22 @@ describe("every scene the writer returns is held to one shape (whole board and s
     expect(scene.beats[0].voiceover_text).toBe("It ships it.\n(pause)");
     expect(scene.components).toEqual([{ type: "kinetic-text", data: { text: "IT SHIPS" } }, "composer", "sticker-prop"]);
     expect(notes.join(" ")).toMatch(/made-up-widget/);
+  });
+  it("lifts the stars off beat lines too, and off lines derived from starred beats", () => {
+    // proj_7adf0eb5 scene 3: narrated per beat, the scene's lines were
+    // derived from the starred beats after the first lift had run.
+    const scene: any = { label: "S", duration_seconds: 9,
+      beats: [{ label: "a", duration_seconds: 4, action: "x", voiceover_text: "It lives right inside *Quotient*," }, { label: "b", duration_seconds: 5, action: "y", voiceover_text: "tracks everything *automatically*." }] };
+    normalizeSceneShape(scene);
+    expect(scene.beats.map((b: any) => b.voiceover_text)).toEqual(["It lives right inside Quotient,", "tracks everything automatically."]);
+    expect(scene.emphasis).toEqual(["quotient", "automatically"]);
+    const late: any = { beats: [{ voiceover_text: "we built *Quotient Analytics*." }] };
+    late.voiceover_text = beatsVoiceover(late.beats);
+    expect(liftSceneEmphasis(late)).toEqual(["quotient", "analytics"]);
+    expect(late.voiceover_text).toBe("we built Quotient Analytics.");
+    expect(late.voiceover_text).not.toMatch(/\*/);
+    const src = require("node:fs").readFileSync(new URL("../src/llm/storyboard-builder.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/beatsVoiceover\(beats\);\s*liftSceneEmphasis\(scene\);/);
   });
   it("the surgical revise sees the library and holds the shape", async () => {
     const fs = await import("node:fs/promises");

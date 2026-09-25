@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — Emphasis stars no longer leak through per-beat lines
+
+- **Bug** (measured on the analytics teasers, proj_7adf0eb5 scene 3 and
+  proj_86591051 scene 3): the prompter read `*Quotient*`, and the caption
+  lane doubled the marks (`**automatically*,*`).
+- **Cause.** A writer that narrates per beat leaves the scene's
+  `voiceover_text` empty. The first lift ran on that empty line, then
+  `finalizeBeats` built the line from the beats, stars included.
+- **Fix.** `liftSceneEmphasis` lifts the marks off the scene's line AND
+  every beat's line into `scene.emphasis`. It runs in `normalizeSceneShape`
+  and again after `finalizeBeats` builds the line.
+
+---
+
 ## 2026-09-24 — The last seven HyperFrames-audit gaps
 
 These are the audit's remaining high-value items. All 29 are now covered.
