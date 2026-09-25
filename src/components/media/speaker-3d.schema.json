@@ -26,6 +26,7 @@
         }
       }
     },
+    "silhouette": { "type": "object", "label": "Measured silhouette (set by the matte -- leave alone)", "optional": true },
     "font": { "type": "string", "label": "Big-word face", "optional": true, "placeholder": "sans (brand, heavy) | serif (italic)" },
     "accent": { "type": "string", "label": "Accent color", "optional": true },
     "camera": { "type": "string", "label": "Camera", "optional": true, "placeholder": "push (default) | orbit | still" },

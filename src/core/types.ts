@@ -781,6 +781,9 @@ export interface SpeakerTrackClip {
   fit?: boolean;
 }
 
+/** The person's extent per row (fractions of the frame width), top to bottom. */
+export interface SilhouetteProfile { rows: Array<[number, number] | null> }
+
 /** A delivered take: what was recorded, for which scene, and what the ingest
  *  sanitizer did to it (see core/take-sanitize.ts). */
 export interface Take {
@@ -818,6 +821,11 @@ export interface Take {
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };
+  /** Where the PERSON is, row by row, measured from the cut-out while the
+   *  matte runs (core/take-matte.ts): 36 rows top to bottom, each the
+   *  person's [left, right] edge as fractions of the width (null: nobody on
+   *  that row). speaker-3d tucks a side word's first letter behind it. */
+  silhouette?: SilhouetteProfile;
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
   /** The scene's spoken lines as they stood when this take attached, so a
    *  later script edit can be flagged against the recording. */

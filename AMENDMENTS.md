@@ -27,6 +27,24 @@ its word, but the typography fell short. Four fixes, all defaults:
 
 Test: `test/speaker-3d.test.ts` ("matches the reference's typography").
 
+**Follow-up: behind, not beside.** Marc: "the reference has the word feel
+behind the person; yours has it in front." Two faults:
+- The demo spec put "forget" and "feel" on the front layer.
+- A side word was parked at the frame edge, clear of the body. Behind or
+  not, nothing covered it, so it read flat.
+
+The reference tucks the first letter behind the person. The cut-out now
+records where the person stands:
+- `silhouetteCollector` in `core/take-matte.ts` keeps each row's typical
+  (median) left and right edge over the take, on 36 rows.
+- That profile is stored on the take as `take.silhouette`.
+- `syncSpeakerClips` stamps it onto the scene's speaker-3d as
+  `data.silhouette`, so every render path already reads it.
+
+A side big word then puts about 60% of its first letter behind the edge at
+its own letter-body height, and keeps inside the frame after the push and
+its drift. With no silhouette it assumes a centred framing.
+
 ---
 
 ## 2026-09-25 — Emphasis stars no longer leak through per-beat lines
