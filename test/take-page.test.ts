@@ -112,7 +112,8 @@ describe("what the booth does", () => {
   });
 
   it("never makes the human scroll: the script scrolls inside its card, the stage owns the viewport, Record stays in reach", () => {
-    expect(html).toMatch(/#ready \{ height:100dvh; overflow:hidden; \}/);
+    expect(html).toMatch(/#ready \{ height:100dvh; overflow-y:auto;/);
+    expect(html).toMatch(/<div class="rec-dock"><button class="btn" id="recordBtn" disabled>Record<\/button><\/div>/);
     expect(html).toMatch(/#script \{ flex:0 1 auto; max-height:44dvh; overflow-y:auto;/);
     expect(html).toMatch(/#stage \{ position:fixed; inset:0; z-index:5; background:#000; touch-action:manipulation; \}/);
     expect(html).toMatch(/try \{ window\.scrollTo\(0, 0\); \} catch \(eS\) \{\}/);
@@ -206,4 +207,32 @@ describe("the server side", () => {
     // Whenever the prompter shows the whole board, the take covers the whole board (the server cuts it per scene).
     expect(html).toMatch(/var recordAll = qp\.get\('scene'\) === 'all' \|\| sceneIndex < 0;/);
   });
+});
+
+describe("Record stays on screen on a small phone (measured)", () => {
+  it("the background row's long hint no longer pushes Record below a screen that cannot scroll", async () => {
+    // Marc, live: "I don't see a record button anymore" -- the Room/Blur/Alpha
+    // hint rendered as a one-word-wide column and shoved Record to y=1072 on
+    // a 664px screen.
+    const { chromium, devices } = await import("playwright");
+    const os = await import("node:os"); const fs = await import("node:fs/promises");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "take-"));
+    await fs.writeFile(path.join(dir, "take.html"), getTakeHtml());
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+    try {
+      for (const dev of ["iPhone SE", "iPhone 13"]) {
+        const page = await (await browser.newContext({ ...devices[dev] })).newPage();
+        await page.route("**/api/**", (r) => r.abort());
+        await page.goto("file://" + path.join(dir, "take.html"));
+        await page.evaluate(() => {
+          document.querySelectorAll("section").forEach((s) => s.classList.remove("on"));
+          document.getElementById("ready")!.classList.add("on");
+          document.getElementById("script")!.innerHTML = "<p class=beat><b>Beat 1</b>" + "A long line of the script that wraps on a phone. ".repeat(12) + "</p>";
+        });
+        const r = await page.evaluate(() => { const b = document.getElementById("recordBtn")!.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, vh: innerHeight }; });
+        expect(r.top, dev).toBeGreaterThan(0);
+        expect(r.bottom, dev).toBeLessThanOrEqual(r.vh);
+      }
+    } finally { await browser.close(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
+  }, 60000);
 });
