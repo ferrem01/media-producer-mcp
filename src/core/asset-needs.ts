@@ -192,11 +192,20 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
   const comps: Array<Record<string, unknown>> = Array.isArray(scene.components) ? (scene.components as any[]).map((c) => (c && typeof c === "object" ? { ...c } : c)) : [];
   const taken = new Set<number>();
   let replaced = 0, added = 0;
+  // A SCENE TEMPLATE HOLDS ITS OWN SCREEN (st-screencast plays `source`):
+  // the template is the whole composition, so a provided recording is not
+  // laid full-bleed beside it. Measured on the dark-mode film: every build
+  // wrote a stray full-frame video of the raw take back onto the board next
+  // to the template that already played the trimmed cut.
+  if ((scene as any).scene_template && typeof (scene as any).scene_template.type === "string") return { components: comps, replaced, added };
   for (const need of scene.assets || []) {
     if (!need || (need.type !== "screen_recording" && need.type !== "screenshot") || !need.path || need.status !== "provided") continue;
     const media = assetMedia(need.path);
     if (!media) continue;
-    if (comps.some((c) => c && typeof c === "object" && (c as any).data && String((c as any).data.src || "") === need.path)) continue;
+    // Already on screen -- as a plain image/video `src`, or as the footage of
+    // a frame component (screencast-frame's `video_url`, a template-style
+    // `source`): a rebuild must not lay a second copy beside it.
+    if (comps.some((c) => { const d: any = c && typeof c === "object" ? (c as any).data : null; return !!d && [d.src, d.video_url, d.image_url, d.source].some((v: unknown) => String(v || "") === need.path); })) continue;
     // Its own slate first (the honest stand-in cast while it was open), then
     // the mock the scene staged as its payoff.
     let idx = comps.findIndex((c, i) => !taken.has(i) && isScreenSlate(c) && (c as any).data.need === need.description);
