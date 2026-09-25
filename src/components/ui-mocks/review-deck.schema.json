@@ -1,0 +1,32 @@
+{
+  "type": "review-deck",
+  "label": "Review Deck -- every record read, stamped, dealt",
+  "category": "ui-mocks",
+  "description": "'It reads every one': rich record cards dealt one at a time. On each card a highlight scans down, a tick lands on each row it passes, a verdict STAMPS on (Shortlisted / Not this search, or your own words), and the card is dealt away -- kept ones up and out, passed ones down -- as the next rises from the deck behind. A small counter ('Application 127 of 480') ticks per card. Use it for applications, leads, tickets, invoices -- any 'the agent reviews each one' beat. 2-6 cards; about 2-3 s each. Size it with its box; fits 16x9, 9x16, 4x5. Anchors: card, avatar.",
+  "data": {
+    "cards": {
+      "type": "array",
+      "label": "The records, in deal order: [{name, role, avatar (URL, optional), rows: 2-4 short lines (experience, signals), thumbs: 0-4 image URLs, quote (optional), keep: false for a pass, stamp: custom verdict text}]",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "label": "Name", "required": true },
+          "role": { "type": "string", "label": "Second line", "optional": true },
+          "avatar": { "type": "string", "label": "Avatar image URL", "optional": true },
+          "rows": { "type": "array", "label": "Rows the scan ticks (2-4)", "optional": true, "items": { "type": "string" } },
+          "thumbs": { "type": "array", "label": "Thumbnail image URLs (0-4)", "optional": true, "items": { "type": "string" } },
+          "quote": { "type": "string", "label": "A line in their words", "optional": true },
+          "keep": { "type": "boolean", "label": "false = passed (grey stamp, dealt down)", "optional": true },
+          "stamp": { "type": "string", "label": "Verdict text override", "optional": true }
+        }
+      }
+    },
+    "counter": { "type": "object", "label": "The ticking counter: {label: 'Application', from: 127, total: 480} (omit for none)", "optional": true },
+    "labels": { "type": "object", "label": "Section and stamp words: {rows: 'Experience', thumbs: 'Portfolio', quote: 'Why this role', yes: 'Shortlisted', no: 'Not this search'}", "optional": true },
+    "per_card": { "type": "number", "label": "Seconds per card (default: the scene shared out, 1.6-3.2)", "optional": true },
+    "at": { "type": "number", "label": "When the first card rises (scene seconds, default 0.3)", "optional": true },
+    "color": { "type": "color", "label": "Accent (scan band, stamp dot; default brand primary)", "optional": true },
+    "theme": { "type": "string", "label": "light | dark (default: from the ground)", "optional": true, "enum": ["light", "dark"] }
+  }
+}

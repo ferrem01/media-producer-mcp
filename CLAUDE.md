@@ -13,7 +13,7 @@ the **environment gotchas** that will otherwise cost you an hour.
   enforcement), `ARCHITECTURE.md`
   (data model — note it is partly stale: it still says `plan`/`brief`; current
   vocabulary is `storyboard`/`visual_notes`), `UNIFIED-CODEGEN-SPEC.md`,
-  `ROADMAP.md`, `SPEC-studio.md`, `SPEC-brand-extraction.md`, `SPEC-team.md` (who shares a tenant: invite, membership, company domain), `SPEC-briefs.md` (a marketing brief in, a film out: what a brief locks, real footage on any grammar), `SPEC-recipes.md` (the third axis: a measured cut the writer fills -- grammar, frame, recipe).
+  `ROADMAP.md`, `SPEC-studio.md`, `SPEC-brand-extraction.md`, `SPEC-team.md` (who shares a tenant: invite, membership, company domain), `SPEC-briefs.md` (a marketing brief in, a film out: what a brief locks, real footage on any grammar), `SPEC-recipes.md` (the third axis: a measured cut the writer fills -- grammar, frame, recipe), `SPEC-metamorph.md` (DESIGN: a oner carried by objects -- handoffs as `enter` effects that name a source anchor, rack focus; no new concepts, no per-component morph states).
 - Running change log + open items: `AMENDMENTS.md`.
 
 ## What this is

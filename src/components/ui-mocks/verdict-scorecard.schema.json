@@ -1,0 +1,31 @@
+{
+  "type": "verdict-scorecard",
+  "label": "Verdict Scorecard -- evidence, then the verdict",
+  "category": "ui-mocks",
+  "description": "Evidence, then the verdict: criteria rows tick one by one (a circle fills, a check draws), then a dark tile lands the verdict ('Top 5%', 'Qualified', 'A+'). Use it for an assessment beside an interview, a lead score, an audit result -- any 'it checked these, so this' beat. 3-5 criteria. Wide boxes put the tile beside the list, tall boxes under it; size it with its box. Pairs with video-call. Anchors: card (the panel), number (the verdict tile).",
+  "data": {
+    "criteria": {
+      "type": "array",
+      "label": "The checks, in order: [{label, pass: false for a miss (red ring, no tick), at: scene seconds (word anchor) when it ticks}] or plain strings",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "label": "Criterion", "required": true },
+          "pass": { "type": "boolean", "label": "false = a miss", "optional": true },
+          "at": { "type": "number", "label": "When it ticks (scene seconds)", "optional": true }
+        }
+      }
+    },
+    "verdict": { "type": "string", "label": "The verdict ('Top 5%')", "required": true },
+    "verdict_label": { "type": "string", "label": "Small label on the tile (default 'Verdict')", "optional": true },
+    "verdict_sub": { "type": "string", "label": "A line under the verdict (optional)", "optional": true },
+    "title": { "type": "string", "label": "Small caps header ('Runneth assessment · Lena S.')", "optional": true },
+    "count": { "type": "boolean", "label": "Count the verdict's number up as it lands", "optional": true },
+    "at": { "type": "number", "label": "When the panel rises (scene seconds, default 0.2)", "optional": true },
+    "stagger": { "type": "number", "label": "Seconds between ticks (default: shared from the scene, 0.3-0.6)", "optional": true },
+    "verdict_at": { "type": "number", "label": "When the verdict lands (default: just after the last tick)", "optional": true },
+    "color": { "type": "color", "label": "Tick color (default success green)", "optional": true },
+    "theme": { "type": "string", "label": "light | dark (default: from the ground)", "optional": true, "enum": ["light", "dark"] }
+  }
+}
