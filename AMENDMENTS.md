@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — Studio preview: paint containment
+
+On the dark-mode film, Studio (in Arc) flashed the cream scene over the whole
+timeline dock.
+- Trigger: scene 3's float screencast-frame (tilted in 3D) plus its lifted
+  callout, with no full-frame st-screencast shell above them. The flash came
+  at the frame the recording flipped dark.
+- Cause: the preview is a 1920x1080 iframe scaled down inside a wrapper that
+  clipped only with overflow:hidden + border-radius. Chromium does not
+  reliably apply that clip to composited 3D layers.
+- Fix: the wrapper now also sets `clip-path: inset(0 round r)`,
+  `contain: paint` and `isolation: isolate`. Each composite `.mp-scene` gets
+  `contain: paint`.
+- Not reproducible headless: the sandbox Chromium cannot decode H.264. Marc
+  confirms in Arc.
+
+---
+
 ## 2026-09-25 — the cream world
 
 Marc wanted a whole film on the cream of proj_3bb7a076's statement beats.
