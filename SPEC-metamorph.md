@@ -52,51 +52,63 @@ Constants:
 
 **No.** A morph is a relation between TWO components, so per-component morph
 states would be an N×N problem: every pair would need a bespoke choreography.
-Three tiers instead. Only the third asks anything of a component, and what it
-asks is tagging, not new states:
+Three tiers instead. Only the second and third ask anything of a component,
+and what they ask is anchors, not new states.
+
+**No new concepts.** This design extends two that exist:
+- **Anchors** (`data-anchor`, SPEC-motion-architecture.md): the named parts
+  of a component that the camera already targets as "componentId.name".
+- **`enter`** on a component, which already carries an effect and an `at`.
 
 1. **Rack focus (any two components; zero component work).** The outgoing
    component blurs, scales back ~6% and fades. The incoming one sharpens from
    blur in the same slot, overlapping by ~0.3 s. It is a scene-level wrapper
    effect, like `enter`/`exit`, so every component in the library gets it for
    free. This is the fallback whenever no object handoff fits.
-2. **Object handoffs (tagging only).** Components publish their morphable
-   parts with `data-morph` tags, exactly as they already publish
-   `data-anchor` for the camera (SPEC-motion-architecture.md, "Anchors").
-   Examples: `data-morph="avatar"`, `"card"`, `"logo"`.
-   - A scene-level **handoff engine** flies stand-ins ("ghosts") from the
-     outgoing component's tagged parts to the incoming component's tagged
-     parts.
+2. **Object handoffs (anchors only).** Components publish their morphable
+   parts as anchors, the same `data-anchor` the camera uses: every avatar
+   carries `data-anchor="avatar"`, every card `"card"`, the mark `"logo"`.
+   - The one extension to anchors: a name may match SEVERAL elements. The
+     camera frames the union of the matches; a handoff uses each one.
+   - The incoming component's `enter` names where it comes from, for example
+     `{ effect: "burst", from: "grid.avatar" }`. The handoff runtime flies
+     stand-ins ("ghosts") from those parts to the incoming component's
+     matching anchors.
    - Neither component knows the other exists.
    - Per component this is a few attributes on elements it already draws.
 3. **Performing components (new builds).** Some transformations are a
    component's own internal performance: a grid culling to a shortlist, a
    deck being dealt, a fan collapsing. Those are new components (below).
-   They also publish tags, so they can hand off in and out.
+   They also publish anchors, so they can hand off in and out.
 
-Rough cost: **about 15 existing components get tags** (a few lines each),
-**three new components**, **one handoff engine**. Nothing else in the library
-changes.
+Rough cost: **about 15 existing components publish a few more anchors** (a
+few lines each), **three new components**, **one handoff runtime** in the
+assembler. Nothing else in the library changes.
 
 ## The handoff engine
 
-### Data (on `Scene`, beside `camera_moves` — one lane, like the camera)
+### Data: the entrance that names its source
+
+No new field on `Scene`. A handoff is the incoming component's existing
+`enter`, with a new effect and one new key, `from`:
 
 ```ts
-handoffs?: Array<{
-  at: number | string;          // seconds, or a word anchor ("@shortlist")
-  from: string;                 // "componentId.tag"  e.g. "grid.avatar"
-  to: string;                   // "componentId.tag"  e.g. "notif.avatar"
-  move: "fly" | "burst" | "converge" | "dive" | "rack-focus";
-  duration?: number;            // default 0.9
-  stagger?: number;             // default 0.025 per ghost
-  ease?: string;                // default power3.inOut
-}>;
+enter?: {
+  effect: "fly" | "burst" | "converge" | "dive" | "rack-focus" | /* existing: */ "cut" | "fade" | ...;
+  at: number | string;          // seconds, or a word anchor ("@shortlist") -- as today
+  from?: string;                // NEW: "componentId.anchor" -- the parts it is born from
+                                //   e.g. "grid.avatar"; for rack-focus, "componentId" alone
+  anchor?: string;              // NEW, optional: which of ITS anchors receive
+                                //   (default: the same name as the source's)
+  duration?: number;            // default 0.9 -- as today
+  stagger?: number;             // default 0.025 per ghost -- as today
+  ease?: string;                // default power3.inOut -- as today
+}
 ```
 
-Word anchors resolve exactly like every other `at` (core/word-anchors.ts).
-For `rack-focus`, the tags are ignored: it acts on the two components'
-wrappers.
+The outgoing component needs nothing: the runtime hides its `from` parts at
+`at`, and ends it by rack focus when nothing of it is left. Word anchors
+resolve exactly like every other `at` (core/word-anchors.ts).
 
 ### Mapping sources to targets
 
@@ -106,7 +118,7 @@ wrappers.
 | `burst` | 1 or few → many | Ghosts start stacked on the source's centre and spread to every target slot. |
 | `converge` | many → 1 | Every source ghost flies to the single target, shrinking; the target fades in on the last arrival. |
 | `dive` | 1 → 1, target smaller | Scale-down flight with a slight arc; the target slot "receives" it with a 1.06 pulse. |
-| `rack-focus` | wrapper → wrapper | Blur, scale and opacity crossfade in place. |
+| `rack-focus` | wrapper → wrapper | Blur, scale and opacity crossfade in place (`from` names the outgoing component). |
 
 ### Runtime (deterministic, single renderer)
 
@@ -134,9 +146,9 @@ wrappers.
   single-renderer rule (no per-ghost callbacks), and no randomness is used.
   The capture's seek-anywhere contract holds.
 
-### Tags (the vocabulary, and who publishes them first)
+### Anchor names (the vocabulary, and who publishes them first)
 
-| tag | meaning | first publishers |
+| anchor | meaning | first publishers |
 |---|---|---|
 | `avatar` | a round face | brady-grid, audience-people-list, notification-stack, macos-notification, card-fan, the new review-deck and grid-cull |
 | `card` | a rectangular record | card-fan, card-cascade, audience-people-list rows, the new review-deck and grid-cull |
@@ -147,8 +159,9 @@ wrappers.
 | `notification` | a toast | notification-stack, macos-notification, liquid-glass-notification |
 | `screen` | a UI window | browser-frame, device-mockup, the quotient-* shells |
 
-A component may publish several tags. Tags are listed in the component's
-schema (`morph_tags`) so the writer only pairs what exists.
+A component may publish several anchors. The ones meant for handoffs are
+listed in its schema (`anchors`, next to the ones the camera uses), so the
+writer only pairs what exists.
 
 ## The three new components
 
@@ -159,7 +172,7 @@ schema (`morph_tags`) so the writer only pairs what exists.
    - Data:
      `cards[{avatar, name, role, rows[], thumbs[], verdict, verdict_tone}]`,
      `pace`.
-   - Tags: `card`, `avatar`.
+   - Anchors: `card`, `avatar`.
    - For Quotient: lead scoring, "the agent reads every lead."
 2. **grid-cull.** A dense wall of small row cards (40–300).
    - Matches ring in brand color, the rest blur and fade, and the survivors
@@ -167,12 +180,12 @@ schema (`morph_tags`) so the writer only pairs what exists.
      Creative strategist").
    - Data: `count`, `rows` (or generated from `seed` plus a few real ones),
      `keep[]`, `column_title`.
-   - Tags: `card`, `avatar` (the survivors).
+   - Anchors: `card`, `avatar` (the survivors).
    - For Quotient: audience segmentation, the needle in the haystack.
 3. **verdict-scorecard.** Criteria rows tick one by one, then a dark verdict
    tile lands ("Top 5%").
    - Data: `criteria[]`, `verdict`, `at`.
-   - Pairs with video-call; tag `number` on the verdict.
+   - Pairs with video-call; anchor `number` on the verdict.
 
 The reference's other pieces already exist: typewriter, logo-band, card-fan,
 notification-stack or macos-notification, video-call, brady-grid,
@@ -192,8 +205,8 @@ extension to floating-pills.
   - Between chapters the scene transition is `rack-focus` (a blur crossfade
     at scene level), never a cut.
 - **Every beat is born from the last.** Each beat names its hero component
-  and the `move` it enters by. The builder turns beats into the chapter's
-  components (enter/exit at beat boundaries) and its `handoffs` lane. A beat
+  and the effect it enters by. The builder turns beats into the chapter's
+  components, each with an `enter` that names its source (`from`). A beat
   with no plausible object handoff enters by rack focus. At most two rack
   focuses in a row, or it stops being a metamorph film.
 - **The narrator types.**
@@ -216,9 +229,10 @@ Frame: any. On 9x16 and 4x5 the typed line moves above the object.
      renders.
    - Exit: each performs deterministically, stays in frame at 16x9, 9x16 and
      4x5, and seeks anywhere.
-2. **Rack focus + handoff engine + tags.**
-   - The `handoffs` lane and its runtime; tags on the ~15 first publishers;
-     `rack-focus` as a scene transition and an in-scene move.
+2. **Rack focus + handoff runtime + anchors.**
+   - The new `enter` effects and `from`, their runtime in the assembler,
+     plural anchors, anchors on the ~15 first publishers, and `rack-focus`
+     as a scene transition and an in-scene effect.
    - Exit: a one-chapter demo recreating the reference's middle run (avatars
      burst into a grid, cull to a shortlist, a deck, a card dives into a
      notification) with no visible cut, measured by the shot-change
@@ -233,7 +247,7 @@ Frame: any. On 9x16 and 4x5 the typed line moves above the object.
 ## Non-goals
 
 - Morphing arbitrary pixels (shape tweening between unrelated drawings).
-  Handoffs move tagged DOM parts; anything else rack-focuses.
+  Handoffs move anchored DOM parts; anything else rack-focuses.
 - Handoffs across scene boundaries. Chapters are the unit, and between
   chapters it is rack focus.
 - Camera travel as the carrier. That is canvas-tour; the two can combine
