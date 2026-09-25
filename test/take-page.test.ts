@@ -157,6 +157,11 @@ describe("what the booth does", () => {
     expect(html).not.toMatch(/\/board\?/);
     expect(html).toMatch(/id="softLook" checked/);
     expect(html).toMatch(/look: \(\$\('softLook'\) && \$\('softLook'\)\.checked\) \? 'soft' : 'natural'/);
+    // Marc: "something we can dial up and dial down" -- a smoothing dial
+    // under the checkbox (still checked by default), starting at his pick.
+    expect(html).toMatch(/id="softStrength" min="0" max="1" step="0\.05" value="0\.5"/);
+    expect(html).toMatch(/soft_strength: \$\('softStrength'\) \? parseFloat\(\$\('softStrength'\)\.value\)/);
+    expect(html).toMatch(/\$\('softDial'\)\.classList\.toggle\('off', !this\.checked\)/);
   });
 
   it("is mobile-safe: playsinline video, safe-area padding, no zoom", () => {
@@ -188,7 +193,7 @@ describe("the server side", () => {
     // The route's body lives in attachTakeToScene (shared with the Recorder's camera file).
     const at = src.indexOf("async function attachTakeToScene(");
     expect(at).toBeGreaterThan(0);
-    const block = src.slice(at, at + 10000);
+    const block = src.slice(at, at + 14000);
     expect(block).toMatch(/expectedPrefix = `\/assets\/\$\{tkTenant\}\/projects\/\$\{tkProject\}\/assets\/`/);
     expect(block).toMatch(/tkUrl\.includes\("\.\."\)/);
     // the take is attached per scene through the needs module, not by hand

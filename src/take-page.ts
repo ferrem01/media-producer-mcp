@@ -95,6 +95,10 @@ ${QUOTIENT_CSS}
   #bgChoice label { margin: 0 6px 0 2px; }
   .toggle input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--primary); }
   .toggle .hint { color: var(--muted-foreground); font-size: 13px; }
+  /* The smoothing dial sits under Soft look; off with it. */
+  #softDial { align-items: center; margin-top: -4px; }
+  #softDial input[type=range] { width: auto; height: auto; flex: 1; min-width: 0; margin: 0; }
+  #softDial.off { opacity: .4; pointer-events: none; }
   .row { display: flex; gap: 8px; margin-top: 12px; }
   .row .btn { flex: 1; }
   .spacer { flex: 1; }
@@ -167,7 +171,8 @@ ${QUOTIENT_CSS}
   <div class="card" id="script"></div>
   <div class="spacer"></div>
   <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
-  <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(gentle skin smoothing and warmth, applied when the take is processed)</span></label>
+  <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(skin smoothing and warmth, applied when the take is processed; change it later in Studio)</span></label>
+  <div class="toggle" id="softDial">Smoothing <span class="hint">light</span><input type="range" id="softStrength" min="0" max="1" step="0.05" value="0.5" aria-label="Skin smoothing"><span class="hint">strong</span></div>
   <div class="toggle" id="bgChoice" role="radiogroup" aria-label="Background">Background:
     <label><input type="radio" name="bg" value="room" checked> Room</label>
     <label><input type="radio" name="bg" value="blur"> Blur</label>
@@ -559,6 +564,7 @@ ${QUOTIENT_CSS}
     if (total) $('barFill').style.width = Math.min(100, (el / total) * 100) + '%';
   }
 
+  $('softLook').addEventListener('change', function () { $('softDial').classList.toggle('off', !this.checked); });
   $('recordBtn').addEventListener('click', function () {
     $('recordBtn').disabled = true;
     var constraints = {
@@ -705,6 +711,7 @@ ${QUOTIENT_CSS}
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: up.url, duration: blobDuration, mime: mime, capture: capture,
           look: ($('softLook') && $('softLook').checked) ? 'soft' : 'natural',
+          soft_strength: $('softStrength') ? parseFloat($('softStrength').value) : undefined,
           background: (document.querySelector('input[name="bg"]:checked') || {}).value || 'room',
           scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
           width: capture === 'canvas' ? capW : trackW, height: capture === 'canvas' ? capH : trackH }),

@@ -64,8 +64,6 @@ export interface TakeSanitizeResult {
   oriented: { width: number; height: number };
   /** Set when the wide take was center-cropped to the canvas frame. */
   reframed?: { from: string; to: string; mode?: "crop" | "pillarbox" };
-  /** The grade that was applied. */
-  look?: TakeLook;
   /** Integrated loudness before, and the target it was normalized to (absent
    *  when no audio or already within tolerance). */
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
@@ -171,15 +169,94 @@ async function loudnormMeasure(filePath: string): Promise<Record<string, string>
  * caller attaches the take regardless and the report says what was done.
  */
 /** The "soft" look: a phone camera at arm's length is unflattering in a
- *  way a gentle grade fixes -- temporal denoise smooths skin without
- *  blurring edges, a touch of warmth and contrast. Deliberately mild. */
-export const SOFT_LOOK_FILTER = "hqdn3d=4:3:6:4,eq=contrast=1.02:brightness=0.02:saturation=1.05,colorbalance=rm=0.02:bm=-0.02";
+ *  way a gentle grade fixes. Two parts:
+ *  - the BASE, always on: temporal denoise, a touch of warmth and contrast
+ *    (the whole look until 2026-09-25; Marc: "it doesn't entirely look like
+ *    it was on");
+ *  - SKIN SMOOTHING on a dial, `strength` 0-1: an edge-preserving bilateral
+ *    blur that flattens skin texture and keeps eyes, hair and beard sharp.
+ *    0 is the base alone; 0.5 is the level Marc picked on a side-by-side.
+ *  `baseSoft`: the source already carries the base (a take graded before
+ *  the dial existed, whose original was not kept) -- add the smoothing only. */
+export const DEFAULT_SOFT_STRENGTH = 0.5;
+const SOFT_BASE = "hqdn3d=4:3:6:4,eq=contrast=1.02:brightness=0.02:saturation=1.05,colorbalance=rm=0.02:bm=-0.02";
+export function softLookFilter(strength: number = DEFAULT_SOFT_STRENGTH, opts: { baseSoft?: boolean; fallback?: boolean } = {}): string {
+  const s = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : DEFAULT_SOFT_STRENGTH));
+  const parts: string[] = opts.baseSoft ? [] : [SOFT_BASE];
+  if (s > 0.001) {
+    const r = (n: number) => Math.round(n * 1000) / 1000;
+    // An ffmpeg without `bilateral` (older than 4.4) gets smartblur, the
+    // same idea (blur the flat areas, spare the outlines) and far older.
+    parts.push(opts.fallback
+      ? `smartblur=lr=${r(1 + 3 * s)}:ls=${r(0.35 + 0.55 * s)}:lt=${r(-2 - 6 * s)}`
+      : `bilateral=sigmaS=${r(2 + 8 * s)}:sigmaR=${r(0.02 + 0.08 * s)}`);
+  }
+  return parts.length ? parts.join(",") : "null";
+}
+/** The base alone (strength 0). */
+export const SOFT_LOOK_FILTER = softLookFilter(0);
 export type TakeLook = "natural" | "soft";
+
+/** Where a take's ungraded original is kept, beside it (dot-file: never a
+ *  listed asset). Every grade starts from it, so the dial goes both ways. */
+export function ungradedPathOf(filePath: string): string {
+  const ext = path.extname(filePath) || ".mp4";
+  return path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.ungraded${ext}`);
+}
+
+export interface TakeGradeResult {
+  look: TakeLook;
+  strength?: number;
+  /** The kept original. */
+  ungraded: string;
+  /** The kept original already carries the base grade. */
+  baseSoft: boolean;
+  ms: number;
+}
+
+/**
+ * Grade a take IN PLACE from its kept original (made on first use: a copy
+ * of the file as it stands -- `currentLook` says whether that copy already
+ * carries the base). 'natural' puts the original back.
+ */
+export async function gradeTake(filePath: string, o: { look: TakeLook; strength?: number; currentLook?: TakeLook }): Promise<TakeGradeResult> {
+  const t0 = Date.now();
+  const ungraded = ungradedPathOf(filePath);
+  const markerPath = `${ungraded}.soft`;
+  const exists = async (f: string) => fs.stat(f).then(() => true, () => false);
+  if (!(await exists(ungraded))) {
+    await fs.copyFile(filePath, ungraded);
+    if (o.currentLook === "soft") await fs.writeFile(markerPath, "the kept original already carries the soft base\n");
+  }
+  const baseSoft = await exists(markerPath);
+  const ext = path.extname(filePath) || ".mp4";
+  const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.grading${ext}`);
+  if (o.look === "natural") {
+    await fs.copyFile(ungraded, tmp);
+    await fs.rename(tmp, filePath);
+    return { look: "natural", ungraded, baseSoft, ms: Date.now() - t0 };
+  }
+  const strength = Math.max(0, Math.min(1, o.strength ?? DEFAULT_SOFT_STRENGTH));
+  const encode = (vf: string) => execFileAsync("ffmpeg", ["-hide_banner", "-y", "-i", ungraded, "-map", "0:v:0", "-map", "0:a:0?",
+    "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy",
+    ...(ext.toLowerCase() !== ".webm" ? ["-movflags", "+faststart"] : []), tmp], { maxBuffer: 16 * 1024 * 1024 });
+  try {
+    try { await encode(softLookFilter(strength, { baseSoft })); }
+    catch (e: any) {
+      if (!/No such filter|bilateral/i.test(String(e?.stderr || e?.message || ""))) throw e;
+      await encode(softLookFilter(strength, { baseSoft, fallback: true }));
+    }
+    await fs.rename(tmp, filePath);
+  } catch (e: any) {
+    await fs.unlink(tmp).catch(() => {});
+    throw new Error(`take grade failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
+  }
+  return { look: "soft", strength, ungraded, baseSoft, ms: Date.now() - t0 };
+}
 
 export async function sanitizeTake(
   filePath: string,
   canvas?: { width: number; height: number },
-  look: TakeLook = "natural",
 ): Promise<TakeSanitizeResult> {
   const probe = await probeTake(filePath);
   const rotation = ((probe.rotation % 360) + 360) % 360;
@@ -187,7 +264,6 @@ export async function sanitizeTake(
   const oriented = orientedDims(probe);
   const crop = canvas ? reframeCrop(oriented, canvas) : null;
   const pad = canvas && !crop ? reframePad(oriented, canvas) : null;
-  const grade = look === "soft";
 
   let measured: number | null = null;
   let normalize = false;
@@ -202,18 +278,17 @@ export async function sanitizeTake(
     loudness: measured === null ? undefined : { measured_lufs: round1(measured) },
     probe,
   };
-  if (!bake && !crop && !pad && !normalize && !grade) return base;
+  if (!bake && !crop && !pad && !normalize) return base;
 
   const ext = path.extname(filePath) || ".mp4";
   const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
   // ffmpeg applies the rotation tag on decode (autorotate, every version),
   // so a re-encode stores the frames upright with an identity matrix.
   const args = ["-y", "-i", filePath, "-map", "0:v:0"];
-  if (bake || crop || pad || grade) {
+  if (bake || crop || pad) {
     const vf: string[] = [];
     if (crop && canvas) vf.push(`crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`, `scale=${canvas.width}:${canvas.height}`);
     if (pad && canvas) vf.push(`scale=${pad.w}:${pad.h}`, `pad=${canvas.width}:${canvas.height}:(ow-iw)/2:(oh-ih)/2:color=${PILLARBOX_COLOR}`);
-    if (grade) vf.push(SOFT_LOOK_FILTER);
     if (vf.length) args.push("-vf", vf.join(","));
     args.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p");
   } else {
@@ -247,7 +322,6 @@ export async function sanitizeTake(
 
   return {
     ...base,
-    look: grade ? "soft" : undefined,
     reframed: (crop || pad) && canvas ? { from: `${oriented.width}x${oriented.height}`, to: `${canvas.width}x${canvas.height}`, ...(pad ? { mode: "pillarbox" as const } : {}) } : undefined,
     loudness: measured === null ? undefined : { measured_lufs: round1(measured), normalized_to_lufs: normalizedTo },
     probe: await probeTake(filePath),

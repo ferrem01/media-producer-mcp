@@ -51,7 +51,8 @@ describe("background blur at attach", () => {
     expect(take).toMatch(/<input type="radio" name="bg" value="blur"> Blur/);
     const index = await fs.readFile("src/index.ts", "utf8");
     // The attach lands at once; the matte runs after it (the request dropped at 300s when it ran inline).
-    expect(index).toMatch(/reshootStoryboardCardsSoon\(tkTenant, tkProject\);\s*if \(tkMissing\.blur \|\| tkMissing\.alpha\) \{\s*queueTakeMatte\(\{/);
+    // A soft take grades first and the grade queues the matte (the copies are cut from the graded take).
+    expect(index).toMatch(/reshootStoryboardCardsSoon\(tkTenant, tkProject\);[\s\S]{0,1400}?if \(tkSoft\) \{\s*queueTakeGrade\(\{[\s\S]{0,600}?\} else if \(tkMissing\.blur \|\| tkMissing\.alpha\) \{\s*queueTakeMatte\(\{/);
     expect(index).not.toMatch(/await matteTake\(/);
     const matte = await fs.readFile("src/core/take-matte.ts", "utf8");
     expect(matte).toMatch(/if \(blurUrl\) t\.blur = blurUrl;/);

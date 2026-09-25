@@ -2756,12 +2756,21 @@ ${QUOTIENT_CSS}
       // Draft/storyboard-state projects have their own view -- full reload path.
       var hasScenes = project.scenes && project.scenes.length;
       if (!hasScenes) { loadProject(project.project_id); return; }
+      // A take re-graded in place keeps its url: the speaker elements hold
+      // the old pictures in their buffers, so they load again (the server
+      // makes a take revalidate; the fresh file comes down).
+      var gradeKey = function(pr) { return ((pr && pr.takes) || []).map(function(t) { return t.graded_at || ''; }).join('|'); };
+      var regraded = gradeKey(state.currentProject) !== gradeKey(project);
       state.currentProject = project;
       state.totalDuration = calcTotalDuration();
       if (state.masterTime > state.totalDuration) state.masterTime = Math.max(0, state.totalDuration - 0.1);
+      if (regraded) {
+        [els.speakerBg, els.speakerBg2].forEach(function(v) { if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (eR) {} } });
+        (state.mediaClips || []).forEach(function(c) { if (c.kind === 'speaker') c._window = undefined; });
+      }
       initAudio();
       renderSceneList();
-      studioStatus('↻ Updated outside Studio — preview refreshed', 'ok');
+      studioStatus(regraded ? '↻ The take\u2019s new look landed — preview refreshed' : '↻ Updated outside Studio — preview refreshed', 'ok');
       // Mobile boots the composite on demand; don't force it here.
       if (IS_MOBILE && !state._compositeHtml) return;
       startCompositePreview(project, {
@@ -3823,6 +3832,17 @@ ${QUOTIENT_CSS}
       html += '<div class="prop-row"><label class="prop-label">place</label><select class="prop-select prop-place">' +
         ['full', 'bottom-right', 'bottom-left', 'top-right', 'top-left'].map(function(pl) { return '<option value="' + pl + '"' + (pl === curPlace ? ' selected' : '') + '>' + (pl === 'full' ? 'full frame' : pl.replace('-', ' ')) + '</option>'; }).join('') +
         (curPlace === 'custom' ? '<option value="custom" selected>custom</option>' : '') + '</select></div>';
+      // THE SOFT LOOK, ON A DIAL (core/take-grade.ts): the take behind this
+      // scene, re-graded from its kept original in the background.
+      var lookTake = sceneTakeFor(state.currentSceneIndex);
+      if (lookTake) {
+        var lookOn = lookTake.look === 'soft';
+        var lookS = typeof lookTake.soft_strength === 'number' ? lookTake.soft_strength : (lookOn ? 0 : 0.5);
+        html += '<div class="prop-row"><label class="prop-label" title="Skin smoothing and warmth on the take. Re-graded from the original in about a minute; every scene cut from the same recording follows.">soft look</label>' +
+          '<input type="checkbox" class="prop-soft-on"' + (lookOn ? ' checked' : '') + ' style="flex:0 0 auto;margin-right:8px;">' +
+          '<input type="range" class="prop-soft" min="0" max="1" step="0.05" value="' + lookS + '"' + (lookOn ? '' : ' disabled') + ' style="flex:1;min-width:0;" title="light \u2194 strong smoothing">' +
+          '<span class="prop-soft-val" style="flex:0 0 34px;text-align:right;font-size:11px;color:var(--content-secondary);">' + Math.round(lookS * 100) + '</span></div>';
+      }
     }
     html += '</div>';
     els.propEditor.innerHTML = html;
@@ -3856,6 +3876,25 @@ ${QUOTIENT_CSS}
         });
       }
     });
+
+    var softOn = els.propEditor.querySelector('.prop-soft-on');
+    var softDial = els.propEditor.querySelector('.prop-soft');
+    if (softOn && softDial) {
+      var softVal = els.propEditor.querySelector('.prop-soft-val');
+      var sendLook = function() {
+        var siL = state.currentSceneIndex, on = softOn.checked, st = parseFloat(softDial.value);
+        softDial.disabled = !on;
+        api('POST', '/take-look/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), on ? { scene_index: siL, look: 'soft', strength: st } : { scene_index: siL, look: 'natural' })
+          .then(function(r) {
+            var sc = (r.scenes || []).length > 1 ? 'Scenes ' + r.scenes.join(', ') : 'Scene ' + (siL + 1);
+            studioStatus(sc + ': ' + (on ? 'smoothing at ' + Math.round(st * 100) : 'soft look off') + ' \u2014 about a minute; the preview refreshes when it lands.', 'ok');
+          })
+          .catch(function(e) { studioStatus('Soft look: ' + (e.message || String(e)), 'err'); });
+      };
+      softDial.addEventListener('input', function() { if (softVal) softVal.textContent = Math.round(parseFloat(softDial.value) * 100); });
+      softDial.addEventListener('change', sendLook);
+      softOn.addEventListener('change', sendLook);
+    }
 
     // Select dropdowns (enum)
     var placeSel = els.propEditor.querySelector('.prop-place');
@@ -5757,6 +5796,11 @@ ${QUOTIENT_CSS}
   // film time 0 at its trim. Per-scene takes (clips carry scene_index): the
   // scene's own clip, whose trim_start is that scene's film start; a scene
   // with no take has no camera. Mirrors speakerClipForScene on the server.
+  // The newest take recorded for a scene (the one its clip plays).
+  function sceneTakeFor(si) {
+    var takes = ((state.currentProject && state.currentProject.takes) || []).filter(function(t) { return t.scene_index === si; });
+    return takes.length ? takes[takes.length - 1] : null;
+  }
   function speakerClipForTime(time) {
     var project = state.currentProject;
     var clips = (project && project.speaker_track && project.speaker_track.clips) || [];
