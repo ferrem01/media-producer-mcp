@@ -45,7 +45,17 @@ ${QUOTIENT_CSS}
   /* The ready screen never scrolls: a long script (record-all) scrolls
      INSIDE its card and the Record button stays in reach (Marc: "scroll
      all the way down, hit record, then scroll all the way back"). */
-  #ready { height:100dvh; overflow:hidden; }
+  /* ...and Record is PINNED to the bottom edge: measured on a phone, the
+     background row's long hint (a narrow column beside Room/Blur/Alpha)
+     pushed Record below the screen of a page that could not scroll. The
+     screen may now scroll as a last resort, but Record never leaves it. */
+  #ready { height:100dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #ready > * { flex-shrink: 0; }
+  #ready > #script { flex-shrink: 1; min-height: 96px; }
+  #ready .rec-dock { position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom)); z-index: 2; margin: 0 -18px calc(-16px - env(safe-area-inset-bottom));
+    padding: 10px 18px calc(12px + env(safe-area-inset-bottom)); background: var(--background, #f8f8fa); box-shadow: 0 -8px 16px -6px rgba(20, 20, 40, 0.10); }
+  #ready .rec-dock #recordBtn { width: 100%; }
+  body.embed #ready .rec-dock { position: static; margin: 0; padding: 0; background: none; box-shadow: none; }
   /* Studio's dialog: the ready screen is as tall as its content, no more. */
   body.embed { min-height: 0; height: auto; }
   body.embed section.on { flex: 0 0 auto; }
@@ -78,6 +88,10 @@ ${QUOTIENT_CSS}
   a.link { color: var(--muted-foreground); font-size: 14px; text-decoration: none; }
   .toggle { display: flex; gap: 10px; align-items: flex-start; color: var(--content-primary); font-size: 14px; margin: 10px 0 14px; white-space: nowrap; }
   .toggle .hint { white-space: normal; }
+  /* A choice row wraps: its hint takes a full line of its own instead of a
+     one-word-wide column beside the options. */
+  #bgChoice { flex-wrap: wrap; align-items: center; }
+  #bgChoice .hint { flex: 1 0 100%; }
   #bgChoice label { margin: 0 6px 0 2px; }
   .toggle input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--primary); }
   .toggle .hint { color: var(--muted-foreground); font-size: 13px; }
@@ -143,7 +157,7 @@ ${QUOTIENT_CSS}
     <label><input type="radio" name="bg" value="blur"> Blur</label>
     <label><input type="radio" name="bg" value="alpha"> Alpha</label>
     <span class="hint">(Room keeps what the camera sees. Blur softens it, you stay sharp. Alpha cuts you out so whatever the scene puts behind you is the room. Blur and alpha are made a few minutes after the take lands; the raw take is kept.)</span></div>
-  <button class="btn" id="recordBtn" disabled>Record</button>
+  <div class="rec-dock"><button class="btn" id="recordBtn" disabled>Record</button></div>
 </section>
 
 <section id="stage">

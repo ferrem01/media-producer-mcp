@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — The booth: Record never leaves the screen
+
+Marc, live on his phone: "I don't see a record button anymore."
+- The Room/Blur/Alpha row (#862) put its long hint beside the radios in a
+  nowrap flex row, as a one-word-wide column. Measured live on an iPhone 13
+  viewport: Record at y=1072 on a 664px screen.
+- `#ready` was `overflow:hidden` by design ("never scroll"), so Record was
+  unreachable.
+- Fix:
+  - The row wraps, and the hint takes its own full line.
+  - Record sits in a sticky `.rec-dock` pinned to the bottom edge.
+  - The ready screen may scroll as a last resort; the script card keeps a
+    96px minimum.
+- Test: `test/take-page.test.ts` measures Record inside the viewport on an
+  iPhone SE and an iPhone 13.
+
+---
+
 ## 2026-09-25 — screencast-frame: `glass: false`
 
 The float presentation lays a frosted glass pane behind the tilted recording
