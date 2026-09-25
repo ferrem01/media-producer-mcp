@@ -74,6 +74,33 @@ async function open(data: unknown, speaker: Record<string, unknown>): Promise<{ 
   return { page, close: async () => { await browser.close(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); } };
 }
 
+describe("the silhouette: measured while the matte runs, carried to speaker-3d", () => {
+  it("keeps the typical edge per row (a hand flung out once does not widen it)", async () => {
+    const { silhouetteCollector } = await import("../src/core/take-matte.js");
+    const c = silhouetteCollector();
+    const w = 100, h = 72;
+    for (let f = 0; f < 30; f++) {
+      const a = new Uint8Array(w * h);
+      for (let y = 18; y < h; y++) for (let x = 40; x < 60; x++) a[y * w + x] = 255;
+      if (f === 5) for (let y = 40; y < 44; y++) for (let x = 60; x < 95; x++) a[y * w + x] = 255; // a hand, once
+      c.add(a, w, h);
+    }
+    const p = c.profile()!;
+    expect(p.rows.length).toBe(36);
+    expect(p.rows[0]).toBeNull();
+    expect(p.rows[20]).toEqual([0.4, 0.6]);
+  });
+  it("syncSpeakerClips stamps the take's silhouette onto the scene's speaker-3d", async () => {
+    const { syncSpeakerClips } = await import("../src/core/speaker-layer.js");
+    const sil = { rows: [null, [0.4, 0.6]] as Array<[number, number] | null> };
+    const project: any = { scenes: [{ components: [{ type: "speaker-3d", data: { src: "speaker" } }] }],
+      takes: [{ source: "/t/raw.mp4", alpha: "/t/raw-alpha.webm", scene_index: 0, silhouette: sil }],
+      speaker_track: { clips: [{ source: "/t/raw.mp4", scene_index: 0 }] } };
+    syncSpeakerClips(project);
+    expect(project.scenes[0].components[0].data.silhouette).toEqual(sil);
+  });
+});
+
 describe("speaker-3d in the browser", () => {
   it("stacks room -> big word -> person cut-out -> small words, and a ring in both halves", async () => {
     const { page, close } = await open({ src: "speaker", lines: LINES, wipes: [{ at: 2.0 }] },
@@ -167,6 +194,27 @@ describe("speaker-3d in the browser", () => {
       await at(3.8);
       const ringOp = await page.evaluate(() => [...document.querySelectorAll("svg.s3d-ring")].map((s) => Number(getComputedStyle(s).opacity)));
       expect(Math.max(...ringOp)).toBeLessThan(0.05);
+    } finally { await close(); }
+  }, 60000);
+
+  it("tucks a side word's first letter behind the person's measured edge (behind, not beside)", async () => {
+    // Marc, side by side with the reference: "the word feel is behind the
+    // person; yours is in front." A side word parked at the frame edge sat
+    // clear of her; the reference tucks its first letter behind her.
+    const rows: Array<[number, number] | null> = Array.from({ length: 36 }, (_, r) => (r < 4 ? null : [0.36, 0.64]));
+    const { page, close } = await open({ src: "speaker", font: "serif", silhouette: { rows }, lines: [{ at: 0.2, kind: "big", text: "feel", side: "right" }] }, {});
+    try {
+      await page.evaluate(() => { (window as any).__MP_TIMELINE.time(0.9); });
+      const m = await page.evaluate(() => {
+        const w = document.querySelector(".s3d-big")!;
+        const f = w.firstElementChild!.getBoundingClientRect();
+        return { layer: w.parentElement!.className, fL: f.left, fR: f.right, right: w.getBoundingClientRect().right };
+      });
+      expect(m.layer).toBe("s3d-back");
+      // The edge (64% of 1920 = 1229) cuts through the first letter.
+      expect(m.fL).toBeLessThan(1229);
+      expect(m.fR).toBeGreaterThan(1229);
+      expect(m.right).toBeLessThan(1920);
     } finally { await close(); }
   }, 60000);
 

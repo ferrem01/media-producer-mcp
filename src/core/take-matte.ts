@@ -63,6 +63,8 @@ export interface MatteResult {
   output?: string;
   /** The alpha copy (when asked). */
   alpha?: string;
+  /** Where the person stands, row by row (with the alpha copy). */
+  silhouette?: { rows: Array<[number, number] | null> };
   frames: number;
   ms: number;
   model_size: { width: number; height: number };
@@ -175,6 +177,46 @@ async function probeVideo(file: string): Promise<{ width: number; height: number
  * and returns their paths; the input is untouched. One matte pass feeds
  * both encodes.
  */
+/** Where the person stands, row by row: for every matted frame, each
+ *  row's leftmost and rightmost opaque pixel; the profile keeps the TYPICAL
+ *  edge over the take (the median, so a hand flung out does not widen it,
+ *  and a letter tucked behind it stays covered most of the time) on 36
+ *  rows. speaker-3d tucks a side word's first letter behind this edge --
+ *  the overlap is what reads as depth. */
+export const SILHOUETTE_ROWS = 36;
+export function silhouetteCollector() {
+  const lefts: number[][] = Array.from({ length: SILHOUETTE_ROWS }, () => []);
+  const rights: number[][] = Array.from({ length: SILHOUETTE_ROWS }, () => []);
+  let n = 0;
+  return {
+    add(a: Uint8Array | Uint8ClampedArray, w: number, h: number) {
+      // Sample at most ~1 frame in 3 past the first 60 (cheap and enough).
+      n++; if (n > 60 && n % 3) return;
+      for (let r = 0; r < SILHOUETTE_ROWS; r++) {
+        const y0 = Math.floor((r * h) / SILHOUETTE_ROWS), y1 = Math.max(y0 + 1, Math.floor(((r + 1) * h) / SILHOUETTE_ROWS));
+        let l = w, rt = -1;
+        for (let y = y0; y < y1; y++) {
+          const row = y * w;
+          for (let x = 0; x < l; x++) if (a[row + x] > 128) { l = x; break; }
+          for (let x = w - 1; x > rt; x--) if (a[row + x] > 128) { rt = x; break; }
+        }
+        if (rt >= l) { lefts[r].push(l / w); rights[r].push((rt + 1) / w); }
+      }
+    },
+    profile(): { rows: Array<[number, number] | null> } | null {
+      const pick = (v: number[], q: number) => { const s = v.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))]; };
+      let any = false;
+      const rows = lefts.map((ls, r) => {
+        // A row the person holds in under a fifth of the samples is empty.
+        if (ls.length < Math.max(1, Math.round(n / 3) * 0.2)) return null;
+        any = true;
+        return [Math.round(pick(ls, 0.5) * 1000) / 1000, Math.round(pick(rights[r], 0.5) * 1000) / 1000] as [number, number];
+      });
+      return any ? { rows } : null;
+    },
+  };
+}
+
 export async function matteTake(input: string, opts: MatteOptions): Promise<MatteResult> {
   // The runtime's async run does not hold Node's event loop on its own
   // (measured: a bare script exited 0 mid-matte with nothing logged); in
@@ -219,6 +261,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   const dsr = new ort.Tensor("float32", new Float32Array([1]), [1]);
   const src = new Float32Array(3 * mh * mw);
   const plane = mh * mw;
+  const edges = silhouetteCollector();
   let frames = 0;
   let carry: Buffer = Buffer.alloc(0);
   const runFrame = async (rgb: Buffer) => {
@@ -228,6 +271,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
     const pha: Float32Array = out.pha.data;
     const a = Buffer.allocUnsafe(plane);
     for (let i = 0; i < plane; i++) { const v = pha[i]; a[i] = v <= 0 ? 0 : v >= 1 ? 255 : Math.round(v * 255); }
+    if (wantAlpha) edges.add(a, mw, mh);
     if (!alphaSink.write(a)) await new Promise<void>((r) => alphaSink.once("drain", () => r()));
     frames++;
     if (opts.onProgress && frames % 100 === 0) opts.onProgress(frames, 0);
@@ -274,7 +318,8 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   } finally {
     await fsp.unlink(alphaRaw).catch(() => {});
   }
-  return { ...(wantBlur ? { output } : {}), ...(wantAlpha ? { alpha: alphaOut } : {}), frames, ms: Date.now() - t0, model_size: ms, fps };
+  const silhouette = wantAlpha ? edges.profile() : null;
+  return { ...(wantBlur ? { output } : {}), ...(wantAlpha ? { alpha: alphaOut, ...(silhouette ? { silhouette } : {}) } : {}), frames, ms: Date.now() - t0, model_size: ms, fps };
 }
 
 /**
@@ -322,6 +367,7 @@ export function queueTakeMatte(opts: {
         if (takeCopies(t).raw !== opts.rawUrl) continue;
         if (blurUrl) t.blur = blurUrl;
         if (alphaUrl) t.alpha = alphaUrl;
+        if (alphaUrl && m.silhouette) t.silhouette = m.silhouette;
         owned++;
         const miss = missingSpeakerCopies(project, t);
         again.blur = again.blur || miss.blur; again.alpha = again.alpha || miss.alpha;

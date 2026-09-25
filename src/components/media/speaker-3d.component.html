@@ -95,6 +95,22 @@
         if (t > x.at + 0.3 && t < x.until) x.until = t + num(wp.duration, 0.7) * 0.45;
       });
     });
+    // The person's edge (fraction of the width) over a band of rows, from
+    // the take's measured silhouette: the middle edge in the band, so the
+    // tucked letter is covered across the letter's body.
+    var SIL = data.silhouette && Array.isArray(data.silhouette.rows) && data.silhouette.rows.length ? data.silhouette.rows : null;
+    function silhouetteEdge(side, y0, y1) {
+      if (!SIL) return null;
+      var n = SIL.length, a = Math.max(0, Math.floor((y0 / H) * n)), b = Math.min(n - 1, Math.floor((y1 / H) * n)), vs = [];
+      for (var r = a; r <= b; r++) {
+        var row = SIL[r]; if (!row) continue;
+        var v = side === 'right' ? Number(row[1]) : Number(row[0]);
+        if (isFinite(v)) vs.push(v);
+      }
+      if (!vs.length) return null;
+      vs.sort(function (x, y) { return x - y; });
+      return vs[Math.floor(vs.length / 2)];
+    }
     var pct = function (v, total, d) {
       if (v === undefined || v === null || v === '') return d;
       var s = String(v);
@@ -186,18 +202,41 @@
             // reference's "fo(head)get" spans ~70% of the frame).
             var k = Math.min((W * 0.7) / bw, (H * 0.42) / size);
             size = size * k;
-          } else if (bw > W * 0.38) {
+          } else if (bw > W * 0.4) {
             // A side word keeps to its side of the frame.
-            size = size * (W * 0.38) / bw;
+            size = size * (W * 0.4) / bw;
           }
           w.style.fontSize = size + 'px'; bw = w.offsetWidth || bw;
         }
         var defX, defY;
         if (x.kind === 'big') {
-          // Side words keep a margin: the camera push scales the front layer
-          // and the word drifts right as it holds (measured: "forget" and
-          // "feel" ran off the right edge).
-          defX = side === 'center' ? (W - bw) / 2 : (side === 'right' ? W * 0.88 - bw - size * 0.12 : W * 0.08);
+          // A side word TUCKS its first letters behind the person: it starts
+          // just inside the body's edge, so the cut-out covers the "f" of
+          // "feel" -- that overlap is what reads as depth (the reference; a
+          // word parked out at the frame edge sat clear of her and looked
+          // flat, measured side by side). It still keeps inside the frame
+          // after the push and its drift.
+          // With the take's measured silhouette (core/take-matte.ts), the
+          // edge is the PERSON's at the word's own height, and about half the
+          // first letter goes behind it; without one, a centred framing is
+          // assumed (the body's edge near 56% / 44%).
+          defY = side === 'center' ? H * 0.04 : H * 0.62 - size * 0.5;
+          var tuck = side === 'right' ? W * 0.56 : W * 0.44 - bw;
+          // The band the letters' bodies fill (x-height, not the ascenders).
+          var edge = side === 'center' ? null : silhouetteEdge(side, pct(l.y, H, defY) + size * 0.4, pct(l.y, H, defY) + size * 0.75);
+          for (var pass = 0; pass < 2 && edge !== null; pass++) {
+            var cap = side === 'right' ? w.firstElementChild : w.lastElementChild;
+            var letter = (cap && cap.offsetWidth) || size * 0.4;
+            tuck = side === 'right' ? edge * W - letter * 0.6 : edge * W - bw + letter * 0.6;
+            var avail = side === 'right' ? W * 0.92 - size * 0.12 - tuck : tuck + bw - W * 0.08;
+            if (bw <= avail || l.size !== undefined) break;
+            size = size * Math.max(0.5, avail / bw); w.style.fontSize = size + 'px'; bw = w.offsetWidth || bw;
+          }
+          // Inside the frame after the push (the back layer scales ~6%) and the drift.
+          var room = W * 0.92 - size * 0.12;
+          if (side === 'right' && tuck + bw > room) tuck = Math.max(W * 0.3, room - bw);
+          if (side === 'left' && tuck < W * 0.05) tuck = Math.min(W * 0.7 - bw, W * 0.05);
+          defX = side === 'center' ? (W - bw) / 2 : tuck;
           defY = side === 'center' ? H * 0.04 : H * 0.62 - size * 0.5;
         } else {
           defX = side === 'right' ? W * 0.66 : W * 0.07;

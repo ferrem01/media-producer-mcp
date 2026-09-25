@@ -52,7 +52,7 @@ export const SPEAKER_SHAPES: readonly SpeakerShape[] = ["rectangle", "rounded", 
 
 type Comp = { id?: string; type?: string; z_index?: number; position?: any; data?: Record<string, any>; enter?: any; exit?: any };
 type SceneLike = { components?: Array<Comp | null> | null; duration_seconds?: number; transparent_background?: boolean };
-type TakeLike = { source: string; blur?: string; alpha?: string; background?: { mode?: string; source_raw?: string } | null; scene_index?: number };
+type TakeLike = { source: string; blur?: string; alpha?: string; background?: { mode?: string; source_raw?: string } | null; scene_index?: number; silhouette?: { rows: Array<[number, number] | null> } };
 type ClipLike = { source: string; alpha?: string; scene_index?: number };
 type ProjectLike = { scenes?: SceneLike[] | null; takes?: TakeLike[] | null; speaker_track?: { clips: ClipLike[] } | null };
 
@@ -259,8 +259,26 @@ export function syncSpeakerClips(project: ProjectLike): number {
     if (clip.source !== wantSource) { clip.source = wantSource; changed++; }
     if (copies.alpha && clip.alpha !== copies.alpha) { clip.alpha = copies.alpha; changed++; }
     if (!copies.alpha && clip.alpha) { delete clip.alpha; changed++; }
+    // speaker-3d tucks its side words behind the person: it carries the
+    // take's measured silhouette in its data (every render path reads data).
+    changed += stampSilhouette((project.scenes || [])[clip.scene_index], take.silhouette);
+    changed += stampSilhouette(((project as any).storyboard?.scenes || [])[clip.scene_index], take.silhouette);
   }
   return changed;
+}
+
+/** Put the take's silhouette on the scene's speaker-3d components (or take
+ *  a stale one off). Returns how many changed. */
+function stampSilhouette(scene: any, silhouette: TakeLike["silhouette"]): number {
+  let n = 0;
+  for (const c of (scene && Array.isArray(scene.components) ? scene.components : [])) {
+    if (!c || typeof c !== "object" || c.type !== SPEAKER_3D_TYPE || !c.data) continue;
+    const want = silhouette && Array.isArray(silhouette.rows) ? silhouette : undefined;
+    if (JSON.stringify(c.data.silhouette) === JSON.stringify(want)) continue;
+    if (want) c.data.silhouette = want; else delete c.data.silhouette;
+    n++;
+  }
+  return n;
 }
 
 /** The copies a take still lacks for the settings of the scenes it
