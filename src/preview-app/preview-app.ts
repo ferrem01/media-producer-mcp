@@ -255,7 +255,14 @@ ${QUOTIENT_CSS}
     border-radius: var(--radius-md);
     transform-origin: top left;
   }
-  .preview-wrapper { overflow: hidden; border-radius: var(--radius-md); }
+  /* PAINT CONTAINMENT: the preview is a 1920x1080 iframe scaled down, and
+     overflow:hidden + border-radius alone does not clip 3D-transformed
+     layers in Chromium (a tilted float screencast-frame and its lifted
+     callout): measured in Arc, the cream scene document flashed over the
+     whole timeline dock at the frame the recording flipped dark.
+     clip-path + contain:paint clip composited descendants too. */
+  .preview-wrapper { overflow: hidden; border-radius: var(--radius-md);
+    clip-path: inset(0 round var(--radius-md)); contain: paint; isolation: isolate; }
   .no-scene { color: var(--content-tertiary); font-size: 13px; text-align: center; }
 
   /* Playback controls */

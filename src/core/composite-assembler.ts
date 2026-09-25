@@ -361,6 +361,9 @@ html, body {
   width: ${canvas.width}px;
   height: ${canvas.height}px;
   overflow: hidden;
+  /* 3D-tilted layers (float screencast-frame, lifted callouts) escape a
+     plain overflow clip under compositing; paint containment holds them. */
+  contain: paint;
 }
 
 /* ── Component containers ── */

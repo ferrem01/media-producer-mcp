@@ -119,6 +119,12 @@ describe("the mock is the placeholder: a provided screen takes its slot on any f
     expect(r2.added).toBe(1);
     expect(r2.components[1]).toMatchObject({ id: "screen_2", type: "image", data: { src: "/a/s.png", drift: false, fit: "contain", at: 2, exit_at: 5 }, position: { width: "100%", height: "100%" } });
     expect(castProvidedScreens({ components: [{ type: "quotient-home", data: {} }], assets: [{ type: "screen_recording", description: "x", status: "needed" }] } as any).replaced).toBe(0);
+    // A scene template plays its own screen: nothing is laid beside it (the dark-mode film).
+    const tpl = castProvidedScreens({ components: [], scene_template: { type: "st-screencast", data: { source: "/a/cut.mp4" } }, assets: [{ type: "screen_recording", description: "x", status: "provided", path: "/a/raw.webm" }] } as any);
+    expect(tpl.added).toBe(0); expect(tpl.components).toEqual([]);
+    // A screencast-frame already playing the file is the screen: no second copy.
+    const fr = castProvidedScreens({ components: [{ type: "screencast-frame", data: { video_url: "/a/cut.mp4" } }], assets: [{ type: "screen_recording", description: "x", status: "provided", path: "/a/cut.mp4" }] } as any);
+    expect(fr.added + fr.replaced).toBe(0);
   });
   it("the screen slate: an open screen need takes the mock's slot with a slate, never the mock; the recording then takes the slate's slot", async () => {
     const { castScreenSlates, castProvidedScreens, isProofSurface } = await import("../src/core/asset-needs.js");
