@@ -15,9 +15,9 @@ const BRAND = { colors: { primary: "#393bf5", background: "#ffffff", text: "#171
 // A tiny real image (so the capture's image wait has something to load).
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP4z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==";
 
-async function open(type: string, data: unknown, run: (page: Page, seek: (t: number) => Promise<void>) => Promise<void>, size = { w: 1920, h: 1080 }) {
+async function open(type: string, data: unknown, run: (page: Page, seek: (t: number) => Promise<void>) => Promise<void>, size = { w: 1920, h: 1080 }, position: unknown = { x: "center", y: "center" }) {
   const html = await assembleScene({
-    scene: { id: "s", label: "s", duration_seconds: 8, background: "#fafaf8", components: [{ id: "c0", type, position: { x: "center", y: "center" }, data }] } as any,
+    scene: { id: "s", label: "s", duration_seconds: 8, background: "#fafaf8", components: [{ id: "c0", type, position, data }] } as any,
     components: [{ type, source: await SRC(type) }],
     brandKit: BRAND as any, canvas: { width: size.w, height: size.h } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap"),
   } as any);
@@ -50,6 +50,34 @@ describe("before-after-wipe", () => {
       expect(rest.clip).toMatch(/inset\(0px 50%/);
       expect((await at(1.6)).p).toBeCloseTo(mid.p, 3); // seek back: same frame
     });
+  }, 60000);
+});
+
+describe("before-after-wipe: padding", () => {
+  it("holds an exact gap around the frame all scene long, against the ambient camera drift", async () => {
+    // Marc: "give the component a little space, 10-20px". The scene's slow
+    // camera push grew the frame past the gap (16px at the start, -16px at the end).
+    await open("before-after-wipe", { before_text: "Light", after_text: "Dark", padding: 16 }, async (page, seek) => {
+      for (const t of [0.8, 3, 7.9]) {
+        await seek(t);
+        const g = await page.evaluate(() => { const r = document.querySelector(".baw-frame")!.getBoundingClientRect(); return [r.left, r.top, innerWidth - r.right, innerHeight - r.bottom]; });
+        for (const v of g) expect(Math.abs(v - 16), `gap at ${t}s: ${g.join(",")}`).toBeLessThan(0.75);
+      }
+    }, { w: 1920, h: 1080 }, { x: "0%", y: "0%", width: "100%", height: "100%" });
+  }, 60000);
+
+  it("paints the gap in the editorial cream when ground is 'cream', edge to edge all scene long", async () => {
+    // Marc: "change the background to be more like" the cream statement beats.
+    await open("before-after-wipe", { before_text: "Light", after_text: "Dark", padding: 16, ground: "cream" }, async (page, seek) => {
+      for (const t of [0.8, 7.9]) {
+        await seek(t);
+        const m = await page.evaluate(() => { const el = document.querySelector(".baw-root") as HTMLElement; const r = el.getBoundingClientRect();
+          return { bg: getComputedStyle(el).backgroundColor, img: getComputedStyle(el).backgroundImage, covers: r.left <= 0 && r.top <= 0 && r.right >= innerWidth && r.bottom >= innerHeight }; });
+        expect(m.bg).toBe("rgb(244, 239, 225)");
+        expect(m.img).toContain("radial-gradient");
+        expect(m.covers, `ground covers the frame at ${t}s`).toBe(true);
+      }
+    }, { w: 1920, h: 1080 }, { x: "0%", y: "0%", width: "100%", height: "100%" });
   }, 60000);
 });
 

@@ -58,6 +58,16 @@
     var vertical = data.direction === 'vertical';
     if (vertical) root.classList.add('vertical');
     if (data.bleed === true) root.classList.add('bleed');
+    // GROUND: what shows in the gap around the frame. Unset, the scene's own
+    // ground (the film's world) shows through. 'cream' / 'dark' are the
+    // editorial statement grounds (st-statement's canvas and centre glow),
+    // so a wipe can sit on the same paper as the statement beats around it;
+    // any other value is a CSS background.
+    var GROUNDS = {
+      cream: 'radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%), #f4efe1',
+      dark: 'radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.06), rgba(255,255,255,0) 70%), #14131b'
+    };
+    if (data.ground) root.style.background = GROUNDS[String(data.ground)] || String(data.ground);
     function side(layer, src, text) {
       if (src) { layer.style.backgroundImage = 'url("' + String(src).replace(/"/g, '%22') + '")'; layer.classList.add('has-img'); if (data.fit === 'contain') { layer.style.backgroundSize = 'contain'; layer.style.backgroundRepeat = 'no-repeat'; layer.style.backgroundPosition = 'center'; } }
       layer.querySelector('.baw-text').textContent = text ? String(text) : '';
@@ -73,7 +83,12 @@
     var W0 = el.clientWidth || 900, H0 = el.clientHeight || 520;
     var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
     var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc;
-    var pad = data.bleed === true ? 0 : Math.round(Math.min(W0, H0) * 0.04);
+    // The gap around the frame: `padding` in px at 1080p (Marc: "give it a
+    // little space, 10-20px"), else 4% of the slot. Measured from the
+    // VISIBLE frame edge, so a full-frame slot's overscan does not add to it.
+    var pad = data.bleed === true ? 0 : (isFinite(Number(data.padding)) && data.padding !== '' && data.padding !== null
+      ? Math.max(0, Number(data.padding)) * (Math.min(window.innerWidth, window.innerHeight) / 1080) / sc
+      : Math.round(Math.min(W0, H0) * 0.04));
     root.style.setProperty('--pad', pad + 'px');
     var W = W0 - 2 * (pad + (data.bleed === true ? 0 : ox)), H = H0 - 2 * (pad + (data.bleed === true ? 0 : oy));
     frame.style.width = W + 'px'; frame.style.height = H + 'px';
@@ -94,7 +109,27 @@
     var st = { p: 1 };
     var sweeps = Array.isArray(data.sweeps) && data.sweeps.length ? data.sweeps
       : [{ at: Number(data.sweep_at) || AT + 0.5, to: 0.1, duration: 1.0 }, { to: split, duration: 0.8 }];
+    // PINNED FRAME: with an explicit padding the gap must stay exact, but the
+    // scene's ambient camera (.mp-camera: a slow 3% push + drift on every
+    // scene) grows the frame past it (measured: 16px at the start, -16px by
+    // the end). The root cancels that drift each frame -- the ground behind
+    // keeps drifting, the frame holds. Only the ambient camera; an authored
+    // camera move (the rig) still moves it, as intended.
+    var pinCam = data.bleed !== true && isFinite(Number(data.padding)) && data.padding !== '' && data.padding !== null && data.pin !== false ? el.closest('.mp-camera') : null;
+    var pinK = 1, pinO = null;
+    if (pinCam) {
+      var rr = root.getBoundingClientRect(), cr = pinCam.getBoundingClientRect();
+      pinK = rr.width / (root.offsetWidth || rr.width) || 1;
+      pinO = { x: (cr.left + cr.width / 2 - rr.left) / pinK, y: (cr.top + cr.height / 2 - rr.top) / pinK };
+      root.style.transformOrigin = pinO.x.toFixed(2) + 'px ' + pinO.y.toFixed(2) + 'px';
+    }
+    function pin() {
+      if (!pinCam) return;
+      var s = Number(gsap.getProperty(pinCam, 'scale')) || 1, dx = Number(gsap.getProperty(pinCam, 'x')) || 0, dy = Number(gsap.getProperty(pinCam, 'y')) || 0;
+      root.style.transform = 'translate(' + (-dx / (s * pinK)).toFixed(3) + 'px,' + (-dy / (s * pinK)).toFixed(3) + 'px) scale(' + (1 / s).toFixed(5) + ')';
+    }
     function apply() {
+      pin();
       var p = st.p;
       if (vertical) {
         before.style.clipPath = 'inset(0 0 ' + ((1 - p) * 100).toFixed(3) + '% 0)';

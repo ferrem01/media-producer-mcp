@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — before-after-wipe: `padding`, and a frame that holds still
+
+For the dark-mode launch film Marc asked for "a little space, 10-20px"
+around the wipe.
+- **`padding`**, in px at 1080p, sets the gap around the rounded frame. It
+  is measured from the visible frame edge. Without it, the gap stays at 4%
+  of the slot (about 40px).
+- **The frame holds still.** Every scene's ambient camera (`.mp-camera`: a
+  3% push plus a drift) grew the frame past the gap (measured: 16px at the
+  start, -16px by the end).
+  - With a padding set, the root cancels that ambient transform each frame
+    from the timeline's single `onUpdate`. The ground keeps drifting behind
+    it; the frame holds.
+  - An authored camera move (the rig) still moves it.
+  - `pin: false` opts out.
+- **`ground`** paints the gap. Marc wanted it "more like" the cream statement
+  beats of proj_3bb7a076.
+  - `cream` and `dark` are st-statement's own canvases (`#f4efe1` / `#14131b`,
+    with the soft centre glow).
+  - Any other value is a CSS background.
+  - Unset, the film's world shows through, as before.
+  - Under a world, a backdrop cast on the scene is dropped (one world per
+    film), so the ground has to come from the component itself.
+
+Test: `test/product-flow.test.ts` ("holds an exact gap ... against the
+ambient camera drift").
+
+---
+
 ## 2026-09-25 — Metamorph phase 1: grid-cull, review-deck, verdict-scorecard
 
 The three performing components from the Runneth reference
