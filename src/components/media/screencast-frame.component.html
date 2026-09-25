@@ -584,14 +584,19 @@
       tl.to(pool, { scale: 1.06, duration: Math.max(4, (ctx.duration || 8) / 2), yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.4);
       // The glass the video sits on: same pose, a real translateZ gap
       // behind the video -- drift parallax between the two surfaces.
-      var glass = document.createElement('div');
-      glass.className = 'scf-glass';
-      stage.appendChild(glass);
-      gsap.set(glass, { autoAlpha: 0 });
-      tl.to(glass, { autoAlpha: 1, duration: 0.9, ease: 'power2.out' }, 0.25);
-      var poseTargets = wrap3d ? [frame, wrap3d, glass] : [frame, glass];
+      // `glass: false` drops the pane (Marc: "what is this layer behind the
+      // tilted screen?") -- the recording floats alone over its pool.
+      var glass = null;
+      if (data.glass !== false) {
+        glass = document.createElement('div');
+        glass.className = 'scf-glass';
+        stage.appendChild(glass);
+        gsap.set(glass, { autoAlpha: 0 });
+        tl.to(glass, { autoAlpha: 1, duration: 0.9, ease: 'power2.out' }, 0.25);
+      }
+      var poseTargets = [frame].concat(wrap3d ? [wrap3d] : [], glass ? [glass] : []);
       gsap.set(poseTargets, { rotateY: pose.ry, rotateX: pose.rx, transformOrigin: '50% 50%' });
-      gsap.set(glass, { z: -48 });
+      if (glass) gsap.set(glass, { z: -48 });
       gsap.set(wrap3d ? [frame, wrap3d] : [frame], { z: 22 });
       // One slow deterministic sweep across the scene -- the camera never
       // stops. Seek-exact (plain tween on the scene timeline).
@@ -606,7 +611,7 @@
           // Glass mirrors the frame's box with a margin (offset geometry,
           // pre-transform -- the shared pose does the rest).
           var fw = frame.offsetWidth, fh = frame.offsetHeight;
-          if (fw > 4) {
+          if (glass && fw > 4) {
             // Glass mirrors the frame's box with an even margin -- the
             // glassy-border framing.
             var gm = Math.max(18, fw * 0.045);

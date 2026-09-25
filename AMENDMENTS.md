@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — screencast-frame: `glass: false`
+
+The float presentation lays a frosted glass pane behind the tilted recording
+(a second 3D surface with `backdrop-filter: blur` and `-webkit-box-reflect`).
+- Marc asked "what is this layer behind the tilted screen?". Inside a
+  component box shorter than the frame (y 4%, h 82%), the pane was also cut
+  off at the bottom.
+- `glass: false` now drops it; the recording floats alone over its pool.
+  Default unchanged.
+- The pane is also the prime suspect for the Studio flash, which the
+  paint-containment fix did not cure: Chromium's backdrop-filter layers are
+  known to paint outside their clip.
+- Test: `test/screencast-frame-glass.test.ts`.
+
+---
+
 ## 2026-09-25 — Studio preview: paint containment
 
 On the dark-mode film, Studio (in Arc) flashed the cream scene over the whole
