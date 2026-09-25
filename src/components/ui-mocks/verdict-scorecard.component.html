@@ -1,0 +1,109 @@
+<template>
+  <div class="vs-root">
+    <div class="vs-panel" data-anchor="card">
+      <div class="vs-title"></div>
+      <div class="vs-body">
+        <div class="vs-list"></div>
+        <div class="vs-tile" data-anchor="number"><div class="vs-tlabel"></div><div class="vs-verdict"></div><div class="vs-sub"></div></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* VERDICT SCORECARD: evidence, then the verdict. Criteria rows tick one
+     by one (a circle fills, a check draws), then a dark tile lands the
+     verdict ("Top 5%"). The assessment beside an interview, a lead score,
+     an audit. Wide boxes put the tile beside the list; tall ones under it. */
+  .vs-root, .vs-root * { box-sizing: border-box; max-width: none; }
+  .vs-root { --u: 1px; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); color: var(--ink); }
+  .vs-root.t-light { --ink: var(--mp-color-on-light, #17171c); --mute: color-mix(in srgb, var(--mp-color-on-light, #17171c) 55%, #ffffff); --faint: color-mix(in srgb, var(--mp-color-on-light, #17171c) 38%, #ffffff); --card: #ffffff; --edge: rgba(20, 20, 40, 0.08); --line: rgba(20, 20, 40, 0.08); }
+  .vs-root.t-dark { --ink: #f5f6fa; --mute: rgba(255, 255, 255, 0.62); --faint: rgba(255, 255, 255, 0.4); --card: #1d1e26; --edge: rgba(255, 255, 255, 0.09); --line: rgba(255, 255, 255, 0.09); }
+  .vs-panel { background: var(--card); border-radius: calc(var(--u) * 22); padding: calc(var(--u) * 26) calc(var(--u) * 28);
+    box-shadow: 0 calc(var(--u) * 22) calc(var(--u) * 56) rgba(20, 20, 60, 0.15), 0 calc(var(--u) * 3) calc(var(--u) * 10) rgba(20, 20, 60, 0.07), inset 0 0 0 1px var(--edge); }
+  .vs-title { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: calc(var(--u) * 14); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-bottom: calc(var(--u) * 16); white-space: nowrap; }
+  .vs-title:empty { display: none; }
+  .vs-body { display: flex; gap: calc(var(--u) * 22); align-items: stretch; }
+  .vs-root.stack .vs-body { flex-direction: column; }
+  .vs-list { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
+  .vs-row { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 24); padding: calc(var(--u) * 13) 0; border-top: 1px solid var(--line); font-size: calc(var(--u) * 22); font-weight: 500; white-space: nowrap; }
+  .vs-row:first-child { border-top: 0; }
+  .vs-dot { flex: 0 0 auto; width: calc(var(--u) * 30); height: calc(var(--u) * 30); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 calc(var(--u) * 2) var(--line); }
+  .vs-dot svg { width: 58%; height: 58%; }
+  .vs-dot path { stroke-dasharray: 24; stroke-dashoffset: 24; }
+  .vs-tile { flex: 0 0 auto; min-width: calc(var(--u) * 230); border-radius: calc(var(--u) * 16); background: #17171c; color: #fff; padding: calc(var(--u) * 18) calc(var(--u) * 22);
+    display: flex; flex-direction: column; justify-content: flex-end; }
+  .vs-tlabel { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: calc(var(--u) * 13); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); margin-bottom: auto; padding-bottom: calc(var(--u) * 18); }
+  .vs-verdict { font-size: calc(var(--u) * 56); font-weight: 700; letter-spacing: -0.03em; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .vs-sub { font-size: calc(var(--u) * 16); color: rgba(255, 255, 255, 0.62); margin-top: calc(var(--u) * 8); }
+  .vs-sub:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.vs-root'), panel = q('.vs-panel'), list = q('.vs-list'), tile = q('.vs-tile'), verdict = q('.vs-verdict');
+    var DUR = (ctx && ctx.duration) || 6;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var gl = window.mpGroundLum ? mpGroundLum() : null;
+    root.classList.add('t-' + (data.theme === 'dark' || data.theme === 'light' ? data.theme : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light')));
+    var OK = data.color ? String(data.color) : '#22c55e';
+    q('.vs-title').textContent = data.title ? String(data.title) : '';
+    q('.vs-tlabel').textContent = String(data.verdict_label || 'Verdict');
+    q('.vs-sub').textContent = data.verdict_sub ? String(data.verdict_sub) : '';
+    var finalText = String(data.verdict !== undefined ? data.verdict : 'Top 5%');
+    verdict.textContent = finalText;
+    var crit = (Array.isArray(data.criteria) ? data.criteria : []).map(function (c) { return typeof c === 'string' ? { label: c } : c; }).filter(function (c) { return c && c.label; }).slice(0, 7);
+    if (!crit.length) crit = [{ label: 'Criteria met' }];
+    var dots = crit.map(function (c) {
+      var r = document.createElement('div'); r.className = 'vs-row';
+      var t = document.createElement('span'); t.textContent = String(c.label); r.appendChild(t);
+      var d = document.createElement('span'); d.className = 'vs-dot';
+      d.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+      r.appendChild(d); list.appendChild(r);
+      return { row: r, dot: d, pass: c.pass !== false, at: c.at };
+    });
+
+    // ---- Layout: the visible frame; tile beside (wide) or under (tall);
+    // shrink until the panel fits the box. ----
+    var W0 = el.clientWidth || 1000, H0 = el.clientHeight || 600;
+    var rc = el.getBoundingClientRect(), sc = rc.width / W0 || 1;
+    var ox = Math.max(0, -rc.left, rc.right - window.innerWidth) / sc + W0 * 0.04, oy = Math.max(0, -rc.top, rc.bottom - window.innerHeight) / sc + H0 * 0.05;
+    root.style.padding = oy + 'px ' + ox + 'px';
+    var W = W0 - 2 * ox, H = H0 - 2 * oy;
+    if (H > W * 0.85) root.classList.add('stack');
+    // Grow until the panel fills the box on one axis, then shrink to fit.
+    var u = Math.min(W / 760, H / 420);
+    var fits = function (k) { root.style.setProperty('--u', u.toFixed(3) + 'px'); return panel.offsetWidth <= W * k + 1 && panel.offsetHeight <= H * k + 1; };
+    for (var g = 0; g < 30 && fits(0.94); g++) u *= 1.05;
+    for (var f = 0; f < 30 && !fits(1); f++) u *= 0.95;
+
+    // ---- Motion: the panel rises; rows land; each tick fills and draws;
+    // the verdict lands in the tile after the last tick. ----
+    var AT = num(data.at, 0.2);
+    var stagger = num(data.stagger, Math.max(0.3, Math.min(0.6, (DUR - AT - 2) / crit.length)));
+    gsap.set(panel, { autoAlpha: 0, y: 24 * u });
+    tl.to(panel, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, AT);
+    if (window.mpLineRise) mpLineRise(tl, dots.map(function (d) { return d.row; }), AT + 0.2, { stagger: 0.07, rise: 10 * u });
+    var last = AT + 0.6;
+    dots.forEach(function (d, i) {
+      var at = d.at !== undefined && isFinite(Number(d.at)) ? Number(d.at) : AT + 0.7 + i * stagger;
+      last = Math.max(last, at);
+      if (d.pass) {
+        gsap.set(d.dot, { backgroundColor: 'rgba(34,197,94,0)', scale: 0.85 });
+        tl.to(d.dot, { backgroundColor: OK, boxShadow: 'inset 0 0 0 0px rgba(0,0,0,0)', scale: 1, duration: 0.24, ease: 'back.out(2.2)' }, at);
+        tl.to(d.dot.querySelector('path'), { strokeDashoffset: 0, duration: 0.25, ease: 'power2.out' }, at + 0.06);
+      } else {
+        d.dot.querySelector('svg').style.display = 'none';
+        tl.to(d.dot, { boxShadow: 'inset 0 0 0 ' + (2 * u).toFixed(1) + 'px rgba(200,60,60,0.55)', duration: 0.2 }, at);
+      }
+    });
+    var vAt = num(data.verdict_at, last + 0.4);
+    gsap.set(verdict, { autoAlpha: 0, y: 16 * u, filter: 'blur(8px)' });
+    tl.to(verdict, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.45, ease: 'power3.out' }, vAt);
+    tl.fromTo(tile, { scale: 1 }, { scale: 1.04, duration: 0.14, yoyo: true, repeat: 1, ease: 'power1.inOut', immediateRender: false }, vAt);
+    if (data.count && /\d/.test(finalText) && window.mpCountUp) mpCountUp(tl, verdict, vAt, { to: finalText, duration: 0.8 });
+    return tl;
+  }
+</script>

@@ -6,6 +6,39 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — Metamorph phase 1: grid-cull, review-deck, verdict-scorecard
+
+The three performing components from the Runneth reference
+(SPEC-metamorph.md). They need no morph engine and work in every grammar
+now. Each publishes anchors (`card`, `avatar`, `number`, `grid`,
+`shortlist`) so phase 2 can hand off in and out of them.
+- **grid-cull** (data-viz). A wall of 40–320 small record cards lands in a
+  wave from the centre. The survivors ring in the accent in reading order,
+  the rest blur away, and the survivors glide into a ranked column under a
+  title chip, where their score badges appear.
+  - The crowd is seeded: a same-seed PRNG, never `Math.random`. Only the
+    survivors need real rows.
+  - Times compress together when the scene is short.
+- **review-deck** (ui-mocks). Record cards are dealt one at a time: a band
+  scans down the card, each row ticks as the band passes its centre, the
+  verdict stamps on, and kept cards leave up and left while passes drop
+  down.
+  - The next two cards peek behind.
+  - The counter is one span per card, shown in turn with no callbacks.
+  - The type grows until the tallest card fills most of the box. The scan
+    band sits in its own clip layer so the stamp's 2x slam isn't cut by the
+    card edge (measured).
+- **verdict-scorecard** (ui-mocks). Criteria tick one by one: the circle
+  fills and the check draws, and a miss gets a red ring. The dark verdict
+  tile lands last. The tile sits beside the list, or under it in a tall
+  box, and the panel grows to fill its box.
+
+Test: `test/metamorph-components.test.ts` covers each behaviour, the same
+crowd on every load, nothing leaving the frame at 16x9, 9x16 and 4x5, and
+a seek landing on the same frame however it was reached.
+
+---
+
 ## 2026-09-25 — speaker-3d, measured against the reference side by side
 
 A side-by-side with the camera-3d-captions reference (same quote, a matching
