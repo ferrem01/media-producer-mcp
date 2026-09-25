@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — The mix keeps the voice
+
+Found while adding a music bed to Teaser D. `mixAudio` built its output from
+the tracks it added and mapped that over the video. A speaker film's composite
+carries the voice as the video's own audio, so any sound cue or music bed
+REPLACED the voice. Measured: a 3s voiced clip plus one tick came out as the
+tick and then silence. Sound cues are recent, so every speaker-film render
+with a cue had lost its voice.
+- The fix: when the video has an audio stream (`hasAudioStream`, which reads
+  ffmpeg's own stream report because ffprobe is not on every host), it goes
+  into the mix first, untouched.
+- `edit_speaker` coerces `scene_index` and `strength`, because a client
+  holding the tool's older schema sends them as strings.
+- Test: `test/mixer-keeps-voice.test.ts`. The voice level after the tick
+  matches the source, the tick sits on top, and a silent picture still mixes.
+
 ## 2026-09-25 — The soft look on a dial
 
 Marc: "It doesn't entirely look like it was on." It was on: the take was
