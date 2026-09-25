@@ -129,7 +129,7 @@ export async function reviseDraftSceneSurgical(
     : `Revise this scene against the direction below. Keep everything the direction does not ask to change -- same cast, same beats, same timings -- and edit surgically.\n\nTHE SCENE AS IT IS:\n${JSON.stringify(target, null, 1)}\n\nDirection: ${op.feedback}\n\nReturn the revised scene's JSON only.`;
 
   const text = await callLLM(llmConfig, [{ role: "user", content: user }], {
-    systemPrompt: system, maxTokens: 8000, temperature: 0.4,
+    systemPrompt: system, maxTokens: 16000, temperature: 0.4,
   });
   const scene = parseSceneJson(text);
   const notes = normalizeSceneShape(scene, catalog && catalog.length ? new Set(catalog.map((c) => c.type)) : undefined);

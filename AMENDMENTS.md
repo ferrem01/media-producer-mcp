@@ -17,6 +17,12 @@ session can pick up mid-thread.
 - **Fix.** `liftSceneEmphasis` lifts the marks off the scene's line AND
   every beat's line into `scene.emphasis`. It runs in `normalizeSceneShape`
   and again after `finalizeBeats` builds the line.
+- **Truncated answers retry once** (`llm/client.ts`). Thinking can use up
+  most of `max_tokens` and leave a partial answer: a one-scene revise at
+  8000 tokens came back as 2201 characters cut off mid-JSON.
+  - The empty-answer self-heal now covers that case too: one retry with 4x
+    the budget, capped at 32768.
+  - The surgical revise also starts at 16000.
 
 ---
 
