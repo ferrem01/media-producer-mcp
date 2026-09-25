@@ -23,6 +23,16 @@ session can pick up mid-thread.
   - The empty-answer self-heal now covers that case too: one retry with 4x
     the budget, capped at 32768.
   - The surgical revise also starts at 16000.
+- **A one-scene revise keeps the grammar's casting contract**
+  (`grammarContract` in `llm/storyboard-surgical.ts`).
+  - The surgical prompt only named the grammar, so a creator-cut revise
+    cast two proof mocks with no cut window. Both would have sat over the
+    person for the whole scene (proj_86591051 scene 3).
+  - Creator-cut and speaker now get their cutaway rule in the prompt.
+- **Broken caption marks recast** (`laneMarksBroken` in `core/captions.ts`).
+  - A lane cut from starred lines keeps the same words as the take, so
+    `recaptionIfStale` never recast it.
+  - It now also recasts when a starred token is not exactly `*word*`.
 
 ---
 

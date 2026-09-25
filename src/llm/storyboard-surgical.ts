@@ -55,6 +55,21 @@ function boardContext(project: Project): string {
   ].filter(Boolean).join("\n\n");
 }
 
+/** The grammar's casting contract, which the whole-board writer is held to
+ *  and a one-scene edit must keep. Without it a creator-cut revise cast two
+ *  proof mocks with no cut window, so both sat over the person for the whole
+ *  scene (measured live, proj_86591051 scene 3). */
+export function grammarContract(project: Project): string {
+  const g = String(((project as any).treatment || {}).filmGrammar || "");
+  if (g === "creator-cut") {
+    return `CREATOR-CUT CONTRACT: a person explains and the screen proves it. Every proof mock is a CUTAWAY: enter {"effect": "cut", "at": "@word"} on the word the claim lands, and exit {"effect": "cut", "at": "@word"} on the word the person moves on, so the mock takes the whole frame for that window and the person is back after it. Two proofs in one scene get two windows that do not overlap. Only small overlays (sticker-prop, captions, pills) ride over the person without a window. voiceover_text is plain text: mark the ONE word a line turns on with *stars*, nothing else.`;
+  }
+  if (g === "speaker") {
+    return `SPEAKER CONTRACT: the person is full-bleed on camera and graphics ride over them. A graphic that takes the frame is a cutaway with enter/exit {"effect": "cut", "at": "@word"}; everything else sits clear of the face.`;
+  }
+  return "";
+}
+
 /** Strip markdown fences and parse the one scene object the LLM returns. */
 function parseSceneJson(text: string): any {
   const stripped = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -120,6 +135,7 @@ export async function reviseDraftSceneSurgical(
     catalog && catalog.length
       ? `THE COMPONENT LIBRARY -- a component's data carries ONLY the fields listed for its type. Never invent a "script" array on a type whose fields do not include one; a performed word is a kinetic-text with text/at/exit_at, a stamp is a sticker-prop with kind/text/at.\n\n${formatCatalogForPrompt(catalog)}`
       : "",
+    grammarContract(project),
     `Return EXACTLY ONE scene as a single JSON object. No prose, no markdown fences, no array.`,
     boardContext(project),
   ].join("\n\n");

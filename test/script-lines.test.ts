@@ -122,6 +122,14 @@ describe("every scene the writer returns is held to one shape (whole board and s
     const src = require("node:fs").readFileSync(new URL("../src/llm/storyboard-builder.ts", import.meta.url), "utf8");
     expect(src).toMatch(/beatsVoiceover\(beats\);\s*liftSceneEmphasis\(scene\);/);
   });
+  it("a one-scene revise keeps the grammar's casting contract", async () => {
+    const { grammarContract } = await import("../src/llm/storyboard-surgical.js");
+    expect(grammarContract({ treatment: { filmGrammar: "creator-cut" } } as any)).toMatch(/CUTAWAY.*enter.*exit/s);
+    expect(grammarContract({ treatment: { filmGrammar: "tempo-cut" } } as any)).toBe("");
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile(new URL("../src/llm/storyboard-surgical.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/grammarContract\(project\),/);
+  });
   it("the surgical revise sees the library and holds the shape", async () => {
     const fs = await import("node:fs/promises");
     const src = await fs.readFile(new URL("../src/llm/storyboard-surgical.ts", import.meta.url), "utf8");
