@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   probeTake, orientedDims, reframeCrop, reframePad, measureLoudness, sanitizeTake, TAKE_LOUDNESS_TARGET_LUFS, SOFT_LOOK_FILTER,
+  gradeTake, softLookFilter, ungradedPathOf, DEFAULT_SOFT_STRENGTH,
 } from "../src/core/take-sanitize.js";
 
 const run = promisify(execFile);
@@ -119,17 +120,50 @@ describe("the take sanitizer", () => {
     if (within) expect((await fs.stat(file)).mtimeMs).toBe(stat.mtimeMs);
   });
 
-  it("applies the soft look as a re-encode that changes the pixels and nothing else", async () => {
-    const file = await phoneTake(dir, "soft", { gainDb: 0, scene: "testsrc=size=270x480:rate=30:duration=2" });
-    const natural = path.join(dir, "soft-natural.mp4"); await fs.copyFile(file, natural);
-    const r = await sanitizeTake(file, { width: 270, height: 480 }, "soft");
-    expect(r.look).toBe("soft");
-    expect([r.probe.width, r.probe.height]).toEqual([270, 480]);
-    expect(SOFT_LOOK_FILTER).toMatch(/hqdn3d/);
-    const diff = await frameDiff(dir, file, natural);
-    expect(diff).toBeGreaterThan(0.5);   // graded
-    expect(diff).toBeLessThan(25);       // gently
+  it("no longer grades: the soft look is its own pass (gradeTake), off the kept original", async () => {
+    const file = await phoneTake(dir, "nograde", { audio: false, scene: "testsrc=size=270x480:rate=30:duration=2" });
+    const before = await fs.readFile(file);
+    await sanitizeTake(file, { width: 270, height: 480 });
+    expect((await fs.readFile(file)).equals(before)).toBe(true); // nothing to fix, nothing graded
   });
+
+  it("grades on a dial from the kept original: up, down, and back to natural", async () => {
+    // Marc: "it doesn't entirely look like it was on" -- the base alone was
+    // too mild; he picked 0.5 of the smoothing on a side-by-side.
+    const file = await phoneTake(dir, "dial", { gainDb: 0, scene: "testsrc2=size=270x480:rate=30:duration=2" });
+    const original = await fs.readFile(file);
+    expect(softLookFilter(0)).toBe(SOFT_LOOK_FILTER);
+    expect(SOFT_LOOK_FILTER).toMatch(/hqdn3d/);
+    expect(SOFT_LOOK_FILTER).not.toMatch(/bilateral/);
+    expect(softLookFilter(DEFAULT_SOFT_STRENGTH)).toMatch(/hqdn3d.*bilateral=sigmaS=6:sigmaR=0\.06/);
+    expect(softLookFilter(0.5, { baseSoft: true })).toBe("bilateral=sigmaS=6:sigmaR=0.06");
+    expect(softLookFilter(0.5, { fallback: true })).toMatch(/smartblur/);
+
+    const light = await gradeTake(file, { look: "soft", strength: 0 });
+    expect(light.baseSoft).toBe(false);
+    expect((await fs.readFile(ungradedPathOf(file))).equals(original)).toBe(true); // the original is kept
+    const dLight = await frameDiff(dir, file, ungradedPathOf(file));
+    await gradeTake(file, { look: "soft", strength: 1 });
+    const dStrong = await frameDiff(dir, file, ungradedPathOf(file));
+    expect(dLight).toBeGreaterThan(0.3);
+    expect(dStrong).toBeGreaterThan(dLight * 1.5); // the dial turns it up
+    await gradeTake(file, { look: "soft", strength: 0 });
+    expect(Math.abs((await frameDiff(dir, file, ungradedPathOf(file))) - dLight)).toBeLessThan(0.2); // and down again: from the original, not stacked
+    const back = await gradeTake(file, { look: "natural" });
+    expect(back.look).toBe("natural");
+    expect((await fs.readFile(file)).equals(original)).toBe(true);
+    const p = await probeTake(file);
+    expect([p.width, p.height, p.hasAudio]).toEqual([270, 480, true]);
+  }, 60000);
+
+  it("grades a take whose original is gone over its old base, adding the smoothing only", async () => {
+    const file = await phoneTake(dir, "legacy", { gainDb: 0, scene: "testsrc2=size=270x480:rate=30:duration=2" });
+    const g = await gradeTake(file, { look: "soft", strength: 0.5, currentLook: "soft" });
+    expect(g.baseSoft).toBe(true);
+    await expect(fs.stat(`${ungradedPathOf(file)}.soft`)).resolves.toBeTruthy();
+    // A later grade still knows (the marker stays with the kept file).
+    expect((await gradeTake(file, { look: "soft", strength: 0.2 })).baseSoft).toBe(true);
+  }, 60000);
 
   it("copes with a silent camera-only file: no audio, no normalization, orientation still baked", async () => {
     const file = await phoneTake(dir, "silent", { sideways: true, audio: false });

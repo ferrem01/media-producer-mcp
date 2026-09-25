@@ -1864,11 +1864,14 @@ export function createMcpServer(): McpServer {
 
   tool(
     "edit_speaker",
-    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'.",
+    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'. action='look' sets the soft look on the booth take behind scene_index -- look 'soft' with strength 0-1 (skin smoothing; 0.5 the house pick) or 'natural' -- re-graded from the kept original in the background (every scene cut from the same recording follows; Studio refreshes when it lands).",
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),
-      action: z.enum(["list", "cut", "restore"]),
+      action: z.enum(["list", "cut", "restore", "look"]),
+      scene_index: z.number().optional().describe("look: 0-based scene whose take to grade"),
+      look: z.enum(["soft", "natural"]).optional().describe("look: the grade"),
+      strength: z.number().min(0).max(1).optional().describe("look: skin smoothing 0-1 (default 0.5)"),
       from: z.number().optional().describe("cut: film-time start in seconds"),
       to: z.number().optional().describe("cut: film-time end in seconds"),
       src_start: z.number().optional().describe("restore: the cut's src_start (from action='list')"),
@@ -1877,6 +1880,24 @@ export function createMcpServer(): McpServer {
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
+      if (params.action === "look") {
+        const { activeTake } = await import("./core/take-needs.js");
+        const { takeCopies } = await import("./core/speaker-layer.js");
+        const { queueTakeGrade } = await import("./core/take-grade.js");
+        const lk = params.look || "soft";
+        const take = activeTake(project, Number(params.scene_index ?? 0));
+        if (!take) return err(`Scene ${Number(params.scene_index ?? 0) + 1} has no take`);
+        const raw = takeCopies(take).raw;
+        if (!raw.startsWith(`/assets/${project.tenant_id}/projects/${project.project_id}/assets/`)) return err("The take is not a file of this project");
+        const strength = lk === "soft" ? (params.strength ?? 0.5) : undefined;
+        queueTakeGrade({
+          tenantId: project.tenant_id, projectId: project.project_id, rawUrl: raw, look: lk, strength, dataDir: config.dataDir,
+          resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject: (t, p) => loadProject(t, p), saveProject,
+          afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
+        });
+        const scenes = (project.takes || []).filter((t) => takeCopies(t).raw === raw).map((t) => t.scene_index + 1);
+        return ok({ status: "grading", look: lk, strength, scenes, note: "Re-grading in the background from the kept original (about a minute); the project saves when it lands." });
+      }
       const { applySpeakerCut, applySpeakerRestore, maintainTranscriptCacheAfterCut, dropTranscriptCache } =
         await import("./core/speaker-edl.js");
 

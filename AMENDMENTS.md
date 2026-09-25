@@ -6,6 +6,54 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-25 — The soft look on a dial
+
+Marc: "It doesn't entirely look like it was on." It was on: the take was
+re-encoded by the server with the grade. But the grade was only a light
+denoise plus a touch of warmth and contrast. He compared a frame side by side
+with an edge-preserving smoothing added and said the smoother one looked
+"definitely nicer": "something we can dial up and dial down". The checkbox
+stays, checked by default.
+- **The look** (`core/take-sanitize.ts`):
+  - `softLookFilter(strength)` is the old base plus a bilateral
+    skin-smoothing pass on a 0–1 dial. At 0.5 (the default) it is
+    `sigmaS=6, sigmaR=0.06`, the frame Marc picked.
+  - An ffmpeg without `bilateral` (older than 4.4) falls back to
+    `smartblur`.
+- **Grading from a kept original** (`gradeTake`):
+  - The sanitizer no longer grades. `gradeTake` keeps the ungraded original
+    beside the take (`.<name>.ungraded.<ext>`) and grades from it every
+    time, so the dial goes down as well as up, and `natural` puts the
+    original back.
+  - Takes graded before the dial lost their original. For those, the file as
+    it stands becomes the kept copy, a `.soft` marker says it already carries
+    the base, and later grades add only the smoothing.
+- **Background grading** (`core/take-grade.ts`):
+  - The attach lands the take natural and queues the grade. A bilateral pass
+    over a minute-long take runs for minutes, and the request must stay
+    under the proxy limit (the reason the matte moved out of the request
+    too).
+  - One grade per file at a time; the last request made while one runs
+    wins. Every take cut from the same recording follows.
+  - Blur and alpha copies cut from the old grade are dropped, and the grade
+    queues the matte again, so the matte always runs after the grade.
+- **Controls:**
+  - Booth: a light-to-strong slider under Soft look, off when it is
+    unchecked; it sends `soft_strength`.
+  - Studio: in the speaker's Inspect panel, a `soft look` checkbox and
+    slider → `POST /api/take-look` `{scene_index, look, strength}`.
+  - MCP: `edit_speaker` `action:'look'`.
+- **Seeing the new grade:**
+  - `take-*` files are now served with `no-cache` and an ETag (a 304 when
+    unchanged). A re-grade keeps the url, and an hour of browser cache kept
+    the old picture on screen.
+  - Studio's live sync spots a changed `graded_at` and reloads the speaker
+    elements.
+- Tests: `test/take-sanitize.test.ts` covers the dial going up, down and back
+  to the byte-identical original, and the legacy base. `test/take-grade.test.ts`
+  covers two scenes from one recording, the last request winning, stale copies
+  dropped, and another recording left alone. Also `test/take-page.test.ts`.
+
 ## 2026-09-25 — Studio playback: no rewinds at a cut, sound cues audible
 
 Marc (proj_86591051, a screen recording of Studio): "during the zoom and screen

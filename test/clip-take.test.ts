@@ -48,7 +48,7 @@ describe("the clip need", () => {
     expect(body).toMatch(/type: "video", position, z_index: 12, data: \{ src: url, object_fit: "cover", start_at: 0, clip: true \}, enter: \{ effect: "cut", at: 0 \}/);
     expect(body).toMatch(/need\.status = "provided"; need\.path = url;/);
     // No reframe to the canvas: the clip keeps its whole picture and the cover fit frames it.
-    expect(body).toMatch(/sanitizeTake\(resolveVideoPath\(url, config\.dataDir\), undefined, "natural"\)/);
+    expect(body).toMatch(/sanitizeTake\(resolveVideoPath\(url, config\.dataDir\), undefined\)/);
     expect(body).toMatch(/sbScene\.duration_seconds = Math\.ceil\(dur \* 10\) \/ 10;/);
     expect(body).toMatch(/resolveTakeWaiters\(tkTenant, tkProject, take\)/);
     // The slate the board cast for this need leaves with the clip's arrival, on the board and the built scene.

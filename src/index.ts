@@ -37,6 +37,8 @@ import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-trac
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
 import { queueTakeMatte } from "./core/take-matte.js";
+import { queueTakeGrade } from "./core/take-grade.js";
+import { DEFAULT_SOFT_STRENGTH } from "./core/take-sanitize.js";
 import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies } from "./core/speaker-layer.js";
 import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
@@ -453,7 +455,7 @@ async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Re
   // proj_09b6d0cb: 9:16 cameos on a 4:5 film with 140px bars baked in).
   // The video component's cover fit frames it at render. Rotation and
   // loudness are still made right.
-  try { sanitized = await sanitizeTake(resolveVideoPath(url, config.dataDir), undefined, "natural"); }
+  try { sanitized = await sanitizeTake(resolveVideoPath(url, config.dataDir), undefined); }
   catch (e: any) { console.warn(`  clip: sanitize skipped for ${path.basename(url)}: ${e?.message || e}`); }
   const project = await loadProject(tkTenant, tkProject);
   if (!project) return { status: 404, body: { error: "Project not found" } };
@@ -515,7 +517,7 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
     // file work is done, and saved within milliseconds.
     let sanitized: TakeSanitizeResult | undefined;
     try {
-      sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas, tkBody.look === "soft" ? "soft" : "natural");
+      sanitized = await sanitizeTake(resolveVideoPath(tkUrl, config.dataDir), tkPeek.canvas);
     } catch (e: any) {
       console.warn(`  take: sanitize skipped for ${path.basename(tkUrl)}: ${e?.message || e}`);
     }
@@ -562,7 +564,8 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
       capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw",
       rotation_baked: sanitized?.rotation_baked || undefined,
       reframed: sanitized?.reframed,
-      look: sanitized?.look,
+      // Natural until the grade lands (queued below, after the save).
+      look: "natural" as const,
       face: tkFace,
       loudness: sanitized?.loudness,
     };
@@ -616,7 +619,20 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
     // provided screen does (measured live, proj_25b2858c: the take
     // landed, the scene re-timed to 4.98s, the card kept the outline).
     reshootStoryboardCardsSoon(tkTenant, tkProject);
-    if (tkMissing.blur || tkMissing.alpha) {
+    // THE SOFT LOOK (core/take-grade.ts): graded in the background from a
+    // kept original, so Studio's dial can move it later. The grade queues
+    // the matte itself when it lands (the copies are cut from the graded
+    // take), so the matte is queued here only for a natural take.
+    const tkSoft = tkBody.look === "soft";
+    const tkSoftStrength = Number.isFinite(Number(tkBody.soft_strength)) && tkBody.soft_strength !== null && tkBody.soft_strength !== ""
+      ? Math.max(0, Math.min(1, Number(tkBody.soft_strength))) : DEFAULT_SOFT_STRENGTH;
+    if (tkSoft) {
+      queueTakeGrade({
+        tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, look: "soft", strength: tkSoftStrength, matteStrength: tkBlurStrength, dataDir: config.dataDir,
+        resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
+        afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
+      });
+    } else if (tkMissing.blur || tkMissing.alpha) {
       queueTakeMatte({
         tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, dataDir: config.dataDir, strength: tkBlurStrength,
         blur: tkMissing.blur, alpha: tkMissing.alpha,
@@ -631,7 +647,7 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
       take.duration ? `${take.duration}s` : "",
       sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
       sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
-      sanitized?.look ? `${sanitized.look} look` : "",
+      tkSoft ? `soft look ${tkSoftStrength} grading` : "",
       tkBlurNote,
       tkFace ? `face at ${Math.round(tkFace.cx * 100)}%/${Math.round(tkFace.cy * 100)}% (${Math.round(tkFace.size * 100)}% tall)` : "no face found",
       deair && (deair.head > 0 || deair.tail > 0) ? `de-aired -${deair.head}s head / -${deair.tail}s tail` : "",
@@ -727,6 +743,19 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
     ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf",
   };
   const contentType = mimeTypes[ext] || "application/octet-stream";
+  // A booth take (and its copies) is re-graded IN PLACE at the same url
+  // (core/take-grade.ts): an hour of browser cache kept the old grade on
+  // screen. Takes revalidate instead -- a 304 when nothing changed.
+  const isTake = /^\.?take-/.test(path.basename(filePath));
+  const etag = `"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`;
+  const cacheHeaders: Record<string, string> = isTake
+    ? { "Cache-Control": "no-cache", "ETag": etag, "Last-Modified": stat.mtime.toUTCString() }
+    : { "Cache-Control": "public, max-age=3600" };
+  if (isTake && req.headers["if-none-match"] === etag) {
+    res.writeHead(304, { ...cacheHeaders, "Access-Control-Allow-Origin": "*" });
+    res.end();
+    return;
+  }
   const range = req.headers.range;
 
   if (range) {
@@ -740,7 +769,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       "Content-Length": chunkSize,
       "Content-Type": contentType,
       "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=3600",
+      ...cacheHeaders,
     });
     createReadStream(filePath, { start, end }).pipe(res);
   } else {
@@ -749,7 +778,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       "Content-Type": contentType,
       "Accept-Ranges": "bytes",
       "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=3600",
+      ...cacheHeaders,
     });
     createReadStream(filePath).pipe(res);
   }
@@ -1200,7 +1229,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|take-look|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -3030,6 +3059,37 @@ Rules:
       if (armedGetMatch && method === "GET") {
         const armed = await readArmedNeed(decodeURIComponent(armedGetMatch[1]));
         jsonResponse(res, 200, { ok: true, armed });
+        return;
+      }
+
+      // POST /api/take-look/{tenant}/{project} {scene_index, look, strength}
+      // Studio's smoothing dial: re-grade the take behind one scene (every
+      // scene cut from the same recording follows -- it is one file) from
+      // its kept original. Runs in the background; the project saves when
+      // the grade lands and Studio's live sync reloads the take.
+      const takeLookMatch = urlPath.match(/^\/api\/take-look\/([^/]+)\/([^/]+)$/);
+      if (takeLookMatch && method === "POST") {
+        const [, tlTenant, tlProject] = takeLookMatch.map(decodeURIComponent);
+        let tlBody: Record<string, unknown> = {};
+        try { tlBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
+        const tlLook = tlBody.look === "natural" ? "natural" : tlBody.look === "soft" ? "soft" : null;
+        if (!tlLook) { jsonResponse(res, 400, { error: "look must be soft or natural" }); return; }
+        const tlStrength = Number(tlBody.strength);
+        if (tlLook === "soft" && !(tlStrength >= 0 && tlStrength <= 1)) { jsonResponse(res, 400, { error: "strength must be 0-1" }); return; }
+        const tlProj = await loadProject(tlTenant, tlProject);
+        if (!tlProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const tlTake = activeTake(tlProj, Number(tlBody.scene_index));
+        if (!tlTake) { jsonResponse(res, 404, { error: "that scene has no take" }); return; }
+        const tlRaw = takeCopies(tlTake).raw;
+        if (!tlRaw.startsWith(`/assets/${tlTenant}/projects/${tlProject}/assets/`)) { jsonResponse(res, 400, { error: "the take is not a file of this project" }); return; }
+        queueTakeGrade({
+          tenantId: tlTenant, projectId: tlProject, rawUrl: tlRaw, look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, dataDir: config.dataDir,
+          resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
+          afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
+        });
+        const tlScenes = (tlProj.takes || []).filter((t) => takeCopies(t).raw === tlRaw).map((t) => t.scene_index + 1);
+        console.log(`  take look: ${tlProject} ${path.basename(tlRaw)} -> ${tlLook}${tlLook === "soft" ? ` ${tlStrength}` : ""} (scenes ${tlScenes.join(", ")})`);
+        jsonResponse(res, 200, { ok: true, grading: "running", look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, scenes: tlScenes });
         return;
       }
 

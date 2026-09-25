@@ -806,8 +806,18 @@ export interface Take {
   trim_end?: number;
   rotation_baked?: number;
   reframed?: { from: string; to: string };
-  /** The grade applied at ingest ("soft": gentle skin smoothing and warmth). */
+  /** The grade on the file ("soft": warmth, denoise and skin smoothing --
+   *  core/take-grade.ts). Applied in the background after the take lands. */
   look?: "natural" | "soft";
+  /** The soft look's skin smoothing, 0-1 (0: the mild base alone). */
+  soft_strength?: number;
+  /** The ungraded original, kept beside the take so a re-grade starts clean. */
+  ungraded?: string;
+  /** The kept original already carries the soft base (a take graded before
+   *  the dial, whose true original was gone): natural returns to that. */
+  ungraded_soft?: boolean;
+  /** When the current grade landed (Studio reloads the take on a change). */
+  graded_at?: string;
   /** Older shape (before the copies below): `source` was swapped to the
    *  blurred copy and the raw take kept here. Read through takeCopies. */
   background?: { mode: "blur"; source_raw: string; strength?: number; ms?: number };
