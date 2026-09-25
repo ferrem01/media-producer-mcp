@@ -16,6 +16,20 @@ the **environment gotchas** that will otherwise cost you an hour.
   `ROADMAP.md`, `SPEC-studio.md`, `SPEC-brand-extraction.md`, `SPEC-team.md` (who shares a tenant: invite, membership, company domain), `SPEC-briefs.md` (a marketing brief in, a film out: what a brief locks, real footage on any grammar), `SPEC-recipes.md` (the third axis: a measured cut the writer fills -- grammar, frame, recipe), `SPEC-metamorph.md` (phase 1 shipped, phases 2–3 BACKLOG -- parked by Marc: a oner carried by objects -- handoffs as `enter` effects that name a source anchor, rack focus; no new concepts, no per-component morph states).
 - Running change log + open items: `AMENDMENTS.md`.
 
+## Working on Marc's films (hard rules)
+
+- **Never render unless Marc says so.** That covers the `render` tool in
+  every form: full films, preview-quality films and single-scene stills. A
+  render costs minutes and he calls it waste. Check your work with
+  `get target:'layout'` / `target:'motion'` or a local still harness instead,
+  and tell him it is ready to render.
+- **Never rebuild a built film.** `generate` mode `full` on a project that
+  already has scenes remakes every scene from the board, and it wipes his
+  Studio edits (timing, removed sounds, positions); the server keeps no
+  history. Change a built film with `update` (a scene or component),
+  `add`, `delete`, or the board's `sfx` edit. The board alone does not
+  change the film.
+
 ## What this is
 
 An MCP server that generates videos/images/decks from a text prompt. Stack:
