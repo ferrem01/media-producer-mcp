@@ -59,6 +59,21 @@
     text-shadow: 0 0 60px rgba(167, 139, 250, 0.25), 0 0 120px rgba(167, 139, 250, 0.1);
   }
 
+  /* PLATE: the row laid over a live picture (a person's room, footage)
+     gets a dark frosted panel so the digits read on any ground -- white
+     numbers on a bright wall washed out (Marc, proj_7adf0eb5: the numbers
+     moved above his head). A plate row is a banner: tight padding. */
+  .number-counter-row.nc-plate { padding: 12px; }
+  .number-counter-row.nc-plate .stats-container {
+    background: rgba(10, 12, 24, 0.62);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 28px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  }
+  .number-counter-row.nc-plate .stat-item { padding: 22px 26px; }
+
   .stat-label {
     font-size: 16px;
     font-weight: 600;
@@ -74,6 +89,7 @@
     var tl = gsap.timeline();
     var container = el.querySelector('.stats-container');
     var stats = data.stats || [];
+    if (data.plate) el.querySelector('.number-counter-row').classList.add('nc-plate');
 
     if (stats.length > 6) stats = stats.slice(0, 6);
 

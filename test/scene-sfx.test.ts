@@ -136,3 +136,25 @@ describe("the captions follow the lines", () => {
     expect(server).toMatch(/const linesEdited = u\.voiceover_text !== undefined;/);
   });
 });
+
+describe("sound cues get their files when Studio opens the film", () => {
+  it("spots a cue the build carried over without its file, and fills it once", async () => {
+    // Marc (proj_7adf0eb5): the build carried the board's cues onto the
+    // scenes as ids and times; Studio plays a cue's FILE, so none sounded.
+    const { hasCueWithoutFile, ensureSoundFiles } = await import("../src/core/scene-sfx.js");
+    const project: any = {
+      storyboard: { scenes: [{ sfx: [{ at: 1, id: "house-thud", src: "/assets/t/projects/p/assets/sfx-thud.wav" }] }] },
+      scenes: [{ sfx: [{ at: 3.13, id: "house-riser", anchor: { word: "happened" } }] }],
+    };
+    expect(hasCueWithoutFile(project)).toBe(true);
+    let calls = 0;
+    const n = await ensureSoundFiles(project, async (id) => { calls++; return { url: `/assets/t/projects/p/assets/sfx-${id.replace(/^house-/, "")}.wav`, title: "Riser", duration: 1.2 }; });
+    expect(n).toBe(1);
+    expect(project.scenes[0].sfx[0].src).toBe("/assets/t/projects/p/assets/sfx-riser.wav");
+    expect(hasCueWithoutFile(project)).toBe(false);
+    expect(await ensureSoundFiles(project, async () => { calls++; return { url: "x", title: "x", duration: 0 }; })).toBe(0);
+    expect(calls).toBe(1);
+    const src = await (await import("node:fs/promises")).readFile("src/index.ts", "utf8");
+    expect(src).toMatch(/if \(hasCueWithoutFile\(project\)\) \{[\s\S]{0,400}ensureSoundFiles\(project,[\s\S]{0,200}project\.updated_at = stamp; await saveProject\(project\);/);
+  });
+});

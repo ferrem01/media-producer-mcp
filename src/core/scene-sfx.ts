@@ -107,6 +107,12 @@ export async function ensureSoundFiles(
   return n;
 }
 
+/** Any cue (board or built) still waiting for its file. */
+export function hasCueWithoutFile(project: Pick<Project, "scenes" | "storyboard">): boolean {
+  const lists = [...((project.storyboard?.scenes || []) as any[]), ...((project.scenes || []) as any[])];
+  return lists.some((s) => Array.isArray(s?.sfx) && s.sfx.some((c: any) => c && c.id && !c.src));
+}
+
 export interface SfxTrack {
   path: string;
   type: "sfx";
