@@ -99,6 +99,11 @@
       "type": "number",
       "label": "Seconds into the camera clip where this scene's PiP starts (default 0; speaker-track mode sets it automatically)",
       "optional": true
+    },
+    "glass": {
+      "type": "boolean",
+      "label": "Float only: the frosted glass pane behind the tilted recording (default true). false floats the recording alone.",
+      "optional": true
     }
   }
 }
