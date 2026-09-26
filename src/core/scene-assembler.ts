@@ -32,8 +32,11 @@ export function isCutInProof(comp: { type: string; enter?: any }): boolean {
  *  caption lane is the film's text layer -- the reference films punch in
  *  on the person while the words hold still. Inside the rig a 1.3x
  *  punch-in pushed the chest band to 87%-103% of the frame (measured live,
- *  proj_9e650f1a scenes 6-7: the captions in the platform strip). */
-const FIXED_TO_FRAME = new Set(["reel-caption-lane"]);
+ *  proj_9e650f1a scenes 6-7: the captions in the platform strip). The
+ *  stacking list carried over the person is words too: a 1.12x punch-in on
+ *  "seeing the numbers" pushed its left edge 20px off the frame (measured,
+ *  Teaser D proj_86591051, the Claim scene). */
+const FIXED_TO_FRAME = new Set(["reel-caption-lane", "stack-list"]);
 export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
 /** The scatter caption lane (core/captions.ts, the Air cut): words around
  *  the person that stay; over a cutaway the choreography flags the window
