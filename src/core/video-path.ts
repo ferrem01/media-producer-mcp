@@ -36,6 +36,8 @@ export function resolveVideoPath(
     let m: RegExpMatchArray | null;
     if ((m = q.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/)))
       return path.join(dataDir, m[1], "projects", m[2], "assets", m[3]);
+    if ((m = q.match(/^\/assets\/_system\/stickers\/([^/]+)$/)))
+      return path.join(dataDir, "_system", "stickers", m[1]);
     if ((m = q.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/)))
       return path.join(dataDir, m[1], "brand-kit", "assets", m[2]);
     if ((m = q.match(/^\/assets\/([^/]+)\/assets\/(.+)$/)))

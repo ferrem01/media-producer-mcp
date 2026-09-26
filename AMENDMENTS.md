@@ -6,6 +6,40 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The house sticker library, stickers on demand, sticker rain
+
+Marc: "am i supposed to like go out and find all these stickers and
+stickify a bunch of things or is there like a library somewhere". He wants a
+stack of money on "money" and a little chimp for MailChimp (never their
+logo). The monkey in the Instagram ad was the emoji on a stamp. Asked for
+all three pieces:
+- **House set** (`core/sticker-library.ts`, `src/stickers/`): 44 die-cut
+  stickers drawn once with gpt-image-1 in one house style (flat vector, a dark
+  line, a thick white die-cut border, no text, no logos). Each is trimmed to
+  its art with ffmpeg alone (the raw alpha plane gives the crop box, and
+  near-transparent haze is cleared), then written as WebP with alpha: about
+  35KB each, 1.4MB for the whole set. The server copies them into
+  `_system/stickers` on first use (the foley pattern) and serves them at
+  `/assets/_system/stickers/<name>.webp`. Render and preview resolve that
+  path.
+- **By name**: `sticker-prop {kind:'image', sticker:'chimp'}`. The assembler
+  swaps the name for the file (`stickerData`), and the stored data keeps the
+  name. The prop's schema lists every house name so the writer can cast one.
+- **On demand**: a name the library lacks is drawn in the house style
+  (`mintSticker`, about 15s) the first time a component uses it: on `add`/`update`,
+  and at assembly as a backstop. The new sticker joins the library for every
+  tenant (`minted.json`). The `sticker` tool lists the library and makes one
+  ahead of time.
+- **`sticker-rain`** (props): the dollar-bills shot. Pieces fall from above,
+  either flutter through (sway and tumble) or pile (drop, bounce, stay). The
+  pattern comes from a seeded PRNG, so a seed always gives the same shower.
+  `lanes:'sides'` keeps it off the face. Measured in stills and fixed:
+  staggered starts fell as one diagonal row (start order is now shuffled
+  against the lanes); coins hung off the bottom and side edges (a piece now
+  rests by its bottom edge, inside a margin that covers its tilt and the
+  scene's camera push).
+- Test: `test/sticker-library.test.ts`.
+
 ## 2026-09-26 — Teaser D restored; `add` keeps a component's zoom
 
 Marc on the Scale Army restructure of Teaser D: "go back to the original

@@ -1,0 +1,73 @@
+{
+  "type": "sticker-rain",
+  "label": "Sticker rain",
+  "category": "props",
+  "description": "A SHOWER of die-cut stickers timed to a word: dollar bills fluttering down around a person grinning up at them ('money'), coins dropping into a pile, envelopes pouring in ('your inbox'). Pieces fall from above the frame, sway and tumble, and either pass out the bottom (mode 'flutter', the default -- paper, bills, confetti) or land on a floor and stay (mode 'pile' -- coins, objects). Name the sticker from the house library with `sticker` (e.g. 'dollar-bill', 'coin', 'envelope', 'money-stack') or mix several with `stickers`; a name the library lacks is drawn in the house style on first use (give `sticker_subject` to say what to draw). Full-frame over the scene -- lanes 'sides' keeps the middle third clear so it never covers a face. Time `at` to the spoken word. Example: {\"sticker\":\"dollar-bill\",\"count\":16,\"at\":1.2,\"spread\":1.2}.",
+  "data": {
+    "sticker": {
+      "type": "string",
+      "label": "House-library sticker name (dollar-bill, coin, money-stack, envelope, star, heart, party-popper ...), or a new name to draw on first use",
+      "optional": true
+    },
+    "stickers": {
+      "type": "array",
+      "label": "Several sticker names to mix in one shower",
+      "optional": true
+    },
+    "sticker_subject": {
+      "type": "string",
+      "label": "What to draw when the name is new to the library (e.g. 'a cartoon chimpanzee face')",
+      "optional": true
+    },
+    "src": {
+      "type": "string",
+      "label": "A transparent image URL instead of a library name",
+      "optional": true
+    },
+    "count": {
+      "type": "number",
+      "label": "How many pieces (default 14, max 40)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the first piece appears (scene seconds, default 0.2)",
+      "optional": true
+    },
+    "spread": {
+      "type": "number",
+      "label": "Seconds over which the pieces start falling (default 1.4)",
+      "optional": true
+    },
+    "fall": {
+      "type": "number",
+      "label": "Seconds one piece takes to fall (default 2.2)",
+      "optional": true
+    },
+    "size": {
+      "type": "number",
+      "label": "Piece width as a fraction of the frame width (default 0.2)",
+      "optional": true
+    },
+    "mode": {
+      "type": "string",
+      "label": "flutter (default: sway and tumble through the frame) | pile (drop, bounce, land and stay)",
+      "optional": true
+    },
+    "floor": {
+      "type": "number",
+      "label": "pile only: where they land, as a fraction of the frame height (default 0.94)",
+      "optional": true
+    },
+    "lanes": {
+      "type": "string",
+      "label": "all (default) | sides (keep the middle third clear, off the face)",
+      "optional": true
+    },
+    "seed": {
+      "type": "number",
+      "label": "Changes the pattern (same seed, same shower)",
+      "optional": true
+    }
+  }
+}

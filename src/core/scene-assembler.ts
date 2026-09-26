@@ -14,6 +14,7 @@
  */
 
 import { fitBoxFor, wrapInFitBox } from "./fit-box.js";
+import { stickerData, ensureStickerFiles } from "./sticker-library.js";
 import { bindSpeakerLayerData, isSpeakerLayer, speakerRendersInside } from "./speaker-layer.js";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { resolveComponentTags, transformComponentTagData, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
@@ -215,6 +216,11 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // Resolve brand fonts FIRST so the font links and --mp-font-family agree
   // on a family that actually exists (see font-resolve.ts).
   const brandKit = await resolveBrandKitFonts(options.brandKit);
+  // Stickers named from the house library exist before they are drawn: a
+  // name the library lacks is minted in the house style here (once, for
+  // every tenant) so a preview, a layout probe and a render all find it.
+  try { await ensureStickerFiles(config.dataDir, scene.components || []); }
+  catch (e: any) { console.warn(`  stickers: ${e?.message || e}`); }
 
   // Build a lookup of component sources by type
   const sourceMap = new Map<string, ParsedComponent>();
@@ -254,7 +260,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     if (!layerData) continue;
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
-    const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData({ ...comp, data: bakeLogoPillData({ ...comp, data: layerData }, brandKit) });
+    const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : stickerData(comp.type, bakeDirectLogoData({ ...comp, data: bakeLogoPillData({ ...comp, data: layerData }, brandKit) }));
     // Option-A backstop: a PiP pointing at the speaker clip by URL becomes the
     // "speaker" token regardless of how it was authored (generate, hand-edit,
     // or a client that skipped the update-tool guardrail) -- so preview dedups
@@ -2025,6 +2031,11 @@ function resolveAssetPath(urlPath: string, preview?: boolean): string {
   // In preview mode, keep HTTP paths so the browser can load them
   if (preview) {
     return urlPath;
+  }
+  // /assets/_system/stickers/{file} -> {dataDir}/_system/stickers/{file} (the house sticker library)
+  const stickerMatch = urlPath.match(/^\/assets\/_system\/stickers\/([^/]+)$/);
+  if (stickerMatch) {
+    return `file://${path.resolve(config.dataDir, "_system", "stickers", stickerMatch[1])}`;
   }
   // /assets/{tenant}/brand-kit/{rest} -> {dataDir}/{tenant}/brand-kit/assets/{rest}
   const brandMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);

@@ -8,6 +8,7 @@
  */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { ensureStickerLibrary, stickerDir } from "./core/sticker-library.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID, createHash } from "node:crypto";
 import http from "node:http";
@@ -982,6 +983,19 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         if (f.includes("..") || !/\.(wav|mp3|m4a|ogg|aac)$/i.test(f)) { res.writeHead(403); res.end("Forbidden"); return; }
         try { await ensureFoleyLibrary(SFX_DIR); } catch { /* serve whatever is there */ }
         try { await streamFile(req, res, path.join(config.dataDir, "_system", "sfx", f)); }
+        catch { res.writeHead(404); res.end("Asset not found"); }
+        return;
+      }
+
+      // The house sticker library (core/sticker-library.ts): images only.
+      // The committed set is copied in on first request, so a fresh server
+      // has it without a deploy step; minted stickers land beside it.
+      const stickerFileMatch = urlPath.match(/^\/assets\/_system\/stickers\/([^/]+)$/);
+      if (stickerFileMatch && (method === "GET" || method === "HEAD")) {
+        const f = decodeURIComponent(stickerFileMatch[1]);
+        if (f.includes("..") || !/\.(webp|png)$/i.test(f)) { res.writeHead(403); res.end("Forbidden"); return; }
+        try { await ensureStickerLibrary(config.dataDir); } catch { /* serve whatever is there */ }
+        try { await streamFile(req, res, path.join(stickerDir(config.dataDir), f)); }
         catch { res.writeHead(404); res.end("Asset not found"); }
         return;
       }
