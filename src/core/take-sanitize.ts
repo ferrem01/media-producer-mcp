@@ -24,6 +24,12 @@
  *     went through <video> as object-fit: cover and zoomed into the face
  *     (measured live, proj_179c8dfa).
  *
+ *  2b. HDR BECOMES SDR. An iPhone shooting HDR writes HLG (bt2020, 10-bit);
+ *     re-encoded as 8-bit yuv420p without a tone map and played as bt709 it
+ *     comes out grey and washed out, and every later measure (the studio
+ *     correction, the matte) reads the wrong numbers. The take is tone-mapped
+ *     to SDR bt709 once, here (hdrToSdrFilter).
+ *
  *  3. A QUIET VOICE. A phone at arm's length in a room lands around -35
  *     LUFS; dialogue that will carry a film wants about -16. Two-pass linear
  *     loudnorm so the take is not crushed.
@@ -35,6 +41,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { measureTake, studioGradeFilter, type FaceHint, type TakeStudioStats, type TakeStudioCorrection } from "./take-studio.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -55,6 +62,11 @@ export interface TakeProbe {
   rotation: number;
   hasAudio: boolean;
   duration: number;
+  /** HDR transfer read off the stream (iPhone HDR video is HLG; some
+   *  cameras and screen tools write PQ). Absent for SDR. */
+  hdr?: "hlg" | "pq";
+  /** The stream says full range ("pc"); absent = limited ("tv") or untagged. */
+  fullRange?: boolean;
 }
 
 export interface TakeSanitizeResult {
@@ -67,6 +79,9 @@ export interface TakeSanitizeResult {
   /** Integrated loudness before, and the target it was normalized to (absent
    *  when no audio or already within tolerance). */
   loudness?: { measured_lufs: number; normalized_to_lufs?: number };
+  /** Set when an HDR take was tone-mapped to SDR bt709 (`fallback`: the
+   *  ffmpeg build had no zscale; the approximate colorspace path ran). */
+  tonemapped?: { from: "hlg" | "pq"; fallback?: boolean };
   probe: TakeProbe;
 }
 
@@ -94,7 +109,12 @@ export async function probeTake(filePath: string): Promise<TakeProbe> {
   const rotation = matrix ? Number(matrix[1]) : legacy ? Number(legacy[1]) : 0;
   const dur = table.match(/Duration: (\d+):(\d+):([\d.]+)/);
   const duration = dur ? Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]) : 0;
+  // The pixel format's colour tuple: "yuv420p10le(tv, bt2020nc/bt2020/arib-std-b67)".
+  const vline = table.match(/Stream #\d+:\d+.*: Video: .*/)?.[0] || "";
+  const hdr = /arib-std-b67/.test(vline) ? "hlg" as const : /smpte2084/.test(vline) ? "pq" as const : undefined;
   return {
+    ...(hdr ? { hdr } : {}),
+    ...(/\(pc[,)]/.test(vline) ? { fullRange: true } : {}),
     width: Number(video[1]),
     height: Number(video[2]),
     rotation: Number.isFinite(rotation) ? Math.round(rotation) : 0,
@@ -138,6 +158,29 @@ export function reframeCrop(
   // Even dimensions keep yuv420p happy.
   const w = Math.round((take.height * canvasAspect) / 2) * 2;
   return { w, h: take.height, x: Math.round((take.width - w) / 4) * 2, y: 0 };
+}
+
+/** HDR -> SDR bt709. zscale linearizes the HLG/PQ signal with diffuse white
+ *  at 203 nits (ITU-R BT.2408's reference white, where an iPhone puts a
+ *  white wall) as 1.0, converts bt2020 primaries to bt709, and mobius
+ *  keeps everything up to that white linear while rolling the speculars
+ *  above it off (hable and reinhard darkened the midtones: measured on an
+ *  SDR clip taken to HLG and back, mean rgb 133.5 -> mobius 130.5, hable
+ *  87, reinhard 122). Without zscale (an ffmpeg built without libzimg),
+ *  `colorspace` converts the primaries treating the signal as bt2020
+ *  gamma, and a curve lifts reference white (HLG 0.75) back toward 1:
+ *  the same round trip measured 135.9 -- approximate, but not grey. */
+export function hdrToSdrFilter(hdr: "hlg" | "pq", o: { fallback?: boolean; fullRange?: boolean } = {}): string {
+  const tin = hdr === "hlg" ? "arib-std-b67" : "smpte2084";
+  if (o.fallback) {
+    // PQ's reference white sits at ~0.58 of the signal, HLG's at 0.75.
+    const w = hdr === "hlg" ? 0.75 : 0.58;
+    return `colorspace=all=bt709:iall=bt2020:itrc=bt2020-10:format=yuv420p,curves=all='0/0 ${w / 2}/0.42 ${w}/0.86 1/1'`;
+  }
+  // Every input property is stated: zscale finds "no path between
+  // colorspaces" when one is missing from the stream (measured: an
+  // untagged range fails), and HDR video is limited range unless it says.
+  return `zscale=tin=${tin}:pin=bt2020:min=bt2020nc:rin=${o.fullRange ? "pc" : "tv"}:t=linear:npl=203,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=mobius:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p`;
 }
 
 /** Integrated loudness in LUFS (EBU R128), or null when unmeasurable. Read
@@ -211,15 +254,31 @@ export interface TakeGradeResult {
   ungraded: string;
   /** The kept original already carries the base grade. */
   baseSoft: boolean;
+  /** The studio correction was asked for (core/take-studio.ts). */
+  correct: boolean;
+  /** What the studio correction measured and applied (absent when not
+   *  asked for, or when the take could not be measured). */
+  studio?: { measured: TakeStudioStats; applied: TakeStudioCorrection };
   ms: number;
 }
 
 /**
  * Grade a take IN PLACE from its kept original (made on first use: a copy
  * of the file as it stands -- `currentLook` says whether that copy already
- * carries the base). 'natural' puts the original back.
+ * carries the base). Two passes stacked in one encode, in this order:
+ *  - the STUDIO CORRECTION (`correct: true`; core/take-studio.ts): white
+ *    balance, a warm key pulled off the skin, exposure, a shadow curve --
+ *    measured off the kept original (or `stats`, measured before: the
+ *    original never changes, so neither do they);
+ *  - the LOOK: 'soft' adds the soft grade on its dial; 'natural' adds
+ *    nothing.
+ * 'natural' without a correction (or with one that measured nothing worth
+ * doing) puts the original back byte for byte.
  */
-export async function gradeTake(filePath: string, o: { look: TakeLook; strength?: number; currentLook?: TakeLook }): Promise<TakeGradeResult> {
+export async function gradeTake(filePath: string, o: {
+  look: TakeLook; strength?: number; currentLook?: TakeLook;
+  correct?: boolean; stats?: TakeStudioStats; face?: FaceHint | null;
+}): Promise<TakeGradeResult> {
   const t0 = Date.now();
   const ungraded = ungradedPathOf(filePath);
   const markerPath = `${ungraded}.soft`;
@@ -229,29 +288,45 @@ export async function gradeTake(filePath: string, o: { look: TakeLook; strength?
     if (o.currentLook === "soft") await fs.writeFile(markerPath, "the kept original already carries the soft base\n");
   }
   const baseSoft = await exists(markerPath);
+  const correct = o.correct === true;
+  let studio: TakeGradeResult["studio"];
+  if (correct) {
+    // A take that cannot be measured is graded without the correction --
+    // never held back by it.
+    try {
+      const measured = o.stats?.v === 1 ? o.stats : await measureTake(ungraded, { duration: (await probeTake(ungraded)).duration, face: o.face });
+      studio = { measured, applied: studioGradeFilter(measured) };
+    } catch (e: any) {
+      console.warn(`  take grade: studio correction skipped for ${path.basename(filePath)}: ${e?.message || e}`);
+    }
+  }
+  const studioVf = studio && studio.applied.filter !== "null" ? studio.applied.filter : "";
   const ext = path.extname(filePath) || ".mp4";
   const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.grading${ext}`);
-  if (o.look === "natural") {
+  if (o.look === "natural" && !studioVf) {
     await fs.copyFile(ungraded, tmp);
     await fs.rename(tmp, filePath);
-    return { look: "natural", ungraded, baseSoft, ms: Date.now() - t0 };
+    return { look: "natural", ungraded, baseSoft, correct, studio, ms: Date.now() - t0 };
   }
   const strength = Math.max(0, Math.min(1, o.strength ?? DEFAULT_SOFT_STRENGTH));
+  const chain = (fallback: boolean) => [studioVf, o.look === "soft" ? softLookFilter(strength, { baseSoft, fallback }) : ""].filter((x) => x && x !== "null").join(",") || "null";
   const encode = (vf: string) => execFileAsync("ffmpeg", ["-hide_banner", "-y", "-i", ungraded, "-map", "0:v:0", "-map", "0:a:0?",
     "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy",
     ...(ext.toLowerCase() !== ".webm" ? ["-movflags", "+faststart"] : []), tmp], { maxBuffer: 16 * 1024 * 1024 });
   try {
-    try { await encode(softLookFilter(strength, { baseSoft })); }
+    try { await encode(chain(false)); }
     catch (e: any) {
-      if (!/No such filter|bilateral/i.test(String(e?.stderr || e?.message || ""))) throw e;
-      await encode(softLookFilter(strength, { baseSoft, fallback: true }));
+      if (o.look !== "soft" || !/No such filter|bilateral/i.test(String(e?.stderr || e?.message || ""))) throw e;
+      await encode(chain(true));
     }
     await fs.rename(tmp, filePath);
   } catch (e: any) {
     await fs.unlink(tmp).catch(() => {});
     throw new Error(`take grade failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
   }
-  return { look: "soft", strength, ungraded, baseSoft, ms: Date.now() - t0 };
+  return o.look === "soft"
+    ? { look: "soft", strength, ungraded, baseSoft, correct, studio, ms: Date.now() - t0 }
+    : { look: "natural", ungraded, baseSoft, correct, studio, ms: Date.now() - t0 };
 }
 
 export async function sanitizeTake(
@@ -278,22 +353,29 @@ export async function sanitizeTake(
     loudness: measured === null ? undefined : { measured_lufs: round1(measured) },
     probe,
   };
-  if (!bake && !crop && !pad && !normalize) return base;
+  const hdr = probe.hdr;
+  if (!bake && !crop && !pad && !normalize && !hdr) return base;
 
   const ext = path.extname(filePath) || ".mp4";
   const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.sanitized${ext}`);
   // ffmpeg applies the rotation tag on decode (autorotate, every version),
   // so a re-encode stores the frames upright with an identity matrix.
-  const args = ["-y", "-i", filePath, "-map", "0:v:0"];
-  if (bake || crop || pad) {
+  // The video half is built per tone-map path: an ffmpeg without zscale
+  // retries on the approximate one.
+  const videoArgs = (tmFallback: boolean): string[] => {
+    if (!(bake || crop || pad || hdr)) return ["-c:v", "copy"];
+    const out: string[] = [];
     const vf: string[] = [];
+    // Tone map FIRST, on the decoded HDR frames, before any scale.
+    if (hdr) vf.push(hdrToSdrFilter(hdr, { fallback: tmFallback, fullRange: probe.fullRange }));
     if (crop && canvas) vf.push(`crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`, `scale=${canvas.width}:${canvas.height}`);
     if (pad && canvas) vf.push(`scale=${pad.w}:${pad.h}`, `pad=${canvas.width}:${canvas.height}:(ow-iw)/2:(oh-ih)/2:color=${PILLARBOX_COLOR}`);
-    if (vf.length) args.push("-vf", vf.join(","));
-    args.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p");
-  } else {
-    args.push("-c:v", "copy");
-  }
+    if (vf.length) out.push("-vf", vf.join(","));
+    out.push("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p");
+    if (hdr) out.push("-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709");
+    return out;
+  };
+  const args = ["-y", "-i", filePath, "-map", "0:v:0", "@VIDEO@"];
   let normalizedTo: number | undefined;
   if (probe.hasAudio) {
     args.push("-map", "0:a:0");
@@ -312,8 +394,15 @@ export async function sanitizeTake(
   }
   if (ext.toLowerCase() !== ".webm") args.push("-movflags", "+faststart");
   args.push(tmp);
+  const run = (tmFallback: boolean) => execFileAsync("ffmpeg", ["-hide_banner", ...args.flatMap((a) => (a === "@VIDEO@" ? videoArgs(tmFallback) : [a]))], { maxBuffer: 16 * 1024 * 1024 });
+  let tmFallback = false;
   try {
-    await execFileAsync("ffmpeg", ["-hide_banner", ...args], { maxBuffer: 16 * 1024 * 1024 });
+    try { await run(false); }
+    catch (e: any) {
+      if (!hdr || !/No such filter|zscale|tonemap/i.test(String(e?.stderr || e?.message || ""))) throw e;
+      tmFallback = true;
+      await run(true);
+    }
     await fs.rename(tmp, filePath);
   } catch (e: any) {
     await fs.unlink(tmp).catch(() => {});
@@ -324,6 +413,7 @@ export async function sanitizeTake(
     ...base,
     reframed: (crop || pad) && canvas ? { from: `${oriented.width}x${oriented.height}`, to: `${canvas.width}x${canvas.height}`, ...(pad ? { mode: "pillarbox" as const } : {}) } : undefined,
     loudness: measured === null ? undefined : { measured_lufs: round1(measured), normalized_to_lufs: normalizedTo },
+    ...(hdr ? { tonemapped: { from: hdr, ...(tmFallback ? { fallback: true } : {}) } } : {}),
     probe: await probeTake(filePath),
   };
 }

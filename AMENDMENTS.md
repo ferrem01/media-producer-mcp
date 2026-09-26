@@ -6,6 +6,67 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The studio correction: every booth take lands colour- and exposure-corrected
+
+Marc's latest test take, measured from frames: the lit cheek R/B ~2.3
+(the key panel on its warm setting), the shadow cheek ~1.55 and the wall
+~0.98, both neutral. The wall's luma was ~158, as bright as the face
+(~130-168). Takes were never colour- or exposure-corrected. The soft look
+only smoothed them, and its base made them warmer.
+
+`core/take-studio.ts` adds a deterministic correction. Every take now goes
+through `queueTakeGrade` on arrival, soft or natural, and the correction
+runs in the same encode ahead of the soft look.
+- MEASURE (`measureTake`): 8 frames at 160 px wide, rgb24 into Node. The
+  face comes from the take's own pico detection (`take.face`). Without one
+  it falls back to an assumed upper-middle ellipse. Either way a skin-colour
+  mask decides which pixels count. The measure records frame and skin luma
+  percentiles and the skin's lit and shadow halves, split BY SIDE. A luma
+  split mixed lips and beard into "shadow" and read 2.20 vs 1.98 on Marc's
+  take; the side split reads 2.36 vs 1.69, which matches his numbers. The
+  background cast is the median of the near-neutral pixels well outside
+  the head.
+- CORRECT (`studioGradeFilter`, pure): stats in, ffmpeg filter out.
+  (1) White balance from the background, luma-preserving gains, each
+  clamped to ±15%. It has a skin guard: gains that would turn the face
+  magenta are scaled back. On take-d the beige wall asked for blue +15%,
+  and the guard scaled that to 37%.
+  (2) A warm key is taken off the skin only when the lit half is ≥1.12x
+  warmer than the shadow half. One neutral light gives both halves about
+  the same R/B, and a darker skin tone is warm on both halves, so neither
+  triggers it. The fix is a hue-keeping desaturation toward luma, done
+  through `selectivecolor`'s reds range (absolute). A neutral wall at the
+  same brightness has no chroma and is not touched; a highlights/midtones
+  colour balance would have shifted it. The lit half goes to shadow ×1.1.
+  The pull is capped at 45%, each c/m/y at 0.5, and the shadow half never
+  goes under R/B 1.3. A straight red-down/blue-up turned his hands pink,
+  which is why it desaturates instead.
+  (3) Exposure brings the face median to the nearest edge of 0.45-0.60,
+  clamped to ±0.5 stop. The curve is pinned at 0 and 1, there is no lift
+  when more than 2% of the skin clips, and the face's p95 stays under 0.96.
+  (4) Contrast is only the lower half of an S (shadows deepen, 0.6 and up
+  stay put). A full S lifted the face and the already-bright wall. There is
+  no background pull-down, because that needs a mask. A clean take returns
+  `"null"`, and a natural take with nothing to fix is restored byte for
+  byte.
+- Measured on IMG_2755: lit cheek R/B 2.37 -> 1.90, shadow cheek 1.70 ->
+  1.50, whole face 2.12 -> 1.77. The wall stays at R/B 0.99 (luma 158 ->
+  157) and the face median goes 152 -> 155.
+- HDR: `probeTake` reads HLG/PQ off the stream, and `sanitizeTake`
+  tone-maps to SDR bt709 before any reframe. The tone map is zscale (every
+  input property stated) with mobius at npl 203, BT.2408's reference white.
+  On an SDR clip taken to HLG and back, mean rgb went 133.5 -> 130.5 with
+  mobius, 87 with hable and 122 with reinhard. Without zscale, a
+  `colorspace` + lift curve fallback runs. On that round trip the naive
+  8-bit re-encode dropped chroma 31.7 -> 18.7 (washed out); the tone map
+  kept 30.6.
+- Control: `take.correct === false` turns the correction off, and absent
+  means on. It is set by `edit_speaker` `look` with `correct: false|true`,
+  `POST /api/take-look {correct}` or the booth body `correct: false`.
+  A re-grade keeps the take's setting and reuses `take.grade.measured`,
+  since the kept original never changes. `take.grade` also holds the
+  applied gains, pull, stops, curve, notes and filter. The raw take is
+  never modified: every grade runs off `.<name>.ungraded.mp4`.
 ## 2026-09-26 — The booth checks the light before the take
 
 A manual review of Marc's latest booth take, measured from its frames,

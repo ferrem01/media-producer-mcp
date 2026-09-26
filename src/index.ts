@@ -620,16 +620,20 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
     // provided screen does (measured live, proj_25b2858c: the take
     // landed, the scene re-timed to 4.98s, the card kept the outline).
     reshootStoryboardCardsSoon(tkTenant, tkProject);
-    // THE SOFT LOOK (core/take-grade.ts): graded in the background from a
-    // kept original, so Studio's dial can move it later. The grade queues
-    // the matte itself when it lands (the copies are cut from the graded
-    // take), so the matte is queued here only for a natural take.
+    // THE GRADE (core/take-grade.ts): the studio correction (colour and
+    // exposure, core/take-studio.ts) on EVERY take, then the soft look when
+    // the booth asked for it -- one encode in the background from a kept
+    // original, so Studio's dial and the correction switch can move it
+    // later. The grade queues the matte itself when it lands (the copies
+    // are cut from the graded take), so the matte is queued here only for a
+    // take with nothing to grade (natural, correction switched off).
     const tkSoft = tkBody.look === "soft";
+    const tkCorrect = tkBody.correct !== false;
     const tkSoftStrength = Number.isFinite(Number(tkBody.soft_strength)) && tkBody.soft_strength !== null && tkBody.soft_strength !== ""
       ? Math.max(0, Math.min(1, Number(tkBody.soft_strength))) : DEFAULT_SOFT_STRENGTH;
-    if (tkSoft) {
+    if (tkSoft || tkCorrect) {
       queueTakeGrade({
-        tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, look: "soft", strength: tkSoftStrength, matteStrength: tkBlurStrength, dataDir: config.dataDir,
+        tenantId: tkTenant, projectId: tkProject, rawUrl: tkUrl, look: tkSoft ? "soft" : "natural", strength: tkSoft ? tkSoftStrength : undefined, correct: tkCorrect, matteStrength: tkBlurStrength, dataDir: config.dataDir,
         resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
         afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
       });
@@ -649,6 +653,8 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
       sanitized?.rotation_baked ? `rotation ${sanitized.rotation_baked} baked` : "",
       sanitized?.reframed ? `reframed ${sanitized.reframed.from} -> ${sanitized.reframed.to}` : "",
       tkSoft ? `soft look ${tkSoftStrength} grading` : "",
+      tkCorrect ? "studio correction grading" : "studio correction off",
+      sanitized?.tonemapped ? `HDR ${sanitized.tonemapped.from} tone-mapped to SDR${sanitized.tonemapped.fallback ? " (approximate)" : ""}` : "",
       tkBlurNote,
       tkFace ? `face at ${Math.round(tkFace.cx * 100)}%/${Math.round(tkFace.cy * 100)}% (${Math.round(tkFace.size * 100)}% tall)` : "no face found",
       deair && (deair.head > 0 || deair.tail > 0) ? `de-aired -${deair.head}s head / -${deair.tail}s tail` : "",
@@ -3089,11 +3095,13 @@ Rules:
         return;
       }
 
-      // POST /api/take-look/{tenant}/{project} {scene_index, look, strength}
+      // POST /api/take-look/{tenant}/{project} {scene_index, look, strength, correct?}
       // Studio's smoothing dial: re-grade the take behind one scene (every
       // scene cut from the same recording follows -- it is one file) from
       // its kept original. Runs in the background; the project saves when
-      // the grade lands and Studio's live sync reloads the take.
+      // the grade lands and Studio's live sync reloads the take. `correct`
+      // (boolean, optional) switches the studio correction; absent keeps
+      // the take's setting (core/take-studio.ts).
       const takeLookMatch = urlPath.match(/^\/api\/take-look\/([^/]+)\/([^/]+)$/);
       if (takeLookMatch && method === "POST") {
         const [, tlTenant, tlProject] = takeLookMatch.map(decodeURIComponent);
@@ -3109,14 +3117,15 @@ Rules:
         if (!tlTake) { jsonResponse(res, 404, { error: "that scene has no take" }); return; }
         const tlRaw = takeCopies(tlTake).raw;
         if (!tlRaw.startsWith(`/assets/${tlTenant}/projects/${tlProject}/assets/`)) { jsonResponse(res, 400, { error: "the take is not a file of this project" }); return; }
+        const tlCorrect = typeof tlBody.correct === "boolean" ? tlBody.correct : undefined;
         queueTakeGrade({
-          tenantId: tlTenant, projectId: tlProject, rawUrl: tlRaw, look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, dataDir: config.dataDir,
+          tenantId: tlTenant, projectId: tlProject, rawUrl: tlRaw, look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, correct: tlCorrect, dataDir: config.dataDir,
           resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
           afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
         });
         const tlScenes = (tlProj.takes || []).filter((t) => takeCopies(t).raw === tlRaw).map((t) => t.scene_index + 1);
         console.log(`  take look: ${tlProject} ${path.basename(tlRaw)} -> ${tlLook}${tlLook === "soft" ? ` ${tlStrength}` : ""} (scenes ${tlScenes.join(", ")})`);
-        jsonResponse(res, 200, { ok: true, grading: "running", look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, scenes: tlScenes });
+        jsonResponse(res, 200, { ok: true, grading: "running", look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, correct: tlCorrect ?? tlTake.correct !== false, scenes: tlScenes });
         return;
       }
 

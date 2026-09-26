@@ -2,6 +2,8 @@
  * Core types for the media producer.
  */
 
+import type { TakeStudioCorrection, TakeStudioStats } from "./take-studio.js";
+
 // ── Output Formats ──
 
 export type OutputFormat = "video" | "image" | "slideshow" | "presentation" | "one-pager" | "gif" | "social" | "email-header" | "thumbnail";
@@ -823,6 +825,15 @@ export interface Take {
   ungraded_soft?: boolean;
   /** When the current grade landed (Studio reloads the take on a change). */
   graded_at?: string;
+  /** false: the studio correction is off for this take (absent = on;
+   *  core/take-studio.ts). Every grade honours it. */
+  correct?: boolean;
+  /** The studio correction, for transparency: what was measured off the
+   *  kept original (`measured`, reused by every re-grade) and what was
+   *  applied -- white-balance gains, the warm-key pull, stops of exposure,
+   *  the shadow curve, one note per decision and the ffmpeg filter.
+   *  `off`: measured, not applied (the take's `correct` is false). */
+  grade?: Partial<TakeStudioCorrection> & { measured?: TakeStudioStats; off?: boolean };
   /** Older shape (before the copies below): `source` was swapped to the
    *  blurred copy and the raw take kept here. Read through takeCopies. */
   background?: { mode: "blur"; source_raw: string; strength?: number; ms?: number };
