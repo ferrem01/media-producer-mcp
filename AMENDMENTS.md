@@ -6,6 +6,30 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The newest image model; cutouts without Veo; tilted stickers fit
+
+Marc: "are we using the latest OpenAI image model?" No: every image call was
+on gpt-image-1 (April 2025). The key's /v1/models listing showed 1-mini,
+1.5, 2, and two 2.5 variants from September 2026. The same chimp prompt went
+to each: every 2.x model drew richer art with a clean transparent ground.
+gpt-image-2.5-flare was the fastest (~12s; gpt-image-2 took ~45s).
+- `DEFAULT_IMAGE_MODEL` (`media/image-gen.ts`, overridable with
+  `MP_IMAGE_MODEL`) is now used everywhere an image is drawn: stickers, scene
+  hero images, the image API. The house set was redrawn with it.
+  `ensureStickerLibrary` re-copies a house file whose size changed, so a
+  server that already holds the old set picks up the new one.
+- `generate_clip mode:'cutout'` no longer renders an 8-second Veo clip and
+  keys a green frame; the image model draws the sticker directly (~15s). The
+  contract is unchanged: a job and a `*-cutout.png` brand image for the motif
+  resolver. `cutoutSubject` strips a prompt written for the old route
+  ("...on a plain solid green background, static shot") back to what to
+  draw. `processClipToCutout` is deleted; `keyStillToCutout` stays for the
+  sky world.
+- An image sticker fits its box at its tilt plus the entrance's 6-degree
+  over-swing. Measured: the Instagram ad's chimp at -8 degrees ran 23px out
+  of its box.
+- Test: `test/sticker-library.test.ts`.
+
 ## 2026-09-26 — The house sticker library, stickers on demand, sticker rain
 
 Marc: "am i supposed to like go out and find all these stickers and

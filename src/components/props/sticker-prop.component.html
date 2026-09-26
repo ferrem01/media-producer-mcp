@@ -85,6 +85,14 @@
     else if (kind !== 'ring') prop.textContent = String(data.text || '');
     if (data.color) host.style.setProperty('--stkp-c', data.color);
     var rot = data.rotation === undefined ? (kind === 'stamp' ? -8 : 0) : Number(data.rotation) || 0;
+    // A tilted sticker's corners swing past its box (measured: the chimp at
+    // -8 degrees ran 23px below it). Fit the art to the box at its tilt plus
+    // the entrance's 6-degree over-swing.
+    if (isImage) {
+      var th = (Math.abs(rot) + 6) * Math.PI / 180;
+      var fitK = (100 / (Math.cos(th) + Math.sin(th))).toFixed(1) + '%';
+      prop.style.maxWidth = fitK; prop.style.maxHeight = fitK;
+    }
     host.appendChild(prop);
 
     // FIT: a prop must never spill past its own box. The fixed pill font +

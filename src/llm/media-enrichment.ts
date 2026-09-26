@@ -11,7 +11,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { generateImage } from "../media/image-gen.js";
+import { generateImage, DEFAULT_IMAGE_MODEL } from "../media/image-gen.js";
 import { projectDir } from "../persistence/paths.js";
 import type { Project, Asset } from "../core/types.js";
 import type { LLMConfig } from "./client.js";
@@ -188,7 +188,7 @@ Rules:
         prompt: imgPrompt,
         width: imgResult.width,
         height: imgResult.height,
-        model: "gpt-image-1",
+        model: DEFAULT_IMAGE_MODEL,
         size: imgSize,
         quality: imgQuality,
         version: 1,

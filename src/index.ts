@@ -79,7 +79,7 @@ import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled, requireTenant, tenantAllowed } from "./auth/auth.js";
 import { protectedResourceMetadata, authorizationServerMetadata, registerClient, wwwAuthenticateChallenge } from "./auth/mcp-oauth.js";
 import { readTraces, dailyDigest } from "./trace/index.js";
-import { generateImage } from "./media/image-gen.js";
+import { generateImage, DEFAULT_IMAGE_MODEL } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
 import { verifyToken } from "./auth/jwt.js";
 import { initTenantStoreFromFile, listTenants } from "./auth/tenant-store.js";
@@ -4771,7 +4771,7 @@ Rules:
 
           const result = await generateImage({
             prompt,
-            model: (body.model as any) || "gpt-image-1",
+            model: (body.model as any) || DEFAULT_IMAGE_MODEL,
             size: (body.size as any) || "1536x1024",
             quality: (body.quality as any) || "high",
             outputPath,
@@ -4799,7 +4799,7 @@ Rules:
                 prompt,
                 width: result.width,
                 height: result.height,
-                model: (body.model as string) || "gpt-image-1",
+                model: (body.model as string) || DEFAULT_IMAGE_MODEL,
                 created_at: new Date().toISOString(),
               });
               await saveProject(project);

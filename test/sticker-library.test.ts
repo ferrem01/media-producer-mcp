@@ -61,6 +61,8 @@ describe("the house sticker library", () => {
     expect(lib.stickerUrl("Money Stack")).toBe("/assets/_system/stickers/money-stack.webp");
     // The house style never draws a brand's mark.
     expect(lib.stickerPrompt("a chimp")).toMatch(/no logos or brand marks/);
+    // A cutout prompt written for the old Veo route keeps only what to draw.
+    expect(lib.cutoutSubject("flat sticker art of a cartoon taco, centered on a plain solid green background, static shot")).toBe("a cartoon taco");
   });
   it("copies the house set into the data dir and finds a sticker by a word", async () => {
     const all = await lib.ensureStickerLibrary(DATA);
@@ -81,6 +83,19 @@ describe("the house sticker library", () => {
 });
 
 describe("sticker-prop by name", () => {
+  it("a tilted sticker still fits its box (the chimp at -8 degrees ran 23px out)", async () => {
+    await still("sticker-prop", { sticker: "chimp", at: 0.3, rotation: -8 }, async (page, seek) => {
+      for (const t of [0.6, 1.0, 1.6]) {
+        await seek(t);
+        const inside = await page.evaluate(() => {
+          const r = (document.querySelector(".stkp-image") as HTMLElement).getBoundingClientRect();
+          const box = document.querySelector(".mp-component")!.getBoundingClientRect();
+          return r.left >= box.left - 1 && r.right <= box.right + 1 && r.top >= box.top - 1 && r.bottom <= box.bottom + 1;
+        });
+        expect(inside, `t=${t}`).toBe(true);
+      }
+    });
+  }, 60000);
   it("draws the named house sticker in its box", async () => {
     await still("sticker-prop", { sticker: "chimp", at: 0.3 }, async (page, seek) => {
       await seek(1.6);

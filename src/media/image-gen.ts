@@ -1,9 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+/** The house image model: the newest OpenAI image model this account has
+ *  (checked against /v1/models on 2026-09-26: gpt-image-2.5-flare, the
+ *  fastest of the 2.x line at ~12s for a sticker, where gpt-image-1 drew
+ *  flatter art and gpt-image-2 took ~45s). MP_IMAGE_MODEL overrides it. */
+export const DEFAULT_IMAGE_MODEL = process.env.MP_IMAGE_MODEL || "gpt-image-2.5-flare";
+
 export interface ImageGenOptions {
   prompt: string;
-  model?: "gpt-image-1" | "dall-e-3" | "dall-e-2";
+  model?: string;
   size?: "1024x1024" | "1536x1024" | "1024x1536" | "auto";
   quality?: "low" | "medium" | "high" | "auto";
   style?: "natural" | "vivid";
@@ -22,7 +28,7 @@ export async function generateImage(opts: ImageGenOptions): Promise<ImageGenResu
   const apiKey = opts.apiKey || process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY required for image generation");
 
-  const model = opts.model || "gpt-image-1";
+  const model = opts.model || DEFAULT_IMAGE_MODEL;
   const size = opts.size || "1536x1024"; // landscape default for video scenes
   const quality = opts.quality || "high";
 
@@ -40,7 +46,7 @@ export async function generateImage(opts: ImageGenOptions): Promise<ImageGenResu
       n: 1,
       size,
       quality,
-      ...(model !== "gpt-image-1" ? { response_format: "b64_json" } : {}),
+      ...(!model.startsWith("gpt-image") ? { response_format: "b64_json" } : {}),
     }),
   });
 
