@@ -75,6 +75,17 @@ export function bakeDirectLogoData(comp: { type: string; data: Record<string, un
   return ld;
 }
 
+/** THE LOGO PILL (sticker-prop kind 'logo'): the company's wordmark on a
+ *  brand-colour pill. The storyboard names the pill, not the file: the
+ *  brand kit's wordmark (else its full logo, else any) is filled in here,
+ *  where the kit is at hand. A pill given its own src keeps it. */
+export function bakeLogoPillData(comp: { type: string; data: Record<string, unknown> }, brandKit: { logos?: Array<{ url: string; variant?: string }> } | undefined): Record<string, unknown> {
+  if (comp.type !== "sticker-prop" || String(comp.data?.kind || "") !== "logo" || comp.data?.src) return comp.data;
+  const logos = brandKit?.logos || [];
+  const pick = logos.find((l) => l.variant === "wordmark") || logos.find((l) => l.variant === "full") || logos[0];
+  return pick ? { ...comp.data, src: pick.url } : comp.data;
+}
+
 /** Component types that are scene BACKDROPS: they stay outside the camera
  *  rig (the camera moves the subject, not the world) and are skipped by
  *  wrapper choreography defaults. */
@@ -240,7 +251,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     if (!layerData) continue;
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
-    const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData({ ...comp, data: layerData });
+    const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData({ ...comp, data: bakeLogoPillData({ ...comp, data: layerData }, brandKit) });
     // Option-A backstop: a PiP pointing at the speaker clip by URL becomes the
     // "speaker" token regardless of how it was authored (generate, hand-edit,
     // or a client that skipped the update-tool guardrail) -- so preview dedups

@@ -99,7 +99,7 @@ describe("the naano takeaways", () => {
     expect(sp).toMatch(/\.stkp-url \{[^}]*backdrop-filter: blur\(14px\)/);
     expect(sp).not.toMatch(/repeat: -1/); // a finite breath: the timeline's duration stays finite
     const sps = JSON.parse(await read("src/components/props/sticker-prop.schema.json"));
-    expect(sps.data.kind.enum).toEqual(["stamp", "gesture", "pill", "ring", "image", "url"]);
+    expect(sps.data.kind.enum).toEqual(["stamp", "gesture", "pill", "ring", "image", "url", "logo"]);
     expect(sps.data.click_at.type).toBe("number");
     expect(sps.data.ink.enum).toEqual(["white", "dark"]);
   });

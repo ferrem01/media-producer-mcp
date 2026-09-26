@@ -381,7 +381,13 @@ export function castWordmarkCards(board: { scenes: Array<{ label?: unknown; voic
     const wantsUrl = enters.some((e) => /^stamp:url/.test(e));
     const own = String(s.voiceover_text || "");
     const m = (own.match(/\b[a-z0-9-]+\.(?:ai|com|io|co|app|dev)(?:\/[\w-]+)?/i) || allText.match(/\b[a-z0-9-]+\.(?:ai|com|io|co|app|dev)(?:\/[\w-]+)?/i));
-    s.scene_template = { type: "st-logo-close", data: { tagline: "", cta: "", url: wantsUrl && m ? m[0] : "" } };
+    // cta:boxed (the Scale Army close): the ask as plain type with a
+    // hand-drawn box round it. The ask is the scene's own name ("End_card -
+    // Book a call"), kept when it is a short phrase.
+    const boxed = enters.some((e) => /^cta:boxed/.test(e));
+    const askFromLabel = String(s.label || "").split(/\s+-\s+/).slice(1).join(" - ").trim();
+    const ask = boxed && askFromLabel && askFromLabel.split(/\s+/).length <= 4 ? askFromLabel : "";
+    s.scene_template = { type: "st-logo-close", data: { tagline: "", cta: ask, url: wantsUrl && m ? m[0] : "", ...(ask ? { cta_style: "boxed" } : {}) } };
     s.components = comps.filter((c) => !(c && typeof c === "object" && c.type === "sticker-prop" && String(c.data?.kind || "") === "ring"));
     n++;
   }

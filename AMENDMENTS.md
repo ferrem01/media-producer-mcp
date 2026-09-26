@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — Logo pill and the hand-boxed ask (Scale Army, pieces 4-5)
+
+- **`sticker-prop` kind `logo`.** The company's wordmark sits on a
+  brand-colour pill and pops on the name (a scale-up with an overshoot and
+  a tilt settle).
+  - The storyboard names the pill, not the file: `bakeLogoPillData` fills
+    `src` at assembly from the brand kit's wordmark (else its full logo,
+    else any).
+  - The image is shown white (`brightness(0) invert(1)`), so a dark
+    wordmark reads on the pill.
+  - With no logo at all, the pill carries the name as bold type.
+- **`st-logo-close` `cta_style: "boxed"`.** The ask is plain type, and a
+  hand-drawn box sketches round it once it lands.
+  - The draw-on uses a stroke-dash over `pathLength` 1, and it breathes
+    no more (no pulse).
+  - Two traps, both measured: `vector-effect: non-scaling-stroke` moves the
+    dash into screen pixels, so the draw-on stopped short of closing; and
+    the stage's global `max-width: 100%` on media capped the SVG to the
+    word's own width. The box is now sized from the laid-out word with
+    `max-width: none`.
+- **The recipe.** `castWordmarkCards` reads `cta:boxed` on a type-card beat,
+  and the ask is the scene's own name ("End_card - Book a call"). The
+  founder-selfie-punch-cards recipe carries it, and its turn and close
+  beats name the logo pill.
+- Tests: `test/scale-army-pieces.test.ts` (logo pill fill, white, pop,
+  hold; boxed close drawn round the word) and `test/recipes.test.ts` (the
+  boxed close cast from the label). Full suite: 1316 passed.
+
 ## 2026-09-26 — The Scale Army pieces: tiered captions, punch card, stacking list
 
 Marc: "there is this text highlighting too... do we have that?" We had

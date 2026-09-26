@@ -29,6 +29,14 @@
   .stlc-cta { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.14em;
     text-transform: uppercase; color: #fff; padding: 14px 34px; border-radius: 100px;
     background: linear-gradient(135deg, var(--mp-color-primary, #4f46e5), color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, #8b5cf6)); }
+  /* cta_style 'boxed' (the Scale Army close): the ask as plain type with a
+     hand-drawn box sketching round it, not a gradient pill. */
+  .stlc-cta.boxed { position: relative; background: none; padding: 0.34em 0.7em; font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
+    font-size: 4.6vw; font-weight: 500; letter-spacing: -0.01em; text-transform: none; color: inherit; }
+  .stlc-box { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  /* Stroke in viewBox units (no non-scaling-stroke: it moves the dash into
+     screen pixels and the draw-on stops short of closing the box). */
+  .stlc-box path { fill: none; stroke: var(--mp-color-primary, #4f46e5); stroke-width: 0.9; stroke-linecap: round; stroke-linejoin: round; }
   .stlc-url { font-family: 'Inter', sans-serif; font-size: 15px; letter-spacing: 0.08em; color: rgba(244,244,248,0.78); }
   .st-overlay { position: absolute; inset: 0; pointer-events: none; }
 </style>
@@ -42,6 +50,33 @@
     if (logo) { if (data.logo_url) logo.src = data.logo_url; else logo.style.display = 'none'; }
     var cta = q('.stlc-cta');
     if (cta && !data.cta) cta.style.display = 'none';
+    var boxed = !!(cta && data.cta && data.cta_style === 'boxed');
+    var boxPath = null;
+    if (boxed) {
+      cta.classList.add('boxed');
+      var bsvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      bsvg.setAttribute('class', 'stlc-box');
+      bsvg.setAttribute('viewBox', '0 0 100 40');
+      bsvg.setAttribute('preserveAspectRatio', 'none');
+      boxPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      // One loose stroke round the word, overshooting where it closes.
+      boxPath.setAttribute('d', 'M4 7 C30 4 68 5 97 4 C98 15 97 26 96 36 C66 38 35 36 3 37 C2 27 3 16 6 3');
+      boxPath.setAttribute('pathLength', '1');
+      bsvg.appendChild(boxPath);
+      cta.appendChild(bsvg);
+      // Sized from the laid-out word (the CSS percentages lose to the SVG's
+      // own 300x150 default here): a little wider and taller than the ask.
+      var cw = cta.offsetWidth, ch = cta.offsetHeight;
+      if (cw > 0 && ch > 0) {
+        bsvg.setAttribute('width', String(Math.round(cw * 1.1)));
+        bsvg.setAttribute('height', String(Math.round(ch * 1.24)));
+        bsvg.style.maxWidth = 'none'; // the stage caps media at 100% of its box
+        bsvg.style.width = Math.round(cw * 1.1) + 'px';
+        bsvg.style.height = Math.round(ch * 1.24) + 'px';
+        bsvg.style.left = Math.round(-cw * 0.05) + 'px';
+        bsvg.style.top = Math.round(-ch * 0.12) + 'px';
+      }
+    }
     var url = q('.stlc-url');
     if (url && !data.url) url.style.display = 'none';
 
@@ -69,11 +104,16 @@
         else if (window.mpGlow) mpGlow(logo, brandPrimary, 0.8);
       }
     }
-    if (window.mpGlow && cta && !isLight) mpGlow(cta, brandPrimary, 0.5);
+    if (boxPath) {
+      // The box sketches round the ask once it has landed.
+      gsap.set(boxPath, { strokeDasharray: 1, strokeDashoffset: 1 });
+      tl.to(boxPath, { strokeDashoffset: 0, duration: 0.7, ease: 'power2.inOut' }, 2.2);
+    }
+    if (window.mpGlow && cta && !isLight && !boxed) mpGlow(cta, brandPrimary, 0.5);
     if (window.mpShimmer && logo) mpShimmer(tl, q('.stlc-center'), 2.6);
     if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.05);
     // Breathe: the CTA pulses gently for the remainder.
-    if (cta) tl.to(cta, { scale: 1.03, duration: 1.6, repeat: -1, yoyo: true, ease: 'sine.inOut' }, 2.6);
+    if (cta && !boxed) tl.to(cta, { scale: 1.03, duration: 1.6, repeat: -1, yoyo: true, ease: 'sine.inOut' }, 2.6);
     return tl;
   }
 </script>

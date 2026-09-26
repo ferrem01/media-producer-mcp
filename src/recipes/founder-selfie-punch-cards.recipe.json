@@ -57,7 +57,7 @@
         "keyword:plate",
         "stamp:logo@name"
       ],
-      "note": "Back to the person for the turn ('but nothing actually DROVE PIPELINE ... then we hired ...'). The plate lands on the result word; when the line names the company, its logo pops in as a small pill sticker in place of the plate for a second."
+      "note": "Back to the person for the turn ('but nothing actually DROVE PIPELINE ... then we hired ...'). The plate lands on the result word; when the line names the company, its logo pops in as a small pill sticker in place of the plate for a second. The logo pill is sticker-prop kind 'logo' (text: the company name; the brand kit's wordmark fills in), timed to the name, hold about 1.2s."
     },
     {
       "role": "proof",
@@ -123,7 +123,7 @@
         "stamp:logo@name",
         "cta-line"
       ],
-      "note": "The result in four words, big and plain ('SAME TEAM') with the small payoff under it ('completely different output'); the logo pill once more on the company's name; the ask said to camera ('link below to book a call')."
+      "note": "The result in four words, big and plain ('SAME TEAM') with the small payoff under it ('completely different output'); the logo pill once more on the company's name; the ask said to camera ('link below to book a call'). The logo pill is sticker-prop kind 'logo' (text: the company name; the brand kit's wordmark fills in), timed to the name, hold about 1.2s."
     },
     {
       "role": "end_card",
@@ -137,9 +137,10 @@
       "enters": [
         "stamp:wordmark",
         "button:cta",
-        "end_card@start"
+        "end_card@start",
+        "cta:boxed"
       ],
-      "note": "The brand's dark colour, the wordmark drawing in, the ask ('Book a call') below it with a hand-drawn box sketching round it. The voice has stopped; the music carries it out."
+      "note": "The brand's dark colour, the wordmark drawing in, the ask ('Book a call') below it with a hand-drawn box sketching round it. The voice has stopped; the music carries it out. Name the scene 'End_card - <the ask>' (e.g. 'End_card - Book a call'): the build casts the logo close with that ask boxed by hand."
     }
   ],
   "rhythm": {

@@ -360,3 +360,17 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(roleOfLabel("Wish 1 - every reply", r)).toBe("wish"); // a single-role family
   });
 });
+
+describe("the Scale Army close: the ask boxed by hand", () => {
+  it("casts the logo close with the scene's ask as a boxed CTA", async () => {
+    const { getRecipe, castWordmarkCards } = await import("../src/core/recipes.js");
+    const r = getRecipe("founder-selfie-punch-cards")!;
+    const board: any = { scenes: [
+      { label: "Close - Same team", voiceover_text: "Same team, completely different output. Link below to book a call.", components: [] },
+      { label: "End_card - Book a call", voiceover_text: "", components: [] },
+    ] };
+    expect(castWordmarkCards(board, r)).toBe(1);
+    expect(board.scenes[1].scene_template).toEqual({ type: "st-logo-close", data: { tagline: "", cta: "Book a call", url: "", cta_style: "boxed" } });
+    expect(board.scenes[0].scene_template).toBeUndefined();
+  });
+});
