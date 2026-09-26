@@ -6,6 +6,37 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The Cosmos recreation: the input test
+
+Marc: "see if you recreate the Cosmos video. That input test that we achieved
+our goal." Test film `proj_9c829aa3` ("Cosmos recreation (component test)",
+16x9, 39.5 s, 17 scenes) rebuilds the 39.5 s promo from library components
+only: no codegen, 41 Pexels stand-ins for the promo's images. Checked the
+way Marc's rules require, without rendering: every scene was stilled in a
+local harness at the original's beats (29 frames, original beside ours) and
+tuned over three passes, then written with `add`/`update` and confirmed by
+`get target:'layout'`. The stored scenes match the tuned data exactly.
+
+What matched: every beat has its counterpart, and each handoff happens
+through an object, as in the original. The wall spirals into a point, the
+point becomes the logo, and the logo's dot becomes the search bar. A colour
+dot floods the frame and pulls back. A keep-only step frames the red set. A
+scatter pulls into a sphere, then the close.
+
+Found and fixed while building it (this PR):
+- cta-card clipped "Sign up for Cosmos": a squeezed flex item never shows as
+  overflow, so the fit loop missed it. The actions no longer shrink, and
+  `actions:'stack'` puts the secondary link under the button.
+- The CTA button's glow was always the brand colour, which put a blue halo
+  under a black button. It now follows `button_color`.
+- dot-logo's tagline fade-in could outlast the collapse and linger under the
+  moving dot. `formed:true` cuts onto a standing mark (the close).
+
+Still apart: the search bar grows out of its dot over about 1.2 s, against
+about 0.5 s in the original, so that beat runs about half a second late. A
+`grow` duration on search-bar would close it. The original's camera also
+drifts in on the search bar; ours holds still.
+
 ## 2026-09-26 — The Cosmos pieces: swarm, dot handoffs, flood, filter grid
 
 Marc shared Zsolt Kacso's Cosmos promo (a 40s oner, HyperFrames + Opus 5.5)
