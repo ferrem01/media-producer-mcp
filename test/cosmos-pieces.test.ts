@@ -229,4 +229,13 @@ describe("the close: the button's label never clips, and the link can stack unde
       expect(await page.evaluate(() => +getComputedStyle(document.querySelector(".dlg-tag")!).opacity)).toBeLessThan(0.05);
     });
   });
+
+  it("dot-logo formed:true opens on the standing ring, every dot visible at t=0", async () => {
+    await still([{ type: "dot-logo", dir: "titles", data: { formed: true, dots: 7 } }], async (page, seek) => {
+      await seek(0);
+      const d = (await boxes(page, ".dlg-dot")).filter((b) => b.vis);
+      expect(d.length).toBe(7);
+      expect(Math.max(...d.map((b) => Math.hypot(b.x - 960, b.y - 1080 * 0.42)))).toBeGreaterThan(20);
+    });
+  });
 });
