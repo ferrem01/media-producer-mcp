@@ -1,0 +1,22 @@
+{
+  "type": "image-graph",
+  "label": "Image graph (related images)",
+  "category": "data-viz",
+  "description": "One image in the middle and its RELATED images drawn out around it on fine connecting lines -- visual search, 'more like this', a web of sources behind an answer. The centre lands first, the others slide out from behind it as the lines draw to them, then they float gently. Full-frame; centre at x/y. Example: {\"center\":\"/assets/.../bag.jpg\",\"nodes\":[\"...\",\"...\",\"...\",\"...\",\"...\",\"...\"],\"at\":0.3}.",
+  "data": {
+    "center": { "type": "string", "label": "The centre image URL", "required": true },
+    "nodes": { "type": "array", "label": "Related image URLs (up to 12; 5-8 reads best)", "required": true },
+    "at": { "type": "number", "label": "When the centre lands (s, default 0.2)", "optional": true },
+    "nodes_at": { "type": "number", "label": "When the related images start sliding out (default at + 0.6)", "optional": true },
+    "stagger": { "type": "number", "label": "Seconds between related images (default 0.12)", "optional": true },
+    "x": { "type": "number", "label": "Centre, fraction of width (default 0.5)", "optional": true },
+    "y": { "type": "number", "label": "Centre, fraction of height (default 0.52)", "optional": true },
+    "size": { "type": "number", "label": "Centre tile width, fraction of the frame width (default 0.075)", "optional": true },
+    "node_size": { "type": "number", "label": "Related tile width (default 0.052)", "optional": true },
+    "radius": { "type": "number", "label": "How far out they sit, fraction of the width (default 0.2)", "optional": true },
+    "flatten": { "type": "number", "label": "Vertical squash of the spread (default 0.42)", "optional": true },
+    "line_color": { "type": "string", "label": "Line colour (default a faint ink)", "optional": true },
+    "float": { "type": "boolean", "label": "Gentle drift after they land (default true)", "optional": true },
+    "seed": { "type": "number", "label": "Changes the arrangement", "optional": true }
+  }
+}

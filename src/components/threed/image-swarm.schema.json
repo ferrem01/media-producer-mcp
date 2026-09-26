@@ -1,0 +1,38 @@
+{
+  "type": "image-swarm",
+  "label": "Image swarm",
+  "category": "threed",
+  "description": "ONE set of images that changes FORMATION over time, in real 3D perspective, never cutting -- the Cosmos oner. Formations, each reached from the last: 'wall' (a masonry wall that rises in from below; group rotateX/rotateZ tilts it back), 'cluster' (a tight swirling pile), 'point' (the pile collapses to nothing -- hand off to a logo appearing there), 'scatter' (images everywhere at depth), 'sphere' (a spinning globe of images -- 'all of it, in one place'), 'orbit' (a ring turning around a word), 'flythrough' (the camera flies through a field of images rushing past, text readable in the clear middle), 'grid' (the first N land in a clean grid, the rest fly off). Full-frame. Give 20-80 real images (photos, screenshots). Example: {\"images\":[...],\"formations\":[{\"shape\":\"wall\",\"at\":0.2},{\"shape\":\"wall\",\"at\":2.2,\"group\":{\"rotateX\":28,\"rotateZ\":-20,\"scale\":0.9}},{\"shape\":\"cluster\",\"at\":3.0,\"duration\":0.8,\"group\":{\"rotateZ\":180}},{\"shape\":\"point\",\"at\":3.9,\"duration\":0.4}]}.",
+  "data": {
+    "images": {
+      "type": "array",
+      "label": "Image URLs (real /assets/... paths); repeated to fill `count`",
+      "required": true
+    },
+    "formations": {
+      "type": "array",
+      "label": "In order: {shape: wall|cluster|point|scatter|sphere|orbit|flythrough|grid, at (s), duration?, ease?, stagger? (s spread across items), order? (index|random|distance), group? {rotateX, rotateY, rotateZ, scale, x, y (fractions of the frame)}, plus per-shape: wall {top, cols, size, gap}; cluster/point {x, y (0-1), spread, size}; scatter {size, width, height}; sphere {radius, size, x, y, spin (deg), hold}; orbit {radius, depth, size, wobble, spin, hold}; flythrough {travel, size, clear (0-1: the empty middle)}; grid {count, cols, cell (fraction of width), aspect, gap, x, y}; the first formation also takes from: below|depth|point|fade|none}",
+      "required": true
+    },
+    "count": {
+      "type": "number",
+      "label": "How many tiles (default: one per image, max 120)",
+      "optional": true
+    },
+    "tile": {
+      "type": "number",
+      "label": "Base tile width as a fraction of the frame width (default 0.105)",
+      "optional": true
+    },
+    "drift": {
+      "type": "number",
+      "label": "Slow upward scroll of the whole field across the scene, as a fraction of the frame height (e.g. 0.08)",
+      "optional": true
+    },
+    "seed": {
+      "type": "number",
+      "label": "Changes the arrangement (same seed, same swarm)",
+      "optional": true
+    }
+  }
+}

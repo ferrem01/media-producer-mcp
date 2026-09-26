@@ -1,0 +1,180 @@
+<template>
+  <div class="sbr">
+    <div class="sbr-bar">
+      <svg class="sbr-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.2 4.2"/></svg>
+      <div class="sbr-field">
+        <span class="sbr-chip"></span>
+        <span class="sbr-ph"></span>
+        <span class="sbr-val"></span><span class="sbr-caret"></span>
+      </div>
+      <div class="sbr-icons">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 5v3M12 16v3M5 12h3M16 12h3"/></svg>
+      </div>
+    </div>
+    <div class="sbr-burst"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* SEARCH BAR: the product's search as the hero. It can GROW OUT OF A DOT
+     (the logo's last dot swells, pales and stretches into the pill), cycle
+     its placeholder, type a query, carry a chip (a colour swatch, an image),
+     burst on submit, and slide up to the top as results arrive. Every beat
+     is on the timeline -- the caret blink too -- so a render is exact. */
+  .sbr, .sbr * { max-width: none; }
+  .sbr { position: absolute; inset: 0; overflow: visible; pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .sbr-bar { position: absolute; left: 50%; top: 50%; display: flex; align-items: center; gap: 0.6em;
+    background: #ffffff; border-radius: 999px; color: #17171c; overflow: hidden; white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.06), 0 8px 26px rgba(20, 20, 30, 0.1); }
+  .sbr-glass { width: 1.05em; height: 1.05em; flex: none; color: #55555f; }
+  .sbr-field { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; height: 100%; }
+  .sbr-ph { position: absolute; left: 0; top: 50%; transform: translateY(-50%); color: #a3a3ad; }
+  .sbr-ph span { position: absolute; left: 0; top: 50%; transform: translateY(-50%); white-space: nowrap; }
+  .sbr-val { white-space: pre; }
+  .sbr-caret { display: inline-block; width: 0.08em; height: 1.15em; background: #17171c; margin-left: 0.04em; }
+  .sbr-chip { display: none; align-items: center; gap: 0.35em; margin-right: 0.45em; color: #9a9aa5; }
+  .sbr-chip .sw { width: 0.72em; height: 0.72em; border-radius: 50%; display: inline-block; }
+  .sbr-chip img { height: 1.35em; width: 1.35em; object-fit: cover; border-radius: 0.25em; display: inline-block; }
+  .sbr-chip .x { font-size: 0.8em; }
+  .sbr-icons { display: flex; gap: 0.55em; color: #8a8a94; flex: none; }
+  .sbr-icons svg { width: 0.95em; height: 0.95em; }
+  .sbr-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  .sbr-bit { position: absolute; left: 0; top: 0; width: 5px; height: 5px; border-radius: 50%; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.sbr'), bar = el.querySelector('.sbr-bar');
+    if (!root || !bar) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var BW = root.clientWidth || 700, BH = root.clientHeight || 60;
+    var frameW = (ctx && ctx.canvas && ctx.canvas.width) || 1920, frameH = (ctx && ctx.canvas && ctx.canvas.height) || 1080;
+    var h = Math.min(BH, frameW * num(data.height, 0.036));
+    var w = BW;
+    var fs = h * 0.36;
+    // Centred by GSAP's percent offsets, not a CSS translate: GSAP would bake
+    // a CSS translate into pixels once, at the bar's first width, and the
+    // dot would grow from the wrong place (measured: 0.44/0.35, not 0.5/0.53).
+    gsap.set(bar, { xPercent: -50, yPercent: -50 });
+    bar.style.fontSize = fs + 'px';
+    bar.style.height = h + 'px';
+    bar.style.padding = '0 ' + (h * 0.42) + 'px';
+    var chip = el.querySelector('.sbr-chip'), ph = el.querySelector('.sbr-ph'), val = el.querySelector('.sbr-val'), caret = el.querySelector('.sbr-caret');
+    var inner = [el.querySelector('.sbr-glass'), el.querySelector('.sbr-field'), el.querySelector('.sbr-icons')];
+    if (data.icons === false) el.querySelector('.sbr-icons').style.display = 'none';
+
+    // ── Entrance: out of a dot, or a plain fade ──
+    var at = num(data.at, 0.1);
+    var from = String(data.from || 'dot');
+    if (from === 'dot') {
+      var ds = h * 0.42;
+      gsap.set(bar, { width: ds, height: ds, padding: 0, backgroundColor: data.dot_color || '#111111', boxShadow: 'none', scale: 0.4, autoAlpha: 0 });
+      gsap.set(inner, { autoAlpha: 0 });
+      tl.to(bar, { scale: 1, autoAlpha: 1, duration: 0.25, ease: 'back.out(2)' }, at)
+        .to(bar, { width: h, height: h, backgroundColor: '#f0f0f2', duration: 0.3, ease: 'power2.inOut' }, at + 0.3)
+        .to(bar, { backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(20,20,30,0.06), 0 8px 26px rgba(20,20,30,0.1)', duration: 0.2 }, at + 0.55)
+        .to(bar, { width: w, padding: '0 ' + (h * 0.42) + 'px', duration: 0.55, ease: 'power3.inOut' }, at + 0.62)
+        .to(inner, { autoAlpha: 1, duration: 0.3, stagger: 0.06 }, at + 1.0);
+    } else if (from === 'fade') {
+      gsap.set(bar, { width: w, autoAlpha: 0, y: 10 });
+      tl.to(bar, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, at);
+    } else gsap.set(bar, { width: w });
+
+    // ── Placeholder: one hint, or a cycle ──
+    var hints = Array.isArray(data.placeholder) ? data.placeholder : (data.placeholder ? [data.placeholder] : []);
+    var hintEls = hints.map(function (t) { var s = document.createElement('span'); s.textContent = String(t); ph.appendChild(s); return s; });
+    gsap.set(hintEls, { autoAlpha: 0, y: 6 });
+    var pat = num(data.placeholder_at, at + (from === 'dot' ? 1.1 : 0.3));
+    var every = num(data.placeholder_every, 1.2);
+    hintEls.forEach(function (s, i) {
+      tl.to(s, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, pat + i * every);
+      if (i < hintEls.length - 1) tl.to(s, { autoAlpha: 0, y: -6, duration: 0.25, ease: 'power2.in' }, pat + (i + 1) * every - 0.1);
+    });
+
+    // ── Value: typing and clearing on the timeline ──
+    var value = '';
+    var setVal = function (v) {
+      val.textContent = v;
+      ph.style.visibility = v || chip.style.display === 'inline-flex' ? 'hidden' : 'visible';
+    };
+    setVal('');
+    var steps = (Array.isArray(data.steps) ? data.steps : []).slice().sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+    var cps = num(data.cps, 16);
+    var chipNow = null;
+    var showChip = function (c) {
+      chip.innerHTML = '';
+      if (!c) { chip.style.display = 'none'; setVal(val.textContent); return; }
+      if (c.color) { var sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = c.color; chip.appendChild(sw); }
+      if (c.image) { var im = document.createElement('img'); im.src = c.image; chip.appendChild(im); var x = document.createElement('span'); x.className = 'x'; x.textContent = '\u00d7'; chip.appendChild(x); }
+      chip.style.display = 'inline-flex';
+      setVal(val.textContent);
+    };
+    var burstDone = 0;
+    steps.forEach(function (st) {
+      var sat = num(st.at, 0);
+      if (typeof st.type === 'string') {
+        var start = value, text = st.type, end = st.append ? start + text : text;
+        var from0 = st.append ? start : '';
+        var proxy = { n: 0 };
+        var len = end.length - from0.length;
+        tl.to(proxy, { n: len, duration: Math.max(0.05, len / num(st.cps, cps)), ease: 'none',
+          onUpdate: function () { setVal(from0 + end.slice(from0.length, from0.length + Math.round(proxy.n))); } }, sat);
+        value = end;
+      } else if (st.clear) {
+        var was = value, pr = { n: was.length };
+        tl.to(pr, { n: 0, duration: Math.max(0.05, was.length / 40), ease: 'none', onUpdate: function () { setVal(was.slice(0, Math.round(pr.n))); } }, sat);
+        value = '';
+      }
+      if (st.chip !== undefined) {
+        // A tiny tween, not a call: its onUpdate also runs when the playhead
+        // moves BACK past it, so scrubbing restores the earlier chip.
+        var before = chipNow, after = st.chip || null;
+        var cp = { v: 0 };
+        tl.to(cp, { v: 1, duration: 0.01, ease: 'none', onUpdate: function () { showChip(cp.v > 0.5 ? after : before); } }, sat);
+        chipNow = after;
+      }
+      if (st.submit) {
+        // Submit: a small burst of coloured dots around the bar.
+        var burst = el.querySelector('.sbr-burst');
+        var cols = data.burst_colors || ['#e8453c', '#f5a623', '#4a90e2', '#7ed321', '#9b59b6', '#393bf5'];
+        for (var b = 0; b < 26; b++) {
+          var bit = document.createElement('div'); bit.className = 'sbr-bit';
+          bit.style.background = cols[b % cols.length];
+          burst.appendChild(bit);
+          var a = (b / 26) * Math.PI * 2 + burstDone;
+          var sx = Math.cos(a) * w * 0.5, sy = Math.sin(a) * h * 0.55;
+          var ex = Math.cos(a) * (w * 0.5 + 40 + (b % 5) * 22), ey = Math.sin(a) * (h * 0.55 + 30 + (b % 4) * 18);
+          gsap.set(bit, { x: sx, y: sy, autoAlpha: 0, scale: 0.6 });
+          tl.to(bit, { autoAlpha: 1, duration: 0.08 }, sat)
+            .to(bit, { x: ex, y: ey, scale: 1, duration: 0.8, ease: 'power2.out' }, sat)
+            .to(bit, { autoAlpha: 0, duration: 0.4, ease: 'power1.in' }, sat + 0.45);
+        }
+        burstDone += 0.4;
+        tl.to(bar, { scale: 0.985, duration: 0.08, yoyo: true, repeat: 1 }, sat);
+      }
+      if (st.to_y !== undefined) {
+        // Slide to a place in the FRAME (fraction of its height), e.g. the
+        // top as the results arrive.
+        var rect0 = el.getBoundingClientRect();
+        var curCenter = rect0.top + rect0.height / 2;
+        tl.to([bar, el.querySelector('.sbr-burst')], { y: (num(st.to_y, 0.06) * frameH) - curCenter, duration: num(st.duration, 0.7), ease: 'power3.inOut' }, sat);
+      }
+    });
+
+    // Caret: blinks on the timeline (never a CSS animation -- renders seek).
+    var dur = (ctx && ctx.duration) || 6;
+    var cat0 = at + (from === 'dot' ? 1.05 : 0.3);
+    gsap.set(caret, { autoAlpha: 0 });
+    if (data.caret !== false) {
+      tl.set(caret, { autoAlpha: 1 }, cat0);
+      var blinks = Math.max(1, Math.floor((dur - cat0) / 0.5));
+      tl.to(caret, { autoAlpha: 0, duration: 0.25, ease: 'steps(1)', repeat: blinks, yoyo: true }, cat0 + 0.25);
+    }
+    if (data.exit_at !== undefined) tl.to(bar, { autoAlpha: 0, y: -10, duration: 0.35, ease: 'power2.in' }, num(data.exit_at, dur - 0.4));
+    return tl;
+  }
+</script>

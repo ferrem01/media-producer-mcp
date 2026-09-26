@@ -22,7 +22,7 @@ import type { Scene } from "../core/types.js";
 /** Overlays / accents / ambient layers / backdrops: neither match-cut
  *  surfaces nor collision obstacles (they float above or wash below). */
 const NON_SURFACE_TYPES = new Set([
-  "lottie-accent", "sticker-prop", "sticker-rain", "cursor-performer", "floating-pills",
+  "lottie-accent", "sticker-prop", "sticker-rain", "color-flood", "cursor-performer", "floating-pills",
   "ghost-type", "mesh-gradient", "webgl-backdrop", "gradient-background",
   "liquid-background", "grain-overlay", "narration-track",
 ]);

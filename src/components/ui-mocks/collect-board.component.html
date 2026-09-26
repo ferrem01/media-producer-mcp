@@ -1,0 +1,77 @@
+<template>
+  <div class="cbd">
+    <div class="cbd-card"><div class="cbd-head"><span class="cbd-title"></span><span class="cbd-count"><b></b> <i></i></span></div><div class="cbd-grid"></div></div>
+    <div class="cbd-fly"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* COLLECT BOARD: a board/collection card that FILLS as things are saved
+     into it -- each image flies in from off-card, lands in the next slot,
+     and the count in the corner ticks up ("future home  47 -> 59 elements").
+     Saving, shown as the thing piling up. */
+  .cbd, .cbd * { max-width: none; }
+  .cbd { position: absolute; inset: 0; overflow: visible; pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .cbd-card { position: absolute; inset: 0; background: #ffffff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.05), 0 12px 34px rgba(20, 20, 30, 0.1); }
+  .cbd-head { display: flex; justify-content: space-between; align-items: baseline; color: #17171c; }
+  .cbd-title { font-weight: 500; }
+  .cbd-count { color: #8f8f9f; }
+  .cbd-count b { font-weight: 500; color: #8f8f9f; font-variant-numeric: tabular-nums; }
+  .cbd-count i { font-style: normal; }
+  .cbd-grid { position: relative; }
+  .cbd-fly { position: absolute; inset: 0; overflow: visible; }
+  .cbd-tile { position: absolute; left: 0; top: 0; border-radius: 5px; overflow: hidden; background: #ece9e2;
+    box-shadow: 0 6px 16px rgba(20, 16, 24, 0.14); will-change: transform; }
+  .cbd-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.cbd'), card = el.querySelector('.cbd-card'), fly = el.querySelector('.cbd-fly');
+    if (!root) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var BW = root.clientWidth || 600, BH = root.clientHeight || 500;
+    var fs = Math.max(12, BW * num(data.text_size, 0.034));
+    var pad = BW * 0.04;
+    var head = el.querySelector('.cbd-head');
+    head.style.fontSize = fs + 'px'; head.style.padding = pad + 'px ' + pad + 'px ' + (pad * 0.6) + 'px';
+    el.querySelector('.cbd-title').textContent = String(data.title || 'Collection');
+    var countEl = el.querySelector('.cbd-count b'); el.querySelector('.cbd-count i').textContent = String(data.unit || 'elements');
+    var items = (Array.isArray(data.items) ? data.items : []).map(function (s) { return typeof s === 'string' ? s : (s && s.src); }).filter(Boolean);
+    var c0 = Math.round(num(data.count_from, 0));
+    countEl.textContent = String(c0);
+
+    var cols = Math.max(1, Math.round(num(data.cols, 4)));
+    var gap = BW * 0.012;
+    var tw = (BW - pad * 2 - gap * (cols - 1)) / cols, th = tw * num(data.aspect, 0.82);
+    var top0 = pad + fs * 1.6;
+    var at = num(data.at, 0.3);
+    gsap.set(card, { autoAlpha: 0, y: 12 });
+    tl.to(card, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, at);
+    var every = num(data.every, 0.3);
+    var hash = function (i, k) { var v = Math.sin((i + 1) * 57.3 + k * 29.1) * 43758.5453; return v - Math.floor(v); };
+    items.forEach(function (src, i) {
+      var d = document.createElement('div'); d.className = 'cbd-tile';
+      d.style.width = tw + 'px'; d.style.height = th + 'px';
+      var im = document.createElement('img'); im.alt = ''; im.src = src; d.appendChild(im);
+      fly.appendChild(d);
+      var x = pad + (i % cols) * (tw + gap), y = top0 + Math.floor(i / cols) * (th + gap);
+      // From off the card, a side picked per tile, tilted, larger: it lands.
+      var side = Math.floor(hash(i, 1) * 3);
+      var fx = side === 0 ? -BW * 0.55 - tw : side === 1 ? BW * 1.05 : x + (hash(i, 2) - 0.5) * BW * 0.6;
+      var fy = side === 2 ? BH * 1.1 : y + (hash(i, 3) - 0.5) * BH * 0.8;
+      gsap.set(d, { x: fx, y: fy, rotation: (hash(i, 4) - 0.5) * 40, scale: 1.25, autoAlpha: 0 });
+      var t = num(data.first_at, at + 0.5) + i * every;
+      tl.to(d, { autoAlpha: 1, duration: 0.1 }, t)
+        .to(d, { x: x, y: y, rotation: 0, scale: 1, duration: 0.55, ease: 'power3.out' }, t);
+      // The count ticks as it lands (a tiny tween, so scrubbing counts back).
+      var cp = { v: 0 };
+      tl.to(cp, { v: 1, duration: 0.01, onUpdate: (function (n) { return function () { countEl.textContent = String(cp.v > 0.5 ? n : n - 1); }; })(c0 + i + 1) }, t + 0.45);
+    });
+    return tl;
+  }
+</script>

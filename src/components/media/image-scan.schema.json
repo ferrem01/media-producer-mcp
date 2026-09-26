@@ -1,0 +1,15 @@
+{
+  "type": "image-scan",
+  "label": "Image scan (recognition)",
+  "category": "media",
+  "description": "An image under recognition: corner brackets draw in, a small 'Researching' chip sits top-left with its spark turning, and the image swaps to the next one on a beat -- 'Know what you're looking at', 'we read every creative', shown working. The card fills the component's box (a portrait box reads best beside a headline). Example: {\"images\":[\"...\",\"...\",\"...\"],\"label\":\"Researching\",\"every\":1.3}.",
+  "data": {
+    "images": { "type": "array", "label": "Image URLs, shown in turn", "required": true },
+    "label": { "type": "string", "label": "Chip text (default 'Researching'; '' hides the chip)", "optional": true },
+    "at": { "type": "number", "label": "When the card appears (s, default 0.2)", "optional": true },
+    "scan_at": { "type": "number", "label": "When the brackets draw and the chip shows (default at + 0.45)", "optional": true },
+    "every": { "type": "number", "label": "Seconds per image (default 1.3)", "optional": true },
+    "brackets": { "type": "boolean", "label": "Corner brackets (default true)", "optional": true },
+    "chip_size": { "type": "number", "label": "Chip text size as a fraction of the card width (default 0.038)", "optional": true }
+  }
+}

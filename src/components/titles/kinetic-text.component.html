@@ -218,6 +218,28 @@
           ? Number(data.word_times[i]) : at + i * step;
         tl.set(span, { display: 'inline' }, when);
       });
+    } else if (data.entrance === 'focus') {
+      // Focus pull, word by word: each word is in its final place from the
+      // start and comes INTO FOCUS on its beat -- blur to sharp, faint to
+      // full (the Cosmos line reveal). The line never reflows.
+      var fwords = [];
+      while ((m = re.exec(text)) !== null) {
+        var fAcc = m[1] !== undefined;
+        String(fAcc ? m[1] : m[2]).split(/\s+/).forEach(function (w) { if (w) fwords.push({ w: w, accent: fAcc }); });
+      }
+      var fAt = data.at !== undefined ? Number(data.at) : 0.3;
+      var fStep = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.16;
+      fwords.forEach(function (it, i) {
+        if (i > 0) container.appendChild(document.createTextNode(' '));
+        var span = document.createElement('span');
+        if (it.accent) span.className = 'kt-accent';
+        span.style.display = 'inline-block';
+        span.textContent = it.w;
+        container.appendChild(span);
+        var when = Array.isArray(data.word_times) && data.word_times[i] !== undefined ? Number(data.word_times[i]) : fAt + i * fStep;
+        gsap.set(span, { autoAlpha: 0, filter: 'blur(14px)', scale: 1.04 });
+        tl.to(span, { autoAlpha: 1, filter: 'blur(0px)', scale: 1, duration: 0.55, ease: 'power2.out' }, when);
+      });
     } else {
       while ((m = re.exec(text)) !== null) {
         if (m[1] !== undefined) {

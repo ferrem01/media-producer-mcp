@@ -1,0 +1,113 @@
+<template>
+  <div class="dlg">
+    <div class="dlg-mark"></div>
+    <div class="dlg-word"></div>
+    <div class="dlg-tag"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* DOT LOGO: a mark made of dots in a ring that ASSEMBLES out of a point
+     (the swarm that collapsed there hands over to it), types its wordmark
+     in, then collapses back into ONE dot that travels on -- to become the
+     next thing (a search bar, a button). The Cosmos handoff, both ways. */
+  .dlg, .dlg * { max-width: none; }
+  .dlg { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .dlg-mark { position: absolute; width: 0; height: 0; }
+  .dlg-dot { position: absolute; left: 0; top: 0; border-radius: 50%; background: var(--dlg-c, #111); will-change: transform; }
+  .dlg-word { position: absolute; white-space: nowrap; font-weight: 500; letter-spacing: 0.02em; color: var(--dlg-c, #111);
+    text-align: center; transform: translate(-50%, 0); }
+  .dlg-word span { display: inline-block; }
+  .dlg-word .dlg-clip { display: inline-block; overflow: hidden; vertical-align: bottom; padding: 0 0.01em; }
+  .dlg-tag { position: absolute; white-space: nowrap; color: var(--dlg-muted, #8f8f9f); text-align: center; transform: translate(-50%, 0); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.dlg'), mark = el.querySelector('.dlg-mark');
+    var word = el.querySelector('.dlg-word'), tag = el.querySelector('.dlg-tag');
+    if (!root || !mark) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080;
+    var color = data.color || '#111111';
+    root.style.setProperty('--dlg-c', color);
+    if (data.muted) root.style.setProperty('--dlg-muted', data.muted);
+    var n = Math.max(3, Math.min(16, Math.round(num(data.dots, 7))));
+    var ds = W * num(data.dot_size, 0.017);
+    var R = W * num(data.radius, 0.021);
+    var cx = W * num(data.x, 0.5), cy = H * num(data.y, 0.42);
+    mark.style.left = cx + 'px'; mark.style.top = cy + 'px';
+
+    var dots = [];
+    for (var i = 0; i < n; i++) {
+      var d = document.createElement('div');
+      d.className = 'dlg-dot';
+      d.style.width = ds + 'px'; d.style.height = ds + 'px';
+      mark.appendChild(d);
+      dots.push(d);
+    }
+    var ring = function (i, rot) { var a = -Math.PI / 2 + (i / n) * Math.PI * 2 + (rot || 0) * Math.PI / 180; return { x: Math.cos(a) * R, y: Math.sin(a) * R }; };
+    gsap.set(dots, { xPercent: -50, yPercent: -50, x: 0, y: 0, scale: 0, autoAlpha: 0 });
+
+    // Assemble: out of a point, the dots spread to the ring while it turns.
+    var at = num(data.at, 0.2);
+    var spin = num(data.spin, 90);
+    dots.forEach(function (d, i) {
+      var p = ring(i, 0);
+      tl.fromTo(d, { x: 0, y: 0, scale: 0.2, autoAlpha: 0 },
+        { x: p.x, y: p.y, scale: 1, autoAlpha: 1, duration: 0.7, ease: 'back.out(1.6)', immediateRender: false }, at + i * 0.04);
+    });
+    tl.fromTo(mark, { rotation: -spin }, { rotation: 0, duration: 1.0, ease: 'power3.out', immediateRender: false }, at);
+
+    // Wordmark: letters rise into place under a clip.
+    var wm = String(data.wordmark || '');
+    var fs = W * num(data.word_size, 0.019);
+    if (wm) {
+      word.style.left = cx + 'px'; word.style.top = (cy + R + ds + fs * 0.55) + 'px'; word.style.fontSize = fs + 'px';
+      var letters = wm.split('').map(function (ch) {
+        var clip = document.createElement('span'); clip.className = 'dlg-clip';
+        var s = document.createElement('span'); s.textContent = ch === ' ' ? ' ' : ch;
+        clip.appendChild(s); word.appendChild(clip); return s;
+      });
+      var wat = num(data.wordmark_at, at + 0.55);
+      gsap.set(letters, { yPercent: 110 });
+      tl.to(letters, { yPercent: 0, duration: 0.45, ease: 'power3.out', stagger: 0.05 }, wat);
+    } else word.style.display = 'none';
+    var tg = String(data.tagline || '');
+    if (tg) {
+      tag.textContent = tg; tag.style.fontSize = (fs * 0.42) + 'px';
+      tag.style.left = cx + 'px'; tag.style.top = (cy + R + ds + fs * 1.9) + 'px';
+      gsap.set(tag, { autoAlpha: 0, y: 8 });
+      tl.to(tag, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, num(data.tagline_at, at + 0.95));
+    } else tag.style.display = 'none';
+
+    // Collapse: the words go, the ring pulls into ONE dot.
+    if (data.collapse_at !== undefined && data.collapse_at !== null) {
+      var cat = num(data.collapse_at, 3);
+      tl.to([word, tag], { autoAlpha: 0, y: -6, duration: 0.3, ease: 'power2.in' }, cat);
+      tl.to(mark, { rotation: 120, duration: 0.6, ease: 'power2.in' }, cat);
+      tl.to(dots, { x: 0, y: 0, duration: 0.55, ease: 'power3.in', stagger: 0.02 }, cat);
+      tl.to(dots.slice(1), { autoAlpha: 0, duration: 0.1 }, cat + 0.6);
+      tl.to(dots[0], { scale: num(data.merged_scale, 1.25), duration: 0.25, ease: 'back.out(2)' }, cat + 0.6);
+      // Travel: the one dot moves on (and may grow, change colour, fade).
+      var mv = data.move;
+      if (mv && typeof mv === 'object') {
+        var mat = num(mv.at, cat + 0.95), mdur = num(mv.duration, 0.6);
+        // The dot lives inside the mark, which the collapse left turned by
+        // 120 degrees: the frame-space offset is turned back into that local
+        // frame, or the dot lands off its mark (measured: 115px off).
+        var dxF = (num(mv.x, 0.5) * W) - cx, dyF = (num(mv.y, 0.5) * H) - cy;
+        var th = -120 * Math.PI / 180;
+        var props = { x: dxF * Math.cos(th) - dyF * Math.sin(th), y: dxF * Math.sin(th) + dyF * Math.cos(th), duration: mdur, ease: mv.ease || 'power3.inOut' };
+        if (mv.scale !== undefined) props.scale = num(mv.scale, 1);
+        if (mv.color) props.backgroundColor = mv.color;
+        tl.to(dots[0], props, mat);
+        if (mv.fade !== false) tl.to(dots[0], { autoAlpha: 0, duration: 0.25 }, mat + mdur + num(mv.hold, 0.1));
+      }
+    }
+    return tl;
+  }
+</script>

@@ -1,0 +1,21 @@
+{
+  "type": "search-bar",
+  "label": "Search bar",
+  "category": "ui-mocks",
+  "description": "A product's SEARCH as the hero beat: a white pill that can grow out of a dot (from:'dot' -- the logo's last dot swells, pales and stretches into the bar: the Cosmos handoff), cycles its placeholder, types a query, carries a chip (a colour swatch for 'search by colour', an image thumbnail for 'visual search'), bursts on submit, and slides up to the top of the frame as results arrive (to_y). Position its box where the bar sits (the bar fills the box width). Steps run on the timeline, the caret too. Example: {\"from\":\"dot\",\"at\":0.1,\"placeholder\":\"Try 'scandinavian furniture'\",\"steps\":[{\"at\":1.8,\"type\":\"warm minimal interiors\"},{\"at\":3.4,\"submit\":true}]}.",
+  "data": {
+    "from": { "type": "string", "label": "dot (default: grows out of a dot) | fade | none", "optional": true },
+    "at": { "type": "number", "label": "When the dot appears / the bar enters (s, default 0.1)", "optional": true },
+    "dot_color": { "type": "string", "label": "The starting dot's colour (default near-black -- match the logo)", "optional": true },
+    "placeholder": { "type": "string", "label": "Placeholder text, or an array of them to cycle", "optional": true },
+    "placeholder_at": { "type": "number", "label": "When the placeholder shows", "optional": true },
+    "placeholder_every": { "type": "number", "label": "Seconds per placeholder in a cycle (default 1.2)", "optional": true },
+    "steps": { "type": "array", "label": "In order: {at, type:'text'} types a query (append:true adds to it) | {at, clear:true} | {at, chip:{color:'#BC361B'} or {image:url} or null} | {at, submit:true} (a burst) | {at, to_y:0.07, duration?} slides the bar to that height of the frame", "optional": true },
+    "cps": { "type": "number", "label": "Typing speed, characters per second (default 16)", "optional": true },
+    "height": { "type": "number", "label": "Bar height as a fraction of the frame width (default 0.036; capped by the box)", "optional": true },
+    "icons": { "type": "boolean", "label": "The two small icons at the right (default true)", "optional": true },
+    "caret": { "type": "boolean", "label": "Blinking caret (default true)", "optional": true },
+    "burst_colors": { "type": "array", "label": "Colours of the submit burst", "optional": true },
+    "exit_at": { "type": "number", "label": "When the bar leaves (omit to stay)", "optional": true }
+  }
+}
