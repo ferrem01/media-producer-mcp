@@ -74,11 +74,14 @@
       var ds = h * 0.42;
       gsap.set(bar, { width: ds, height: ds, padding: 0, backgroundColor: data.dot_color || '#111111', boxShadow: 'none', scale: 0.4, autoAlpha: 0 });
       gsap.set(inner, { autoAlpha: 0 });
-      tl.to(bar, { scale: 1, autoAlpha: 1, duration: 0.25, ease: 'back.out(2)' }, at)
-        .to(bar, { width: h, height: h, backgroundColor: '#f0f0f2', duration: 0.3, ease: 'power2.inOut' }, at + 0.3)
-        .to(bar, { backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(20,20,30,0.06), 0 8px 26px rgba(20,20,30,0.1)', duration: 0.2 }, at + 0.55)
-        .to(bar, { width: w, padding: '0 ' + (h * 0.42) + 'px', duration: 0.55, ease: 'power3.inOut' }, at + 0.62)
-        .to(inner, { autoAlpha: 1, duration: 0.3, stagger: 0.06 }, at + 1.0);
+      // grow: seconds from the dot landing to the full bar (default 1.2);
+      // every beat of the growth scales with it.
+      var g = Math.max(0.3, num(data.grow, 1.2)) / 1.2;
+      tl.to(bar, { scale: 1, autoAlpha: 1, duration: 0.25 * g, ease: 'back.out(2)' }, at)
+        .to(bar, { width: h, height: h, backgroundColor: '#f0f0f2', duration: 0.3 * g, ease: 'power2.inOut' }, at + 0.3 * g)
+        .to(bar, { backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(20,20,30,0.06), 0 8px 26px rgba(20,20,30,0.1)', duration: 0.2 * g }, at + 0.55 * g)
+        .to(bar, { width: w, padding: '0 ' + (h * 0.42) + 'px', duration: 0.55 * g, ease: 'power3.inOut' }, at + 0.62 * g)
+        .to(inner, { autoAlpha: 1, duration: 0.3 * g, stagger: 0.06 * g }, at + 1.0 * g);
     } else if (from === 'fade') {
       gsap.set(bar, { width: w, autoAlpha: 0, y: 10 });
       tl.to(bar, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, at);
@@ -88,7 +91,7 @@
     var hints = Array.isArray(data.placeholder) ? data.placeholder : (data.placeholder ? [data.placeholder] : []);
     var hintEls = hints.map(function (t) { var s = document.createElement('span'); s.textContent = String(t); ph.appendChild(s); return s; });
     gsap.set(hintEls, { autoAlpha: 0, y: 6 });
-    var pat = num(data.placeholder_at, at + (from === 'dot' ? 1.1 : 0.3));
+    var pat = num(data.placeholder_at, at + (from === 'dot' ? 1.1 * (g || 1) : 0.3));
     var every = num(data.placeholder_every, 1.2);
     hintEls.forEach(function (s, i) {
       tl.to(s, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, pat + i * every);
@@ -161,13 +164,17 @@
         // top as the results arrive.
         var rect0 = el.getBoundingClientRect();
         var curCenter = rect0.top + rect0.height / 2;
-        tl.to([bar, el.querySelector('.sbr-burst')], { y: (num(st.to_y, 0.06) * frameH) - curCenter, duration: num(st.duration, 0.7), ease: 'power3.inOut' }, sat);
+        var mv = { y: (num(st.to_y, 0.06) * frameH) - curCenter, duration: num(st.duration, 0.7), ease: 'power3.inOut' };
+        // scale: the bar settles smaller at its new place (Cosmos: the
+        // results bar sits at ~85% of the hero bar).
+        if (st.scale !== undefined) mv.scale = num(st.scale, 1);
+        tl.to([bar, el.querySelector('.sbr-burst')], mv, sat);
       }
     });
 
     // Caret: blinks on the timeline (never a CSS animation -- renders seek).
     var dur = (ctx && ctx.duration) || 6;
-    var cat0 = at + (from === 'dot' ? 1.05 : 0.3);
+    var cat0 = at + (from === 'dot' ? 1.05 * (g || 1) : 0.3);
     gsap.set(caret, { autoAlpha: 0 });
     if (data.caret !== false) {
       tl.set(caret, { autoAlpha: 1 }, cat0);

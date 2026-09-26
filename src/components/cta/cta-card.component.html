@@ -146,7 +146,10 @@
     var lines = ['.cta-eyebrow', '.cta-headline', '.cta-description'].map(q).filter(function (x) { return x && x.textContent; });
     if (window.mpLineRise) mpLineRise(tl, lines, AT + 0.2, { stagger: 0.12, duration: 0.4, rise: 14 });
     var act = [btn, q('.cta-secondary')].filter(function (x) { return x && x.textContent && x.style.display !== 'none'; });
-    var bAt = AT + 0.35 + lines.length * 0.12;
+    // actions_at: the button lands on a cue of its own -- e.g. the moment a
+    // travelling dot (dot-logo move) arrives where the button stands.
+    var bAt = data.actions_at !== undefined && data.actions_at !== null && isFinite(Number(data.actions_at))
+      ? Number(data.actions_at) : AT + 0.35 + lines.length * 0.12;
     if (act.length) {
       gsap.set(act, { autoAlpha: 0, y: 12 });
       tl.to(act, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.1, ease: 'power3.out' }, bAt);
