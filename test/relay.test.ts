@@ -53,7 +53,7 @@ describe("relay grammar", () => {
   it("is exposed on the generate tool and the operator instructions", async () => {
     const src = await read("../src/server.ts");
     expect(src).toMatch(/"canvas-tour", "relay", "screencast"/);
-    expect(src).toContain("* relay -- every beat CARRIED BY AN OBJECT");
+    expect(src).toContain("* relay -- every beat CARRIED BY AN OBJECT: one becomes the next, or one stays as the through-line");
     expect(src).toContain("relay: every beat carried by an OBJECT");
   });
 });

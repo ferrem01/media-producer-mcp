@@ -425,14 +425,14 @@ BEFORE GENERATING
 - FILM GRAMMARS (what carries the argument; pass film_grammar to pin, omit to let the director choose):
   * launch-film -- few long cinematic scenes, one world.
   * tempo-cut -- product-first montage: driving music, bar-quantized cuts, on-screen type IS the voiceover.
-  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats; premise, escalation, payoff. Hook-first ads.
+  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats. Hook-first ads.
   * editorial -- typography-first: huge serif statements alternating with full-bleed proof.
   * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene; real figures only.
   * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
-  * relay -- every beat CARRIED BY AN OBJECT: a handoff (the dot becomes the logo becomes the search bar) or a through-line (one search bar stays while the beats change around it). 1-3 long oners + hard-cut type punctuation.
+  * relay -- every beat CARRIED BY AN OBJECT: one becomes the next, or one stays as the through-line.
   * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
   * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
-  * creator-cut -- a person explains, the screen PROVES it: each claim names its proof (screenshot, recording, b-roll), cut in full-frame and back. The board asks for every piece.
+  * creator-cut -- a person explains, the screen PROVES it: each claim names its proof, cut in full-frame and back.
     Real person (both): take(project_id) -> a link the human records on (phone); the job completes when the take lands.
   Choosing: ask what carries the argument.
 - FRAME (4th axis; pass frame to pin, omit to infer): 16x9 default | 9x16 Reels/TikTok (top 12%/bottom 18% = platform UI) | 4x5 feed | 1x1. A SIZE, nothing else; never changes the grammar. Instagram ad = 9x16 + any grammar.
