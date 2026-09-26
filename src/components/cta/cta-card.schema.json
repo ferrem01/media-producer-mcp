@@ -77,6 +77,11 @@
       "type": "boolean",
       "label": "Fade out before the scene ends (default: hold; the cut is the exit)",
       "optional": true
+    },
+    "actions": {
+      "type": "string",
+      "label": "'stack' puts the secondary action UNDER the button as a small white pill (the app-launch close); default: side by side",
+      "optional": true
     }
   }
 }

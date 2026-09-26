@@ -4,22 +4,95 @@
   "category": "titles",
   "description": "A logo MARK made of dots in a ring that assembles out of a point, types its wordmark in letter by letter, and can then collapse back into ONE dot that travels on (move) to become the next thing -- the Cosmos handoff: an image swarm collapses to a point, the mark appears there; later the mark collapses to a dot that swells into a search bar or a button placed where it lands. Full-frame; the mark sits at x/y. Pair a swarm 'point' formation at the same spot and time for the handoff in. Example: {\"wordmark\":\"COSMOS\",\"tagline\":\"Your space for inspiration\",\"at\":0.2,\"collapse_at\":2.4,\"move\":{\"x\":0.5,\"y\":0.62,\"scale\":1.6}}.",
   "data": {
-    "dots": { "type": "number", "label": "Dots in the ring (default 7)", "optional": true },
-    "color": { "type": "string", "label": "Dot + wordmark colour (default near-black)", "optional": true },
-    "muted": { "type": "string", "label": "Tagline colour", "optional": true },
-    "x": { "type": "number", "label": "Mark centre, fraction of the frame width (default 0.5)", "optional": true },
-    "y": { "type": "number", "label": "Mark centre, fraction of the frame height (default 0.42)", "optional": true },
-    "dot_size": { "type": "number", "label": "Dot diameter as a fraction of the frame width (default 0.017)", "optional": true },
-    "radius": { "type": "number", "label": "Ring radius as a fraction of the frame width (default 0.021)", "optional": true },
-    "spin": { "type": "number", "label": "Degrees the ring turns as it assembles (default 90)", "optional": true },
-    "at": { "type": "number", "label": "When the dots start to assemble (s, default 0.2)", "optional": true },
-    "wordmark": { "type": "string", "label": "The name under the mark (letters rise in)", "optional": true },
-    "wordmark_at": { "type": "number", "label": "When the wordmark types (default at + 0.55)", "optional": true },
-    "word_size": { "type": "number", "label": "Wordmark size as a fraction of the frame width (default 0.019)", "optional": true },
-    "tagline": { "type": "string", "label": "Small line under the wordmark", "optional": true },
-    "tagline_at": { "type": "number", "label": "When the tagline fades in", "optional": true },
-    "collapse_at": { "type": "number", "label": "When the words leave and the ring pulls into one dot (omit to hold)", "optional": true },
-    "merged_scale": { "type": "number", "label": "Size of the merged dot relative to one dot (default 1.25)", "optional": true },
-    "move": { "type": "object", "label": "After the collapse: {at?, x, y (0-1), scale?, color?, duration?, hold?, fade? (default true: it hands off where it lands)}", "optional": true }
+    "dots": {
+      "type": "number",
+      "label": "Dots in the ring (default 7)",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Dot + wordmark colour (default near-black)",
+      "optional": true
+    },
+    "muted": {
+      "type": "string",
+      "label": "Tagline colour",
+      "optional": true
+    },
+    "x": {
+      "type": "number",
+      "label": "Mark centre, fraction of the frame width (default 0.5)",
+      "optional": true
+    },
+    "y": {
+      "type": "number",
+      "label": "Mark centre, fraction of the frame height (default 0.42)",
+      "optional": true
+    },
+    "dot_size": {
+      "type": "number",
+      "label": "Dot diameter as a fraction of the frame width (default 0.017)",
+      "optional": true
+    },
+    "radius": {
+      "type": "number",
+      "label": "Ring radius as a fraction of the frame width (default 0.021)",
+      "optional": true
+    },
+    "spin": {
+      "type": "number",
+      "label": "Degrees the ring turns as it assembles (default 90)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the dots start to assemble (s, default 0.2)",
+      "optional": true
+    },
+    "wordmark": {
+      "type": "string",
+      "label": "The name under the mark (letters rise in)",
+      "optional": true
+    },
+    "wordmark_at": {
+      "type": "number",
+      "label": "When the wordmark types (default at + 0.55)",
+      "optional": true
+    },
+    "word_size": {
+      "type": "number",
+      "label": "Wordmark size as a fraction of the frame width (default 0.019)",
+      "optional": true
+    },
+    "tagline": {
+      "type": "string",
+      "label": "Small line under the wordmark",
+      "optional": true
+    },
+    "tagline_at": {
+      "type": "number",
+      "label": "When the tagline fades in",
+      "optional": true
+    },
+    "collapse_at": {
+      "type": "number",
+      "label": "When the words leave and the ring pulls into one dot (omit to hold)",
+      "optional": true
+    },
+    "merged_scale": {
+      "type": "number",
+      "label": "Size of the merged dot relative to one dot (default 1.25)",
+      "optional": true
+    },
+    "move": {
+      "type": "object",
+      "label": "After the collapse: {at?, x, y (0-1), scale?, color?, duration?, hold?, fade? (default true: it hands off where it lands)}",
+      "optional": true
+    },
+    "formed": {
+      "type": "boolean",
+      "label": "Start with the mark already standing (no assembly) -- a cut onto the logo",
+      "optional": true
+    }
   }
 }

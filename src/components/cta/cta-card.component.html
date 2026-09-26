@@ -59,6 +59,12 @@
     font-size: calc(var(--u) * 24); line-height: 1.4; color: var(--s-muted); text-wrap: balance;
   }
   .cta-actions { display: flex; align-items: center; gap: calc(var(--u) * 26); margin-top: calc(var(--u) * 40); }
+  /* The button and the link never shrink: a squeezed flex item clipped the
+     label ("Sign up for Cosmo") without the fit loop ever seeing overflow. */
+  .cta-actions > * { flex-shrink: 0; }
+  .cta-root.stack .cta-actions { flex-direction: column; gap: calc(var(--u) * 16); }
+  .cta-root.stack .cta-secondary { font-size: calc(var(--u) * 19); padding: calc(var(--u) * 10) calc(var(--u) * 26); border-radius: 999px; background: var(--s-bg, #fff);
+    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.06), 0 6px 18px rgba(20, 20, 30, 0.08); }
   .cta-button {
     position: relative; overflow: hidden;
     display: inline-flex; align-items: center; gap: calc(var(--u) * 12);
@@ -101,7 +107,13 @@
       : (typeof gl === 'number' && gl < 0.18 ? 'dark' : 'light');
     root.classList.add('t-' + theme);
     if (data.surface === 'none') root.classList.add('surface-none');
-    if (data.button_color) btn.style.background = String(data.button_color);
+    if (data.actions === 'stack') root.classList.add('stack');
+    if (data.button_color) {
+      btn.style.background = String(data.button_color);
+      // The glow follows the button, not the brand: a black button with a
+      // blue halo read as a mistake.
+      btn.style.boxShadow = '0 calc(var(--u) * 10) calc(var(--u) * 26) color-mix(in srgb, ' + String(data.button_color) + ' 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22)';
+    }
 
     // SIZE: the card fills the slot (a landscape card never wider than ~1.9:1),
     // type from the box, then shrink until the content fits.

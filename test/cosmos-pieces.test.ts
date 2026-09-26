@@ -207,3 +207,35 @@ describe("the small pieces", () => {
     }, 6);
   }, 90000);
 });
+
+describe("the close: the button's label never clips, and the link can stack under it", () => {
+  it("cta-card actions:'stack' keeps 'Sign up for Cosmos' whole in a narrow box, the link below it", async () => {
+    await still([{ type: "cta-card", dir: "cta", position: { x: "30%", y: "25%", width: "40%", height: "45%" },
+      data: { description: "Dream with us.", button_text: "Sign up for Cosmos", button_color: "#111111", secondary_text: "Download the app", url: "cosmos.so", arrow: false, surface: "none", actions: "stack", at: 0.1 } }], async (page, seek) => {
+      await seek(2.5);
+      const m = await page.evaluate(() => {
+        const b = document.querySelector(".cta-button") as HTMLElement, l = document.querySelector(".cta-label") as HTMLElement, s = document.querySelector(".cta-secondary") as HTMLElement;
+        const rb = b.getBoundingClientRect(), rl = l.getBoundingClientRect(), rs = s.getBoundingClientRect();
+        return { labelIn: rl.right <= rb.right + 0.5 && rl.left >= rb.left - 0.5, below: rs.top >= rb.bottom - 0.5 };
+      });
+      expect(m).toEqual({ labelIn: true, below: true });
+    });
+  });
+
+  it("dot-logo: the tagline has landed before the collapse, so nothing lingers under the travelling dot", async () => {
+    await still([{ type: "dot-logo", dir: "titles", data: { at: 0.2, wordmark: "COSMOS", tagline: "Your space for inspiration", tagline_at: 1.4, collapse_at: 1.4, move: { x: 0.5, y: 0.6, at: 2.1, fade: false } } }], async (page, seek) => {
+      // Played forward, as the render does: each frame renders the tweens in order.
+      for (const t of [0.8, 1.3, 1.5, 1.8, 2.2, 3]) await seek(t);
+      expect(await page.evaluate(() => +getComputedStyle(document.querySelector(".dlg-tag")!).opacity)).toBeLessThan(0.05);
+    });
+  });
+
+  it("dot-logo formed:true opens on the standing ring, every dot visible at t=0", async () => {
+    await still([{ type: "dot-logo", dir: "titles", data: { formed: true, dots: 7 } }], async (page, seek) => {
+      await seek(0);
+      const d = (await boxes(page, ".dlg-dot")).filter((b) => b.vis);
+      expect(d.length).toBe(7);
+      expect(Math.max(...d.map((b) => Math.hypot(b.x - 960, b.y - 1080 * 0.42)))).toBeGreaterThan(20);
+    });
+  });
+});

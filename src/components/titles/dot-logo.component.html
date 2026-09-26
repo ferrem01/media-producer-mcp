@@ -55,12 +55,18 @@
     // Assemble: out of a point, the dots spread to the ring while it turns.
     var at = num(data.at, 0.2);
     var spin = num(data.spin, 90);
-    dots.forEach(function (d, i) {
-      var p = ring(i, 0);
-      tl.fromTo(d, { x: 0, y: 0, scale: 0.2, autoAlpha: 0 },
-        { x: p.x, y: p.y, scale: 1, autoAlpha: 1, duration: 0.7, ease: 'back.out(1.6)', immediateRender: false }, at + i * 0.04);
-    });
-    tl.fromTo(mark, { rotation: -spin }, { rotation: 0, duration: 1.0, ease: 'power3.out', immediateRender: false }, at);
+    if (data.formed) {
+      // Already standing when the scene opens (a cut onto the mark, e.g. the
+      // close after the swarm collapsed into it): no assembly.
+      dots.forEach(function (d, i) { var p = ring(i, 0); gsap.set(d, { x: p.x, y: p.y, scale: 1, autoAlpha: 1 }); });
+    } else {
+      dots.forEach(function (d, i) {
+        var p = ring(i, 0);
+        tl.fromTo(d, { x: 0, y: 0, scale: 0.2, autoAlpha: 0 },
+          { x: p.x, y: p.y, scale: 1, autoAlpha: 1, duration: 0.7, ease: 'back.out(1.6)', immediateRender: false }, at + i * 0.04);
+      });
+      tl.fromTo(mark, { rotation: -spin }, { rotation: 0, duration: 1.0, ease: 'power3.out', immediateRender: false }, at);
+    }
 
     // Wordmark: letters rise into place under a clip.
     var wm = String(data.wordmark || '');
@@ -81,7 +87,11 @@
       tag.textContent = tg; tag.style.fontSize = (fs * 0.42) + 'px';
       tag.style.left = cx + 'px'; tag.style.top = (cy + R + ds + fs * 1.9) + 'px';
       gsap.set(tag, { autoAlpha: 0, y: 8 });
-      tl.to(tag, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, num(data.tagline_at, at + 0.95));
+      // The tagline lands before any collapse, or its fade-in outlives the
+      // collapse's fade-out and it lingers under the travelling dot.
+      var tgAt = num(data.tagline_at, at + 0.95);
+      if (data.collapse_at !== undefined && data.collapse_at !== null) tgAt = Math.min(tgAt, num(data.collapse_at, 3) - 0.55);
+      tl.to(tag, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, tgAt);
     } else tag.style.display = 'none';
 
     // Collapse: the words go, the ring pulls into ONE dot.
