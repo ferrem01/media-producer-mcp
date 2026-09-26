@@ -123,6 +123,18 @@ const transitionSchema = z.object({
   duration_seconds: z.number(),
 }).optional();
 
+/** Word anchors on a component, keyed by the data path they set ("at",
+ *  "lines[1].at", "enter.at", "phrases[0].start"): the time lands on that
+ *  spoken word -- now when the scene already has its words, and again when a
+ *  take lands (the take re-times every anchor). Give a number too, so the
+ *  component plays before the words are known. */
+const anchorsSchema = z.record(z.object({
+  word: z.string(),
+  occurrence: z.number().optional(),
+  edge: z.enum(["start", "end"]).optional(),
+  offset: z.number().optional(),
+})).optional().describe("Word anchors by data path ('at', 'lines[1].at', 'enter.at'): {word, occurrence?, edge?, offset?}. The time lands on that spoken word when the scene's words are known (now, or when the take lands); keep a numeric value in the data so it plays before then.");
+
 const componentSchema = z.object({
   id: z.string(),
   type: z.string(),
@@ -131,6 +143,7 @@ const componentSchema = z.object({
   z_index: z.number().optional(),
   enter: animationSchema,
   exit: animationSchema,
+  anchors: anchorsSchema,
 });
 
 /** A beat: one thought inside a scene's continuous take (see SceneBeat). */
@@ -260,6 +273,16 @@ async function sanitizeSpeakerClips(project: Project): Promise<Array<{ source: s
     }
   }
   return out;
+}
+
+/** After a component lands on a built scene: when the scene has its words,
+ *  resolve every word anchor on it now (the take re-times them later). */
+async function landAnchorsOnWords(project: Project, sceneId: string): Promise<void> {
+  const sc = (project.scenes || []).find((x: any) => x.id === sceneId) as any;
+  if (!sc?.spine?.words?.length) return;
+  const { applySpine } = await import("./core/word-anchors.js");
+  applySpine(sc, sc.spine);
+  await saveProject(project);
 }
 
 function previewUrl(tenantId: string, projectId: string, token?: string): string {
@@ -1166,6 +1189,7 @@ export function createMcpServer(): McpServer {
           params.component as SceneComponent,
         );
         if (!project) return err("Project or scene not found");
+        await landAnchorsOnWords(project, params.scene_id);
         return ok(withStudio(project));
       }
 
@@ -1223,6 +1247,7 @@ export function createMcpServer(): McpServer {
       project_id: z.string(),
       scene_id: z.string().optional(),
       component_id: z.string().optional(),
+      anchors: anchorsSchema,
 
       // Project-level updates
       name: z.string().optional(),
@@ -1657,6 +1682,21 @@ export function createMcpServer(): McpServer {
             if (params.pose === null) delete (comp as any).pose;
             else (comp as any).pose = params.pose;
             updated = true;
+          }
+          if (params.anchors !== undefined) {
+            (comp as any).anchors = { ...((comp as any).anchors || {}), ...params.anchors };
+            updated = true;
+          }
+        }
+
+        // An edited scene that already has its words lands every word
+        // anchor now ("@word" shorthand included), not only when a take
+        // lands -- an edit timed to a word plays on the word today.
+        if (updated && params.scene_id) {
+          const sc = project.scenes.find((x: any) => x.id === params.scene_id) as any;
+          if (sc?.spine?.words?.length) {
+            const { applySpine } = await import("./core/word-anchors.js");
+            applySpine(sc, sc.spine);
           }
         }
 

@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — Edits land on the words: anchors on add/update
+
+Applying the Scale Army recipe to Teaser D (a built film, so update/add
+only, never a rebuild) showed a gap. A component placed by hand had no way
+to be timed to a spoken word:
+- the `add`/`update` component schemas had no `anchors`;
+- an `@word` shorthand was only resolved when a take landed.
+So a hand edit timed to a word either played at a guessed second forever,
+or played nothing until the next take.
+- The component schema now carries `anchors` (keyed by data path: `at`,
+  `lines[1].at`, `enter.at` ...), and `update` merges an `anchors` param.
+- An edited scene that already has its words resolves every anchor at once
+  (`applySpine`, the same pass a take runs), `@word` shorthand included.
+  A new scene with no words keeps its numbers until its take lands, then
+  re-times.
+- Test: `test/edit-anchors.test.ts`.
+
 ## 2026-09-26 — Logo pill and the hand-boxed ask (Scale Army, pieces 4-5)
 
 - **`sticker-prop` kind `logo`.** The company's wordmark sits on a
