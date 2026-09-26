@@ -82,6 +82,11 @@
       "type": "string",
       "label": "'stack' puts the secondary action UNDER the button as a small white pill (the app-launch close); default: side by side",
       "optional": true
+    },
+    "actions_at": {
+      "type": "number",
+      "label": "When the button (and link) land, if not right after the lines -- e.g. when a dot-logo's travelling dot arrives there",
+      "optional": true
     }
   }
 }

@@ -238,4 +238,28 @@ describe("the close: the button's label never clips, and the link can stack unde
       expect(Math.max(...d.map((b) => Math.hypot(b.x - 960, b.y - 1080 * 0.42)))).toBeGreaterThan(20);
     });
   });
+
+  it("search-bar grow:0.6 opens the full bar in 0.6 s; a to_y step with scale settles it smaller at the top", async () => {
+    await still([{ type: "search-bar", dir: "ui-mocks", position: { x: "20%", y: "0%", width: "60%", height: "111%" },
+      data: { from: "dot", at: 0.2, grow: 0.6, height: 0.05, steps: [{ at: 1.5, to_y: 0.09, scale: 0.85, duration: 0.5 }] } }], async (page, seek) => {
+      await seek(0.85);
+      const open = (await boxes(page, ".sbr-bar"))[0];
+      expect(open.w).toBeGreaterThan(1920 * 0.55);
+      await seek(2.3);
+      const top = (await boxes(page, ".sbr-bar"))[0];
+      expect(Math.abs(top.y - 1080 * 0.09)).toBeLessThan(14);
+      expect(top.w).toBeLessThan(open.w * 0.9);
+      expect(top.vis).toBe(true);
+    });
+  });
+
+  it("cta-card actions_at holds the button until its cue", async () => {
+    await still([{ type: "cta-card", dir: "cta", position: { x: "25%", y: "20%", width: "50%", height: "50%" },
+      data: { description: "Dream with us.", button_text: "Sign up", surface: "none", at: 0.2, actions_at: 1.6 } }], async (page, seek) => {
+      await seek(1.2);
+      expect((await boxes(page, ".cta-button"))[0].vis).toBe(false);
+      await seek(2.3);
+      expect((await boxes(page, ".cta-button"))[0].o).toBeGreaterThan(0.95);
+    });
+  });
 });
