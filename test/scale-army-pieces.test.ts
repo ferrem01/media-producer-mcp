@@ -12,10 +12,10 @@ import { assembleScene } from "../src/core/scene-assembler.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BRAND = { colors: { primary: "#f0643a", background: "#ffffff", text: "#17171c" }, fonts: [] };
 
-async function still(type: string, dir: string, data: unknown, position: unknown, run: (page: Page, seek: (t: number) => Promise<void>) => Promise<void>, background = "linear-gradient(160deg,#6b5a4e,#2c2622)", brand: any = BRAND) {
+async function still(type: string, dir: string, data: unknown, position: unknown, run: (page: Page, seek: (t: number) => Promise<void>) => Promise<void>, background = "linear-gradient(160deg,#6b5a4e,#2c2622)", brand: any = BRAND, sceneExtra: any = {}) {
   const src = await fs.readFile(path.resolve(__dirname, `../src/components/${dir}/${type}.component.html`), "utf-8");
   const html = await assembleScene({
-    scene: { id: "s", label: "s", duration_seconds: 5, background, components: [{ id: "c", type, position, data }] } as any,
+    scene: { id: "s", label: "s", duration_seconds: 5, background, components: [{ id: "c", type, position, data }], ...sceneExtra } as any,
     components: [{ type, source: src }], brandKit: brand as any, canvas: { width: 1080, height: 1920 } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap"),
   } as any);
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "sap-"));
@@ -150,6 +150,18 @@ describe("stack-list: a lead, then items rising one per word, carried over the p
       expect(a.items.every((i) => i.o === 1)).toBe(true);
       expect(a.shadow).not.toBe("none");
     });
+  }, 60000);
+  it("pinned to the frame: a punch-in on the person never pushes the words off the edge", async () => {
+    // Measured live (Teaser D, the Claim scene): inside the camera rig a 1.12x zoom put the items at x=-20.
+    await still("stack-list", "titles", { ...data, ground: "none", settled: true }, { x: 0, y: 0, width: "100%", height: "100%" }, async (page, seek) => {
+      await seek(0.05);
+      const a = await read(page);
+      await seek(2.0);
+      const b = await read(page);
+      expect(b.items[0].left).toBeGreaterThan(0);
+      expect(Math.abs(b.items[0].left - a.items[0].left)).toBeLessThan(2);
+      expect(Math.abs(b.items[0].top - a.items[0].top)).toBeLessThan(2);
+    }, "#6b5a4e", BRAND, { camera_moves: [{ at: 0.5, type: "zoom", scale: 1.3, x: 50, y: 42, duration: 0.3 }] });
   }, 60000);
 });
 

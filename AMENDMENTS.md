@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The stacking list is pinned to the frame
+
+Teaser D's Claim scene carries the list over the person and punches in
+(1.12x) on "seeing the numbers". Measured with `get target:'layout'`: inside
+the camera rig the zoom put the items at x=-20, off the left edge.
+- `stack-list` joins `reel-caption-lane` in `FIXED_TO_FRAME`
+  (`core/scene-assembler.ts`): it is parked outside the rig, so the person
+  punches in and the words hold still, as in the reference.
+- Test: `test/scale-army-pieces.test.ts` (a 1.3x zoom leaves the items where
+  they were; without the pin they sat at x=-96).
+- Open (seen on the same film, not fixed here): `add` with `position` and the
+  MCP board's `remove_scenes`/`reorder_scenes` do not move `takes[].scene_index`
+  or `speaker_track.clips[].scene_index`. Studio's reorder does
+  (`reorderBoard`). A scene inserted into a film with per-scene takes hands
+  every later scene the previous scene's voice until the takes are recorded again.
+
 ## 2026-09-26 — Edits land on the words: anchors on add/update
 
 Applying the Scale Army recipe to Teaser D (a built film, so update/add
