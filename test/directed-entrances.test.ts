@@ -144,7 +144,8 @@ describe("the storyboard can reach the choreography", () => {
   it("maps them onto the built scene component", async () => {
     const src = await read("../src/llm/scene-generator.ts");
     expect(src).toMatch(/normalizeAnim\(\(c as any\)\.enter\)/);
-    expect(src).toMatch(/normalizeAnim\(\(c as any\)\.exit\)/);
+    // The exit is normalized AS an exit: a morph is an entrance only.
+    expect(src).toMatch(/normalizeAnim\(\(c as any\)\.exit, "exit"\)/);
     // ...and refuses effects wrapperChoreoScript has no offset for.
     expect(src).toMatch(/CHOREO_EFFECTS/);
   });

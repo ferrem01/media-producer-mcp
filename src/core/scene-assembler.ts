@@ -53,6 +53,31 @@ export function isSplitWrapper(comp: { data?: unknown }): boolean {
   const d = comp && (comp as any).data;
   return !!d && typeof d === "object" && String((d as any).use || "") === "split";
 }
+/** THE MORPH'S SOURCE (SPEC-metamorph.md, settled in review): an entrance
+ *  `{effect: "morph", from}` names the component it is born from -- by id,
+ *  or "id.anchor" for a [data-anchor] part inside it. The board has no ids:
+ *  the build gives the first of a type its type as id (repeats _2, _3), so a
+ *  type resolves to its first instance too. Resolved against THIS scene's
+ *  cast, because a morph only works inside one scene (both wrappers on the
+ *  page at once). Null when nothing matches or it names itself -- the
+ *  choreography then fades the component in instead. */
+export function resolveMorphSource(
+  from: unknown,
+  selfId: string,
+  components: Array<{ id: string; type: string }>,
+): { src: string; anchor: string | null } | null {
+  const s = typeof from === "string" ? from.trim() : "";
+  if (!s) return null;
+  const find = (k: string) => components.find((c) => c.id === k) || components.find((c) => c.type === k);
+  let hit = find(s);
+  let anchor: string | null = null;
+  if (!hit) {
+    const dot = s.lastIndexOf(".");
+    if (dot > 0 && dot < s.length - 1) { hit = find(s.slice(0, dot)); anchor = s.slice(dot + 1); }
+  }
+  if (!hit || hit.id === selfId) return null;
+  return { src: hit.id, anchor };
+}
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
@@ -773,6 +798,17 @@ export function wrapperChoreoScript(
       scatter: isScatterLane(c),
       top0: c.position && (c.position as any).y !== undefined ? String((c.position as any).y) : null,
       height0: c.position && (c.position as any).height !== undefined ? String((c.position as any).height) : null,
+      // The morph's source, resolved here against the cast (ids, types,
+      // "id.anchor"); srcExit: the author gave the source its own exit, so
+      // the morph leaves the source's wrapper alone.
+      morph: (() => {
+        const e = animOf(c.enter) as any;
+        if (!e || e.effect !== "morph") return null;
+        const r = resolveMorphSource(e.from, c.id, components);
+        if (!r) return null;
+        const src = components.find((k) => k.id === r.src);
+        return { src: `${cidPrefix}${r.src}`, anchor: r.anchor, srcExit: !!(src && src.exit) };
+      })(),
     }));
   if (!moves.length) return "";
   return `
@@ -825,6 +861,141 @@ export function wrapperChoreoScript(
       tx = Math.max(W - W * sc, Math.min(0, tx));
       ty = Math.max(H - H * sc, Math.min(0, ty));
       return { scale: sc, x: tx, y: ty };
+    }
+    // ── THE MORPH (SPEC-metamorph.md): one component born from another's box ──
+    // enter {effect:'morph', from:'A' | 'A.anchor'}: the wrapper starts ON the
+    // source's box and travels to its own (FLIP: translate + non-uniform scale
+    // from the top-left corner), while the source fades out in place. Scaled
+    // content smears, so nothing of the target shows while the box is far
+    // from home: a SKIN -- a plain surface in the source's colour and corner
+    // radius, a sibling of the wrapper riding the same transform -- carries
+    // the first half, and the target's content (the wrapper's own opacity)
+    // dissolves in over the second half as the skin dissolves out.
+    //
+    // Boxes are LAYOUT boxes in page coordinates (offsets, not client rects):
+    // the camera rig and the ambient push transform both wrappers alike, and
+    // measuring through them would bake the push into the FLIP. An anchor's
+    // box inside the source comes from client rects RELATIVE to the source
+    // wrapper, divided back by the wrapper's own client/layout ratio, so the
+    // fit box's scale and the component's own transforms count and the
+    // camera cancels out. Measured at the morph's first render (function
+    // values), like the camera's anchored moves: the part is where it is at
+    // that moment, not where it was when the timeline was built.
+    function pageBox(node) {
+      var x = 0, y = 0, n = node;
+      while (n) { x += n.offsetLeft || 0; y += n.offsetTop || 0; n = n.offsetParent; }
+      return { x: x, y: y, w: node.offsetWidth || 0, h: node.offsetHeight || 0 };
+    }
+    function alphaOf(col) {
+      var m = /rgba?\\(([^)]+)\\)/.exec(col || '');
+      if (!m) return 0;
+      var p = m[1].split(/[ ,\\/]+/).filter(Boolean);
+      return p.length > 3 ? parseFloat(p[3]) : 1;
+    }
+    // The visible surface of a box: the node itself or the first descendant
+    // (breadth-first, a few levels) with an opaque-ish fill that covers most
+    // of it. Its colour dresses the skin; its corner radius (in box units)
+    // is the skin's starting radius. A surface much smaller than the box
+    // (a small card centred in a big slot) would lie about the shape: none.
+    function surfaceOf(node, bw, bh) {
+      var nr = node.getBoundingClientRect();
+      if (!nr.width || !nr.height) return null;
+      var queue = [{ n: node, d: 0 }], seen = 0;
+      while (queue.length && seen < 80) {
+        var q = queue.shift(); seen++;
+        var cs = getComputedStyle(q.n);
+        if (alphaOf(cs.backgroundColor) > 0.5) {
+          var r = q.n.getBoundingClientRect();
+          if (r.width >= nr.width * 0.85 && r.height >= nr.height * 0.85) {
+            var kx = bw / nr.width, ky = bh / nr.height;
+            var lw = q.n.offsetWidth || r.width, lh = q.n.offsetHeight || r.height;
+            var raw = cs.borderTopLeftRadius || '0px';
+            var rx = parseFloat(raw) || 0, ry = rx;
+            if (/%/.test(raw)) { rx = rx / 100 * lw; ry = ry / 100 * lh; }
+            // Local px -> client px -> box units.
+            return { bg: cs.backgroundColor, rx: rx * (r.width / lw) * kx, ry: ry * (r.height / lh) * ky };
+          }
+        }
+        if (q.d < 4) for (var i = 0; i < q.n.children.length; i++) queue.push({ n: q.n.children[i], d: q.d + 1 });
+      }
+      return null;
+    }
+    function morphSource(srcEl, anchor) {
+      var sb = pageBox(srcEl);
+      var part = null;
+      if (anchor) {
+        try { part = srcEl.querySelector('[data-anchor="' + anchor + '"]'); } catch (e) {}
+      }
+      if (part) {
+        var wr = srcEl.getBoundingClientRect(), ar = part.getBoundingClientRect();
+        var kx = wr.width / (sb.w || 1), ky = wr.height / (sb.h || 1);
+        if (kx > 0 && ky > 0 && ar.width > 0 && ar.height > 0) {
+          var b = { x: sb.x + (ar.left - wr.left) / kx, y: sb.y + (ar.top - wr.top) / ky, w: ar.width / kx, h: ar.height / ky };
+          return { box: b, surf: surfaceOf(part, b.w, b.h) };
+        }
+      }
+      return { box: sb, surf: surfaceOf(srcEl, sb.w, sb.h) };
+    }
+    function morphIn(el, srcEl, c) {
+      var m = c.morph;
+      var at = +c.enter.at || 0;
+      var D = c.enter.duration > 0 ? +c.enter.duration : 0.8;
+      var E = c.enter.ease || 'power3.inOut';
+      var H = D / 2;
+      var part = null;
+      if (m.anchor) {
+        try { part = srcEl.querySelector('[data-anchor="' + m.anchor + '"]'); } catch (e) {}
+        if (!part) console.warn('[morph] ' + c.cid + ': no anchor "' + m.anchor + '" in ' + m.src + ' -- morphing from its whole box');
+      }
+      // The skin: a sibling in the wrapper's slot and stacking order, so the
+      // one camera carries it; built now, dressed at the first render.
+      var skin = document.createElement('div');
+      skin.className = 'mp-morph-skin';
+      skin.setAttribute('data-morph-for', c.cid);
+      skin.style.cssText = 'position:absolute;pointer-events:none;box-sizing:border-box;visibility:hidden;opacity:0;' +
+        'left:' + el.offsetLeft + 'px;top:' + el.offsetTop + 'px;width:' + el.offsetWidth + 'px;height:' + el.offsetHeight + 'px;' +
+        'z-index:' + (getComputedStyle(el).zIndex || 0) + ';' +
+        'border-radius:calc(var(--mp-mrx, 0) * 1px) / calc(var(--mp-mry, 0) * 1px);';
+      el.parentNode.insertBefore(skin, el.nextSibling);
+      var geo = null;
+      function G() {
+        if (geo) return geo;
+        var t = pageBox(el), s = morphSource(srcEl, part ? m.anchor : null);
+        var sx = t.w ? s.box.w / t.w : 1, sy = t.h ? s.box.h / t.h : 1;
+        if (!(sx > 0) || !(sy > 0)) { sx = 1; sy = 1; }
+        var ts = surfaceOf(el, t.w, t.h);
+        var surf = s.surf || ts;
+        geo = { x: s.box.x - t.x, y: s.box.y - t.y, sx: sx, sy: sy,
+          bg: surf ? surf.bg : 'rgba(0,0,0,0)',
+          // The skin is scaled with the box: divide the source's radius by
+          // the scale so it READS as the source's corner at the start.
+          rx0: s.surf ? s.surf.rx / sx : 0, ry0: s.surf ? s.surf.ry / sy : 0,
+          rx1: ts ? ts.rx : 0, ry1: ts ? ts.ry : 0 };
+        try { el.setAttribute('data-mp-morph', m.src + (part ? '.' + m.anchor : '')); } catch (e) {}
+        return geo;
+      }
+      // Hidden until the box is nearly home, then the content resolves.
+      master.fromTo(el, { autoAlpha: 0 }, { autoAlpha: 1, duration: H, ease: 'power1.out', immediateRender: true }, at + H);
+      // The box travels: target and skin share one FLIP, measured once.
+      master.fromTo([el, skin],
+        { transformOrigin: '0 0', x: function() { return G().x; }, y: function() { return G().y; },
+          scaleX: function() { return G().sx; }, scaleY: function() { return G().sy; } },
+        { transformOrigin: '0 0', x: 0, y: 0, scaleX: 1, scaleY: 1, duration: D, ease: E, immediateRender: false }, at);
+      // Home: a later exit (pop) scales about the centre like every other.
+      master.set(el, { transformOrigin: '50% 50%' }, at + D);
+      master.fromTo(skin,
+        { backgroundColor: function() { return G().bg; }, '--mp-mrx': function() { return G().rx0; }, '--mp-mry': function() { return G().ry0; } },
+        { backgroundColor: function() { return G().bg; }, '--mp-mrx': function() { return G().rx1; }, '--mp-mry': function() { return G().ry1; },
+          duration: D, ease: E, immediateRender: false }, at);
+      master.fromTo(skin, { autoAlpha: 0 }, { autoAlpha: 1, duration: D * 0.4, ease: 'power1.out', immediateRender: true }, at);
+      // Out early in the half: over a target with no surface of its own
+      // (type on the ground) a lingering skin reads as a grey veil.
+      master.fromTo(skin, { autoAlpha: 1 }, { autoAlpha: 0, duration: H, ease: 'power1.out', immediateRender: false }, at + H);
+      // The source hands itself over: its part (an anchor) or its wrapper
+      // crossfades out over the first half and stays gone -- unless the
+      // author gave the source an exit of its own, which wins.
+      if (part) master.to(part, { autoAlpha: 0, duration: H, ease: 'power1.in' }, at);
+      else if (!m.srcExit) master.to(srcEl, { autoAlpha: 0, duration: H, ease: 'power1.in' }, at);
     }
     var OFF = { 'slide-left': { x: '-115%' }, 'slide-right': { x: '115%' },
                 'slide-up': { y: '-115%' }, 'slide-down': { y: '115%' },
@@ -935,7 +1106,16 @@ export function wrapperChoreoScript(
           .to(el, mk(d1, pMid, 'none'), pIn)
           .to(el, mk(toV, pOut, 'power2.in'), pIn + pMid);
       }
-      if (c.enter && !traverses) {
+      // A morph whose source is on the page runs its own entrance; one whose
+      // source is missing says so once and falls through to a fade (OFF has
+      // no 'morph' pose).
+      var morphed = false;
+      if (c.enter && c.enter.effect === 'morph') {
+        var mSrc = c.morph ? document.querySelector('.mp-component[data-cid="' + c.morph.src + '"]') : null;
+        if (mSrc && mSrc !== el && el.offsetWidth && el.offsetHeight) { morphIn(el, mSrc, c); morphed = true; }
+        else console.warn('[morph] ' + c.cid + ': source "' + (c.enter.from || '') + '" is not in this scene -- fading in instead');
+      }
+      if (c.enter && !traverses && !morphed) {
         var eCut = c.enter.effect === 'cut';
         var eFrom = OFF[c.enter.effect] || OFF['fade'];
         var eAt = c.enter.at || 0;

@@ -357,6 +357,9 @@ async function generateSceneBody(opts: SceneGeneratorOpts): Promise<GeneratedSce
 /** The house entrance/exit effects wrapperChoreoScript knows how to run. */
 const CHOREO_EFFECTS = new Set([
   "slide-left", "slide-right", "slide-up", "slide-down", "rise", "pop", "fade",
+  // Born from another component's box in the same scene (SPEC-metamorph.md):
+  // an ENTRANCE only, carrying `from`.
+  "morph",
   // A HARD cut: on screen at `at`, gone at exit `at`, no motion either side
   // (SPEC-creator-cut.md -- the proof takes the frame for a beat).
   "cut",
@@ -371,11 +374,12 @@ const CHOREO_EFFECTS = new Set([
  * entry for it, so the element would be posed to nothing and simply appear,
  * which is the "a word that just shows up" defect the grammars call out.
  */
-function normalizeAnim(v: unknown): import("../core/types.js").ComponentAnimation | undefined {
+export function normalizeAnim(v: unknown, which: "enter" | "exit" = "enter"): import("../core/types.js").ComponentAnimation | undefined {
   if (!v) return undefined;
   const raw = typeof v === "string" ? { effect: v } : (v as any);
   const effect = String(raw?.effect || "").trim();
   if (!CHOREO_EFFECTS.has(effect)) return undefined;
+  if (effect === "morph" && which !== "enter") return undefined;
   const num = (x: any, lo: number, hi: number) =>
     Number.isFinite(Number(x)) ? Math.max(lo, Math.min(hi, Number(x))) : undefined;
   const at = num(raw.at, 0, 60);
@@ -387,6 +391,10 @@ function normalizeAnim(v: unknown): import("../core/types.js").ComponentAnimatio
     ...(duration !== undefined ? { duration } : {}),
     ...(stagger !== undefined ? { stagger } : {}),
     ...(typeof raw.ease === "string" ? { ease: raw.ease } : {}),
+    // The morph's source rides through as the board wrote it: the build ids
+    // the first of a type by its type, so a board's "from" already names the
+    // built component (the assembler resolves ids, types and "id.anchor").
+    ...(effect === "morph" && typeof raw.from === "string" && raw.from.trim() ? { from: raw.from.trim() } : {}),
   };
 }
 
@@ -1350,7 +1358,7 @@ export function buildAuthoredCompositionScene(
     // A cut window too short to read is held open: the proof stays at
     // least CUT_MIN seconds (measured live, proj_b04fb594: windows of 0.5s
     // and 0.6s where the "until" word came right after the "at" word).
-    var enterAnim = normalizeAnim((c as any).enter), exitAnim = normalizeAnim((c as any).exit);
+    var enterAnim = normalizeAnim((c as any).enter), exitAnim = normalizeAnim((c as any).exit, "exit");
     if (isCutaway(c as any) && enterAnim && enterAnim.effect === "cut" && exitAnim && exitAnim.effect === "cut"
         && typeof exitAnim.at === "number" && exitAnim.at - (enterAnim.at || 0) < CUT_MIN) {
       var held = Math.min(Math.max(0.5, (draft.duration_seconds || 8) - 0.2), (enterAnim.at || 0) + CUT_MIN);
@@ -1386,7 +1394,7 @@ export function buildAuthoredCompositionScene(
       // it rides through untouched, on any component.
       ...((c as any).pose && typeof (c as any).pose === "object" ? { pose: (c as any).pose } : {}),
       ...(normalizeAnim((c as any).enter) ? { enter: normalizeAnim((c as any).enter)! } : {}),
-      ...(normalizeAnim((c as any).exit) ? { exit: normalizeAnim((c as any).exit)! } : {}),
+      ...(normalizeAnim((c as any).exit, "exit") ? { exit: normalizeAnim((c as any).exit, "exit")! } : {}),
     });
   });
   // The board's transition rides through -- INCLUDING "none": a hard cut

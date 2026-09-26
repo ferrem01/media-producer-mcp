@@ -3,9 +3,12 @@
 Status: PHASE 1 SHIPPED (#973: grid-cull, review-deck, verdict-scorecard);
 THE GRAMMAR SHIPPED 2026-09-26 as `relay` (SPEC-relay.md; Marc: "Yes on
 grammar") -- handoffs as coordinates between library pieces inside one
-scene, no morph runtime. The morph runtime and rack focus below stay parked.
-PHASES 2–3 BACKLOG -- parked by Marc 2026-09-25. Do not start the morph
-runtime, rack focus or the grammar without his go-ahead. Settled in review
+scene. MORPH RUNTIME v1 SHIPPED 2026-09-26 (below, "Morph v1"): one entrance
+effect with a source, `enter {effect: "morph", from: "id" | "id.anchor"}`,
+wrapper to wrapper inside one scene. Rack focus, the ghost moves (`fly`,
+`burst`, `converge`, `dive`), plural anchors and cross-scene joins stay
+parked. PHASES 2–3 BACKLOG -- parked by Marc 2026-09-25. Do not start rack
+focus or the ghost engine without his go-ahead. Settled in review
 (keep when it resumes): a morph is an ENTRANCE EFFECT with a source (`enter`
 + `from: "componentId.anchor"`), it works INSIDE one scene only (both
 components on the page at once), and between scenes the join is a
@@ -245,6 +248,43 @@ not as the cross-scene `enter` source engine above, which stays parked:
 - `color-flood` blooms a dot into the whole frame.
 A handoff across components means placing the two ends at the same frame
 point and time. That's authored, and the tests measure it.
+
+## Morph v1 (shipped 2026-09-26): an entrance born from a box
+
+The smallest piece of the handoff engine: one component, one source, no
+ghosts. `enter: { effect: "morph", from, at, duration, ease }` on the
+incoming component, same place as every other entrance.
+
+- **`from`** names a component in the same scene: its id, its type (the
+  build ids the first of a type by its type, `_2` for the next), or
+  `"id.anchor"` for a `[data-anchor]` part inside it. Resolved at assembly
+  against the scene's cast (`resolveMorphSource`, core/scene-assembler.ts).
+  Missing or naming itself: the component fades in and the page warns once.
+- **The box travels.** The wrapper starts exactly on the source's box (FLIP:
+  translate plus non-uniform scale from the top-left corner) and eases to
+  its own over `duration` (default 0.8 s, `power3.inOut`).
+- **No smear, no counter-scale.** A skin (a plain surface in the source's
+  fill and corner radius, a sibling of the wrapper riding the same
+  transform) carries the first half; the wrapper itself is hidden until
+  halfway, then its content dissolves in as the skin dissolves out. The
+  skin takes the target's fill when the source has none.
+- **The source hands over.** A wrapper source fades out over the first half
+  and stays gone, unless the author gave it an exit (that wins). An anchor
+  source hides only that part; the component around it stays.
+- **Boxes are layout boxes** in page coordinates (offsets), so the camera rig
+  and the ambient push, which transform both wrappers alike, cancel out. An
+  anchor's box is read from client rects relative to its wrapper and
+  divided back by the wrapper's client/layout ratio (the fit box's scale
+  counts). Measured at the morph's first render, like the camera's
+  anchored moves. Rotation is not compensated.
+- **Both paths.** `wrapperChoreoScript` runs it for the single-scene
+  render/preview and, with namespaced ids, for the Studio composite.
+- Tests: `test/morph.test.ts` (box on box at `at`, between, home, scrub
+  back, missing source, anchor source, the composite, and every schema layer
+  that must keep `from`).
+
+What v1 is not: several targets or sources (`burst`, `converge`), a ghost
+per anchor, a morph across a scene boundary, rack focus.
 
 ## Phases and exit tests
 

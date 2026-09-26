@@ -139,8 +139,13 @@ export interface ComponentPosition {
 }
 
 export interface ComponentAnimation {
-  /** slide-left | slide-right | slide-up | slide-down | fade | rise | pop */
+  /** slide-left | slide-right | slide-up | slide-down | fade | rise | pop |
+   *  cut, and on an ENTRANCE, morph (needs `from`). */
   effect: string;
+  /** morph only: the component this one is born from, by id (a type names
+   *  its first instance) or "id.anchor" for a [data-anchor] part inside it.
+   *  Same scene only; a missing source fades in instead (SPEC-metamorph.md). */
+  from?: string;
   /** Scene-local start time in seconds. Enter defaults to 0; exit defaults
    *  to scene end minus duration. */
   at?: number;

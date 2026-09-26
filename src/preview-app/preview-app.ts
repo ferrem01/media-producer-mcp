@@ -4061,11 +4061,14 @@ ${QUOTIENT_CSS}
   // travelling ones -- they are what pair across a boundary (something that
   // exits toward one edge is picked up entering from the opposite one).
   var CHOREO_EFFECTS = ['slide-left', 'slide-right', 'slide-up', 'slide-down', 'rise', 'pop', 'fade'];
+  // A morph (born from another component's box) is an entrance with a source:
+  // shown on Enters only, and it keeps the source the board gave it.
+  var ENTER_ONLY_EFFECTS = ['morph'];
   function choreoSelect(which, label, current, ci) {
     var h = '<label class="ch-row"><span class="ch-lbl">' + label + '</span>'
       + '<select class="ch-sel" data-ch="' + which + '" data-ci="' + ci + '">'
       + '<option value=""' + (current ? '' : ' selected') + '>\\u2014 none \\u2014</option>';
-    CHOREO_EFFECTS.forEach(function(e) {
+    CHOREO_EFFECTS.concat(which === 'enter' ? ENTER_ONLY_EFFECTS : []).forEach(function(e) {
       h += '<option value="' + e + '"' + (e === current ? ' selected' : '') + '>' + e + '</option>';
     });
     return h + '</select></label>';
@@ -4145,6 +4148,7 @@ ${QUOTIENT_CSS}
           next = { effect: effect };
           if (typeof prev.at === 'number') next.at = prev.at;
           if (typeof prev.duration === 'number') next.duration = prev.duration;
+          if (effect === 'morph' && typeof prev.from === 'string') next.from = prev.from;
         }
         if (next) comp[which] = next; else delete comp[which];
         var body = {}; body[which] = next;
