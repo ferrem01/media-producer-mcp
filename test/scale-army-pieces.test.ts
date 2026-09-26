@@ -12,11 +12,11 @@ import { assembleScene } from "../src/core/scene-assembler.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BRAND = { colors: { primary: "#f0643a", background: "#ffffff", text: "#17171c" }, fonts: [] };
 
-async function still(type: string, dir: string, data: unknown, position: unknown, run: (page: Page, seek: (t: number) => Promise<void>) => Promise<void>, background = "linear-gradient(160deg,#6b5a4e,#2c2622)") {
+async function still(type: string, dir: string, data: unknown, position: unknown, run: (page: Page, seek: (t: number) => Promise<void>) => Promise<void>, background = "linear-gradient(160deg,#6b5a4e,#2c2622)", brand: any = BRAND) {
   const src = await fs.readFile(path.resolve(__dirname, `../src/components/${dir}/${type}.component.html`), "utf-8");
   const html = await assembleScene({
     scene: { id: "s", label: "s", duration_seconds: 5, background, components: [{ id: "c", type, position, data }] } as any,
-    components: [{ type, source: src }], brandKit: BRAND as any, canvas: { width: 1080, height: 1920 } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+    components: [{ type, source: src }], brandKit: brand as any, canvas: { width: 1080, height: 1920 } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap"),
   } as any);
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "sap-"));
   await fs.writeFile(path.join(tmp, "s.html"), html);
@@ -149,6 +149,55 @@ describe("stack-list: a lead, then items rising one per word, carried over the p
       expect(a.lead).toBe(1);
       expect(a.items.every((i) => i.o === 1)).toBe(true);
       expect(a.shadow).not.toBe("none");
+    });
+  }, 60000);
+});
+
+// A dark wordmark (as most brand kits hold it): the pill must show it white.
+const WORDMARK = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="60" viewBox="0 0 300 60"><rect x="0" y="10" width="300" height="40" rx="8" fill="#17171c"/></svg>');
+
+describe("sticker-prop kind 'logo': the wordmark on a brand pill, popped on the name", () => {
+  it("fills the brand kit's wordmark, shows it white on the brand colour, and pops in at its time", async () => {
+    await still("sticker-prop", "props", { kind: "logo", text: "scalearmy", at: 1.0, hold: 1.5 }, { x: "30%", y: "60%", width: "40%", height: "6%" }, async (page, seek) => {
+      const read = () => page.evaluate(() => {
+        const p = document.querySelector(".stkp-logo") as HTMLElement;
+        const img = p.querySelector("img") as HTMLImageElement | null;
+        return { o: +getComputedStyle(p).opacity, bg: getComputedStyle(p).backgroundColor, src: img ? img.src.slice(0, 26) : null, filter: img ? getComputedStyle(img).filter : null, w: p.getBoundingClientRect().width, box: (p.parentElement as HTMLElement).getBoundingClientRect().width };
+      });
+      await seek(0.5);
+      expect((await read()).o).toBe(0);
+      await seek(1.6);
+      const a = await read();
+      await shot(page, "logo-pill.png");
+      expect(a.o).toBe(1);
+      expect(a.src).toBe("data:image/svg+xml;utf8,%3");
+      expect(a.bg).toBe("rgb(240, 100, 58)");
+      expect(a.filter).toMatch(/brightness\(0\).*invert\(1\)/);
+      expect(a.w).toBeLessThanOrEqual(a.box + 1);
+      await seek(3.0);
+      expect((await read()).o).toBe(0); // gone after its hold
+    }, undefined, { ...BRAND, logos: [{ name: "wm", url: WORDMARK, variant: "wordmark", theme: "light" }] });
+  }, 60000);
+});
+
+describe("st-logo-close cta_style 'boxed': a hand-drawn box sketches round the ask", () => {
+  it("sets the ask as plain type and draws the box after it lands", async () => {
+    await still("st-logo-close", "scene-templates", { cta: "Book a call", cta_style: "boxed", logo_url: WORDMARK }, { x: 0, y: 0, width: "100%", height: "100%" }, async (page, seek) => {
+      const read = () => page.evaluate(() => {
+        const c = document.querySelector(".stlc-cta") as HTMLElement;
+        const p = document.querySelector(".stlc-box path") as SVGPathElement | null;
+        return { boxed: c.classList.contains("boxed"), bgImg: getComputedStyle(c).backgroundImage, off: p ? parseFloat(getComputedStyle(p).strokeDashoffset) : null, cta: c.getBoundingClientRect(), box: p ? (p.ownerSVGElement as SVGSVGElement).getBoundingClientRect() : null };
+      });
+      await seek(2.0);
+      const a = await read();
+      expect(a.boxed).toBe(true);
+      expect(a.bgImg).toBe("none");
+      expect(a.off).toBeGreaterThan(0.9); // not drawn yet
+      await seek(3.2);
+      const b = await read();
+      await shot(page, "logo-close-boxed.png");
+      expect(b.off).toBeLessThan(0.02); // drawn
+      expect(b.box!.left).toBeLessThan(b.cta.left + 1); expect(b.box!.right).toBeGreaterThan(b.cta.right - 1); // round the word
     });
   }, 60000);
 });
