@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — Recipe eleven: founder-selfie-punch-cards (Scale Army)
+
+Marc sent the Scale Army ad ("I like it"): a founder's before/after on her
+phone, 47.7s, 1:1. It is measured into `src/recipes/founder-selfie-punch-cards.recipe.json`.
+- **Cuts:** 2.6, 5.93, 13.87, 17.67, 21.37/25.0 (a punch-in and back out),
+  28.9, 32.23, 43.1. Pace is about 175 wpm.
+- **The eight beats:** hook (key phrase on a brand plate), punch (white
+  type card: the old way repeated, the next words blurring in), turn (a
+  plate on the result, the logo pill on the company's name), proof (a
+  close, shallow-focus product surface, with captions running over it),
+  claim (plate plus one huge plain phrase, with a punch-in), list (white
+  card, items stacking, carried back over the person), close (big plain
+  payoff, the ask to camera), end card (dark brand ground, wordmark,
+  hand-boxed "Book a call").
+- **What the build does not perform yet:** the two-size caption with a
+  brand plate, blur-in type cards, and a stacking list carried over the
+  person. They are writer guidance in the recipe; the build casts its
+  nearest components (the plated caption lane, kinetic type, the pill
+  sticker, the logo close).
+- Registered in the tool descriptions, `test/recipes.test.ts` (eleven
+  recipes), and `SPEC-recipes.md`.
+
 ## 2026-09-25 — Built films play their sound cues in Studio; a plate for the number row
 
 - **Cues without files.** Marc (proj_7adf0eb5): "the sound effects are in the
