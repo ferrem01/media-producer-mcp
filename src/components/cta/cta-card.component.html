@@ -108,7 +108,12 @@
     root.classList.add('t-' + theme);
     if (data.surface === 'none') root.classList.add('surface-none');
     if (data.actions === 'stack') root.classList.add('stack');
-    if (data.button_color) btn.style.background = String(data.button_color);
+    if (data.button_color) {
+      btn.style.background = String(data.button_color);
+      // The glow follows the button, not the brand: a black button with a
+      // blue halo read as a mistake.
+      btn.style.boxShadow = '0 calc(var(--u) * 10) calc(var(--u) * 26) color-mix(in srgb, ' + String(data.button_color) + ' 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22)';
+    }
 
     // SIZE: the card fills the slot (a landscape card never wider than ~1.9:1),
     // type from the box, then shrink until the content fits.
