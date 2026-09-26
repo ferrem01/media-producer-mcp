@@ -1,0 +1,53 @@
+{
+  "type": "stack-list",
+  "label": "Stacking list",
+  "category": "titles",
+  "description": "A small lead line, then 2-5 short items rising one per spoken word, flush left in the brand colour (the Scale Army cut, recipe founder-selfie-punch-cards: 'that continuously improves / our hooks / our formats / our CTAs'). First on its own white card (ground 'white'); then the SAME list carries over the person as the film cuts back: cast it again on the next scene with ground 'none' and settled true, so it opens already landed and rides over the footage with a soft halo. Time each item to the word that says it (at). Full-frame -- it places itself top-left. Example: {\"lead\":\"that continuously improves\",\"items\":[{\"text\":\"our hooks\",\"at\":1.0},{\"text\":\"our formats\",\"at\":1.5},{\"text\":\"our CTAs\",\"at\":2.0}]}.",
+  "data": {
+    "lead": {
+      "type": "string",
+      "label": "The small line above the items",
+      "optional": true
+    },
+    "items": {
+      "type": "array",
+      "label": "The items: strings or {text, at?} -- 1-4 words each",
+      "required": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the lead lands (s, default 0.15); items without their own at follow every `step` seconds",
+      "optional": true
+    },
+    "step": {
+      "type": "number",
+      "label": "Seconds between items when they carry no at (default 0.4)",
+      "optional": true
+    },
+    "ground": {
+      "type": "string",
+      "label": "white (default: its own card) | none (over the person, with a halo) | any CSS colour",
+      "optional": true
+    },
+    "settled": {
+      "type": "boolean",
+      "label": "Open already landed (the carry-over onto the next scene)",
+      "optional": true
+    },
+    "ink": {
+      "type": "string",
+      "label": "Word colour (default the brand primary)",
+      "optional": true
+    },
+    "align": {
+      "type": "string",
+      "label": "left (default) | right",
+      "optional": true
+    },
+    "size": {
+      "type": "number",
+      "label": "Item size as a fraction of the frame width (default 0.08)",
+      "optional": true
+    }
+  }
+}

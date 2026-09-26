@@ -2952,9 +2952,11 @@ async function runUnifiedPipeline(
         // one; an empty cast is no longer filled from the scene's name.
         // The recipe's caption style is read here (SPEC-recipes.md): a
         // "scatter" recipe (the Air cut) lands each phrase at its own
-        // spot around the person; every other style is the plated lane.
+        // spot around the person; a "tiered" one (the Scale Army cut) sets
+        // the running words small and the starred phrase big on a brush
+        // plate; every other style is the plated lane.
         const capStyle = String((recipeObj as any)?.layers?.captions?.style || "");
-        const wantMode = capStyle === "scatter" ? "scatter" : capStyle === "none" ? "none" : "";
+        const wantMode = capStyle === "scatter" ? "scatter" : capStyle === "tiered" ? "tiered" : capStyle === "none" ? "none" : "";
         // A lane THIS pass cast earlier (id "captions": a board built before
         // the recipe's style reached the build, or the recipe changed) is
         // recast when its mode disagrees; the writer's own lane is kept.

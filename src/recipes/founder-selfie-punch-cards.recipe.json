@@ -28,7 +28,7 @@
       "enters": [
         "keyword:plate"
       ],
-      "note": "Selfie, straight to camera, the setup in the first breath ('We hired a social media manager before'). Small words run; the one phrase that matters lands big on a brand-colour plate under them, the tail word small beneath it."
+      "note": "Selfie, straight to camera, the setup in the first breath ('We hired a social media manager before'). Small words run; the one phrase that matters lands big on a brand-colour plate under them, the tail word small beneath it. The captions do this by themselves (the tiered lane): mark the phrase with *stars* in the lines."
     },
     {
       "role": "punch",
@@ -42,7 +42,7 @@
       "enters": [
         "keyword:blur"
       ],
-      "note": "Hard cut to a plain white card; the voice carries on. The old way in a few big brand-colour words, stacked and repeated ('MORE POSTS / MORE POSTS / MORE POSTS'), then the next words blur in and out on a slant ('WE GOT BETTER DESIGNS'). Type only, no picture."
+      "note": "Hard cut to a plain white card; the voice carries on. The old way in a few big brand-colour words, stacked and repeated ('MORE POSTS / MORE POSTS / MORE POSTS'), then the next words blur in and out on a slant ('WE GOT BETTER DESIGNS'). Type only, no picture. Cast type-punch-card (lines with repeat, x/y spots, an italic word, from-directions)."
     },
     {
       "role": "turn",
@@ -107,7 +107,7 @@
       "enters": [
         "list:stack"
       ],
-      "note": "Hard cut to white: a small lead line, then three short items stacking one per spoken word ('our hooks / our formats / our CTAs'); the stacked list rides over the person as the next beat cuts back."
+      "note": "Hard cut to white: a small lead line, then three short items stacking one per spoken word ('our hooks / our formats / our CTAs'); the stacked list rides over the person as the next beat cuts back. Cast stack-list (lead + items timed to their words); cast it again on the next scene with ground 'none' and settled true so it rides over the person."
     },
     {
       "role": "close",
@@ -151,8 +151,8 @@
   },
   "layers": {
     "captions": {
-      "style": "keyword",
-      "words": 3,
+      "style": "tiered",
+      "words": 6,
       "pos": "lower-middle",
       "through_cutaways": true,
       "note": "two sizes: running words small and white, two or three at a time; the line's key phrase big on a brand-colour plate (slightly tilted), or big plain white for the payoff, with its tail line small beneath"

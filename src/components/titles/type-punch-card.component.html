@@ -1,0 +1,149 @@
+<template>
+  <div class="tpc">
+    <div class="tpc-stage"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* THE PUNCH CARD (the Scale Army cut, recipe founder-selfie-punch-cards):
+     a hard cut to a plain card between two lines of the person talking; the
+     voice carries on while a few big words in the brand colour streak into
+     their own spots around the frame and streak out again. */
+  .tpc {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: var(--tpc-ground, #ffffff);
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+  .tpc-stage {
+    position: absolute;
+    inset: 0;
+  }
+  .tpc-line {
+    position: absolute;
+    white-space: nowrap;
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    color: var(--tpc-ink, var(--mp-color-primary, #f0643a));
+    will-change: transform, opacity;
+  }
+  .tpc-line.it {
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+  }
+  .tpc-copy {
+    display: block;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.tpc');
+    var stage = el.querySelector('.tpc-stage');
+    if (!root || !stage) return tl;
+    var lines = (data && Array.isArray(data.lines)) ? data.lines.filter(function (l) { return l && String(l.text || '').trim(); }) : [];
+    if (!lines.length) return tl;
+
+    // Ground and ink: white card, brand-colour words (a dark ground wants
+    // light ink -- data.ink overrides either way).
+    var ground = String((data && data.ground) || 'white');
+    if (ground === 'none') root.style.background = 'transparent';
+    else if (ground !== 'white') root.style.setProperty('--tpc-ground', ground);
+    if (data && data.ink) root.style.setProperty('--tpc-ink', String(data.ink));
+
+    var W = el.clientWidth || (ctx.canvas && ctx.canvas.width) || 1080;
+    var H = el.clientHeight || (ctx.canvas && ctx.canvas.height) || 1920;
+    var dur = ctx.duration || 4;
+    var SIZE = { xl: 0.15, l: 0.115, m: 0.085, s: 0.06 };
+    // Spots when a line names none: the reference's zig-zag down the card.
+    var SPOTS = [[0.62, 0.2], [0.14, 0.44], [0.46, 0.68], [0.5, 0.86], [0.3, 0.3], [0.7, 0.55]];
+
+    // One directional blur filter per line (a streak along the travel).
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+    svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+    root.appendChild(svg);
+    window.__tpc = (window.__tpc || 0) + 1;
+    var uid = 'tpc' + window.__tpc;
+
+    // Times: explicit `at` wins; otherwise the lines share the card evenly.
+    var gap = Math.max(0.35, (dur - 0.6) / lines.length);
+    var built = [];
+    for (var i = 0; i < lines.length; i++) {
+      var L = lines[i];
+      var d = document.createElement('div');
+      d.className = 'tpc-line' + (L.italic ? ' it' : '');
+      var reps = Math.max(1, Math.min(4, Number(L.repeat) || 1));
+      var copies = [];
+      for (var r = 0; r < reps; r++) {
+        var c = document.createElement('span');
+        c.className = 'tpc-copy';
+        c.textContent = String(L.text);
+        d.appendChild(c);
+        copies.push(c);
+      }
+      var fs = Math.round(W * (SIZE[L.size] || SIZE.l));
+      d.style.fontSize = fs + 'px';
+      stage.appendChild(d);
+      // Fit: a line never runs past the card's side margins.
+      var guard = 0;
+      while (guard++ < 30 && d.scrollWidth > W * 0.92) { fs = Math.round(fs * 0.92); d.style.fontSize = fs + 'px'; }
+      var spot = SPOTS[i % SPOTS.length];
+      var x = L.x != null ? Number(L.x) / 100 : spot[0];
+      var y = L.y != null ? Number(L.y) / 100 : spot[1];
+      var bw = d.offsetWidth, bh = d.offsetHeight;
+      var left = Math.max(W * 0.03, Math.min(W * 0.97 - bw, x * W - bw / 2));
+      var top = Math.max(H * 0.03, Math.min(H * 0.97 - bh, y * H - bh / 2));
+      d.style.left = left + 'px';
+      d.style.top = top + 'px';
+      if (L.rotate) d.style.transform = 'rotate(' + Number(L.rotate) + 'deg)';
+      var at = L.at != null ? Number(L.at) : 0.15 + i * gap;
+      built.push({ el: d, copies: copies, at: at, L: L, i: i });
+    }
+    // Out: explicit `out`, else it holds to the card's end (the cut takes it).
+    for (var b = 0; b < built.length; b++) {
+      var it = built[b];
+      it.out = it.L.out != null ? Number(it.L.out) : null;
+    }
+
+    built.forEach(function (it) {
+      var from = String(it.L.from || (it.i % 2 ? 'left' : 'right'));
+      var dx = from === 'left' ? -1 : from === 'right' ? 1 : 0;
+      var dy = from === 'up' ? -1 : from === 'down' ? 1 : 0;
+      var dist = dx ? W * 0.22 : H * 0.12;
+      var f = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+      f.setAttribute('id', uid + '-' + it.i);
+      f.setAttribute('x', '-60%'); f.setAttribute('y', '-60%'); f.setAttribute('width', '220%'); f.setAttribute('height', '220%');
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+      g.setAttribute('stdDeviation', '0 0');
+      f.appendChild(g);
+      svg.appendChild(f);
+      var streak = { v: 0 };
+      var apply = function () {
+        var sx = dx ? streak.v : streak.v * 0.15, sy = dy ? streak.v : streak.v * 0.15;
+        g.setAttribute('stdDeviation', sx.toFixed(2) + ' ' + sy.toFixed(2));
+        it.el.style.filter = streak.v > 0.05 ? 'url(#' + uid + '-' + it.i + ')' : 'none';
+      };
+      gsap.set(it.copies, { autoAlpha: 0 });
+      // In: each copy streaks in along the travel and lands sharp; a
+      // repeated line stacks its copies one after another.
+      it.copies.forEach(function (c, k) {
+        var t0 = it.at + k * 0.12;
+        tl.fromTo(c, { autoAlpha: 0, x: dx * dist, y: dy * dist, scaleX: dx ? 1.25 : 1 },
+          { autoAlpha: 1, x: 0, y: 0, scaleX: 1, duration: 0.34, ease: 'power3.out', immediateRender: false }, t0);
+      });
+      tl.fromTo(streak, { v: 22 }, { v: 0, duration: 0.34, ease: 'power3.out', immediateRender: false, onUpdate: apply, onComplete: apply, onReverseComplete: apply }, it.at);
+      if (it.out != null) {
+        // Out: the same streak, continuing on through.
+        tl.to(it.copies, { autoAlpha: 0, x: -dx * dist * 0.8, y: -dy * dist * 0.8, duration: 0.28, ease: 'power2.in', stagger: 0.04 }, it.out);
+        tl.to(streak, { v: 18, duration: 0.28, ease: 'power2.in', onUpdate: apply }, it.out);
+      }
+    });
+    return tl;
+  }
+</script>
