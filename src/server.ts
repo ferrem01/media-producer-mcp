@@ -6,7 +6,8 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ensureStickerFiles, ensureStickerLibrary, mintSticker } from "./core/sticker-library.js";
+import { ensureStickerFiles, ensureStickerLibrary, mintSticker, drawSticker, cutoutSubject } from "./core/sticker-library.js";
+import { DEFAULT_IMAGE_MODEL } from "./media/image-gen.js";
 import { extractBriefLocks, briefLockBlock, previousBoardBlock } from "./llm/brief-locks.js";
 import { z } from "zod";
 
@@ -2415,16 +2416,64 @@ export function createMcpServer(): McpServer {
 
   tool(
     "generate_clip",
-    "Generate a standalone AI video clip with Veo (diffusion video) from a text prompt -- a talking-head take (Veo generates the VOICE too: put the spoken line in quotes inside the prompt), a branded shot no stock library has, or b-roll to attach to a project later. Async: returns a job_id to poll with get(target='job'); the completed job carries download_url, and the clip is saved as a tenant brand video asset so it can be referenced in briefs/uploads. Clips are ~8 seconds. ASSET MODES: mode='cutout' post-processes a frame into a TRANSPARENT PNG sticker (prompt flat sticker art 'centered on a plain solid green background, static shot'); mode='texture' into a neutral high-passed surface tile (prompt 'extreme close-up macro photograph of <surface>, filling the frame, static'). Both save the still as a brand image asset alongside the clip. Requires GEMINI_API_KEY on the server.",
+    "Generate a standalone AI video clip with Veo (diffusion video) from a text prompt -- a talking-head take (Veo generates the VOICE too: put the spoken line in quotes inside the prompt), a branded shot no stock library has, or b-roll to attach to a project later. Async: returns a job_id to poll with get(target='job'); the completed job carries download_url, and the clip is saved as a tenant brand video asset so it can be referenced in briefs/uploads. Clips are ~8 seconds. ASSET MODES: mode='cutout' draws a TRANSPARENT PNG sticker with the image model instead of Veo (~15 s, no clip; prompt = what to draw, e.g. 'a cartoon taco'), saved as a *-cutout.png brand image; mode='texture' high-passes a frame of a Veo clip into a neutral surface tile (prompt 'extreme close-up macro photograph of <surface>, filling the frame, static'). Clip and texture need GEMINI_API_KEY on the server.",
     {
       tenant_id: z.string().optional(),
-      prompt: z.string().describe("The shot as a cinematography direction: subject, action, camera move, light. For speech, include the line in quotes: \"a friendly woman looks into the camera and says: 'One conversation becomes a campaign.'\" For mode='cutout': flat sticker art centered on a plain solid green background, static shot. For mode='texture': a macro surface photo filling the frame, static."),
+      prompt: z.string().describe("The shot as a cinematography direction: subject, action, camera move, light. For speech, include the line in quotes: \"a friendly woman looks into the camera and says: 'One conversation becomes a campaign.'\" For mode='cutout': just what to draw (a cartoon taco). For mode='texture': a macro surface photo filling the frame, static."),
       aspect_ratio: z.enum(["16:9", "9:16"]).optional().describe("Clip aspect (default 16:9; use 9:16 for reels)"),
       name: z.string().optional().describe("Filename stem for the saved clip (default: clip_<jobid>)"),
       reference_image: z.string().optional().describe("CHARACTER CONSISTENCY: an /assets/... URL or server path to an image the clip animates FROM (first-frame conditioning). Use a frame of a prior take (or a character still) to keep the same presenter across clips."),
-      mode: z.enum(["clip", "cutout", "texture"]).optional().describe("clip (default): just the video. cutout: also key the solid background off a frame -> transparent PNG sticker asset (illustrated props). texture: also high-pass a frame -> neutral surface tile asset (paper/linen worlds)."),
+      mode: z.enum(["clip", "cutout", "texture"]).optional().describe("clip (default): just the video. cutout: a transparent PNG sticker drawn by the image model (no video). texture: also high-pass a frame -> neutral surface tile asset (paper/linen worlds)."),
     },
     async (params) => {
+      // Register a minted still in the kit's assets[] -- writing the PNG to
+      // the images directory is NOT enough. Both consumers of a minted still
+      // read the MANIFEST, not the disk: deriveWorld resolves the paper
+      // world's photographic tooth from `*-texture.png` entries, and the motif
+      // resolver auto-fills `visual_system.motif.assets` from `*-cutout.png`
+      // entries. Unregistered, a minted texture silently never reaches the
+      // paper, and a minted sticker set still throws "no cutout assets exist".
+      const registerStill = async (tid: string, stem: string, mode: string, stillUrl: string, description: string) => {
+        try {
+          const kit = await loadBrandKit(tid);
+          if (!kit) return;
+          if (!kit.assets) kit.assets = [];
+          const entry = { name: `${stem}-${mode}`, url: stillUrl, type: "image" as const, description, tags: [mode, "generated"] };
+          const at = kit.assets.findIndex((a: any) => a?.url === stillUrl);
+          if (at >= 0) kit.assets[at] = entry as any;
+          else kit.assets.push(entry as any);
+          await saveBrandKit(tid, kit);
+        } catch (regErr: any) {
+          console.warn("Failed to register the generated still in the brand kit:", regErr?.message);
+        }
+      };
+      // A CUTOUT IS A STILL: drawn by the image model with a transparent
+      // ground (core/sticker-library.ts, the house sticker style), not keyed
+      // off a frame of an 8-second Veo video. The video route took minutes,
+      // cost a clip, and left green fringes; this one is ~15 s. Same contract:
+      // a job, and a `*-cutout.png` brand image the motif resolver finds.
+      if (params.mode === "cutout") {
+        const tid = params.tenant_id!;
+        const job = queueJob("generate", tid, async (j) => {
+          j.progress = { step: "cutout", percent: 20, detail: "Drawing the sticker (image model, ~15 s)" };
+          const stem = (params.name || `sticker_${j.id.replace(/^job_/, "")}`).replace(/[^a-zA-Z0-9_-]/g, "_");
+          const imgDir = path.join(config.dataDir, tid, "brand-kit", "assets", "images");
+          const pngName = `${stem}-cutout.png`;
+          const subject = cutoutSubject(params.prompt);
+          await drawSticker(subject, path.join(imgDir, pngName), { format: "png", maxSide: 1024 });
+          const stillUrl = `/assets/${tid}/brand-kit/images/${pngName}`;
+          await registerStill(tid, stem, "cutout", stillUrl, `Illustrated cutout with a transparent ground (house sticker style): ${subject.slice(0, 160)}`);
+          j.progress = { step: "done", percent: 100, detail: "Sticker ready" };
+          return {
+            asset_url: stillUrl,
+            download_url: `${config.publicUrl}${stillUrl}`,
+            still: { asset_url: stillUrl, download_url: `${config.publicUrl}${stillUrl}`, kind: "cutout" },
+            model: DEFAULT_IMAGE_MODEL,
+            note: "A brand image asset -- place it on a scene (sticker-prop kind 'image' with src) or let a cutout motif pick it up. For a sticker every tenant can use by name, the sticker tool's make is the same drawing.",
+          };
+        });
+        return ok({ job_id: job.id, status: job.status, message: `Sticker queued (image model, ~15 s). Poll with get(target='job', job_id='${job.id}').` });
+      }
       if (!process.env.GEMINI_API_KEY) {
         return err("GEMINI_API_KEY is not configured on this server -- diffusion video is unavailable.");
       }
@@ -2460,44 +2509,17 @@ export function createMcpServer(): McpServer {
         const servedUrl = `/assets/${tenantId}/brand-kit/video/${filename}`;
         // Asset modes: distill the clip into a still brand asset (task #54).
         let still: { asset_url: string; download_url: string; kind: string } | undefined;
-        if (params.mode === "cutout" || params.mode === "texture") {
+        if (params.mode === "texture") {
           j.progress = { step: params.mode, percent: 80, detail: `Processing the ${params.mode} still` };
-          const { processClipToCutout, processClipToTexture } = await import("./media/video-gen.js");
+          const { processClipToTexture } = await import("./media/video-gen.js");
           const imgDir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "images");
           await fs.mkdir(imgDir, { recursive: true });
           const pngName = `${stem}-${params.mode}.png`;
           const pngPath = path.join(imgDir, pngName);
-          const clipPath = path.join(outputDir, filename);
-          if (params.mode === "cutout") await processClipToCutout(clipPath, pngPath);
-          else await processClipToTexture(clipPath, pngPath);
+          await processClipToTexture(path.join(outputDir, filename), pngPath);
           const stillUrl = `/assets/${tenantId}/brand-kit/images/${pngName}`;
           still = { asset_url: stillUrl, download_url: `${config.publicUrl}${stillUrl}`, kind: params.mode };
-          // Register it in the kit's assets[] -- writing the PNG to the images
-          // directory is NOT enough. Both consumers of a minted still read the
-          // MANIFEST, not the disk: deriveWorld resolves the paper world's
-          // photographic tooth from `*-texture.png` entries, and the motif
-          // resolver auto-fills `visual_system.motif.assets` from `*-cutout.png`
-          // entries. Unregistered, a minted texture silently never reaches the
-          // paper, and a minted sticker set still throws "no cutout assets exist".
-          try {
-            const kit = await loadBrandKit(tenantId);
-            if (kit) {
-              if (!kit.assets) kit.assets = [];
-              const entry = {
-                name: `${stem}-${params.mode}`,
-                url: stillUrl,
-                type: "image" as const,
-                description: `${params.mode === "cutout" ? "Illustrated cutout with a transparent ground" : "Neutral-gray surface tooth tile"}, distilled from a generated clip: ${params.prompt.slice(0, 160)}`,
-                tags: [params.mode, "generated"],
-              };
-              const at = kit.assets.findIndex((a: any) => a?.url === stillUrl);
-              if (at >= 0) kit.assets[at] = entry as any;
-              else kit.assets.push(entry as any);
-              await saveBrandKit(tenantId, kit);
-            }
-          } catch (regErr: any) {
-            console.warn("Failed to register the generated still in the brand kit:", regErr?.message);
-          }
+          await registerStill(tenantId, stem, params.mode, stillUrl, `Neutral-gray surface tooth tile, distilled from a generated clip: ${params.prompt.slice(0, 160)}`);
         }
         j.progress = { step: "done", percent: 100, detail: still ? `Clip + ${still.kind} still ready` : "Clip ready" };
         return {

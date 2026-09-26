@@ -20,6 +20,7 @@
  * "chimp" for MailChimp is a chimp, not their logo.
  */
 import fs from "node:fs/promises";
+import { DEFAULT_IMAGE_MODEL } from "../media/image-gen.js";
 import fsSync from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -97,6 +98,19 @@ export function stickerPrompt(subject: string): string {
   return `A single die-cut sticker of ${subject}. Flat 2D vector illustration: bold clean shapes, a few soft cel-shaded highlights, rich saturated colours, a dark outline on the art, and a thick uniform white die-cut border following the whole silhouette. No text, no letters, no numbers, no logos or brand marks. One object only, centered, filling most of the canvas, on a fully transparent background.`;
 }
 
+/** A cutout prompt written for the old Veo route ("flat sticker art centered
+ *  on a plain solid green background, static shot") reduced to what to draw:
+ *  the house prompt supplies the style and the transparent ground. */
+export function cutoutSubject(prompt: string): string {
+  const s = String(prompt || "")
+    .replace(/\b(?:flat\s+)?(?:die-?cut\s+)?sticker(?:\s+art)?\s+(?:of\s+)?/gi, "")
+    .replace(/,?\s*(?:centered|centred)?\s*on\s+a\s+(?:plain\s+)?(?:solid\s+)?(?:green|white|chroma[- ]?key)\s+(?:background|screen)/gi, "")
+    .replace(/,?\s*static(?:\s+shot)?\.?/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, "");
+  return s || String(prompt || "").trim();
+}
+
 export function stickerSlug(name: string): string {
   return String(name || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 }
@@ -136,8 +150,11 @@ export async function ensureStickerLibrary(dataDir: string): Promise<StickerEntr
   for (const spec of HOUSE_STICKERS) {
     const file = `${stickerSlug(spec.name)}.webp`;
     const dest = path.join(dir, file);
-    if (!fsSync.existsSync(dest) && fsSync.existsSync(path.join(src, file))) {
-      await fs.copyFile(path.join(src, file), dest);
+    // Copied when missing OR when the committed file changed (a redrawn
+    // house set reaches a server that already holds the old one).
+    const from = path.join(src, file);
+    if (fsSync.existsSync(from) && (!fsSync.existsSync(dest) || fsSync.statSync(dest).size !== fsSync.statSync(from).size)) {
+      await fs.copyFile(from, dest);
     }
     if (fsSync.existsSync(dest)) out.push({ ...spec, file, url: STICKER_URL_PREFIX + file, source: "house" });
   }
@@ -168,7 +185,7 @@ export function findSticker(library: StickerEntry[], query: string): StickerEntr
  *  behind some stickers), cap its size and write it as WebP with alpha (a 512px sticker is ~40KB, the PNG
  *  ~700KB), with ffmpeg alone: read the alpha plane raw, find the box, crop,
  *  scale, encode. */
-export async function trimSticker(input: string, output: string, maxSide = 512): Promise<{ width: number; height: number }> {
+export async function trimSticker(input: string, output: string, maxSide = 512, format: "webp" | "png" = "webp"): Promise<{ width: number; height: number }> {
   const probe = await execFileAsync("ffmpeg", ["-v", "error", "-i", input, "-vf", "alphaextract", "-f", "rawvideo", "-pix_fmt", "gray", "-"], { encoding: "buffer", maxBuffer: 64 * 1024 * 1024 } as any);
   const buf = probe.stdout as unknown as Buffer;
   // The source is square (1024x1024) from the image model; derive W from the
@@ -189,18 +206,19 @@ export async function trimSticker(input: string, output: string, maxSide = 512):
   const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
   const k = Math.min(1, maxSide / Math.max(cw, ch));
   const ow = Math.max(2, Math.round(cw * k / 2) * 2), oh = Math.max(2, Math.round(ch * k / 2) * 2);
-  await execFileAsync("ffmpeg", ["-v", "error", "-y", "-i", input, "-vf", `crop=${cw}:${ch}:${x0}:${y0},scale=${ow}:${oh}:flags=lanczos,format=rgba,lutrgb=a='if(lt(val\\,40)\\,0\\,val)'`, "-c:v", "libwebp", "-lossless", "0", "-q:v", "88", "-pix_fmt", "yuva420p", output]);
+  await execFileAsync("ffmpeg", ["-v", "error", "-y", "-i", input, "-vf", `crop=${cw}:${ch}:${x0}:${y0},scale=${ow}:${oh}:flags=lanczos,format=rgba,lutrgb=a='if(lt(val\\,40)\\,0\\,val)'`, ...(format === "png" ? ["-pix_fmt", "rgba"] : ["-c:v", "libwebp", "-lossless", "0", "-q:v", "88", "-pix_fmt", "yuva420p"]), output]);
   return { width: ow, height: oh };
 }
 
 /** Draw one sticker with the image model in the house style (transparent
  *  ground), trim it, and write it to `outFile`. */
-export async function drawSticker(subject: string, outFile: string, apiKey = process.env.OPENAI_API_KEY): Promise<{ width: number; height: number }> {
+export async function drawSticker(subject: string, outFile: string, opts: { apiKey?: string; format?: "webp" | "png"; maxSide?: number } = {}): Promise<{ width: number; height: number }> {
+  const apiKey = opts.apiKey || process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is required to draw a sticker");
   const r = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "gpt-image-1", prompt: stickerPrompt(subject), n: 1, size: "1024x1024", quality: "medium", background: "transparent", output_format: "png" }),
+    body: JSON.stringify({ model: DEFAULT_IMAGE_MODEL, prompt: stickerPrompt(subject), n: 1, size: "1024x1024", quality: "medium", background: "transparent", output_format: "png" }),
   });
   if (!r.ok) throw new Error(`image model ${r.status}: ${(await r.text().catch(() => "")).slice(0, 300)}`);
   const j: any = await r.json();
@@ -209,7 +227,7 @@ export async function drawSticker(subject: string, outFile: string, apiKey = pro
   await fs.mkdir(path.dirname(outFile), { recursive: true });
   const raw = `${outFile}.raw.png`;
   await fs.writeFile(raw, Buffer.from(b64, "base64"));
-  try { return await trimSticker(raw, outFile); }
+  try { return await trimSticker(raw, outFile, opts.maxSide || 512, opts.format || "webp"); }
   finally { await fs.unlink(raw).catch(() => {}); }
 }
 

@@ -162,7 +162,8 @@ describe("the naano takeaways", () => {
     expect(enrich).toMatch(/await keyStillToCutout\(result\.path, cutPath\);/);
     const vg = await read("src/media/video-gen.ts");
     expect(vg).toMatch(/export async function keyStillToCutout\(framePng: string, outPng: string\)/);
-    expect(vg).toMatch(/await keyStillToCutout\(tmpFrame, outPng\);/); // the clip path shares it
+    // generate_clip mode='cutout' now draws with the image model, not a keyed Veo frame.
+    expect(vg).not.toMatch(/processClipToCutout/);
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/cutout: world\.backdrop\.component === "sky-backdrop",/);
     const gen = await read("src/llm/scene-generator.ts");

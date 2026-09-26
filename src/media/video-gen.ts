@@ -517,29 +517,16 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
  * ASSET MODES for generate_clip (SPEC-canvas-tour dependencies; task #54):
  * post-process a Veo clip into a still brand asset.
  *
- * - CUTOUT: the clip was prompted as flat sticker art on a solid chroma
- *   background; sample the actual background color from a corner, then
- *   colorkey + despill into a transparent PNG. Flat sticker art keys
- *   cleanly (hard ink outlines, no hair/fuzz) -- proven in the illustrated-
- *   prop prototype (megaphone sticker on #5fb05e).
+ * - CUTOUT: no longer a Veo clip -- generate_clip mode='cutout' draws the
+ *   sticker with the image model (core/sticker-library.ts). keyStillToCutout
+ *   below still keys the sky world's generated stills.
  * - TEXTURE: the clip was prompted as a macro surface photo (paper tooth,
  *   linen...); take the center square, strip the low-frequency lighting
  *   with a grainextract high-pass, desaturate -- a neutral tile ready for
  *   feathered-stamp compositing (NEVER grid/mirror tiling downstream).
  */
-export async function processClipToCutout(clipPath: string, outPng: string): Promise<void> {
-  const { execFile } = await import("node:child_process");
-  const { promisify } = await import("node:util");
-  const run = promisify(execFile);
-  const tmpFrame = outPng.replace(/\.png$/, ".frame.png");
-  await run(FFMPEG(), ["-y", "-ss", "2", "-i", clipPath, "-frames:v", "1", tmpFrame]);
-  await keyStillToCutout(tmpFrame, outPng);
-  await fs.rm(tmpFrame, { force: true });
-}
-
 /** Key a still's flat background (sampled from a corner patch) to alpha:
- *  the cutout step of generate_clip mode='cutout', shared with the sky
- *  world's illustrations (a generated object on a plain green ground
+ *  the sky world's illustrations (a generated object on a plain green ground
  *  becomes an object ON the sky). */
 export async function keyStillToCutout(framePng: string, outPng: string): Promise<void> {
   const { execFile } = await import("node:child_process");
