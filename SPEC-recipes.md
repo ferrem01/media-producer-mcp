@@ -65,7 +65,7 @@ beats, seconds and word budgets (`recipeBlock`), sets the scene budget
 recipe's enter/exit unless the writer set one; a fixed camera marks the
 scene so no punch-in is invented).
 
-## The library (measured 2026-09-19)
+## The library (measured 2026-09-19; Scale Army added 2026-09-26)
 
 Two things the seventh and sixth taught: a recipe can have no take at all
 (`asks.take: "none"`, the on-screen type is the voice, `layers.voice:
@@ -92,6 +92,7 @@ full-frame screen. Every other style is the plated chest-band lane.
 | ask-work-result | canvas-tour | 1x1 | Runway in ChatGPT, 28.5s | an agent demo: a second of the payoff, the ask typed in full, the agent's checklist with its elapsed time, the deliverable full frame for half the film with two claim lines, one CTA line, wordmark on black; four lines of type in all |
 | founder-bookends-chapters | creator-cut | 16x9 | Voicepanel Grade, 88.5s | a founder on a couch with props beside the head that get badged on the turn; the wordmark on white; 'let me show you how'; two or three chapters of MOTION GRAPHICS on white, each named by a kicker with step dots, one surface building per chapter; back to the founder with a logo band; wordmark and URL |
 | launch-what-if-features | hype-cut | 16x9 | naano launch (X), 30s | no person, a voice: a question in type that climbs in with motion blur; one or two "what if" wishes over an object each; the wordmark; three features as one moving object each (a checklist whose switches flip on as the voice names the rows, a fan of cards turning in 3D, the product's surface); the proof on a surface with real numbers; URL pill and cursor to close |
+| founder-selfie-punch-cards | creator-cut | 1x1 | Scale Army, 47.7s | a founder's before/after on her phone: the key phrase big on a brand plate under small running words; hard cuts to white type cards (the old way repeated and blurring, a list stacking that rides back over the person); a close-up product surface as proof; the logo as a pill sticker on its name; a punch-in on the claim; a dark end card with the wordmark and a hand-boxed 'Book a call' |
 
 ## Adding one
 

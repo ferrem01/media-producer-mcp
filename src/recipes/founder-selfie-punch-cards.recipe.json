@@ -1,0 +1,261 @@
+{
+  "id": "founder-selfie-punch-cards",
+  "name": "Founder selfie with punch cards",
+  "grammar": "creator-cut",
+  "frames_proven": [
+    "1x1"
+  ],
+  "suits": [
+    "before and after: what we did, what changed",
+    "a founder's result story with a service or product inside",
+    "we tried X, it did not work, then Y did",
+    "book a call"
+  ],
+  "length_s": [
+    35,
+    55
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        2.6,
+        3.5
+      ],
+      "enters": [
+        "keyword:plate"
+      ],
+      "note": "Selfie, straight to camera, the setup in the first breath ('We hired a social media manager before'). Small words run; the one phrase that matters lands big on a brand-colour plate under them, the tail word small beneath it."
+    },
+    {
+      "role": "punch",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        2.5,
+        3.3,
+        4
+      ],
+      "enters": [
+        "keyword:blur"
+      ],
+      "note": "Hard cut to a plain white card; the voice carries on. The old way in a few big brand-colour words, stacked and repeated ('MORE POSTS / MORE POSTS / MORE POSTS'), then the next words blur in and out on a slant ('WE GOT BETTER DESIGNS'). Type only, no picture."
+    },
+    {
+      "role": "turn",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        5,
+        8,
+        9
+      ],
+      "enters": [
+        "keyword:plate",
+        "stamp:logo@name"
+      ],
+      "note": "Back to the person for the turn ('but nothing actually DROVE PIPELINE ... then we hired ...'). The plate lands on the result word; when the line names the company, its logo pops in as a small pill sticker in place of the plate for a second."
+    },
+    {
+      "role": "proof",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        3,
+        3.8,
+        5
+      ],
+      "enters": [
+        "keyword:logo-word"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "use": "cutaway",
+        "kind": "mockup"
+      },
+      "note": "Full-frame product surface shot close and at an angle with a shallow focus (the dashboard the line describes), slowly drifting; captions keep running over it and a named tool lands as its own logo word ('connected to HubSpot')."
+    },
+    {
+      "role": "claim",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        8,
+        11,
+        12
+      ],
+      "enters": [
+        "keyword:plate",
+        "keyword:big"
+      ],
+      "note": "The longest beat: what was built, point by point. Plate on the headline phrase with a small contrast line under it ('GENERATING LEADS / not likes'); one phrase goes huge in plain white with no plate ('ACTUAL PIPELINE'). The camera punches in for the middle of the beat and back out."
+    },
+    {
+      "role": "list",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        3,
+        3.3,
+        4
+      ],
+      "enters": [
+        "list:stack"
+      ],
+      "note": "Hard cut to white: a small lead line, then three short items stacking one per spoken word ('our hooks / our formats / our CTAs'); the stacked list rides over the person as the next beat cuts back."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        9,
+        10.8,
+        12
+      ],
+      "enters": [
+        "keyword:big",
+        "stamp:logo@name",
+        "cta-line"
+      ],
+      "note": "The result in four words, big and plain ('SAME TEAM') with the small payoff under it ('completely different output'); the logo pill once more on the company's name; the ask said to camera ('link below to book a call')."
+    },
+    {
+      "role": "end_card",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        4,
+        4.7,
+        5
+      ],
+      "enters": [
+        "stamp:wordmark",
+        "button:cta",
+        "end_card@start"
+      ],
+      "note": "The brand's dark colour, the wordmark drawing in, the ask ('Book a call') below it with a hand-drawn box sketching round it. The voice has stopped; the music carries it out."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 4.8,
+    "max_hold_s": 11,
+    "wpm": 175,
+    "first_cut_by_s": 2.6,
+    "end_card_s": 4.7
+  },
+  "layers": {
+    "captions": {
+      "style": "keyword",
+      "words": 3,
+      "pos": "lower-middle",
+      "through_cutaways": true,
+      "note": "two sizes: running words small and white, two or three at a time; the line's key phrase big on a brand-colour plate (slightly tilted), or big plain white for the payoff, with its tail line small beneath"
+    },
+    "stamps": {
+      "pos": "lower-middle",
+      "hold_s": 1.2,
+      "note": "the company logo as a small pill sticker, popped in on its name, in place of the caption for a second"
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "punch-in-per-claim",
+    "music": {
+      "bed": true,
+      "duck": true,
+      "feel": "bright, light, steady pulse under the voice; carries the end card alone"
+    }
+  },
+  "motion": {
+    "elements": {
+      "keyword": {
+        "in": "pop",
+        "in_s": 0.2,
+        "out": "cut"
+      },
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.25,
+        "out": "fade",
+        "out_s": 0.2
+      },
+      "type_card": {
+        "in": "blur",
+        "in_s": 0.3,
+        "out": "blur",
+        "out_s": 0.3,
+        "per": "phrase"
+      },
+      "list": {
+        "in": "rise",
+        "in_s": 0.25,
+        "per": "line"
+      },
+      "cutaway": {
+        "in": "cut",
+        "out": "cut"
+      },
+      "button": {
+        "in": "fade",
+        "in_s": 0.3,
+        "out": "cut"
+      }
+    },
+    "transitions": {
+      "default": "cut",
+      "into_type_card": "cut",
+      "out_of_list": "carry-over"
+    },
+    "camera": {
+      "hook": "fixed",
+      "turn": "fixed",
+      "claim": "punch-in",
+      "close": "fixed"
+    },
+    "physics": "punchy"
+  },
+  "asks": {
+    "take": "continuous",
+    "screens": "0-1",
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "proof",
+      "list"
+    ],
+    "fixed": [
+      "hook",
+      "punch",
+      "close",
+      "end_card"
+    ],
+    "may_double": [
+      "claim"
+    ]
+  },
+  "source": {
+    "film": "scale_army_DdbNEM0gheh",
+    "length_s": 47.7,
+    "frame": "1x1",
+    "cuts_s": [
+      2.6,
+      5.93,
+      13.87,
+      17.67,
+      21.37,
+      25.0,
+      28.9,
+      32.23,
+      43.1
+    ],
+    "measured": "2026-09-26"
+  }
+}

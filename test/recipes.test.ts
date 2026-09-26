@@ -5,10 +5,10 @@ import path from "node:path";
 const read = (p: string) => fs.readFile(path.join(process.cwd(), p), "utf8");
 
 describe("the recipe: the measured cut of a film with the content removed", () => {
-  it("the library loads ten valid recipes, each under one grammar with proven frames and a measured source", async () => {
+  it("the library loads eleven valid recipes, each under one grammar with proven frames and a measured source", async () => {
     const { loadRecipes, validateRecipe, recipeSceneBand } = await import("../src/core/recipes.js");
     const rs = loadRecipes();
-    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-story-broll", "launch-what-if-features", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
+    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-selfie-punch-cards", "founder-story-broll", "launch-what-if-features", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
     for (const r of rs) {
       expect(validateRecipe(r)).toEqual([]);
       expect(["creator-cut", "speaker", "hype-cut", "canvas-tour"]).toContain(r.grammar);
