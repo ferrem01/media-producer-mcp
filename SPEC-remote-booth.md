@@ -1,6 +1,6 @@
 # SPEC: the remote booth — record from across the room
 
-Status: DRAFT for Marc's review (2026-09-26). Nothing is built yet.
+Status: APPROVED by Marc 2026-09-26 ("lets build the remote booth"), with two additions from him: pair ONCE per session (not per film), and move between films from the phone without re-scanning.
 
 ## Why
 
@@ -51,6 +51,24 @@ take lands in Studio exactly like a booth take.
 6. **Keep:** the take attaches through the normal path. It gets the
    correction, the scene split, word-timed stickers and captions, and the
    Room/Blur choice. Nothing downstream changes.
+
+## Moving between films without touching the rig (Marc's addition)
+
+Marc: "Sometimes I have the rig set up and I want to move from one recording
+to another between films. I have to remove the camera from the stand and then
+scan the QR for each."
+
+- **Pair once.** A remote session belongs to the TENANT and the device pair,
+  not to one film or scene. The phone stays paired as the camera until the
+  session ends. The laptop's control screen has a **film and scene picker**
+  (films that still need a take are listed first). Picking the next film
+  retargets the session, and the phone never moves.
+- **Switch from the phone too.** The regular booth (arm's-length, front
+  camera) gets a **Films** button on its ready screen and its review screen.
+  It opens a list of the tenant's person-carried films (speaker and
+  creator-cut) with their scenes and what each still needs. Tapping a scene
+  opens that recording with no QR code and no Studio round trip. The booth's
+  tenant token already scopes this list.
 
 ## How it works
 
@@ -146,10 +164,8 @@ the scene split. This covers the true-4K case, whatever the browser allows.
 - **Proving it:** Marc does one real wide take by the French doors, and I
   review it the way I reviewed today's takes.
 
-## Questions for Marc
+## Questions for Marc (defaults used until answered)
 
-1. **The big screen:** laptop, iPad, or a TV? (It only changes the default
-   type size.)
-2. **Standing or seated** for the first wide film? (It sets the shot size.)
-3. **A clicker:** do you have a presentation remote? If not, the space bar
-   and click-to-advance cover it.
+1. **The big screen:** laptop, iPad, or a TV? Default: laptop, with type size adjustable.
+2. **Standing or seated** for the first wide film? Default: both, via a shot-size selector (close, medium, wide).
+3. **A clicker:** do you have a presentation remote? Default: the space bar and arrow keys (clickers send those).
