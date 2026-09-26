@@ -21,6 +21,7 @@
  * behind the auth middleware, so a link without a valid token gets a 401.
  */
 import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
+import { LIGHT_CHECK_JS } from "./core/light-check.js";
 
 export function getTakeHtml(): string {
   return `<!DOCTYPE html>
@@ -153,6 +154,35 @@ ${QUOTIENT_CSS}
      again, same camera, no trip back out of the recorder (Marc). */
   .btn.again { background: rgba(255,255,255,.16); color:#fff; flex:0 0 38% !important; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 
+  /* ── framing + light check: the camera is up, the take has not started ──
+     A manual review of a booth take found three lighting faults nobody can
+     see from behind the phone (a warm key in a daylight room, a wall as
+     bright as the face, no rim). PREROLL is the moment between opening the
+     camera and the count-in: the light check speaks there, never during
+     the take. FRAMING (preroll + count-in) shows where the face goes. */
+  #guide { position:absolute; inset:0; pointer-events:none; display:none; }
+  #stage.framing #guide { display:block; }
+  #oval { position:absolute; box-sizing:border-box; border:2px dashed rgba(255,255,255,.38); border-radius:50%; }
+  #eyes { position:absolute; height:0; border-top:1px solid rgba(255,255,255,.3); }
+  #eyes span { position:absolute; right:0; top:-17px; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.62); text-shadow:0 1px 4px rgba(0,0,0,.7); }
+  #lightCard { position:absolute; left:16px; right:16px; bottom: calc(98px + env(safe-area-inset-bottom)); display:none; background:rgba(14,14,20,.8);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border-radius:14px; padding:10px 12px 12px 14px; font-size:14px; line-height:1.4; }
+  #stage.preroll #lightCard { display:block; }
+  #stage.preroll.lightoff #lightCard { display:none; }
+  #lightHead { display:flex; align-items:center; gap:8px; font-weight:600; font-size:13px; }
+  .ldot { width:8px; height:8px; border-radius:50%; background:#f59e0b; flex:0 0 auto; }
+  #lightCard.good .ldot, #lightBadge.good .ldot { background:var(--ok); }
+  #lightCard.wait .ldot { background:rgba(255,255,255,.5); }
+  #lightHide { margin-left:auto; background:none; border:0; color:rgba(255,255,255,.72); font-size:22px; line-height:1; padding:0 4px; cursor:pointer; }
+  #lightTips { margin:6px 0 0; padding-left:18px; }
+  #lightTips li { margin-top:4px; }
+  #lightBadge { display:none; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#fff; background:rgba(255,255,255,.16); border:0; border-radius:9999px; padding:4px 10px; cursor:pointer; }
+  #stage.preroll.lightoff #lightBadge { display:inline-flex; }
+  #frameWrap { position:absolute; left:18px; right:18px; bottom: calc(18px + env(safe-area-inset-bottom)); display:none; gap:10px; }
+  #frameWrap .btn { flex:1; }
+  #stage.preroll #frameWrap { display:flex; }
+  #stage.preroll #stopWrap { display:none; }
+
   /* ── review ── */
   #play { width: 100%; max-height: 62dvh; border-radius: var(--radius); background: #000; }
   .prog { height: 4px; border-radius: 9999px; background: var(--muted); overflow: hidden; margin: 14px 0 8px; }
@@ -170,7 +200,7 @@ ${QUOTIENT_CSS}
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
   <div class="spacer"></div>
-  <p class="note" id="readyNote">Hold your phone upright. Tap record, you get a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
+  <p class="note" id="readyNote">Hold your phone upright. Tap Record: the camera opens with a quick light check. Tap Start recording for a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
   <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(skin smoothing and warmth, applied when the take is processed; change it later in Studio)</span></label>
   <div class="toggle" id="softDial">Smoothing <span class="hint">light</span><input type="range" id="softStrength" min="0" max="1" step="0.05" value="0.5" aria-label="Skin smoothing"><span class="hint">strong</span></div>
   <div class="toggle" id="bgChoice" role="radiogroup" aria-label="Background">Background:
@@ -185,11 +215,14 @@ ${QUOTIENT_CSS}
   <video id="live" autoplay muted playsinline></video>
     <canvas id="cap" width="1080" height="1920"></canvas>
   <div id="veil"></div>
-  <div id="top"><span id="timer">0:00</span><div id="meterWrap"><div id="meter"></div></div></div>
+  <div id="guide" aria-hidden="true"><div id="oval"></div><div id="eyes"><span>eyes here</span></div></div>
+  <div id="top"><span id="timer">0:00</span><div id="meterWrap"><div id="meter"></div></div><button id="lightBadge" type="button" title="Show the light check"><i class="ldot"></i><span id="lightBadgeText">Light</span></button></div>
   <div id="silent">No sound is reaching the mic — this take is recording nothing.</div>
   <div id="count"></div>
   <div id="prompt"><div id="cue"></div><div id="next"></div><div id="next2"></div></div>
   <div id="bar"><div id="barFill"></div></div>
+  <div id="lightCard" class="wait" role="status" aria-live="polite"><div id="lightHead"><i class="ldot"></i><span id="lightTitle">Checking your light…</span><button id="lightHide" type="button" aria-label="Hide the light check" title="Hide the light check for this visit">×</button></div><ul id="lightTips"></ul></div>
+  <div id="frameWrap"><button class="btn again" id="frameBack">Back</button><button class="btn stop" id="goBtn">Start recording</button></div>
   <div id="stopWrap"><button class="btn again" id="againRecBtn">Start over</button><button class="btn stop" id="stopBtn">Stop</button></div>
 </section>
 
@@ -433,7 +466,7 @@ ${QUOTIENT_CSS}
       if (embedded) postSize();
       // The copy speaks to the device: a laptop is not held upright.
       var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
-      if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Click Record: a 3-second count-in, then your lines one at a time at speaking pace. Click anywhere to jump to the next line.';
+      if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Click Record: the camera opens with a quick light check; Start recording gives a 3-second count-in, then your lines one at a time at speaking pace. Click anywhere to jump to the next line.';
       var g = (p.treatment && p.treatment.filmGrammar) || '';
       var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
       $('subtitle').textContent = beats
@@ -558,6 +591,146 @@ ${QUOTIENT_CSS}
     drawReq = 0;
   }
 
+  // ── light check: measure the live frame before the take ──────────────
+  // lightStats / lightAdvice / guideOval come from src/core/light-check.ts,
+  // inlined verbatim so the tests run the code the phone runs.
+  ${LIGHT_CHECK_JS}
+  // Hidden with the x: this visit's takes go straight to the count-in.
+  // sessionStorage can throw (private mode, blocked storage): treat that as
+  // "not hidden" -- the check shows, recording never depends on it.
+  var LIGHT_OFF_KEY = 'mp.booth.lightcheck.off';
+  function lightOff() { try { return sessionStorage.getItem(LIGHT_OFF_KEY) === '1'; } catch (e) { return false; } }
+  function setLightOff(v) { try { if (v) sessionStorage.setItem(LIGHT_OFF_KEY, '1'); else sessionStorage.removeItem(LIGHT_OFF_KEY); } catch (e) {} }
+  var lcTimer = null, lcCanvas = null, lcSmooth = null, lcShown = null;
+
+  // The oval and the eyes line, drawn over the camera picture's own box
+  // (the full-bleed stage, or the centred frame of a wide film) with the
+  // same numbers the measurement uses, so the face you frame is the face
+  // measured.
+  function placeGuide() {
+    var r = $('live').getBoundingClientRect(), s0 = $('stage').getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    var o = guideOval(r.width, r.height), x0 = r.left - s0.left, y0 = r.top - s0.top;
+    var ov = $('oval').style;
+    ov.left = (x0 + o.cx - o.rx) + 'px'; ov.top = (y0 + o.cy - o.ry) + 'px'; ov.width = (2 * o.rx) + 'px'; ov.height = (2 * o.ry) + 'px';
+    var ey = $('eyes').style;
+    ey.left = (x0 + o.cx - o.rx * 1.7) + 'px'; ey.width = (o.rx * 3.4) + 'px'; ey.top = (y0 + o.eyeY) + 'px';
+  }
+  window.addEventListener('resize', function () { if ($('stage').classList.contains('framing')) placeGuide(); });
+
+  // One sample: the picture the screen shows (object-fit: cover of the
+  // camera into the element's box), downscaled to 160px wide -- ~45k pixels
+  // at 2 a second is nothing next to the camera itself.
+  function sampleLight() {
+    var v = $('live'), vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw || !vh || v.readyState < 2) return;
+    var r = v.getBoundingClientRect(); if (!r.width || !r.height) return;
+    var sw = 160, sh = Math.max(60, Math.min(400, Math.round(160 * r.height / r.width)));
+    if (!lcCanvas) lcCanvas = document.createElement('canvas');
+    if (lcCanvas.width !== sw) lcCanvas.width = sw;
+    if (lcCanvas.height !== sh) lcCanvas.height = sh;
+    var ctx = lcCanvas.getContext('2d', { willReadFrequently: true }); if (!ctx) return;
+    var k = Math.max(sw / vw, sh / vh), dw = vw * k, dh = vh * k;
+    ctx.drawImage(v, (sw - dw) / 2, (sh - dh) / 2, dw, dh);
+    var st = lightStats(ctx.getImageData(0, 0, sw, sh).data, sw, sh);
+    // Smoothed over ~1.5s: a hand through the frame or a head turn must not
+    // flicker the tips.
+    if (!lcSmooth) lcSmooth = st;
+    else for (var key in st) lcSmooth[key] = lcSmooth[key] * 0.6 + st[key] * 0.4;
+    renderLight(lightAdvice(lcSmooth));
+  }
+  function renderLight(tips) {
+    var good = !tips.length;
+    if (good) maybeLock();
+    var key = tips.map(function (t) { return t.text; }).join('|');
+    if (key === lcShown) return;
+    lcShown = key;
+    var card = $('lightCard'); card.classList.remove('wait'); card.classList.toggle('good', good);
+    $('lightTitle').textContent = good ? 'Light looks good' : 'Light check';
+    var ul = $('lightTips'); ul.innerHTML = '';
+    tips.forEach(function (t) { var li = document.createElement('li'); li.textContent = t.text; ul.appendChild(li); });
+    $('lightBadge').classList.toggle('good', good);
+    $('lightBadgeText').textContent = good ? 'Light good' : (tips.length + (tips.length === 1 ? ' light tip' : ' light tips'));
+  }
+  function startLightCheck() {
+    if (lcTimer) return;
+    lcSmooth = null; lcShown = null;
+    $('lightCard').className = 'wait';
+    $('lightTitle').textContent = 'Checking your light…'; $('lightTips').innerHTML = ''; $('lightBadgeText').textContent = 'Light';
+    lcTimer = setInterval(function () { try { sampleLight(); } catch (e) { /* a courtesy; never the take */ } }, 500);
+  }
+  function stopLightCheck() { if (lcTimer) clearInterval(lcTimer); lcTimer = null; }
+
+  // PREROLL: camera up, guide and light check showing, Start recording
+  // rolls. Non-blocking by construction -- Start is live from the first
+  // frame whatever the check says.
+  function enterFraming() {
+    var st = $('stage');
+    st.classList.add('preroll', 'framing'); st.classList.toggle('lightoff', lightOff());
+    placeGuide(); startLightCheck();
+  }
+  function leaveFraming() { $('stage').classList.remove('preroll'); stopLightCheck(); }
+  $('goBtn').addEventListener('click', function (ev) {
+    ev.stopPropagation(); leaveFraming();
+    if (stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; })) roll(stream);
+    else { stopAll(); show('ready'); $('recordBtn').disabled = false; }
+  });
+  $('frameBack').addEventListener('click', function (ev) { ev.stopPropagation(); stopAll(); show('ready'); $('recordBtn').disabled = false; });
+  $('lightHide').addEventListener('click', function (ev) { ev.stopPropagation(); setLightOff(true); $('stage').classList.add('lightoff'); maybeLock(); });
+  $('lightBadge').addEventListener('click', function (ev) { ev.stopPropagation(); setLightOff(false); $('stage').classList.remove('lightoff'); });
+
+  // ── exposure + white balance lock ──────────────────────────────────────
+  // Auto exposure and auto white balance hunt while you talk: a hand, a
+  // white shirt, a head turn and the whole picture pumps brighter/darker
+  // and warmer/cooler mid-sentence. Once the light is set (the check is
+  // green, hidden, or the count-in starts) and the camera has had ~1.5s to
+  // settle, freeze both at what the camera metered. ONLY where the track
+  // lists the modes in getCapabilities() -- Chrome on Android does
+  // (exposureMode / whiteBalanceMode 'manual' with exposureTime /
+  // colorTemperature), as do some USB webcams in desktop Chrome. iOS Safari
+  // (and desktop Safari, Firefox) expose neither: nothing happens there and
+  // the phone's own auto stays on. A throw or a rejection is swallowed --
+  // a lock is a nicety, the take is the job.
+  var camLiveAt = 0, lockedTrack = null, lockPending = false;
+  function maybeLock() {
+    var vt = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+    if (!vt || vt === lockedTrack || vt.readyState !== 'live' || lockPending) return;
+    var wait = 1500 - (performance.now() - camLiveAt);
+    if (wait > 0) { lockPending = true; setTimeout(function () { lockPending = false; maybeLock(); }, wait + 20); return; }
+    lockedTrack = vt;
+    lockCamera(vt);
+  }
+  function lockCamera(vt) {
+    try {
+      if (!vt.getCapabilities || !vt.applyConstraints) return;
+      var caps = vt.getCapabilities() || {};
+      var set = vt.getSettings ? (vt.getSettings() || {}) : {};
+      var has = function (list, m) { return Array.isArray(list) && list.indexOf(m) >= 0; };
+      var adv = [];
+      if (has(caps.exposureMode, 'manual')) {
+        var ex = { exposureMode: 'manual' };
+        if (typeof set.exposureTime === 'number' && caps.exposureTime) ex.exposureTime = set.exposureTime;
+        adv.push(ex);
+      } else if (has(caps.exposureMode, 'none')) adv.push({ exposureMode: 'none' });
+      if (has(caps.whiteBalanceMode, 'manual')) {
+        var wb = { whiteBalanceMode: 'manual' };
+        if (typeof set.colorTemperature === 'number' && caps.colorTemperature) wb.colorTemperature = set.colorTemperature;
+        adv.push(wb);
+      } else if (has(caps.whiteBalanceMode, 'none')) adv.push({ whiteBalanceMode: 'none' });
+      if (!adv.length) return;
+      // applyConstraints REPLACES the track's constraint set: carry the
+      // size and frame rate we asked for, or the camera may fall back to its
+      // default resolution. Separate advanced sets, so a camera that takes
+      // one lock and refuses the other still gets the one.
+      var base = vt.getConstraints ? (vt.getConstraints() || {}) : {};
+      var c = {};
+      for (var bk in base) { if (bk !== 'advanced') c[bk] = base[bk]; }
+      c.advanced = adv;
+      var p = vt.applyConstraints(c);
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) { /* never break the take over a lock */ }
+  }
+
   function tick() {
     var el = (performance.now() - t0) / 1000;
     $('timer').textContent = fmt(el) + (total ? ' / ' + fmt(total) : '');
@@ -577,6 +750,7 @@ ${QUOTIENT_CSS}
     // take -- Marc: "I've already said yes"). Released when the page hides.
     var live = stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; });
     (live ? Promise.resolve(stream) : navigator.mediaDevices.getUserMedia(constraints)).then(function (s) {
+      if (s !== stream) camLiveAt = performance.now();
       stream = s;
       var vt = s.getVideoTracks()[0]; var st = vt && vt.getSettings ? vt.getSettings() : {};
       trackW = st.width || 0; trackH = st.height || 0;
@@ -585,7 +759,9 @@ ${QUOTIENT_CSS}
       $('timer').textContent = '0:00'; $('timer').classList.remove('rec');
       startMeter(s);
       if (navigator.wakeLock && navigator.wakeLock.request) { navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); }
-      roll(s);
+      // The light check first (Start recording rolls), unless it was hidden
+      // this visit: then straight to the count-in, as before.
+      if (lightOff()) roll(s); else enterFraming();
     }).catch(function (e) {
       $('recordBtn').disabled = false;
       fail('Camera or microphone was not allowed (' + (e.name || e) + '). Allow both for this site and try again.');
@@ -596,6 +772,9 @@ ${QUOTIENT_CSS}
   // again on the SAME stream, from the stage.
   var countTimer = null;
   function roll(s) {
+      // The guide stays up through the count-in (last chance to frame), and
+      // the count-in is when the camera's auto exposure/white balance lock.
+      $('stage').classList.add('framing'); placeGuide(); maybeLock();
       var n = 3; $('count').style.display = 'flex'; $('count').textContent = String(n);
       var cd = countTimer = setInterval(function () {
         n -= 1;
@@ -625,8 +804,11 @@ ${QUOTIENT_CSS}
         }
         // The bitrate is asked for: left to the browser it lands near 2.5 Mbps,
         // which smears hair and skin at 1080p (Marc: "the camera quality on
-        // the laptop seems low"). 8 Mbps video, 128 kbps audio.
-        var recOpts = { videoBitsPerSecond: 8000000, audioBitsPerSecond: 128000 };
+        // the laptop seems low"). 12 Mbps video, 128 kbps audio: at 8 Mbps a
+        // 1080x1920 30fps take from iOS BANDS the soft gradients of skin and a
+        // plain wall, and the steps show once the take is graded and
+        // re-encoded. 12 keeps them smooth, for ~90 MB a minute.
+        var recOpts = { videoBitsPerSecond: 12000000, audioBitsPerSecond: 128000 };
         if (mime) recOpts.mimeType = mime;
         try { rec = new MediaRecorder(src, recOpts); }
         catch (e1) {
@@ -638,6 +820,7 @@ ${QUOTIENT_CSS}
         rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
         rec.onstop = onStopped;
         rec.start(1000);
+        $('stage').classList.remove('framing');
         t0 = performance.now();
         $('timer').classList.add('rec');
         tickTimer = setInterval(tick, 200);
@@ -660,6 +843,7 @@ ${QUOTIENT_CSS}
   });
 
   function stopAll() {
+    leaveFraming(); $('stage').classList.remove('framing');
     stopDraw();
     if (tickTimer) clearInterval(tickTimer); tickTimer = null;
     clearPrompter(); stopMeter();

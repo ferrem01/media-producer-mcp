@@ -6,6 +6,54 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The booth checks the light before the take
+
+A manual review of Marc's latest booth take, measured from its frames,
+found three lighting faults he could not see from behind the phone: the key
+panel on WARM in a daylight room (lit cheek R/B ~2.3, shadow cheek and wall
+~1.0-1.5), a wall as bright as his face (luma ~158 vs a face of ~130-168),
+and no rim light. The booth now catches the first two itself.
+
+- **Light check** (`src/core/light-check.ts`, inlined into `take-page.ts`).
+  Record now opens the camera on a PREROLL: a face oval with an "eyes here"
+  line on the upper third, and a card with at most three plain-English tips
+  (or a green "Light looks good"). **Start recording** rolls the count-in
+  and is live from the first frame, so the check never blocks. The x hides it
+  for the visit (sessionStorage, try/catch), and later takes go straight to
+  the count-in as before. A badge brings it back.
+- **Measured, not guessed.** The frame the screen shows is sampled 2x a
+  second at 160px wide. The face is the inner 70% of the oval, the
+  background is the top band outside the head, and the numbers are smoothed
+  over ~1.5s. Priority: dark (face luma < 70), then colour, shine (> 3% of
+  face pixels > 245), wall (bg >= 0.9x face; measured 1.06x), flat
+  (|L-R|/max < 0.12; the measured 168/130 is 23%).
+- **Colour is read two ways, because skin is warm.** The shadow cheek read
+  1.5 against a wall of 1.0 under matched light, so a "face R/B > 1.4x the
+  wall" rule would flag every correct setup. Face vs room fires at 1.75x.
+  The main signal compares the face with itself: halves more than 1.3x apart
+  on R/B (measured 2.3/1.5 = 1.53x), which does not depend on skin tone.
+  Bluer than the room (< 0.95x) and green (G/((R+B)/2) > 1.1x the wall) have
+  tips of their own. Rim light is NOT measured: it needs a person mask the
+  booth does not have live.
+- **One source, two runtimes.** The functions are written once, as ES5 in
+  `LIGHT_CHECK_JS`. The page inlines that string, and the module evaluates
+  the same string for Node, so the tests run the phone's code (no twin to
+  drift, unlike `MAP_SOURCE_TIME_JS`).
+- **12 Mbps** (was 8): at 8, a 1080x1920 30fps take from iOS bands skin and
+  wall gradients.
+- **Exposure/WB lock**: 1.5s after the camera goes live, once the check is
+  green, hidden or the count-in starts, `applyConstraints` freezes exposure
+  and white balance at the metered values. It does this ONLY when
+  `getCapabilities()` lists the modes (Chrome on Android, some desktop-Chrome
+  USB webcams), and it carries the track's own constraints so the resolution
+  stays put. iOS Safari exposes neither mode, so nothing changes there.
+  Failures are swallowed.
+- Tests: `test/booth-light-check.test.ts` (the measured case, synthetic
+  frames, and a fake-camera browser run covering hide, lock and 12 Mbps).
+  The prompter test in `take-page.test.ts` now taps Start recording.
+
+---
+
 ## 2026-09-26 — Morph v1: one component born from another's box
 
 The relay grammar hands off through coordinates, which only works for the
