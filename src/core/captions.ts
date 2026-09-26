@@ -29,6 +29,9 @@ export interface CaptionPhrase { text: string; start: number; end: number }
 const MAX_WORDS = 4;
 /** The scatter lane lands shorter phrases: one to three words per spot. */
 const SCATTER_MAX_WORDS = 3;
+/** The tiered lane (the Scale Army cut) holds a lead, the key phrase and a
+ *  tail on screen at once: "We hired a / SOCIAL MEDIA MANAGER / before". */
+const TIERED_MAX_WORDS = 6;
 const MAX_SPAN_S = 1.8;
 /** A silence this long between two words is a breath: the phrase breaks. */
 const BREATH_GAP_S = 0.6;
@@ -136,8 +139,10 @@ export interface CaptionLaneOpts {
   /** The recipe's caption style (layers.captions.style). "scatter" (the Air
    *  cut): each phrase lands at its own spot around the person and STAYS
    *  until the cut, three words at most, no plate; over a cutaway the
-   *  running phrase sits in the bottom band. Anything else: the plated
-   *  chest-band lane, phrases replacing each other. */
+   *  running phrase sits in the bottom band. "tiered" (the Scale Army
+   *  cut): the running words small, the starred phrase big on a brush
+   *  plate, the tail small beneath. Anything else: the plated chest-band
+   *  lane, phrases replacing each other. */
   style?: string;
 }
 
@@ -149,7 +154,8 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
   if (!words.length) return null;
   const em = emphasis.length ? emphasis : fallbackEmphasis(words, opts.brandWords || []);
   const scatter = opts.style === "scatter";
-  const phrases = captionPhrases(spine, em, { maxWords: scatter ? SCATTER_MAX_WORDS : MAX_WORDS });
+  const tiered = opts.style === "tiered";
+  const phrases = captionPhrases(spine, em, { maxWords: scatter ? SCATTER_MAX_WORDS : tiered ? TIERED_MAX_WORDS : MAX_WORDS });
   if (!phrases.length) return null;
   // Anchors: phrase i starts on its first word and ends where phrase i+1
   // starts (the same word), the last on its own last word's end plus the
@@ -178,7 +184,9 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
     type: "reel-caption-lane",
     data: scatter
       ? { phrases, mode: "scatter", scrim: "shadow", align: "left", max_font: opts.maxFont || 72, min_font: 34 }
-      : { phrases, scrim: "plate", align: "center", max_font: opts.maxFont || 84, min_font: 40 },
+      : tiered
+        ? { phrases, mode: "tiered", scrim: "shadow", align: "center", max_font: opts.maxFont || 96, min_font: 40 }
+        : { phrases, scrim: "plate", align: "center", max_font: opts.maxFont || 84, min_font: 40 },
     anchors,
   };
 }
@@ -231,7 +239,7 @@ export function recaptionIfStale(
     const marked = emphasisFromLines(lines).emphasis;
     const kept = (Array.isArray(scene.emphasis) ? scene.emphasis.map(String) : []).filter((e) => want.includes(normalizeToken(e)));
     const fresh = captionLane(spine, marked.length ? marked : kept, {
-      style: String(lane.data?.mode || "") === "scatter" ? "scatter" : "",
+      style: ["scatter", "tiered"].includes(String(lane.data?.mode || "")) ? String(lane.data?.mode) : "",
       maxFont: typeof lane.data?.max_font === "number" ? lane.data.max_font : undefined,
     });
     if (!fresh) continue;

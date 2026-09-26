@@ -6,6 +6,38 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The Scale Army pieces: tiered captions, punch card, stacking list
+
+Marc: "there is this text highlighting too... do we have that?" We had
+hand-drawn marks on `kinetic-text`, but not the look. Three pieces make the
+founder-selfie-punch-cards recipe read as that cut:
+- **Tiered captions** (`reel-caption-lane` `mode: "tiered"`).
+  - The running words are small. The starred phrase is big on a ragged
+    brush stroke of the brand colour, which wipes on left to right with a
+    -1.5° tilt. The tail sits small beneath, and a phrase with no star is
+    one small line.
+  - `key_style: "plain"`: the payoff big in plain white caps.
+  - The plate ink is white unless the brand colour is too light to carry
+    it.
+  - The build casts it from a recipe's `layers.captions.style: "tiered"`
+    (`core/captions.ts`: six words a phrase, so lead, key and tail share
+    the screen; recaption keeps the mode). The Scale Army recipe now says
+    tiered.
+- **`type-punch-card`** (new): a white card with big brand-colour lines at
+  their own spots, mixed heavy and italic.
+  - Each line streaks in along its axis with directional motion blur (an
+    SVG blur per line, tweened to sharp) and can streak out.
+  - `repeat` stacks copies ("MORE POSTS" x3). Lines without spots
+    zig-zag down the card.
+- **`stack-list`** (new): a small lead, then items rising one per word, flush
+  left.
+  - The carry-over is the same list cast on the next scene with
+    `ground: "none"` and `settled: true`: it opens already landed, with a
+    soft halo over the footage.
+- The recipe's beats now name the components.
+- Tests: `test/scale-army-pieces.test.ts`, 9:16 stills of each piece. Full
+  suite: 1313 passed.
+
 ## 2026-09-26 — Recipe eleven: founder-selfie-punch-cards (Scale Army)
 
 Marc sent the Scale Army ad ("I like it"): a founder's before/after on her

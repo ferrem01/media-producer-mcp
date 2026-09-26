@@ -130,6 +130,61 @@
     text-align: right;
   }
 
+  /* ── Tiered (the Scale Army cut) ──────────────────────────────────────
+     A phrase is three lines: the running words SMALL, the starred phrase
+     BIG on a ragged brush stroke of the brand colour (wiping in left to
+     right, a little tilted), the tail small beneath. A phrase with no star
+     is one small line. key_style 'plain' drops the plate: the payoff big
+     in plain white caps. */
+  .rcl-tiered .rcl-tier {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.06em;
+    width: 100%;
+    font-size: 96px;
+    color: #ffffff;
+    text-align: center;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 6px 26px rgba(0, 0, 0, 0.4);
+  }
+  .rcl-tiered .rcl-lead,
+  .rcl-tiered .rcl-tail {
+    font-size: var(--rcl-small, 0.44em);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+  .rcl-tiered .rcl-key {
+    position: relative;
+    display: inline-block;
+    padding: 0.04em 0.28em 0.1em;
+    font-weight: 800;
+    line-height: 1.0;
+    letter-spacing: -0.035em;
+    transform: rotate(-1.5deg);
+    max-width: 100%;
+  }
+  .rcl-tiered .rcl-plate {
+    position: absolute;
+    inset: 0 -0.06em;
+    background: var(--mp-color-primary, #f26b3a);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 40' preserveAspectRatio='none'><path d='M4 6 L22 3 L61 5 L108 2 L158 4 L196 2 L199 11 L195 20 L199 29 L193 37 L151 36 L101 38 L52 36 L13 38 L2 34 L5 26 L1 18 L4 10 Z'/></svg>") center / 100% 100% no-repeat;
+    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 40' preserveAspectRatio='none'><path d='M4 6 L22 3 L61 5 L108 2 L158 4 L196 2 L199 11 L195 20 L199 29 L193 37 L151 36 L101 38 L52 36 L13 38 L2 34 L5 26 L1 18 L4 10 Z'/></svg>") center / 100% 100% no-repeat;
+    clip-path: inset(0 100% 0 0);
+  }
+  .rcl-tiered .rcl-keytext {
+    position: relative;
+    text-shadow: none;
+  }
+  .rcl-tiered .rcl-key.plain {
+    transform: none;
+    text-transform: uppercase;
+    padding: 0;
+  }
+  .rcl-tiered .rcl-key.plain .rcl-keytext {
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 6px 26px rgba(0, 0, 0, 0.4);
+  }
+
   .rcl-kicker {
     position: absolute;
     left: 0;
@@ -169,6 +224,10 @@
     // Eight spots: left / right columns, stepping down the frame. A ninth
     // phrase clears the board and starts over at the top.
     var SPOTS = 8;
+
+    // Tiered (the Scale Army cut): lead small, starred phrase big on a
+    // brush plate, tail small. Its own build and timeline, below.
+    if (data && data.mode === 'tiered') return tieredTimeline(el, root, stack, phrases, data, ctx, tl);
 
     var maxFont = (data && data.max_font) || 104;
     var minFont = (data && data.min_font) || 44;
@@ -339,6 +398,128 @@
       tl.set(itm.wrap, { autoAlpha: 0, y: 0 }, itm.end);
     }
 
+    return tl;
+  }
+  function tieredTimeline(el, root, stack, phrases, data, ctx, tl) {
+    root.classList.add('rcl-tiered');
+    var maxFont = data.max_font || 96;
+    var minFont = data.min_font || 40;
+    var small = typeof data.small === 'number' ? data.small : 0.44;
+    // The ink on the plate: white unless the brand colour is too light to
+    // carry it (then near-black).
+    var plateInk = '#ffffff';
+    if (window.mpParseColor) {
+      var probe = document.createElement('span');
+      probe.style.color = 'var(--mp-color-primary, #f26b3a)';
+      stack.appendChild(probe);
+      var pc = mpParseColor(getComputedStyle(probe).color);
+      stack.removeChild(probe);
+      if (pc) {
+        var lin = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        var L = 0.2126 * lin(pc.r) + 0.7152 * lin(pc.g) + 0.0722 * lin(pc.b);
+        if ((1.05) / (L + 0.05) < 3) plateInk = '#111118';
+      }
+    }
+    var built = [];
+    for (var i = 0; i < phrases.length; i++) {
+      var p = phrases[i] || {};
+      var text = String(p.text || '').trim();
+      if (!text) continue;
+      // Split on the stars: lead, key (every starred run joined), tail.
+      var segs = text.split('*');
+      var balanced = segs.length % 2 === 1;
+      var lead = [], key = [], tail = [];
+      for (var s = 0; s < segs.length; s++) {
+        var ws = segs[s].split(/\s+/).filter(function (w) { return w.length; });
+        if (!ws.length) continue;
+        var isKey = balanced && s % 2 === 1;
+        if (isKey) key = key.concat(ws);
+        else if (key.length) tail = tail.concat(ws);
+        else lead = lead.concat(ws);
+      }
+      // A key that only closes the line's punctuation ("*Analytics*.")
+      // leaves a tail of stray marks: fold them onto the key.
+      if (tail.length && tail.join('').replace(/[.,!?;:\u2014\u2013\-"')]/g, '') === '') { key[key.length - 1] += tail.join(''); tail = []; }
+      var plain = String(p.key_style || data.key_style || 'plate') === 'plain';
+      var wrap = document.createElement('div');
+      wrap.className = 'rcl-phrase';
+      var tier = document.createElement('div');
+      tier.className = 'rcl-tier';
+      tier.style.setProperty('--rcl-small', key.length ? small + 'em' : '0.5em');
+      var mk = function (cls, words) {
+        var d = document.createElement('div');
+        d.className = cls;
+        var spans = [];
+        for (var w = 0; w < words.length; w++) {
+          var sp = document.createElement('span');
+          sp.className = 'rcl-w';
+          sp.textContent = words[w];
+          d.appendChild(sp);
+          if (w < words.length - 1) d.appendChild(document.createTextNode(' '));
+          spans.push(sp);
+        }
+        return { el: d, words: spans };
+      };
+      var leadB = lead.length ? mk('rcl-lead', lead) : null;
+      var keyB = null, plate = null;
+      if (key.length) {
+        var kd = document.createElement('div');
+        kd.className = 'rcl-key' + (plain ? ' plain' : '');
+        if (!plain) { plate = document.createElement('span'); plate.className = 'rcl-plate'; kd.appendChild(plate); }
+        var kt = mk('rcl-keytext', key);
+        kt.el.style.display = 'inline';
+        if (!plain) kt.el.style.color = plateInk;
+        kd.appendChild(kt.el);
+        keyB = { el: kd, words: kt.words };
+      }
+      var tailB = tail.length ? mk('rcl-tail', tail) : null;
+      if (leadB) tier.appendChild(leadB.el);
+      if (keyB) tier.appendChild(keyB.el);
+      if (tailB) tier.appendChild(tailB.el);
+      wrap.appendChild(tier);
+      stack.appendChild(wrap);
+      built.push({ wrap: wrap, tier: tier, lead: leadB, key: keyB, plate: plate, tail: tailB,
+        start: Number(p.start) || 0, end: (p.end != null ? Number(p.end) : (Number(p.start) || 0) + 2.4) });
+    }
+    if (!built.length) return tl;
+    // Fit: step the size down until the tier clears the lane in both axes.
+    var boxW = stack.clientWidth || el.clientWidth;
+    var boxH = stack.clientHeight || el.clientHeight;
+    for (var b = 0; b < built.length; b++) {
+      var it = built[b];
+      it.wrap.style.visibility = 'hidden';
+      var fs = it.key ? maxFont : Math.round(maxFont * 0.9);
+      it.tier.style.fontSize = fs + 'px';
+      var guard = 0;
+      while (guard++ < 40 && fs > minFont && (it.tier.scrollHeight > boxH || it.tier.scrollWidth > boxW + 1 || (it.key && it.key.el.scrollWidth > boxW + 1))) {
+        fs = Math.round(fs * 0.92);
+        it.tier.style.fontSize = fs + 'px';
+      }
+    }
+    // Timeline: the words land in reading order across the first 70% of
+    // the phrase; the plate wipes on as the key begins; the phrase cuts out.
+    for (var j = 0; j < built.length; j++) {
+      var ph = built[j];
+      var span = Math.max(0.4, ph.end - ph.start);
+      var order = [].concat(ph.lead ? ph.lead.words : [], ph.key ? ph.key.words : [], ph.tail ? ph.tail.words : []);
+      var step = Math.min(0.16, Math.max(0.03, (span * 0.7) / Math.max(1, order.length)));
+      tl.set(ph.wrap, { autoAlpha: 1 }, ph.start);
+      var t = ph.start;
+      var landSmall = function (els, at) {
+        for (var k = 0; k < els.length; k++) {
+          tl.fromTo(els[k], { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.16, ease: 'power2.out', immediateRender: false }, at + k * step);
+        }
+        return at + els.length * step;
+      };
+      if (ph.lead) t = landSmall(ph.lead.words, t);
+      if (ph.key) {
+        if (ph.plate) tl.fromTo(ph.plate, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: 0.22, ease: 'power2.out', immediateRender: false }, t);
+        tl.fromTo(ph.key.words, { autoAlpha: 0, scale: 0.86 }, { autoAlpha: 1, scale: 1, duration: 0.24, ease: 'back.out(2)', stagger: 0.03, immediateRender: false }, t + (ph.plate ? 0.06 : 0));
+        t += ph.key.words.length * step + 0.12;
+      }
+      if (ph.tail) landSmall(ph.tail.words, t);
+      tl.set(ph.wrap, { autoAlpha: 0 }, ph.end);
+    }
     return tl;
   }
 </script>

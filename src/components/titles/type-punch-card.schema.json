@@ -1,0 +1,23 @@
+{
+  "type": "type-punch-card",
+  "label": "Punch type card",
+  "category": "titles",
+  "description": "The punch between two lines of a person talking (the Scale Army cut, recipe founder-selfie-punch-cards): a hard cut to a plain card while the voice carries on, and a few BIG words in the brand colour streak into their own spots around the frame with directional motion blur, land sharp, and optionally streak out. Use it for the old way in a few words, a list said fast, a contrast ('MORE POSTS' x3, then 'WE GOT BETTER DESIGNS'). Full-frame -- it paints its own ground (white by default). Keep it to 2-5 lines of 1-3 words each. Example: {\"lines\":[{\"text\":\"More posts\",\"repeat\":3,\"x\":62,\"y\":20,\"at\":0.2,\"out\":1.3},{\"text\":\"We\",\"x\":14,\"y\":45,\"at\":1.4,\"size\":\"xl\"},{\"text\":\"Better\",\"x\":42,\"y\":70,\"at\":1.8},{\"text\":\"Designs\",\"italic\":true,\"x\":60,\"y\":78,\"at\":2.1}]}.",
+  "data": {
+    "lines": {
+      "type": "array",
+      "label": "The lines, in order: {text, at?, out?, x?, y? (percent of the frame, the line's centre), size? (xl|l|m|s, default l), italic?, repeat? (1-4 stacked copies), from? (left|right|up|down: the direction it streaks in from), rotate? (degrees)}. Omit at to share the card evenly; omit x/y to zig-zag down the card; omit out to hold to the cut.",
+      "required": true
+    },
+    "ground": {
+      "type": "string",
+      "label": "white (default) | none (over the scene) | any CSS colour",
+      "optional": true
+    },
+    "ink": {
+      "type": "string",
+      "label": "Word colour (default the brand primary)",
+      "optional": true
+    }
+  }
+}
