@@ -100,6 +100,11 @@ describe("the studio correction: stats -> filter", () => {
     expect(studioGradeFilter(stats({ faceP50: 0.3, clip: 0.05 })).ev).toBe(0);
   });
 
+  it("a well-lit light-skinned face (0.66, Marc's IMG_2765) is left alone: the band tops out at 0.70", () => {
+    const c = studioGradeFilter(stats({ faceP50: 0.66, faceP95: 0.86 }));
+    expect(c.ev).toBe(0);
+  });
+
   it("a bright face comes down, clamped", () => {
     const c = studioGradeFilter(stats({ faceP50: 0.85, faceP95: 0.97 }));
     expect(c.ev).toBeLessThan(0);

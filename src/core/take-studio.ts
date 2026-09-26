@@ -34,7 +34,7 @@
  *      chroma (selectivecolor, reds range, absolute) -- a neutral wall at
  *      the same brightness has no chroma and is not touched, which a
  *      highlights/midtones colour balance could not promise.
- *   3. EXPOSURE: the face median into 0.45-0.60 of full range, at most
+ *   3. EXPOSURE: the face median into 0.45-0.70 of full range, at most
  *      +-0.5 stop, through a curve pinned at black and white so highlights
  *      roll off instead of clipping; no lift at all when the face already
  *      clips.
@@ -280,8 +280,11 @@ export const SKIN_PULL_MAX = 0.45;
 const SKIN_ADJ_MAX = 0.5;
 /** Skin keeps green above blue: hue (G-B)/(R-B) under this reads pink. */
 const SKIN_HUE_FLOOR = 0.18;
-/** The face median's target band, fractions of full range (SDR). */
-export const FACE_LUMA_BAND: [number, number] = [0.45, 0.6];
+/** The face median's target band, fractions of full range (SDR). The top
+ *  is 0.70, not 0.60: broadcast puts lighter skin at ~60-70 IRE, and a
+ *  0.60 cap pulled Marc's well-lit take (face 0.66, IMG_2765) down 0.28
+ *  stop -- a dimmer picture for no gain, since the wall darkened with it. */
+export const FACE_LUMA_BAND: [number, number] = [0.45, 0.7];
 /** Exposure moves at most this many stops either way. */
 export const EV_CLAMP = 0.5;
 const EV_DEADBAND = 0.05;
