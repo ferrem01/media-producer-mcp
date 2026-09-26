@@ -98,8 +98,8 @@ const positionSchema = z.object({
   height: z.union([z.number(), z.string()]).optional(),
 }).optional();
 
-const animationSchema = z.object({
-  effect: z.string(),
+export const animationSchema = z.object({
+  effect: z.string().describe("slide-left | slide-right | slide-up | slide-down | rise | pop | fade | cut; on enter also morph (needs from)"),
   // Scene-local start time (seconds). Enter defaults to 0; exit defaults to
   // scene end minus duration. The assembler has always honored this -- the
   // schema just used to strip it. A word ("@acts") lands it on the script:
@@ -108,6 +108,9 @@ const animationSchema = z.object({
   duration: z.number().optional(),
   stagger: z.number().optional(),
   ease: z.string().optional(),
+  // THE MORPH (SPEC-metamorph.md): an entrance born from another component's
+  // box in the same scene. Without it here, add/update would strip it.
+  from: z.string().optional().describe("enter effect 'morph' only: the component it is born from -- its id, or 'id.anchor' for a [data-anchor] part inside it. Same scene; a missing source fades in instead."),
 }).optional();
 
 const transitionSchema = z.object({
@@ -137,7 +140,7 @@ const anchorsSchema = z.record(z.object({
   offset: z.number().optional(),
 })).optional().describe("Word anchors by data path ('at', 'lines[1].at', 'enter.at'): {word, occurrence?, edge?, offset?}. The time lands on that spoken word when the scene's words are known (now, or when the take lands); keep a numeric value in the data so it plays before then.");
 
-const componentSchema = z.object({
+export const componentSchema = z.object({
   id: z.string(),
   type: z.string(),
   data: z.record(z.unknown()),

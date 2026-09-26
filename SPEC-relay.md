@@ -2,7 +2,9 @@
 
 Status: SHIPPED 2026-09-26 (Marc: "Yes on grammar"). The grammar the parked
 `SPEC-metamorph.md` asked for, built on today's machinery: the handoffs
-are coordinates between library components. It needs no morph runtime.
+are coordinates between library components. It needed no morph runtime;
+since Morph v1 (2026-09-26) any other pair hands off with
+`enter {effect: "morph", from}`.
 Reference film: the Cosmos promo (x.com/kaolti/status/2103481296018092204),
 rebuilt as `proj_9c829aa3` (13 scenes, 39.5 s, one 18 s oner).
 
@@ -72,6 +74,14 @@ rises from mid-frame to the top needs a box from `y: 0%` with `height:
 | `dot-logo` `move` | `cta-card` | `actions_at` = the move's end; the dot becomes the button |
 | `search-bar` step `to_y` (+ `scale`) | the rest of the oner | the bar parks at the top, and later steps (`clear`, `chip`, `type`) re-query |
 
+**Any other pair: the morph.** Prefer `enter: { effect: "morph", from:
+"<source>", at, duration }` on the arriving component (SPEC-metamorph.md,
+"Morph v1"). It is born out of the source's box, or out of a part of it
+(`"<source>.<anchor>"`), travels to its own box, and the source hands itself
+over. `from` names a component in the same scene by its type (`_2` for the
+second of a type). The coordinate handoffs above stay for the pieces built
+for them: a dot that becomes a bar is the bar's own growth, not a box.
+
 If the next beat cannot start from something on screen, the oner ends
 there and a punctuation cut follows.
 
@@ -92,8 +102,9 @@ there and a punctuation cut follows.
 
 ## Not in v1 (parked in SPEC-metamorph.md)
 
-- A morph runtime: an `enter` with `from: "componentId.anchor"` that FLIPs
-  one component's box into another's.
+- ~~A morph runtime~~: shipped 2026-09-26 as Morph v1 (one source, one
+  target, inside a scene). The ghost moves (`burst`, `converge`, `dive`)
+  stay parked.
 - A rack-focus transition that joins two oners.
 - Handoffs across a scene boundary. v1 keeps every handoff inside one scene,
   where both components share a page.

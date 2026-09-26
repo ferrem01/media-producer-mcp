@@ -37,6 +37,9 @@ describe("relay grammar", () => {
     // Each kit handoff is written as matching coordinates.
     expect(src).toMatch(/THE HANDOFF: every beat inside a oner STARTS FROM an object of the beat before/);
     for (const k of ['"from":"dot"', "from_x", "retract_at", '"grid" formation', "actions_at"]) expect(src).toContain(k);
+    // Any other pair hands off by morph: an entrance born from the source's box.
+    expect(src).toMatch(/THE MORPH IS THE HANDOFF FOR ANY PAIR/);
+    expect(src).toContain('"enter": {"effect":"morph","from":');
     expect(src).toMatch(/TYPE IS THE VOICE, COMING INTO FOCUS/);
     expect(src).toMatch(/no crossfades or wipes anywhere/);
   });

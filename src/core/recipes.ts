@@ -53,7 +53,7 @@ export interface Recipe {
   spine: RecipeBeat[];
   rhythm: { cut_cadence_s: number; max_hold_s: number; wpm: number; first_cut_by_s: number; end_card_s?: number; [k: string]: unknown };
   layers: Record<string, unknown>;
-  motion: { elements: Record<string, { in?: string; in_s?: number; out?: string; out_s?: number; per?: string; ease?: string }>; transitions?: Record<string, string>; camera?: Record<string, string>; physics?: string };
+  motion: { elements: Record<string, { in?: string; in_s?: number; in_from?: string; out?: string; out_s?: number; per?: string; ease?: string }>; transitions?: Record<string, string>; camera?: Record<string, string>; physics?: string };
   asks: Record<string, unknown>;
   latitude?: { optional?: string[]; fixed?: string[]; may_double?: string[] };
   source: { film: string; length_s: number; frame?: string; cuts_s?: number[]; measured: string };
@@ -202,13 +202,17 @@ export function checkBoardAgainstRecipe(board: { scenes: Array<{ label?: string;
   return out;
 }
 
-const ASSEMBLER_EFFECTS = new Set(["slide-left", "slide-right", "slide-up", "slide-down", "rise", "pop", "fade", "cut"]);
-function fx(spec: { in?: string; in_s?: number; out?: string; out_s?: number } | undefined, which: "in" | "out"): { effect: string; duration?: number } | null {
+const ASSEMBLER_EFFECTS = new Set(["slide-left", "slide-right", "slide-up", "slide-down", "rise", "pop", "fade", "cut", "morph"]);
+function fx(spec: { in?: string; in_s?: number; in_from?: string; out?: string; out_s?: number } | undefined, which: "in" | "out"): { effect: string; duration?: number; from?: string } | null {
   if (!spec) return null;
   const name = which === "in" ? spec.in : spec.out;
   if (!name || !ASSEMBLER_EFFECTS.has(name)) return null;
+  // A morph is an ENTRANCE with a source (SPEC-metamorph.md): only an "in"
+  // that names where it is born from ("in_from": a type or "type.anchor").
+  if (name === "morph" && (which !== "in" || typeof spec.in_from !== "string" || !spec.in_from)) return null;
   const d = which === "in" ? spec.in_s : spec.out_s;
-  return name === "cut" ? { effect: "cut" } : { effect: name, ...(typeof d === "number" ? { duration: d } : {}) };
+  if (name === "cut") return { effect: "cut" };
+  return { effect: name, ...(typeof d === "number" ? { duration: d } : {}), ...(name === "morph" ? { from: spec.in_from } : {}) };
 }
 
 /** The recipe's motion on a scene's cast, deterministically: stamps and

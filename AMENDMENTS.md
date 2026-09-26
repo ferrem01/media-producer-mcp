@@ -6,6 +6,43 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — Morph v1: one component born from another's box
+
+The relay grammar hands off through coordinates, which only works for the
+pieces built to meet (a dot that grows into the bar). Every other pair fell
+back to a fade: the object ending one beat vanished and the next one
+appeared somewhere else. Morph v1 is the smallest part of the parked
+handoff engine that fixes that, exactly as the review settled it: an
+ENTRANCE effect with a source, inside one scene.
+`enter: {effect: "morph", from: "A" | "A.anchor", at, duration, ease}`.
+
+- The wrapper starts on the source's box (FLIP: translate plus non-uniform
+  scale from the top-left) and travels home. The source fades out over the
+  first half, unless it has its own exit. An anchor source hides only that
+  part.
+- Scaled content smears, so the target stays hidden until halfway. A skin
+  (a sibling in the source's fill and radius, on the same transform) carries
+  the first half, and the content dissolves in as the skin dissolves out.
+- Boxes are LAYOUT boxes (offsets), not client rects: the camera rig and
+  the ambient push transform both wrappers alike and cancel. An anchor is
+  read relative to its wrapper and divided back by the wrapper's
+  client/layout ratio. Measured at the morph's first render, like the
+  camera's anchored moves.
+- One implementation (`wrapperChoreoScript`) serves the scene render and the
+  Studio composite. `from` survives every layer that used to strip keys:
+  the add/update/board zod schema, the authored builder's `normalizeAnim`,
+  the storyboard JSON schema, recipes (`in_from`), and Studio's inspector.
+- A missing source fades in and warns once, and never throws.
+- RELAY FILMS tells the writer to prefer morph for any other pair.
+
+Measured in Chromium (`test/morph.test.ts`, 1920x1080, seeking the master
+the way the capture does): at `at` the target's box sits on the source's
+within 3 px, under the camera's push. Halfway it is between the two. At
+`at + duration` it is home, opacity 1 and unscaled, with the source hidden.
+Seeking back to before `at` restores both. The composite does the same on
+namespaced ids. The anchor case (`verdict-scorecard.number`) starts on the
+tile's box, in the tile's dark fill.
+
 ## 2026-09-26 — The relay grammar; the Cosmos rebuild as one oner
 
 Marc watched the first rebuild and was right: "everything's sort of just
