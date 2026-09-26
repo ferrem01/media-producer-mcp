@@ -1,0 +1,23 @@
+{
+  "type": "color-flood",
+  "label": "Colour flood",
+  "category": "effects",
+  "description": "A coloured dot drops into place and FLOODS the whole frame -- the scene turns that colour and names it (\"#BC361B / Search by color.\") -- then can pull back into the dot and vanish. A beat change made from an object on screen, not a cut (the Cosmos search-by-colour beat). Full-frame, above the scene. Label ink is picked for contrast. Example: {\"color\":\"#BC361B\",\"from_y\":0.08,\"at\":0.3,\"label\":\"#BC361B\",\"sublabel\":\"Search by color.\",\"retract_at\":2.8}.",
+  "data": {
+    "color": { "type": "string", "label": "The flood colour (hex)", "required": true },
+    "at": { "type": "number", "label": "When the dot appears (s, default 0.2)", "optional": true },
+    "x": { "type": "number", "label": "Where the dot lands and floods from, fraction of width (default 0.5)", "optional": true },
+    "y": { "type": "number", "label": "...fraction of height (default 0.5)", "optional": true },
+    "from_x": { "type": "number", "label": "Where the dot starts (default: above its mark)", "optional": true },
+    "from_y": { "type": "number", "label": "Where the dot starts, fraction of height (e.g. the search chip's height)", "optional": true },
+    "dot_size": { "type": "number", "label": "Dot diameter as a fraction of the width (default 0.009)", "optional": true },
+    "flood_at": { "type": "number", "label": "When it floods (default at + 0.85)", "optional": true },
+    "flood_duration": { "type": "number", "label": "Seconds the flood takes (default 0.6)", "optional": true },
+    "label": { "type": "string", "label": "Big text on the flood (e.g. the hex)", "optional": true },
+    "sublabel": { "type": "string", "label": "Small line under it", "optional": true },
+    "label_at": { "type": "number", "label": "When the text focuses in (default just after the flood)", "optional": true },
+    "label_size": { "type": "number", "label": "Label size as a fraction of the width (default 0.075)", "optional": true },
+    "ink": { "type": "string", "label": "Text colour override (default: white or near-black by contrast)", "optional": true },
+    "retract_at": { "type": "number", "label": "When the flood pulls back into the dot and vanishes (omit to hold)", "optional": true }
+  }
+}

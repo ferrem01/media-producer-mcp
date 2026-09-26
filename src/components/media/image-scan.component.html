@@ -1,0 +1,80 @@
+<template>
+  <div class="isc">
+    <div class="isc-card"><div class="isc-imgs"></div>
+      <svg class="isc-br" preserveAspectRatio="none"></svg>
+      <div class="isc-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg><span></span></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* IMAGE SCAN: an image under recognition -- corner brackets draw in, a
+     small "Researching" chip sits top-left, and the image swaps to the next
+     one on a beat. "Know what you're looking at", shown working. */
+  .isc, .isc * { max-width: none; }
+  .isc { position: absolute; inset: 0; overflow: visible; pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .isc-card { position: absolute; inset: 0; border-radius: 10px; overflow: hidden; background: #e8e5de;
+    box-shadow: 0 12px 34px rgba(20, 16, 24, 0.16); }
+  .isc-imgs, .isc-imgs img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .isc-imgs img { object-fit: cover; display: block; }
+  .isc-br { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .isc-br path { fill: none; stroke: #ffffff; stroke-width: 2.5; stroke-linecap: round; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
+  .isc-chip { position: absolute; display: flex; align-items: center; gap: 0.35em; color: #fff; white-space: nowrap;
+    background: rgba(20, 20, 26, 0.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-radius: 999px; padding: 0.3em 0.75em 0.3em 0.55em; }
+  .isc-chip svg { width: 1em; height: 1em; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.isc'), card = el.querySelector('.isc-card'), box = el.querySelector('.isc-imgs');
+    if (!root) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var BW = root.clientWidth || 400, BH = root.clientHeight || 500;
+    var srcs = (Array.isArray(data.images) ? data.images : []).map(function (s) { return typeof s === 'string' ? s : (s && s.src); }).filter(Boolean);
+    if (!srcs.length) return tl;
+    var imgs = srcs.map(function (src) { var im = document.createElement('img'); im.alt = ''; im.src = src; box.appendChild(im); return im; });
+    gsap.set(imgs, { autoAlpha: 0 });
+    var at = num(data.at, 0.2);
+    gsap.set(card, { autoAlpha: 0, scale: 0.97 });
+    tl.to(card, { autoAlpha: 1, scale: 1, duration: 0.5, ease: 'power3.out' }, at);
+    tl.set(imgs[0], { autoAlpha: 1 }, at);
+
+    // Corner brackets, drawn in at the card's inset.
+    var svg = el.querySelector('.isc-br');
+    svg.setAttribute('viewBox', '0 0 ' + BW + ' ' + BH);
+    var ins = Math.min(BW, BH) * 0.05, L = Math.min(BW, BH) * 0.1;
+    var corners = [
+      'M' + ins + ' ' + (ins + L) + ' V' + ins + ' H' + (ins + L),
+      'M' + (BW - ins - L) + ' ' + ins + ' H' + (BW - ins) + ' V' + (ins + L),
+      'M' + (BW - ins) + ' ' + (BH - ins - L) + ' V' + (BH - ins) + ' H' + (BW - ins - L),
+      'M' + (ins + L) + ' ' + (BH - ins) + ' H' + ins + ' V' + (BH - ins - L)
+    ];
+    var paths = corners.map(function (d) { var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); p.setAttribute('pathLength', '1'); p.setAttribute('stroke-dasharray', '1'); p.setAttribute('stroke-dashoffset', '1'); svg.appendChild(p); return p; });
+    if (data.brackets === false) svg.style.display = 'none';
+    var bat = num(data.scan_at, at + 0.45);
+    tl.to(paths, { attr: { 'stroke-dashoffset': 0 }, duration: 0.45, ease: 'power2.out', stagger: 0.05 }, bat);
+
+    var chip = el.querySelector('.isc-chip');
+    chip.style.fontSize = Math.max(11, BW * num(data.chip_size, 0.038)) + 'px';
+    chip.style.left = (ins * 1.1) + 'px'; chip.style.top = (ins * 1.1) + 'px';
+    chip.querySelector('span').textContent = String(data.label || 'Researching');
+    if (data.label === '') chip.style.display = 'none';
+    gsap.set(chip, { autoAlpha: 0, y: -4 });
+    tl.to(chip, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, bat + 0.1);
+    // The chip's spark turns while it works.
+    tl.to(chip.querySelector('svg'), { rotation: 360 * 3, duration: Math.max(1, ((ctx && ctx.duration) || 5) - bat), ease: 'none' }, bat);
+
+    // Swap: each next image comes in over the last, slightly settling.
+    var every = num(data.every, 1.3);
+    for (var i = 1; i < imgs.length; i++) {
+      var t = bat + 0.3 + i * every - 0.3;
+      tl.fromTo(imgs[i], { autoAlpha: 0, scale: 1.06 }, { autoAlpha: 1, scale: 1, duration: 0.45, ease: 'power2.out', immediateRender: false }, t);
+      tl.set(imgs[i - 1], { autoAlpha: 0 }, t + 0.46);
+    }
+    return tl;
+  }
+</script>

@@ -1,0 +1,80 @@
+<template>
+  <div class="igr"><svg class="igr-lines"></svg><div class="igr-nodes"></div></div>
+</template>
+
+<style scoped>
+  /* IMAGE GRAPH: one image in the middle and its RELATED images drawn out
+     around it on fine lines -- visual search, "more like this", a web of
+     sources. The centre lands first; the others slide out from behind it
+     and the lines draw to them, then everything floats gently. */
+  .igr, .igr * { max-width: none; }
+  .igr { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .igr-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .igr-lines line { stroke: var(--igr-line, rgba(23, 23, 28, 0.22)); stroke-width: 1.5; }
+  .igr-node { position: absolute; left: 0; top: 0; border-radius: 6px; overflow: hidden; background: #e8e5de;
+    box-shadow: 0 8px 22px rgba(20, 16, 24, 0.14); will-change: transform; }
+  .igr-node img { width: 100%; height: 100%; object-fit: cover; display: block; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.igr'), svg = el.querySelector('.igr-lines'), box = el.querySelector('.igr-nodes');
+    if (!root || !data.center) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080;
+    if (data.line_color) root.style.setProperty('--igr-line', data.line_color);
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    var cx = W * num(data.x, 0.5), cy = H * num(data.y, 0.52);
+    var cs = W * num(data.size, 0.075), ns = W * num(data.node_size, 0.052);
+    var rx = W * num(data.radius, 0.2), ry = rx * num(data.flatten, 0.42);
+    var nodes = (Array.isArray(data.nodes) ? data.nodes : []).slice(0, 12);
+    var hash = function (i, k) { var v = Math.sin((i + 1) * 91.7 + k * 47.3 + num(data.seed, 3) * 13.1) * 43758.5453; return v - Math.floor(v); };
+    var mk = function (src, w, h) {
+      var d = document.createElement('div'); d.className = 'igr-node';
+      d.style.width = w + 'px'; d.style.height = h + 'px';
+      var im = document.createElement('img'); im.alt = ''; im.src = src; d.appendChild(im);
+      box.appendChild(d); return d;
+    };
+    var at = num(data.at, 0.2);
+    // Nodes first in the DOM so the centre sits on top of them.
+    var placed = nodes.map(function (src, i) {
+      var a = -Math.PI + (i + 0.5) / nodes.length * Math.PI * 2 + (hash(i, 1) - 0.5) * 0.35;
+      var r = 0.78 + hash(i, 2) * 0.35;
+      var asp = 0.9 + hash(i, 3) * 0.5;
+      var x = cx + Math.cos(a) * rx * r, y = cy + Math.sin(a) * ry * r * 1.9 - ry * 0.2;
+      var d = mk(typeof src === 'string' ? src : src.src, ns, ns * asp);
+      gsap.set(d, { xPercent: -50, yPercent: -50, x: cx, y: cy, scale: 0.5, autoAlpha: 0 });
+      var ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      ln.setAttribute('x1', cx); ln.setAttribute('y1', cy); ln.setAttribute('x2', x); ln.setAttribute('y2', y);
+      var len = Math.hypot(x - cx, y - cy);
+      ln.setAttribute('stroke-dasharray', len); ln.setAttribute('stroke-dashoffset', len);
+      svg.appendChild(ln);
+      return { el: d, x: x, y: y, ln: ln, i: i };
+    });
+    var center = mk(data.center, cs, cs * num(data.center_aspect, 1.12));
+    gsap.set(center, { xPercent: -50, yPercent: -50, x: cx, y: cy, scale: 0.6, autoAlpha: 0 });
+    tl.to(center, { scale: 1, autoAlpha: 1, duration: 0.55, ease: 'back.out(1.5)' }, at);
+
+    var nat = num(data.nodes_at, at + 0.6), step = num(data.stagger, 0.12);
+    placed.forEach(function (p) {
+      var t = nat + p.i * step;
+      tl.to(p.el, { x: p.x, y: p.y, scale: 1, autoAlpha: 1, duration: 0.7, ease: 'power3.out' }, t);
+      tl.to(p.ln, { attr: { 'stroke-dashoffset': 0 }, duration: 0.55, ease: 'power2.out' }, t + 0.1);
+    });
+    // Float: a slow drift on every node, the lines following their ends.
+    if (data.float !== false) {
+      var fdur = Math.max(1, ((ctx && ctx.duration) || 6) - nat - 0.8);
+      placed.forEach(function (p) {
+        var dy = (hash(p.i, 4) - 0.5) * H * 0.02;
+        var proxy = { k: 0 };
+        tl.to(proxy, { k: 1, duration: fdur, ease: 'sine.inOut', onUpdate: function () {
+          var y = p.y + dy * proxy.k;
+          gsap.set(p.el, { y: y }); p.ln.setAttribute('y2', y);
+        } }, nat + 0.8 + p.i * step);
+      });
+    }
+    return tl;
+  }
+</script>

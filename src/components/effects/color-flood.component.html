@@ -1,0 +1,82 @@
+<template>
+  <div class="cfl">
+    <div class="cfl-dot"></div>
+    <div class="cfl-text"><div class="cfl-label"></div><div class="cfl-sub"></div></div>
+  </div>
+</template>
+
+<style scoped>
+  /* COLOR FLOOD: a coloured dot drops into place and FLOODS the frame -- the
+     scene turns that colour and says so ("#BC361B / Search by color."),
+     then (optionally) pulls back into the dot and is gone. A beat change
+     made from an object on screen, not a cut. */
+  .cfl, .cfl * { max-width: none; }
+  .cfl { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .cfl-dot { position: absolute; left: 0; top: 0; border-radius: 50%; background: var(--cfl-c, #bc361b); will-change: transform; }
+  .cfl-text { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--cfl-ink, #fff); white-space: nowrap; }
+  .cfl-label { font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+  .cfl-sub { font-weight: 500; opacity: 0.92; margin-top: 0.5em; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.cfl'), dot = el.querySelector('.cfl-dot');
+    var text = el.querySelector('.cfl-text'), label = el.querySelector('.cfl-label'), sub = el.querySelector('.cfl-sub');
+    if (!root || !dot) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080;
+    var color = data.color || '#bc361b';
+    root.style.setProperty('--cfl-c', color);
+    // Ink that reads on the flood: white on a dark colour, near-black on a light one.
+    var ink = data.ink;
+    if (!ink) {
+      var m = String(color).match(/^#?([0-9a-f]{6})$/i);
+      if (m) { var v = parseInt(m[1], 16), r = v >> 16, g = (v >> 8) & 255, b = v & 255; ink = (0.299 * r + 0.587 * g + 0.114 * b) > 170 ? '#17171c' : '#ffffff'; }
+      else ink = '#ffffff';
+    }
+    root.style.setProperty('--cfl-ink', ink);
+
+    var ds = W * num(data.dot_size, 0.009);
+    var fx = W * num(data.from_x, num(data.x, 0.5)), fy = H * num(data.from_y, num(data.y, 0.5) - 0.06);
+    var tx = W * num(data.x, 0.5), ty = H * num(data.y, 0.5);
+    dot.style.width = ds + 'px'; dot.style.height = ds + 'px';
+    gsap.set(dot, { xPercent: -50, yPercent: -50, x: fx, y: fy, scale: 0, autoAlpha: 0 });
+
+    var at = num(data.at, 0.2);
+    // Drop: the dot appears where it starts and falls to its mark.
+    tl.to(dot, { scale: 1, autoAlpha: 1, duration: 0.2, ease: 'back.out(2)' }, at)
+      .to(dot, { x: tx, y: ty, duration: 0.45, ease: 'power2.in' }, at + 0.15)
+      .to(dot, { scaleY: 0.8, scaleX: 1.15, duration: 0.08, yoyo: true, repeat: 1 }, at + 0.6);
+    // Flood: from the mark to past every corner.
+    var fat = num(data.flood_at, at + 0.85);
+    var reach = Math.hypot(Math.max(tx, W - tx), Math.max(ty, H - ty)) * 2.1 / ds;
+    tl.to(dot, { scale: reach, duration: num(data.flood_duration, 0.6), ease: 'power3.in' }, fat);
+
+    var lab = String(data.label || '');
+    var fs = W * num(data.label_size, 0.075);
+    label.style.fontSize = fs + 'px'; sub.style.fontSize = (fs * 0.26) + 'px';
+    label.textContent = lab; sub.textContent = String(data.sublabel || '');
+    if (!data.sublabel) sub.style.display = 'none';
+    if (!lab) label.style.display = 'none';
+    gsap.set(text, { autoAlpha: 0 });
+    gsap.set([label, sub], { y: 18, filter: 'blur(8px)' });
+    var lat = num(data.label_at, fat + 0.45);
+    tl.set(text, { autoAlpha: 1 }, lat)
+      .to(label, { y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' }, lat)
+      .to(sub, { y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' }, lat + 0.25);
+    gsap.set(sub, { autoAlpha: 0 });
+    tl.to(sub, { autoAlpha: 1, duration: 0.4 }, lat + 0.25);
+
+    // Retract: the flood pulls back into the dot and the dot is gone.
+    if (data.retract_at !== undefined && data.retract_at !== null) {
+      var rat = num(data.retract_at, fat + 2);
+      tl.to(text, { autoAlpha: 0, duration: 0.25 }, rat)
+        .to(dot, { scale: 1, duration: 0.55, ease: 'power3.inOut' }, rat + 0.1)
+        .to(dot, { scale: 0, autoAlpha: 0, duration: 0.2, ease: 'power2.in' }, rat + 0.65);
+    }
+    return tl;
+  }
+</script>

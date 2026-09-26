@@ -1,0 +1,244 @@
+<template>
+  <div class="isw">
+    <div class="isw-stage"><div class="isw-group"><div class="isw-spin"></div></div></div>
+  </div>
+</template>
+
+<style scoped>
+  /* IMAGE SWARM: one set of images that changes FORMATION over time, in real
+     perspective -- a masonry wall that tilts and spirals into a point, a
+     scatter that pulls into a spinning sphere, a camera flying through a
+     field of images and landing on a clean grid, a ring orbiting a word.
+     The objects never cut: every formation is reached from the last one
+     (the Cosmos oner). Positions come from a seeded hash, so every render
+     is the same. */
+  .isw, .isw * { max-width: none; }
+  .isw { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .isw-stage { position: absolute; inset: 0; perspective: 1400px; perspective-origin: 50% 50%; }
+  .isw-group { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+  /* The spin layer sits INSIDE the group: a ring spins in its own plane,
+     then the group tilts it (rotateX(tilt) rotateY(spin), not the reverse). */
+  .isw-spin { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-style: preserve-3d; }
+  .isw-item { position: absolute; left: 0; top: 0; overflow: hidden; border-radius: 6px;
+    box-shadow: 0 10px 24px rgba(20, 16, 24, 0.16), 0 2px 6px rgba(20, 16, 24, 0.1);
+    background: #e9e6df; backface-visibility: hidden; will-change: transform, opacity; }
+  .isw-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.isw');
+    var group = el.querySelector('.isw-group');
+    var spinner = el.querySelector('.isw-spin');
+    if (!root || !group || !spinner) return tl;
+    var srcs = (Array.isArray(data.images) ? data.images : []).map(function (s) { return typeof s === 'string' ? s : (s && s.src); }).filter(Boolean);
+    if (!srcs.length) return tl;
+    var W = root.clientWidth || el.clientWidth || 1920;
+    var H = root.clientHeight || el.clientHeight || 1080;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var seed = num(data.seed, 11);
+    // Seeded hash: item i, channel k -> [0,1). Same swarm every render.
+    var rnd = function (i, k) { var x = Math.sin((i + 1) * 12.9898 + k * 78.233 + seed * 37.719) * 43758.5453; return x - Math.floor(x); };
+    var count = Math.max(1, Math.min(120, Math.round(num(data.count, srcs.length))));
+    var base = W * num(data.tile, 0.105);          // base tile width
+    var ASPECTS = [1.32, 1, 0.78, 1.18, 1.25, 0.86];
+
+    var items = [];
+    for (var i = 0; i < count; i++) {
+      var d = document.createElement('div');
+      d.className = 'isw-item';
+      var img = document.createElement('img');
+      img.alt = ''; img.src = srcs[i % srcs.length];
+      d.appendChild(img);
+      spinner.appendChild(d);
+      var asp = ASPECTS[Math.floor(rnd(i, 1) * ASPECTS.length)];
+      items.push({ el: d, i: i, asp: asp });
+    }
+    // Every item is placed by its CENTRE: xPercent/yPercent -50.
+    gsap.set(items.map(function (it) { return it.el; }), { xPercent: -50, yPercent: -50, transformPerspective: 0, force3D: true });
+
+    // ── Formation targets: per item {x, y, z, w, h, rx, ry, rz, o} ──
+    function wallTargets(f) {
+      var gap = W * num(f.gap, 0.008);
+      var tw = base * num(f.size, 1);
+      var cols = Math.max(2, Math.round(num(f.cols, (W * 1.04) / (tw + gap))));
+      var colH = []; for (var c = 0; c < cols; c++) colH.push(num(f.stagger_cols, 1) ? rnd(c, 9) * tw * 0.5 : 0);
+      var top = -H / 2 + H * num(f.top, 0.3);
+      var left = -((cols * tw + (cols - 1) * gap) / 2);
+      return items.map(function (it) {
+        var c = 0; for (var k = 1; k < cols; k++) if (colH[k] < colH[c]) c = k;
+        var h = tw * it.asp;
+        var y = top + colH[c] + h / 2;
+        colH[c] += h + gap;
+        return { x: left + c * (tw + gap) + tw / 2, y: y, z: 0, w: tw, h: h, rx: 0, ry: 0, rz: 0, o: 1 };
+      });
+    }
+    function clusterTargets(f, vanish) {
+      var cx = (num(f.x, 0.5) - 0.5) * W, cy = (num(f.y, 0.5) - 0.5) * H;
+      var r = W * num(f.spread, 0.07);
+      var tw = base * num(f.size, 0.34);
+      return items.map(function (it) {
+        var a = rnd(it.i, 2) * Math.PI * 2, rr = Math.sqrt(rnd(it.i, 3)) * r;
+        return { x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr * 0.8, z: (rnd(it.i, 4) - 0.5) * 60,
+          w: vanish ? tw * 0.08 : tw, h: (vanish ? tw * 0.08 : tw) * it.asp, rx: 0, ry: 0, rz: (rnd(it.i, 5) - 0.5) * 80, o: vanish ? 0 : 1 };
+      });
+    }
+    function scatterTargets(f) {
+      var tw = base * num(f.size, 0.8);
+      return items.map(function (it) {
+        return { x: (rnd(it.i, 6) - 0.5) * W * num(f.width, 1.25), y: (rnd(it.i, 7) - 0.5) * H * num(f.height, 1.3),
+          z: -900 + rnd(it.i, 8) * 1100, w: tw, h: tw * it.asp, rx: 0, ry: 0, rz: (rnd(it.i, 10) - 0.5) * 24, o: 1 };
+      });
+    }
+    function sphereTargets(f) {
+      var R = Math.min(W, H) * num(f.radius, 0.34);
+      var tw = base * num(f.size, 0.62);
+      var n = items.length, golden = Math.PI * (3 - Math.sqrt(5));
+      var cx = (num(f.x, 0.5) - 0.5) * W, cy = (num(f.y, 0.47) - 0.5) * H;
+      return items.map(function (it) {
+        var y = 1 - (2 * (it.i + 0.5)) / n, rr = Math.sqrt(1 - y * y), th = it.i * golden;
+        return { x: cx + Math.cos(th) * rr * R, y: cy + y * R, z: Math.sin(th) * rr * R, w: tw, h: tw * Math.min(it.asp, 1.1), rx: 0, rz: 0, o: 1, billboard: true };
+      });
+    }
+    function orbitTargets(f) {
+      var rx = W * num(f.radius, 0.32), rz = rx * num(f.depth, 0.85);
+      var tw = base * num(f.size, 0.62);
+      var n = items.length;
+      return items.map(function (it) {
+        var a = (it.i / n) * Math.PI * 2;
+        return { x: Math.cos(a) * rx, y: (rnd(it.i, 11) - 0.5) * H * num(f.wobble, 0.06), z: Math.sin(a) * rz, w: tw, h: tw * Math.min(it.asp, 1.1), rx: 0, rz: (rnd(it.i, 12) - 0.5) * 14, o: 1, billboard: true };
+      });
+    }
+    function gridTargets(f) {
+      var n = Math.max(1, Math.min(items.length, Math.round(num(f.count, 8))));
+      var cols = Math.max(1, Math.round(num(f.cols, Math.ceil(Math.sqrt(n * 2)))));
+      var rows = Math.ceil(n / cols);
+      var cw = W * num(f.cell, 0.1), ch = cw * num(f.aspect, 0.75), gap = W * num(f.gap, 0.007);
+      var cx = (num(f.x, 0.5) - 0.5) * W, cy = (num(f.y, 0.55) - 0.5) * H;
+      var gw = cols * cw + (cols - 1) * gap, gh = rows * ch + (rows - 1) * gap;
+      return items.map(function (it) {
+        if (it.i < n) {
+          var c = it.i % cols, r = Math.floor(it.i / cols);
+          return { x: cx - gw / 2 + c * (cw + gap) + cw / 2, y: cy - gh / 2 + r * (ch + gap) + ch / 2, z: 0, w: cw, h: ch, rx: 0, ry: 0, rz: 0, o: 1 };
+        }
+        // The rest leave: outward and away, fading (the field clears).
+        var a = rnd(it.i, 13) * Math.PI * 2;
+        return { x: Math.cos(a) * W * 0.9, y: Math.sin(a) * H * 0.9, z: 400, w: base * 0.5, h: base * 0.5 * it.asp, rx: 0, ry: 0, rz: 0, o: 0 };
+      });
+    }
+    function targetsFor(f) {
+      switch (String(f.shape || 'wall')) {
+        case 'cluster': return clusterTargets(f, false);
+        case 'point': return clusterTargets(f, true);
+        case 'scatter': return scatterTargets(f);
+        case 'sphere': return sphereTargets(f);
+        case 'orbit': return orbitTargets(f);
+        case 'grid': return gridTargets(f);
+        default: return wallTargets(f);
+      }
+    }
+    var props = function (t) {
+      var p = { x: t.x, y: t.y, z: t.z, width: t.w, height: t.h, rotationX: t.rx, rotationZ: t.rz, autoAlpha: t.o };
+      if (t.ry !== undefined) p.rotationY = t.ry;
+      return p;
+    };
+
+    var formations = (Array.isArray(data.formations) && data.formations.length ? data.formations : [{ shape: 'wall', at: 0 }])
+      .map(function (f, k) { return Object.assign({ at: k === 0 ? 0.2 : 1 + k * 1.5 }, f); })
+      .sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+
+    formations.forEach(function (f, k) {
+      var at = Math.max(0, num(f.at, 0));
+      var dur = Math.max(0.05, num(f.duration, k === 0 ? 0.9 : 1.1));
+      var ease = f.ease || (k === 0 ? 'power3.out' : 'power3.inOut');
+      var shape = String(f.shape || 'wall');
+      var spread = Math.max(0, num(f.stagger, k === 0 ? 0.5 : 0.25));
+
+      // Group moves (a tilt, a drift, a zoom) ride alongside.
+      var g = Object.assign({}, f.group || {});
+      // An orbit reads as a RING only seen from a little above.
+      if (shape === 'orbit' && g.rotateX === undefined && g.rotationX === undefined) g.rotateX = -50;
+      // Billboards: a sphere/orbit image cancels the group's tilt so it faces
+      // the camera (the spin is cancelled per frame below).
+      var tiltX = num(g.rotateX !== undefined ? g.rotateX : g.rotationX, 0);
+      var gp = {};
+      ['rotationX', 'rotationY', 'rotationZ', 'scale', 'x', 'y', 'z'].forEach(function (key) {
+        var short = { rotationX: 'rotateX', rotationY: 'rotateY', rotationZ: 'rotateZ' }[key];
+        var v = g[key] !== undefined ? g[key] : (short ? g[short] : undefined);
+        if (v !== undefined) gp[key] = (key === 'x') ? num(v, 0) * W : (key === 'y') ? num(v, 0) * H : num(v, 0);
+      });
+
+      if (shape === 'flythrough') {
+        // The camera flies through a field: every item streams toward the
+        // lens on its own depth, fading in far away and out as it passes.
+        var travel = num(f.travel, 3400), near = 700, far = -3200;
+        items.forEach(function (it) {
+          var a = rnd(it.i, 14) * Math.PI * 2;
+          var rr = (num(f.clear, 0.22) + rnd(it.i, 15) * 0.75) * Math.max(W, H) * 0.55;
+          // Spread along the whole tunnel: some already near (they pass the
+          // lens early), most arriving from far away across the scene.
+          var z0 = (near - 150) - rnd(it.i, 16) * ((near - 150) - (far - travel * 0.85));
+          var tw = base * num(f.size, 0.7);
+          var t0 = at;
+          tl.set(it.el, { x: Math.cos(a) * rr, y: Math.sin(a) * rr * 0.62, z: z0, width: tw, height: tw * Math.min(it.asp, 1.2), rotationX: 0, rotationY: 0, rotationZ: (rnd(it.i, 17) - 0.5) * 30, autoAlpha: 0 }, t0);
+          tl.to(it.el, { z: z0 + travel, duration: dur, ease: 'none' }, t0);
+          // Fade: visible once it is nearer than `far`, gone past `near`.
+          var tIn = Math.max(0, (far - z0) / travel) * dur, tOut = Math.max(0, (near - z0) / travel) * dur;
+          tl.to(it.el, { autoAlpha: 1, duration: 0.35, ease: 'power1.out' }, t0 + Math.min(tIn, dur - 0.1));
+          if (tOut < dur) tl.to(it.el, { autoAlpha: 0, duration: 0.25, ease: 'power1.in' }, t0 + tOut);
+        });
+        if (Object.keys(gp).length) tl.to(group, Object.assign({ duration: dur, ease: 'none' }, gp), at);
+        return;
+      }
+
+      var targets = targetsFor(f);
+      var order = String(f.order || (shape === 'cluster' || shape === 'point' ? 'distance' : 'index'));
+      var keyOf = function (it) {
+        if (order === 'random') return rnd(it.i, 18);
+        if (order === 'distance') { var t = targets[it.i]; return Math.hypot(t.x, t.y) / Math.hypot(W, H); }
+        return it.i / Math.max(1, items.length - 1);
+      };
+      var maxKey = Math.max.apply(null, items.map(keyOf)) || 1;
+
+      items.forEach(function (it) {
+        var t = targets[it.i];
+        if (t.billboard) t.rx = -tiltX;
+        var delay = (keyOf(it) / maxKey) * spread;
+        if (k === 0) {
+          // The first formation ENTERS: from below (a wall rising), from
+          // depth, or in place.
+          var from = String(f.from || (shape === 'wall' ? 'below' : 'fade'));
+          var start = props(t);
+          if (from === 'below') start.y = t.y + H * 0.9;
+          if (from === 'depth') { start.z = t.z - 1600; }
+          if (from === 'point') { start.x = 0; start.y = 0; start.width = t.w * 0.1; start.height = t.h * 0.1; }
+          start.autoAlpha = from === 'none' ? t.o : 0;
+          gsap.set(it.el, start);
+          tl.to(it.el, Object.assign(props(t), { duration: dur, ease: ease }), at + delay);
+        } else {
+          tl.to(it.el, Object.assign(props(t), { duration: dur, ease: ease }), at + delay);
+        }
+      });
+      if (Object.keys(gp).length) tl.to(group, Object.assign({ duration: num(g.duration, dur + spread), ease: g.ease || ease }, gp), at);
+
+      // Spin (sphere, orbit): the group turns while each image counter-turns
+      // so it keeps facing the camera.
+      var spin = num(f.spin, (shape === 'sphere' || shape === 'orbit') ? 80 : 0);
+      if (spin) {
+        var hold = Math.max(0.1, num(f.hold, 2.4));
+        var proxy = { a: 0 };
+        var els = items.map(function (it) { return it.el; });
+        tl.to(proxy, { a: spin, duration: dur + spread + hold, ease: 'none', onUpdate: function () {
+          gsap.set(spinner, { rotationY: proxy.a });
+          gsap.set(els, { rotationY: -proxy.a });
+        } }, at);
+      }
+    });
+
+    // Drift: a slow scroll of the whole field (the wall creeping up).
+    if (data.drift) tl.to(group, { y: '-=' + (num(data.drift, 0) * H), duration: (ctx && ctx.duration) || 5, ease: 'none' }, 0);
+    return tl;
+  }
+</script>

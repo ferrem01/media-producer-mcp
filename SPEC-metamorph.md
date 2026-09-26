@@ -228,6 +228,21 @@ extension to floating-pills.
 
 Frame: any. On 9x16 and 4x5 the typed line moves above the object.
 
+## Addendum 2026-09-26: object handoffs inside one component (Cosmos)
+
+The Cosmos promo (a 40s oner built in HyperFrames) hands off through objects
+at every beat. We built those handoffs as components that own both ends,
+not as the cross-scene `enter` source engine above, which stays parked:
+- `image-swarm` moves one set of images between formations: a wall spirals
+  into a point, a scatter pulls into a sphere, a flythrough lands on a grid.
+- `dot-logo` assembles a dot mark out of a point, then collapses it into one
+  dot that travels to a named spot.
+- `search-bar` grows from a dot at its own centre, so a `dot-logo` move and a
+  `search-bar from:'dot'` at the same point and time read as one object.
+- `color-flood` blooms a dot into the whole frame.
+A handoff across components means placing the two ends at the same frame
+point and time. That's authored, and the tests measure it.
+
 ## Phases and exit tests
 
 1. **Components (useful in every grammar now).**

@@ -6,6 +6,46 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The Cosmos pieces: swarm, dot handoffs, flood, filter grid
+
+Marc shared Zsolt Kacso's Cosmos promo (a 40s oner, HyperFrames + Opus 5.5)
+and asked for everything it showed that we lacked, then a recreation to test
+it. Built and measured in stills (`test/cosmos-pieces.test.ts`):
+- **`image-swarm`** (threed): one set of real images moving between
+  formations in CSS 3D:
+  - wall, which rises in and tilts back;
+  - cluster and point, the swirl-collapse;
+  - scatter;
+  - sphere and orbit, spun with each image counter-turned to face the camera;
+  - flythrough, a camera dolly through a depth tunnel;
+  - grid, a landing where the rest fly off.
+  Positions come from a seeded hash. Measured and fixed along the way:
+  - the flythrough started every image beyond the far plane, so nothing
+    reached the lens;
+  - the orbit read as noise until the spin layer was nested inside the tilt
+    (`rotateX(tilt) rotateY(spin)`, not the reverse).
+- **`dot-logo`** (titles): a dot ring assembles out of a point, types its
+  wordmark, collapses to one dot, and the dot travels. The travel is turned
+  into the ring's local frame; it had landed 115px off its mark.
+- **`search-bar`** (ui-mocks): grows from a dot at its own centre, cycles a
+  placeholder, types, takes a colour or image chip, bursts on submit, and
+  slides to the top. The caret blink and chips are timeline-driven and
+  scrub-safe. It's centred with GSAP percentages; a CSS translate was baked
+  into pixels at the first width, so the dot grew from the wrong place.
+- **`color-flood`** (effects): a dot drops and floods the frame with a
+  contrast-picked label, then retracts.
+- **`filter-grid`** (data-viz): a segmented control drives a grid:
+  - blur puts a pill over the flagged tiles;
+  - hide takes them out and FLIP-reflows the rest;
+  - keep-only sends the rest flying and frames the survivors.
+- **Small pieces**:
+  - `kinetic-text` gets `entrance:'focus'` (per-word blur to sharp, in place);
+  - `image-graph` (related images on drawn lines);
+  - `collect-board` (the count ticks as saved images land);
+  - `image-scan` (brackets, a Researching chip, images swapping).
+- All of them skip the tall-frame phone zoom, since each sizes itself;
+  `color-flood` is a non-surface overlay. SPEC-metamorph has an addendum.
+
 ## 2026-09-26 — The newest image model; cutouts without Veo; tilted stickers fit
 
 Marc: "are we using the latest OpenAI image model?" No: every image call was

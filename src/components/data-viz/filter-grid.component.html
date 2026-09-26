@@ -1,0 +1,156 @@
+<template>
+  <div class="fgr">
+    <div class="fgr-items"></div>
+    <div class="fgr-frame"></div>
+    <div class="fgr-ctl"><div class="fgr-title"></div><div class="fgr-sub"></div><div class="fgr-seg"><div class="fgr-thumb"></div></div></div>
+  </div>
+</template>
+
+<style scoped>
+  /* FILTER GRID: a control DRIVES a grid. A segmented control (Show / Blur /
+     Hide) flips and the matching tiles blur under a "Likely AI" pill, or
+     leave and the rest reflow into the gaps; a keep-only filter sends the
+     rest flying and snaps the survivors into a framed grid (search by
+     colour). The product's filter, shown doing its job. */
+  .fgr, .fgr * { max-width: none; }
+  .fgr { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .fgr-items { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  .fgr-item { position: absolute; left: 0; top: 0; border-radius: 6px; overflow: hidden; background: #e8e5de;
+    box-shadow: 0 6px 18px rgba(20, 16, 24, 0.12); will-change: transform, opacity; }
+  .fgr-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .fgr-pill { position: absolute; left: 50%; top: 50%; white-space: nowrap;
+    background: rgba(255, 255, 255, 0.92); color: #17171c; font-weight: 600; border-radius: 999px; padding: 0.35em 0.8em;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+  .fgr-frame { position: absolute; left: 0; top: 0; border: 2px solid var(--fgr-frame, #bc361b); border-radius: 12px; }
+  .fgr-ctl { position: absolute; left: 0; top: 0; background: #ffffff; border-radius: 12px; padding: 0.9em 1em 1em;
+    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.05), 0 10px 30px rgba(20, 20, 30, 0.1); color: #17171c; }
+  .fgr-title { font-weight: 600; }
+  .fgr-sub { color: #8f8f9f; font-size: 0.72em; margin-top: 0.25em; }
+  .fgr-seg { position: relative; display: flex; margin-top: 0.8em; background: #f1f1f3; border-radius: 999px; padding: 0.2em; }
+  .fgr-opt { position: relative; z-index: 1; flex: 1; text-align: center; font-size: 0.8em; padding: 0.45em 0; color: #55555f; }
+  .fgr-thumb { position: absolute; top: 0.2em; bottom: 0.2em; left: 0.2em; border-radius: 999px; background: #17171c; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.fgr'), box = el.querySelector('.fgr-items');
+    if (!root || !box) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080;
+    var list = (Array.isArray(data.items) ? data.items : []).map(function (it) { return typeof it === 'string' ? { src: it } : (it || {}); }).filter(function (it) { return it.src; });
+    if (!list.length) return tl;
+
+    // ── Layout: a grid centred at x/y; positions for any ordering ──
+    var cols = Math.max(1, Math.round(num(data.cols, 3)));
+    var cw = W * num(data.cell, 0.085), ch = cw * num(data.aspect, 1), gap = W * num(data.gap, 0.007);
+    var gx = W * num(data.x, 0.3), gy = H * num(data.y, 0.5);
+    var slot = function (k, n, c, cx, cy, w, h) {
+      var rows = Math.ceil(n / c), gw = c * w + (c - 1) * gap, gh = rows * h + (rows - 1) * gap;
+      return { x: cx - gw / 2 + (k % c) * (w + gap), y: cy - gh / 2 + Math.floor(k / c) * (h + gap), gw: gw, gh: gh, left: cx - gw / 2, top: cy - gh / 2 };
+    };
+    var fsPill = cw * 0.11;
+    var items = list.map(function (it, i) {
+      var d = document.createElement('div'); d.className = 'fgr-item';
+      d.style.width = cw + 'px'; d.style.height = ch + 'px';
+      var img = document.createElement('img'); img.alt = ''; img.src = it.src; d.appendChild(img);
+      var pill = null;
+      if (it.flag) { pill = document.createElement('div'); pill.className = 'fgr-pill'; pill.textContent = String(it.flag); pill.style.fontSize = fsPill + 'px'; d.appendChild(pill); gsap.set(pill, { xPercent: -50, yPercent: -50, autoAlpha: 0, scale: 0.8 }); }
+      box.appendChild(d);
+      var p = slot(i, list.length, cols, gx, gy, cw, ch);
+      gsap.set(d, { x: p.x, y: p.y, autoAlpha: 0, scale: 0.92 });
+      return { el: d, img: img, pill: pill, data: it, i: i, hidden: false };
+    });
+    var matches = function (it, m) {
+      if (!m || m === 'flagged') return !!it.data.flag;
+      if (m === 'all') return true;
+      return Array.isArray(it.data.tags) ? it.data.tags.indexOf(m) >= 0 : it.data.tag === m;
+    };
+    var at = num(data.at, 0.2);
+    items.forEach(function (it, i) { tl.to(it.el, { autoAlpha: 1, scale: 1, duration: 0.45, ease: 'power3.out' }, at + i * 0.04); });
+
+    // ── The control ──
+    var ctl = el.querySelector('.fgr-ctl');
+    var c = data.control;
+    var opts = [], thumb = el.querySelector('.fgr-thumb');
+    if (c && typeof c === 'object') {
+      var cfs = W * num(c.size, 0.0105);
+      ctl.style.fontSize = cfs + 'px';
+      ctl.style.width = (W * num(c.width, 0.145)) + 'px';
+      el.querySelector('.fgr-title').textContent = String(c.title || '');
+      el.querySelector('.fgr-sub').textContent = String(c.subtitle || '');
+      if (!c.subtitle) el.querySelector('.fgr-sub').style.display = 'none';
+      var seg = el.querySelector('.fgr-seg');
+      opts = (Array.isArray(c.options) ? c.options : ['Show', 'Blur', 'Hide']).map(function (o) { var s = document.createElement('div'); s.className = 'fgr-opt'; s.textContent = String(o); seg.appendChild(s); return s; });
+      gsap.set(ctl, { x: W * num(c.x, 0.64), y: H * num(c.y, 0.3), autoAlpha: 0 });
+      tl.fromTo(ctl, { autoAlpha: 0, y: H * num(c.y, 0.3) + 10 }, { autoAlpha: 1, y: H * num(c.y, 0.3), duration: 0.45, ease: 'power2.out', immediateRender: false }, num(c.at, at + 0.3));
+    } else ctl.style.display = 'none';
+    var selected = c ? Math.max(0, Math.min(opts.length - 1, num(c.selected, 0))) : 0;
+    var placeThumb = function (k, t, dur) {
+      if (!opts.length) return;
+      var segW = opts[0].parentNode.getBoundingClientRect().width || 1;
+      var ow = (segW - 2 * (parseFloat(getComputedStyle(opts[0].parentNode).paddingLeft) || 0)) / opts.length;
+      var props = { width: ow, x: k * ow, duration: dur || 0, ease: 'power3.inOut' };
+      if (t === null) gsap.set(thumb, props);
+      else tl.to(thumb, props, t);
+      opts.forEach(function (o, j) {
+        var col = j === k ? '#ffffff' : '#55555f';
+        if (t === null) o.style.color = col; else tl.to(o, { color: col, duration: dur || 0.2 }, t);
+      });
+    };
+    placeThumb(selected, null, 0);
+
+    // ── Steps: each flips the control and does its job ──
+    var frame = el.querySelector('.fgr-frame');
+    gsap.set(frame, { autoAlpha: 0 });
+    var visible = items.slice();
+    var steps = (Array.isArray(data.steps) ? data.steps : []).slice().sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+    steps.forEach(function (st) {
+      var sat = num(st.at, 1);
+      if (st.option !== undefined && opts.length) {
+        var k = typeof st.option === 'number' ? st.option : opts.map(function (o) { return o.textContent; }).indexOf(String(st.option));
+        if (k >= 0) placeThumb(k, sat, 0.35);
+      }
+      var action = String(st.action || (typeof st.option === 'string' ? st.option.toLowerCase() : ''));
+      var hit = items.filter(function (it) { return matches(it, st.match); });
+      var t = sat + 0.15;
+      if (action === 'blur') {
+        hit.forEach(function (it) {
+          tl.to(it.img, { filter: 'blur(' + num(st.blur, 10) + 'px)', scale: 1.08, duration: 0.45, ease: 'power2.out' }, t);
+          if (it.pill) tl.to(it.pill, { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2)' }, t + 0.2);
+        });
+      } else if (action === 'hide' || action === 'show' || action === 'keep') {
+        // Who stays, and where: the survivors reflow in reading order.
+        var keep = action === 'show' ? items.slice() : items.filter(function (it) { return action === 'keep' ? matches(it, st.match) : !matches(it, st.match); });
+        var gone = items.filter(function (it) { return keep.indexOf(it) < 0; });
+        var kc = action === 'keep' ? Math.max(1, Math.round(num(st.cols, 4))) : cols;
+        var kw = action === 'keep' ? W * num(st.cell, 0.085) : cw, kh = action === 'keep' ? kw * num(st.aspect, 1) : ch;
+        var kx = action === 'keep' ? W * num(st.x, 0.5) : gx, ky = action === 'keep' ? H * num(st.y, 0.5) : gy;
+        gone.forEach(function (it, j) {
+          if (action === 'keep') {
+            // Fly off, outward (the field clears around the survivors).
+            var a = ((it.i * 137.5) % 360) * Math.PI / 180;
+            tl.to(it.el, { x: '+=' + Math.cos(a) * W * 0.7, y: '+=' + Math.sin(a) * H * 0.7, rotation: (j % 2 ? 1 : -1) * 20, autoAlpha: 0, duration: 0.7, ease: 'power3.in' }, t + (j % 6) * 0.03);
+          } else {
+            tl.to(it.el, { scale: 0.6, autoAlpha: 0, duration: 0.35, ease: 'power2.in' }, t);
+          }
+        });
+        keep.forEach(function (it, k) {
+          var p = slot(k, keep.length, kc, kx, ky, kw, kh);
+          var props = { x: p.x, y: p.y, width: kw, height: kh, scale: 1, rotation: 0, autoAlpha: 1, duration: 0.55, ease: 'power3.inOut' };
+          tl.to(it.el, props, t + (action === 'keep' ? 0.35 : 0.2) + k * 0.02);
+          if (action === 'show') { tl.to(it.img, { filter: 'blur(0px)', scale: 1, duration: 0.4 }, t); if (it.pill) tl.to(it.pill, { autoAlpha: 0, duration: 0.2 }, t); }
+        });
+        if (action === 'keep' && st.frame !== false && keep.length) {
+          var p0 = slot(0, keep.length, kc, kx, ky, kw, kh), pad = kw * 0.07;
+          root.style.setProperty('--fgr-frame', st.frame_color || data.frame_color || '#bc361b');
+          gsap.set(frame, { x: p0.left - pad, y: p0.top - pad, width: p0.gw + pad * 2, height: p0.gh + pad * 2 });
+          tl.fromTo(frame, { autoAlpha: 0, scale: 1.04 }, { autoAlpha: 1, scale: 1, duration: 0.4, ease: 'power2.out', immediateRender: false }, t + 0.95);
+        }
+      }
+    });
+    return tl;
+  }
+</script>

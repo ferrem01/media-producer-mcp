@@ -1,0 +1,18 @@
+{
+  "type": "collect-board",
+  "label": "Collect board (saved things pile in)",
+  "category": "ui-mocks",
+  "description": "A board / collection card that FILLS as things are saved into it: each image flies in from off the card, lands in the next slot, and the count in the corner ticks up ('future home  47 -> 59 elements'). Saving, shown as the thing piling up -- pair it with a line that changes per source ('from the web', 'from your camera roll'). The card fills the component's box. Example: {\"title\":\"future home\",\"count_from\":47,\"items\":[...12 urls],\"cols\":4,\"every\":0.3}.",
+  "data": {
+    "title": { "type": "string", "label": "Board name (top-left)", "optional": true },
+    "count_from": { "type": "number", "label": "The count before anything lands (default 0)", "optional": true },
+    "unit": { "type": "string", "label": "Word after the count (default 'elements')", "optional": true },
+    "items": { "type": "array", "label": "Image URLs, in landing order", "required": true },
+    "cols": { "type": "number", "label": "Grid columns (default 4)", "optional": true },
+    "aspect": { "type": "number", "label": "Tile height / width (default 0.82)", "optional": true },
+    "at": { "type": "number", "label": "When the card appears (s, default 0.3)", "optional": true },
+    "first_at": { "type": "number", "label": "When the first image lands (default at + 0.5)", "optional": true },
+    "every": { "type": "number", "label": "Seconds between landings (default 0.3)", "optional": true },
+    "text_size": { "type": "number", "label": "Header size as a fraction of the card width (default 0.034)", "optional": true }
+  }
+}

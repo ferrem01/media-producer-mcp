@@ -2,7 +2,7 @@
   "type": "kinetic-text",
   "label": "Kinetic Text",
   "category": "titles",
-  "description": "Editorial text line with the two sanctioned entrances. Default: house line-rise (whole line rises ~10px, fades in ~300ms). entrance:'type-on': words appear in place in reading order on a beat interval and the centered line reflows as it grows (tempo-cut build-up). No per-word effects in either mode. Emphasis via *stars* = brand-color accent, color only.",
+  "description": "Editorial text line with its sanctioned entrances (line-rise, type-on, assemble, focus). Default: house line-rise (whole line rises ~10px, fades in ~300ms). entrance:'type-on': words appear in place in reading order on a beat interval and the centered line reflows as it grows (tempo-cut build-up). No per-word effects in either mode. Emphasis via *stars* = brand-color accent, color only.",
   "data": {
     "text": {
       "type": "string",
@@ -16,7 +16,7 @@
     },
     "entrance": {
       "type": "string",
-      "label": "line-rise (default) | type-on (words appear in place on a beat) | assemble (words fly up from below into the laid-out line; *starred* word lands with a scale pop -- the print-film gathering beat)",
+      "label": "line-rise (default) | type-on (words appear in place on a beat) | assemble (words fly up from below into the laid-out line; *starred* word lands with a scale pop -- the print-film gathering beat) | focus (each word comes into focus in place on its beat -- blur to sharp; at / word_interval / word_times time it)",
       "optional": true
     },
     "at": {
