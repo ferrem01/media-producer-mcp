@@ -11,6 +11,13 @@
  * from the kept original, so the dial goes down as well as up. The blurred
  * and alpha copies are made FROM the graded take, so a grade drops them and
  * queues the matte again -- the matte always runs after the grade.
+ *
+ * THE STUDIO CORRECTION (core/take-studio.ts) rides in the same encode,
+ * ahead of the look: every booth take is queued here on arrival, soft or
+ * natural, so it lands corrected. A re-grade keeps the take's setting
+ * (`take.correct`, on unless set false) unless the job says otherwise, and
+ * reuses the stats measured the first time (`take.grade.measured`: the
+ * kept original never changes).
  */
 
 import path from "node:path";
@@ -26,6 +33,9 @@ export interface TakeGradeJob {
   rawUrl: string;
   look: TakeLook;
   strength?: number;
+  /** The studio correction: true/false sets it; absent keeps the take's
+   *  own setting (on unless `take.correct === false`). */
+  correct?: boolean;
   /** The background blur's strength, for the matte the grade queues. */
   matteStrength?: number;
   dataDir: string;
@@ -54,7 +64,11 @@ export function queueTakeGrade(job: TakeGradeJob): void {
       const before = await job.loadProject(job.tenantId, job.projectId);
       const owner = (before?.takes || []).find((t: any) => takeCopies(t).raw === job.rawUrl);
       const currentLook: TakeLook = owner?.look === "soft" && !owner?.ungraded ? "soft" : "natural";
-      const g = await gradeTake(job.resolvePath(job.rawUrl), { look: job.look, strength: job.strength, currentLook });
+      const correct = job.correct ?? (owner?.correct !== false);
+      const g = await gradeTake(job.resolvePath(job.rawUrl), {
+        look: job.look, strength: job.strength, currentLook, correct,
+        stats: owner?.grade?.measured, face: owner?.face,
+      });
       const project = await job.loadProject(job.tenantId, job.projectId);
       if (!project) return;
       const ungradedUrl = job.rawUrl.replace(/[^/]+$/, path.basename(g.ungraded));
@@ -68,6 +82,15 @@ export function queueTakeGrade(job: TakeGradeJob): void {
         t.ungraded = ungradedUrl;
         if (g.baseSoft) t.ungraded_soft = true;
         t.graded_at = stamp;
+        if (g.correct) delete t.correct; else t.correct = false;
+        // What the correction measured (kept either way: a later "on" reuses
+        // it) and what it applied.
+        const measured = g.studio?.measured || t.grade?.measured;
+        if (g.studio) {
+          const { notes, ...applied } = g.studio.applied;
+          t.grade = { measured, ...applied, notes };
+        } else if (measured) t.grade = { measured, off: true };
+        else delete t.grade;
         // The copies were cut from the old grade: drop them; the matte
         // makes them again from this one.
         if (t.blur) { delete t.blur; }
@@ -83,7 +106,8 @@ export function queueTakeGrade(job: TakeGradeJob): void {
       }
       project.updated_at = stamp;
       await job.saveProject(project);
-      console.log(`  take grade: ${path.basename(job.rawUrl)} -> ${g.look}${g.look === "soft" ? ` ${g.strength}` : ""}${g.baseSoft ? " (over the old base)" : ""} in ${Math.round(g.ms / 1000)}s; ${owned} take(s)`);
+      const studioNote = g.studio ? `, studio ${g.studio.applied.filter === "null" ? "clean (nothing to correct)" : `wb ${g.studio.applied.wb.join("/")} skin ${g.studio.applied.skin} ev ${g.studio.applied.ev} curve ${g.studio.applied.contrast}`}` : g.correct ? ", studio skipped" : ", studio off";
+      console.log(`  take grade: ${path.basename(job.rawUrl)} -> ${g.look}${g.look === "soft" ? ` ${g.strength}` : ""}${g.baseSoft ? " (over the old base)" : ""}${studioNote} in ${Math.round(g.ms / 1000)}s; ${owned} take(s)`);
       if (rematte.blur || rematte.alpha) {
         queueTakeMatte({
           tenantId: job.tenantId, projectId: job.projectId, rawUrl: job.rawUrl, dataDir: job.dataDir, strength: job.matteStrength,
