@@ -406,7 +406,7 @@ var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 // plated caption that fits its lane, the stage overlay) and must NOT be
 // zoomed on top of that. Everything else gets the phone zoom on a tall
 // speaker frame: a mock, a stamp, a pill set, a composer, a stat.
-var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "chapter-kicker", "logo-band", "tool-storm", "time-card", "checklist-toggles", "card-fan", "video", "image"];
+var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "chapter-kicker", "logo-band", "sticker-rain", "tool-storm", "time-card", "checklist-toggles", "card-fan", "video", "image"];
 function phoneZoomable(type: string): boolean {
   return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
 }

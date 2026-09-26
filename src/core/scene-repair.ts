@@ -73,7 +73,7 @@ const BACKDROP_RE = /^(bg$|backdrop|mesh-gradient|webgl-backdrop|liquid-backgrou
 /** Decoration, not subject. Enlarging a sticker does not fill a dead frame --
  *  measured on proj_0a31e568, where the loop grew a sticker-prop 36% -> 60%
  *  while the actual subject stayed small. */
-const PROP_RE = /^(sticker-prop|floating-pills|shimmer-sweep|magnetic|portal|confetti|accent-)/;
+const PROP_RE = /^(sticker-prop|sticker-rain|floating-pills|shimmer-sweep|magnetic|portal|confetti|accent-)/;
 
 function pctNum(v: unknown): number | null {
   if (typeof v === "number") return v;

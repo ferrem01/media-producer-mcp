@@ -6,6 +6,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ensureStickerFiles, ensureStickerLibrary, mintSticker } from "./core/sticker-library.js";
 import { extractBriefLocks, briefLockBlock, previousBoardBlock } from "./llm/brief-locks.js";
 import { z } from "zod";
 
@@ -1191,6 +1192,10 @@ export function createMcpServer(): McpServer {
         );
         if (!project) return err("Project or scene not found");
         await landAnchorsOnWords(project, params.scene_id);
+        // A sticker named from the house library: a name it lacks is drawn
+        // now, in the house style, so the preview finds it.
+        const stk = await ensureStickerFiles(config.dataDir, [params.component as any]).catch((e: any) => ({ minted: [], failed: [{ name: "?", error: String(e?.message || e) }] }));
+        if (stk.minted.length || stk.failed.length) return ok({ ...withStudio(project), stickers: stk });
         return ok(withStudio(project));
       }
 
@@ -1687,6 +1692,10 @@ export function createMcpServer(): McpServer {
           if (params.anchors !== undefined) {
             (comp as any).anchors = { ...((comp as any).anchors || {}), ...params.anchors };
             updated = true;
+          }
+          if (params.data !== undefined) {
+            const stk = await ensureStickerFiles(config.dataDir, [comp as any]).catch(() => null);
+            if (stk?.failed.length) pipWarning = [pipWarning, `Sticker not drawn: ${stk.failed.map((f) => `${f.name} (${f.error})`).join("; ")}`].filter(Boolean).join(" ");
           }
         }
 
@@ -2375,6 +2384,34 @@ export function createMcpServer(): McpServer {
   // ─────────────────────────────────────────────
   // upload - Upload an asset to a project
   // ─────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────
+  // sticker - the house sticker library
+  // ─────────────────────────────────────────────
+  tool(
+    "sticker",
+    "The HOUSE STICKER LIBRARY (shared by every tenant): die-cut stickers in one house style -- a stack of cash on 'money', a chimp on 'MailChimp' (never a brand's logo), a rocket on 'launch'. action='list' returns every sticker by name with its tags. action='make' draws a new one in the house style from a name and a subject (what to draw) and adds it to the library (~15 s). Use a sticker by NAME on a component: sticker-prop {kind:'image', sticker:'money-stack'} for one sticker popping in, sticker-rain {sticker:'dollar-bill'} for a shower. A name the library lacks is also drawn automatically the first time a component uses it.",
+    {
+      tenant_id: z.string().optional(),
+      action: z.enum(["list", "make"]).describe("list: the library. make: draw a new sticker."),
+      name: z.string().optional().describe("make: the sticker's name (e.g. 'taco'); becomes its address"),
+      subject: z.string().optional().describe("make: what to draw, plainly (e.g. 'a cartoon taco with a happy face'). No logos or text -- the house style forbids them."),
+      query: z.string().optional().describe("list: filter by a word (matches names and tags)"),
+    },
+    async (params) => {
+      if (params.action === "make") {
+        if (!params.name) return err("make needs a name");
+        try {
+          const entry = await mintSticker(config.dataDir, params.name, params.subject);
+          return ok({ sticker: entry, use: { type: "sticker-prop", data: { kind: "image", sticker: entry.name } } });
+        } catch (e: any) { return err(`Could not draw the sticker: ${e?.message || e}`); }
+      }
+      const lib = await ensureStickerLibrary(config.dataDir);
+      const q = String(params.query || "").toLowerCase().trim();
+      const rows = lib.filter((e) => !q || e.name.includes(q) || e.tags.some((t) => t.includes(q)));
+      return ok({ count: rows.length, stickers: rows.map((e) => ({ name: e.name, tags: e.tags, url: e.url, source: e.source })) });
+    },
+  );
 
   tool(
     "generate_clip",
