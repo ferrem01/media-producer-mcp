@@ -2566,6 +2566,15 @@ async function runUnifiedPipeline(
     creativity = 0.15;
     console.log("  Editorial grammar: creativity clamped to 0.15 (template/component-first assembly)");
   }
+  // Relay is component-first: its handoffs are DATA between library pieces
+  // (a swarm's point formation at the logo's x/y, the logo's move ending
+  // where the search bar grows from its dot, a flood starting at the chip)
+  // -- codegen cannot know those coordinates and would cut instead.
+  if (filmGrammar === "relay" && opts.creativity === undefined) {
+    opts.creativity = 0.15;
+    creativity = 0.15;
+    console.log("  Relay grammar: creativity clamped to 0.15 (component-first: handoffs are data between library pieces)");
+  }
   // Data-story lives or dies on the data kit performing real figures --
   // freeform codegen is where invented statistics and pre-drawn charts
   // sneak in.
@@ -2595,7 +2604,7 @@ async function runUnifiedPipeline(
   // defaults ON for tempo-cut; an explicit false still wins.
   const wantsMusic = opts.backgroundMusic !== undefined
     ? opts.backgroundMusic
-    : filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour";
+    : filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour" || filmGrammar === "relay";
   if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }
@@ -2788,7 +2797,9 @@ async function runUnifiedPipeline(
   // rule in its block). The lines then also feed TTS, as on a spoken film.
   const recipeVoice = recipeWantsVoice(recipeObj);
   if (recipeVoice && opts.voiceover === undefined) opts.voiceover = true;
-  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour") && !opts.voiceover && !recipeVoice;
+  let textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "data-story" || filmGrammar === "canvas-tour") && !opts.voiceover && !recipeVoice;
+  // relay: the type comes into focus as the voice, same as the tempo family.
+  if (filmGrammar === "relay" && !opts.voiceover && !recipeVoice) textIsVoiceover = true;
   if (textIsVoiceover) {
     for (const d of storyboard.scenes as any[]) {
       if (d.voiceover_text) d.voiceover_text = undefined;
@@ -4335,6 +4346,15 @@ async function runUnifiedPipeline(
       const t = boardTransition(s);
       if (t && project.scenes[i]) (project.scenes[i] as any).transition_in = t;
     });
+  }
+  // RELAY (SPEC-relay.md): the objects are the transitions, so every cut is
+  // hard, and a punctuation beat (<= 1.5 s: "Saved." / "No ads.") lands on
+  // STANDING type -- an entrance playing inside half a second never finishes.
+  if (filmGrammar === "relay") {
+    for (const sc of project.scenes as any[]) {
+      sc.transition_in = { type: "none", duration_seconds: 0 };
+      if ((Number(sc.duration_seconds) || 0) <= 1.5 && sc.entrance === undefined) sc.entrance = "settled";
+    }
   }
   // The person's own tracks ride through (see keptAudioTracks).
   if (opts.keptAudioTracks?.length) {

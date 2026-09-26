@@ -6,6 +6,37 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — The relay grammar; the Cosmos rebuild as one oner
+
+Marc watched the first rebuild and was right: "everything's sort of just
+their own little separate scenes. And then it just transitions to a new
+scene." The object handoffs happened only inside scene B, and every
+boundary after it was a hard cut that reset the bar, the images and the
+dot. Stills matched frame for frame, but a still can't show a cut.
+
+The rebuild now runs 1.5-19.5 s as ONE 18 s scene. Scenes b, c, d and e
+merged, and c, d and e were deleted with his OK. The search bar is one
+component for the whole shot: it grows from the logo's dot, types, submits,
+rises to the top at 85% and holds while the fly-through lands as the
+results grid. Its colour chip drops the dot that floods the frame, and it
+re-queries as the image search. The close merged too (l and m): the sphere
+collapses to a point, the logo assembles out of it, and the logo's dot
+becomes the button. The project is now 13 scenes, still 39.5 s, and the
+server layout confirms the bar at the top from 9 s to 17.5 s. PR #998 added
+what this needed: search-bar `grow` and `to_y` `scale`, and cta-card
+`actions_at`.
+
+Marc then named the pattern: a through-line cut, "each object from the
+previous scene is the start of the next, or a single component like the
+search box creates a throughline". It is now a grammar, `relay`
+(SPEC-relay.md). It has two moves, the handoff and the through-line. A film
+is 1-3 oners with hard-cut type punctuation between them. The handoffs are
+coordinates between library pieces, so the grammar is component-first
+(creativity 0.15). Every cut is hard, and beats of 1.5 s or less land
+`settled`. The first build of it taught one law, written into the contract:
+a through-line that travels needs a box spanning its whole path. The
+component wrapper clips, and the bar vanished the moment it rose.
+
 ## 2026-09-26 — The Cosmos recreation: the input test
 
 Marc: "see if you recreate the Cosmos video. That input test that we achieved

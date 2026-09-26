@@ -23,7 +23,7 @@ const read = () => fs.readFile(path.resolve(__dirname, "../src/llm/storyboard-bu
 // must live in the UNIVERSAL block, never be inherited by accident from a
 // dialect that happens to be loaded.
 
-const GRAMMARS = ["tempo-cut","hype-cut","editorial","data-story","canvas-tour","screencast","speaker","creator-cut"];
+const GRAMMARS = ["tempo-cut","hype-cut","editorial","data-story","canvas-tour","relay","screencast","speaker","creator-cut"];
 
 /** Split the prompt into the universal preamble and each gated section. */
 async function sections(): Promise<{ universal: string; byGrammar: Record<string,string> }> {

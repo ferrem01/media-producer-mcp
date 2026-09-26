@@ -1,6 +1,9 @@
 # SPEC: metamorph — a oner carried by objects, not the camera
 
 Status: PHASE 1 SHIPPED (#973: grid-cull, review-deck, verdict-scorecard);
+THE GRAMMAR SHIPPED 2026-09-26 as `relay` (SPEC-relay.md; Marc: "Yes on
+grammar") -- handoffs as coordinates between library pieces inside one
+scene, no morph runtime. The morph runtime and rack focus below stay parked.
 PHASES 2–3 BACKLOG -- parked by Marc 2026-09-25. Do not start the morph
 runtime, rack focus or the grammar without his go-ahead. Settled in review
 (keep when it resumes): a morph is an ENTRANCE EFFECT with a source (`enter`

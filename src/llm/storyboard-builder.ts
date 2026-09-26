@@ -409,6 +409,7 @@ const GRAMMAR_SCENE_BAND: Record<string, { min: number; max: number }> = {
   "editorial": { min: 6, max: 10 },
   "data-story": { min: 5, max: 8 },
   "canvas-tour": { min: 5, max: 9 },
+  "relay": { min: 5, max: 14 },
 };
 
 /** THE RECIPE'S VOICE WINS OVER THE GRAMMAR'S: a recipe measured from a
@@ -559,7 +560,7 @@ A frame is a size and nothing else: it decides how things are STAGED, never what
 - READING AT FEED SPEED: max ~8 words on screen at once; the viewer may have the sound off.
 
 ` : ""}### WHAT A FILM GRAMMAR IS (and is not)
-A film grammar is the answer to ONE question -- WHAT CARRIES THE ARGUMENT -- plus the editing logic that follows from that answer. The product (tempo-cut), the story (hype-cut), the words (editorial), the numbers (data-story), one surface (canvas-tour), the screen (screencast), a person (speaker). Where the film SHIPS is not a grammar -- that is the FRAME, above. Everything a grammar states is downstream of its protagonist, and only four things are:
+A film grammar is the answer to ONE question -- WHAT CARRIES THE ARGUMENT -- plus the editing logic that follows from that answer. The product (tempo-cut), the story (hype-cut), the words (editorial), the numbers (data-story), one surface (canvas-tour), objects handing the story on (relay), the screen (screencast), a person (speaker). Where the film SHIPS is not a grammar -- that is the FRAME, above. Everything a grammar states is downstream of its protagonist, and only four things are:
   1. WHAT CARRIES IT -- the protagonist, named.
   2. THE CUT LOGIC -- what causes each boundary (a downbeat, a click, a sentence ending, a camera arriving).
   3. THE BEAT STRUCTURE -- scene count, duration band, order, escalation.
@@ -637,6 +638,17 @@ The continuous-surface dialect: ONE unbroken shot across a single surface, no cu
 - NO VOICEOVER: voiceover_text stays empty -- the performed type IS the voice.
 - OBJECTS, NOT STRINGS: every components[] entry is an OBJECT with type + data. The surface component (paper-ground or the world backdrop) is the first entry of every scene.
 - THE SURFACE IS NOT THE SCENE: every PLACE carries a thing. A scene whose components are only the world's backdrop is a dead frame -- 6s of empty surface -- and describing what happens there in visual_notes does not put it on the surface. Cast the actual components from THE WORLD's materials (named in the world block above; the world decides what can credibly sit on it, this grammar decides where the camera goes and in what order).
+` : ""}
+${__g("relay") ? `### RELAY FILMS (${opts.filmGrammar === "relay" ? "ACTIVE for this film" : 'when the director\'s treatment names "relay"'})
+The through-line dialect (SPEC-relay.md; reference: the Cosmos promo rebuilt as proj_9c829aa3): every beat is CARRIED BY AN OBJECT, never by a cut. Obey this contract exactly:
+- THE SHAPE: 5-14 scenes. 1-3 are ONERS -- long scenes (10-20s) holding 4-8 beats each with NO cut inside -- and the rest are PUNCTUATION: hard-cut type beats of 0.5-3s between them (a flash triplet "Saved." / "Screenshotted." / "Forgotten." over three images, a negation triplet "No ads." / "No likes." / "No performing." alternating dark/light grounds, a stat card, "Just taste." inside an orbit of images). A punctuation card (<= 1.5s) lands on standing type -- the build pre-rolls its entrance -- so write it as the finished word, not a reveal. Every transition_in is {"type":"none"}.
+- A ONER IS ONE SCENE, NOT A SEQUENCE: its beats are components ARRIVING and LEAVING on times inside the scene -- "enter": {"effect":"fade","at":7.4} and "exit": {"effect":"fade","at":12.05} on the component, or a component's own timeline (data.at, data.steps[].at, formation at, exit_at). Never split a oner into scenes to change what is on screen: a scene boundary resets every component and the object you were carrying vanishes -- the exact failure this grammar exists to fix (measured on the first rebuild: seventeen scenes read as "their own little separate scenes").
+- THE THROUGH-LINE: each oner names ONE object that stays in frame across its beats while they change around it -- a search bar that types, rises to the top and holds while results arrive, filter and re-query (search-bar steps: type / submit / to_y+scale / clear / chip / type again), a cursor, a phone, a card. It is ONE component instance for the whole oner; its box spans the whole path it travels (a component's wrapper clips: a bar that rises from mid-frame to the top needs a box from y 0% to past its start, e.g. y:"0%", height:"111%").
+- THE HANDOFF: every beat inside a oner STARTS FROM an object of the beat before, and the pair is written AS DATA with matching coordinates -- never only in visual_notes. The kit's handoffs: image-swarm {"shape":"point","x":0.5,"y":0.42} -> dot-logo at the same x/y with "at" = the point's end; dot-logo "move" {x,y,at,duration} -> search-bar "from":"dot" whose box centres on that x/y and whose "at" = move.at + move.duration; a search chip -> color-flood "from_x"/"from_y" = the chip's place; color-flood "retract_at" -> the next grid's "at"; image-swarm "flythrough" -> "grid" formation (the field lands as the results); filter-grid "keep" -> the framed set; dot-logo move -> cta-card "actions_at" (the dot becomes the button). If the next beat cannot start from something on screen, the oner ends there and a punctuation cut follows.
+- TYPE IS THE VOICE, COMING INTO FOCUS: no narrator, voiceover_text stays empty. Lines arrive word by word with the type's focus entrance (entrance:"focus", at + word_interval) and leave with exit_at before the next beat claims the frame; one short line per beat (3-6 words). A punctuation card is one to three words at display size.
+- THE GROUND NEVER CHANGES INSIDE A ONER: one flat light ground (e.g. #f4f3ef) under every oner; only a color-flood may turn the frame a colour, and it pulls back. Punctuation cards may flip dark/light -- that flip is their rhythm.
+- REFUSALS: no crossfades or wipes anywhere (the objects are the transitions); no scene inside a oner-length beat run; no codegen scenes (the handoffs are coordinates between library pieces, which a freeform scene cannot know); no second through-line competing in the same oner.
+- OBJECTS, NOT STRINGS: every components[] entry is an OBJECT with type + data, with explicit positions and z_index for everything in a oner (the through-line sits above the rest).
 ` : ""}
 ${__g("screencast") ? `### SCREENCAST FILMS (${opts.filmGrammar === "screencast" ? "ACTIVE for this film" : "when a screen recording drives the film"})
 The screen carries the argument; a narrator drives the clock -- on camera in a corner bubble, or voice-only. The contract:

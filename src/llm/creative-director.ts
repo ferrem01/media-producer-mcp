@@ -34,14 +34,14 @@ import {
  *  cross-cutting -- who narrates, what earns a cut, the music's role, the
  *  camera policy, and how scenes are assembled. Components (L1), scene
  *  templates (L2) and scenes/beats (L3) all live INSIDE one of these. */
-export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "editorial" | "data-story" | "canvas-tour" | "screencast" | "speaker" | "creator-cut";
+export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "editorial" | "data-story" | "canvas-tour" | "relay" | "screencast" | "speaker" | "creator-cut";
 
 /** Every value answers ONE question -- what carries the argument: the brand
  *  moment, the product, the story, the words, the numbers, one surface, the
  *  screen, a person, a person WITH the screen answering them. Where a film
  *  SHIPS is not on this list; that is the FRAME axis (core/types.ts,
  *  SPEC-format-and-spine.md). */
-export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "screencast", "speaker", "creator-cut"];
+export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"];
 
 /** ── The LOOK axis (visual_system) and SOUND axis (audio_system) ──
  * The film-craft triad on the generate surface: film_grammar = the RHYTHM,
@@ -190,6 +190,7 @@ Every film commits to exactly ONE grammar. It is not a mood -- it is the contrac
 - "data-story": the numbers-as-protagonist dialect. The film IS a sequence of data beats: each one stages ONE number or chart as the hero of its scene (a counter counting up live, a bar chart racing, a line drawing its climb, a progress bar filling) with a short claim in type that the number then PROVES. Claim -> proof, claim -> proof, numbers escalating toward the biggest figure, which is the payoff -- the money number lands last and largest. Every figure must come from the brief (never invent statistics); every chart DRAWS on screen, never appears pre-drawn. A dashboard recap is earned only as the finale. For metrics announcements, quarterly recaps, benchmark results, growth stories, ROI cases -- anywhere the argument is quantitative. sceneCount: 5-8 (each data beat is its own scene; setup claims may share the data beat's scene as a leading beat).
 
 - "canvas-tour": the continuous-surface dialect -- the film reads as ONE unbroken shot across a single surface, with NO cuts the viewer can name. Beats are PLACES on that surface, not slides: the content TRAVELS between them, each beat leaving toward one edge and the next arriving from the opposite one, and display type is PERFORMED where it lives -- made in front of the viewer, never slammed in. Every scene change is CAUSED by the outgoing scene (something falls out of frame and the next beat enters from where it left; a click, a stamp, a line that keeps travelling), and the film's first beat is often a MACRO detail that pulls back to reveal the whole surface. Music is a quiet bed; the words carry the film. For craft-forward brand films, manifestos with a made-by-hand feeling, and single-surface launches.
+- "relay": the through-line dialect (SPEC-relay.md; the Cosmos app promo) -- every beat is CARRIED BY AN OBJECT instead of a cut. Two moves make it: THE HANDOFF (the object that ends one beat becomes the start of the next -- a wall of images spirals to a point, the point becomes the logo, the logo's last dot swells into the search bar, the search's colour chip drops a dot that floods the frame) and THE THROUGH-LINE (one object stays on screen across beats while they change around it -- the search bar parked at the top while results arrive, filter, flood and re-query). The film is built as 1-3 long ONERS (10-20s each) that never cut inside, punctuated by hard-cut type beats between them (a flash triplet "Saved. / Screenshotted. / Forgotten.", a negation triplet "No ads. / No likes. / No performing.", a stat card). The on-screen type IS the voice (lines come into focus word by word), a driving bed under it. Canvas-tour moves the viewer across one surface; relay moves the STORY through objects. For app and product launches where a UI element can be the hero (a search bar, a cursor, a card, a logo mark), consumer-app promos, and any brief that says "one thing becomes the next". sceneCount: 5-14 (the oners are long scenes, the punctuation beats 0.5-3s each).
 
 Echo the grammar in visualStyle.motionPersonality (e.g. "tempo-cut: ..."), and let every other choice serve it.
 
@@ -219,7 +220,9 @@ opening world, one or two long living middles (12-18s each), and a closing world
 EXCEPTION: a TEMPO-CUT film inverts this -- set sceneCount to 6-9, each scene one short
 thought (2-5 bars), because in that grammar the cut itself is the rhythm instrument. A
 HYPE-CUT film inverts it further: 10-16 scenes, alternating one-bar type interstitials
-with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
+with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s). A RELAY film
+holds 5-14 scenes: 1-3 long oners (10-20s, many beats each, no cut inside) and short
+hard-cut punctuation beats around them (the Cosmos rebuild: 13 scenes in 39.5s, one 18s oner).
 
 ## Output Format (valid JSON, no markdown fences)
 
@@ -247,7 +250,7 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
-  "filmGrammar": "launch-film | tempo-cut | hype-cut | editorial | data-story | canvas-tour | screencast | speaker | creator-cut",
+  "filmGrammar": "launch-film | tempo-cut | hype-cut | editorial | data-story | canvas-tour | relay | screencast | speaker | creator-cut",
   "frame": "16x9 | 9x16 | 4x5 | 1x1 -- the DELIVERY GEOMETRY, inferred from where the prompt says the film ships: Reels / TikTok / Shorts / Stories -> 9x16; an Instagram or LinkedIn FEED post -> 4x5; 'square' -> 1x1; anything else or unstated -> 16x9. When the caller pinned it, echo it. A frame is a size and nothing more -- it never changes the grammar.",
   "recipe": "<recipe id> | null -- THE RECIPE (the third axis): a measured cut from the library below that the writer will fill. Pick one when the brief's shape matches a recipe's suits and the recipe's grammar is the grammar you chose; null when none fits (the writer then invents the beats). When the caller pinned it, echo it.",
   "visualSystem": {
