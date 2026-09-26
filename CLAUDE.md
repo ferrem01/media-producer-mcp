@@ -13,7 +13,7 @@ the **environment gotchas** that will otherwise cost you an hour.
   enforcement), `ARCHITECTURE.md`
   (data model — note it is partly stale: it still says `plan`/`brief`; current
   vocabulary is `storyboard`/`visual_notes`), `UNIFIED-CODEGEN-SPEC.md`,
-  `ROADMAP.md`, `SPEC-studio.md`, `SPEC-brand-extraction.md`, `SPEC-team.md` (who shares a tenant: invite, membership, company domain), `SPEC-briefs.md` (a marketing brief in, a film out: what a brief locks, real footage on any grammar), `SPEC-recipes.md` (the third axis: a measured cut the writer fills -- grammar, frame, recipe), `SPEC-metamorph.md` (phase 1 shipped, phases 2–3 BACKLOG -- parked by Marc: a oner carried by objects -- handoffs as `enter` effects that name a source anchor, rack focus; no new concepts, no per-component morph states).
+  `ROADMAP.md`, `SPEC-studio.md`, `SPEC-brand-extraction.md`, `SPEC-team.md` (who shares a tenant: invite, membership, company domain), `SPEC-briefs.md` (a marketing brief in, a film out: what a brief locks, real footage on any grammar), `SPEC-recipes.md` (the third axis: a measured cut the writer fills -- grammar, frame, recipe), `SPEC-relay.md` (the relay grammar: every beat carried by an object -- a handoff or a through-line; 1-3 long oners + hard-cut punctuation; the handoffs are coordinates between library pieces), `SPEC-metamorph.md` (phase 1 shipped, phases 2–3 BACKLOG -- parked by Marc: a oner carried by objects -- handoffs as `enter` effects that name a source anchor, rack focus; no new concepts, no per-component morph states).
 - Running change log + open items: `AMENDMENTS.md`.
 
 ## Working on Marc's films (hard rules)
@@ -54,7 +54,7 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
    `visualStyle.{colorMood,typographyAttitude,motionPersonality,spatialStrategy}`,
    emotionalArc, directorNote). Takes the raw prompt directly (no expander step).
    Commits the film to its four axes: `filmGrammar` (what carries the argument --
-   nine values, `screencast`/`speaker`/`creator-cut` among them), `visualSystem`, `audioSystem`,
+   ten values, `screencast`/`speaker`/`creator-cut`/`relay` among them), `visualSystem`, `audioSystem`,
    and `frame` (the delivery geometry: `16x9|9x16|4x5|1x1`, inferred from where
    the prompt says the film ships, pinnable). A frame is a SIZE and nothing else --
    see `SPEC-format-and-spine.md`. The tall-frame composition laws fire from the
