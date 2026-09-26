@@ -181,9 +181,9 @@ describe("the server side", () => {
     expect(src).toMatch(/\|traces\|take\|take-poster\|storyboard\|provide-asset\|team\)\\\/\(\[\^\/\]\+\)\//);
   });
 
-  it("asks the recorder for 8 Mbps video (the browser's default near 2.5 Mbps smeared a 1080p take)", async () => {
+  it("asks the recorder for 12 Mbps video (the default near 2.5 smeared a 1080p take; 8 banded skin on iOS)", async () => {
     const src = await read("../src/take-page.ts");
-    expect(src).toMatch(/var recOpts = \{ videoBitsPerSecond: 8000000, audioBitsPerSecond: 128000 \};/);
+    expect(src).toMatch(/var recOpts = \{ videoBitsPerSecond: 12000000, audioBitsPerSecond: 128000 \};/);
     expect(src).toMatch(/rec = new MediaRecorder\(src, recOpts\);/);
     expect(src).not.toMatch(/new MediaRecorder\(src, \{ mimeType: mime \}\)/);
   });
@@ -281,6 +281,10 @@ describe("the prompter in a browser (fake camera)", () => {
       // The whole script runs at speaking pace: well under the board's 22s.
       expect(await page.evaluate(() => document.getElementById("subtitle")!.textContent)).toMatch(/about 0:0[2-6] at speaking pace/);
       await page.click("#recordBtn");
+      // The camera opens on the light check (booth-light-check.test.ts);
+      // Start recording rolls the count-in.
+      await page.waitForSelector("#goBtn", { state: "visible", timeout: 8000 });
+      await page.click("#goBtn");
       await page.waitForFunction(() => document.querySelectorAll("#cue .w").length > 0, null, { timeout: 8000 });
       const first = await page.evaluate(() => ({
         em: [...document.querySelectorAll("#cue .w.em")].map((e) => e.textContent),
