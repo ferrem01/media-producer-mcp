@@ -144,6 +144,7 @@ const componentSchema = z.object({
   enter: animationSchema,
   exit: animationSchema,
   anchors: anchorsSchema,
+  zoom: z.number().optional().describe("CSS zoom on the wrapper (a tall frame sets 1.8 so fixed-pixel type reads on a phone); the box stays where the layout put it"),
 });
 
 /** A beat: one thought inside a scene's continuous take (see SceneBeat). */

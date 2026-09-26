@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-26 — Teaser D restored; `add` keeps a component's zoom
+
+Marc on the Scale Army restructure of Teaser D: "go back to the original
+version". The voice no longer lined up with the pictures, because inserting
+scenes left every take on its old index (the open item below). The film was
+put back from the last snapshot before the restructure, using the edit tools
+only: new scenes deleted, original components re-added, board restored.
+- One field could not go back: two stickers carried `zoom: 1.8` (the
+  tall-frame phone scale), and the `add` component schema stripped it.
+  `componentSchema` now takes `zoom`.
+- Test: `test/edit-anchors.test.ts`.
+
 ## 2026-09-26 — The stacking list is pinned to the frame
 
 Teaser D's Claim scene carries the list over the person and punches in

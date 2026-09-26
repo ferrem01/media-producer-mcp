@@ -20,6 +20,9 @@ describe("word anchors on edited components", () => {
   it("the add and update tools carry anchors and land them when the scene has words", async () => {
     const src = await fs.readFile("src/server.ts", "utf8");
     expect(src).toMatch(/const componentSchema = z\.object\(\{[\s\S]{0,300}anchors: anchorsSchema,/);
+    // A component's own zoom (the tall-frame phone scale) survives an add:
+    // restoring a film's stickers must not drop them back to desktop size.
+    expect(src).toMatch(/const componentSchema = z\.object\(\{[\s\S]{0,400}zoom: z\.number\(\)\.optional\(\)/);
     expect(src).toMatch(/await landAnchorsOnWords\(project, params\.scene_id\);/);
     expect(src).toMatch(/if \(params\.anchors !== undefined\) \{\s*\(comp as any\)\.anchors = \{ \.\.\.\(\(comp as any\)\.anchors \|\| \{\}\), \.\.\.params\.anchors \};/);
     expect(src).toMatch(/if \(sc\?\.spine\?\.words\?\.length\) \{\s*const \{ applySpine \} = await import\("\.\/core\/word-anchors\.js"\);\s*applySpine\(sc, sc\.spine\);/);
