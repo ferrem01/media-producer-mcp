@@ -152,6 +152,12 @@ The beat map, as rebuilt:
     black. The next scene starts on
     `color-flood {mode: "contract"}`: full black shrinking into its first
     shape.
+- **The locked camera.** Every assembled scene used to drift (a Ken Burns
+  push to scale 1.03 plus a few pixels) over an ambient dot layer, so one
+  scene's last frame never matched the next scene's first, and the dots are
+  the "particles" the reference bans. `locked_camera: true` on a scene drops
+  both; `camera_moves` still play. The build stamps it on every relay scene,
+  and the `add` / `update` tools take it.
 - **The cursor drives every change.** Each change is a real click, drag or
   long-press. Components with clicks take `cursor`, `cursor_from` and
   `cursor_to`, so the next component picks the cursor up where the last one
