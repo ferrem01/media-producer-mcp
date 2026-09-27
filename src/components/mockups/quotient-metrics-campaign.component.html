@@ -1,0 +1,680 @@
+<template>
+  <div class="qmc">
+    <div class="qmc-card">
+      <div class="qmc-bar" data-anchor="tabs">
+        <div class="qmc-tabs-wrap"><div class="qmc-tabs" role="tablist"></div></div>
+        <div class="qmc-bar-actions">
+          <button class="qmc-btn qmc-kebab" data-cursor-target="menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          <button class="qmc-btn qmc-thread" data-cursor-target="go-to-thread"><span class="qmc-thread-txt"></span><svg viewBox="0 0 24 24"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
+        </div>
+      </div>
+      <div class="qmc-panel">
+        <div class="qmc-kpis" data-anchor="kpis"></div>
+        <div class="qmc-charts">
+          <div class="qmc-surface qmc-chart-card qmc-traffic" data-anchor="traffic" data-cursor-target="traffic">
+            <div class="qmc-chart-head"><h3 class="qmc-h3 qmc-traffic-title"></h3></div>
+            <div class="qmc-chart-body">
+              <div class="qmc-chart-box">
+                <div class="qmc-plot qmc-line-plot">
+                  <div class="qmc-ylabels"></div>
+                  <div class="qmc-svgbox"><svg class="qmc-svg" xmlns="http://www.w3.org/2000/svg"><g class="qmc-grid"></g><g class="qmc-lines"></g></svg></div>
+                </div>
+                <div class="qmc-xlabels qmc-line-x"></div>
+                <div class="qmc-legend"></div>
+              </div>
+              <button class="qmc-ghost" data-cursor-target="view-data"><svg viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg><span class="qmc-vd"></span></button>
+            </div>
+          </div>
+          <div class="qmc-surface qmc-chart-card qmc-deliv" data-anchor="deliverables" data-cursor-target="deliverables">
+            <div class="qmc-chart-head"><h3 class="qmc-h3 qmc-deliv-title"></h3></div>
+            <div class="qmc-chart-body">
+              <div class="qmc-chart-box">
+                <div class="qmc-plot qmc-bar-plot">
+                  <div class="qmc-ylabels"></div>
+                  <div class="qmc-svgbox"><svg class="qmc-svg" xmlns="http://www.w3.org/2000/svg"><g class="qmc-grid"></g></svg></div>
+                  <div class="qmc-bars"></div>
+                </div>
+                <div class="qmc-xlabels qmc-bar-x"></div>
+                <div class="qmc-note"></div>
+              </div>
+              <button class="qmc-ghost" data-cursor-target="view-data-deliverables"><svg viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg><span class="qmc-vd"></span></button>
+            </div>
+          </div>
+        </div>
+        <div class="qmc-surface qmc-footer" data-anchor="footer">
+          <div class="qmc-footer-copy">
+            <p class="qmc-footer-title"></p>
+            <p class="qmc-footer-text"></p>
+          </div>
+          <div class="qmc-footer-actions">
+            <button class="qmc-btn qmc-open" data-cursor-target="open-reports"><span class="qmc-open-txt"></span><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+            <button class="qmc-btn qmc-ask" data-cursor-target="ask-the-agent"><svg viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg><span class="qmc-ask-txt"></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  /* QUOTIENT CAMPAIGN METRICS: a campaign's Metrics tab, hand-built from the
+     product capture (1288px native). Every size is written in NATIVE px
+     times --u, and --u is set from the box: the page reads the same at any
+     size, and the charts take whatever height the box has left. */
+  .qmc, .qmc * { box-sizing: border-box; max-width: none; }
+  .qmc {
+    --u: 1px; --qmc-accent: #393bf5;
+    position: absolute; inset: 0; padding: 6px 4px;
+    font-family: Inter, 'Inter Fallback', system-ui, -apple-system, sans-serif;
+    color: #17171c; -webkit-font-smoothing: antialiased;
+    font-size: calc(16 * var(--u)); line-height: 1.5;
+  }
+  .qmc svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .qmc p, .qmc h3 { margin: 0; }
+  .qmc button { font-family: inherit; cursor: pointer; }
+  .qmc-card {
+    position: relative; width: 100%; height: 100%; overflow: hidden;
+    background: #fff;
+    /* >= 1.5px border + a real shadow: the ghost-panel gate's visible edge. */
+    border: 2px solid #dedcd6; border-radius: 14px;
+    box-shadow: 0 10px 32px rgba(23, 23, 28, 0.16);
+    display: flex; flex-direction: column;
+  }
+  .qmc.is-docked { padding: 0; }
+  .qmc.is-docked .qmc-card { border: 0; box-shadow: none; }
+
+  /* ── campaign tab bar ── */
+  .qmc-bar {
+    flex: none; height: calc(56 * var(--u)); display: flex; align-items: flex-end; justify-content: space-between;
+    gap: calc(8 * var(--u)); padding: 0 calc(8 * var(--u)); border-bottom: 1px solid #eff0f6; font-weight: 500;
+  }
+  .qmc-tabs-wrap { display: flex; align-items: flex-end; padding-left: calc(16 * var(--u)); min-width: 0; }
+  .qmc-tabs { display: flex; align-items: center; height: calc(35 * var(--u)); border-bottom: 1px solid #eff0f6;
+              transform: translateY(calc(1.5 * var(--u))); }
+  .qmc-tab {
+    position: relative; display: flex; align-items: center; height: calc(34 * var(--u));
+    padding: calc(6 * var(--u)) calc(12 * var(--u)); color: #54545f;
+    font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); white-space: nowrap;
+  }
+  .qmc-tab svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-right: calc(8 * var(--u)); flex: none; }
+  .qmc-tab.is-active { color: #17171c; }
+  .qmc-tab-ul { position: absolute; left: 0; right: 0; bottom: calc(-1.5 * var(--u)); height: calc(2 * var(--u));
+                background: #17171c; transform-origin: 50% 50%; }
+  .qmc-bar-actions { display: flex; align-items: center; gap: calc(8 * var(--u)); margin-bottom: calc(9 * var(--u)); flex: none; }
+  .qmc-btn {
+    display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u));
+    height: calc(36 * var(--u)); padding: 0 calc(12 * var(--u));
+    background: #fff; color: #17171c; border: 1px solid #eff0f6; border-radius: calc(12 * var(--u));
+    font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; white-space: nowrap;
+    box-shadow: 0 calc(1.5 * var(--u)) calc(1.5 * var(--u)) rgba(44, 51, 69, 0.04), 0 calc(1 * var(--u)) calc(2 * var(--u)) rgba(196, 196, 215, 0.25);
+  }
+  .qmc-btn svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); flex: none; }
+  .qmc-kebab { width: calc(36 * var(--u)); padding: 0; }
+
+  /* ── the tab panel ── */
+  .qmc-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: calc(24 * var(--u)); padding: calc(24 * var(--u)); }
+  .qmc-kpis { flex: none; display: grid; grid-template-columns: repeat(var(--qmc-cols, 6), minmax(0, 1fr)); gap: calc(16 * var(--u)); }
+  .qmc-surface {
+    position: relative; background: #fff; border: 1px solid #eff0f6; border-radius: calc(12 * var(--u));
+    box-shadow: 0 calc(8 * var(--u)) calc(8 * var(--u)) rgba(25, 44, 128, 0.02), 0 calc(2 * var(--u)) calc(4 * var(--u)) rgba(196, 196, 215, 0.17),
+                0 calc(1 * var(--u)) calc(2 * var(--u)) rgba(196, 196, 215, 0.25);
+  }
+  .qmc-kpi { height: calc(160 * var(--u)); padding: calc(24 * var(--u)); display: flex; flex-direction: column; gap: calc(8 * var(--u)); min-width: 0; }
+  .qmc-kpi-label { display: flex; align-items: flex-start; gap: calc(8 * var(--u)); font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; }
+  .qmc-kpi-label svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-top: calc(2 * var(--u)); flex: none; }
+  .qmc-kpi-value { margin-top: auto; font-size: calc(24 * var(--u)); line-height: calc(32 * var(--u)); font-weight: 600;
+                   font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .qmc-charts { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(24 * var(--u)); }
+  .qmc-chart-card { display: flex; flex-direction: column; min-height: 0; }
+  .qmc-chart-head { flex: none; height: calc(70 * var(--u)); padding: calc(24 * var(--u)); display: flex; align-items: center; }
+  .qmc-h3 { font-size: calc(18 * var(--u)); line-height: calc(18 * var(--u)); font-weight: 500; letter-spacing: calc(-0.45 * var(--u)); white-space: nowrap; }
+  .qmc-chart-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: calc(8 * var(--u));
+                    padding: 0 calc(24 * var(--u)) calc(24 * var(--u)); }
+  .qmc-chart-box { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); }
+  .qmc-plot { position: relative; flex: 1; min-height: 0; margin-top: calc(5 * var(--u)); }
+  .qmc-svgbox { position: absolute; top: 0; bottom: 0; right: calc(10 * var(--u)); left: var(--qmc-yw, calc(36 * var(--u))); }
+  .qmc-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+  .qmc-svg line { stroke: #e7e8ef; stroke-width: 1; stroke-dasharray: 3 3; stroke-linecap: butt; }
+  .qmc-svg path.qmc-series { stroke-width: 2; fill: none; }
+  .qmc-ylabels { position: absolute; top: 0; bottom: 0; left: 0; width: var(--qmc-yw, calc(36 * var(--u))); color: #54545f; }
+  .qmc-ylabels span { position: absolute; right: calc(10 * var(--u)); transform: translateY(-50%); white-space: nowrap; }
+  .qmc-xlabels { position: relative; flex: none; height: calc(30 * var(--u)); margin: 0 calc(10 * var(--u)) 0 var(--qmc-yw, calc(36 * var(--u))); color: #54545f; }
+  .qmc-xlabels span { position: absolute; top: calc(6 * var(--u)); transform: translateX(-50%); white-space: nowrap; }
+  .qmc-bar-x span { overflow: hidden; text-overflow: ellipsis; text-align: center; }
+  .qmc-legend { flex: none; height: calc(28 * var(--u)); padding-top: calc(12 * var(--u)); display: flex; justify-content: center; gap: calc(16 * var(--u)); }
+  .qmc-legend-item { display: flex; align-items: center; gap: calc(6 * var(--u)); white-space: nowrap; }
+  .qmc-legend-item i { width: calc(8 * var(--u)); height: calc(8 * var(--u)); border-radius: calc(2 * var(--u)); display: block; }
+  .qmc-bars { position: absolute; top: 0; bottom: 0; right: calc(10 * var(--u)); left: var(--qmc-yw, calc(36 * var(--u))); display: flex; }
+  .qmc-slot { position: relative; flex: 1; height: 100%; }
+  .qmc-barfill { position: absolute; bottom: 0; left: 10%; width: 80%; background: #3b82f6;
+                 border-radius: calc(2 * var(--u)) calc(2 * var(--u)) 0 0; transform-origin: 50% 100%; }
+  .qmc-bartag { position: absolute; left: 50%; transform: translate(-50%, -100%); margin-top: calc(-6 * var(--u));
+                background: #17171c; color: #fff; font-weight: 600; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u));
+                padding: calc(3 * var(--u)) calc(7 * var(--u)); border-radius: calc(6 * var(--u)); white-space: nowrap; visibility: hidden; }
+  .qmc-note { flex: none; height: calc(16 * var(--u)); color: #54545f; margin-top: calc(-4 * var(--u)); }
+  .qmc-ghost {
+    flex: none; align-self: flex-start; display: flex; align-items: center; gap: calc(6 * var(--u));
+    height: calc(36 * var(--u)); padding: 0 calc(12 * var(--u)); background: transparent; border: 1px solid transparent;
+    border-radius: calc(12 * var(--u)); color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500;
+  }
+  .qmc-ghost svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+
+  /* ── ask-the-agent footer ── */
+  .qmc-footer { flex: none; display: flex; align-items: center; gap: calc(16 * var(--u)); padding: calc(24 * var(--u)); min-height: calc(94 * var(--u)); }
+  .qmc-footer-copy { flex: 1; min-width: 0; }
+  .qmc-footer-title { font-size: calc(16 * var(--u)); line-height: calc(24 * var(--u)); font-weight: 500; }
+  .qmc-footer-text { color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qmc-footer-actions { display: flex; align-items: center; gap: calc(8 * var(--u)); flex: none; }
+  .qmc-footer .qmc-btn { gap: calc(6 * var(--u)); }
+  .qmc-ask { background: #17171c; color: #fff; border-color: transparent; }
+
+  /* a highlight: accent ring + faint wash laid over the thing */
+  .qmc-ring { position: absolute; inset: calc(-3 * var(--u)); border: calc(2.5 * var(--u)) solid var(--qmc-accent);
+              border-radius: calc(14 * var(--u)); pointer-events: none; visibility: hidden; opacity: 0; z-index: 3; }
+  .qmc-ring::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--qmc-accent); opacity: 0.06; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    data = data || {};
+    var tl = gsap.timeline();
+    var root = el.querySelector('.qmc');
+    var card = el.querySelector('.qmc-card');
+    if (data.docked) root.classList.add('is-docked');
+    if (data.accent) root.style.setProperty('--qmc-accent', data.accent);
+    var num = function (v, d) { var n = Number(v); return isFinite(n) ? n : d; };
+    var str = function (v, d) { return (typeof v === 'string' || typeof v === 'number') ? String(v) : d; };
+    var isObj = function (v) { return v && typeof v === 'object' && !Array.isArray(v); };
+    var slug = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+    var NS = 'http://www.w3.org/2000/svg';
+
+    var ICONS = {
+      brief: '<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>',
+      tasks: '<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>',
+      activation: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+      deliverables: '<path d="M8 2v4"/><path d="M12 2v4"/><path d="M16 2v4"/><rect width="16" height="18" x="4" y="4" rx="2"/><path d="M8 10h6"/><path d="M8 14h8"/><path d="M8 18h5"/>',
+      metrics: '<path d="M12 16v5"/><path d="M16 14v7"/><path d="M20 10v11"/><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15"/><path d="M4 18v3"/><path d="M8 14v7"/>',
+      chats: '<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>',
+      eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+      activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+      mail: '<path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/>',
+      click: '<path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/>',
+      globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+      heart: '<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>',
+      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      trending: '<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>',
+      dollar: '<line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+      share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>',
+      message: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+      calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+      file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>'
+    };
+    var ICON_ALIASES = { views: 'eye', 'page-views': 'eye', sessions: 'activity', opens: 'mail', email: 'mail', clicks: 'click',
+      'mouse-pointer-click': 'click', impressions: 'globe', likes: 'heart', people: 'users', revenue: 'dollar', chart: 'metrics' };
+    var svgIcon = function (key, fallback) {
+      var k = slug(key); k = ICON_ALIASES[k] || k;
+      return '<svg viewBox="0 0 24 24">' + (ICONS[k] || ICONS[fallback] || ICONS.metrics) + '</svg>';
+    };
+
+    // ── data, every word and number, with the Q3 Flows launch as default ──
+    var DEFAULT_TABS = ['Brief', 'Tasks', 'Activation', 'Deliverables', 'Metrics', 'Chats'];
+    var tabs = (Array.isArray(data.tabs) && data.tabs.length ? data.tabs : DEFAULT_TABS).map(function (t) {
+      if (isObj(t)) return { label: str(t.label, 'Tab'), icon: t.icon || t.label };
+      return { label: str(t, 'Tab'), icon: t };
+    });
+    var activeName = str(data.active_tab, 'Metrics');
+
+    var DEFAULT_KPIS = [
+      { label: 'Page Views', icon: 'eye', value: 48210 },
+      { label: 'Sessions', icon: 'activity', value: 31904 },
+      { label: 'Email Opens', icon: 'mail', value: 15605 },
+      { label: 'Email Clicks', icon: 'click', value: 3284 },
+      { label: 'Social Impressions', icon: 'globe', value: 186420 },
+      { label: 'Social Likes', icon: 'heart', value: 4812 }
+    ];
+    var kpis = (Array.isArray(data.kpis) ? data.kpis : []).filter(isObj);
+    if (!kpis.length) kpis = DEFAULT_KPIS;
+
+    var weekLabels = function (n) {
+      var M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], out = [];
+      for (var i = 0; i < n; i++) { var d = new Date(Date.UTC(2026, 0, 26 + 7 * i)); out.push(M[d.getUTCMonth()] + ' ' + d.getUTCDate()); }
+      return out;
+    };
+    var Z21 = []; for (var z = 0; z < 21; z++) Z21.push(0);
+    var DEFAULT_TRAFFIC = {
+      title: 'Traffic over time',
+      series: [
+        { name: 'Page Views', color: '#3b82f6', points: Z21.concat([110, 240, 430, 2590, 3730, 3120, 4260, 5480, 4040, 4490, 5790, 4870, 4420, 4640]) },
+        { name: 'Sessions', color: '#22c55e', points: Z21.concat([66, 144, 258, 1661, 2467, 2188, 2689, 3788, 2510, 2968, 4061, 2977, 2966, 3161]) }
+      ],
+      labels: weekLabels(35)
+    };
+    var traffic = isObj(data.traffic) ? data.traffic : {};
+    var series = (Array.isArray(traffic.series) ? traffic.series : []).filter(function (s) { return isObj(s) && Array.isArray(s.points) && s.points.length > 1; });
+    var defaultSeries = !series.length;
+    if (defaultSeries) series = DEFAULT_TRAFFIC.series;
+    var SERIES_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
+    series = series.map(function (s, i) { return { name: str(s.name, 'Series ' + (i + 1)), color: s.color || SERIES_COLORS[i % 4], points: s.points.map(function (p) { return Math.max(0, num(p, 0)); }) }; });
+    var nPts = series.reduce(function (m, s) { return Math.max(m, s.points.length); }, 0);
+    var xLabels = Array.isArray(traffic.labels) ? traffic.labels.map(function (l) { return str(l, ''); })
+      : (defaultSeries ? DEFAULT_TRAFFIC.labels : []);
+    var trafficTitle = str(traffic.title, str(data.traffic_title, DEFAULT_TRAFFIC.title));
+
+    var DEFAULT_DELIV = [
+      { name: 'Q3 launch email · Try Flows free', value: 9840 },
+      { name: 'Flows launch webinar', value: 7420 },
+      { name: 'LinkedIn: Meet Flows', value: 6310 },
+      { name: 'Blog: How Northwind cut reporting time 80%', value: 5860 },
+      { name: 'X: Flows is live', value: 4120 },
+      { name: 'Flows product tour', value: 3540 },
+      { name: 'Launch recap newsletter', value: 2960 },
+      { name: 'LinkedIn: Flows customer story', value: 2380 },
+      { name: 'Blog: 5 flows to build first', value: 1910 },
+      { name: 'X: Flows webinar clip', value: 1240 }
+    ];
+    var deliv = (Array.isArray(data.deliverables) ? data.deliverables : []).filter(isObj).map(function (d) { return { name: str(d.name || d.label, ''), value: Math.max(0, num(d.value, 0)) }; });
+    if (!deliv.length) deliv = DEFAULT_DELIV;
+    var delivTitle = str(data.deliverables_title, 'Traffic by deliverable');
+    var delivNote = data.deliverables_note === false ? '' : str(data.deliverables_note, 'Top series only.');
+    var viewData = str(data.view_data_label, 'View data');
+
+    var footer = data.footer === false ? null : (isObj(data.footer) ? data.footer : {});
+    var entranceNone = data.entrance === 'none';
+    var AT = num(data.at, 0);
+    var P = function (t) { return Math.max(0, t + AT); };
+
+    // ── fit: --u = one native px of the capture ──
+    var kpiCols = Math.max(1, Math.min(kpis.length, Math.round(num(data.kpi_columns, kpis.length))));
+    var kpiRows = Math.ceil(kpis.length / kpiCols);
+    var FIXED = 56 + 24 + 160 * kpiRows + 16 * (kpiRows - 1) + 24 + 24 + (footer ? 24 + 94 : 0);   // bar, pad, tiles, gap, pad (+ gap, footer)
+    var CHART_MIN = 420;
+    var u = 1;
+    var fit = function () {
+      var cw = card.clientWidth || el.clientWidth || 1288, ch = card.clientHeight || el.clientHeight || 880;
+      u = Math.max(0.3, Math.min(cw / 1288, ch / (FIXED + CHART_MIN)) * Math.max(0.5, Math.min(2, num(data.scale, 1))));
+      root.style.setProperty('--u', u + 'px');
+      drawSvg();
+    };
+
+    // ── tab bar ──
+    var tabsWrap = el.querySelector('.qmc-tabs');
+    var tabEls = tabs.map(function (t) {
+      var b = document.createElement('div');
+      b.className = 'qmc-tab'; b.setAttribute('role', 'tab');
+      b.setAttribute('data-cursor-target', slug(t.label));
+      b.innerHTML = svgIcon(t.icon, 'metrics') + '<span></span><i class="qmc-tab-ul"></i>';
+      b.querySelector('span').textContent = t.label;
+      tabsWrap.appendChild(b);
+      return b;
+    });
+    var tabIndex = function (name) {
+      var n = slug(name);
+      for (var i = 0; i < tabs.length; i++) if (slug(tabs[i].label) === n) return i;
+      return -1;
+    };
+    var activeIdx = tabIndex(activeName);
+    tabEls.forEach(function (b, i) {
+      var on = i === activeIdx;
+      if (on) b.classList.add('is-active');
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      gsap.set(b.querySelector('.qmc-tab-ul'), { scaleX: on ? 1 : 0, autoAlpha: on ? 1 : 0 });
+    });
+    el.querySelector('.qmc-thread-txt').textContent = str(data.thread_label, 'Go to thread');
+    if (data.show_thread === false) el.querySelector('.qmc-bar-actions').style.display = 'none';
+
+    // ── KPI tiles ──
+    var fmt = function (v, k) {
+      var f = k.format || 'number', dec = num(k.decimals, f === 'percent' ? 1 : 0), s;
+      if (f === 'compact') {
+        var a = Math.abs(v);
+        s = a >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : a >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : a >= 1e4 ? (v / 1e3).toFixed(1) + 'K' : Math.round(v).toLocaleString('en-US');
+        s = s.replace('.0', '');
+      } else {
+        s = v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      }
+      if (f === 'percent') s += '%';
+      if (f === 'currency') s = '$' + s;
+      return (k.prefix || '') + s + (k.suffix || '');
+    };
+    var kpiWrap = el.querySelector('.qmc-kpis');
+    kpiWrap.style.setProperty('--qmc-cols', String(kpiCols));
+    var tiles = kpis.map(function (k, i) {
+      var tile = document.createElement('div');
+      tile.className = 'qmc-surface qmc-kpi';
+      tile.setAttribute('data-anchor', 'kpi-' + i);
+      tile.setAttribute('data-cursor-target', slug(k.label) || ('kpi-' + i));
+      tile.innerHTML = '<div class="qmc-kpi-label">' + svgIcon(k.icon || k.label, 'metrics') + '<span></span></div><div class="qmc-kpi-value"></div>';
+      tile.querySelector('.qmc-kpi-label span').textContent = str(k.label, '');
+      kpiWrap.appendChild(tile);
+      var to = num(k.value, 0);
+      var o = { tile: tile, label: str(k.label, ''), valueEl: tile.querySelector('.qmc-kpi-value'), k: k, to: to, display: k.display != null ? String(k.display) : null };
+      o.write = function (v, final, kk, disp) { o.valueEl.textContent = (final && disp != null) ? disp : fmt(v, kk || k); };
+      o.write(to, true, k, o.display);
+      return o;
+    });
+
+    // ── traffic chart: y ticks, x labels, legend, smoothed lines ──
+    var niceTicks = function (max) {
+      if (!(max > 0)) return [0, 1, 2, 3, 4];
+      var raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+      var step = (f <= 1 ? 1 : f <= 1.5 ? 1.5 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 3 ? 3 : f <= 5 ? 5 : 10) * mag;
+      return [0, step, 2 * step, 3 * step, 4 * step];
+    };
+    var tickText = function (v) { return Math.round(v * 100) / 100 === Math.round(v) ? Math.round(v).toLocaleString('en-US') : String(Math.round(v * 100) / 100); };
+    var trafficCard = el.querySelector('.qmc-traffic');
+    var delivCard = el.querySelector('.qmc-deliv');
+    el.querySelector('.qmc-traffic-title').textContent = trafficTitle;
+    el.querySelector('.qmc-deliv-title').textContent = delivTitle;
+    [].forEach.call(el.querySelectorAll('.qmc-vd'), function (s) { s.textContent = viewData; });
+    if (data.show_view_data === false) [].forEach.call(el.querySelectorAll('.qmc-ghost'), function (b) { b.style.display = 'none'; });
+
+    var lineMax = series.reduce(function (m, s) { return Math.max(m, Math.max.apply(null, s.points)); }, 0);
+    var lineTicks = niceTicks(num(traffic.y_max, 0) || lineMax);
+    var barTicks = niceTicks(num(data.deliverables_y_max, 0) || deliv.reduce(function (m, d) { return Math.max(m, d.value); }, 0));
+    var setYAxis = function (cardEl, ticks, bottomPad) {
+      var yl = cardEl.querySelector('.qmc-ylabels');
+      var longest = 0;
+      ticks.forEach(function (t) {
+        var s = document.createElement('span');
+        s.textContent = tickText(t);
+        longest = Math.max(longest, s.textContent.length);
+        s.style.top = (100 - (t / ticks[4]) * 100) + '%';
+        yl.appendChild(s);
+      });
+      cardEl.style.setProperty('--qmc-yw', 'calc(' + Math.max(36, 10 + longest * 7.2) + ' * var(--u))');
+    };
+    setYAxis(trafficCard, lineTicks);
+    setYAxis(delivCard, barTicks);
+
+    var lineX = el.querySelector('.qmc-line-x');
+    var addX = function (text, frac) {
+      var sp = document.createElement('span');
+      sp.textContent = text; sp.style.left = (frac * 100) + '%';
+      lineX.appendChild(sp);
+    };
+    var xEvery = 0;
+    var layoutX = function (plotW) {
+      if (!(xLabels.length >= nPts && nPts > 1)) {
+        if (!lineX.childNodes.length) xLabels.forEach(function (l, i) { addX(l, xLabels.length > 1 ? i / (xLabels.length - 1) : 0.5); });
+        return;
+      }
+      // One label per point: tick every Nth (about a dozen, fewer when the
+      // plot is narrow), and always the last point -- dropping a tick that
+      // would crowd it.
+      var room = Math.max(2, Math.floor((plotW / u) / 48));
+      var every = Math.max(1, Math.round(num(traffic.label_every, Math.max(Math.ceil(nPts / 12), Math.ceil(nPts / room)))));
+      if (every === xEvery) return;
+      xEvery = every; lineX.innerHTML = '';
+      var lastI = nPts - 1;
+      for (var xi = 0; xi < lastI; xi += every) if (lastI - xi >= every * 0.67) addX(xLabels[xi], xi / lastI);
+      addX(xLabels[lastI], 1);
+    };
+    var legend = el.querySelector('.qmc-legend');
+    series.forEach(function (s) {
+      var it = document.createElement('div'); it.className = 'qmc-legend-item';
+      it.innerHTML = '<i></i><span></span>';
+      it.querySelector('i').style.background = s.color;
+      it.querySelector('span').textContent = s.name;
+      legend.appendChild(it);
+    });
+    if (data.show_legend === false) legend.style.display = 'none';
+
+    var lineSvg = trafficCard.querySelector('.qmc-svg');
+    var barSvg = delivCard.querySelector('.qmc-svg');
+    var linesG = lineSvg.querySelector('.qmc-lines');
+    var paths = series.map(function (s) {
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('class', 'qmc-series');
+      p.setAttribute('pathLength', '1');
+      p.style.stroke = s.color;
+      linesG.appendChild(p);
+      return p;
+    });
+    // d3.curveMonotoneX (what the product's chart library draws): smooth,
+    // never overshooting between points.
+    var monotone = function (xy) {
+      var n = xy.length; if (n < 2) return '';
+      var t = new Array(n), m = new Array(n - 1), i;
+      for (i = 0; i < n - 1; i++) m[i] = (xy[i + 1][1] - xy[i][1]) / ((xy[i + 1][0] - xy[i][0]) || 1);
+      var sgn = function (v) { return v < 0 ? -1 : 1; };
+      for (i = 1; i < n - 1; i++) {
+        var h0 = xy[i][0] - xy[i - 1][0], h1 = xy[i + 1][0] - xy[i][0], s0 = m[i - 1], s1 = m[i];
+        var p = (s0 * h1 + s1 * h0) / ((h0 + h1) || 1);
+        t[i] = (sgn(s0) + sgn(s1)) * Math.min(Math.abs(s0), Math.abs(s1), 0.5 * Math.abs(p)) || 0;
+      }
+      var h = xy[1][0] - xy[0][0];
+      t[0] = n > 2 ? ((3 * (xy[1][1] - xy[0][1]) / (h || 1) - t[1]) / 2) : m[0];
+      h = xy[n - 1][0] - xy[n - 2][0];
+      t[n - 1] = n > 2 ? ((3 * (xy[n - 1][1] - xy[n - 2][1]) / (h || 1) - t[n - 2]) / 2) : m[0];
+      var d = 'M' + xy[0][0].toFixed(2) + ',' + xy[0][1].toFixed(2);
+      for (i = 0; i < n - 1; i++) {
+        var dx = (xy[i + 1][0] - xy[i][0]) / 3;
+        d += 'C' + (xy[i][0] + dx).toFixed(2) + ',' + (xy[i][1] + dx * t[i]).toFixed(2) + ',' +
+             (xy[i + 1][0] - dx).toFixed(2) + ',' + (xy[i + 1][1] - dx * t[i + 1]).toFixed(2) + ',' +
+             xy[i + 1][0].toFixed(2) + ',' + xy[i + 1][1].toFixed(2);
+      }
+      return d;
+    };
+    var gridFor = function (svg, w, h) {
+      var g = svg.querySelector('.qmc-grid');
+      g.innerHTML = '';
+      for (var i = 0; i < 5; i++) {
+        var y = (h * i / 4).toFixed(2);
+        var ln = document.createElementNS(NS, 'line');
+        ln.setAttribute('x1', '0'); ln.setAttribute('x2', String(w)); ln.setAttribute('y1', y); ln.setAttribute('y2', y);
+        g.appendChild(ln);
+      }
+    };
+    function drawSvg() {
+      // Geometry is drawn in the plot's own layout px (offset sizes ignore
+      // any scale above us), so the SVG is 1:1 and strokes stay crisp.
+      [lineSvg, barSvg].forEach(function (svg) {
+        var box = svg.parentNode, w = box.clientWidth || 500, h = box.clientHeight || 250;
+        svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        gridFor(svg, w, h);
+        if (svg === lineSvg) {
+          layoutX(w);
+          series.forEach(function (s, si) {
+            var n = s.points.length, top = lineTicks[4] || 1;
+            var xy = s.points.map(function (v, i) { return [nPts > 1 ? (i / (nPts - 1)) * w : 0, h - (v / top) * h]; });
+            paths[si].setAttribute('d', monotone(xy.slice(0, n)));
+          });
+        }
+      });
+    }
+
+    // ── deliverable bars ──
+    var barsWrap = delivCard.querySelector('.qmc-bars');
+    var barX = delivCard.querySelector('.qmc-bar-x');
+    var bars = deliv.map(function (d, i) {
+      var slot = document.createElement('div'); slot.className = 'qmc-slot';
+      slot.setAttribute('data-cursor-target', 'bar-' + i);
+      var fill = document.createElement('div'); fill.className = 'qmc-barfill';
+      fill.style.height = Math.min(100, (d.value / (barTicks[4] || 1)) * 100) + '%';
+      var tag = document.createElement('div'); tag.className = 'qmc-bartag';
+      tag.textContent = d.value.toLocaleString('en-US');
+      tag.style.bottom = Math.min(100, (d.value / (barTicks[4] || 1)) * 100) + '%';
+      slot.appendChild(fill); slot.appendChild(tag); barsWrap.appendChild(slot);
+      var lab = document.createElement('span');
+      lab.textContent = d.name; lab.title = d.name;
+      lab.style.left = ((i + 0.5) / deliv.length * 100) + '%';
+      lab.style.width = (100 / deliv.length * 0.96) + '%';
+      barX.appendChild(lab);
+      return { slot: slot, fill: fill, tag: tag, name: d.name, label: lab };
+    });
+    var note = delivCard.querySelector('.qmc-note');
+    if (delivNote) note.textContent = delivNote; else note.style.display = 'none';
+
+    // ── footer ──
+    var footerEl = el.querySelector('.qmc-footer');
+    if (!footer) footerEl.style.display = 'none';
+    else {
+      el.querySelector('.qmc-footer-title').textContent = str(footer.title, 'Want to dig deeper?');
+      el.querySelector('.qmc-footer-text').textContent = str(footer.text, 'Ask the agent a question about these numbers, or build a report of your own.');
+      el.querySelector('.qmc-open-txt').textContent = str(footer.secondary, 'Open reports');
+      el.querySelector('.qmc-ask-txt').textContent = str(footer.primary, 'Ask the agent');
+    }
+
+    fit();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { fit(); }).observe(el);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { drawSvg(); });
+
+    // ── SCRIPT ──
+    var find = function (name) {
+      if (name == null) return null;
+      var n = slug(name), i;
+      var m = /^kpi-(\d+)$/.exec(n);
+      if (m && tiles[+m[1]]) return { kind: 'kpi', el: tiles[+m[1]].tile, kpi: tiles[+m[1]] };
+      for (i = 0; i < tiles.length; i++) if (slug(tiles[i].label) === n) return { kind: 'kpi', el: tiles[i].tile, kpi: tiles[i] };
+      m = /^bar-(\d+)$/.exec(n);
+      if (m && bars[+m[1]]) return { kind: 'bar', el: bars[+m[1]].slot, bar: bars[+m[1]], index: +m[1] };
+      for (i = 0; i < bars.length; i++) if (slug(bars[i].name) === n) return { kind: 'bar', el: bars[i].slot, bar: bars[i], index: i };
+      if (n === 'traffic' || n === slug(trafficTitle) || n === 'chart') return { kind: 'card', el: trafficCard };
+      if (n === 'deliverables' || n === slug(delivTitle)) return { kind: 'card', el: delivCard };
+      if (n === 'footer' || (footer && n === slug(el.querySelector('.qmc-footer-title').textContent))) return { kind: 'card', el: footerEl };
+      if (n === 'kpis') return { kind: 'card', el: kpiWrap };
+      if (n === 'tabs') return { kind: 'card', el: el.querySelector('.qmc-bar') };
+      var ti = tabIndex(name);
+      if (ti >= 0) return { kind: 'tab', el: tabEls[ti], index: ti };
+      for (i = 0; i < bars.length; i++) if (bars[i].name && slug(bars[i].name).indexOf(n) === 0 && n.length > 3) return { kind: 'bar', el: bars[i].slot, bar: bars[i], index: i };
+      var btn = { 'ask-the-agent': '.qmc-ask', 'ask-agent': '.qmc-ask', 'open-reports': '.qmc-open', 'go-to-thread': '.qmc-thread', 'menu': '.qmc-kebab', 'view-data': '.qmc-traffic .qmc-ghost' };
+      if (footer) { btn[slug(el.querySelector('.qmc-ask-txt').textContent)] = '.qmc-ask'; btn[slug(el.querySelector('.qmc-open-txt').textContent)] = '.qmc-open'; }
+      btn[slug(el.querySelector('.qmc-thread-txt').textContent)] = '.qmc-thread';
+      if (btn[n]) return { kind: 'button', el: el.querySelector(btn[n]) };
+      return null;
+    };
+
+    var script = Array.isArray(data.script) ? data.script.filter(isObj) : [];
+    var OWN = { count: 1, highlight: 1, 'switch-tab': 1, 'set-text': 1 };
+    var ordered = script.map(function (a, i) { return { a: a, i: i }; })
+      .sort(function (x, y) { return (num(x.a.at, 0) - num(y.a.at, 0)) || (x.i - y.i); });
+    var current = tiles.map(function (o) { return { v: o.to, k: o.k, disp: o.display }; });
+    var curTab = activeIdx;
+    var textNow = new Map();
+    var accentOf = function () { return getComputedStyle(root).getPropertyValue('--qmc-accent').trim() || '#393bf5'; };
+
+    ordered.forEach(function (x) {
+      var a = x.a, at = num(a.at, 0), hit;
+      if (a.action === 'count') {
+        hit = find(a.target);
+        if (!hit || hit.kind !== 'kpi') return;
+        var ti = tiles.indexOf(hit.kpi), cur = current[ti];
+        var kk = Object.assign({}, cur.k, a.format ? { format: a.format } : {}, a.decimals != null ? { decimals: a.decimals } : {},
+          a.prefix != null ? { prefix: a.prefix } : {}, a.suffix != null ? { suffix: a.suffix } : {});
+        var from = a.from != null ? num(a.from, cur.v) : cur.v, to = num(a.to, from);
+        var disp = a.display != null ? String(a.display) : null;
+        var prox = { n: from };
+        var o = hit.kpi;
+        tl.to(prox, { n: to, duration: num(a.duration, 1.2), ease: a.ease || 'power2.out', immediateRender: false,
+          onUpdate: function () { o.write(prox.n, Math.abs(prox.n - to) < 1e-9, kk, disp); } }, at);
+        current[ti] = { v: to, k: kk, disp: disp };
+      } else if (a.action === 'highlight') {
+        hit = find(a.target);
+        if (!hit) return;
+        var dur = num(a.duration, 1.6);
+        if (hit.kind === 'bar') {
+          bars.forEach(function (b, bi) {
+            if (bi === hit.index) return;
+            tl.to(b.fill, { opacity: 0.3, duration: 0.3, ease: 'power1.out' }, at);
+            tl.to(b.fill, { opacity: 1, duration: 0.35, ease: 'power1.in' }, at + dur);
+          });
+          tl.fromTo(hit.bar.tag, { autoAlpha: 0, y: 6 }, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out', immediateRender: false }, at);
+          tl.to(hit.bar.tag, { autoAlpha: 0, duration: 0.3 }, at + dur);
+          tl.fromTo(hit.bar.label, { color: '#54545f' }, { color: '#17171c', duration: 0.3, immediateRender: false }, at);
+          tl.to(hit.bar.label, { color: '#54545f', duration: 0.3 }, at + dur);
+          return;
+        }
+        var host = hit.el;
+        if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+        var ring = document.createElement('div'); ring.className = 'qmc-ring';
+        if (a.color) ring.style.borderColor = a.color;
+        if (hit.kind === 'tab' || hit.kind === 'button') ring.style.borderRadius = 'calc(10 * var(--u))';
+        host.appendChild(ring);
+        tl.fromTo(ring, { autoAlpha: 0, scale: 1.04 }, { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'power2.out', immediateRender: false }, at);
+        tl.to(ring, { autoAlpha: 0, duration: 0.4, ease: 'power1.in' }, at + dur);
+        if (hit.kind === 'kpi') {
+          tl.fromTo(hit.kpi.valueEl, { color: '#17171c' }, { color: a.color || accentOf(), duration: 0.3, immediateRender: false }, at);
+          tl.to(hit.kpi.valueEl, { color: '#17171c', duration: 0.4 }, at + dur);
+        }
+      } else if (a.action === 'switch-tab') {
+        var to2 = tabIndex(a.tab || a.target);
+        if (to2 < 0 || to2 === curTab) return;
+        var d2 = num(a.duration, 0.3);
+        if (curTab >= 0) {
+          tl.to(tabEls[curTab].querySelector('.qmc-tab-ul'), { scaleX: 0, autoAlpha: 0, duration: d2, ease: 'power2.in' }, at);
+          tl.to(tabEls[curTab], { color: '#54545f', duration: d2 }, at);
+          tl.set(tabEls[curTab], { attr: { 'aria-selected': 'false' } }, at);
+        }
+        tl.fromTo(tabEls[to2].querySelector('.qmc-tab-ul'), { scaleX: 0, autoAlpha: 1 }, { scaleX: 1, autoAlpha: 1, duration: d2 + 0.1, ease: 'power3.out', immediateRender: false }, at + 0.05);
+        tl.to(tabEls[to2], { color: '#17171c', duration: d2 }, at);
+        tl.set(tabEls[to2], { attr: { 'aria-selected': 'true' } }, at);
+        curTab = to2;
+      } else if (a.action === 'set-text') {
+        hit = find(a.target);
+        var tgt = null;
+        if (hit && hit.kind === 'kpi') tgt = hit.kpi.tile.querySelector('.qmc-kpi-label span');
+        else if (hit && hit.kind === 'bar') tgt = hit.bar.label;
+        else if (hit && hit.kind === 'tab') tgt = hit.el.querySelector('span');
+        else if (hit && hit.kind === 'card') tgt = hit.el.querySelector('.qmc-h3, .qmc-footer-title');
+        else if (hit && hit.kind === 'button') tgt = hit.el.querySelector('span');
+        if (!tgt || a.text == null) return;
+        var before = textNow.has(tgt) ? textNow.get(tgt) : tgt.textContent, after = String(a.text), sw = { p: 0 };
+        textNow.set(tgt, after);
+        tl.to(sw, { p: 1, duration: 0.01, onUpdate: function () { tgt.textContent = sw.p >= 1 ? after : before; } }, at);
+      }
+    });
+
+    // Cursor verbs (move-cursor / click / hover / wait ...) through the shared
+    // runner; a target may be a tile label, tab, deliverable or button name.
+    var rest = script.filter(function (a) { return !OWN[a.action]; }).map(function (a) {
+      if (!a.target) return a;
+      var hit = find(a.target);
+      var ct = hit && hit.el && hit.el.getAttribute('data-cursor-target');
+      return ct ? Object.assign({}, a, { target: ct }) : a;
+    });
+    if (rest.length) runScript(tl, el, rest, data.cursor_targets || {}, ctx, {});
+
+    // ── ENTRANCE: everything a tween on tl (scrub-safe). Built AFTER the
+    // script so cursor targets are measured at rest, not mid-entrance. ──
+    var countUp = function (o, at, dur) {
+      var prox = { n: 0 };
+      o.write(0, false);
+      tl.to(prox, { n: o.to, duration: dur, ease: 'power2.out', onUpdate: function () { o.write(prox.n, prox.n >= o.to, o.k, o.display); } }, at);
+    };
+    if (!entranceNone) {
+      gsap.set(card, { autoAlpha: 0, y: 16 });
+      tl.to(card, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, P(0.05));
+      var barEl = el.querySelector('.qmc-bar');
+      gsap.set(barEl, { autoAlpha: 0 });
+      tl.to(barEl, { autoAlpha: 1, duration: 0.35, ease: 'power1.out' }, P(0.15));
+      tiles.forEach(function (o, i) {
+        var at = 0.3 + i * 0.08;
+        gsap.set(o.tile, { autoAlpha: 0, y: 12 });
+        tl.to(o.tile, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, P(at));
+        countUp(o, P(at + 0.05), 1.2);
+      });
+      [trafficCard, delivCard].forEach(function (c, i) {
+        gsap.set(c, { autoAlpha: 0, y: 18 });
+        tl.to(c, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power3.out' }, P(0.7 + i * 0.1));
+      });
+      paths.forEach(function (p, i) {
+        gsap.set(p, { strokeDasharray: 1, strokeDashoffset: 1 });
+        tl.to(p, { strokeDashoffset: 0, duration: 1.5, ease: 'power2.inOut' }, P(1.0 + i * 0.15));
+      });
+      bars.forEach(function (b, i) {
+        gsap.set(b.fill, { scaleY: 0 });
+        tl.to(b.fill, { scaleY: 1, duration: 0.65, ease: 'power3.out' }, P(1.1 + i * 0.06));
+      });
+      if (footer) {
+        gsap.set(footerEl, { autoAlpha: 0, y: 14 });
+        tl.to(footerEl, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power3.out' }, P(1.45));
+      }
+    }
+
+    return tl;
+  }
+</script>

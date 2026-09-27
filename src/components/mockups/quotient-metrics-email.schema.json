@@ -1,0 +1,60 @@
+{
+  "type": "quotient-metrics-email",
+  "label": "Quotient email broadcast Metrics tab",
+  "category": "mockups",
+  "description": "The Quotient EMAIL BROADCAST METRICS screen, hand-built from the real product: a top bar with line tabs (Metrics active / Recipients / Details / Editor) and, on the right, the kebab + share buttons, the campaign chip (blue megaphone, campaign name, 'n/m' + green progress ring), 'Threads (3) ↗' and a green-rocket 'Sent 3 days ago' status; four KPI tiles with icons (Total Emails Sent, Delivery Rate, Open Rate, Click Rate); the 'Broadcast Engagement Funnel' bar chart (1. Sent / 2. Delivered / 3. Opened / 4. Clicked, y-axis 0..max with gridlines, auto nice scale); and the 'Want to dig deeper?' card with 'Open reports →' and a black 'Ask the agent' button. Every word and number comes from data (defaults: a strong Q3 Flows launch email -- 18,400 sent, 99.20% delivered, 52.40% open, 11.80% click; funnel 18,400 → 18,253 → 9,565 → 2,154 on a 0-20000 axis so Clicked reads as a real bar). ENTRANCE (scrub-safe, all on the timeline): the header chips fade up and the campaign ring draws, the tiles land with a stagger and their numbers ROLL UP through the final format (thousands separators, %, $, K/M), the funnel card lands, gridlines + ticks fade in and the bars GROW from the baseline one after another, then the footer card. data.at shifts the whole entrance; entrance:'none' shows the settled screen from frame 0 (stills). SCRIPT verbs (data.script, [{action, at, ...}]): count {target: tile label | 'kpi-N' | funnel stage ('Clicked' | 'stage-N'), to, display?, duration?} rolls a tile's number (or grows a funnel bar) from its current value to a new one; highlight {target: tile label | stage | tab | 'kpis'|'funnel'|'footer'|'campaign'|'threads'|'Ask the agent'|any visible text, duration?, color?, hold?} -- accent ring + wash; switch-tab {to: 'Recipients'}; set-text {target: current text, to}; plus the shared cursor verbs move-cursor / click / hover / wait (targets by visible text: 'Ask the agent', 'Open reports', 'Threads', 'Recipients', a tile label, a stage label -- resolved to the real element). CAMERA ANCHORS: header, tabs, kpis, kpi-0..kpi-3, funnel, chart, stage-0..stage-3, footer. PLACEMENT: sits in quotient-app-shell's content well -- shell at x 1.2%, y 2%, width 97.6%, height 96% with show_panel:false and nav_active:'email' (breadcrumbs e.g. ['Email', 'Q3 launch email · Try Flows free']), this component at x 4.7%, y 8%, width 93.7%, height 89% with docked:true. Standalone (docked false) it is a white rounded card with a visible border + shadow. Laid out in the capture's px off the box width (1300u across, refits on resize), so it reads the same at any size; the funnel card takes the spare height.",
+  "data": {
+    "tabs": { "type": "array", "label": "Top-bar tabs: strings or {label, icon?: metrics|recipients|details|editor} (default Metrics, Recipients, Details, Editor)", "optional": true },
+    "active_tab": { "type": "string", "label": "Active tab label (default 'Metrics')", "optional": true },
+    "campaign": { "type": "string", "label": "Campaign chip name (default 'Q3 Flows Launch'; ellipsizes past ~128px like the product). false hides the chip", "optional": true },
+    "campaign_progress": { "type": "string", "label": "Chip progress text 'n/m' (default '4/4'); the green ring fills to n/m", "optional": true },
+    "campaign_ring": { "type": "number", "label": "Override the ring fill 0..1", "optional": true },
+    "threads": { "type": "number", "label": "Threads count in 'Threads (N) ↗' (default 3). false hides it", "optional": true },
+    "threads_label": { "type": "string", "label": "Full threads chip text override", "optional": true },
+    "status": { "type": "string", "label": "Sent status text beside the green rocket (default 'Sent 3 days ago'). false hides it", "optional": true },
+    "kpis": { "type": "array", "label": "KPI tiles: [{label, icon?: send|check|open|click|users|reply|dollar|trending|bounce|eye (false = none), value: number or '52.4%' (rolls up), format?: number|percent|currency|compact, decimals? (percent defaults to 2 like the product), prefix?, suffix?, display?: final text override, from?: roll-up start}] -- 4 fit best (up to 6)", "optional": true },
+    "tile_height": { "type": "number", "label": "KPI tile height in capture px (default 124)", "optional": true },
+    "funnel_title": { "type": "string", "label": "Chart card title (default 'Broadcast Engagement Funnel')", "optional": true },
+    "funnel": { "type": "array", "label": "Funnel bars: [{label: 'Sent', value: 18400}] -- labels are numbered '1. Sent' automatically (number_stages:false to skip)", "optional": true },
+    "number_stages": { "type": "boolean", "label": "Prefix stage labels with '1. ', '2. ' ... (default true)", "optional": true },
+    "axis_max": { "type": "number", "label": "Y-axis max (default: auto nice scale above the biggest bar)", "optional": true },
+    "axis_ticks": { "type": "number", "label": "Number of y-axis intervals (default 4 -> 5 ticks)", "optional": true },
+    "axis_format": { "type": "string", "label": "Y tick format: plain (default, like the product '20000') | comma | compact", "optional": true },
+    "bar_values": { "type": "boolean", "label": "Show each bar's value above it, counting up as it grows (default false -- the product shows them on hover only)", "optional": true },
+    "bar_color": { "type": "string", "label": "Bar color (default the product's #3b82f6)", "optional": true },
+    "footer": { "type": "object", "label": "'Want to dig deeper?' card: {title, text, secondary: 'Open reports', primary: 'Ask the agent'}; false hides it", "optional": true },
+    "show_footer": { "type": "boolean", "label": "false hides the footer card (the funnel takes the height)", "optional": true },
+    "accent": { "type": "string", "label": "Highlight ring color (default Quotient #393bf5)", "optional": true },
+    "entrance": { "type": "string", "label": "rise (default: tiles land + roll up, bars grow) | none (settled from frame 0, for stills)", "optional": true },
+    "at": { "type": "number", "label": "Shift the whole entrance by this many seconds (negative starts it under a relay join)", "optional": true },
+    "docked": { "type": "boolean", "label": "true = sit flush in quotient-app-shell's content well (no outer border/shadow)", "optional": true },
+    "scale": { "type": "number", "label": "Type/layout scale multiplier (default 1)", "optional": true },
+    "card_background": { "type": "string", "label": "Card background override", "optional": true },
+    "script": { "type": "array", "label": "Performance: count {target, to, display?, duration?}, highlight {target, duration?, color?}, switch-tab {to}, set-text {target, to}, move-cursor / click / hover {target: visible text} / wait -- each with at (seconds)", "optional": true },
+    "cursor_targets": { "type": "object", "label": "Explicit named cursor positions (optional; targets resolve to the real elements by their text)", "optional": true }
+  },
+  "example": {
+    "docked": true,
+    "campaign": "Q3 Flows Launch",
+    "status": "Sent 3 days ago",
+    "kpis": [
+      { "label": "Total Emails Sent", "icon": "send", "value": 18400 },
+      { "label": "Delivery Rate", "icon": "check", "value": 99.2, "format": "percent" },
+      { "label": "Open Rate", "icon": "open", "value": 52.4, "format": "percent" },
+      { "label": "Click Rate", "icon": "click", "value": 11.8, "format": "percent" }
+    ],
+    "funnel": [
+      { "label": "Sent", "value": 18400 },
+      { "label": "Delivered", "value": 18253 },
+      { "label": "Opened", "value": 9565 },
+      { "label": "Clicked", "value": 2154 }
+    ],
+    "script": [
+      { "action": "count", "target": "Open Rate", "to": 58.6, "at": 3.2 },
+      { "action": "highlight", "target": "Open Rate", "at": 3.2 },
+      { "action": "count", "target": "Clicked", "to": 3120, "at": 4.8 },
+      { "action": "click", "target": "Ask the agent", "at": 6.2 }
+    ]
+  },
+  "tier": "performable-surface"
+}

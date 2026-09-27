@@ -1,0 +1,109 @@
+{
+  "type": "quotient-analytics-report",
+  "label": "Quotient Analytics saved report (Query panel + chart + table)",
+  "category": "mockups",
+  "description": "The Quotient Reports SAVED-REPORT screen, hand-built from the real product captures (Inter, the product's own sizes, borders, radii and lucide icons): header row with the report title, a green-dot 'Last run less than a minute ago' chip, 'Go to thread ↗', kebab and the grey (disabled) Save button; on the left the QUERY PANEL (back arrow + Query/Chart toggle, Metrics rows with icon + name + × and '+ Add metric', Dimensions rows (a 'Day' select where the dimension is Time) and '+ Add dimension', Filters: '& AND' chip over a dashed group of segmented filter pills such as 'Time | between | Sep 1, 2026 | Sep 30, 2026 | 🗑' and '⊕ Add filter'); on the right the CHART (dashed gridlines, y-axis ticks, x labels, legend) over its TABLE (grey header row, white rows, type icons). ONE component, THREE chart kinds, each a complete coherent default via `preset`: 'traffic' (DEFAULT: 'Website Traffic — Last 90 Days', three smooth lines Page views / Sessions / Visitors over 90 days that CLIMB strongly into the Q3 Flows launch, table Day | Page Views | Sessions | Visitors newest day first), 'deliverables' ('Top Deliverables by Website Traffic — September 2026', bars coloured by content type with legend Email broadcast / Social post / Flow, table Source Content (type icon) | Source Content Type | Page Views | Sessions | Visitors), 'social' ('Top Performing Social Posts', a TREEMAP of posts sized by Social Impressions with name + number in each tile, legend LinkedIn, table Platform | Social Post | Social Impressions). Every word, name and number comes from data; defaults are the Flows launch world (Northwind, Sarah Chen, 'Q3 launch email · Try Flows free', 'LinkedIn: Meet Flows', 'Flows launch webinar'). The table is the chart's data: rows are derived from chart.items / chart.series unless table.rows is given, and a row whose first cell equals a chart item's label is LINKED to it (a count on one moves both). The page continues below the fold like the product (more table rows): `scroll` reveals them. ENTRANCE (scrub-safe, all on the timeline; data.at shifts it, entrance:'none' = settled from frame 0 for stills): header fades in, the query panel's rows cascade in quickly, axes fade, then bars GROW from the baseline in a stagger / treemap tiles POP in largest-first with their numbers ROLLING / lines DRAW left to right; legend fades; table rows cascade with their numbers rolling up (formatted: thousands separators, %, $, K/M kept from the final text). SCRIPT (data.script, [{action, at, ...}]): count {target: item label | row text | a number on screen e.g. '4,812', to, column?: 'Sessions' (default the first number column), display?: final text e.g. '5.1K', duration?} -- rolls the cell from its current value (and the linked tile's number / bar height), with a brief row wash; highlight {target: tile / bar / row / metric / filter / button text, duration? (1.8), hold?: true} -- accent ring on the tile, the bar stays while the others dim, the row washes, a panel row / pill / button rings; save {at, click?: true} -- the Save button enables, presses and flips to '✓ Saved' (click:true also sends the cursor to it first); set-text {target: current text, to}; switch-tab {to: 'chart' | 'query'} slides the Query/Chart toggle; scroll {to: 'table' | row text | 'top' | design px, duration?} scrolls the page (panel + chart + table) to reveal rows below the fold; plus the cursor verbs via the shared runner -- click / move-cursor / hover / wait {target}: targets resolve by visible text ('Save', 'Go to thread', 'Add filter', 'LinkedIn: Meet Flows') or the named slots save, go-to-thread, menu, back, query-tab, chart-tab, add-metric, add-dimension, add-filter. Exact matches win over partial ones. CAMERA ANCHORS: header, query (the left panel), chart, table -- camera_moves [{type:'zoom', anchor:'<componentId>.chart'}]. SIZING: lays out in em from its own width (1em = card width / 80.5 = 16 px of the 1288 px capture), so it reads the same at any size; height is free (the table fills and runs past the fold). SHELL PLACEMENT: quotient-app-shell at x 1.2%, y 2%, width 97.6%, height 96% with show_panel:false and nav_active:'analytics' (breadcrumbs e.g. ['Reports', '<report title>']); this component at x 4.7%, y 8%, width 93.7%, height 89% with docked:true (flush in the shell's white content well). Standalone (docked false) it is a white rounded card with a 2px border + shadow. Example: {\"preset\":\"deliverables\",\"docked\":true,\"script\":[{\"action\":\"highlight\",\"target\":\"LinkedIn: Meet Flows\",\"at\":3},{\"action\":\"count\",\"target\":\"LinkedIn: Meet Flows\",\"to\":5120,\"at\":3.2},{\"action\":\"save\",\"click\":true,\"at\":5.2}]}.",
+  "data": {
+    "preset": {
+      "type": "string",
+      "label": "Which saved report: 'traffic' (default -- lines), 'deliverables' (bars by content type), 'social' (treemap of posts). Fills every field below with a coherent default; anything you pass overrides that piece. A chart.type alone picks the matching preset.",
+      "optional": true
+    },
+    "title": {
+      "type": "string",
+      "label": "Report title (default per preset, e.g. 'Website Traffic — Last 90 Days')",
+      "optional": true
+    },
+    "last_run": {
+      "type": "string",
+      "label": "Green-dot status chip text (default 'Last run less than a minute ago'; false hides it)",
+      "optional": true
+    },
+    "go_to_thread": {
+      "type": "boolean",
+      "label": "Show the 'Go to thread ↗' button (default true for deliverables/social, false for traffic, as in the product); a string sets its label",
+      "optional": true
+    },
+    "saved": {
+      "type": "boolean",
+      "label": "Start with the Save button already showing '✓ Saved'",
+      "optional": true
+    },
+    "chart": {
+      "type": "object",
+      "label": "The chart. {type:'bars', items:[{label, value, series?: 'Email broadcast'|'Social post'|'Flow'|..., values?: [n, n, n] (the table's metric columns), platform?/icon?: 'linkedin'|'x'|'facebook'|'instagram'|'email'|'flow'|'none', short?: x label, color?}], y_max?, y_ticks?, bar_width?: 0-1 of the slot (0.3)} | {type:'treemap', items:[{label, value, series?: 'LinkedIn', display?}]} | {type:'lines', x: ['2026-09-01', ...] (ISO days become 'Sep 1' labels and the table's Day column), labels?: [x labels], series:[{name, color?, points:[numbers]}], y_max?, x_label_count? (12)}. Axis ticks are nice numbers (0, 750, 1.5K ...).",
+      "optional": true
+    },
+    "metrics": {
+      "type": "array",
+      "label": "Query-panel Metrics rows: ['Page Views', ...] or [{name, icon?: eye|activity|users|globe|share|thumbs-up|send|layers|clock|calendar-clock|mail|click|target|dollar|flow|hash}] (icon guessed from the name)",
+      "optional": true
+    },
+    "dimensions": {
+      "type": "array",
+      "label": "Query-panel Dimensions rows: [{name, icon?, select?: 'Day' (the granularity select)}]",
+      "optional": true
+    },
+    "filters": {
+      "type": "array",
+      "label": "Filter pills: [{field: 'Time', icon?, op: 'between'|'in last'|'is set'|..., values?: ['Sep 1, 2026', 'Sep 30, 2026']}]",
+      "optional": true
+    },
+    "legend": {
+      "type": "array",
+      "label": "Legend under the chart: ['Email broadcast', ...] or [{name, color}] (default: the chart's series in order; false hides it)",
+      "optional": true
+    },
+    "colors": {
+      "type": "object",
+      "label": "Series colours by name, e.g. {'Email broadcast': '#3b82f6'} (defaults: blue / green / purple as the product)",
+      "optional": true
+    },
+    "table": {
+      "type": "object",
+      "label": "{columns?: [{name, width?: design px number | '2fr'}], rows?: [[cell, ...]] where a cell is a string, a number (formatted 4,812) or {text|value, display?, icon?, strong?}, max_rows? (40)}. Omit rows to derive them from the chart.",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Highlight colour (default Quotient blue #393bf5)",
+      "optional": true
+    },
+    "tab": {
+      "type": "string",
+      "label": "Which toggle is active at open: 'query' (default) | 'chart'",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "label": "Performance: count {target, to, column?, display?, duration?} | highlight {target, duration?, hold?} | save {click?} | set-text {target, to} | switch-tab {to} | scroll {to: 'table'|row text|'top'|px, duration?} | click / move-cursor / hover / wait {target: visible text or save|go-to-thread|menu|back|query-tab|chart-tab|add-metric|add-dimension|add-filter}. Each takes at (seconds).",
+      "optional": true
+    },
+    "cursor_targets": {
+      "type": "object",
+      "label": "Extra named cursor positions {name: {x: '50%', y: '40%'}}",
+      "optional": true
+    },
+    "entrance": {
+      "type": "string",
+      "label": "'none' = the settled screen from frame 0 (stills); default performs the entrance",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Shift the whole entrance by this many seconds (negative starts it under a relay join)",
+      "optional": true
+    },
+    "docked": {
+      "type": "boolean",
+      "label": "true = flush in quotient-app-shell's content well (no card border/shadow). Default false = standalone white card with border + shadow.",
+      "optional": true
+    },
+    "scale": {
+      "type": "number",
+      "label": "Type/layout scale multiplier (default 1 = the product's proportions at the box width)",
+      "optional": true
+    }
+  },
+  "tier": "performable-surface"
+}
