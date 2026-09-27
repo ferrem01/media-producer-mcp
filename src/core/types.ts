@@ -446,6 +446,9 @@ export interface AudioTrack {
   /** Skip this many seconds of the source before it starts playing (e.g.
    *  align a music track's first downbeat with video t=0). */
   trim_start?: number;
+  /** Play only this many seconds of the source (after trim_start): two
+   *  clips of one song can repeat a bar (the develop. film's breakdown). */
+  duration?: number;
   loop?: boolean;
   fade_in?: number;
   fade_out?: number;

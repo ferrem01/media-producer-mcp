@@ -2075,19 +2075,22 @@ ${QUOTIENT_CSS}
         }
         var dur = el.duration;
         if (!dur || !isFinite(dur)) continue;
+        var trim = el._trimStart || 0;
         if (clip.loop) {
           // Looping music: spans the whole timeline.
-          syncElement(clip, el, time % dur, playing, false);
+          syncElement(clip, el, (trim + time) % dur, playing, false);
         } else {
-          // Voiceover/sfx: only audible inside its window on the global
-          // timeline. Source position is time relative to the clip's start.
+          // Voiceover/sfx/music: only audible inside its window on the global
+          // timeline. Source position is time relative to the clip's start,
+          // after the trimmed head, for the clip's length.
           var local = time - (clip.start || 0);
-          if (local < 0 || local >= dur) {
+          var span = el._clipDur > 0 ? Math.min(el._clipDur, dur - trim) : dur - trim;
+          if (local < 0 || local >= span) {
             if (!el.paused) el.pause();
             clip.lastOffset = null;
             continue;
           }
-          syncElement(clip, el, local, playing, false);
+          syncElement(clip, el, trim + local, playing, false);
         }
         continue;
       }
@@ -2326,6 +2329,11 @@ ${QUOTIENT_CSS}
       // When on the global timeline this track begins (voiceover clips are
       // staggered per scene). Looping music spans the whole timeline.
       audio._startTime = typeof track.start_time === 'number' ? track.start_time : 0;
+      // The source head skipped (a drop landed on the film's beat) and the
+      // clip length (a bar repeated by two clips of one song) -- the render
+      // honours both, so the preview must too (it played the song from 0).
+      audio._trimStart = Number(track.trim_start) > 0 ? Number(track.trim_start) : 0;
+      audio._clipDur = Number(track.duration) > 0 ? Number(track.duration) : 0;
       audio._cue = !!track._cue;
 
       // Kick off buffering now (on project load) so the first clip is decoded
@@ -2370,6 +2378,7 @@ ${QUOTIENT_CSS}
       if (audio._cue) return; // a sound cue draws on the Effects lane
       var start = audio._startTime || 0;
       var dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : 0;
+      if (dur > 0) dur = audio._clipDur > 0 ? Math.min(audio._clipDur, dur - (audio._trimStart || 0)) : dur - (audio._trimStart || 0);
       // Looping music covers from its start to the end of the film.
       var end = audio.loop ? total : (dur > 0 ? Math.min(start + dur, total) : total);
       if (end <= start) return;

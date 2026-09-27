@@ -100,7 +100,9 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
 
     // Fade out
     if (track.fadeOut && track.fadeOut > 0) {
-      const fadeOutStart = opts.totalDuration - track.fadeOut;
+      // A clip (duration) fades at ITS end, not the film's.
+      const clipEnd = track.duration && track.duration > 0 ? Math.min(opts.totalDuration, (track.startTime || 0) + span) : opts.totalDuration;
+      const fadeOutStart = Math.max(0, clipEnd - track.fadeOut);
       filters.push(`afade=t=out:st=${fadeOutStart}:d=${track.fadeOut}`);
     }
 
