@@ -6,6 +6,54 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — Relay v2: the continuous take, with "develop." as the reference
+
+Marc, on the "develop." launch film (x.com/twoclipping/status/2103835273813496100):
+"a better example of the new grammar we just created ... Let's modify the relay
+grammar to reflect this video and add any components or concepts we need to
+recreate this video with megamedia. Then recreate it as our validation." Then:
+"make this the reference video for relay".
+
+- **The grammar** (`SPEC-relay.md` v2; director, storyboard contract, server
+  instructions):
+  - The continuous take is relay's default: 3-7 scenes, zero cuts.
+  - Scenes join on identical frames: the same full-frame photo, or a flood
+    to black that contracts into the next scene's first shape.
+  - A cursor drives every change, something happens on every beat, and the
+    film loops.
+  - The punctuated oners (Cosmos) stay for claim-slam briefs. The relay
+    scene band is now 3-14.
+- **The locked camera** (`scene.locked_camera`):
+  - The problem: every assembled scene drifted (Ken Burns to scale 1.03)
+    over an ambient dot layer. A scene's last frame never matched the
+    next's first, and the dots are the particles the reference bans.
+  - Locked drops both; `camera_moves` still play.
+  - The build stamps it on relay scenes, and `add` / `update` take it.
+- **Ten pieces** (`SPEC-relay.md` kit table):
+  - `wordmark-squeeze`, `iris`, `photo-unfold`, `glass-relight`,
+    `glass-lockscreen`, `desktop-stage`, `print-shop`, `status-morph` and
+    `framed-print` are new.
+  - `color-flood` gains `mode:"flood"` / `"contract"`.
+  - Four parallel builders made them against a shared geometry contract.
+    Two were stopped mid-way by a session interruption; their work was
+    complete and passing its tests, and was finished and integrated here.
+- **Music:**
+  - The audio tool takes `trim_start`, so a drop lands on the film's beat.
+  - `jamendo:<id>` sources download again: the branch tested `!source`
+    after `source` was already set to the id, so it never ran.
+- **The rebuild** (`proj_790dc4fa`):
+  - 5 scenes, 28.3 s on a 123 BPM bed, with every reference time scaled by
+    120/123.
+  - The four joins and the loop are equal to within a few cursor pixels in
+    local stills.
+  - Two timing rules came out of it:
+    - A component's default times are the reference's 120 BPM offsets, so
+      on another tempo every `*_at` must be written.
+    - A scene's last move must end a frame before the scene does. A zoom
+      still finishing on the last frame left a visible jump at the join.
+  - Not reproduced: the reference's hands, its breakdown (the bed has none
+    under the wall), and its motion blur (a render-time subframe blend).
+
 ## 2026-09-27 — The take: a fill light, a blur amount, and a status line that says what is happening
 
 Marc on his booth take for the Instagram ad (proj_4dfaa63e): "The dark side

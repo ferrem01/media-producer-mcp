@@ -5,8 +5,20 @@ Status: SHIPPED 2026-09-26 (Marc: "Yes on grammar"). The grammar the parked
 are coordinates between library components. It needed no morph runtime;
 since Morph v1 (2026-09-26) any other pair hands off with
 `enter {effect: "morph", from}`.
-Reference film: the Cosmos promo (x.com/kaolti/status/2103481296018092204),
-rebuilt as `proj_9c829aa3` (13 scenes, 39.5 s, one 18 s oner).
+**THE reference film: "develop."** (x.com/twoclipping/status/2103835273813496100),
+rebuilt as `proj_790dc4fa` (5 scenes, 29 s, square, one continuous take).
+Marc, 2026-09-27: "make this the reference video for relay". The first
+reference, the Cosmos promo (x.com/kaolti/status/2103481296018092204,
+rebuilt as `proj_9c829aa3`: 13 scenes, 39.5 s, one 18 s oner), stays as
+the reference for the punctuated-oners dialect only.
+
+**v2 (2026-09-27): the continuous take.** Marc, on the "develop." launch
+film (x.com/twoclipping/status/2103835273813496100): "a better example of
+the new grammar we just created". It is relay with the punctuation taken
+out: 29 s, square, one continuous take with no cut the eye can find.
+Rebuilt as `proj_790dc4fa`. It is now the DEFAULT dialect; the punctuated
+oners (Cosmos) stay for a film whose argument is a set of short claims.
+See "v2: the continuous take" below.
 
 ## What it is
 
@@ -108,3 +120,83 @@ there and a punctuation cut follows.
 - A rack-focus transition that joins two oners.
 - Handoffs across a scene boundary. v1 keeps every handoff inside one scene,
   where both components share a page.
+
+## v2: the continuous take
+
+The reference is 29 s at 120 BPM: 54 beats, and something happens on every
+beat. Nothing fades, blurs or cuts. Objects change shape instead.
+
+The beat map, as rebuilt:
+
+| Film s | What happens | Made from |
+|---|---|---|
+| 0-6 | The wordmark squeezes into its own period. The dot grows into a black pill, and a label rises inside it. A click closes six iris blades over the label, and they open onto a photo. | the wordmark |
+| 6-11.25 | The circle becomes a square and shrinks. The grid unfolds from behind it like a paper map (centre, plus, corners) and reflows into a bento. A click zooms into one tile, landing on the drop. | the iris photo |
+| 11.25-16 | A glass word pops in letter by letter and melts into a droplet that stretches into a glass toolbar. Dragging a slider relights the photo from day to golden hour. The knob lifts into a glass orb, the next photo opens inside it, and the orb expands into a lock screen. | the zoomed tile (full-frame photo) |
+| 16-21.75 | The lock screen pulls back into a phone. The island flies over and grows into a Mac window. The wallpaper is dragged onto a Safari tab and becomes the hero of a landing page, then morphs into a framed print on a product card. The nav button flies down into "Order print". One black shape morphs: Ordered ✓ → Printing % → On its way → Delivered ✓. | the lock screen |
+| 21.75-25.5 | The delivered circle floods the frame, holds black for a beat, and contracts into the framed print hanging on real wall footage (the breakdown). | the delivered circle |
+| 25.5-29 | The iris opens onto the print and closes again. The frame floods and contracts into the pill → the dot → the letters spring back out, on the beat return. The last frame is the first. | the print |
+
+### The rules
+
+- **One take, 3-7 scenes, zero cuts.** A scene boundary is an engineering
+  seam (component count, a new world), never a cut the eye sees. Every
+  `transition_in` is `none`.
+- **Scene joins land on identical frames.** A scene ends on a frame the next
+  scene starts on, pixel for pixel. Two joins do it:
+  - **A full-frame photo.** One scene zooms into a tile until the photo
+    fills the frame; the next scene starts on that photo, full frame.
+  - **The flood / contract.** One scene ends on
+    `color-flood {mode: "flood"}`: a shape grows past the corners (about
+    0.3 s, overscaled, or half the screen changes in one frame) to full
+    black. The next scene starts on
+    `color-flood {mode: "contract"}`: full black shrinking into its first
+    shape.
+- **The locked camera.** Every assembled scene used to drift (a Ken Burns
+  push to scale 1.03 plus a few pixels) over an ambient dot layer, so one
+  scene's last frame never matched the next scene's first, and the dots are
+  the "particles" the reference bans. `locked_camera: true` on a scene drops
+  both; `camera_moves` still play. The build stamps it on every relay scene,
+  and the `add` / `update` tools take it.
+- **The cursor drives every change.** Each change is a real click, drag or
+  long-press. Components with clicks take `cursor`, `cursor_from` and
+  `cursor_to`, so the next component picks the cursor up where the last one
+  left it.
+- **A beat on every beat.** Every time sits on the music's grid (0.5 s at
+  120 BPM). No hold is longer than 1 s. The song starts on a downbeat
+  (`trim_start` on the music track), the zoom lands on the drop, the quiet
+  scene sits in the breakdown, and the return lands on the beat.
+- **The film loops.** The close runs the open backwards, so the last frame
+  is the first.
+- **Banned:** crossfades, blur-ins, brightness "developing", 3D flips,
+  particles, glows, holds over 1 s, anything that looks like a template.
+
+### The v2 kit (the handoff geometry, fractions of a square frame)
+
+Every piece meets the next at shared coordinates:
+
+- pill: centre (0.5, 0.5), width 0.30, height 0.085;
+- iris circle: diameter 0.30;
+- hero tile: side 0.46;
+- phone: height 0.52, width 0.52 × 0.485;
+- done circle: centre (0.5, 0.62), diameter 0.12;
+- framed print: 0.30 × 0.40.
+
+| Piece | What it performs | Joins |
+|---|---|---|
+| `wordmark-squeeze` | `mode:"open"`: the wordmark squeezes into its own period, the dot grows into the pill, a label rises, a click. `mode:"return"`: pill → dot → the letters spring back out. | Open ends on the pill (`hide_at`); return's last frame = open's first frame. |
+| `iris` | Six blades close over a shape (from the pill, or a rect) and snap open onto a photo. | `from` = the pill box; after the open, a photo in the circle (d 0.30) or the print rect. |
+| `photo-unfold` | Circle → rounded square → shrink → the grid unfolds like a paper map → bento → a click zooms one tile to full frame. | Starts as the iris circle; ends on a plain full-frame photo (a scene join). |
+| `glass-relight` | A glass word melts into a toolbar; a slider relights day → golden hour (two aligned shots); the knob becomes a lens, lifts into an orb, and the next photo expands to full frame. | Starts and ends on full-frame photos (two scene joins). |
+| `glass-lockscreen` | The full-frame photo becomes a lock screen (glass clock, a home bar that stretches into a player) and pulls back into a phone. | Ends on the phone geometry, the silk stage. |
+| `desktop-stage` | The island pinches off into a Mac window that rolls up onto Safari; the wallpaper is long-pressed, dragged in, dropped as a landing-page hero. | Starts on the phone; ends on the window + hero box. |
+| `print-shop` | The hero morphs into a framed print on a product card; frame colour paints on, size slides, "Order print"; one black shape runs Ordered → Printing % → On its way → done. | Starts on desktop-stage's last frame; ends on the done circle (0.5, 0.62) d 0.12. |
+| `status-morph` | The same one-shape state machine, standalone. | Its done circle defaults to the done geometry. |
+| `color-flood` `mode:"flood"` / `"contract"` | A shape floods the frame to black; black contracts into the next first shape. | The scene joiner. |
+| `framed-print` | A print on the wall footage (or plaster): mat and molding, a slow push to the photo, a flood. | Starts as the black print rect a contract lands on; ends on a flood. |
+
+Times inside these pieces default to the reference's 120 BPM offsets. On any other tempo, write every `*_at` explicitly (the rebuild scaled all of them by 120/123), and end each scene's last move at least one frame before its end, or the join lands mid-move (measured: a zoom still finishing on the last frame left a 2-level mean difference at the join; after the fix, 0.05).
+
+### The rebuild, measured
+
+`proj_790dc4fa`: 5 scenes, 28.3 s on a 123 BPM bed ("Nothing More To Say", Jamendo 1332110, `trim_start` 11.13 so the drop lands on the zoom at 5.85 s). All four joins and the loop compare equal to within a few cursor pixels (mean difference ≤ 0.05 of 255) in local stills. The bed has no quiet section where the wall sits; the reference's breakdown is not reproduced.

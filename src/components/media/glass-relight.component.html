@@ -1,0 +1,608 @@
+<template>
+  <div class="grl">
+    <div class="grl-cam">
+      <img class="grl-day" alt="" />
+      <img class="grl-after" alt="" />
+      <div class="grl-warm"></div>
+      <div class="grl-sun"></div>
+      <svg class="grl-glass grl-glass-a" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="grl-ui">
+        <div class="grl-icons"></div>
+        <div class="grl-slider">
+          <div class="grl-row">
+            <div class="grl-label"><span class="grl-sunicon"></span><span class="grl-label-t"></span></div>
+            <div class="grl-value">0</div>
+          </div>
+          <div class="grl-track"><div class="grl-fill"></div></div>
+        </div>
+      </div>
+      <svg class="grl-glass grl-glass-b" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <img class="grl-next" alt="" />
+  </div>
+</template>
+
+<style scoped>
+  /* GLASS RELIGHT: iOS-26 liquid glass over a photo, one object changing
+     shape the whole way -- a glass word pops in letter by letter, melts into
+     one droplet that falls and stretches into a glass toolbar; the adjust
+     icon turns it into a slider; dragging relights the photo (day -> golden
+     hour); the knob becomes a glass lens, lifts into an orb, the next photo
+     opens inside it and the orb floods the frame with it. Every glass shape
+     carries its own copy of the photo behind it, refracted at the rim
+     (displacement from the shape's own blurred alpha), frosted, rim-lit. */
+  .grl, .grl * { max-width: none; box-sizing: border-box; }
+  .grl { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background: #0b0b0c;
+    font-family: 'Geist', var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .grl-cam { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; will-change: transform; }
+  .grl-day, .grl-after, .grl-next { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }
+  .grl-after { opacity: 0; }
+  .grl-next { visibility: hidden; }
+  .grl-warm { position: absolute; inset: 0; opacity: 0; mix-blend-mode: multiply;
+    background: linear-gradient(180deg, #ff9a52 0%, #ffb877 45%, #e2874a 100%); }
+  .grl-sun { position: absolute; left: 0; top: 0; border-radius: 50%; opacity: 0; mix-blend-mode: screen;
+    background: radial-gradient(circle, rgba(255,247,214,1) 0%, rgba(255,196,110,0.75) 18%, rgba(255,140,60,0.28) 45%, rgba(255,120,40,0) 70%); }
+  .grl-glass { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+  .grl-ui { position: absolute; left: 0; top: 0; overflow: hidden; color: #fff; }
+  .grl-icons { position: absolute; left: 0; top: 0; }
+  .grl-ico { position: absolute; left: 0; top: 0; display: block; }
+  .grl-ico svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.28)); }
+  .grl-slider { position: absolute; left: 0; top: 0; }
+  .grl-row { position: absolute; left: 0; top: 0; display: flex; justify-content: space-between; align-items: center; white-space: nowrap;
+    font-weight: 500; letter-spacing: -0.005em; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+  .grl-label { display: flex; align-items: center; }
+  .grl-sunicon { display: inline-block; }
+  .grl-sunicon svg { display: block; width: 100%; height: 100%; }
+  .grl-value { font-variant-numeric: tabular-nums; }
+  .grl-track { position: absolute; left: 0; top: 0; border-radius: 999px; background: rgba(255,255,255,0.32);
+    box-shadow: inset 0 0.5px 1px rgba(0,0,0,0.25); transform-origin: 0 50%; }
+  .grl-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 999px; background: #fff; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.grl');
+    if (!root) return tl;
+    var q = function (s) { return root.querySelector(s); };
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || 1080, H = root.clientHeight || 1080;
+    // THE FRAME, not the box: a full-frame slot rides the camera layer, which
+    // overhangs the frame on every side. Geometry is laid out in the visible
+    // frame (centred in the box); the photo layers still cover the whole box.
+    var FW = W, FH = H;
+    if (ctx && ctx.canvas && W >= ctx.canvas.width && H >= ctx.canvas.height) { FW = ctx.canvas.width; FH = ctx.canvas.height; }
+    var FX = (W - FW) / 2, FY = (H - FH) / 2;
+    var fx = function (v) { return FX + FW * v; }, fy = function (v) { return FY + FH * v; };
+    var U = Math.min(FW, FH);               // the size unit (the frame is square in the reference)
+    var NS = 'http://www.w3.org/2000/svg';
+    var cid = ((el.closest && el.closest('[data-cid]')) || el).getAttribute('data-cid') || 'x';
+    var uid = 'grl' + String(cid).replace(/[^a-zA-Z0-9]/g, '') + (window.__grlN = (window.__grlN || 0) + 1);
+
+    // ── Geist for the UI (id-guarded, one link per document) ──
+    if (!document.getElementById('mp-font-geist')) {
+      var lk = document.createElement('link');
+      lk.id = 'mp-font-geist'; lk.rel = 'stylesheet';
+      lk.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap';
+      document.head.appendChild(lk);
+    }
+
+    // ── Times (scene seconds; every default is relative to `at`) ──
+    var at = num(data.at, 0);
+    var T = {
+      word: num(data.word_at, at + 0.25),
+      melt: num(data.melt_at, at + 1.0),
+      toolbar: num(data.toolbar_at, at + 1.3),
+      click: num(data.click_at, at + 2.25),
+      slider: num(data.slider_at, at + 2.5),
+      drag: num(data.drag_at, at + 2.75),
+      dragEnd: num(data.drag_end, at + 4.0),
+      lens: num(data.lens_at, at + 4.25),
+      orb: num(data.orb_at, at + 4.5),
+      expand: num(data.expand_at, at + 4.9)
+    };
+    T.like = num(data.like_at, T.click - 0.3);
+    T.expandEnd = T.expand + num(data.expand_duration, 0.35);
+    var END = T.expandEnd + 0.6;
+
+    // ── Data ──
+    var img = data.image || data.src || '';
+    var imgAfter = data.image_after || '';
+    var nextImg = data.next_image || '';
+    var word = String(data.word == null ? 'relight.' : data.word);
+    var label = String(data.slider_label || 'Golden hour');
+    var sun = data.sun || { x: 0.5, y: 0.42 };
+    var iconNames = Array.isArray(data.icons) && data.icons.length ? data.icons.slice(0, 6) : ['share', 'heart', 'info', 'adjust'];
+    var adjustIdx = Math.max(0, iconNames.indexOf('adjust')); if (iconNames.indexOf('adjust') < 0) adjustIdx = iconNames.length - 1;
+    var heartIdx = iconNames.indexOf('heart');
+    var accent = data.accent || '#ff9f0a';
+    var useCursor = data.cursor !== false;
+    var cFrom = Array.isArray(data.cursor_from) ? data.cursor_from : [0.72, 0.5];
+    var cTo = Array.isArray(data.cursor_to) ? data.cursor_to : [0.8, 0.74];
+    var camOn = data.camera !== false;
+
+    // ── Geometry (fractions of the box; sizes in U) ──
+    var WX = fx(num(data.word_x, 0.36)), WY = fy(num(data.word_y, 0.26)), FS = U * num(data.word_size, 0.13);
+    var TB = { cx: fx(0.5), cy: fy(num(data.toolbar_y, 0.9)), w: U * 0.62, h: U * 0.08 };
+    TB.r = TB.h / 2;
+    var PN = { w: U * 0.74, h: U * 0.15, r: U * 0.045 };
+    PN.cx = fx(0.5); PN.cy = TB.cy + TB.h / 2 - PN.h / 2;
+    var PAD = U * 0.034;
+    var TRK = { x0: PN.cx - PN.w / 2 + PAD, x1: PN.cx + PN.w / 2 - PAD, y: PN.cy + PN.h / 2 - U * 0.043, h: U * 0.0065 };
+    var KN = { w: U * 0.078, h: U * 0.046 };
+    var DROP = U * 0.07;
+    var LD = U * num(data.lens_size, 0.2), OD = U * num(data.orb_size, 0.28);
+    var ORB = { x: fx(num(data.orb_x, 0.5)), y: fy(num(data.orb_y, 0.36)) };
+
+    // ── Photo layers ──
+    var day = q('.grl-day'), after = q('.grl-after'), warm = q('.grl-warm'), sunEl = q('.grl-sun'), next = q('.grl-next');
+    if (img) day.src = img; else day.style.display = 'none';
+    if (imgAfter) { after.src = imgAfter; warm.style.display = 'none'; sunEl.style.display = 'none'; }
+    else after.style.display = 'none';
+    var SUNR = U * 0.55;
+    sunEl.style.width = sunEl.style.height = (SUNR * 2) + 'px';
+    gsap.set(sunEl, { x: fx(num(sun.x, 0.5)) - SUNR, y: fy(num(sun.y, 0.42)) - SUNR });
+    if (nextImg) next.src = nextImg; else next.style.display = 'none';
+
+    // ── SVG helpers ──
+    var S = function (tag, attrs, parent) {
+      var n = document.createElementNS(NS, tag);
+      for (var k in attrs) if (attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+      if (parent) parent.appendChild(n);
+      return n;
+    };
+    var A = function (n, attrs) { for (var k in attrs) n.setAttribute(k, attrs[k]); };
+
+    // THE GLASS: one kit per glass layer. The shapes live in a (goo-able)
+    // mask; the masked group holds a copy of the photo exactly aligned with
+    // the one behind (same box, `slice` = object-fit cover), magnified about
+    // the shape's centre; a filter bends it at the rim (a displacement map
+    // made from the gradient of the shape's own blurred alpha, three scales
+    // for chromatic edges), frosts, tints, and lights the rim.
+    function glassKit(svg, id) {
+      A(svg, { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H });
+      var defs = S('defs', {}, svg);
+      var goo = S('filter', { id: id + '-goo', filterUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H, 'color-interpolation-filters': 'sRGB' }, defs);
+      var gooBlur = S('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: 1 }, goo);
+      S('feColorMatrix', { type: 'matrix', values: '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10' }, goo);
+      var mask = S('mask', { id: id + '-m', maskUnits: 'userSpaceOnUse', x: -W, y: -H, width: W * 3, height: H * 3 }, defs);
+      var shapes = S('g', {}, mask);
+      var iris = S('clipPath', { id: id + '-iris' }, defs);
+      var irisC = S('circle', { cx: 0, cy: 0, r: 0 }, iris);
+      var f = S('filter', { id: id + '-f', filterUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H, 'color-interpolation-filters': 'sRGB' }, defs);
+      var P = {};
+      P.b = S('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: 6, result: 'b' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 1 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1', result: 'bx' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 -1 1  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1', result: 'bxn' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 0 0  0 0 0 1 0  0 0 0 0 0  0 0 0 0 1', result: 'by' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 0 0  0 0 0 -1 1  0 0 0 0 0  0 0 0 0 1', result: 'byn' }, f);
+      P.ox1 = S('feOffset', { in: 'bx', dx: -3, dy: 0, result: 'bxR' }, f);
+      P.ox2 = S('feOffset', { in: 'bxn', dx: 3, dy: 0, result: 'bxnL' }, f);
+      P.oy1 = S('feOffset', { in: 'by', dx: 0, dy: -3, result: 'byD' }, f);
+      P.oy2 = S('feOffset', { in: 'byn', dx: 0, dy: 3, result: 'bynU' }, f);
+      var K = 2.6;
+      S('feComposite', { in: 'bxR', in2: 'bxnL', operator: 'arithmetic', k1: 0, k2: K / 2, k3: K / 2, k4: 0.5 - K / 2, result: 'gx' }, f);
+      S('feComposite', { in: 'byD', in2: 'bynU', operator: 'arithmetic', k1: 0, k2: K / 2, k3: K / 2, k4: 0.5 - K / 2, result: 'gy' }, f);
+      S('feComposite', { in: 'gx', in2: 'gy', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'map' }, f);
+      P.dR = S('feDisplacementMap', { in: 'SourceGraphic', in2: 'map', scale: 20, xChannelSelector: 'R', yChannelSelector: 'G', result: 'dR' }, f);
+      P.dG = S('feDisplacementMap', { in: 'SourceGraphic', in2: 'map', scale: 18, xChannelSelector: 'R', yChannelSelector: 'G', result: 'dG' }, f);
+      P.dB = S('feDisplacementMap', { in: 'SourceGraphic', in2: 'map', scale: 16, xChannelSelector: 'R', yChannelSelector: 'G', result: 'dB' }, f);
+      S('feColorMatrix', { in: 'dR', type: 'matrix', values: '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0', result: 'cR' }, f);
+      S('feColorMatrix', { in: 'dG', type: 'matrix', values: '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0', result: 'cG' }, f);
+      S('feColorMatrix', { in: 'dB', type: 'matrix', values: '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0', result: 'cB' }, f);
+      S('feComposite', { in: 'cR', in2: 'cG', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'cRG' }, f);
+      S('feComposite', { in: 'cRG', in2: 'cB', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'disp' }, f);
+      P.frost = S('feGaussianBlur', { in: 'disp', stdDeviation: 1, result: 'frost' }, f);
+      P.sat = S('feColorMatrix', { in: 'frost', type: 'saturate', values: 1.45, result: 'sat' }, f);
+      P.bri = S('feComponentTransfer', { in: 'sat', result: 'bri' }, f);
+      P.briR = S('feFuncR', { type: 'linear', slope: 1.06, intercept: 0.02 }, P.bri);
+      P.briG = S('feFuncG', { type: 'linear', slope: 1.06, intercept: 0.02 }, P.bri);
+      P.briB = S('feFuncB', { type: 'linear', slope: 1.06, intercept: 0.02 }, P.bri);
+      S('feComposite', { in: 'bri', in2: 'SourceAlpha', operator: 'in', result: 'body' }, f);
+      P.tint = S('feFlood', { 'flood-color': '#ffffff', 'flood-opacity': 0.1, result: 'tintc' }, f);
+      S('feComposite', { in: 'tintc', in2: 'SourceAlpha', operator: 'in', result: 'tint' }, f);
+      P.spec = S('feSpecularLighting', { in: 'b', surfaceScale: 4, specularConstant: 0.9, specularExponent: 28, 'lighting-color': '#ffffff', result: 'spec0' }, f);
+      S('feDistantLight', { azimuth: 235, elevation: 42 }, P.spec);
+      P.specA = S('feComponentTransfer', { in: 'spec0', result: 'spec1' }, f);
+      P.specAA = S('feFuncA', { type: 'linear', slope: 0.8, intercept: 0 }, P.specA);
+      S('feComposite', { in: 'spec1', in2: 'SourceAlpha', operator: 'in', result: 'spec' }, f);
+      P.rt = S('feOffset', { in: 'SourceAlpha', dx: 1, dy: 1.6, result: 'sT' }, f);
+      S('feComposite', { in: 'SourceAlpha', in2: 'sT', operator: 'out', result: 'rT0' }, f);
+      P.rtc = S('feFlood', { 'flood-color': '#ffffff', 'flood-opacity': 0.75, result: 'rTc' }, f);
+      S('feComposite', { in: 'rTc', in2: 'rT0', operator: 'in', result: 'rimT' }, f);
+      P.rb = S('feOffset', { in: 'SourceAlpha', dx: -1, dy: -1.6, result: 'sB' }, f);
+      S('feComposite', { in: 'SourceAlpha', in2: 'sB', operator: 'out', result: 'rB0' }, f);
+      P.rbc = S('feFlood', { 'flood-color': '#ffffff', 'flood-opacity': 0.3, result: 'rBc' }, f);
+      S('feComposite', { in: 'rBc', in2: 'rB0', operator: 'in', result: 'rimB' }, f);
+      P.sh = S('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: 8, result: 'sh0' }, f);
+      P.sho = S('feOffset', { in: 'sh0', dx: 0, dy: 5, result: 'sh1' }, f);
+      P.shc = S('feFlood', { 'flood-color': '#000000', 'flood-opacity': 0.22, result: 'shc' }, f);
+      S('feComposite', { in: 'shc', in2: 'sh1', operator: 'in', result: 'sh2' }, f);
+      S('feComposite', { in: 'sh2', in2: 'SourceAlpha', operator: 'out', result: 'shadow' }, f);
+      var mg = S('feMerge', {}, f);
+      ['shadow', 'body', 'tint', 'spec', 'rimB', 'rimT'].forEach(function (r) { S('feMergeNode', { in: r }, mg); });
+
+      var outer = S('g', { filter: 'url(#' + id + '-f)' }, svg);
+      var inner = S('g', { mask: 'url(#' + id + '-m)' }, outer);
+      var mag = S('g', {}, inner);
+      // An opaque floor under the copies so the frame edge is never read as a glass edge.
+      S('rect', { x: -W, y: -H, width: W * 3, height: H * 3, fill: '#0b0b0c' }, inner).parentNode.insertBefore(inner.lastChild, mag);
+      // The photo copies: identical to the layers behind.
+      var cDay = img ? S('image', { href: img, x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' }, mag) : S('rect', { x: 0, y: 0, width: W, height: H, fill: '#6f8fb0' }, mag);
+      var cAfter = null, cWarm = null, cSun = null;
+      if (imgAfter) cAfter = S('image', { href: imgAfter, x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice', opacity: 0 }, mag);
+      else {
+        var lg = S('linearGradient', { id: id + '-wg', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+        S('stop', { offset: '0', 'stop-color': '#ff9a52' }, lg); S('stop', { offset: '0.45', 'stop-color': '#ffb877' }, lg); S('stop', { offset: '1', 'stop-color': '#e2874a' }, lg);
+        var rg = S('radialGradient', { id: id + '-sg' }, defs);
+        S('stop', { offset: '0', 'stop-color': 'rgb(255,247,214)', 'stop-opacity': 1 }, rg); S('stop', { offset: '0.18', 'stop-color': 'rgb(255,196,110)', 'stop-opacity': 0.75 }, rg);
+        S('stop', { offset: '0.45', 'stop-color': 'rgb(255,140,60)', 'stop-opacity': 0.28 }, rg); S('stop', { offset: '0.7', 'stop-color': 'rgb(255,120,40)', 'stop-opacity': 0 }, rg);
+        cWarm = S('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#' + id + '-wg)', opacity: 0, style: 'mix-blend-mode:multiply' }, mag);
+        cSun = S('circle', { cx: fx(num(sun.x, 0.5)), cy: fy(num(sun.y, 0.42)), r: SUNR, fill: 'url(#' + id + '-sg)', opacity: 0, style: 'mix-blend-mode:screen' }, mag);
+      }
+      return { svg: svg, f: f, P: P, shapes: shapes, gooBlur: gooBlur, gooId: id + '-goo', inner: inner, mag: mag, irisC: irisC, irisId: id + '-iris', cAfter: cAfter, cWarm: cWarm, cSun: cSun };
+    }
+    // Rim/refraction strength, by edge width E (px of curvature), displacement S.
+    function glassParams(k, o) {
+      var P = k.P, E = Math.max(0.5, o.E), d = Math.max(0.5, E * 0.6), s = o.S;
+      A(P.b, { stdDeviation: E });
+      A(P.ox1, { dx: -d }); A(P.ox2, { dx: d }); A(P.oy1, { dy: -d }); A(P.oy2, { dy: d });
+      var ch = o.ch == null ? 0.2 : o.ch;
+      A(P.dR, { scale: s }); A(P.dG, { scale: s * (1 - ch / 2) }); A(P.dB, { scale: s * (1 - ch) });
+      A(P.frost, { stdDeviation: Math.max(0, o.frost) });
+      A(P.sat, { values: o.sat == null ? 1.45 : o.sat });
+      var sl = o.bright == null ? 1.06 : o.bright, ic = o.lift == null ? 0.02 : o.lift;
+      [P.briR, P.briG, P.briB].forEach(function (n) { A(n, { slope: sl, intercept: ic }); });
+      A(P.tint, { 'flood-opacity': o.tint });
+      A(P.spec, { surfaceScale: o.ss == null ? 4 : o.ss });
+      A(P.specAA, { slope: o.spec == null ? 0.8 : o.spec });
+      var rw = o.rim == null ? 1.5 : o.rim;
+      A(P.rt, { dx: rw * 0.45, dy: rw }); A(P.rb, { dx: -rw * 0.45, dy: -rw });
+      A(P.rtc, { 'flood-opacity': o.rimTop == null ? 0.75 : o.rimTop });
+      A(P.rbc, { 'flood-opacity': o.rimBot == null ? 0.3 : o.rimBot });
+      A(P.sh, { stdDeviation: o.shBlur == null ? U * 0.008 : o.shBlur });
+      A(P.sho, { dy: o.shY == null ? U * 0.005 : o.shY });
+      A(P.shc, { 'flood-opacity': o.shadow == null ? 0.22 : o.shadow });
+    }
+    function region(k, x0, y0, x1, y1, m) {
+      var X0 = Math.max(-m, x0 - m), Y0 = Math.max(-m, y0 - m), X1 = Math.min(W + m, x1 + m), Y1 = Math.min(H + m, y1 + m);
+      A(k.f, { x: X0, y: Y0, width: Math.max(1, X1 - X0), height: Math.max(1, Y1 - Y0) });
+    }
+    function magnify(k, cx, cy, m) {
+      k.mag.setAttribute('transform', 'translate(' + cx + ' ' + cy + ') scale(' + m + ') translate(' + (-cx) + ' ' + (-cy) + ')');
+    }
+
+    var gA = glassKit(q('.grl-glass-a'), uid + 'a');
+    var gB = glassKit(q('.grl-glass-b'), uid + 'b');
+    // Layer A: the word, the droplet, the toolbar, the slider panel (one goo'd mask).
+    var fontFam = "Geist, " + ((getComputedStyle(root).getPropertyValue('--mp-font-family') || '').trim() || 'Inter') + ", system-ui, sans-serif";
+    var letters = [];
+    for (var li = 0; li < word.length; li++) {
+      var ch = word.charAt(li);
+      var tx = S('text', { x: 0, y: 0, fill: '#fff', 'text-anchor': 'middle', 'font-size': FS, 'font-weight': 700, style: 'font-family:' + fontFam + ';letter-spacing:0' }, gA.shapes);
+      tx.textContent = ch;
+      letters.push({ ch: ch, el: tx });
+    }
+    var blob = S('rect', { x: 0, y: 0, width: 0, height: 0, rx: 0, ry: 0, fill: '#fff' }, gA.shapes);
+    // Layer B: the knob -> lens -> orb, which carries the next photo.
+    var lensR = S('rect', { x: 0, y: 0, width: 0, height: 0, rx: 0, ry: 0, fill: '#fff' }, gB.shapes);
+    var nextG = null, nextI = null;
+    if (nextImg) {
+      nextG = S('g', { 'clip-path': 'url(#' + gB.irisId + ')' }, gB.inner);
+      nextI = S('image', { href: nextImg, x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' }, nextG);
+    }
+
+    // Letter layout: measured advances (canvas measure uses the loaded font).
+    var mc = document.createElement('canvas').getContext('2d');
+    var layoutKey = '', layout = [];
+    function wordLayout() {
+      var fontStr = '700 ' + FS + 'px ' + fontFam;
+      var key = fontStr + (document.fonts && document.fonts.check ? document.fonts.check('700 12px Geist') : '');
+      if (key === layoutKey) return layout;
+      layoutKey = key; mc.font = fontStr;
+      var adv = letters.map(function (L) { return mc.measureText(L.ch).width; });
+      var tot = adv.reduce(function (a, b) { return a + b; }, 0) - FS * 0.02 * (letters.length - 1);
+      var x = WX - tot / 2; layout = [];
+      for (var i = 0; i < letters.length; i++) { layout.push({ cx: x + adv[i] / 2, w: adv[i] }); x += adv[i] - FS * 0.02; }
+      return layout;
+    }
+
+    // ── UI: icons, slider ──
+    var ui = q('.grl-ui'), iconsBox = q('.grl-icons'), slider = q('.grl-slider');
+    var ICON = {
+      share: '<path d="M12 3.5v10.5"/><path d="M8.3 7.2 12 3.5l3.7 3.7"/><path d="M8.6 10.2H7.4a1.9 1.9 0 0 0-1.9 1.9v6.5a1.9 1.9 0 0 0 1.9 1.9h9.2a1.9 1.9 0 0 0 1.9-1.9v-6.5a1.9 1.9 0 0 0-1.9-1.9h-1.2"/>',
+      heart: '<path class="grl-heart" d="M12 19.6s-7.2-4.3-7.2-9.7A4.1 4.1 0 0 1 12 7.4a4.1 4.1 0 0 1 7.2 2.5c0 5.4-7.2 9.7-7.2 9.7z"/>',
+      info: '<circle cx="12" cy="12" r="8.6"/><path d="M12 10.9v5.4"/><circle cx="12" cy="7.9" r="0.55" fill="#fff"/>',
+      adjust: '<path d="M4 8h8.6"/><path d="M17.4 8H20"/><circle cx="15" cy="8" r="2.4"/><path d="M4 16h2.6"/><path d="M11.4 16H20"/><circle cx="9" cy="16" r="2.4"/>',
+      edit: '<path d="M4.5 19.5h4l10-10-4-4-10 10z"/>',
+      trash: '<path d="M5 7h14"/><path d="M9.5 7V5h5v2"/><path d="M7 7l.8 12h8.4L17 7"/>',
+      crop: '<path d="M7 3v14h14"/><path d="M3 7h14v14"/>',
+      sparkle: '<path d="M12 4l1.8 5.2L19 11l-5.2 1.8L12 18l-1.8-5.2L5 11l5.2-1.8z"/>'
+    };
+    var ISZ = U * 0.03;
+    var icons = iconNames.map(function (nm, i) {
+      var d = document.createElement('div'); d.className = 'grl-ico';
+      d.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (ICON[nm] || ICON.info) + '</svg>';
+      d.style.width = d.style.height = ISZ + 'px';
+      iconsBox.appendChild(d);
+      return { el: d, svg: d.querySelector('svg'), heart: d.querySelector('.grl-heart') };
+    });
+    var row = q('.grl-row'), lab = q('.grl-label-t'), val = q('.grl-value'), sunI = q('.grl-sunicon'), track = q('.grl-track'), fill = q('.grl-fill');
+    lab.textContent = label;
+    var LFS = U * 0.026;
+    row.style.fontSize = LFS + 'px'; row.style.width = (PN.w - PAD * 2) + 'px'; row.style.height = (LFS * 1.4) + 'px';
+    gsap.set(row, { x: PAD, y: U * 0.03 });
+    sunI.style.width = sunI.style.height = (LFS * 1.05) + 'px'; sunI.style.marginRight = (LFS * 0.45) + 'px';
+    sunI.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
+    track.style.width = (TRK.x1 - TRK.x0) + 'px'; track.style.height = TRK.h + 'px';
+    gsap.set(track, { x: TRK.x0 - (PN.cx - PN.w / 2), y: TRK.y - TRK.h / 2 - (PN.cy - PN.h / 2) });
+    slider.style.width = PN.w + 'px'; slider.style.height = PN.h + 'px';
+
+    // ── Cursor (shared helper when present) ──
+    var CS = Math.round(U * 0.026);
+    var cur = null, ring = null;
+    if (useCursor) {
+      if (typeof createCursor === 'function') cur = createCursor(q('.grl-cam'), { color: '#0b0b0c', size: CS, zIndex: 50 });
+      else {
+        cur = document.createElement('div');
+        cur.style.cssText = 'position:absolute;left:0;top:0;width:' + CS + 'px;height:' + CS + 'px;z-index:50';
+        cur.innerHTML = '<svg width="' + CS + '" height="' + CS + '" viewBox="0 0 24 24"><path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.45 0 .67-.53.35-.85L5.85 2.35a.5.5 0 0 0-.35.86z" fill="#0b0b0c" stroke="#fff" stroke-width="1.5"/></svg>';
+        q('.grl-cam').appendChild(cur);
+      }
+      cur.classList.add('grl-cursor');
+      ring = cur.querySelector('.mp-cursor-ring');
+      gsap.set(cur, { autoAlpha: 1, transformOrigin: (5.5 / 24 * 100) + '% ' + (3.2 / 24 * 100) + '%' });
+    }
+
+    // ── Easing ──
+    var E = {
+      io2: gsap.parseEase('power2.inOut'), io3: gsap.parseEase('power3.inOut'), o2: gsap.parseEase('power2.out'), o3: gsap.parseEase('power3.out'),
+      i2: gsap.parseEase('power2.in'), back: gsap.parseEase('back.out(2.2)'), back1: gsap.parseEase('back.out(1.3)'), sio: gsap.parseEase('sine.inOut')
+    };
+    var cl = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+    var P01 = function (t, t0, d) { return cl((t - t0) / d, 0, 1); };
+    var lerp = function (a, b, p) { return a + (b - a) * p; };
+    function rectLerp(a, b, p) { return { cx: lerp(a.cx, b.cx, p), cy: lerp(a.cy, b.cy, p), w: lerp(a.w, b.w, p), h: lerp(a.h, b.h, p), r: lerp(a.r, b.r, p) }; }
+    function setRect(n, R) {
+      var w = Math.max(0, R.w), h = Math.max(0, R.h);
+      A(n, { x: R.cx - w / 2, y: R.cy - h / 2, width: w, height: h, rx: Math.min(R.r, w / 2), ry: Math.min(R.ry == null ? R.r : R.ry, h / 2) });
+    }
+
+    // ── Camera: a screen-studio push onto the toolbar, back out for the orb ──
+    var camKeys = [
+      { t: at, s: 1, fx: 0.5, fy: 0.5 },
+      { t: T.melt, s: 1.03, fx: 0.36, fy: 0.3 },
+      { t: T.melt + 0.2, s: 1.03, fx: 0.36, fy: 0.3 },
+      { t: T.toolbar + 0.5, s: 1.16, fx: 0.5, fy: (TB.cy - FY) / FH },
+      { t: T.dragEnd + 0.05, s: 1.16, fx: 0.5, fy: (TB.cy - FY) / FH },
+      { t: T.orb + 0.3, s: 1, fx: 0.5, fy: 0.5 }
+    ];
+    function camAt(t) {
+      if (!camOn) return { s: 1, x: 0, y: 0 };
+      var k = camKeys, a = k[0], b = k[0];
+      if (t <= k[0].t) b = a = k[0];
+      else if (t >= k[k.length - 1].t) a = b = k[k.length - 1];
+      else for (var i = 0; i < k.length - 1; i++) if (t >= k[i].t && t < k[i + 1].t) { a = k[i]; b = k[i + 1]; break; }
+      var p = a === b ? 0 : E.io2((t - a.t) / (b.t - a.t));
+      var ax = fx(a.fx) * (1 - a.s), ay = fy(a.fy) * (1 - a.s), bx = fx(b.fx) * (1 - b.s), by = fy(b.fy) * (1 - b.s);
+      return { s: lerp(a.s, b.s, p), x: lerp(ax, bx, p), y: lerp(ay, by, p) };
+    }
+
+    var cam = q('.grl-cam');
+    var knobAt = function (p) { return { x: lerp(TRK.x0 + KN.w * 0.32, TRK.x1 - KN.w * 0.32, p), y: TRK.y }; };
+    var iconPos = function (i) { var n = icons.length; return { x: TB.cx - TB.w / 2 + TB.w * (i + 0.5) / n, y: TB.cy }; };
+
+    function render(t) {
+      // camera
+      var c = camAt(t);
+      cam.style.transform = 'translate(' + c.x + 'px,' + c.y + 'px) scale(' + c.s + ')';
+      var done = t >= T.expandEnd;
+      next.style.visibility = (done && nextImg) ? 'visible' : 'hidden';
+
+      // relight progress (the knob drives the light)
+      var p = E.sio(P01(t, T.drag, T.dragEnd - T.drag));
+      if (imgAfter) { after.style.opacity = p; if (gA.cAfter) { gA.cAfter.setAttribute('opacity', p); gB.cAfter.setAttribute('opacity', p); } }
+      else {
+        warm.style.opacity = 0.62 * p; sunEl.style.opacity = p;
+        [gA, gB].forEach(function (k) { if (k.cWarm) { k.cWarm.setAttribute('opacity', 0.62 * p); k.cSun.setAttribute('opacity', p); } });
+      }
+
+      // ── Layer A ──
+      var L = wordLayout(), anyA = false, bx0 = W, by0 = H, bx1 = 0, by1 = 0;
+      var grow = function (x0, y0, x1, y1) { bx0 = Math.min(bx0, x0); by0 = Math.min(by0, y0); bx1 = Math.max(bx1, x1); by1 = Math.max(by1, y1); anyA = true; };
+      var m = E.i2(P01(t, T.melt, 0.24));                     // letters converge + shrink
+      var baseY = WY + FS * 0.36;
+      for (var i = 0; i < letters.length; i++) {
+        var tp = T.word + i * 0.05;
+        var s = t < tp ? 0 : E.back(P01(t, tp, 0.32));
+        s *= (1 - m);
+        var lx = lerp(L[i].cx, WX, m), ly = lerp(baseY, WY + FS * 0.36, m);
+        var midY = WY;
+        if (s <= 0.001) { letters[i].el.setAttribute('display', 'none'); continue; }
+        letters[i].el.removeAttribute('display');
+        A(letters[i].el, { x: lx, y: ly, transform: 'translate(' + lx + ' ' + lerp(midY, WY, m) + ') scale(' + s + ') translate(' + (-lx) + ' ' + (-midY) + ')' });
+        grow(lx - L[i].w * 0.6 * s, midY - FS * 0.6 * s, lx + L[i].w * 0.6 * s, midY + FS * 0.5 * s);
+      }
+      // The droplet, the toolbar, the panel: one rect changing shape.
+      var R = null;
+      var tDrop0 = T.melt + 0.05, tFall0 = T.melt + 0.12, tLand = T.toolbar + 0.04;
+      if (t >= tDrop0 && t < T.lens + 0.3) {
+        var dr = DROP * E.o2(P01(t, tDrop0, 0.18));
+        if (t < tLand) {
+          var fp = P01(t, tFall0, tLand - tFall0);
+          var dfx = lerp(WX, TB.cx, E.sio(fp)), dfy = lerp(WY, TB.cy, E.i2(fp));
+          var v = Math.sin(Math.PI * cl(fp * 1.1, 0, 1)) * 0.5 + fp * 0.3;
+          R = { cx: dfx, cy: dfy, w: dr * (1 - 0.14 * v), h: dr * (1 + 0.32 * v), r: dr };
+        } else {
+          var sp = P01(t, tLand, 0.36);
+          var sw = E.back1(sp), sh = E.o3(sp);
+          var squash = Math.sin(Math.PI * cl(sp * 2.2, 0, 1)) * 0.28;
+          R = { cx: TB.cx, cy: TB.cy, w: lerp(DROP, TB.w, sw), h: lerp(DROP, TB.h, sh) * (1 - squash), r: TB.h };
+          R.cy = TB.cy + (TB.h - R.h) * 0.25;
+          if (t >= T.slider) {
+            var mp = E.io3(P01(t, T.slider, 0.34));
+            var over = Math.sin(Math.PI * P01(t, T.slider + 0.2, 0.3)) * 0.018;
+            R = rectLerp({ cx: TB.cx, cy: TB.cy, w: TB.w, h: TB.h, r: TB.r }, { cx: PN.cx, cy: PN.cy, w: PN.w * (1 + over), h: PN.h * (1 - over * 0.6), r: PN.r }, mp);
+          }
+          if (t >= T.lens) {
+            // The panel is drawn into the lens.
+            var cp = E.i2(P01(t, T.lens, 0.3)), kp = knobAt(1);
+            R = rectLerp(R, { cx: kp.x, cy: kp.y - U * 0.05, w: LD * 0.6, h: LD * 0.6, r: LD * 0.3 }, cp);
+          }
+        }
+        if (R.w > 0.5) { setRect(blob, R); blob.removeAttribute('display'); grow(R.cx - R.w / 2, R.cy - R.h / 2, R.cx + R.w / 2, R.cy + R.h / 2); }
+        else blob.setAttribute('display', 'none');
+      } else blob.setAttribute('display', 'none');
+
+      var gooS = U * 0.012 * E.o2(P01(t, T.melt, 0.12));
+      var melting = gooS > 0.4 && t < T.melt + 0.4;
+      if (melting) { gA.gooBlur.setAttribute('stdDeviation', gooS); A(gA.shapes, { filter: 'url(#' + gA.gooId + ')' }); }
+      else gA.shapes.removeAttribute('filter');
+
+      gA.svg.style.display = anyA ? 'block' : 'none';
+      if (anyA) {
+        var isWord = t < T.melt + 0.2;
+        var cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2;
+        if (isWord) glassParams(gA, { E: FS * 0.045, S: FS * 0.22, frost: 1.4, tint: 0.2, ss: 3, spec: 0.9, rim: 1.4, rimTop: 0.85, rimBot: 0.35, shadow: 0.16, shBlur: U * 0.006, shY: U * 0.004, sat: 1.3, bright: 1.12, lift: 0.04 });
+        else glassParams(gA, { E: U * 0.009, S: U * 0.045, frost: t >= T.slider ? 2.2 : 1.4, tint: t >= T.slider ? 0.1 : 0.07, ss: 3, spec: 0.75, rim: 1.4, rimTop: 0.8, rimBot: 0.35, shadow: 0.2, sat: 1.35, bright: 1.08, lift: 0.03 });
+        magnify(gA, cx, cy, isWord ? 1.04 : 1.03);
+        region(gA, bx0, by0, bx1, by1, U * 0.05);
+      }
+
+      // ── UI in the blob ──
+      if (R && t >= T.toolbar && t < T.lens + 0.3) {
+        ui.style.display = 'block';
+        var ux = R.cx - R.w / 2, uy = R.cy - R.h / 2;
+        ui.style.left = ux + 'px'; ui.style.top = uy + 'px'; ui.style.width = R.w + 'px'; ui.style.height = R.h + 'px';
+        ui.style.borderRadius = Math.min(R.r, R.w / 2, R.h / 2) + 'px';
+        for (var j = 0; j < icons.length; j++) {
+          var ip = iconPos(j), ti = T.toolbar + 0.22 + j * 0.08;
+          var is = t < ti ? 0 : E.back(P01(t, ti, 0.34));
+          is *= 1 - E.i2(P01(t, T.slider, 0.16));
+          if (j === heartIdx && heartIdx >= 0) {
+            var lp = P01(t, T.like, 0.12);
+            is *= 1 + 0.25 * Math.sin(Math.PI * P01(t, T.like, 0.3));
+            if (icons[j].heart) icons[j].heart.setAttribute('fill', lp > 0 ? 'rgba(255,255,255,' + lp + ')' : 'none');
+          }
+          if (j === adjustIdx) {
+            var on = t >= T.click;
+            icons[j].svg.setAttribute('stroke', on ? accent : '#fff');
+            if (on) is *= 1 + 0.18 * Math.sin(Math.PI * P01(t, T.click, 0.25));
+          }
+          gsap.set(icons[j].el, { x: ip.x - ux - ISZ / 2, y: ip.y - uy - ISZ / 2, scale: is, autoAlpha: is > 0.01 ? 1 : 0 });
+        }
+        var sOn = t >= T.slider + 0.1;
+        slider.style.display = sOn ? 'block' : 'none';
+        if (sOn) {
+          gsap.set(slider, { x: PN.cx - PN.w / 2 - ux, y: PN.cy - PN.h / 2 - uy });
+          var rp = E.o3(P01(t, T.slider + 0.12, 0.34));
+          gsap.set(row, { y: U * 0.03 + (1 - rp) * U * 0.05 });
+          gsap.set(track, { scaleX: E.o3(P01(t, T.slider + 0.2, 0.36)) });
+          var kp2 = knobAt(p);
+          fill.style.width = Math.max(0, kp2.x - TRK.x0) + 'px';
+          val.textContent = String(Math.round(p * 100));
+        }
+      } else ui.style.display = 'none';
+
+      // ── Layer B: knob -> lens -> orb ──
+      var B = null, bm = 1, bpar = null, carry = null;
+      var kOn = T.slider + 0.2;
+      if (t >= kOn && t < T.expandEnd) {
+        var kp3 = knobAt(p), ks = E.back(P01(t, kOn, 0.3));
+        B = { cx: kp3.x, cy: kp3.y, w: KN.w * ks, h: KN.h * ks, r: KN.h / 2 * ks };
+        bm = 1.12;
+        bpar = { E: U * 0.007, S: U * 0.03, frost: 0.6, tint: 0.22, ss: 3, spec: 0.95, rim: 1.6, rimTop: 1, rimBot: 0.55, shadow: 0.3, shBlur: U * 0.006, shY: U * 0.004, sat: 1.3, bright: 1.1, lift: 0.04 };
+        if (t >= T.lens) {
+          var lp2 = E.back1(P01(t, T.lens, 0.26)), kp4 = knobAt(1);
+          var lensRect = { cx: kp4.x, cy: kp4.y - U * 0.05, w: LD, h: LD, r: LD / 2 };
+          B = rectLerp({ cx: kp4.x, cy: kp4.y, w: KN.w, h: KN.h, r: KN.h / 2 }, lensRect, lp2);
+          bm = lerp(1.12, 1.3, lp2);
+          var e1 = lerp(U * 0.007, LD * 0.11, lp2);
+          bpar = { ch: lerp(0.2, 0.06, lp2), E: e1, S: lerp(U * 0.03, LD * 0.2, lp2), frost: lerp(0.6, 0.3, lp2), tint: lerp(0.22, 0.04, lp2), ss: lerp(3, 6, lp2), spec: lerp(0.95, 0.85, lp2), rim: lerp(1.6, 2, lp2), rimTop: lerp(1, 0.9, lp2), rimBot: lerp(0.55, 0.45, lp2), shadow: 0.3, shBlur: lerp(U * 0.006, U * 0.02, lp2), shY: lerp(U * 0.004, U * 0.018, lp2), sat: lerp(1.3, 1.25, lp2), bright: lerp(1.1, 1.08, lp2), lift: lerp(0.04, 0.03, lp2) };
+          if (t >= T.orb) {
+            var op = E.io3(P01(t, T.orb, 0.4));
+            // lift on an arc
+            var mx = (lensRect.cx + ORB.x) / 2 + U * 0.05, my = Math.min(lensRect.cy, ORB.y) - U * 0.02;
+            var bx = (1 - op) * (1 - op) * lensRect.cx + 2 * (1 - op) * op * mx + op * op * ORB.x;
+            var by = (1 - op) * (1 - op) * lensRect.cy + 2 * (1 - op) * op * my + op * op * ORB.y;
+            var dd = lerp(LD, OD, op);
+            B = { cx: bx, cy: by, w: dd, h: dd, r: dd / 2 };
+            bpar.E = dd * 0.11; bpar.S = dd * 0.2; bpar.ss = 6;
+            bpar.shBlur = lerp(U * 0.02, U * 0.03, op); bpar.shY = lerp(U * 0.018, U * 0.03, op);
+            if (t >= T.expand) {
+              var xp = E.io2(P01(t, T.expand, T.expandEnd - T.expand));
+              var Rmax = Math.hypot(W, H) / 2 + U * 0.12;
+              var ed = lerp(OD, Rmax * 2, xp);
+              B = { cx: lerp(ORB.x, W / 2, xp), cy: lerp(ORB.y, H / 2, xp), w: ed, h: ed, r: ed / 2 };
+              bpar.E = lerp(OD * 0.11, U * 0.01, xp); bpar.S = lerp(OD * 0.2, 0, xp);
+              bpar.tint = lerp(0.04, 0, xp); bpar.shadow = lerp(0.3, 0, xp);
+              bpar.bright = lerp(1.08, 1, xp); bpar.lift = lerp(0.03, 0, xp); bpar.sat = lerp(1.25, 1, xp);
+            }
+          }
+        }
+        carry = { x: B.cx, y: B.cy };
+      }
+      if (B && B.w > 0.5) {
+        gB.svg.style.display = 'block';
+        setRect(lensR, B);
+        glassParams(gB, bpar);
+        magnify(gB, B.cx, B.cy, bm);
+        region(gB, B.cx - B.w / 2, B.cy - B.h / 2, B.cx + B.w / 2, B.cy + B.h / 2, U * 0.06);
+        if (nextG) {
+          var ir = 0, kk = 0.5, axx = B.cx, ayy = B.cy;
+          if (t >= T.orb + 0.08) ir = (B.w / 2) * E.o2(P01(t, T.orb + 0.08, 0.36));
+          if (t >= T.expand) { var xp2 = E.io2(P01(t, T.expand, T.expandEnd - T.expand)); kk = lerp(0.5, 1, xp2); axx = lerp(B.cx, W / 2, xp2); ayy = lerp(B.cy, H / 2, xp2); ir = B.w / 2; }
+          A(gB.irisC, { cx: B.cx, cy: B.cy, r: ir });
+          nextG.setAttribute('display', ir > 0.5 ? 'inline' : 'none');
+          nextI.setAttribute('transform', 'translate(' + axx + ' ' + ayy + ') scale(' + kk + ') translate(' + (-W / 2) + ' ' + (-H / 2) + ')');
+        }
+      } else gB.svg.style.display = 'none';
+
+      // ── Cursor ──
+      if (cur) {
+        var pts = [
+          { t: at, x: fx(cFrom[0]), y: fy(cFrom[1]) },
+          { t: T.like - 0.4, x: fx(cFrom[0]), y: fy(cFrom[1]) }
+        ];
+        var hp = heartIdx >= 0 ? iconPos(heartIdx) : iconPos(0), ap = iconPos(adjustIdx);
+        pts.push({ t: T.like - 0.04, x: hp.x + ISZ * 0.1, y: hp.y + ISZ * 0.15 });
+        pts.push({ t: T.click - 0.3, x: hp.x + ISZ * 0.1, y: hp.y + ISZ * 0.15 });
+        pts.push({ t: T.click - 0.04, x: ap.x + ISZ * 0.1, y: ap.y + ISZ * 0.15 });
+        pts.push({ t: T.slider + 0.05, x: ap.x + ISZ * 0.1, y: ap.y + ISZ * 0.15 });
+        var k0 = knobAt(0);
+        pts.push({ t: T.drag - 0.04, x: k0.x, y: k0.y });
+        var cx2, cy2;
+        if (t < T.drag) {
+          var a2 = pts[0], b2 = pts[0];
+          for (var pi = 0; pi < pts.length - 1; pi++) if (t >= pts[pi].t && t < pts[pi + 1].t) { a2 = pts[pi]; b2 = pts[pi + 1]; break; }
+          if (t >= pts[pts.length - 1].t) a2 = b2 = pts[pts.length - 1];
+          var pp = a2 === b2 ? 0 : E.io2((t - a2.t) / (b2.t - a2.t));
+          cx2 = lerp(a2.x, b2.x, pp); cy2 = lerp(a2.y, b2.y, pp);
+        } else if (t < T.expand) {
+          var kk2 = carry || knobAt(p); cx2 = kk2.x; cy2 = kk2.y;
+        } else {
+          var rp2 = E.io2(P01(t, T.expand, T.expandEnd - T.expand));
+          var from = { x: ORB.x, y: ORB.y };
+          cx2 = lerp(from.x, fx(cTo[0]), rp2); cy2 = lerp(from.y, fy(cTo[1]), rp2);
+        }
+        // presses: like, adjust (clicks), knob (held from drag to expand)
+        var press = 1;
+        [T.like, T.click].forEach(function (tc) { if (t >= tc && t < tc + 0.16) press = Math.min(press, 1 - 0.15 * Math.sin(Math.PI * (t - tc) / 0.16)); });
+        if (t >= T.drag && t < T.expand) press = Math.min(press, 1 - 0.15 * cl((t - T.drag) / 0.08, 0, 1) * cl((T.expand - t) / 0.08, 0, 1));
+        gsap.set(cur, { x: cx2 - CS * 5.5 / 24, y: cy2 - CS * 3.2 / 24, scale: press });
+        if (ring) {
+          var rt = -1;
+          [T.like, T.click, T.drag].forEach(function (tc) { if (t >= tc && t < tc + 0.42) rt = t - tc; });
+          if (rt >= 0) { var rq = E.o2(rt / 0.42); gsap.set(ring, { autoAlpha: 0.8 * (1 - rq), scale: 0.25 + 1.3 * rq }); }
+          else gsap.set(ring, { autoAlpha: 0 });
+        }
+      }
+    }
+
+    var clock = { t: 0 };
+    render(0);
+    tl.to(clock, { t: END, duration: END, ease: 'none', onUpdate: function () { render(clock.t); } }, 0);
+    return tl;
+  }
+</script>

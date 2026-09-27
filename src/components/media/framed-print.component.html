@@ -1,0 +1,202 @@
+<template>
+  <div class="fp">
+    <div class="fp-cam">
+      <div class="fp-wall"></div>
+      <div class="fp-frame">
+        <div class="fp-mat"><div class="fp-photo"><img alt="" /></div></div>
+      </div>
+    </div>
+    <div class="fp-flood"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* FRAMED PRINT: the print hanging on a real wall. It starts as the solid
+     black rectangle a contracting flood leaves behind (the molding before the
+     photo shows), the photo and mat are there under the iris when it opens
+     (or the mat and molding grow out of the photo's edge), the camera pushes
+     in until the photo alone fills the frame, and the molding can flood the
+     whole frame to join the next scene. Every style is a pure function of time. */
+  .fp, .fp * { max-width: none; box-sizing: border-box; }
+  .fp { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .fp-cam { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  .fp-wall { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background: #e9e6e0; }
+  .fp-wall svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .fp-frame { position: absolute; left: 0; top: 0; background: #141414; }
+  .fp-mat { position: absolute; background: #f3f2eb; overflow: hidden; visibility: hidden; }
+  .fp-photo { position: absolute; overflow: hidden; background: #222; }
+  .fp-photo img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }
+  .fp-flood { position: absolute; left: 0; top: 0; border-style: solid; border-color: #141414; visibility: hidden; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.fp'), cam = q('.fp-cam'), wall = q('.fp-wall'), frame = q('.fp-frame'), mat = q('.fp-mat'), photo = q('.fp-photo'), flood = q('.fp-flood');
+    if (!root || !cam || !frame) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var inOut3 = function (p) { p = clamp01(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+    var out3 = function (p) { p = clamp01(p); return 1 - Math.pow(1 - p, 3); };
+    var in2 = function (p) { p = clamp01(p); return p * p; };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080, S = Math.min(W, H);
+
+    // ── Geometry (fractions of the frame): centre 0.5/0.5, outer 0.30 x 0.40.
+    var fw = W * num(data.w, 0.30), fh = H * num(data.h, 0.40);
+    var fcx = W * num(data.x, 0.5), fcy = H * num(data.y, 0.5);
+    var ox = fcx - fw / 2, oy = fcy - fh / 2;
+    var M = fw * num(data.molding, 0.052);                                   // molding width
+    var MM = data.mat === false ? 0 : fw * num(data.mat_width, 0.128);        // mat margin
+    var frameColor = String(data.frame_color || '#141414');
+    var floodColor = String(data.flood_color || frameColor);
+    frame.style.background = frameColor;
+    if (data.mat_color) mat.style.background = String(data.mat_color);
+    if (data.mat === false) mat.style.background = 'transparent';
+    var pimg = photo.querySelector('img');
+    if (data.image) pimg.src = String(data.image); else { pimg.style.display = 'none'; photo.style.background = 'linear-gradient(160deg,#6d7f5a,#2f3a28)'; }
+    // The photo's final box (camera space) -- what the push fills the frame with.
+    var PW = fw - 2 * M - 2 * MM, PH = fh - 2 * M - 2 * MM, PX = fcx, PY = fcy;
+    var bevel = Math.max(1, fw * 0.004);
+
+    // ── Beats.
+    var AT = num(data.at, 0);
+    var RV = num(data.reveal_at, AT + 0.5);
+    var grow = String(data.reveal || 'instant') === 'grow';
+    var RG = 0.35;
+    var PU = num(data.push_at, AT + 2.5), PD = Math.max(0.1, num(data.push_duration, 0.8));
+    var drift = num(data.push_drift, 0);
+    var hasFlood = data.flood_at !== undefined && data.flood_at !== null && data.flood_at !== '';
+    var FL = num(data.flood_at, 1e9), FD = Math.max(0.05, num(data.flood_duration, 0.3));
+    var shadowOn = data.shadow !== false;
+
+    // ── The wall: real footage (seeked by the capture like the video component), or plaster with leaf shadows.
+    var kind = String(data.wall || (data.wall_src ? 'footage' : 'plaster'));
+    var fronds = [];
+    if (kind === 'footage' && data.wall_src && typeof loadVideoForCapture === 'function') {
+      var wStart = Math.max(0, num(data.wall_start, 0));
+      var v = loadVideoForCapture(wall, String(data.wall_src), { style: 'position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;display:block;', startAt: wStart });
+      // Loop: a source map (data-mp-edl) the capture and the preview both honour -- the clip from
+      // wall_start to its end, then from 0 again, as long as the scene needs.
+      var wLen = num(data.wall_duration, 0);
+      if (v && wLen > 0.5) {
+        var need = Math.max(num(ctx && ctx.duration, 0), PU + PD + 4, (hasFlood ? FL + FD : 0) + 1) + 1;
+        var segs = [{ src_start: Math.min(wStart, wLen - 0.2), src_end: wLen, rate: 1 }], acc = wLen - Math.min(wStart, wLen - 0.2);
+        while (acc < need) { segs.push({ src_start: 0, src_end: wLen, rate: 1 }); acc += wLen; }
+        v.setAttribute('data-mp-edl', JSON.stringify(segs));
+      }
+    } else {
+      // Warm plaster, lit from the upper right, with a soft blurred fern shadow swaying from the lower left.
+      wall.style.background = 'radial-gradient(ellipse 90% 80% at 72% 18%, ' + String(data.wall_color || '#f3f0ea') + ' 0%, #e8e4dc 55%, #dcd7ce 100%)';
+      var NS = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 100 100'); svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      var noiseId = 'fpn' + Math.floor(fcx * 7 + fcy * 13 + fw);
+      svg.innerHTML = '<defs><filter id="' + noiseId + '" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 0.35  0 0 0 0 0.33  0 0 0 0 0.3  0 0 0 0.9 0"/></filter></defs>';
+      var shade = document.createElementNS(NS, 'g');
+      shade.setAttribute('fill', '#3b3a35');
+      // Blur in the SVG's own units (the viewBox is 100 wide): ~0.75% of the frame, a soft cast shadow.
+      shade.setAttribute('style', 'filter:blur(0.75px);opacity:0.2');
+      // Fronds: [base x, base y, tip x, tip y, bend, leaves, leaf length, sway amp (deg), period (s), phase]
+      var FR = [[-10, 112, 44, 60, 9, 15, 13, 2.2, 3.3, 0.0], [-16, 90, 24, 50, -6, 11, 10.5, 2.8, 2.7, 1.7], [114, 112, 72, 74, -7, 10, 10, 2.0, 3.9, 3.1], [-8, 70, 12, 38, 4, 8, 8, 3.2, 2.4, 4.4]];
+      FR.forEach(function (f) {
+        var g = document.createElementNS(NS, 'g');
+        var bx = f[0], by = f[1], tx = f[2], ty = f[3], mx = (bx + tx) / 2, my = (by + ty) / 2;
+        var dx = tx - bx, dy = ty - by, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
+        var cxp = mx + nx * f[4], cyp = my + ny * f[4];
+        var d = 'M' + bx + ',' + by + ' Q' + cxp.toFixed(2) + ',' + cyp.toFixed(2) + ' ' + tx + ',' + ty;
+        var html = '<path d="' + d + '" stroke="#3b3a35" stroke-width="0.7" fill="none"/>';
+        for (var i = 1; i <= f[5]; i++) {
+          var u = 0.12 + 0.86 * i / f[5], a = 1 - u;
+          var px = a * a * bx + 2 * a * u * cxp + u * u * tx, py = a * a * by + 2 * a * u * cyp + u * u * ty;
+          var tgx = 2 * a * (cxp - bx) + 2 * u * (tx - cxp), tgy = 2 * a * (cyp - by) + 2 * u * (ty - cyp);
+          var ang = Math.atan2(tgy, tgx) * 180 / Math.PI;
+          var L = f[6] * (1 - 0.55 * u) * (0.85 + 0.15 * Math.sin(i * 2.3));
+          [-1, 1].forEach(function (side) {
+            var la = ang + side * (48 + 10 * u), lr = la * Math.PI / 180;
+            var ex = px + Math.cos(lr) * L * 0.5, ey = py + Math.sin(lr) * L * 0.5;
+            html += '<ellipse cx="' + ex.toFixed(2) + '" cy="' + ey.toFixed(2) + '" rx="' + (L * 0.5).toFixed(2) + '" ry="' + (L * 0.085).toFixed(2) + '" transform="rotate(' + la.toFixed(1) + ' ' + ex.toFixed(2) + ' ' + ey.toFixed(2) + ')"/>';
+          });
+        }
+        g.innerHTML = html;
+        shade.appendChild(g);
+        fronds.push({ g: g, bx: bx, by: by, amp: f[7], per: f[8], ph: f[9] });
+      });
+      svg.appendChild(shade);
+      var grain = document.createElementNS(NS, 'rect');
+      grain.setAttribute('width', '100'); grain.setAttribute('height', '100');
+      grain.setAttribute('filter', 'url(#' + noiseId + ')'); grain.setAttribute('opacity', '0.07');
+      svg.appendChild(grain);
+      wall.appendChild(svg);
+    }
+
+    // ── The push: a camera move from identity to the photo filling the frame (cover).
+    var K = Math.max(W / PW, H / PH) * 1.001;
+    function camAt(t) {
+      var e = inOut3((t - PU) / PD), s = Math.pow(K, e);
+      if (drift && t > PU + PD) s *= 1 + drift * (t - PU - PD);
+      var ccx = PX + (W / 2 - PX) * e, ccy = PY + (H / 2 - PY) * e;
+      return { s: s, tx: ccx - PX * s, ty: ccy - PY * s };
+    }
+
+    function render(t) {
+      // Sway the leaf shadow (plaster wall).
+      for (var i = 0; i < fronds.length; i++) {
+        var f = fronds[i];
+        var a = f.amp * Math.sin(2 * Math.PI * t / f.per + f.ph) + f.amp * 0.35 * Math.sin(2 * Math.PI * t / (f.per * 0.41) + f.ph * 1.7);
+        f.g.setAttribute('transform', 'rotate(' + a.toFixed(3) + ' ' + f.bx + ' ' + f.by + ')');
+      }
+      // Camera. Applied as LAYOUT (every box placed in screen pixels), never as a scale
+      // transform: a scaled layer next to a <video> gets composited and rastered at its
+      // first size -- the push read soft. Laid out, every frame paints at full resolution.
+      var c = camAt(t), k = c.s;
+      var sx = function (x) { return c.tx + x * k; }, sy = function (y) { return c.ty + y * k; };
+      wall.style.left = c.tx.toFixed(2) + 'px'; wall.style.top = c.ty.toFixed(2) + 'px';
+      wall.style.width = (W * k).toFixed(2) + 'px'; wall.style.height = (H * k).toFixed(2) + 'px';
+      // Frame: the black rectangle from `at` on (and before -- it is what the flood contracts into).
+      frame.style.left = sx(ox).toFixed(2) + 'px'; frame.style.top = sy(oy).toFixed(2) + 'px';
+      frame.style.width = (fw * k).toFixed(2) + 'px'; frame.style.height = (fh * k).toFixed(2) + 'px';
+      var sh = shadowOn ? out3((t - AT) / 0.4) : 0;
+      frame.style.boxShadow = sh > 0 ? '0 ' + (S * 0.004 * k).toFixed(1) + 'px ' + (S * 0.008 * k).toFixed(1) + 'px rgba(0,0,0,' + (0.3 * sh).toFixed(3) + '), 0 ' + (S * 0.014 * k).toFixed(1) + 'px ' + (S * 0.035 * k).toFixed(1) + 'px rgba(0,0,0,' + (0.18 * sh).toFixed(3) + ')' : 'none';
+      // Reveal: mat + photo inside the molding (instant), or grown out of the photo's edge.
+      var shown = t >= RV - 1e-4;
+      mat.style.visibility = shown ? 'inherit' : 'hidden';
+      var g = grow ? out3((t - RV) / RG) : 1;
+      var m = M * g, mm = MM * g;
+      mat.style.left = (m * k).toFixed(2) + 'px'; mat.style.top = (m * k).toFixed(2) + 'px';
+      mat.style.width = ((fw - 2 * m) * k).toFixed(2) + 'px'; mat.style.height = ((fh - 2 * m) * k).toFixed(2) + 'px';
+      mat.style.boxShadow = MM > 0 ? 'inset 0 ' + (fw * 0.006 * g * k).toFixed(2) + 'px ' + (fw * 0.014 * g * k).toFixed(2) + 'px rgba(0,0,0,' + (0.32 * g).toFixed(3) + ')' : 'none';
+      photo.style.left = (mm * k).toFixed(2) + 'px'; photo.style.top = (mm * k).toFixed(2) + 'px';
+      photo.style.width = ((fw - 2 * m - 2 * mm) * k).toFixed(2) + 'px'; photo.style.height = ((fh - 2 * m - 2 * mm) * k).toFixed(2) + 'px';
+      photo.style.boxShadow = MM > 0 && g > 0.01 ? '0 0 0 ' + (bevel * g * k).toFixed(2) + 'px #fbfaf6, 0 0 ' + (bevel * 2.5 * g * k).toFixed(2) + 'px ' + (bevel * g * k).toFixed(2) + 'px rgba(0,0,0,' + (0.1 * g).toFixed(3) + ')' : 'none';
+      // Flood: the molding's black spreads out past every corner and closes over the photo.
+      var fp = hasFlood ? in2((t - FL) / FD) : 0;
+      if (fp <= 0) { flood.style.visibility = 'hidden'; return; }
+      flood.style.visibility = 'inherit';
+      // The molding's outer and inner rects on screen now.
+      var O = { l: sx(ox), t: sy(oy), r: sx(ox + fw), b: sy(oy + fh) };
+      var I = { l: Math.max(sx(ox + M), 0), t: Math.max(sy(oy + M), 0), r: Math.min(sx(ox + fw - M), W), b: Math.min(sy(oy + fh - M), H) };
+      var mX = W * 0.06, mY = H * 0.06;
+      var Ot = { l: Math.min(O.l, -mX), t: Math.min(O.t, -mY), r: Math.max(O.r, W + mX), b: Math.max(O.b, H + mY) };
+      var icx = (I.l + I.r) / 2, icy = (I.t + I.b) / 2;
+      var lerp = function (a, b) { return a + (b - a) * fp; };
+      var oL = lerp(O.l, Ot.l), oT = lerp(O.t, Ot.t), oR = lerp(O.r, Ot.r), oB = lerp(O.b, Ot.b);
+      var iL = lerp(I.l, icx), iT = lerp(I.t, icy), iR = lerp(I.r, icx), iB = lerp(I.b, icy);
+      flood.style.borderColor = floodColor;
+      // Once the hole is under a couple of pixels the whole box is the flood (no sub-pixel pinhole).
+      flood.style.backgroundColor = (iR - iL < 2 || iB - iT < 2) ? floodColor : 'transparent';
+      flood.style.left = oL.toFixed(2) + 'px'; flood.style.top = oT.toFixed(2) + 'px';
+      flood.style.width = (oR - oL).toFixed(2) + 'px'; flood.style.height = (oB - oT).toFixed(2) + 'px';
+      flood.style.borderLeftWidth = Math.max(0, iL - oL).toFixed(2) + 'px'; flood.style.borderRightWidth = Math.max(0, oR - iR).toFixed(2) + 'px';
+      flood.style.borderTopWidth = Math.max(0, iT - oT).toFixed(2) + 'px'; flood.style.borderBottomWidth = Math.max(0, oB - iB).toFixed(2) + 'px';
+    }
+
+    var END = Math.max(num(ctx && ctx.duration, 0), PU + PD + 0.5, hasFlood ? FL + FD + 0.5 : 0);
+    var st = { t: 0 };
+    tl.to(st, { t: END, duration: END, ease: 'none' }, 0);
+    tl.eventCallback('onUpdate', function () { render(st.t); });
+    render(0);
+    return tl;
+  }
+</script>

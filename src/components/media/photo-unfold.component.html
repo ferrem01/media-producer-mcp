@@ -1,0 +1,217 @@
+<template>
+  <div class="pu">
+    <div class="pu-stage"></div>
+    <div class="pu-final"><img alt="" /></div>
+  </div>
+</template>
+
+<style scoped>
+  /* PHOTO UNFOLD: one photo becomes a library and the library becomes one
+     photo again. The hero arrives as the iris's circle, turns into a rounded
+     square on a spring, shrinks to a tile, and the 3x3 grid unfolds from
+     behind it like a paper map (centre -> plus -> corners); the grid reflows
+     into a bento around the tile the cursor wants, and a click zooms that
+     tile to the full frame. Every style is a pure function of the time. */
+  .pu, .pu * { max-width: none; box-sizing: border-box; }
+  .pu { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .pu-stage { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  .pu-tile { position: absolute; left: 0; top: 0; overflow: hidden; background: #1b1b1d; visibility: hidden;
+  }
+  .pu-tile img, .pu-final img { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+    object-fit: cover; object-position: 50% 50%; display: block; }
+  .pu-final { position: absolute; inset: 0; overflow: hidden; visibility: hidden; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.pu'), stage = el.querySelector('.pu-stage'), fin = el.querySelector('.pu-final');
+    if (!root || !stage || !fin) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080, S = Math.min(W, H);
+
+    // ── Images: 9 in row-major grid order; the hero sits in the centre cell.
+    var src = (Array.isArray(data.images) ? data.images : []).filter(function (s) { return s; }).map(String);
+    var cells = [];
+    for (var i = 0; i < 9; i++) cells.push(src.length ? src[i % src.length] : '');
+    var hero = Math.max(0, Math.min(8, Math.round(num(data.hero, 4))));
+    // The hero image goes to the centre cell; the image that was there takes its slot.
+    var cellOf = function (imgIdx) { return imgIdx === hero ? 4 : (imgIdx === 4 ? hero : imgIdx); };
+    if (hero !== 4) { var tmp = cells[4]; cells[4] = cells[hero]; cells[hero] = tmp; }
+    var zoomCell = cellOf(Math.max(0, Math.min(8, Math.round(num(data.zoom_index, 5)))));
+
+    // ── Geometry (fractions of the frame; sizes of the short side).
+    var cx = W * num(data.x, 0.5), cy = H * num(data.y, 0.5);
+    var d0 = S * num(data.iris_size, 0.30);          // the iris circle it arrives as
+    var hs = S * num(data.hero_side, 0.67);          // the rounded square it springs to
+    var G = S * num(data.grid_size, 0.644);          // the 3x3 grid's side
+    var gap = S * num(data.gap, 0.0097);
+    var tile = (G - 2 * gap) / 3;
+    var rfHero = num(data.hero_radius, 0.08);        // corner radius / side
+    var rt = tile * num(data.radius, 0.085);         // tile corner radius (px)
+    var cellC = function (c) { return { x: cx + ((c % 3) - 1) * (tile + gap), y: cy + (Math.floor(c / 3) - 1) * (tile + gap) }; };
+
+    // ── Beats.
+    var AT = num(data.at, 0);
+    var SQ = num(data.square_at, AT + 0.05);
+    var SH = num(data.shrink_at, AT + 0.45);
+    var UN = num(data.unfold_at, AT + 0.7);
+    var CO = num(data.corners_at, UN + 0.25);
+    var BE = num(data.bento_at, AT + 1.9);
+    var ZO = num(data.zoom_at, AT + 2.7);
+    var ZD = Math.max(0.1, num(data.zoom_duration, 0.35));
+    var LAND = ZO + ZD;
+
+    // ── Closed-form springs (step responses), normalised to land exactly on 1.
+    function spring(zeta, omega) {
+      var wd = omega * Math.sqrt(1 - zeta * zeta);
+      var raw = function (p) { return 1 - Math.exp(-zeta * omega * p) * (Math.cos(wd * p) + (zeta * omega / wd) * Math.sin(wd * p)); };
+      var end = raw(1);
+      return function (p) { if (p <= 0) return 0; if (p >= 1) return 1; return raw(p) + (1 - end) * p; };
+    }
+    var inOut3 = function (p) { p = clamp01(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+    var out3 = function (p) { p = clamp01(p); return 1 - Math.pow(1 - p, 3); };
+    var sGrow = spring(0.5, 9.1), sShrink = spring(0.9, 7), sUnfold = spring(0.62, 10), sBento = spring(0.8, 10);
+    var DG = 0.42, DS = 0.4, DU = 0.42, DB = 0.5;
+    var seg = function (f, t, t0, d) { return f((t - t0) / d); };
+
+    // ── Tiles.
+    var tiles = [];
+    for (var c = 0; c < 9; c++) {
+      var d = document.createElement('div');
+      d.className = 'pu-tile';
+      if (cells[c]) { var im = document.createElement('img'); im.src = cells[c]; im.alt = ''; d.appendChild(im); }
+      else d.style.background = 'hsl(' + ((c * 47 + 200) % 360) + ',38%,46%)';
+      stage.appendChild(d);
+      tiles.push(d);
+    }
+    var finImg = fin.querySelector('img');
+    if (cells[zoomCell]) finImg.src = cells[zoomCell]; else { finImg.style.display = 'none'; fin.style.background = tiles[zoomCell].style.background; }
+
+    // Unfold order: edges from under the centre, corners from under the
+    // edge in their row (top corners out of the top edge, bottom out of the bottom).
+    var EDGES = [1, 3, 5, 7], parentOf = { 0: 1, 2: 1, 6: 7, 8: 7 };
+
+    // ── The bento: 4 columns x 3 rows across the grid's width, the zoom tile
+    // 2x2 at the top-right, the other eight reflowed into the free cells with
+    // the least travel (or in bento_order).
+    var cb = (G - 3 * gap) / 4, Hb = 3 * cb + 2 * gap, bl = cx - G / 2, bt = cy - Hb / 2;
+    var bBox = function (col, row, span) { return { x: bl + col * (cb + gap) + (span * cb + (span - 1) * gap) / 2, y: bt + row * (cb + gap) + (span * cb + (span - 1) * gap) / 2, w: span * cb + (span - 1) * gap, h: span * cb + (span - 1) * gap }; };
+    var free = [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2], [2, 2], [3, 2]].map(function (p) { return bBox(p[0], p[1], 1); });
+    var others = []; for (c = 0; c < 9; c++) if (c !== zoomCell) others.push(c);
+    var bento = {}; bento[zoomCell] = bBox(2, 0, 2);
+    var order = null;
+    if (Array.isArray(data.bento_order) && data.bento_order.length === 8) {
+      var mapped = data.bento_order.map(function (v) { return cellOf(Math.round(num(v, -1))); });
+      if (mapped.every(function (m) { return others.indexOf(m) >= 0; }) && mapped.filter(function (m, k) { return mapped.indexOf(m) === k; }).length === 8) order = mapped;
+    }
+    if (!order) {
+      // Exact least-squares assignment (8! permutations, trivial).
+      var best = null, bestCost = Infinity, used = [], cur = [];
+      var rec = function (k, cost) {
+        if (cost >= bestCost) return;
+        if (k === 8) { bestCost = cost; best = cur.slice(); return; }
+        for (var f = 0; f < 8; f++) {
+          if (used[f]) continue;
+          var o = cellC(others[k]), dx = o.x - free[f].x, dy = o.y - free[f].y;
+          used[f] = true; cur[k] = f; rec(k + 1, cost + dx * dx + dy * dy); used[f] = false;
+        }
+      };
+      rec(0, 0);
+      order = []; for (var f = 0; f < 8; f++) order[f] = others[best.indexOf(f)];
+    }
+    for (var f2 = 0; f2 < 8; f2++) bento[order[f2]] = free[f2];
+
+    // ── The zoom: a camera move that carries the zoom tile's bento box onto the frame.
+    var Z = bento[zoomCell], k = Math.max(W / Z.w, H / Z.h);
+    var fcx = W / 2, fcy = H / 2;
+
+    // ── Cursor (the shared helper), tip-anchored.
+    var useCursor = data.cursor !== false;
+    var cursor = null, csz = S * num(data.cursor_size, 0.027), tipX = csz * 5.5 / 24, tipY = csz * 3.2 / 24;
+    var pt = function (v, dx, dy) { return Array.isArray(v) && v.length >= 2 ? { x: W * num(v[0], dx), y: H * num(v[1], dy) } : null; };
+    var cFrom = pt(data.cursor_from) || { x: W * 0.8, y: H * 0.79 };
+    var zc = cellC(zoomCell);
+    var cTo = pt(data.cursor_to);
+    if (!cTo) {
+      // Where the tile is both before and after the reflow, so the click lands on it either way.
+      var ax0 = Math.max(zc.x - tile / 2, Z.x - Z.w / 2), ax1 = Math.min(zc.x + tile / 2, Z.x + Z.w / 2);
+      var ay0 = Math.max(zc.y - tile / 2, Z.y - Z.h / 2), ay1 = Math.min(zc.y + tile / 2, Z.y + Z.h / 2);
+      cTo = (ax1 > ax0 && ay1 > ay0) ? { x: (ax0 + ax1) / 2, y: (ay0 + ay1) / 2 } : { x: Z.x, y: Z.y };
+    }
+    if (useCursor && typeof createCursor === 'function') {
+      cursor = createCursor(root, { color: data.cursor_color || '#0b0b0c', size: Math.round(csz) });
+      gsap.set(cursor, { x: cFrom.x - tipX, y: cFrom.y - tipY, transformOrigin: (tipX / csz * 100) + '% ' + (tipY / csz * 100) + '%' });
+      tl.fromTo(cursor, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.001, ease: 'none', immediateRender: false }, AT);
+      var moveAt = num(data.cursor_move_at, Math.max(CO + 0.3, BE - 0.6));
+      tl.fromTo(cursor, { x: cFrom.x - tipX, y: cFrom.y - tipY }, { x: cTo.x - tipX, y: cTo.y - tipY, duration: 0.4, ease: 'power2.inOut', immediateRender: false }, moveAt);
+      if (typeof clickCursor === 'function') clickCursor(tl, cursor, ZO);
+      if (data.cursor_exit_at !== undefined && data.cursor_exit_at !== null) tl.to(cursor, { autoAlpha: 0, duration: 0.001 }, num(data.cursor_exit_at, LAND));
+    }
+
+    // ── The whole state at time t.
+    function boxAt(c, t) {
+      // Unfold position (grid cell once settled).
+      var cc = cellC(c), p, x, y, w, r, vis;
+      if (c === 4) {
+        var side = d0 + (hs - d0) * seg(sGrow, t, SQ, DG) + (tile - hs) * seg(sShrink, t, SH, DS);
+        // Circle -> rounded square (radius/side 0.5 -> hero_radius), then the tile's radius.
+        var rf = 0.5 + (rfHero - 0.5) * out3((t - SQ) / 0.3);
+        x = cx; y = cy; w = side; vis = t >= AT - 1e-4;
+        r = Math.min(side / 2, rf * side + (rt - rfHero * tile) * seg(sShrink, t, SH, DS));
+      } else if (EDGES.indexOf(c) >= 0) {
+        p = seg(sUnfold, t, UN, DU);
+        x = cx + (cc.x - cx) * p; y = cy + (cc.y - cy) * p; w = tile * (0.9 + 0.1 * p); r = rt; vis = t >= UN - 1e-4;
+      } else {
+        var par = parentOf[c], pc = cellC(par), pp = seg(sUnfold, t, UN, DU), q = seg(sUnfold, t, CO, DU);
+        var px0 = cx + (pc.x - cx) * pp, py0 = cy + (pc.y - cy) * pp;
+        x = px0 + (cc.x - pc.x) * q; y = py0 + (cc.y - pc.y) * q; w = tile * (0.92 + 0.08 * q); r = rt; vis = t >= CO - 1e-4;
+      }
+      var h = w;
+      // Bento reflow (a change added on top, so it composes with a late unfold).
+      var bb = bento[c], dl = BE + (c === zoomCell ? 0 : 0.03 + 0.02 * (Math.abs((c % 3) - (zoomCell % 3)) + Math.abs(Math.floor(c / 3) - Math.floor(zoomCell / 3))));
+      var b = seg(sBento, t, dl, DB);
+      x += (bb.x - cc.x) * b; y += (bb.y - cc.y) * b; w += (bb.w - tile) * b; h += (bb.h - tile) * b;
+      if (c === zoomCell) {
+        // Pressed by the click, then its box becomes the frame (exact for any aspect).
+        var ez = inOut3((t - ZO) / ZD);
+        var press = 1 - 0.035 * Math.sin(Math.PI * clamp01((t - ZO) / 0.16));
+        w += (W / k - bb.w) * ez; h += (H / k - bb.h) * ez;
+        w *= press; h *= press; r = r * (1 - ez);
+      }
+      return { x: x, y: y, w: w, h: h, r: r, vis: vis };
+    }
+
+    function render(t) {
+      root.style.visibility = t >= AT - 1e-4 ? 'inherit' : 'hidden';
+      var landed = t >= LAND - 1e-4;
+      fin.style.visibility = landed ? 'inherit' : 'hidden';
+      stage.style.visibility = landed ? 'hidden' : 'inherit';
+      // Camera, applied as LAYOUT (each tile placed in screen pixels), not a scale
+      // transform on the stage: a composited, scaled layer rasters at its first size and
+      // reads soft; laid out, every frame paints the photos at full resolution.
+      var ez = inOut3((t - ZO) / ZD), s = Math.pow(k, ez);
+      var ccx = Z.x + (fcx - Z.x) * ez, ccy = Z.y + (fcy - Z.y) * ez;
+      for (var c = 0; c < 9; c++) {
+        var b = boxAt(c, t), el = tiles[c];
+        var X = ccx + (b.x - Z.x) * s, Y = ccy + (b.y - Z.y) * s, bw = b.w * s, bh = b.h * s;
+        el.style.visibility = b.vis ? 'inherit' : 'hidden';
+        el.style.width = bw.toFixed(2) + 'px'; el.style.height = bh.toFixed(2) + 'px';
+        el.style.transform = 'translate(' + (X - bw / 2).toFixed(2) + 'px,' + (Y - bh / 2).toFixed(2) + 'px)';
+        el.style.borderRadius = Math.max(0, b.r * s).toFixed(2) + 'px';
+        el.style.boxShadow = '0 ' + (S * 0.002 * s).toFixed(1) + 'px ' + (S * 0.007 * s).toFixed(1) + 'px rgba(0,0,0,0.12)';
+        // Stack: hero over edges over corners while unfolding; the zoom tile on top from the reflow on.
+        el.style.zIndex = c === zoomCell && t >= BE ? 5 : c === 4 ? 3 : EDGES.indexOf(c) >= 0 ? 2 : 1;
+      }
+    }
+
+    var END = Math.max(num(ctx && ctx.duration, 0), LAND + 0.5);
+    var st = { t: 0 };
+    tl.to(st, { t: END, duration: END, ease: 'none' }, 0);
+    tl.eventCallback('onUpdate', function () { render(st.t); });
+    render(0);
+    return tl;
+  }
+</script>

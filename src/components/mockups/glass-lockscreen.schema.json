@@ -1,0 +1,30 @@
+{
+  "type": "glass-lockscreen",
+  "label": "Glass lock screen -> phone pull-back",
+  "category": "mockups",
+  "description": "A full-frame photo becomes an iOS-26 LOCK SCREEN and then pulls back into a PHONE (the relay beat after the orb floods the frame). Beats: the wallpaper full-frame from `at` (object-fit cover -- identical to a plain full-frame photo, so it joins the scene before); big liquid-GLASS clock digits pop in over the wallpaper with the date rising above them (clock_at); a home bar appears at the bottom and STRETCHES up into a glass music player -- track, artist, prev/play/next, a progress line (bar_at, formed by bar_at+0.4); the cursor clicks play and it becomes pause (click_at); the whole screen PULLS BACK into a phone (pullback_at, 0.5 s): the black bezel grows out of the screen edge, the corners round, the Dynamic Island appears, landing on the phone geometry (centre 0.5/0.5, height 0.52 of the frame, width 0.52x0.485, corner radius 0.11 x width, bezel 0.012) on a pale lavender stage with a flowing blue silk swoosh. The lock screen stays on the screen, re-laid from square to tall. Hand-on classes for the next piece: the phone `.gls-phone`, its screen `.gls-screen`, the island `.gls-island`. All times are scene seconds; defaults are relative to `at`. Full-frame box. Example: {\"wallpaper\":\"/assets/astronaut.jpg\",\"date\":\"Friday, September 25\",\"time\":\"9:41\",\"track\":\"motion study 04\",\"artist\":\"made in code\",\"at\":0,\"cursor_from\":[0.8,0.74],\"cursor_to\":[0.82,0.77]}.",
+  "data": {
+    "wallpaper": { "type": "string", "label": "Lock-screen wallpaper (starts full-frame, object-fit cover)", "required": true },
+    "date": { "type": "string", "label": "Date above the clock (default \"Friday, September 25\")", "optional": true, "default": "Friday, September 25" },
+    "time": { "type": "string", "label": "Glass clock digits (default \"9:41\")", "optional": true, "default": "9:41" },
+    "track": { "type": "string", "label": "Player track title (default \"motion study 04\")", "optional": true, "default": "motion study 04" },
+    "artist": { "type": "string", "label": "Player artist line (default \"made in code\")", "optional": true, "default": "made in code" },
+    "stage": { "type": "object", "label": "The ground it pulls back onto: {color (default #ecebf5), silk (default true), silk_color (default #2d5bff)}", "optional": true, "properties": { "color": { "type": "string" }, "silk": { "type": "boolean" }, "silk_color": { "type": "string" } } },
+    "phone_island": { "type": "boolean", "label": "Show the Dynamic Island on the phone (.gls-island; default true)", "optional": true, "default": true },
+    "phone_x": { "type": "number", "label": "Phone centre x, fraction of the frame (default 0.5)", "optional": true },
+    "phone_y": { "type": "number", "label": "Phone centre y, fraction of the frame (default 0.5)", "optional": true },
+    "phone_height": { "type": "number", "label": "Phone height, fraction of the frame (default 0.52)", "optional": true },
+    "phone_aspect": { "type": "number", "label": "Phone width / height (default 0.485)", "optional": true },
+    "bezel": { "type": "number", "label": "Bezel width, fraction of the frame (default 0.012)", "optional": true },
+    "at": { "type": "number", "label": "Start (s); every default time below is relative to it (default 0)", "optional": true },
+    "clock_at": { "type": "number", "label": "Glass clock digits pop in, the date rises (default at+0.5)", "optional": true },
+    "bar_at": { "type": "number", "label": "Home bar appears and stretches into the glass player by bar_at+0.4 (default at+1.0)", "optional": true },
+    "player_at": { "type": "number", "label": "When the player starts stretching out of the bar (default bar_at+0.12)", "optional": true },
+    "click_at": { "type": "number", "label": "The cursor clicks play -> pause (default at+1.6)", "optional": true },
+    "pullback_at": { "type": "number", "label": "The screen pulls back into the phone (default at+2.0)", "optional": true },
+    "pullback_duration": { "type": "number", "label": "Seconds the pull-back takes (default 0.5)", "optional": true },
+    "cursor": { "type": "boolean", "label": "Show the built-in cursor (default true)", "optional": true, "default": true },
+    "cursor_from": { "type": "array", "label": "Where the cursor starts, [x, y] fractions of the frame (hand-on)", "optional": true, "items": { "type": "number" }, "default": [0.8, 0.74] },
+    "cursor_to": { "type": "array", "label": "Where the cursor rests after the click, [x, y] fractions of the frame (hand-off)", "optional": true, "items": { "type": "number" }, "default": [0.82, 0.77] }
+  }
+}

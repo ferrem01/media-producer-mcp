@@ -1,0 +1,33 @@
+{
+  "type": "framed-print",
+  "label": "Framed print on a wall",
+  "category": "media",
+  "description": "A photo as a framed print hanging on a wall -- real footage (a white wall with swaying plant shadows, looped and seeked by the capture like the video component) or warm plaster with a soft blurred fern shadow swaying as a pure function of time. A relay handoff piece (the 'develop.' film, 21.75-25.5 s). Beats: at `at` a SOLID rectangle of frame_color sits at the frame geometry (centre 0.5/0.5, outer 0.30 x 0.40 of the frame -- exactly where a contracting colour flood ends; it IS the molding before the photo shows); at `reveal_at` the white mat and the photo are inside the molding -- reveal 'instant' (compose the iris component over it to do the opening) or 'grow' (the photo fills the rectangle and the mat and molding grow out of its edge, 0.35 s); a soft drop shadow settles on the wall from `at`; at `push_at` a slow camera push-in until the photo alone fills the frame (object-fit cover) at push_at + push_duration (0.8 s) -- the mat and molding pass out of frame; optional `flood_at`: the molding's black floods the whole frame (out past every corner and in over the photo, 0.3 s) -- a scene join onto full black. Full-frame component. Example: {\"image\":\"/assets/astronaut.jpg\",\"wall\":\"footage\",\"wall_src\":\"/assets/wall.mp4\",\"wall_duration\":7.37,\"at\":0.5,\"reveal_at\":1.0,\"push_at\":3.0,\"flood_at\":4.25}.",
+  "data": {
+    "image": { "type": "string", "label": "The print (a photo URL; portrait prints fit the 0.30 x 0.40 frame best)", "required": true },
+    "wall": { "type": "string", "label": "The wall: real footage (wall_src) or drawn plaster (default footage when wall_src is given, else plaster)", "optional": true, "enum": ["footage", "plaster"] },
+    "wall_src": { "type": "string", "label": "Wall video URL (a plain wall with moving plant shadows; all-intra encodes seek best)", "optional": true },
+    "wall_start": { "type": "number", "label": "Seconds into the wall clip at scene time 0 (default 0)", "optional": true, "default": 0 },
+    "wall_duration": { "type": "number", "label": "The wall clip's length in seconds; given, the footage loops (a data-mp-edl source map), else it holds its last frame", "optional": true },
+    "wall_color": { "type": "string", "label": "Plaster highlight colour (default #f3f0ea)", "optional": true },
+    "frame_color": { "type": "string", "label": "Molding colour -- also the starting rectangle (default #141414)", "optional": true, "default": "#141414" },
+    "flood_color": { "type": "string", "label": "Flood colour (default frame_color; match the next scene's black)", "optional": true },
+    "mat": { "type": "boolean", "label": "A white mat around the photo (default true)", "optional": true, "default": true },
+    "mat_color": { "type": "string", "label": "Mat colour (default #f3f2eb)", "optional": true },
+    "molding": { "type": "number", "label": "Molding width as a fraction of the outer frame width (default 0.052)", "optional": true, "default": 0.052 },
+    "mat_width": { "type": "number", "label": "Mat margin as a fraction of the outer frame width (default 0.128)", "optional": true, "default": 0.128 },
+    "x": { "type": "number", "label": "Frame centre x, fraction of the frame (default 0.5)", "optional": true, "default": 0.5 },
+    "y": { "type": "number", "label": "Frame centre y, fraction of the frame (default 0.5)", "optional": true, "default": 0.5 },
+    "w": { "type": "number", "label": "Outer frame width, fraction of the frame width (default 0.30)", "optional": true, "default": 0.3 },
+    "h": { "type": "number", "label": "Outer frame height, fraction of the frame height (default 0.40)", "optional": true, "default": 0.4 },
+    "at": { "type": "number", "label": "The black rectangle stands at the frame geometry; the wall shadow starts settling (s, default 0)", "optional": true, "default": 0 },
+    "reveal_at": { "type": "number", "label": "Mat + photo inside the molding (default at + 0.5)", "optional": true },
+    "reveal": { "type": "string", "label": "instant (under an iris) or grow (mat and molding grow out of the photo's edge, 0.35 s)", "optional": true, "enum": ["instant", "grow"], "default": "instant" },
+    "push_at": { "type": "number", "label": "Slow push-in starts (default at + 2.5)", "optional": true },
+    "push_duration": { "type": "number", "label": "Seconds until the photo alone fills the frame (default 0.8)", "optional": true, "default": 0.8 },
+    "push_drift": { "type": "number", "label": "Keep creeping in after the push, fraction of scale per second (default 0 = hold exactly)", "optional": true, "default": 0 },
+    "flood_at": { "type": "number", "label": "Optional: the molding floods the whole frame (a scene join onto full black)", "optional": true },
+    "flood_duration": { "type": "number", "label": "Seconds the flood takes (default 0.3)", "optional": true, "default": 0.3 },
+    "shadow": { "type": "boolean", "label": "Soft drop shadow on the wall (default true)", "optional": true, "default": true }
+  }
+}

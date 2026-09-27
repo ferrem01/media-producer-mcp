@@ -1,0 +1,38 @@
+{
+  "type": "status-morph",
+  "label": "Status morph (one black shape through states)",
+  "category": "ui-mocks",
+  "description": "ONE black pill that keeps changing shape through a list of states -- the order-button morph as a reusable piece: a label (e.g. 'Order print', or a check + 'Ordered'), a spinner, a progress state (printer icon, 'Printing', a percentage counting 0->100 with a thin line), a route state ('On its way' / 'today' with a tiny van driving a dotted route to a house), and a done circle whose check draws itself. Labels rise out of the shape's own mask while the shape resizes; nothing fades. A built-in cursor clicks the pill as the first morph starts. The pill sits at `pill` (centre x/y, width, height as fractions of the box); the done circle defaults to the done handoff geometry (centre 0.5/0.62, diameter 0.12). If the first state is a label at `at`, it is the pill's standing face. States' `at`/`to` are scene seconds. Example: {\"at\":0.2,\"pill\":{\"x\":0.5,\"y\":0.62,\"w\":0.44,\"h\":0.075},\"states\":[{\"kind\":\"label\",\"text\":\"Order print\",\"at\":0.2},{\"kind\":\"spinner\",\"at\":0.3},{\"kind\":\"label\",\"icon\":\"check\",\"text\":\"Ordered\",\"at\":0.65},{\"kind\":\"progress\",\"icon\":\"printer\",\"text\":\"Printing\",\"at\":1.05,\"to\":1.85},{\"kind\":\"route\",\"text\":\"On its way\",\"right\":\"today\",\"at\":2.15,\"to\":2.65},{\"kind\":\"done\",\"at\":2.9}]}.",
+  "data": {
+    "at": { "type": "number", "label": "Scene second it starts (default 0); default states are relative to it", "optional": true },
+    "pill": {
+      "type": "object", "label": "The pill: centre x/y, width w (of the box width), height h (of the box height). Default {x:0.5,y:0.62,w:0.44,h:0.075}", "optional": true,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" } }
+    },
+    "done": {
+      "type": "object", "label": "The done circle: centre x/y and size (diameter, fraction of the box's short side). Default the pill's centre, 0.12", "optional": true,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "size": { "type": "number" } }
+    },
+    "states": {
+      "type": "array", "label": "In order (scene seconds). Default: Order print -> spinner -> Ordered -> Printing % -> On its way -> done", "optional": true,
+      "items": { "type": "object", "properties": {
+        "kind": { "type": "string", "enum": ["label", "spinner", "progress", "route", "done"] },
+        "at": { "type": "number" }, "to": { "type": "number", "label": "progress/route: when the bar or the van arrives" },
+        "text": { "type": "string" }, "right": { "type": "string", "label": "route: the grey right-hand word" },
+        "icon": { "type": "string", "label": "label: check | progress: printer" },
+        "w": { "type": "number", "label": "Width multiplier of the pill for this state" },
+        "h": { "type": "number", "label": "Height multiplier of the pill for this state" },
+        "d": { "type": "number", "label": "done: diameter in px (overrides done.size)" }
+      } }
+    },
+    "appear": { "type": "string", "label": "none (standing from the start, default) | pop (springs from zero at appear_at)", "enum": ["none", "pop"], "optional": true },
+    "appear_at": { "type": "number", "label": "When it pops in (default at)", "optional": true },
+    "color": { "type": "string", "label": "The shape's colour (default near-black #0b0b0c)", "optional": true },
+    "font_scale": { "type": "number", "label": "Type size as a fraction of the pill height (default 0.3)", "optional": true },
+    "cursor": { "type": "boolean", "label": "Show the built-in cursor (default true)", "optional": true },
+    "click_at": { "type": "number", "label": "When the cursor clicks the pill (default: the first morph - 0.05)", "optional": true },
+    "cursor_from": { "type": "array", "label": "Cursor start [x, y], fractions of the box (default [0.74, 0.82])", "items": { "type": "number" }, "optional": true },
+    "cursor_to": { "type": "array", "label": "Cursor rest [x, y] (default [0.72, 0.8])", "items": { "type": "number" }, "optional": true },
+    "cursor_scale": { "type": "number", "label": "Cursor size multiplier (default 1)", "optional": true }
+  }
+}

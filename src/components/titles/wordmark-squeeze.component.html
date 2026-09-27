@@ -1,0 +1,288 @@
+<template>
+  <div class="wms">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,800&family=Geist:wght@400;600&display=swap">
+    <div class="wms-word"></div>
+    <div class="wms-tagclip"><div class="wms-tag"></div></div>
+    <div class="wms-pill"><div class="wms-label"><span class="wms-label-t"></span></div></div>
+  </div>
+</template>
+
+<style scoped>
+  /* WORDMARK SQUEEZE: the relay film's open and close. The wordmark squeezes
+     into its own period like an accordion (every letter moves toward the dot
+     by the same factor and narrows with it, so they stay touching), the dot
+     grows into a black pill on a spring, a label rises inside it. "return"
+     plays it backwards for the close: pill -> dot -> the letters spring back
+     out, landing on the open's first frame exactly. Everything is computed
+     from the timeline's time (one clock tween) -- no state between frames. */
+  .wms, .wms * { max-width: none; }
+  .wms { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .wms-word { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  .wms-letters { position: absolute; left: 0; top: 0; white-space: nowrap; line-height: 1;
+    font-weight: 800; font-stretch: 125%; font-variation-settings: 'wdth' 125; color: var(--wms-c, #0b0b0c);
+    will-change: transform; }
+  .wms-ghost { opacity: 0; }
+  .wms-probe { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+  .wms-dot { position: absolute; left: 0; top: 0; border-radius: 50%; background: var(--wms-c, #0b0b0c); }
+  .wms-tagclip { position: absolute; left: 0; top: 0; overflow: hidden; text-align: center; white-space: nowrap; }
+  .wms-tag { color: var(--wms-muted, #86868b); line-height: 1.3; font-weight: 400;
+    font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif; will-change: transform; }
+  .wms-pill { position: absolute; left: 0; top: 0; overflow: hidden; background: var(--wms-c, #0b0b0c); visibility: hidden;
+    transform-origin: 50% 50%; }
+  .wms-pill.wms-ghostpill { opacity: 0; }
+  .wms-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .wms-label-t { display: block; color: var(--wms-ink, #ffffff); font-weight: 600; letter-spacing: -0.01em; line-height: 1; white-space: nowrap;
+    font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif; will-change: transform; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.wms'), word = el.querySelector('.wms-word');
+    var tagClip = el.querySelector('.wms-tagclip'), tag = el.querySelector('.wms-tag');
+    var pill = el.querySelector('.wms-pill'), labelT = el.querySelector('.wms-label-t');
+    if (!root || !word || !pill) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var has = function (v) { return v !== null && v !== undefined && v !== '' && isFinite(Number(v)); };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080;
+    var color = data.color || '#0b0b0c';
+    root.style.setProperty('--wms-c', color);
+    if (data.muted) root.style.setProperty('--wms-muted', data.muted);
+    if (data.label_color) root.style.setProperty('--wms-ink', data.label_color);
+
+    // A family other than Archivo is fetched once (id-guarded) -- the template
+    // already links Archivo + Geist, so the page's font wait covers the default.
+    var family = String(data.font_family || 'Archivo');
+    if (family !== 'Archivo' && data.font_link !== false) {
+      var fid = 'mp-font-wms-' + family.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      if (!document.getElementById(fid)) {
+        var lk = document.createElement('link'); lk.id = fid; lk.rel = 'stylesheet';
+        lk.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(family) + ':wght@800&display=swap';
+        document.head.appendChild(lk);
+      }
+    }
+    var fontStack = "'" + family + "', var(--mp-font-family, system-ui), sans-serif";
+
+    // ── Layout (measured once, after the page's fonts) ──
+    var mode = data.mode === 'return' ? 'return' : 'open';
+    var fs = W * num(data.word_size, 0.145);
+    var cx = W * num(data.x, 0.5), cy = H * num(data.y, 0.5);
+    var raw = String(data.wordmark || 'develop.');
+    var text = raw.replace(/\.\s*$/, '');
+
+    var mk = function () {
+      var s = document.createElement('span'); s.className = 'wms-letters';
+      s.style.fontSize = fs + 'px'; s.style.fontFamily = fontStack;
+      s.style.letterSpacing = num(data.letter_spacing, -0.01) + 'em';
+      s.appendChild(document.createTextNode(text));
+      return s;
+    };
+    var letters = mk();
+    var probe = document.createElement('span'); probe.className = 'wms-probe'; letters.appendChild(probe);
+    word.appendChild(letters);
+    // Motion smear: three lagged copies under the letters, shown only while
+    // they move (a squeeze in 0.3 s reads as a smear, like a 1/60 shutter).
+    var ghosts = [];
+    for (var g = 0; g < 3; g++) {
+      var gh = mk(); gh.classList.add('wms-ghost'); gh.setAttribute('aria-hidden', 'true');
+      word.insertBefore(gh, letters); ghosts.push(gh);
+    }
+    var dot = document.createElement('div'); dot.className = 'wms-dot';
+    word.appendChild(dot);
+
+    // Tagline: small grey under the word, in a clip it drops out of / rises into.
+    var tg = String(data.tagline || '');
+    var tfs = W * num(data.tagline_size, 0.022);
+    if (tg) {
+      tag.textContent = tg; tag.style.fontSize = tfs + 'px';
+      tagClip.style.width = W + 'px'; tagClip.style.left = (cx - W / 2) + 'px';
+      tagClip.style.height = (tfs * 1.3) + 'px';
+    } else tagClip.style.display = 'none';
+
+    // Layout from the real face: the word's advance and the period's ink box.
+    // Re-run by render() if the face lands after the build (a slow fetch past
+    // the page's font wait): the measured width changes, the layout follows.
+    var lettersW = -1, dotCx = cx, dotCy = cy, dotD = fs * 0.2, baseY = cy;
+    var layout = function () {
+      lettersW = letters.offsetWidth;
+      var baseOff = probe.offsetTop;
+      var adv = fs * 0.3, inkL = fs * 0.04, inkR = fs * 0.24, asc = fs * 0.2, desc = 0;
+      try {
+        var cv = document.createElement('canvas').getContext('2d');
+        cv.font = '800 ' + fs + 'px ' + fontStack.replace(/var\([^)]*\),\s*/, '');
+        try { cv.fontStretch = 'expanded'; } catch (e) {}
+        var m = cv.measureText('.');
+        if (m && m.width > 0 && isFinite(m.actualBoundingBoxRight)) {
+          adv = m.width; inkL = -m.actualBoundingBoxLeft; inkR = m.actualBoundingBoxRight;
+          asc = m.actualBoundingBoxAscent; desc = m.actualBoundingBoxDescent;
+        }
+      } catch (e) {}
+      dotD = num(data.dot_size, 0) > 0 ? W * num(data.dot_size, 0) : Math.max(inkR - inkL, asc + desc, fs * 0.08);
+      var startX = cx - (lettersW + adv) / 2;
+      // y is the DOT's line: the period sits on it, the letters stand on the
+      // baseline just under it -- and the pill grows on the same line.
+      dotCx = startX + lettersW + (inkL + inkR) / 2;
+      dotCy = cy;
+      baseY = cy + (asc - desc) / 2;
+      var lettersTop = baseY - baseOff;
+      var origin = (dotCx - startX) + 'px ' + (dotCy - lettersTop) + 'px';
+      [letters].concat(ghosts).forEach(function (n) { n.style.left = startX + 'px'; n.style.top = lettersTop + 'px'; n.style.transformOrigin = origin; });
+      dot.style.width = dotD + 'px'; dot.style.height = dotD + 'px';
+      dot.style.left = (dotCx - dotD / 2) + 'px'; dot.style.top = (dotCy - dotD / 2) + 'px';
+      if (tg) tagClip.style.top = (baseY + fs * num(data.tagline_gap, 0.56) - tfs * 0.65) + 'px';
+    };
+    layout();
+
+    // Pill geometry (the relay contract: centre 0.5/0.5, 0.30 x 0.085, fully round).
+    var pw = W * num(data.pill_w, 0.30), ph = H * num(data.pill_h, 0.085);
+    var pcx = W * num(data.pill_x, 0.5), pcy = H * num(data.pill_y, 0.5);
+    var lab = String(data.label || '');
+    labelT.textContent = lab;
+    labelT.style.fontSize = (ph * num(data.label_size, 0.4)) + 'px';
+    if (!lab) labelT.style.display = 'none';
+    var pillGhosts = [];
+    for (var q = 0; q < 2; q++) {
+      var pg = document.createElement('div'); pg.className = 'wms-pill wms-ghostpill'; pg.setAttribute('aria-hidden', 'true');
+      root.insertBefore(pg, pill); pillGhosts.push(pg);
+    }
+
+    // ── Time (scene seconds) ──
+    var at = num(data.at, 0);
+    var sqAt = num(data.squeeze_at, 0.7), sqDur = num(data.squeeze_duration, 0.3);
+    var pillAt = num(data.pill_at, 1.0);
+    var labelAt = num(data.label_at, 1.6);
+    var clickAt = has(data.click_at) ? num(data.click_at, 0) : null;
+    var hideAt = has(data.hide_at) ? num(data.hide_at, 0) : null;
+    var dotAt = num(data.dot_at, at + 0.25), dotDur = num(data.dot_duration, 0.25);
+    var springAt = num(data.spring_at, at + 0.5);
+    var tagAt = num(data.tagline_at, springAt + 0.75);
+
+    var clamp = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var lerp = function (a, b, p) { return a + (b - a) * p; };
+    var inQ = function (p) { p = clamp(p); return p * p; };
+    var out3 = function (p) { p = clamp(p); return 1 - Math.pow(1 - p, 3); };
+    // A closed-form spring step (0 -> 1), blended onto exactly 1 by `end`
+    // seconds so the last frame is the rest pose, not 1 - 1e-4.
+    var spring = function (tau, zeta, omega, end) {
+      if (tau <= 0) return 0;
+      if (tau >= end) return 1;
+      var wd = omega * Math.sqrt(1 - zeta * zeta);
+      var v = 1 - Math.exp(-zeta * omega * tau) * (Math.cos(wd * tau) + (zeta * omega / wd) * Math.sin(wd * tau));
+      var b = clamp((tau - end * 0.7) / (end * 0.3)); b = b * b * (3 - 2 * b);
+      return v + (1 - v) * b;
+    };
+
+    // s: the letters' squeeze factor (1 = the wordmark, 0 = all inside the dot).
+    var sAt = function (t) {
+      if (mode === 'open') return t < sqAt ? 1 : 1 - inQ((t - sqAt) / sqDur);
+      return t < springAt ? 0 : spring(t - springAt, 0.72, 15, 0.62);
+    };
+    // Pill state: k = 0 is the dot (at the period), 1 the pill at its mark.
+    var pillAtT = function (t) {
+      if (mode === 'open') {
+        if (t < pillAt) return null;
+        var tau = t - pillAt;
+        return { pos: spring(tau, 0.98, 12, 0.8), size: spring(tau, 0.6, 12, 0.95) };
+      }
+      if (t < at) return null;
+      if (t < dotAt) return { pos: 1, size: 1 };
+      if (t >= dotAt + dotDur) return null;
+      var p = 1 - inQ((t - dotAt) / dotDur);
+      return { pos: p, size: p };
+    };
+    var place = function (node, st, t) {
+      var x = lerp(dotCx, pcx, st.pos), y = lerp(dotCy, pcy, st.pos);
+      var w = Math.max(1, lerp(dotD, pw, st.size)), h = Math.max(1, lerp(dotD, ph, st.size));
+      node.style.left = (x - w / 2) + 'px'; node.style.top = (y - h / 2) + 'px';
+      node.style.width = w + 'px'; node.style.height = h + 'px';
+      node.style.borderRadius = (Math.min(w, h) / 2) + 'px';
+    };
+    var pressAt = function (t) {
+      if (clickAt === null || t < clickAt) return 1;
+      var tau = t - clickAt;
+      if (tau < 0.1) return 1 - 0.04 * out3(tau / 0.1);
+      return 1 - 0.04 * (1 - out3((tau - 0.1) / 0.15));
+    };
+    var LAG = 0.0056; // three copies across one 60 fps frame
+
+    var render = function (t) {
+      if (letters.offsetWidth !== lettersW) layout();
+      var shown = t >= at;
+      var hidden = hideAt !== null && t >= hideAt;
+      // Letters + smear.
+      var s = sAt(t);
+      var tr = function (v) { return 'scale(' + v + ',' + Math.sqrt(Math.max(0, v)) + ')'; };
+      var lettersOn = shown && s > 0.002 && !(mode === 'open' && hidden);
+      letters.style.visibility = lettersOn ? 'inherit' : 'hidden';
+      letters.style.transform = tr(s);
+      for (var i = 0; i < ghosts.length; i++) {
+        var sg = sAt(t - LAG * (i + 1));
+        var moving = Math.abs(sg - s) > 0.004 && lettersOn && sg > 0.002;
+        ghosts[i].style.visibility = moving ? 'inherit' : 'hidden';
+        ghosts[i].style.opacity = moving ? String([0.2, 0.13, 0.07][i]) : '0';
+        ghosts[i].style.transform = tr(sg);
+      }
+      // The dot: the period, until it becomes the pill (open) / after the pill lands in it (return).
+      var ps = pillAtT(t);
+      var dotOn = shown && !hidden && !ps && (mode === 'open' ? t < pillAt : t >= dotAt);
+      dot.style.visibility = dotOn ? 'inherit' : 'hidden';
+      // The pill.
+      var pillOn = shown && !hidden && !!ps;
+      pill.style.visibility = pillOn ? 'inherit' : 'hidden';
+      if (ps) { place(pill, ps, t); pill.style.transform = 'scale(' + pressAt(t) + ')'; }
+      for (var j = 0; j < pillGhosts.length; j++) {
+        var pg2 = pillAtT(t - LAG * 1.5 * (j + 1));
+        var mv = pillOn && pg2 && ps && (Math.abs(pg2.pos - ps.pos) + Math.abs(pg2.size - ps.size)) > 0.01;
+        pillGhosts[j].style.visibility = mv ? 'inherit' : 'hidden';
+        pillGhosts[j].style.opacity = mv ? String([0.3, 0.15][j]) : '0';
+        if (mv) place(pillGhosts[j], pg2, t);
+      }
+      // Label: rises out of the pill's bottom edge (its mask line).
+      if (lab) {
+        var lp = (mode === 'open' && t >= labelAt) ? out3((t - labelAt) / 0.4) : 0;
+        labelT.style.transform = 'translateY(' + ((1 - lp) * ph * 0.9) + 'px)';
+        labelT.style.visibility = lp > 0 ? 'inherit' : 'hidden';
+      }
+      // Tagline: drops out at the squeeze (open), rises back at tagline_at (return).
+      if (tg) {
+        var ty;
+        if (mode === 'open') ty = t < sqAt ? 0 : inQ((t - sqAt) / 0.2);
+        else ty = t < tagAt ? 1 : 1 - out3((t - tagAt) / 0.45);
+        tag.style.transform = 'translateY(' + (ty * 110) + '%)';
+        tagClip.style.visibility = shown && ty < 0.999 && !(mode === 'open' && hidden) ? 'inherit' : 'hidden';
+      }
+    };
+
+    // One clock drives everything: the timeline seeks it, render() reads it.
+    var end = Math.max(num(ctx && ctx.duration, 0), (hideAt || 0), tagAt, labelAt, (clickAt || 0), pillAt, springAt) + 1;
+    var clock = { t: 0 };
+    render(0);
+    // A face that lands after the build re-lays the word out and redraws the
+    // current time (the capture awaits fonts.ready before its first frame,
+    // and a seek to the time already shown does not re-render the clock).
+    try {
+      var relay = function () { layout(); render(clock.t); };
+      if (document.fonts) {
+        if (document.fonts.ready) document.fonts.ready.then(relay, function () {});
+        if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', relay);
+      }
+    } catch (e) {}
+    tl.fromTo(clock, { t: 0 }, { t: end, duration: end, ease: 'none', immediateRender: false,
+      onUpdate: function () { render(clock.t); } }, 0);
+
+    // The hand that presses the pill (when there is a click): it waits at
+    // cursor_from, travels to cursor_to, presses, and hands on at hide_at.
+    if (clickAt !== null && data.cursor !== false && typeof createCursor === 'function') {
+      var cur = createCursor(root, { color: '#0b0b0c', size: Math.round(W * (Number(data.cursor_size) || 0.027)) });
+      var cf = Array.isArray(data.cursor_from) ? data.cursor_from : [0.82, 0.79];
+      var ct = Array.isArray(data.cursor_to) ? data.cursor_to : [0.52, 0.51];
+      gsap.set(cur, { x: W * num(cf[0], 0.82), y: H * num(cf[1], 0.79), autoAlpha: 0 });
+      if (at <= 0) gsap.set(cur, { autoAlpha: 1 }); else tl.set(cur, { autoAlpha: 1 }, at);
+      tl.to(cur, { x: W * num(ct[0], 0.52), y: H * num(ct[1], 0.51), duration: 0.5, ease: 'power2.inOut' }, Math.max(at, clickAt - 0.6));
+      clickCursor(tl, cur, clickAt);
+      if (hideAt !== null) tl.set(cur, { autoAlpha: 0 }, hideAt);
+    }
+    return tl;
+  }
+</script>

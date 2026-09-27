@@ -4354,6 +4354,9 @@ async function runUnifiedPipeline(
     for (const sc of project.scenes as any[]) {
       sc.transition_in = { type: "none", duration_seconds: 0 };
       if ((Number(sc.duration_seconds) || 0) <= 1.5 && sc.entrance === undefined) sc.entrance = "settled";
+      // v2, the continuous take: scene joins land on identical frames, so no
+      // ambient drift may move the frame between one scene's end and the next's start.
+      sc.locked_camera = true;
     }
   }
   // The person's own tracks ride through (see keptAudioTracks).

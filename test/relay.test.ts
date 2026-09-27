@@ -29,7 +29,7 @@ describe("relay grammar", () => {
     const src = await read("../src/llm/storyboard-builder.ts");
     expect(src).toContain('__g("relay")');
     expect(src).toContain("RELAY FILMS");
-    expect(src).toMatch(/"relay": \{ min: 5, max: 14 \}/);
+    expect(src).toMatch(/"relay": \{ min: 3, max: 14 \}/);
     expect(src).toMatch(/A ONER IS ONE SCENE, NOT A SEQUENCE/);
     expect(src).toMatch(/THE THROUGH-LINE: each oner names ONE object/);
     // The measured gotcha: a travelling through-line clipped by its own box.
@@ -58,5 +58,38 @@ describe("relay grammar", () => {
     expect(src).toMatch(/"canvas-tour", "relay", "screencast"/);
     expect(src).toContain("* relay -- every beat CARRIED BY AN OBJECT: one becomes the next, or one stays as the through-line");
     expect(src).toContain("relay: every beat carried by an OBJECT");
+  });
+
+  // v2 (SPEC-relay.md): the "develop." launch film -- one continuous take,
+  // zero cuts, scenes joined on identical frames, a cursor on every change,
+  // a beat on every beat, and a loop. Marc: "a better example of the new
+  // grammar we just created".
+  it("defaults to the continuous take, joined on identical frames", async () => {
+    const sb = await read("../src/llm/storyboard-builder.ts");
+    expect(sb).toMatch(/TWO DIALECTS, CONTINUOUS BY DEFAULT/);
+    expect(sb).toMatch(/SCENE JOINS LAND ON IDENTICAL FRAMES/);
+    expect(sb).toContain('color-flood {"mode":"flood"');
+    expect(sb).toContain('color-flood {"mode":"contract"');
+    expect(sb).toMatch(/A CURSOR DRIVES EVERY CHANGE/);
+    expect(sb).toMatch(/A BEAT ON EVERY BEAT/);
+    expect(sb).toMatch(/THE FILM LOOPS/);
+    const cd = await read("../src/llm/creative-director.ts");
+    expect(cd).toMatch(/THE CONTINUOUS TAKE \(the default/);
+    expect(cd).toMatch(/as a CONTINUOUS TAKE it holds 3-7 scenes/);
+    const sv = await read("../src/server.ts");
+    expect(sv).toContain("one stays as the through-line; one take.");
+    const spec = await read("../SPEC-relay.md");
+    expect(spec).toMatch(/## v2: the continuous take/);
+    // Marc: "make this the reference video for relay".
+    expect(spec).toContain('**THE reference film: "develop."**');
+    expect(sb).toContain('THE reference: the "develop." launch film rebuilt as proj_790dc4fa');
+    expect(cd).toContain('THE reference is the "develop." launch film');
+  });
+
+  it("lets a music bed land its drop on the film's beat (trim_start), and jamendo: ids download", async () => {
+    const sv = await read("../src/server.ts");
+    expect(sv).toMatch(/trim_start: z\.number\(\)\.min\(0\)\.optional\(\)/);
+    expect(sv).toMatch(/existing\.trim_start = params\.track\.trim_start/);
+    expect(sv).toMatch(/if \(source && source\.startsWith\("jamendo:"\)\)/);
   });
 });

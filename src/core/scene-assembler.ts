@@ -258,6 +258,8 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 
   // Determine if scene should use transparent background (for full-behind speaker overlay)
   const isTransparent = scene.transparent_background === true;
+  // The continuous take (SPEC-relay.md v2): no drift, no ambient layer.
+  const lockedCamera = (scene as any).locked_camera === true;
   // A scene with camera moves over the camera: the camera itself rides the
   // rig, so a zoom zooms the PERSON (Marc: "I should be able to zoom in on
   // myself"). Without moves the camera stays a fixed underlay / the base.
@@ -446,7 +448,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 <body>
 ${preview && speakerUrl && isTransparent && !rigCamera ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script><script>${timelapseClockScript(scene.media_edits, canvas, "document.body", "window.__MP_TIMELINE", scene.duration_seconds)}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
-${rigCamera ? speakerRigVideoHtml(speakerUrl!, options.speakerOffset || 0, !!preview) : ''}${isTransparent ? '' : '<div class="mp-ambient"></div>'}
+${rigCamera ? speakerRigVideoHtml(speakerUrl!, options.speakerOffset || 0, !!preview) : ''}${isTransparent || lockedCamera ? '' : '<div class="mp-ambient"></div>'}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
 ${buildContentRegionWrapper(scene, componentBlocks)}
 </div>
@@ -484,7 +486,8 @@ __mpAfterFonts(function() {
   window.__MP_LOGODEV_TOKEN = ${JSON.stringify(config.logoDevToken)};
 
   // ── Camera motion: subtle Ken Burns zoom + drift ──
-  var cameraEl = document.querySelector('.mp-camera');
+  // (none on a locked camera: the continuous take joins scenes on identical frames)
+  var cameraEl = ${lockedCamera ? "null" : "document.querySelector('.mp-camera')"};
   if (cameraEl) {
     var camDur = ${scene.duration_seconds};
     // Seed drift direction from scene id for per-scene variety

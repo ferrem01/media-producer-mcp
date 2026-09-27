@@ -415,6 +415,11 @@ export interface Scene {
    *  Used with speaker track so content appears beside the speaker. */
   content_region?: ContentRegion;
   /** When true, the scene background is rendered transparently (used with full-behind overlays). */
+  /** THE LOCKED CAMERA (SPEC-relay.md v2, the continuous take): no ambient
+   *  Ken Burns drift and no ambient dot layer, so the scene's last frame is
+   *  exactly the frame the next scene opens on -- a join the eye cannot find.
+   *  camera_moves still play. Relay scenes get it from the build. */
+  locked_camera?: boolean;
   transparent_background?: boolean;
   /** "settled": component timelines are pre-rolled so entrances are already
    *  resolved at frame 0 -- the hard cut lands on standing content with only

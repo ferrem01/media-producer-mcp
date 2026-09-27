@@ -1,0 +1,41 @@
+{
+  "type": "desktop-stage",
+  "label": "Desktop stage (phone -> Mac window -> drop)",
+  "category": "ui-mocks",
+  "description": "A relay oner beat on a pale-lavender silk stage (the shared `stage: \"silk\"` look): the PHONE stands at the phone handoff geometry (centre 0.5/0.5, height 0.52 of the frame, width 0.52x0.485, radius 0.11 x width, bezel 0.012) showing the wallpaper with a small lock-screen clock; at shift_at it steps left and shrinks (the camera pulls back); at island_at its Dynamic Island stretches like liquid, PINCHES OFF (goo), flies right and grows into a black Mac window (0.57 x 0.42 of the frame, left 0.38, centred) that rolls UP like a blind at blind_at onto Safari (traffic lights, sidebar, tabs 'Start Page' + the site, Favorites letter tiles, Reading List cards); at press_at a cursor long-presses the wallpaper (a ring grows), a rounded thumbnail lifts off and is dragged (drag_at) onto the site's tab; on hover the page PUSHES in to the landing page (nav + a dashed drop zone, a green + badge); at drop_at the thumbnail becomes the HERO (`.dst-hero`), the headline and sub rise out of their mask lines and the camera eases toward the window (zoom 1.7) so it fills the frame. HANDOFF (square frame, fractions of the component box): window at the end = left 0.015, top 0.144, width 0.969, height 0.712; hero `.dst-hero` = left 0.5489, top 0.2912, width 0.3915, height 0.4525 (centre 0.7447/0.5174, radius 0.017 x window width) -- print-shop starts from exactly this frame; the root carries data-hero-box. All *_at are scene seconds and default to `at` + the reference offset (shift 0.1, island 0.3, blind 0.85, press 1.2, drag 1.5, drop 2.25; the beat ends ~3.0 s). Example: {\"at\":13.5,\"wallpaper\":\"/assets/astronaut.jpg\",\"site\":{\"brand\":\"develop\",\"nav\":[\"prints\",\"frames\",\"journal\"],\"cta\":\"Order\",\"headline\":\"from screen to wall.\",\"sub\":\"museum-grade prints of the photos you already love. framed by hand, sent in a week.\"},\"cursor_from\":[0.82,0.76],\"cursor_to\":[0.735,0.71]}.",
+  "data": {
+    "wallpaper": { "type": "string", "label": "The phone's screen image (URL) -- it becomes the landing page's hero", "required": true },
+    "at": { "type": "number", "label": "Scene second the beat starts (default 0); every *_at defaults relative to it", "optional": true },
+    "stage": { "type": "string", "label": "The backdrop: silk (pale lavender #ecebf5 with a flowing blue silk swoosh) | none (plain lavender)", "enum": ["silk", "none"], "optional": true, "default": "silk" },
+    "site": {
+      "type": "object", "label": "The landing page", "optional": true,
+      "properties": {
+        "brand": { "type": "string", "label": "Wordmark in the nav and the tab (default develop)" },
+        "nav": { "type": "array", "label": "Nav links (up to 4)", "items": { "type": "string" } },
+        "cta": { "type": "string", "label": "The nav's black button (default Order)" },
+        "headline": { "type": "string", "label": "Hero headline, set in two lines (default 'from screen to wall.')" },
+        "sub": { "type": "string", "label": "The line under it, set in two lines" }
+      }
+    },
+    "favorites": { "type": "array", "label": "Letters on the Safari Start Page tiles (default A M N Y P S, pastel)", "items": { "type": "string" }, "optional": true },
+    "lock": {
+      "type": "object", "label": "The lock screen on the phone, or false for none", "optional": true,
+      "properties": {
+        "date": { "type": "string", "label": "Default 'Friday, September 25'" },
+        "time": { "type": "string", "label": "Default 9:41" },
+        "player": { "type": "object", "label": "Glass music player {title, sub}, or false", "properties": { "title": { "type": "string" }, "sub": { "type": "string" } } }
+      }
+    },
+    "phone_to": { "type": "array", "label": "Where the phone steps to: [x, y, scale] (default [0.205, 0.5, 0.9])", "items": { "type": "number" }, "optional": true },
+    "shift_at": { "type": "number", "label": "The phone steps aside (default at+0.1)", "optional": true },
+    "island_at": { "type": "number", "label": "The island stretches, pinches off and grows into the window by +0.5 (default at+0.3)", "optional": true },
+    "blind_at": { "type": "number", "label": "The window rolls up like a blind onto Safari (default island_at+0.55)", "optional": true },
+    "press_at": { "type": "number", "label": "The cursor long-presses the wallpaper; the thumbnail lifts (default at+1.2)", "optional": true },
+    "drag_at": { "type": "number", "label": "The drag onto the site's tab starts; hover pushes the page in at +0.35 (default at+1.5)", "optional": true },
+    "drop_at": { "type": "number", "label": "The drop: thumbnail -> hero, headline rises, camera pushes in over 0.5 s (default at+2.25)", "optional": true },
+    "zoom": { "type": "number", "label": "The camera's push toward the window after the drop (default 1.7; print-shop's stage_zoom must match)", "optional": true },
+    "cursor": { "type": "boolean", "label": "Show the built-in cursor (default true)", "optional": true },
+    "cursor_from": { "type": "array", "label": "Cursor start [x, y], fractions of the box (default [0.82, 0.76])", "items": { "type": "number" }, "optional": true },
+    "cursor_to": { "type": "array", "label": "Cursor rest at the end [x, y], frame fractions after the camera (default [0.735, 0.71] = print-shop's cursor_from)", "items": { "type": "number" }, "optional": true }
+  }
+}

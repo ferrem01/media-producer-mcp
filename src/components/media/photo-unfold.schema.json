@@ -1,0 +1,169 @@
+{
+  "type": "photo-unfold",
+  "label": "Photo unfold (circle -> grid -> bento -> zoom)",
+  "category": "media",
+  "description": "One photo becomes a library and the library becomes one photo again -- a relay handoff piece (the 'develop.' film, 2.9-6.0 s). Beats, all pure functions of time: at `at` the hero shows as a CIRCLE at the iris geometry (centre 0.5/0.5, diameter 0.30 of the frame -- exactly where the iris component leaves its photo); at `square_at` the circle becomes a rounded square and springs (overshoot ~20%) to the hero tile (side hero_side, default 0.67 = the reference; the relay contract's 0.46 is hero_side:0.46); at `shrink_at` it shrinks to grid-tile size; at `unfold_at` the 3x3 grid unfolds from behind it like a paper map -- the 4 edge neighbours slide out from under the centre, then at `corners_at` the 4 corners slide out of the top/bottom edge tiles (tiles are rounded squares, object-fit cover, grid 0.644 of the frame, gap 0.0097); at `bento_at` the grid reflows (FLIP-style layout morph) into a 4x3 bento with the zoom tile 2x2 at the top-right and the other eight in the free cells with the least travel; at `zoom_at` the built-in cursor clicks the zoom tile and a camera move zooms it to the FULL FRAME, landing exactly at zoom_at + zoom_duration (0.35 s -- put it on the music drop). The last frame is that photo full-frame, object-fit cover, radius 0 -- identical to a plain full-frame image, so the next scene starts on it. The cursor ends at cursor_to and stays (hand it on). Full-frame component. Example: {\"images\":[\"/assets/sunset.jpg\",\"/assets/earth.jpg\",\"/assets/cyclist.jpg\",\"/assets/portrait.jpg\",\"/assets/door.jpg\",\"/assets/arch.jpg\",\"/assets/nebula.jpg\",\"/assets/desert.jpg\",\"/assets/crater.jpg\"],\"hero\":4,\"zoom_index\":5,\"at\":2.9,\"square_at\":3.0,\"shrink_at\":3.45,\"unfold_at\":3.65,\"bento_at\":4.9,\"zoom_at\":5.65,\"cursor_from\":[0.8,0.79]}.",
+  "data": {
+    "images": {
+      "type": "array",
+      "label": "9 photo URLs in row-major grid order (the centre, index 4, is the hero unless `hero` says otherwise); fewer repeat",
+      "required": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "hero": {
+      "type": "number",
+      "label": "Index (in images) of the hero photo -- the circle it starts as; it sits in the centre cell (default 4)",
+      "optional": true,
+      "default": 4
+    },
+    "zoom_index": {
+      "type": "number",
+      "label": "Index (in images) of the tile the cursor clicks and zooms to full frame (default 5, right-middle)",
+      "optional": true,
+      "default": 5
+    },
+    "at": {
+      "type": "number",
+      "label": "Start: the hero as the iris circle (s, default 0)",
+      "optional": true,
+      "default": 0
+    },
+    "square_at": {
+      "type": "number",
+      "label": "Circle -> rounded square, springing to hero_side (default at + 0.05)",
+      "optional": true
+    },
+    "shrink_at": {
+      "type": "number",
+      "label": "The hero shrinks to grid-tile size (default at + 0.45)",
+      "optional": true
+    },
+    "unfold_at": {
+      "type": "number",
+      "label": "The 4 edge tiles slide out from under the hero (default at + 0.7)",
+      "optional": true
+    },
+    "corners_at": {
+      "type": "number",
+      "label": "The 4 corners slide out of the top/bottom edge tiles (default unfold_at + 0.25)",
+      "optional": true
+    },
+    "bento_at": {
+      "type": "number",
+      "label": "The grid reflows into the bento, zoom tile 2x2 top-right (default at + 1.9)",
+      "optional": true
+    },
+    "bento_order": {
+      "type": "array",
+      "label": "Optional: the 8 other image indices in the bento's free cells, row-major (default: least travel)",
+      "optional": true,
+      "items": {
+        "type": "number"
+      }
+    },
+    "zoom_at": {
+      "type": "number",
+      "label": "The click on the zoom tile; the zoom starts here (default at + 2.7)",
+      "optional": true
+    },
+    "zoom_duration": {
+      "type": "number",
+      "label": "Seconds the zoom takes; it lands at zoom_at + this (default 0.35)",
+      "optional": true,
+      "default": 0.35
+    },
+    "x": {
+      "type": "number",
+      "label": "Centre x, fraction of the frame (default 0.5)",
+      "optional": true,
+      "default": 0.5
+    },
+    "y": {
+      "type": "number",
+      "label": "Centre y, fraction of the frame (default 0.5)",
+      "optional": true,
+      "default": 0.5
+    },
+    "iris_size": {
+      "type": "number",
+      "label": "Start circle diameter, fraction of the frame's short side (default 0.30 = the iris)",
+      "optional": true,
+      "default": 0.3
+    },
+    "hero_side": {
+      "type": "number",
+      "label": "Rounded-square side the hero springs to (default 0.67, the reference; contract 0.46)",
+      "optional": true,
+      "default": 0.67
+    },
+    "hero_radius": {
+      "type": "number",
+      "label": "Hero corner radius as a fraction of its side (default 0.08)",
+      "optional": true,
+      "default": 0.08
+    },
+    "grid_size": {
+      "type": "number",
+      "label": "The 3x3 grid's side, fraction of the frame (default 0.644)",
+      "optional": true,
+      "default": 0.644
+    },
+    "gap": {
+      "type": "number",
+      "label": "Gap between tiles, fraction of the frame (default 0.0097)",
+      "optional": true,
+      "default": 0.0097
+    },
+    "radius": {
+      "type": "number",
+      "label": "Tile corner radius as a fraction of the grid tile (default 0.085)",
+      "optional": true,
+      "default": 0.085
+    },
+    "cursor": {
+      "type": "boolean",
+      "label": "Draw the built-in cursor (default true)",
+      "optional": true,
+      "default": true
+    },
+    "cursor_from": {
+      "type": "array",
+      "label": "[x, y] fractions: where the cursor tip is at `at` (default [0.8, 0.79]) -- match the previous component's cursor_to",
+      "optional": true,
+      "items": {
+        "type": "number"
+      }
+    },
+    "cursor_to": {
+      "type": "array",
+      "label": "[x, y] fractions: where it clicks (default: on the zoom tile, inside both its grid and bento boxes); it stays there after the zoom",
+      "optional": true,
+      "items": {
+        "type": "number"
+      }
+    },
+    "cursor_move_at": {
+      "type": "number",
+      "label": "When the cursor travels from cursor_from to cursor_to (0.4 s; default bento_at - 0.6)",
+      "optional": true
+    },
+    "cursor_exit_at": {
+      "type": "number",
+      "label": "Hide the cursor at this time (default: it stays, for the next component to take over)",
+      "optional": true
+    },
+    "cursor_size": {
+      "type": "number",
+      "label": "Cursor size, fraction of the short side (default 0.027)",
+      "optional": true,
+      "default": 0.027
+    },
+    "cursor_color": {
+      "type": "string",
+      "label": "Cursor fill (default #0b0b0c, white outline)",
+      "optional": true
+    }
+  }
+}

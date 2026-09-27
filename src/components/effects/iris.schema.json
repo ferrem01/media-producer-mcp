@@ -1,0 +1,31 @@
+{
+  "type": "iris",
+  "label": "Camera iris (closes, snaps open on a photo)",
+  "category": "effects",
+  "description": "A camera IRIS: six dark graphite blades (each built from its two aperture vertices, both edge extensions and the short arc between them, with a subtle edge highlight) inside a shape -- a circle, or a rounded rect (a framed print). It can grow out of the shape before it: with `from` (e.g. the black pill, carrying the same label) the pill swells into the circle while the blades close over it. The blades close to a small hexagonal aperture at close_at, snap open at open_at onto the photo, and the photo stays in the shape (object-fit cover) until hide_at. The relay open's second beat (the click on the pill -> iris -> photo) and the wall beat (the iris closes over the black print rectangle and opens onto the print). Handoff: at `at` it draws exactly the `from` box (and label), so the previous piece hides at the same moment; after the open it is a photo at x/y/w/h (the iris circle: centre 0.5/0.5, diameter 0.30). Full-frame. Examples: {\"from\":{\"x\":0.5,\"y\":0.5,\"w\":0.3,\"h\":0.085},\"label\":\"Develop\",\"image\":\"/assets/door.jpg\",\"at\":2.3,\"close_at\":2.35,\"open_at\":2.6}; the print: {\"shape\":\"rect\",\"w\":0.3,\"h\":0.4,\"radius\":0.004,\"backdrop\":\"#0b0b0c\",\"image\":\"/assets/astronaut.jpg\",\"at\":1.0,\"close_at\":1.05,\"open_at\":1.5}.",
+  "data": {
+    "image": { "type": "string", "label": "The photo shown through the aperture once it opens (URL)", "required": true },
+    "shape": { "type": "string", "label": "The aperture's outer mask", "enum": ["circle", "rect"], "optional": true, "default": "circle" },
+    "x": { "type": "number", "label": "Centre, fraction of the frame width", "optional": true, "default": 0.5 },
+    "y": { "type": "number", "label": "Centre, fraction of the frame height", "optional": true, "default": 0.5 },
+    "w": { "type": "number", "label": "Width (circle: diameter), fraction of the frame width", "optional": true, "default": 0.3 },
+    "h": { "type": "number", "label": "Height, fraction of the frame height (default: the same pixel size as w)", "optional": true },
+    "radius": { "type": "number", "label": "rect: corner radius, fraction of the frame's shorter side", "optional": true, "default": 0.012 },
+    "from": { "type": "object", "label": "The shape it grows out of at `at`: {x, y, w, h, radius? (omitted = fully round), color? (default #0b0b0c)}", "optional": true,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" }, "radius": { "type": "number" }, "color": { "type": "string" } } },
+    "label": { "type": "string", "label": "The label the `from` shape carries (white Geist 600, label_size x its height -- the same rule as wordmark-squeeze's pill), covered by the blades", "optional": true },
+    "label_size": { "type": "number", "label": "Label size as a fraction of the from-shape height", "optional": true, "default": 0.4 },
+    "label_color": { "type": "string", "label": "Label colour", "optional": true, "default": "#ffffff" },
+    "backdrop": { "type": "string", "label": "Colour inside the shape until the blades have closed (default: from.color, or transparent without from)", "optional": true },
+    "blade_color": { "type": "string", "label": "Blade graphite", "optional": true, "default": "#2a2a2e" },
+    "at": { "type": "number", "label": "When it appears (s); with `from`, the morph into the shape starts here", "optional": true, "default": 0 },
+    "morph_duration": { "type": "number", "label": "Seconds the from-shape takes to become the shape", "optional": true, "default": 0.3 },
+    "close_at": { "type": "number", "label": "When the blades start to close (default at + 0.1)", "optional": true },
+    "close_duration": { "type": "number", "label": "Seconds the close takes", "optional": true, "default": 0.15 },
+    "open_at": { "type": "number", "label": "When the blades snap open onto the photo (default close end + 0.1)", "optional": true },
+    "open_duration": { "type": "number", "label": "Seconds the open takes", "optional": true, "default": 0.25 },
+    "closed_aperture": { "type": "number", "label": "The closed hexagon's size, fraction of the shape's half size", "optional": true, "default": 0.035 },
+    "turn": { "type": "number", "label": "Degrees the blades turn as they close", "optional": true, "default": 38 },
+    "hide_at": { "type": "number", "label": "The iris (and its photo) vanish instantly", "optional": true }
+  }
+}
