@@ -39,7 +39,7 @@ import { buildComponentCatalog, findLibraryFile } from "./llm/catalog.js";
 import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-track.js";
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
-import { queueTakeMatte } from "./core/take-matte.js";
+import { queueTakeMatte, blurPreviewFrame } from "./core/take-matte.js";
 import { takeJobsFor } from "./core/take-jobs.js";
 import { queueTakeGrade } from "./core/take-grade.js";
 import { DEFAULT_SOFT_STRENGTH } from "./core/take-sanitize.js";
@@ -1252,7 +1252,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -3206,6 +3206,13 @@ Rules:
         // A new blur amount on a take that already has its blurred copy: make it again.
         const sbReblur = !!(sbTake && sbMode === "blur" && sbStrengthN !== undefined && Math.abs(sbStrengthN - (typeof sbTake.blur_strength === "number" ? sbTake.blur_strength : 0.6)) > 0.001);
         if (sbReblur) sbMissing.blur = true;
+        // The amount as asked, on every take cut from the file, at once: the
+        // dial shows it while the copy is made (the matte records it again
+        // when the copy lands).
+        if (sbTake && sbMode === "blur" && sbStrengthN !== undefined) {
+          const sbRawAll = takeCopies(sbTake).raw;
+          for (const t of sbProj.takes || []) if (takeCopies(t).raw === sbRawAll) t.blur_strength = sbStrengthN;
+        }
         sbProj.updated_at = new Date().toISOString();
         await saveProject(sbProj);
         let sbQueued = false;
@@ -3220,6 +3227,35 @@ Rules:
         reshootStoryboardCardsSoon(sbTenant, sbProject);
         console.log(`  speaker background: ${sbProject} scene ${sbIndex + 1} -> ${sbMode}${sbQueued ? " (matte queued)" : sbTake ? "" : " (no take yet)"}`);
         jsonResponse(res, 200, { ok: true, scene_index: sbIndex, background: sbMode, matte: sbQueued ? "running" : null, has_take: !!sbTake, project: sbProj });
+        return;
+      }
+
+      // POST /api/blur-preview/{tenant}/{project} {scene_index, strength, at}
+      // One frame of the take behind the scene (at source second `at`),
+      // matted and blurred at `strength`, as a PNG -- what the blur amount
+      // will look like, in a second or two, while the copy takes minutes
+      // (core/take-matte.ts blurPreviewFrame).
+      const blurPrevMatch = urlPath.match(/^\/api\/blur-preview\/([^/]+)\/([^/]+)$/);
+      if (blurPrevMatch && method === "POST") {
+        const [, bpTenant, bpProject] = blurPrevMatch.map(decodeURIComponent);
+        let bpBody: Record<string, unknown> = {};
+        try { bpBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "invalid JSON body" }); return; }
+        const bpStrength = Number(bpBody.strength);
+        if (!(bpStrength >= 0 && bpStrength <= 1)) { jsonResponse(res, 400, { error: "strength must be 0-1" }); return; }
+        const bpProj = await loadProject(bpTenant, bpProject);
+        if (!bpProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const bpTake = activeTake(bpProj, Number(bpBody.scene_index));
+        if (!bpTake) { jsonResponse(res, 404, { error: "that scene has no take" }); return; }
+        const bpRaw = takeCopies(bpTake).raw;
+        if (!bpRaw.startsWith(`/assets/${bpTenant}/projects/${bpProject}/assets/`)) { jsonResponse(res, 400, { error: "the take is not a file of this project" }); return; }
+        const bpAt = Number.isFinite(Number(bpBody.at)) ? Number(bpBody.at) : Number(bpTake.trim_start || 0) + 0.5;
+        try {
+          const png = await blurPreviewFrame(resolveVideoPath(bpRaw, config.dataDir), { at: bpAt, strength: bpStrength, dataDir: config.dataDir });
+          res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store", "Content-Length": png.length });
+          res.end(png);
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: `blur preview failed: ${String(e?.message || e).slice(0, 300)}` });
+        }
         return;
       }
 

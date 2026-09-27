@@ -16,17 +16,17 @@ describe("background blur at attach", () => {
     for (const [w, h] of [[720, 1280], [1280, 720], [640, 480]]) { const s = matteSize(w, h); expect(s.width % 32).toBe(0); expect(s.height % 32).toBe(0); }
   });
 
-  it("blurs the room 3-32 px at 1080 wide by strength (light to deep), scaled with the frame", () => {
-    expect(matteBlurRadius(1080, 0)).toBe(3);   // light: the room still reads
+  it("blurs the room 5-32 px at 1080 wide by strength (light to deep), scaled with the frame", () => {
+    expect(matteBlurRadius(1080, 0)).toBe(5);   // light: the room still reads
     expect(matteBlurRadius(1080, 1)).toBe(32);  // deep: colour shapes only
-    expect(matteBlurRadius(1080)).toBe(20);     // the default, ~ what shipped (22)
-    expect(matteBlurRadius(1920, 0.6)).toBe(36);
+    expect(matteBlurRadius(1080)).toBe(21);     // the default, ~ what shipped (22)
+    expect(matteBlurRadius(1920, 0.6)).toBe(38);
   });
 
   it("the graph: the frame split into the blurred room and the person under the upscaled soft alpha, the person over the room", () => {
     const g = matteFilterGraph(1080, 1920, 0.6);
     expect(g).toContain("[0:v]split=2[base][fgsrc]");
-    expect(g).toContain("[base]boxblur=lr=20:lp=3[bg]");
+    expect(g).toContain("[base]boxblur=lr=21:lp=3[bg]");
     expect(g).toContain("[1:v]scale=1080:1920:flags=bicubic,format=gray,gblur=sigma=1.5[m]");
     expect(g).toContain("[fgc][m]alphamerge[fg]");
     expect(g).toContain("[bg][fg]overlay=shortest=1:format=auto,format=yuv420p[out]");

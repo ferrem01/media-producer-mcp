@@ -149,3 +149,56 @@ describe("Studio: the dials and the status line", () => {
     expect(html).toContain("t.blur_strength == null ? '' : t.blur_strength");
   });
 });
+
+describe("a re-grade never strands a clip on a dropped copy (Marc's Instagram take, scene 1)", () => {
+  it("a clip left on the take's old blur copy is still the take's: sync puts it back on the raw take, the need stays provided, the matte is asked again", async () => {
+    const { syncSpeakerClips, missingSpeakerCopies, takeOwns } = await import("../src/core/speaker-layer.js");
+    const { activeTake } = await import("../src/core/take-needs.js");
+    const raw = "/assets/t/projects/p/assets/take-2026-09-26T21-50-54-542Z.mp4";
+    const blur = "/assets/t/projects/p/assets/take-2026-09-26T21-50-54-542Z-blur.mp4";
+    // What the live project held: the grade dropped `take.blur`, the clip kept playing it.
+    const project: any = {
+      treatment: { filmGrammar: "speaker" },
+      scenes: [{ id: "s1", components: [{ type: "video", data: { src: "speaker", background: "blur" } }] }],
+      takes: [{ id: "take_7", scene_index: 0, source: raw }],
+      speaker_track: { clips: [{ scene_index: 0, source: blur, start: 0 }] },
+    };
+    expect(takeOwns(project.takes[0], blur)).toBe(true); // the copy's NAME is the take's
+    expect(takeOwns(project.takes[0], "/assets/t/projects/p/assets/take-other-blur.mp4")).toBe(false);
+    expect(activeTake(project, 0)?.id).toBe("take_7");
+    expect(missingSpeakerCopies(project, project.takes[0]).blur).toBe(true); // so the matte runs again
+    syncSpeakerClips(project);
+    expect(project.speaker_track.clips[0].source).toBe(raw); // no copy yet: the raw take plays
+  });
+
+  it("the grade puts clips back on the raw take before it drops the copies", async () => {
+    const grade = await fs.readFile(path.join(HERE, "../src/core/take-grade.ts"), "utf8");
+    const i = grade.indexOf("if (c.source && (c.source === t.blur || c.source === t.alpha)) c.source = job.rawUrl;");
+    expect(i).toBeGreaterThan(0);
+    expect(i).toBeLessThan(grade.indexOf("if (t.blur) { delete t.blur; }"));
+  });
+
+  it("a matte asked for while one runs waits and runs next, merged (the newest blur amount wins), instead of being dropped", async () => {
+    const matte = await fs.readFile(path.join(HERE, "../src/core/take-matte.ts"), "utf8");
+    expect(matte).toContain("mattePending.set(key, { ...opts, blur: !!(opts.blur || prev?.blur), alpha: !!(opts.alpha || prev?.alpha), strength: opts.strength ?? prev?.strength });");
+    expect(matte).toContain("if (next) queueTakeMatte({ ...next, blur: !!(next.blur || again.blur), alpha: !!(next.alpha || again.alpha) });");
+  });
+});
+
+describe("the blur amount, previewed on one frame", () => {
+  it("POST /api/blur-preview returns a PNG of the frame at the asked strength; Studio lays it over the speaker video until the copy lands", async () => {
+    const idx = await fs.readFile(path.join(HERE, "../src/index.ts"), "utf8");
+    expect(idx).toMatch(/take-status\|blur-preview\|/);
+    expect(idx).toContain("const png = await blurPreviewFrame(resolveVideoPath(bpRaw, config.dataDir), { at: bpAt, strength: bpStrength, dataDir: config.dataDir });");
+    expect(idx).toContain('res.writeHead(200, { "Content-Type": "image/png"');
+    // The asked amount is on the take at once, so the dial holds it.
+    expect(idx).toContain("for (const t of sbProj.takes || []) if (takeCopies(t).raw === sbRawAll) t.blur_strength = sbStrengthN;");
+    const html = getPreviewHtml();
+    expect(html).toContain('<img id="blur-preview"');
+    expect(html).toContain("showBlurPreview(siU, bv);");
+    expect(html).toContain("fetch(withToken('/api/blur-preview/'");
+    // Gone on play and when the new copy lands.
+    expect(html).toMatch(/function togglePlay\(\) \{\s*hideBlurPreview\(\);/);
+    expect(html).toMatch(/if \(regraded\) \{\s*hideBlurPreview\(\);/);
+  });
+});

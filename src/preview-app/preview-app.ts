@@ -1294,6 +1294,8 @@ ${QUOTIENT_CSS}
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
         <video id="speaker-bg" muted playsinline preload="metadata" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
         <video id="speaker-bg2" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
+        <img id="blur-preview" alt="" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;pointer-events:none;">
+        <div id="blur-preview-badge" style="position:absolute;top:10px;left:10px;z-index:5;display:none;font:600 11px/16px Inter,system-ui,sans-serif;padding:4px 8px;border-radius:6px;background:rgba(12,12,18,.78);color:#fff;pointer-events:none;"></div>
         <iframe id="preview-iframe" allow="autoplay; fullscreen"></iframe>
         <div id="buffer-overlay" class="buffer-overlay"><div class="loading-state">Buffering media<div class="loading-dots"><span></span><span></span><span></span></div></div></div>
       </div>
@@ -2765,6 +2767,7 @@ ${QUOTIENT_CSS}
       state.totalDuration = calcTotalDuration();
       if (state.masterTime > state.totalDuration) state.masterTime = Math.max(0, state.totalDuration - 0.1);
       if (regraded) {
+        hideBlurPreview();
         [els.speakerBg, els.speakerBg2].forEach(function(v) { if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (eR) {} } });
         (state.mediaClips || []).forEach(function(c) { if (c.kind === 'speaker') c._window = undefined; });
       }
@@ -3941,6 +3944,7 @@ ${QUOTIENT_CSS}
       blurDial.addEventListener('input', function() { if (blurValEl) blurValEl.textContent = Math.round(parseFloat(blurDial.value) * 100); });
       blurDial.addEventListener('change', function() {
         var siU = state.currentSceneIndex, bv = parseFloat(blurDial.value);
+        showBlurPreview(siU, bv);
         api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { scene_index: siU, background: 'blur', strength: bv })
           .then(function(r) {
             if (r.project) state.currentProject = r.project;
@@ -5862,6 +5866,47 @@ ${QUOTIENT_CSS}
     if (source.startsWith('/assets/')) return source;
     return source;
   }
+  // ── the blur amount, previewed on the frame on screen ─────────────────
+  // POST /api/blur-preview: this frame, matted and blurred at the new
+  // amount, in a second or two -- laid over the speaker video until the
+  // new copy lands (a live-sync reload) or playback starts. Marc: "As I'm
+  // changing the blur levels, I don't see the actual thing changing."
+  var blurPrev = { seq: 0, url: null };
+  function visibleSpeakerVideo() {
+    var vs = [els.speakerBg, els.speakerBg2].filter(function(v) { return v && v.style.display !== 'none' && v.src; });
+    return vs[0] || null;
+  }
+  function hideBlurPreview() {
+    var img = document.getElementById('blur-preview'), badge = document.getElementById('blur-preview-badge');
+    blurPrev.seq++;
+    if (img) { img.style.display = 'none'; img.removeAttribute('src'); }
+    if (badge) badge.style.display = 'none';
+    if (blurPrev.url) { try { URL.revokeObjectURL(blurPrev.url); } catch (eU) {} blurPrev.url = null; }
+  }
+  function showBlurPreview(si, strength) {
+    var p = state.currentProject; if (!p) return;
+    var img = document.getElementById('blur-preview'), badge = document.getElementById('blur-preview-badge');
+    if (!img || !badge) return;
+    var v = visibleSpeakerVideo();
+    var tk = sceneTakeFor(si) || {};
+    var at = v && isFinite(v.currentTime) ? v.currentTime : (Number(tk.trim_start) || 0) + 0.5;
+    var my = ++blurPrev.seq;
+    badge.textContent = 'Blur ' + Math.round(strength * 100) + ' \u2014 making a preview\u2026';
+    badge.style.display = 'block';
+    var headers = { 'Content-Type': 'application/json' };
+    if (_token) headers['Authorization'] = 'Bearer ' + _token;
+    fetch(withToken('/api/blur-preview/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id)), { method: 'POST', headers: headers, body: JSON.stringify({ scene_index: si, strength: strength, at: at }) })
+      .then(function(r) { if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || ('HTTP ' + r.status)); }, function() { throw new Error('HTTP ' + r.status); }); return r.blob(); })
+      .then(function(b) {
+        if (my !== blurPrev.seq) return;
+        if (blurPrev.url) { try { URL.revokeObjectURL(blurPrev.url); } catch (eU) {} }
+        blurPrev.url = URL.createObjectURL(b);
+        img.src = blurPrev.url; img.style.display = 'block';
+        badge.textContent = 'Blur ' + Math.round(strength * 100) + ' \u2014 preview of this frame; the video switches when the new copy lands';
+      })
+      .catch(function(e) { if (my !== blurPrev.seq) return; badge.textContent = 'Blur preview: ' + (e.message || String(e)); setTimeout(function() { if (my === blurPrev.seq) badge.style.display = 'none'; }, 5000); });
+  }
+
   // ── the take's background jobs (GET /api/take-status) ─────────────────
   // Polled every 2.5 s while a job runs on this film (and for a moment
   // after an action, until the server has picked it up); quiet otherwise.
@@ -8624,6 +8669,7 @@ ${QUOTIENT_CSS}
   }
 
   function togglePlay() {
+    hideBlurPreview();
     if (state.playing) {
       // PAUSE
       if (state.animFrameId) {

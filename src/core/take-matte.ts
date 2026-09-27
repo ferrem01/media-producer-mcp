@@ -27,6 +27,7 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import crypto from "node:crypto";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -87,11 +88,11 @@ export function matteSize(width: number, height: number): { width: number; heigh
 /** 0 is a light blur (the room still reads), 1 a deep one (colour
  *  shapes only); 0.6 is the default the blur shipped with. Marc: "a light
  *  blur vs a deep blur might be requested". Box radius at 1080 px wide,
- *  three passes: 3 at 0, ~20 at 0.6, 32 at 1. */
+ *  three passes: 5 at 0, ~21 at 0.6, 32 at 1. */
 export const DEFAULT_BLUR_STRENGTH = 0.6;
 export function matteBlurRadius(width: number, strength = DEFAULT_BLUR_STRENGTH): number {
   const s = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : DEFAULT_BLUR_STRENGTH));
-  return Math.max(2, Math.round((3 + 29 * s) * (width / 1080)));
+  return Math.max(2, Math.round((5 + 27 * s) * (width / 1080)));
 }
 
 /** The ffmpeg graph: the frame split into the room (blurred) and the
@@ -332,6 +333,57 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
 }
 
 /**
+ * THE BLUR, PREVIEWED ON ONE FRAME. A new blur amount re-makes the whole
+ * copy (minutes), and Marc watched the slider do nothing: "As I'm changing
+ * the blur levels, I don't see the actual thing changing." This mattes the
+ * ONE frame on screen at the asked strength -- the same model, the same
+ * composite graph as the copy -- and returns it as a PNG in a second or
+ * two, so Studio can show the amount while the copy is made.
+ * The model session is kept between previews (a slider sends several).
+ */
+let previewSession: Promise<any> | null = null;
+export async function blurPreviewFrame(input: string, opts: { at: number; strength?: number; dataDir: string; maxWidth?: number }): Promise<Buffer> {
+  const modelPath = await ensureMattingModel(opts.dataDir);
+  if (!previewSession) {
+    previewSession = (async () => {
+      const ort: any = await import("onnxruntime-node");
+      return { ort, session: await ort.InferenceSession.create(modelPath, { executionProviders: ["cpu"], intraOpNumThreads: 4, graphOptimizationLevel: "all" }) };
+    })().catch((e) => { previewSession = null; throw e; });
+  }
+  const { ort, session } = await previewSession;
+  const probe = await probeVideo(input);
+  const at = Math.max(0, Math.min(Number.isFinite(opts.at) ? opts.at : 0, Math.max(0, (probe.duration || 0) - 0.05)));
+  const ms = matteSize(probe.width, probe.height);
+  const mw = ms.width, mh = ms.height, plane = mw * mh;
+  const grab = async (vf: string, fmt: string): Promise<Buffer> => {
+    const { stdout } = await execFileAsync("ffmpeg", ["-hide_banner", "-v", "error", "-ss", String(at), "-i", input, "-frames:v", "1", "-vf", vf, "-f", "rawvideo", "-pix_fmt", fmt, "pipe:1"], { encoding: "buffer" as any, maxBuffer: 64 * 1024 * 1024 });
+    return stdout as unknown as Buffer;
+  };
+  const small = await grab(`scale=${mw}:${mh}:flags=area`, "rgb24");
+  if (small.length < plane * 3) throw new Error("could not read a frame of the take there");
+  const src = new Float32Array(3 * plane);
+  for (let i = 0; i < plane; i++) { src[i] = small[i * 3] / 255; src[plane + i] = small[i * 3 + 1] / 255; src[2 * plane + i] = small[i * 3 + 2] / 255; }
+  const zero = new ort.Tensor("float32", new Float32Array([0]), [1, 1, 1, 1]);
+  const out = await session.run({ src: new ort.Tensor("float32", src, [1, 3, mh, mw]), r1i: zero, r2i: zero, r3i: zero, r4i: zero, downsample_ratio: new ort.Tensor("float32", new Float32Array([1]), [1]) });
+  const pha: Float32Array = out.pha.data;
+  const alpha = Buffer.allocUnsafe(plane);
+  for (let i = 0; i < plane; i++) { const v = pha[i]; alpha[i] = v <= 0 ? 0 : v >= 1 ? 255 : Math.round(v * 255); }
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "blurprev-"));
+  try {
+    const frame = path.join(tmp, "frame.png"), alphaRaw = path.join(tmp, "alpha.raw");
+    await execFileAsync("ffmpeg", ["-hide_banner", "-v", "error", "-y", "-ss", String(at), "-i", input, "-frames:v", "1", frame]);
+    await fsp.writeFile(alphaRaw, alpha);
+    const maxW = Math.max(160, Math.min(probe.width, opts.maxWidth || 540));
+    const graph = matteFilterGraph(probe.width, probe.height, opts.strength).replace(/\[out\]$/, `[o0];[o0]scale=${maxW}:-2[out]`);
+    const { stdout } = await execFileAsync("ffmpeg", ["-hide_banner", "-v", "error", "-i", frame, "-f", "rawvideo", "-pix_fmt", "gray", "-video_size", `${mw}x${mh}`, "-i", alphaRaw,
+      "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1"], { encoding: "buffer" as any, maxBuffer: 64 * 1024 * 1024 });
+    return stdout as unknown as Buffer;
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * THE MATTE RUNS AFTER THE ATTACH. Minutes of matting inside the attach
  * request held the connection past the proxy's limit (measured live: the
  * call dropped at 300 s). The take lands at once, raw; this job mattes the
@@ -343,6 +395,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
  * it queues again.
  */
 const matteJobs = new Set<string>();
+const mattePending = new Map<string, Parameters<typeof queueTakeMatte>[0]>();
 export function queueTakeMatte(opts: {
   tenantId: string;
   projectId: string;
@@ -361,7 +414,15 @@ export function queueTakeMatte(opts: {
 }): boolean {
   if (!opts.blur && !opts.alpha) return false;
   const key = `${opts.tenantId}/${opts.projectId}/${opts.rawUrl}`;
-  if (matteJobs.has(key)) return false;
+  if (matteJobs.has(key)) {
+    // One already running: this one runs NEXT, merged with any other
+    // waiting (the copies asked for add up; the newest strength wins).
+    // Dropping it lost Marc's blur-amount changes while a re-grade's
+    // matte was still going (2026-09-27).
+    const prev = mattePending.get(key);
+    mattePending.set(key, { ...opts, blur: !!(opts.blur || prev?.blur), alpha: !!(opts.alpha || prev?.alpha), strength: opts.strength ?? prev?.strength });
+    return true;
+  }
   matteJobs.add(key);
   const what = [opts.blur ? "blur" : "", opts.alpha ? "alpha" : ""].filter(Boolean);
   takeJobSet(opts.tenantId, opts.projectId, opts.rawUrl, "matte", "running", what);
@@ -416,7 +477,10 @@ export function queueTakeMatte(opts: {
     } finally {
       matteJobs.delete(key);
       takeJobDone(opts.tenantId, opts.projectId, opts.rawUrl, "matte");
-      if (again.blur || again.alpha) queueTakeMatte({ ...opts, ...again });
+      const next = mattePending.get(key);
+      mattePending.delete(key);
+      if (next) queueTakeMatte({ ...next, blur: !!(next.blur || again.blur), alpha: !!(next.alpha || again.alpha) });
+      else if (again.blur || again.alpha) queueTakeMatte({ ...opts, ...again });
     }
   }, 50);
   return true;
