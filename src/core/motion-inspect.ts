@@ -259,8 +259,14 @@ export async function inspectSceneMotion(opts: {
             const hidden = ncs.display === "none" || ncs.visibility === "hidden";
             const p = hidden ? 0 : product * (parseFloat(ncs.opacity) || 0);
             const tag = node.tagName;
+            // A helper the page hides from people (the image component's
+            // preload <img>) is not content.
+            if ((node as HTMLElement).getAttribute && (node as HTMLElement).getAttribute("aria-hidden") === "true") return;
             const hasText = !!(node.childNodes && Array.from(node.childNodes).some((n) => n.nodeType === 3 && (n.textContent || "").trim()));
-            if (hasText || tag === "svg" || tag === "IMG" || tag === "VIDEO" || tag === "CANVAS" || tag === "PATH") {
+            // A CSS background picture is content too (the image component
+            // paints its photo that way).
+            const hasBgImage = !!ncs.backgroundImage && ncs.backgroundImage !== "none" && /url\(/.test(ncs.backgroundImage);
+            if (hasText || hasBgImage || tag === "svg" || tag === "IMG" || tag === "VIDEO" || tag === "CANVAS" || tag === "PATH") {
               contentExists = true;
               if (p > effOpacity) effOpacity = p;
             }
