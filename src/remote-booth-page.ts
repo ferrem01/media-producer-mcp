@@ -106,9 +106,18 @@ ${QUOTIENT_CSS}
   button:disabled { opacity: .45; pointer-events: none; }
   button.on, button[aria-pressed="true"] { background: #fff; color: #0b0b10; }
   #bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,.08); flex-wrap: wrap; }
-  #filmBtn { display: flex; flex-direction: column; align-items: flex-start; gap: 0; max-width: 42vw; text-align: left; }
-  #filmBtn b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
-  #filmBtn small { color: rgba(255,255,255,.62); font-size: 12px; }
+  /* Back to the film in Studio, the film's name, and its scenes: the way
+     out and the way between scenes (Marc: "once I am in this screen on my
+     laptop I have no way to get back out to the film I was working on").
+     Another film is picked in Studio; its "Across the room" rejoins this
+     pairing. */
+  #backLink { color: #fff; text-decoration: none; font-weight: 600; font-size: 15px; padding: 8px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.08); white-space: nowrap; }
+  #backLink:hover { background: rgba(255,255,255,.14); }
+  #filmTitle { display: flex; flex-direction: column; gap: 2px; max-width: 42vw; min-width: 0; }
+  #filmName { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sceneSel { font: 500 13px/18px var(--font-sans); color: rgba(255,255,255,.8); background: transparent; border: 0; padding: 0; max-width: 40vw; cursor: pointer; }
+  #sceneSel option { color: #0b0b10; }
+  #sceneSel:disabled { opacity: .45; }
   .pill { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); }
   .pill.ok { background: rgba(34,197,94,.18); color: #86efac; }
   .seg { display: inline-flex; gap: 0; }
@@ -166,30 +175,19 @@ ${QUOTIENT_CSS}
   #startBtn { font-size: 18px; font-weight: 600; padding: 14px 34px; background: #ef4444; border-color: #ef4444; color: #fff; }
   #startBtn.stop { background: #fff; color: #0b0b10; border-color: #fff; }
   .sheet { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; z-index: 10; }
-  .sheet[hidden], .drawer[hidden] { display: none; }
+  .sheet[hidden] { display: none; }
   .reviewCard { background: #14141b; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 20px; width: min(960px, 92vw); }
   .reviewCard h2 { margin: 0 0 4px; font-size: 20px; }
   #play { width: 100%; max-height: 62vh; background: #000; border-radius: 10px; margin-top: 10px; }
   #keepBtn { background: #fff; color: #0b0b10; font-weight: 600; }
-  .drawer { position: fixed; top: 0; bottom: 0; left: 0; width: min(520px, 94vw); background: #111117; border-right: 1px solid rgba(255,255,255,.1); z-index: 11; display: flex; flex-direction: column; }
-  .drawerHead { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
-  .drawerHead h2 { margin: 0; font-size: 18px; }
-  #filmList { overflow-y: auto; padding: 8px 12px 24px; }
-  .film { margin: 12px 0 4px; }
-  .film .fh { display: flex; align-items: baseline; gap: 8px; padding: 0 6px 6px; }
-  .film .fh b { font-size: 15px; } .film .fh small { color: rgba(255,255,255,.55); font-size: 12px; }
-  button.sc { display: flex; width: 100%; text-align: left; gap: 10px; align-items: flex-start; margin: 4px 0; background: rgba(255,255,255,.04); }
-  button.sc.cur { outline: 2px solid #fff; }
-  button.sc small { display: block; color: rgba(255,255,255,.55); font-size: 12px; line-height: 16px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex: 0 0 auto; background: rgba(255,255,255,.25); }
-  .dot.needed { background: #f59e0b; } .dot.provided { background: #22c55e; }
   #nextBtn[hidden] { display: none; }
   @media (max-width: 820px) { #main { grid-template-columns: 1fr; } #side { border-right: 0; } }
 </style>
 </head>
 <body>
 <header id="bar">
-  <button id="filmBtn" type="button" title="Pick the film and scene"><b id="filmName">Loading…</b><small id="sceneName">Films</small></button>
+  <a id="backLink" href="#">← Studio</a>
+  <div id="filmTitle"><b id="filmName">Loading…</b><select id="sceneSel" title="Pick the scene"></select></div>
   <span id="pair" class="pill">Connecting…</span>
   <span class="grow"></span>
   <span class="seg" id="shotSeg" role="group" aria-label="Shot size"><button type="button" data-shot="close">Close</button><button type="button" data-shot="medium">Medium</button><button type="button" data-shot="wide">Wide</button></span>
@@ -241,10 +239,6 @@ ${QUOTIENT_CSS}
     <video id="play" controls playsinline></video>
     <div class="row"><button id="retakeBtn" type="button">Retake</button><button id="keepBtn" type="button">Keep</button></div>
   </div>
-</div>
-<div id="films" class="drawer" hidden>
-  <div class="drawerHead"><h2>Films</h2><button id="filmsClose" type="button" aria-label="Close">×</button></div>
-  <div id="filmList"><p class="note">Loading…</p></div>
 </div>
 
 <script>
@@ -334,7 +328,7 @@ ${QUOTIENT_CSS}
       $('lockBtn').title = c.locks && c.locks.length ? 'Freeze exposure and white balance at what the camera sees now' : 'This phone’s browser offers no lock (iOS Safari): the correction on arrival covers it';
     }
     $('uploadBtn').disabled = st.mode !== 'idle';
-    $('filmBtn').disabled = st.mode !== 'idle';
+    $('sceneSel').disabled = st.mode !== 'idle';
   }
 
   // ── the target: which film and scene this booth records ─────────────
@@ -346,6 +340,7 @@ ${QUOTIENT_CSS}
   function applyTarget(t) {
     var reload = !sameTarget(st.target, t) || !st.film;
     st.target = t; project = t.project; scene = t.scene;
+    $('backLink').href = studioUrl();
     try { history.replaceState(null, '', '/remote-booth?tenant=' + enc(tenant) + '&project=' + enc(project) + '&scene=' + enc(String(scene)) + (token ? '&token=' + enc(token) : '')); } catch (e) {}
     if (reload) loadScript();
     else pairUi();
@@ -365,8 +360,7 @@ ${QUOTIENT_CSS}
         cues = buildCues(scenes);
         total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
         $('filmName').textContent = st.film.name;
-        var lbl = scene === 'all' ? 'All scenes, one take' : ('Scene ' + (scene + 1) + (all[scene] && all[scene].label ? ' · ' + String(all[scene].label).replace(/^Scene [0-9]+ *[-–—:·] */i, '') : ''));
-        $('sceneName').textContent = lbl + ' · change';
+        fillScenes(all);
         document.title = st.film.name + ' — remote booth';
         // The booth's defaults: the scene's own background (its speaker
         // component), soft look on. A clip on a film no person carries has
@@ -579,7 +573,6 @@ ${QUOTIENT_CSS}
   document.addEventListener('keydown', function (ev) {
     var tag = (ev.target && ev.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    if (!$('films').hidden) { if (ev.key === 'Escape') closeFilms(); return; }
     if (!$('review').hidden) return;
     var k = ev.key;
     var next = k === ' ' || k === 'Spacebar' || k === 'PageDown' || k === 'ArrowRight' || k === 'ArrowDown';
@@ -674,49 +667,43 @@ ${QUOTIENT_CSS}
     xhr.send(f);
   });
 
-  // ── the film + scene picker: pair once, record many films ──────────────
+  // ── the scene picker and the way back: pair once, record many films ──
+  // The film's own scenes are here; another film is picked in Studio,
+  // whose "Across the room" rejoins this pairing (the session id is in
+  // localStorage), so the phone never moves.
   function fetchFilms() {
     return fetch(withToken('/api/booth-films/' + enc(tenant))).then(function (r) { if (!r.ok) throw new Error('films ' + r.status); return r.json(); }).then(function (j) { return j.films || []; });
   }
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function openFilms() {
-    if (st.mode !== 'idle') return;
-    $('films').hidden = false;
-    $('filmList').innerHTML = '<p class="note">Loading…</p>';
-    fetchFilms().then(function (films) {
-      if (!films.length) { $('filmList').innerHTML = '<p class="note">No speaker or creator-cut films yet.</p>'; return; }
-      var h = '';
-      films.forEach(function (f) {
-        h += '<div class="film"><div class="fh"><b>' + esc(f.name) + '</b><small>' + esc(f.grammar) + (f.frame ? ' · ' + esc(f.frame) : '') + ' · ' + (f.open ? f.open + ' to record' : 'all recorded') + '</small></div>';
-        f.scenes.forEach(function (s) {
-          var cur = f.project_id === project && String(s.index) === String(scene);
-          h += '<button type="button" class="sc' + (cur ? ' cur' : '') + '" data-p="' + esc(f.project_id) + '" data-s="' + s.index + '"><i class="dot ' + s.need + '"></i><span>Scene ' + (s.index + 1) + ' · ' + esc(String(s.label).replace(/^Scene [0-9]+ *[-–—:·] */i, '')) +
-            ' <small>' + (s.need === 'needed' ? 'needs a take' : s.need === 'provided' ? 'has a take' : 'no take asked') + (s.lines ? ' · ' + esc(s.lines.slice(0, 90)) : '') + '</small></span></button>';
-        });
-        h += '</div>';
-      });
-      $('filmList').innerHTML = h;
-      [].forEach.call($('filmList').querySelectorAll('button.sc'), function (b) {
-        b.addEventListener('click', function () { pick(b.getAttribute('data-p'), Number(b.getAttribute('data-s'))); });
-      });
-    }).catch(function (e) { $('filmList').innerHTML = '<p class="note">Could not load the films (' + esc(e.message || e) + ').</p>'; });
+  function studioUrl() {
+    return project ? '/studio?tenant=' + enc(tenant) + '&project=' + enc(project) + (token ? '&token=' + enc(token) : '')
+      : '/library?tenant=' + enc(tenant) + (token ? '&token=' + enc(token) : '');
   }
-  function closeFilms() { $('films').hidden = true; }
+  function fillScenes(all) {
+    var sel = $('sceneSel'), h = '';
+    all.forEach(function (s0, i) {
+      var lbl = String(s0.label || '').replace(/^Scene [0-9]+ *[-–—:·] */i, '');
+      h += '<option value="' + i + '">Scene ' + (i + 1) + (lbl ? ' · ' + lbl.replace(/[&<>"]/g, '') : '') + '</option>';
+    });
+    if (all.filter(function (s0) { return String(s0.voiceover_text || '').trim(); }).length > 1) h += '<option value="all">All scenes, one take</option>';
+    sel.innerHTML = h;
+    sel.value = String(scene);
+  }
+  $('sceneSel').addEventListener('change', function () {
+    var v = this.value;
+    pick(project, v === 'all' ? 'all' : Number(v));
+  });
   function pick(p, s) {
-    closeFilms();
     if (st.mode !== 'idle') return;
-    status('Switching to scene ' + (s + 1) + '…');
+    status(s === 'all' ? 'Switching to all scenes…' : 'Switching to scene ' + (s + 1) + '…');
     // Through the session when it is up (the phone follows); alone otherwise.
     if (st.joined && sock.send('target', { project: p, scene: s })) return;
     applyTarget({ project: p, scene: s });
   }
-  $('filmBtn').addEventListener('click', openFilms);
-  $('filmsClose').addEventListener('click', closeFilms);
 
   applyPrefs();
   // The script loads at once, phone or no phone: the prompter never waits on the relay.
   if (project) applyTarget({ project: project, scene: scene });
-  else { status('Pick a film to record.'); openFilms(); }
+  else { $('backLink').href = studioUrl(); $('backLink').textContent = '← Films'; $('filmName').textContent = 'No film open'; status('Open a film in Studio and choose Across the room on a scene.'); }
   setStartBtn();
 })();
 </script>
@@ -836,6 +823,10 @@ ${QUOTIENT_CSS}
       var sz = sizes[i];
       var v = { facingMode: { ideal: st.facing }, frameRate: { ideal: 30 } };
       if (sz) { v.width = { ideal: sz[0] }; v.height = { ideal: sz[1] }; }
+      // Ask for the film's shape too: without it iOS picked 3024x2160
+      // (7:5) for a 3840x2160 ask (Marc's laptop, 2026-09-27), and a
+      // 16x9 crop of that is ~3K.
+      if (sz) v.aspectRatio = { ideal: sz[0] / sz[1] };
       return navigator.mediaDevices.getUserMedia({ video: v, audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } })
         .catch(function (e) { if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e; i += 1; if (i < sizes.length) return attempt(); throw e; });
     }
@@ -940,6 +931,11 @@ ${QUOTIENT_CSS}
 
   // ── recording: local, never waiting on the network ───────────────────
   var CANDS = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  function bitrateFor(w, h) {
+    var px = (w || 0) * (h || 0), lo = 1920 * 1080, hi = 3840 * 2160;
+    var k = Math.max(0, Math.min(1, (px - lo) / (hi - lo)));
+    return Math.round((12 + 12 * k) * 1000) * 1000;
+  }
   function pickMime() {
     if (!window.MediaRecorder) return '';
     for (var i = 0; i < CANDS.length; i++) { try { if (MediaRecorder.isTypeSupported(CANDS[i])) return CANDS[i]; } catch (e) {} }
@@ -980,9 +976,11 @@ ${QUOTIENT_CSS}
         mode = 'canvas';
       } catch (e) { stopDraw(); src = stream; mode = 'raw'; outW = vw; outH = vh; }
     }
-    // 20-25 Mbps at 4K, 12 at 1080p (the booth's number; left to the
-    // browser it lands near 2.5 and smears skin).
-    var bps = Math.min(outW, outH) >= 2160 ? 24000000 : 12000000;
+    // By pixel count: 12 Mbps at 1080p (the booth's number; left to the
+    // browser it lands near 2.5 and smears skin) up to 24 at 4K, in
+    // between for the in-between crops (a 3024x1700 crop is ~18). The
+    // old test was the short side >= 2160, which sent 3K at 12.
+    var bps = bitrateFor(outW, outH);
     mime = pickMime(); ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
     var opts = { videoBitsPerSecond: bps, audioBitsPerSecond: 128000 };
     if (mime) opts.mimeType = mime;

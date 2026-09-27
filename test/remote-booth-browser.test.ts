@@ -157,7 +157,9 @@ describe("the remote booth in a browser (control + phone, fake camera)", () => {
       const recInfo = await lap.evaluate(() => (window as any).__rb.recInfo);
       expect(recInfo.width / recInfo.height).toBeCloseTo(16 / 9, 1); // the film's frame
       const bps = (await phone.evaluate(() => (window as any).__recOpts))[0].videoBitsPerSecond;
-      expect(bps).toBe(Math.min(recInfo.width, recInfo.height) >= 2160 ? 24000000 : 12000000);
+      // By pixel count: 12 Mbps at 1080p up to 24 at 4K, in between for a 3K crop.
+      const k = Math.max(0, Math.min(1, (recInfo.width * recInfo.height - 1920 * 1080) / (3840 * 2160 - 1920 * 1080)));
+      expect(bps).toBe(Math.round((12 + 12 * k) * 1000) * 1000);
       // The prompter runs on the laptop; → advances a line (a clicker's "next").
       await lap.waitForFunction(() => document.querySelectorAll("#cue .w").length > 0, null, { timeout: 4000 });
       await lap.keyboard.press("PageDown");
@@ -188,15 +190,24 @@ describe("the remote booth in a browser (control + phone, fake camera)", () => {
       await lap.waitForSelector("#nextBtn:not([hidden])", { timeout: 5000 });
       expect(await lap.textContent("#nextBtn")).toBe("Next: Scene 2");
 
-      // RETARGET from the picker: another film, a TALL one. The phone follows
-      // (no re-scan) and re-opens its camera in the new orientation.
+      // THE WAY OUT: "← Studio" goes back to this film in Studio (Marc: "I
+      // have no way to get back out to the film I was working on"); the
+      // film to-do drawer is gone.
+      expect(await lap.getAttribute("#backLink", "href")).toBe("/studio?tenant=acme&project=proj_wide&token=tokA");
+      expect(await lap.$("#films")).toBeNull();
+      // Another scene of THIS film: the scene picker; the phone follows.
+      const opts = await lap.evaluate(() => [...(document.getElementById("sceneSel") as HTMLSelectElement).options].map((o) => o.value));
+      expect(opts.slice(0, 2)).toEqual(["0", "1"]);
+      await lap.selectOption("#sceneSel", "1");
+      await phone.waitForFunction(() => (window as any).__cam.target && (window as any).__cam.target.scene === 1, null, { timeout: 8000 });
+      expect(await lap.evaluate(() => location.search)).toBe("?tenant=acme&project=proj_wide&scene=1&token=tokA");
+
+      // ANOTHER FILM, a TALL one, the way Studio's "Across the room" opens
+      // it: this tab navigates to its link. The stored session rejoins, the
+      // link's film wins, and the phone follows (no re-scan) and re-opens
+      // its camera in the new orientation.
       const opened = await phone.evaluate(() => (window as any).__cam.opened);
-      await lap.click("#filmBtn");
-      await lap.waitForSelector('button.sc[data-p="proj_tall"][data-s="1"]', { timeout: 5000 });
-      // Films owed a take come first; the film being recorded is marked.
-      const order = await lap.evaluate(() => [...document.querySelectorAll("#filmList .film .fh b")].map((b) => b.textContent));
-      expect(order).toEqual(["Launch film", "Reel"]);
-      await lap.click('button.sc[data-p="proj_tall"][data-s="1"]');
+      await lap.goto(`${base}/remote-booth?tenant=${TENANT}&project=proj_tall&scene=1&token=tokA`);
       await phone.waitForFunction(() => (window as any).__cam.target && (window as any).__cam.target.project === "proj_tall", null, { timeout: 8000 });
       const tgt = await phone.evaluate(() => (window as any).__cam.target);
       expect(tgt).toMatchObject({ project: "proj_tall", scene: 1, canvas: { width: 1080, height: 1920 } });
@@ -263,17 +274,43 @@ describe("the remote booth pages' client scripts", () => {
     });
   }
 
-  it("camera: rear by default, ideal 3840x2160 then 1920x1080 at 30 fps in the film's orientation, 24 Mbps at 4K / 12 at 1080p, attaches as 'remote'", () => {
+  it("camera: rear by default, ideal 3840x2160 then 1920x1080 at 30 fps in the film's shape, 12-24 Mbps by pixel count, attaches as 'remote'", () => {
     const html = getRemoteCameraHtml();
     expect(html).toMatch(/st = \{ state: 'idle', facing: 'environment'/);
     expect(html).toMatch(/var sizes = \[wide \? \[3840, 2160\] : \[2160, 3840\], wide \? \[1920, 1080\] : \[1080, 1920\], null\];/);
     expect(html).toMatch(/frameRate: \{ ideal: 30 \}/);
-    expect(html).toMatch(/var bps = Math\.min\(outW, outH\) >= 2160 \? 24000000 : 12000000;/);
+    expect(html).toMatch(/var bps = bitrateFor\(outW, outH\);/);
+    // The film's shape rides with the size: iOS gave 3024x2160 for a bare 3840x2160 ask.
+    expect(html).toMatch(/if \(sz\) v\.aspectRatio = \{ ideal: sz\[0\] \/ sz\[1\] \};/);
     expect(html).toMatch(/capture: 'remote'/);
     expect(html).toMatch(/navigator\.wakeLock\.request\('screen'\)/);
     expect(html).toMatch(/navigator\.getBattery/);
     // A lock only when the capabilities list the mode (Android Chrome; iOS has none).
     expect(html).toMatch(/if \(has\(caps\.exposureMode, 'manual'\)\)/);
+  });
+
+  it("bitrate follows the pixels: 12 Mbps at 1080p, ~18 for iOS's 3K crop, 24 at 4K", () => {
+    const html = getRemoteCameraHtml();
+    const src = html.slice(html.indexOf("function bitrateFor("), html.indexOf("function pickMime("));
+    const bitrateFor = new Function(src + "; return bitrateFor;")() as (w: number, h: number) => number;
+    expect(bitrateFor(1920, 1080)).toBe(12000000);
+    expect(bitrateFor(1080, 1920)).toBe(12000000);
+    expect(bitrateFor(3840, 2160)).toBe(24000000);
+    expect(bitrateFor(3024, 1700)).toBeGreaterThan(17000000); // was 12 under the short-side >= 2160 rule
+    expect(bitrateFor(3024, 1700)).toBeLessThan(19000000);
+    expect(bitrateFor(1280, 720)).toBe(12000000);
+  });
+
+  it("Studio's Across the room opens the booth in the same tab, and the booth's ← Studio comes back", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const studio = await readFile(new URL("../src/preview-app/preview-app.ts", import.meta.url), "utf8");
+    expect(studio).toContain("window.location.href = roomUrl;");
+    expect(studio).not.toContain("window.open(roomUrl");
+    const html = getRemoteBoothHtml();
+    expect(html).toContain('<a id="backLink" href="#">← Studio</a>');
+    expect(html).toMatch(/project \? '\/studio\?tenant=' \+ enc\(tenant\) \+ '&project=' \+ enc\(project\)/);
+    expect(html).not.toContain("/api/booth-films/' + enc(tenant))).then(function (r) { if (!r.ok) throw new Error('films ' + r.status); return r.json(); }).then(function (j) { return j.films || []; });\n  }\n  function esc(");
+    expect(html).not.toContain('id="films"');
   });
 
   it("control: clicker keys (PageDown/PageUp/arrows, blank key) and the space bar drive the take", () => {

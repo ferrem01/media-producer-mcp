@@ -4503,12 +4503,13 @@ ${QUOTIENT_CSS}
       return;
     }
     if (src === 'room') {
-      // ACROSS THE ROOM: the remote booth for this scene, in a new tab (it
-      // takes the whole screen: the prompter is read from 8-10 ft). The
-      // phone pairs once there and follows the booth between films.
+      // ACROSS THE ROOM: the remote booth for this scene, in THIS tab (it
+      // takes the whole screen: the prompter is read from 8-10 ft), and
+      // its "← Studio" comes back here. The phone pairs once and follows
+      // the booth between films: the pairing lives in localStorage.
       var roomUrl = withToken('/remote-booth?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si);
-      try { window.open(roomUrl, '_blank', 'noopener'); } catch (eW) {}
-      panel.innerHTML = '<div class="np-hint">The remote booth opened in a new tab for <b>scene ' + (si + 1) + '</b>: scan its code with the phone on the tripod, then run the take from this screen, prompter and all. The take lands here when you keep it. <a href="' + escAttr(roomUrl) + '" target="_blank" rel="noopener">Open it again</a> if the tab was blocked.</div>';
+      panel.innerHTML = '<div class="np-hint">Opening the remote booth for <b>scene ' + (si + 1) + '</b>\u2026 <a href="' + escAttr(roomUrl) + '">Open it</a> if nothing happens.</div>';
+      window.location.href = roomUrl;
       return;
     }
     if (src === 'recorder') {
