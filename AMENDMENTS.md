@@ -6,6 +6,39 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — Quotient metrics and saved reports as library components
+
+Marc captured the product's metrics and report screens as tenant components
+(frozen markup) and asked for "the full treatment": every number, name and
+word controllable, numbers that roll, charts that draw, zoomable, and each
+shown inside the Quotient desktop. Frozen captures can do none of that, so
+each screen is rebuilt by hand from its capture (sizes, colours, icons and
+the Inter font measured from the capture's own styles):
+
+- **`mockups/quotient-metrics-campaign`**: a campaign's Metrics tab (tab bar,
+  six KPI tiles, Traffic over time lines, Traffic by deliverable bars, the
+  ask-the-agent footer from below the fold).
+- **`mockups/quotient-metrics-email`**: an email broadcast's Metrics tab (four
+  tiles, the engagement funnel, the footer).
+- **`mockups/quotient-metrics-event`**: a marketing event's Metrics tab (four
+  tiles, Attendance and Registration rate cards, the status breakdown).
+- **`mockups/quotient-analytics-report`**: ONE component for the saved
+  reports. The three captures (deliverables by traffic, top social posts,
+  website traffic) share a layout -- header, Query panel, chart, table -- and
+  differ only in the chart, so `chart.type` is bars | treemap | lines and
+  `preset` fills each screen. A new saved report is data, not a component.
+
+All four: numbers roll up and charts draw on the timeline (scrub-safe);
+`entrance: "none"` is the settled screen (stills); `script` verbs `count`
+(roll a number mid-scene), `highlight`, `set-text`, `switch-tab` and the
+cursor verbs (plus `save` and `scroll` where the screen has them); camera
+anchors on each region. They sit in `quotient-app-shell` with
+`show_panel: false` at the content well (x 4.7%, y 8%, w 93.7%, h 89%,
+`docked: true`). Defaults are a generic, strong Q3 launch (Northwind,
+Flows); the tests check that none of the captured account's real names
+survive. Names avoid the tenant captures' names, because a tenant
+component shadows a library one of the same type.
+
 ## 2026-09-27 — The activity feed as a column: audience-activity-stream
 
 Scene two of the Analytics story cut puts Sarah Chen's feed in the right
