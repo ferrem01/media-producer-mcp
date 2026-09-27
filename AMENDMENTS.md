@@ -6,6 +6,62 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — The remote booth: record from across the room, pair once, move between films
+
+A wide 16:9 film shot 6-10 ft back breaks the booth's three assumptions.
+Nobody can read a phone from 8 ft away. The rear camera is the better
+camera, but its screen faces away from you. And nobody can reach Record
+from their mark. SPEC-remote-booth.md (approved by Marc) splits the job:
+the phone is only the camera, and a big screen is the prompter and the
+remote. Marc added one thing to the spec: "Sometimes I have the rig set up
+and I want to move from one recording to another between films. I have to
+remove the camera from the stand and then scan the QR for each." So a
+session belongs to the tenant and the device pair, not to a film.
+
+- **Relay** (`core/remote-booth.ts`, glued in `ws.ts`): the existing `/ws`
+  server gains a `remote-booth:*` family. Until now the socket carried no
+  identity. It is now authenticated at the upgrade with the HTTP token.
+  Membership uses `tenantAllowed`, the same decision core the HTTP choke
+  point uses. A retarget reads the project in the SESSION's tenant. A
+  routing table relays each message only from the role that may send it,
+  and only to the other device. A session has a 4 h idle limit. The
+  control screen keeps the session id in localStorage, so a reload, or a
+  second Studio tab, rejoins it. After a server restart the control screen
+  re-registers its id.
+- **Pages** (`remote-booth-page.ts`): `/remote-booth` is the control
+  screen: a QR until a phone pairs, then the preview with the booth's oval
+  and light check, the film + scene picker, the large prompter, Start/Stop
+  with a 3-2-1 on both devices, upload progress, review and Keep/Retake.
+  With no phone paired, it runs the prompter and timer alone and can
+  upload a file. `/remote-camera` is the phone's page: the rear camera,
+  ideal 3840×2160 then 1920×1080 at 30 fps in the film's orientation. It
+  records locally at 24 Mbps at 4K and 12 below, uploads with retries, and
+  on Keep calls the booth's own `POST /api/take` with `capture: 'remote'`.
+- **Films from the phone**: the arm's-length booth's ready, review and done
+  screens get a Films sheet (`GET /api/booth-films/{tenant}`,
+  `core/booth-films.ts`: the person-carried films, owed-a-take first). A
+  tap re-points the page (URL, script, frame) and keeps the open camera.
+- **Shared code instead of twins**: the prompter's timing and karaoke
+  moved out of `take-page.ts` into `core/prompter.ts`, which both booths
+  inline verbatim (the `LIGHT_CHECK_JS` pattern). The light check gained a
+  shot size (`close` is unchanged; `medium` 0.62, `wide` 0.36 of the face,
+  with the eyes rising to 0.30 h and 0.25 h).
+- **Studio**: a camera take gets a new source, **Across the room**, on the
+  desktop only. It opens the control screen for that scene in a new tab.
+- **Measured**: a two-page Chromium test with a fake camera, paired through
+  the real relay. The fake camera delivered 3840×2160 at 20 fps to the
+  ideal-4K request. The phone recorded the raw track (its aspect matched
+  16:9) at 24 Mbps. The take uploaded (>1 KB webm) and Keep attached with
+  `{capture: 'remote', scene_index: 0, background: 'room', look: 'soft'}`.
+  A retarget to a 9:16 film re-opened the camera, and the preview became
+  180×320. A socket carrying another tenant's token is refused on join,
+  over a real socket as well as in the hub. What real phones deliver is
+  unmeasured until Marc's first wide take. iPhone Safari may cap at 1080p
+  and has no exposure lock; both pages say so and point to the Upload
+  fallback for true 4K.
+
+---
+
 ## 2026-09-26 — The studio correction: every booth take lands colour- and exposure-corrected
 
 Marc's latest test take, measured from frames: the lit cheek R/B ~2.3

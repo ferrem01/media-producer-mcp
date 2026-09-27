@@ -1,6 +1,8 @@
 # SPEC: the remote booth — record from across the room
 
-Status: APPROVED by Marc 2026-09-26 ("lets build the remote booth"), with two additions from him: pair ONCE per session (not per film), and move between films from the phone without re-scanning.
+Status: SHIPPED v1 (2026-09-27): phases 1 and 2, the film picker, the phone booth's Films sheet, and Studio's "Across the room". What was built, and where it differs from the text below, is in **As built (v1)** at the end. Still open: Marc's real wide take by the French doors.
+
+APPROVED by Marc 2026-09-26 ("lets build the remote booth"), with two additions from him: pair ONCE per session (not per film), and move between films from the phone without re-scanning.
 
 ## Why
 
@@ -169,3 +171,109 @@ the scene split. This covers the true-4K case, whatever the browser allows.
 1. **The big screen:** laptop, iPad, or a TV? Default: laptop, with type size adjustable.
 2. **Standing or seated** for the first wide film? Default: both, via a shot-size selector (close, medium, wide).
 3. **A clicker:** do you have a presentation remote? Default: the space bar and arrow keys (clickers send those).
+
+## As built (v1)
+
+### Pages and routes
+- `/remote-booth?tenant&project&scene&token`: the control screen
+  (`src/remote-booth-page.ts`, `getRemoteBoothHtml`). Studio opens it in a
+  new tab from the **Across the room** source on a camera take
+  (`src/preview-app/preview-app.ts`, desktop only; the phone Studio is
+  unchanged).
+- `/remote-camera?tenant&session&token`: the camera page
+  (`getRemoteCameraHtml`), opened by the control screen's QR code.
+- `GET /api/take-qr/{tenant}/{project}?session=rb_…` draws the camera link.
+  It is the existing QR route with one new parameter, and it refuses a
+  malformed session id.
+- `GET /api/booth-films/{tenant}` returns the tenant's speaker and
+  creator-cut films. Each film carries its canvas, frame and scenes (label,
+  lines, `need: needed | provided | none`). Films still owed a take come
+  first, then the most recently updated (`src/core/booth-films.ts`). The
+  route is registered at the tenant choke point.
+- Both pages sit behind the auth middleware with the token in the link,
+  like `/take`.
+
+### The relay (`src/core/remote-booth.ts`, glued in `src/ws.ts`)
+- The socket is `/ws?token=…`. The token is read once, at the upgrade,
+  with the HTTP rule (`validateToken`, or the session cookie).
+- **Session**: `rb_` plus 128 random bits. The control screen's first
+  `join` (without an id) mints it, stamped with the token's tenant. The id
+  lives in `localStorage` per tenant, so a reload rejoins it, and so does a
+  second **Across the room** tab (that tab takes over as the control
+  screen and the earlier one steps aside). A session idle for 4 h is
+  dropped, and both pages are told. Sessions live in memory. After a server
+  restart the control screen re-registers its own id when it reconnects,
+  and the phone keeps asking until it can rejoin, so nothing is re-scanned.
+  A camera cannot create a session.
+- **Tenant rule**: a peer joins only if `tenantAllowed(token's tenant,
+  session tenant)` holds (the HTTP decision core, so `*` admin passes) AND
+  the page's own `?tenant=` equals the session's. A retarget resolves the
+  project in the session's tenant (`loadRemoteTarget`), never in a tenant
+  the message names.
+- **Messages** (`remote-booth:` prefix). The server relays only from the
+  role that may send a message, and only to the other device in the same
+  session. It stamps `from` and `session` on everything it relays.
+
+| From → to | Message | As built |
+|---|---|---|
+| control → server | `join {role, session?, tenant}` | the reply is `joined {session, tenant, target, peers}` or `error {code}` |
+| control → server | `target {project, scene}` | resolved in the session's tenant, then `target {project, scene, name, canvas, frame, grammar, lines}` to both devices |
+| server → both | `peer {role, present}`, `replaced`, `expired`, `error`, `pong` | membership, and the answer to `ping` (every 20 s, so proxies keep a quiet socket open during an upload) |
+| phone → laptop | `hello {camera, width, height, fps, locks[], label, max, battery, state, pending}` | re-sent whenever the laptop (re)appears, so a rejoin mid-take reconciles |
+| phone → laptop | `preview {jpeg, w, h}` | a 320 px long side at the film's aspect, cropped exactly like the recording, about 3.5 a second; skipped while the socket is backed up. A message over 512 KB is dropped |
+| laptop → phone | `settings {facing, lock}` | `lock` only acts where `getCapabilities` lists the modes |
+| laptop → phone | `start {t}` / `stop` | both devices count 3-2-1 from `start`; the phone records after its count |
+| phone → laptop | `recording {t0, width, height, mode, bitrate, mime}` | the laptop starts the prompter and the timer from this |
+| phone → laptop | `stopped {duration, size}` / `uploading {pct}` / `uploaded {url, …}` | added `stopped` so the laptop knows the file is safe on the phone |
+| laptop → phone | `keep {look, soft_strength, background}` / `retake` | |
+| phone → laptop | `attached {project, scene_index, open_needs}` / `attach-failed {error}` / `status {text, error}` | added, so the laptop reports the attach and upload retries |
+
+### Deviations from the text above
+- **Recording**: the phone records the RAW camera track when its aspect
+  already matches the film (full resolution, no canvas). Otherwise it draws
+  the centre crop into a canvas at the track's own resolution, with the
+  long side capped at 3840. The bitrate is 24 Mbps when the short side is
+  2160 or more, 12 below that.
+- **Keep**: the phone attaches, as specified, through `POST /api/take` with
+  `capture: 'remote'` and the take's `scene_index`. If the phone has left
+  by then, the laptop attaches the uploaded file itself through the same
+  route. A file uploaded on the laptop (the fallback) attaches with
+  `capture: 'upload'`.
+- **Keys**: before the take, Space, PageDown, → and ↓ all start it. During
+  the take the same keys advance a line; PageUp, ← and ↑ go back one; Esc,
+  `b` and `.` (a clicker's blank key) stop. One "next" past the last line
+  also stops, so a clicker alone runs the whole take. A click on the
+  prompter advances.
+- **Light check with shot size**: `guideOval(w, h, shot)` and
+  `lightStats(px, w, h, shot)`. `close` is the booth's oval unchanged.
+  `medium` scales the face 0.62 with the eyes at 0.30 h, and `wide` scales
+  it 0.36 with the eyes at 0.25 h. The wall rule has no threshold of its
+  own. The background band is the top of the frame outside the head's
+  column, so a smaller head leaves more of the frame counted as
+  background. That is the "larger share of the frame, on purpose".
+- **Prompter**: the booth's timing and karaoke code moved into
+  `src/core/prompter.ts`. Both pages inline it verbatim, as they already do
+  with `LIGHT_CHECK_JS`. Type size (A−/A+) and mirror are remembered on
+  the control screen.
+- **After Keep**: the control screen offers **Next: Scene N**, the next
+  scene of the same film that is still owed a take.
+- **Phone booth Films sheet**: it also appears on the done screen, and it
+  is hidden inside Studio's dialog (`embed=1`), which is one scene's.
+- **Resolution report**: the camera's `hello` is the report. Under test,
+  Chromium's fake camera delivered **3840×2160 at 20 fps** to the ideal
+  3840×2160 / 30 fps request and recorded at 24 Mbps. A real phone may
+  deliver less (see below).
+
+### What real phones may deliver (honest)
+- **Android Chrome** usually honours 3840×2160 on the rear camera, often at
+  30 fps. Recent Chrome versions also list `exposureMode` and
+  `whiteBalanceMode`, so Lock works there.
+- **iPhone Safari** has capped getUserMedia at 1920×1080 on many iOS
+  versions, and newer ones may allow more; the page records what it gets
+  and says so. It offers no exposure or white-balance lock, and no battery
+  API. The correction on arrival covers the lock. For true 4K, use the
+  fallback: record in the Camera app, then **Upload a file** on the control
+  screen.
+- A phone held upright for a wide film delivers a portrait track, which
+  the crop would shrink badly. Both screens say "Turn the phone on its
+  side".

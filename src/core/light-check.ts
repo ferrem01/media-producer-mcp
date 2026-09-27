@@ -59,6 +59,9 @@ export interface GuideOval {
   eyeY: number;
 }
 
+/** How much of the person the frame holds (the remote booth's selector). */
+export type ShotSize = "close" | "medium" | "wide";
+
 export const LIGHT_CHECK_JS = `
   // Thresholds, each set against the measured take (see src/core/light-check.ts).
   var LIGHT = {
@@ -95,21 +98,32 @@ export const LIGHT_CHECK_JS = `
     MAX_TIPS: 3
   };
 
+  // SHOT SIZE (the remote booth, SPEC-remote-booth.md): how much of the
+  // person the frame holds. close = the booth's head and shoulders at arm's
+  // length (the default, unchanged); medium = waist up; wide = standing,
+  // 6-10 ft back. The face shrinks and the eyes rise as the shot widens.
+  // The wall rule needs no threshold of its own: the background band is
+  // the top of the frame outside the head's column, so a smaller head
+  // leaves MORE of the frame counted as background, on purpose -- in a wide
+  // shot the room is a larger share of the picture.
+  var SHOTS = { close: { k: 1, eye: 0 }, medium: { k: 0.62, eye: 0.3 }, wide: { k: 0.36, eye: 0.25 } };
+
   // Where the face goes, in a w x h picture: a head-and-shoulders oval with
   // the eyes on the upper third (the framing hint draws the same numbers).
-  function guideOval(w, h) {
+  function guideOval(w, h, shot) {
+    var sz = (shot === 'medium' || shot === 'wide') ? SHOTS[shot] : SHOTS.close;
     var portrait = h > w;
-    var ry = h * (portrait ? 0.14 : 0.2);
+    var ry = h * (portrait ? 0.14 : 0.2) * sz.k;
     var rx = Math.min(ry * 0.78, w * 0.4);
-    var eyeY = h / 3;
+    var eyeY = sz.eye ? h * sz.eye : h / 3;
     return { cx: w / 2, cy: eyeY + ry * 0.1, rx: rx, ry: ry, eyeY: eyeY };
   }
 
   // RGBA pixels (canvas ImageData.data) -> LightStats. The face is the inner
   // 70% of the guide oval (skin, not hair or the wall beside a cheek); the
   // background is the top band outside the head.
-  function lightStats(px, w, h) {
-    var o = guideOval(w, h);
+  function lightStats(px, w, h, shot) {
+    var o = guideOval(w, h, shot);
     var irx = o.rx * 0.7, iry = o.ry * 0.7;
     var bandY = h * 0.25, clearX = o.rx * 1.35;
     var f = [0, 0, 0, 0, 0], fl = [0, 0, 0, 0, 0], fr = [0, 0, 0, 0, 0], bg = [0, 0, 0, 0, 0];
@@ -185,8 +199,8 @@ export const LIGHT_CHECK_JS = `
 
 interface LightCheckApi {
   LIGHT: Record<string, number>;
-  guideOval(w: number, h: number): GuideOval;
-  lightStats(px: ArrayLike<number>, w: number, h: number): LightStats;
+  guideOval(w: number, h: number, shot?: ShotSize): GuideOval;
+  lightStats(px: ArrayLike<number>, w: number, h: number, shot?: ShotSize): LightStats;
   lightAdvice(s: LightStats): LightTip[];
 }
 

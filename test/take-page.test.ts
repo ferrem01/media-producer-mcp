@@ -303,3 +303,94 @@ describe("the prompter in a browser (fake camera)", () => {
     } finally { await browser.close(); for (const c of closers) await c(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
   }, 90000);
 });
+
+describe("the Films sheet: switch films from the booth itself (SPEC-remote-booth.md)", () => {
+  it("the prompter code is the shared module, the same one the remote booth inlines", async () => {
+    const { PROMPTER_TIMING_JS, PROMPTER_VIEW_JS, buildCues } = await import("../src/core/prompter.js");
+    const html = getTakeHtml();
+    expect(html).toContain(PROMPTER_TIMING_JS.trim().split("\n")[0]);
+    expect(html).toContain("function showCue(i) {");
+    expect(PROMPTER_VIEW_JS).toContain("function showCue(i) {");
+    const cues = buildCues([{ voiceover_text: "One brief, every surface.\n(pause)\nIt ships.", emphasis: ["brief"] }]);
+    expect(cues.map((c) => c.text)).toEqual(["One brief, every surface.", "•••", "It ships."]);
+    expect(cues[0].toks.filter((t) => t.emph).map((t) => t.t)).toEqual(["brief,"]);
+    expect(cues[1].dur).toBe(1);
+  });
+
+  it("lists the tenant's films with what each scene needs, and a tap switches project + scene in place", async () => {
+    const { chromium, devices } = await import("playwright");
+    const http = await import("node:http");
+    const { boothFilms } = await import("../src/core/booth-films.js");
+    const need = (status: string) => ({ type: "camera_video", description: "Camera take of this scene's spoken lines", status });
+    const projects: Record<string, any> = {
+      proj_a: { project_id: "proj_a", name: "Alpha", canvas: { width: 1080, height: 1920 }, treatment: { filmGrammar: "speaker" }, scenes: [], updated_at: "2026-09-26",
+        storyboard: { scenes: [{ label: "Scene 1", voiceover_text: "Alpha one.", assets: [need("needed")] }] } },
+      proj_b: { project_id: "proj_b", name: "Beta", canvas: { width: 1920, height: 1080 }, treatment: { filmGrammar: "creator-cut" }, scenes: [], updated_at: "2026-09-25",
+        storyboard: { scenes: [{ label: "Scene 1", voiceover_text: "Beta one.", assets: [need("provided")] }, { label: "Scene 2 · Close", voiceover_text: "Beta two, the close.", assets: [need("needed")] }] } },
+      proj_c: { project_id: "proj_c", name: "Gamma hype", canvas: { width: 1920, height: 1080 }, treatment: { filmGrammar: "hype-cut" }, scenes: [], storyboard: { scenes: [{ label: "S", voiceover_text: "x" }] } },
+    };
+    const hits: string[] = [];
+    const server = http.createServer((req, res) => {
+      const u = new URL(req.url || "/", "http://x");
+      hits.push(u.pathname);
+      const m = u.pathname.match(/^\/api\/projects\/([^/]+)\/([^/]+)$/);
+      if (m) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(projects[m[2]])); return; }
+      if (u.pathname === "/api/booth-films/t") { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ films: boothFilms(Object.values(projects)) })); return; }
+      res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    const port = (server.address() as any).port;
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined, args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+    try {
+      const page = await (await browser.newContext({ ...devices["iPhone 13"], permissions: ["camera", "microphone"] })).newPage();
+      const errors: string[] = []; page.on("pageerror", (e) => errors.push(e.message));
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=proj_a&scene=0&token=x`);
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      expect(await page.textContent("#title")).toBe("Alpha — Scene 1 · Scene 1");
+      expect(await page.isVisible("#filmsBtn")).toBe(true);
+
+      await page.click("#filmsBtn");
+      await page.waitForSelector(".fscene", { timeout: 5000 });
+      const films = await page.evaluate(() => [...document.querySelectorAll(".ffilm > b")].map((b) => b.textContent));
+      expect(films).toEqual(["Alpha", "Beta"]); // person-carried only, owed-a-take first
+      expect(await page.evaluate(() => document.querySelector(".fscene.cur")!.getAttribute("data-p"))).toBe("proj_a");
+      expect(await page.textContent('.fscene[data-p="proj_b"][data-s="1"]')).toMatch(/Scene 2 · Close\s*Needs a take · Beta two, the close\./);
+      expect(await page.textContent('.fscene[data-p="proj_b"][data-s="0"]')).toMatch(/Has a take/);
+
+      await page.click('.fscene[data-p="proj_b"][data-s="1"]');
+      await page.waitForFunction(() => (document.getElementById("title")!.textContent || "").indexOf("Beta") === 0, null, { timeout: 8000 });
+      expect(await page.isVisible("#filmsSheet")).toBe(false);
+      expect(await page.evaluate(() => location.search)).toBe("?tenant=t&project=proj_b&scene=1&token=x");
+      expect(await page.textContent("#script")).toMatch(/Beta two, the close\./);
+      expect(await page.textContent("#script")).not.toMatch(/Alpha/);
+      // The frame follows the new film: a 16x9 film records 1920x1080.
+      expect(await page.evaluate(() => { const c = document.getElementById("cap") as HTMLCanvasElement; return [c.width, c.height]; })).toEqual([1920, 1080]);
+      expect(await page.evaluate(() => document.getElementById("stage")!.classList.contains("wide"))).toBe(true);
+      expect(await page.evaluate(() => (document.getElementById("studioLinkTop") as HTMLAnchorElement).getAttribute("href"))).toMatch(/project=proj_b/);
+
+      // And it records there: the take goes to the new project and scene.
+      await page.click("#recordBtn");
+      await page.waitForSelector("#goBtn", { state: "visible", timeout: 8000 });
+      await page.click("#goBtn");
+      await page.waitForFunction(() => document.querySelectorAll("#cue .w").length > 0, null, { timeout: 8000 });
+      expect(await page.textContent("#cue")).toBe("Beta two, the close.");
+      await page.click("#stopBtn");
+      await page.waitForSelector("#review.on", { timeout: 8000 });
+      // From review too: Films is there, and switching back discards the unused take.
+      expect(await page.isVisible("#filmsBtnReview")).toBe(true);
+      await page.click("#filmsBtnReview");
+      await page.waitForSelector('.fscene[data-p="proj_a"]', { timeout: 5000 });
+      expect(await page.textContent("#filmsNote")).toMatch(/throws away the take/);
+      await page.click('.fscene[data-p="proj_a"][data-s="0"]');
+      await page.waitForFunction(() => (document.getElementById("title")!.textContent || "").indexOf("Alpha") === 0 && document.getElementById("ready")!.classList.contains("on"), null, { timeout: 8000 });
+      expect(await page.evaluate(() => { const c = document.getElementById("cap") as HTMLCanvasElement; return [c.width, c.height]; })).toEqual([1080, 1920]);
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); await new Promise<void>((r) => server.close(() => r())); }
+  }, 90000);
+
+  it("hides Films inside Studio's dialog (embed=1): the dialog is one scene's", () => {
+    const html = getTakeHtml();
+    expect(html).toMatch(/<p class="toprow"><a class="link" id="studioLinkTop" href="#">← Back to Studio<\/a><button class="chip" id="filmsBtn" type="button">Films<\/button><\/p>/);
+    expect(html).toMatch(/b\.addEventListener\('click', openFilms\); if \(embedded\) b\.style\.display = 'none';/);
+  });
+});
