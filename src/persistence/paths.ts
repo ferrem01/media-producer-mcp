@@ -60,7 +60,14 @@ export function projectsDir(tenantId: string): string {
   return path.join(tenantDir(tenantId), "projects");
 }
 
+/** A project id is one folder name. Anything with a separator or a dot
+ *  segment would climb out of the tenant's projects/ folder (a caller
+ *  allowed tenant B could name "../../A/projects/proj_x" and write A's
+ *  film), so every project path refuses it here, where they all pass. */
 export function projectDir(tenantId: string, projectId: string): string {
+  if (!projectId || /[\\/\0]/.test(projectId) || projectId === "." || projectId === "..") {
+    throw new Error(`invalid project id: ${JSON.stringify(projectId)}`);
+  }
   return path.join(projectsDir(tenantId), projectId);
 }
 

@@ -265,6 +265,16 @@ describe("over a real socket (src/ws.ts)", () => {
     }
     expect(await fs.readFile(file, "utf-8")).toBe(before);
 
+    // Its OWN tenant, but a project id that climbs out of its folder into acme's: refused, file untouched.
+    const climb = await new Promise<any>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=tokB`);
+      ws.on("open", () => ws.send(JSON.stringify({ type: "update-prop", tenantId: "other", projectId: `../../acme/projects/${project.project_id}`, sceneId: "s1", componentId: "c1", data: { title: "pwned" } })));
+      ws.on("message", (raw) => { resolve(JSON.parse(String(raw))); ws.close(); });
+      ws.on("error", reject);
+    });
+    expect(climb.type).toBe("error");
+    expect(await fs.readFile(file, "utf-8")).toBe(before);
+
     // The owner writes, and gets the re-assembled scene back.
     const ok = await reply(port, "tokA", "Updated");
     expect(ok.error).toBeUndefined();
