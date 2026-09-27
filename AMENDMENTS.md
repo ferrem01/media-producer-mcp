@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — Music clips: one song, two clips (and Studio plays the trim)
+
+Marc wants the Quotient Analytics launch film on "the exact music" of the
+develop. film. The song is Mixkit track 1077 (found by fingerprinting
+Mixkit's catalogue against the film's audio: 0.86 correlation against 0.17 for
+everything else). The film plays it from 17.9 s and repeats one bar in the
+breakdown (at 23.5 s film time the song jumps back 2 s).
+
+- **`duration` on an audio track** plays only that many seconds of the
+  source after `trim_start`. The mixer already had it; the type, the three
+  render mixes and the audio tool now carry it. A clipped track fades out at
+  its own end, not the film's.
+- **Studio played every track from source 0.** It ignored `trim_start`, so
+  the develop. rebuild previewed the wrong part of its song. It now plays from
+  the trim, for the clip's length, and draws the lane segment at that length.
+- `test/music-clips.test.ts`: a clip is silent past its end; every layer
+  carries the field.
+
 ## 2026-09-27 — Relay v2: the continuous take, with "develop." as the reference
 
 Marc, on the "develop." launch film (x.com/twoclipping/status/2103835273813496100):

@@ -2866,6 +2866,7 @@ export function createMcpServer(): McpServer {
         volume: z.number().min(0).max(1).optional(),
         start_time: z.number().optional(),
         trim_start: z.number().min(0).optional().describe("Skip this many seconds of the source before it plays -- land a song's drop on the film's beat (music: the drop at source 17.0 s on film 11.25 s = trim_start 5.75)."),
+        duration: z.number().positive().optional().describe("Play only this many seconds of the source (after trim_start). Two clips of one song repeat a bar: {trim_start: 17.9, duration: 23.5} then {trim_start: 39.4, start_time: 23.5}."),
         loop: z.boolean().optional(),
         fade_in: z.number().optional(),
         fade_out: z.number().optional(),
@@ -2977,6 +2978,7 @@ export function createMcpServer(): McpServer {
           volume: params.track.volume ?? 1.0,
           start_time: params.track.start_time,
           ...(params.track.trim_start !== undefined ? { trim_start: params.track.trim_start } : {}),
+          ...(params.track.duration !== undefined ? { duration: params.track.duration } : {}),
           loop: params.track.loop,
           fade_in: params.track.fade_in,
           fade_out: params.track.fade_out,
@@ -3004,6 +3006,7 @@ export function createMcpServer(): McpServer {
         if (params.track.source !== undefined) existing.source = params.track.source;
         if (params.track.loop !== undefined) existing.loop = params.track.loop;
         if (params.track.trim_start !== undefined) existing.trim_start = params.track.trim_start;
+        if (params.track.duration !== undefined) existing.duration = params.track.duration;
         if (params.track.start_time !== undefined) existing.start_time = params.track.start_time;
         if (params.track.fade_in !== undefined) existing.fade_in = params.track.fade_in;
         if (params.track.fade_out !== undefined) existing.fade_out = params.track.fade_out;
