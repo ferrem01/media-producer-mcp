@@ -2303,8 +2303,11 @@ export function createMcpServer(): McpServer {
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
 
-      // Status gating
-      if (project.status === "draft") {
+      // Status gating. A DRAFT WITH SCENES is a hand-built film (scenes
+      // added one by one with add, no storyboard ever made): it renders.
+      // Measured on proj_790dc4fa (the develop. rebuild): five built scenes
+      // refused with "needs a storyboard first" until the status was set by hand.
+      if (project.status === "draft" && !(project.scenes || []).length) {
         return err("Project needs a storyboard first. Run generate with mode='storyboard' to create a storyboard.");
       }
       if (project.status === "storyboard") {

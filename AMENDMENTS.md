@@ -41,6 +41,10 @@ recreate this video with megamedia. Then recreate it as our validation." Then:
   - The audio tool takes `trim_start`, so a drop lands on the film's beat.
   - `jamendo:<id>` sources download again: the branch tested `!source`
     after `source` was already set to the id, so it never ran.
+- **A hand-built film renders:** `render` refused any `draft` project with
+  "needs a storyboard first", but a film made scene by scene with `add` never
+  gets a storyboard. A draft with scenes now renders; an empty draft still
+  asks for a storyboard.
 - **The rebuild** (`proj_790dc4fa`):
   - 5 scenes, 28.3 s on a 123 BPM bed, with every reference time scaled by
     120/123.
