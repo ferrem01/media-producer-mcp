@@ -25,6 +25,14 @@ paths did not.
   (server.ts; reorder now also refuses a non-permutation instead of silently
   filtering) and the storyboard tool's `delete_index` / `insert_at`
   (llm/storyboard-surgical.ts).
+- **Record-all finds a scene said loosely.** The one-take split cuts where
+  each scene's opener is heard, matched word for word. Marc read
+  "Drag-and-drop templates" as "Drop and drag templates" and "Your list?" as
+  "Your lists", so both openers fell back to the proportional guess and
+  landed at the end of the scene before (scene 6 came out 2.2s, its three
+  cutaways stacked). `splitByScripts` now tries a loose match before the
+  guess: plurals and one-letter slips, a compound's parts in any order,
+  backed by the previous scene's last words heard just before.
 - **A monkey in the house set.** The Old Chimp film wanted a monkey sound on
   "this guy"; the house shelf had none and Freesound needs a key. `monkey`
   (audio/foley.ts) is a synthesized cartoon chimp -- four "ooh-ooh-AH-AH"

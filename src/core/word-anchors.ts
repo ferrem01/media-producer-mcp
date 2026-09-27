@@ -278,6 +278,16 @@ export function splitByScripts(scripts: string[], words: SpineWord[], total: num
         break;
       }
     }
+    // Said, but not word for word: "Drag-and-drop templates" read as "Drop
+    // and drag templates", "Your list?" as "Your lists" (measured live,
+    // proj_34225c8a) -- the exact opener never matches and the proportional
+    // guess cut both scenes a line late. Look for the opener loosely
+    // (plurals, a slip of a letter, a compound's parts in any order), backed
+    // by the previous scene's closing words heard just before.
+    if (at === null && head.length) {
+      const k = looseSceneStart(scripts[i - 1], scripts[i], toks, from);
+      if (k !== null) { at = Math.max(cuts[cuts.length - 1], round(words[k].start - 0.1)); cursor = k; }
+    }
     // A window shorter than a breath is not a scene: treat as not found.
     if (at !== null && at - cuts[cuts.length - 1] < 0.3) at = null;
     if (at === null) {
@@ -295,3 +305,66 @@ export function splitByScripts(scripts: string[], words: SpineWord[], total: num
 }
 
 function round(n: number): number { return Math.round(n * 1000) / 1000; }
+
+/** A script's words broken at hyphens and normalized: "Drag-and-drop" is
+ *  three words when it is said. */
+function spokenParts(script: string): string[] {
+  return scriptWords(script).flatMap((w) => w.split(/[-\u2010-\u2014]+/)).map(normalizeToken).filter(Boolean);
+}
+
+function stem(t: string): string {
+  return t.replace(/ies$/, "y").replace(/(?<=\w{3})(es|s|ed|ing)$/, "");
+}
+
+/** Within one edit (insert, delete or substitute) -- for words of 5+ letters. */
+function oneEditApart(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1 || a.length < 5 || b.length < 5) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+/** How alike a script word and a heard word are: 1 the same, 0.85 the same
+ *  stem ("list" / "lists"), 0.7 a slip of one letter, else 0. */
+function tokenLikeness(script: string, heard: string | undefined): number {
+  if (!heard) return 0;
+  if (script === heard) return 1;
+  if (stem(script) === stem(heard)) return 0.85;
+  return oneEditApart(script, heard) ? 0.7 : 0;
+}
+
+/**
+ * Where a scene begins when its opening words were said loosely: the
+ * transcript index that best matches the opener (in order, or as a bag of
+ * the same words in another order) together with the previous scene's
+ * last words heard just before it. Null when nothing is a confident match.
+ */
+function looseSceneStart(prevScript: string, script: string, toks: string[], from: number): number | null {
+  const head = spokenParts(script).slice(0, 3);
+  const tail = spokenParts(prevScript).slice(-2);
+  if (!head.length) return null;
+  let best: { k: number; score: number; first: number } | null = null;
+  for (let k = from; k < toks.length; k++) {
+    let ordered = 0;
+    head.forEach((h, j) => { ordered += tokenLikeness(h, toks[k + j]); });
+    const heard = toks.slice(k, k + head.length);
+    const bag = head.filter((h) => { const at = heard.indexOf(h); if (at < 0) return false; heard.splice(at, 1); return true; }).length * 0.8;
+    const headScore = Math.max(ordered, bag);
+    let tailScore = 0;
+    tail.slice().reverse().forEach((t, j) => { tailScore += tokenLikeness(t, toks[k - 1 - j]); });
+    const confident = headScore >= Math.min(1.6, head.length * 0.8) || (headScore >= 0.85 && tailScore >= Math.min(1.6, tail.length * 0.8));
+    if (!confident) continue;
+    // The first confident spot opens a short window; the best score in it
+    // wins ("years OLD drop and drag" is confident one word early on the
+    // bag alone -- the full opener plus the heard tail beats it).
+    if (best && k > best.first + 4) break;
+    const score = headScore + 0.8 * tailScore;
+    if (!best) best = { k, score, first: k };
+    else if (score > best.score + 1e-9) { best.k = k; best.score = score; }
+  }
+  return best ? best.k : null;
+}
