@@ -6,6 +6,59 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — The take: a fill light, a blur amount, and a status line that says what is happening
+
+Marc on his booth take for the Instagram ad (proj_4dfaa63e): "The dark side
+of my face looks sunken and I have bags under my eyes." The correction was
+not the cause. It had applied a 3% white balance and a 0.03 curve. It was
+the light: a high key from one side and no fill. Then, in Studio, after
+moving soft look to 80 and background to blur: "I wonder if it actually
+worked ... I'm starting to wonder whether the inspector is hooked up to the
+back end." It was hooked up. The blurred copy landed 6 minutes later, and
+the re-grade had run. Nothing on screen said so. And: "can I get control as
+to how much the blur is?"
+
+- **Fill light** (`take-studio.ts` `faceFillGraph`, in the grade's one
+  encode between the correction and the soft look; `gradeChain` composes
+  them):
+  - A lifted copy of the frame is laid back through a mask.
+  - The mask is a feathered ellipse around the detected face, a little
+    larger and lower so the cheeks and jaw are in. It is multiplied by a
+    luma band, so the skin's shadows get it and the lit cheek, pupils,
+    brows and beard do not.
+  - The mask is computed at a quarter of the frame's size.
+  - Strength runs 0-1 on `take.fill`. Absent means 0.5, the level of the
+    side-by-side Marc saw. It is on for every take, including a re-grade of
+    an old one. 0 is off.
+  - It never runs on a guessed face.
+  - Checked through the real encode on his frame; a pixel test pins shadow
+    lifted, lit skin and wall untouched, and off returning the original
+    byte for byte.
+- **Blur amount**:
+  - `matteBlurRadius` now spans 3 px (light, the room still reads) to 32
+    (deep) at 1080 wide; the 0.6 default is about what shipped.
+  - `take.blur_strength` holds the setting. `POST /api/speaker-background`
+    takes `strength`, and a new amount re-makes the blurred copy. The old
+    copy plays until the new one lands.
+  - A grade's re-matte keeps the take's own amount.
+- **What the take is doing** (`core/take-jobs.ts`,
+  `GET /api/take-status/{t}/{p}`):
+  - The grade and the matte report to an in-memory board: running or
+    waiting, with the matte's frame progress (every 25 frames, the pass
+    counted as 90%).
+  - A failure is left on the take as `take.job_error` until that kind of
+    job next succeeds.
+  - In Studio, the speaker's inspector shows "Applying the look (soft 80 ·
+    fill 50)… 1:05" or "Blurring the background… 42%", then "Done", or the
+    failure with a Retry. It polls every 2.5 s only while something runs.
+  - A re-made blur copy at the same url now reloads the preview, as a
+    re-grade already did.
+- **Studio dials**: **fill light** (on/off + 5-100) under soft look, and
+  **blur amount** (0-100) when the scene's background is blur.
+  `edit_speaker` `look` takes `fill`.
+
+---
+
 ## 2026-09-27 — The remote booth: a way back to Studio, and the camera's bitrate
 
 Marc's first real pairing worked ("worked really well. amazing"), and it

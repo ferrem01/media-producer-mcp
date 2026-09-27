@@ -34,6 +34,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { takeCopies, syncSpeakerClips, missingSpeakerCopies } from "./speaker-layer.js";
 import { ensureSpeakerNeeds } from "./take-needs.js";
+import { takeJobSet, takeJobProgress, takeJobDone, markTakeJobError } from "./take-jobs.js";
 
 export const MATTE_MODEL_FILE = "rvm_mobilenetv3_fp32.onnx";
 export const MATTE_MODEL_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx";
@@ -83,9 +84,14 @@ export function matteSize(width: number, height: number): { width: number; heigh
 
 /** Blur radius for the room at this frame width and strength: 8-32 px at
  *  1080 wide, scaled with the frame. */
-export function matteBlurRadius(width: number, strength = 0.6): number {
-  const s = Math.max(0, Math.min(1, strength));
-  return Math.max(2, Math.round((8 + 24 * s) * (width / 1080)));
+/** 0 is a light blur (the room still reads), 1 a deep one (colour
+ *  shapes only); 0.6 is the default the blur shipped with. Marc: "a light
+ *  blur vs a deep blur might be requested". Box radius at 1080 px wide,
+ *  three passes: 3 at 0, ~20 at 0.6, 32 at 1. */
+export const DEFAULT_BLUR_STRENGTH = 0.6;
+export function matteBlurRadius(width: number, strength = DEFAULT_BLUR_STRENGTH): number {
+  const s = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : DEFAULT_BLUR_STRENGTH));
+  return Math.max(2, Math.round((3 + 29 * s) * (width / 1080)));
 }
 
 /** The ffmpeg graph: the frame split into the room (blurred) and the
@@ -158,7 +164,7 @@ async function sha256Matches(file: string): Promise<boolean> {
   } catch { return false; }
 }
 
-async function probeVideo(file: string): Promise<{ width: number; height: number; fps: number; hasAudio: boolean }> {
+async function probeVideo(file: string): Promise<{ width: number; height: number; fps: number; hasAudio: boolean; duration: number }> {
   let table = "";
   try { await execFileAsync("ffmpeg", ["-hide_banner", "-i", file], { maxBuffer: 4 * 1024 * 1024 }); }
   catch (e: any) {
@@ -168,7 +174,9 @@ async function probeVideo(file: string): Promise<{ width: number; height: number
   const v = table.match(/Stream #\d+:\d+.*: Video: .*?\s(\d{2,5})x(\d{2,5})/);
   if (!v) throw new Error(`no video stream in ${path.basename(file)}`);
   const fpsM = table.match(/(\d+(?:\.\d+)?) fps/);
-  return { width: Number(v[1]), height: Number(v[2]), fps: fpsM ? Number(fpsM[1]) : 30, hasAudio: /Stream #\d+:\d+.*: Audio:/.test(table) };
+  const durM = table.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
+  const duration = durM ? Number(durM[1]) * 3600 + Number(durM[2]) * 60 + Number(durM[3]) : 0;
+  return { width: Number(v[1]), height: Number(v[2]), fps: fpsM ? Number(fpsM[1]) : 30, hasAudio: /Stream #\d+:\d+.*: Audio:/.test(table), duration };
 }
 
 /**
@@ -263,6 +271,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
   const plane = mh * mw;
   const edges = silhouetteCollector();
   let frames = 0;
+  const totalFrames = probe.duration > 0 ? Math.round(probe.duration * fps) : 0;
   let carry: Buffer = Buffer.alloc(0);
   const runFrame = async (rgb: Buffer) => {
     for (let i = 0; i < plane; i++) { src[i] = rgb[i * 3] / 255; src[plane + i] = rgb[i * 3 + 1] / 255; src[2 * plane + i] = rgb[i * 3 + 2] / 255; }
@@ -274,7 +283,7 @@ async function matteTakeInner(input: string, opts: MatteOptions): Promise<MatteR
     if (wantAlpha) edges.add(a, mw, mh);
     if (!alphaSink.write(a)) await new Promise<void>((r) => alphaSink.once("drain", () => r()));
     frames++;
-    if (opts.onProgress && frames % 100 === 0) opts.onProgress(frames, 0);
+    if (opts.onProgress && frames % 25 === 0) opts.onProgress(frames, totalFrames);
   };
   for await (const chunk of dec.stdout as AsyncIterable<Buffer>) {
     let buf = carry.length ? Buffer.concat([carry, chunk]) : chunk;
@@ -354,10 +363,25 @@ export function queueTakeMatte(opts: {
   const key = `${opts.tenantId}/${opts.projectId}/${opts.rawUrl}`;
   if (matteJobs.has(key)) return false;
   matteJobs.add(key);
+  const what = [opts.blur ? "blur" : "", opts.alpha ? "alpha" : ""].filter(Boolean);
+  takeJobSet(opts.tenantId, opts.projectId, opts.rawUrl, "matte", "running", what);
   setTimeout(async () => {
     const again = { blur: false, alpha: false };
     try {
-      const m = await matteTake(opts.resolvePath(opts.rawUrl), { dataDir: opts.dataDir, strength: opts.strength, blur: !!opts.blur, alpha: !!opts.alpha, onProgress: (n) => console.log(`  take matte: ${n} frames...`) });
+      // The strength: the caller's, else the take's own dial (Studio's
+      // "blur amount"), else the default.
+      let strength = opts.strength;
+      if (strength === undefined) {
+        const p0 = await opts.loadProject(opts.tenantId, opts.projectId).catch(() => null);
+        const t0 = (p0?.takes || []).find((t: any) => takeCopies(t).raw === opts.rawUrl && typeof t.blur_strength === "number");
+        if (t0) strength = t0.blur_strength;
+      }
+      let lastLog = 0;
+      const m = await matteTake(opts.resolvePath(opts.rawUrl), { dataDir: opts.dataDir, strength, blur: !!opts.blur, alpha: !!opts.alpha, onProgress: (n, total) => {
+        // The blur copy is written after the matte pass; the pass is ~90%.
+        if (total > 0) takeJobProgress(opts.tenantId, opts.projectId, opts.rawUrl, "matte", (n / total) * 90);
+        if (n - lastLog >= 100) { lastLog = n; console.log(`  take matte: ${n}${total ? `/${total}` : ""} frames...`); }
+      } });
       const blurUrl = m.output ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.output)) : undefined;
       const alphaUrl = m.alpha ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.alpha)) : undefined;
       const project = await opts.loadProject(opts.tenantId, opts.projectId);
@@ -365,7 +389,7 @@ export function queueTakeMatte(opts: {
       let owned = 0;
       for (const t of project.takes || []) {
         if (takeCopies(t).raw !== opts.rawUrl) continue;
-        if (blurUrl) t.blur = blurUrl;
+        if (blurUrl) { t.blur = blurUrl; if (typeof strength === "number") t.blur_strength = strength; }
         if (alphaUrl) t.alpha = alphaUrl;
         if (alphaUrl && m.silhouette) t.silhouette = m.silhouette;
         owned++;
@@ -374,14 +398,24 @@ export function queueTakeMatte(opts: {
       }
       const synced = syncSpeakerClips(project);
       ensureSpeakerNeeds(project);
+      markTakeJobError(project, opts.rawUrl, "matte", null, (t) => takeCopies(t).raw);
       project.updated_at = new Date().toISOString();
       await opts.saveProject(project);
       console.log(`  take matte: ${[m.output, m.alpha].filter(Boolean).map((f) => path.basename(f!)).join(" + ")} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${owned} take(s) updated, ${synced} clip field(s) re-pointed`);
       if (opts.afterSave) opts.afterSave(opts.tenantId, opts.projectId);
     } catch (e: any) {
       console.warn(`  take matte failed for ${path.basename(opts.rawUrl)}: ${e?.message || e}`);
+      // Left on the take, so Studio can say so and offer a retry.
+      try {
+        const project = await opts.loadProject(opts.tenantId, opts.projectId);
+        if (project && markTakeJobError(project, opts.rawUrl, "matte", String(e?.message || e), (t) => takeCopies(t).raw)) {
+          project.updated_at = new Date().toISOString();
+          await opts.saveProject(project);
+        }
+      } catch { /* the log line above is the record */ }
     } finally {
       matteJobs.delete(key);
+      takeJobDone(opts.tenantId, opts.projectId, opts.rawUrl, "matte");
       if (again.blur || again.alpha) queueTakeMatte({ ...opts, ...again });
     }
   }, 50);

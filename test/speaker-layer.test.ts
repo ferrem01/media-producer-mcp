@@ -336,7 +336,7 @@ describe("the choice, wherever it is made", () => {
 
   it("the matte records the copies on the take and re-points the clips; the raw take stays the source", async () => {
     const matte = await fsp.readFile("src/core/take-matte.ts", "utf8");
-    expect(matte).toMatch(/if \(blurUrl\) t\.blur = blurUrl;\s*if \(alphaUrl\) t\.alpha = alphaUrl;/);
+    expect(matte).toMatch(/if \(blurUrl\) \{ t\.blur = blurUrl; if \(typeof strength === "number"\) t\.blur_strength = strength; \}\s*if \(alphaUrl\) t\.alpha = alphaUrl;/);
     expect(matte).toMatch(/const synced = syncSpeakerClips\(project\);\s*ensureSpeakerNeeds\(project\);/);
     expect(matte).not.toMatch(/t\.source = blurUrl/);
     expect(matte).toMatch(/if \(again\.blur \|\| again\.alpha\) queueTakeMatte\(\{ \.\.\.opts, \.\.\.again \}\);/);

@@ -2759,7 +2759,7 @@ ${QUOTIENT_CSS}
       // A take re-graded in place keeps its url: the speaker elements hold
       // the old pictures in their buffers, so they load again (the server
       // makes a take revalidate; the fresh file comes down).
-      var gradeKey = function(pr) { return ((pr && pr.takes) || []).map(function(t) { return t.graded_at || ''; }).join('|'); };
+      var gradeKey = function(pr) { return ((pr && pr.takes) || []).map(function(t) { return [t.graded_at || '', t.blur || '', t.blur_strength == null ? '' : t.blur_strength, t.alpha || ''].join(','); }).join('|'); };
       var regraded = gradeKey(state.currentProject) !== gradeKey(project);
       state.currentProject = project;
       state.totalDuration = calcTotalDuration();
@@ -3842,7 +3842,25 @@ ${QUOTIENT_CSS}
           '<input type="checkbox" class="prop-soft-on"' + (lookOn ? ' checked' : '') + ' style="flex:0 0 auto;margin-right:8px;">' +
           '<input type="range" class="prop-soft" min="0" max="1" step="0.05" value="' + lookS + '"' + (lookOn ? '' : ' disabled') + ' style="flex:1;min-width:0;" title="light \u2194 strong smoothing">' +
           '<span class="prop-soft-val" style="flex:0 0 34px;text-align:right;font-size:11px;color:var(--content-secondary);">' + Math.round(lookS * 100) + '</span></div>';
+        // THE FILL LIGHT (core/take-studio.ts): the face's shadows lifted --
+        // the dark cheek and the under-eye -- on the same re-grade.
+        var fillV = typeof lookTake.fill === 'number' ? lookTake.fill : 0.5;
+        var fillOn = fillV > 0;
+        html += '<div class="prop-row"><label class="prop-label" title="Lifts the shadows on your face only -- the darker cheek and under the eyes -- like a fill light. Re-graded from the original; every scene cut from the same recording follows.">fill light</label>' +
+          '<input type="checkbox" class="prop-fill-on"' + (fillOn ? ' checked' : '') + ' style="flex:0 0 auto;margin-right:8px;">' +
+          '<input type="range" class="prop-fill" min="0.05" max="1" step="0.05" value="' + (fillOn ? fillV : 0.5) + '"' + (fillOn ? '' : ' disabled') + ' style="flex:1;min-width:0;" title="gentle \u2194 strong fill">' +
+          '<span class="prop-fill-val" style="flex:0 0 34px;text-align:right;font-size:11px;color:var(--content-secondary);">' + (fillOn ? Math.round(fillV * 100) : 'off') + '</span></div>';
+        if ((comp.data && comp.data.background) === 'blur') {
+          var blurV = typeof lookTake.blur_strength === 'number' ? lookTake.blur_strength : 0.6;
+          html += '<div class="prop-row"><label class="prop-label" title="How far out of focus the room goes. A new amount re-makes the blurred copy in the background (a few minutes); the current one plays until it lands.">blur amount</label>' +
+            '<input type="range" class="prop-blur" min="0" max="1" step="0.05" value="' + blurV + '" style="flex:1;min-width:0;" title="light \u2194 deep blur">' +
+            '<span class="prop-blur-val" style="flex:0 0 34px;text-align:right;font-size:11px;color:var(--content-secondary);">' + Math.round(blurV * 100) + '</span></div>';
+        }
       }
+      // WHAT THE TAKE IS DOING (core/take-jobs.ts): the re-grade and the
+      // blur run for minutes in the background; this line says so, counts,
+      // and says when one failed (Marc: "I wonder if it actually worked").
+      html += '<div class="prop-take-status" style="font-size:12px;line-height:1.4;color:var(--content-secondary);margin:6px 0 2px;min-height:0;"></div>';
     }
     html += '</div>';
     els.propEditor.innerHTML = html;
@@ -3892,9 +3910,47 @@ ${QUOTIENT_CSS}
           .catch(function(e) { studioStatus('Soft look: ' + (e.message || String(e)), 'err'); });
       };
       softDial.addEventListener('input', function() { if (softVal) softVal.textContent = Math.round(parseFloat(softDial.value) * 100); });
-      softDial.addEventListener('change', sendLook);
-      softOn.addEventListener('change', sendLook);
+      softDial.addEventListener('change', function() { sendLook(); watchTakeStatus(); });
+      softOn.addEventListener('change', function() { sendLook(); watchTakeStatus(); });
     }
+    var fillOnEl = els.propEditor.querySelector('.prop-fill-on');
+    var fillDial = els.propEditor.querySelector('.prop-fill');
+    if (fillOnEl && fillDial) {
+      var fillValEl = els.propEditor.querySelector('.prop-fill-val');
+      var sendFill = function() {
+        var siF = state.currentSceneIndex, onF = fillOnEl.checked, fv = onF ? parseFloat(fillDial.value) : 0;
+        fillDial.disabled = !onF;
+        if (fillValEl) fillValEl.textContent = onF ? Math.round(fv * 100) : 'off';
+        var tk = sceneTakeFor(siF) || {};
+        var softNow = tk.look === 'soft';
+        api('POST', '/take-look/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), softNow ? { scene_index: siF, look: 'soft', strength: typeof tk.soft_strength === 'number' ? tk.soft_strength : 0.5, fill: fv } : { scene_index: siF, look: 'natural', fill: fv })
+          .then(function(r) {
+            var sc = (r.scenes || []).length > 1 ? 'Scenes ' + r.scenes.join(', ') : 'Scene ' + (siF + 1);
+            studioStatus(sc + ': ' + (onF ? 'fill light at ' + Math.round(fv * 100) : 'fill light off') + ' \u2014 about a minute; the preview refreshes when it lands.', 'ok');
+            watchTakeStatus();
+          })
+          .catch(function(e) { studioStatus('Fill light: ' + (e.message || String(e)), 'err'); });
+      };
+      fillDial.addEventListener('input', function() { if (fillValEl) fillValEl.textContent = Math.round(parseFloat(fillDial.value) * 100); });
+      fillDial.addEventListener('change', sendFill);
+      fillOnEl.addEventListener('change', sendFill);
+    }
+    var blurDial = els.propEditor.querySelector('.prop-blur');
+    if (blurDial) {
+      var blurValEl = els.propEditor.querySelector('.prop-blur-val');
+      blurDial.addEventListener('input', function() { if (blurValEl) blurValEl.textContent = Math.round(parseFloat(blurDial.value) * 100); });
+      blurDial.addEventListener('change', function() {
+        var siU = state.currentSceneIndex, bv = parseFloat(blurDial.value);
+        api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { scene_index: siU, background: 'blur', strength: bv })
+          .then(function(r) {
+            if (r.project) state.currentProject = r.project;
+            studioStatus('Scene ' + (siU + 1) + ': blur at ' + Math.round(bv * 100) + (r.matte === 'running' ? ' \u2014 re-making the blurred copy, a few minutes; the current one plays until it lands.' : '.'), 'ok');
+            watchTakeStatus();
+          })
+          .catch(function(e) { studioStatus('Blur amount: ' + (e.message || String(e)), 'err'); });
+      });
+    }
+    if (isSpk) takeStatusTick();
 
     // Select dropdowns (enum)
     var placeSel = els.propEditor.querySelector('.prop-place');
@@ -3932,6 +3988,8 @@ ${QUOTIENT_CSS}
               var wordB = modeB === 'room' ? 'the room' : modeB === 'blur' ? 'a blurred room' : 'whatever the scene puts behind you';
               studioStatus(r.matte === 'running' ? 'Scene ' + (siB + 1) + ': ' + (modeB === 'blur' ? 'blurring' : 'cutting you out') + ' \u2014 a few minutes; the scene switches when it lands.' : (r.has_take ? 'Scene ' + (siB + 1) + ' plays you over ' + wordB + '.' : 'Scene ' + (siB + 1) + ' will use ' + wordB + ' when a take lands.'), 'ok');
               startCompositePreview(state.currentProject, { time: state.masterTime, sceneIndex: siB });
+              renderProps();
+              watchTakeStatus();
             })
             .catch(function(e) { sel.disabled = false; studioStatus('Background: ' + (e.message || String(e)), 'err'); });
           return;
@@ -5803,6 +5861,59 @@ ${QUOTIENT_CSS}
     }
     if (source.startsWith('/assets/')) return source;
     return source;
+  }
+  // ── the take's background jobs (GET /api/take-status) ─────────────────
+  // Polled every 2.5 s while a job runs on this film (and for a moment
+  // after an action, until the server has picked it up); quiet otherwise.
+  var takeStatus = { timer: null, idle: 0, seen: {} };
+  function watchTakeStatus() {
+    takeStatus.idle = 0;
+    if (!takeStatus.timer) takeStatus.timer = setInterval(takeStatusTick, 2500);
+    takeStatusTick();
+  }
+  function fmtAgo(iso) { var s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
+  function takeStatusTick() {
+    var p = state.currentProject;
+    if (!p || !state.tenantId) return;
+    api('/take-status/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id)).then(function(r) {
+      var jobs = (r && r.jobs) || [], errors = (r && r.errors) || [];
+      if (jobs.length) takeStatus.idle = 0; else takeStatus.idle++;
+      if (takeStatus.timer && takeStatus.idle >= 3) { clearInterval(takeStatus.timer); takeStatus.timer = null; }
+      renderTakeStatus(jobs, errors);
+    }).catch(function() {});
+  }
+  function renderTakeStatus(jobs, errors) {
+    var box = els.propEditor && els.propEditor.querySelector('.prop-take-status');
+    var si = state.currentSceneIndex;
+    var mine = function(x) { return (x.scenes || []).indexOf(si) >= 0; };
+    var myJobs = jobs.filter(mine), myErr = errors.filter(mine)[0];
+    var lines = [];
+    myJobs.forEach(function(j) {
+      takeStatus.seen[j.raw + j.kind] = true;
+      var what = j.kind === 'grade' ? 'Applying the look' + (j.what && j.what.length ? ' (' + j.what.join(' \u00b7 ') + ')' : '')
+        : ((j.what || []).indexOf('alpha') >= 0 && (j.what || []).indexOf('blur') < 0 ? 'Cutting you out' : 'Blurring the background');
+      lines.push('<span class="tk-spin" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:6px;vertical-align:1px;"></span>' + escHtml(what) + '\u2026 ' + (typeof j.pct === 'number' ? j.pct + '%' : '') + ' <span style="opacity:.7">' + fmtAgo(j.started_at) + '</span>');
+    });
+    if (!myJobs.length && myErr) {
+      lines.push('<span style="color:#dc2626">' + (myErr.kind === 'matte' ? 'The background copy failed' : 'The re-grade failed') + ': ' + escHtml(String(myErr.message || '').slice(0, 140)) + '</span> <a href="#" class="tk-retry" style="color:inherit;text-decoration:underline;">Retry</a>');
+    }
+    if (!myJobs.length && !myErr) {
+      var tk = sceneTakeFor(si);
+      var was = tk && (takeStatus.seen[tk.source + 'grade'] || takeStatus.seen[tk.source + 'matte']);
+      if (was) lines.push('<span style="color:#16a34a">\u2713 Done \u2014 the preview has the new version.</span>');
+    }
+    if (!box) return;
+    box.innerHTML = lines.join('<br>');
+    var retry = box.querySelector('.tk-retry');
+    if (retry && myErr) retry.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      var p = state.currentProject, tk = sceneTakeFor(si) || {};
+      var comp0 = ((p.scenes[si] || {}).components || []).filter(function(c) { return c && c.type === 'video' && c.data && (c.data.src === 'speaker' || c.data.src === 'speaker-alpha'); })[0];
+      var req = myErr.kind === 'matte'
+        ? api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_index: si, background: (comp0 && comp0.data.background) || 'blur' })
+        : api('POST', '/take-look/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), tk.look === 'soft' ? { scene_index: si, look: 'soft', strength: typeof tk.soft_strength === 'number' ? tk.soft_strength : 0.5 } : { scene_index: si, look: 'natural' });
+      req.then(function() { studioStatus('Retrying\u2026', 'ok'); watchTakeStatus(); }).catch(function(e) { studioStatus('Retry: ' + (e.message || String(e)), 'err'); });
+    });
   }
   function getSpeakerClipUrl() {
     var project = state.currentProject;
