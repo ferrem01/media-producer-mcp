@@ -43,6 +43,36 @@ into a pill. `type-relay` (titles) does the same for any card of 1-3 lines.
   lavender ghost box behind the accent word, and a crossfade is on relay's
   banned list. It wipes off the word instead.
 - **Test:** `test/relay-type.test.ts`.
+## 2026-09-27 — screen-flash: a carousel that flashes one screen at a time
+
+A product launch asked for "a moving carousel that flashes one screen, goes
+back into the carousel, and flashes the next thing". `screen-flash` (media)
+is that piece, for relay films.
+
+- **What it does:** 4-10 screenshots stand in a carousel that never stops
+  moving: a ring seen slightly from above (a wheel in a tall frame) or a
+  receding rail. On each cue the front screen lifts out and fills the frame
+  (`flash_fit:"full"` is exactly the component box; a fraction keeps a
+  margin), holds, and drops back into its slot while the carousel keeps
+  turning.
+- **The screen due next is exactly in the front slot as it lifts.** The
+  carousel's position is a monotone spline through those moments, so it only
+  ever turns forward, and it speeds up when the schedule does. An explicit
+  `index` makes it turn to that screen.
+- **No screen slices through another.** Each card is its own flat
+  perspective projection with one shared vanishing point, and the depth
+  order is a z-index sort. In a shared 3D scene (`preserve-3d`), the lifting
+  screen would cut through its neighbours on its way to the frame. Measured
+  at 30 fps: no frame-to-frame spike anywhere in a five-flash cycle.
+- **The schedule is published:** `at` is the arrival (the hit on the beat).
+  The root carries `data-flash-times`, `data-return-times` and
+  `data-settle-time`. The helper's formula is in the schema.
+- **Joins:** enter from a point (`from`), collapse into a point (`to`), or
+  `end:"full"`, where the last screen stays full-frame for the next scene to
+  open on.
+- **Test:** `test/relay-screen-flash.test.ts`. It checks that the flashed
+  screen covers the box within 2 px, that all N are back after each return,
+  that a seek out of order renders the same frame, the rail, and 9:16.
 
 ## 2026-09-27 — The feed a relay scene opens on: rows that were already there
 
