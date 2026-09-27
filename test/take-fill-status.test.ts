@@ -139,12 +139,20 @@ describe("Studio: the dials and the status line", () => {
     expect(html).toContain("{ scene_index: siU, background: 'blur', strength: bv }");
     expect(html).toContain("fill: fv }");
   });
-  it("polls /take-status while work runs, counts, says Done, and offers Retry on a failure", () => {
+  it("polls /take-status while work runs and shows it in the job pill: counts, says Done, offers Retry on a failure", () => {
     expect(html).toContain("api('/take-status/' + encodeURIComponent(state.tenantId)");
     expect(html).toContain("'Blurring the background'");
     expect(html).toContain("'Applying the look'");
     expect(html).toContain("Done \u2014 the preview has the new version.");
-    expect(html).toContain('class="tk-retry"');
+    expect(html).toContain('<a class="jp-retry">Retry</a><a class="jp-close">Dismiss</a>');
+    // Marc: the progress belongs in the pill at the bottom, and it stays
+    // until the work is done -- not hidden in the inspector.
+    expect(html).toContain('<div id="job-pill"></div>');
+    expect(html).toContain('<span class="jp-note">edits to this take wait their turn</span>');
+    expect(html).toContain("body.has-job-pill #studio-toast { bottom: 62px; }");
+    expect(html).not.toContain('class="prop-take-status"');
+    // A film opened while work runs shows it from the start.
+    expect(html).toMatch(/jobPillHide\(\); takeStatus\.wasBusy = false;\s*setTimeout\(watchTakeStatus, 0\);/);
     // A re-made blur copy (same url) reloads the preview like a re-grade.
     expect(html).toContain("t.blur_strength == null ? '' : t.blur_strength");
   });

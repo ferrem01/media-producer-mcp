@@ -74,6 +74,21 @@ to how much the blur is?"
     first time, while the model loads). Studio lays it over the speaker
     video until the new copy lands or playback starts.
   - The light end moved from 3 px to 5, because 3 read as no blur at all.
+- **The progress moved to the pill at the bottom.** Marc: "that indicator is
+  sitting inside the inspector ... it's pretty hidden. We should have it
+  showing up in that little notification at the bottom and have it stay
+  there until it's done, to remind the user that there's a process
+  happening in the background."
+  - `#job-pill` sits where the toast lives. It lists every job on the
+    film's takes: what it is, the scenes it covers, the %, and the time
+    elapsed. A bar along its bottom edge fills with progress. A note says
+    "edits to this take wait their turn".
+  - It stays until the work ends, then turns green with "Done" for a
+    moment. A failure stays red with Retry and Dismiss.
+  - Toasts stack above it.
+  - A film opened while work is already running shows the pill from the
+    start.
+  - The inspector's status line is gone.
 
 ---
 
