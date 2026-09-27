@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — click-stream: the clicks that fill the feed
+
+The Analytics film needs a person's clicks to arrive in their activity feed.
+`click-stream` (media) is the piece that makes them.
+
+- **What it does:** web content rushes past inside a `region`. It stops on
+  each piece, the cursor clicks that piece's `target`, and each click throws
+  a purple event chip that lands exactly at `chip_to`.
+- **The schedule is a formula:** the holds shrink geometrically from
+  `first_hold` to `last_hold`, and so do the travels. The component publishes
+  its times on the root, because the film times the feed rows to the chip
+  landings. `times` overrides the formula.
+- **The end:** `end_mode:"zoom"` covers the region with the last stop and
+  holds it there, with the cursor on the target. `data-last-target` is that
+  target's box, so the flood can start from it. The formula for computing it
+  from the data alone is in the schema.
+- **Test:** `test/relay-click-stream.test.ts`.
+
 ## 2026-09-27 — A picture a relay join can land on
 
 Building the Quotient Analytics relay film, the join from the wall's one email

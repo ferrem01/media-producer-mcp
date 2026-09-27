@@ -194,6 +194,7 @@ Every piece meets the next at shared coordinates:
 | `status-morph` | The same one-shape state machine, standalone. | Its done circle defaults to the done geometry. |
 | `color-flood` `mode:"flood"` / `"contract"` | A shape floods the frame to black; black contracts into the next first shape. | The scene joiner. |
 | `framed-print` | A print on the wall footage (or plaster): mat and molding, a slow push to the photo, a flood. | Starts as the black print rect a contract lands on; ends on a flood. |
+| `click-stream` | Web content rushes past in a region; it stops on 5-7 pieces, each shorter than the last; the cursor clicks one target on each, and each click throws a purple event chip to `chip_to` (a feed row takes over there). | Publishes its click and landing times (`data-click-times`, `data-land-times`) so the feed rows land on them. Ends holding the last stop, or zoomed to cover the region with the cursor on the target; `data-last-target` is where a flood grows from. |
 
 Times inside these pieces default to the reference's 120 BPM offsets. On any other tempo, write every `*_at` explicitly (the rebuild scaled all of them by 120/123), and end each scene's last move at least one frame before its end, or the join lands mid-move (measured: a zoom still finishing on the last frame left a 2-level mean difference at the join; after the fix, 0.05).
 
