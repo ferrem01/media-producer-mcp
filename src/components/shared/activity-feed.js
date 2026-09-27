@@ -25,6 +25,9 @@
  *   time    -- the right-hand time label (default 'Just now').
  *   source  -- a small pill after the title: "HubSpot", "Product", "Website".
  *   highlight -- false to skip the accent wash the row lands with.
+ *   at < 0  -- the row is ALREADY in the feed at frame 0 (no landing): the
+ *              events that happened before the shot, e.g. a relay scene that
+ *              opens on the page after the previous scene landed them live.
  *
  * Uses `var` throughout -- inlined into assembled HTML, no bundler.
  */
@@ -273,6 +276,7 @@ function capActivityFeed(tl, root, events, opts) {
     // Land it: the row opens from nothing (the rows under it slide down), then
     // an accent wash fades off it. Heights are measured now, at build, so the
     // timeline seeks cleanly to any frame.
+    if (at < 0) return;
     row.style.overflow = 'hidden';
     var h = row.offsetHeight;
     gsap.set(row, { height: 0, autoAlpha: 0 });

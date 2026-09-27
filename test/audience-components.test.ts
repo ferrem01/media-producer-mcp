@@ -148,6 +148,35 @@ describe("audience-person-detail", () => {
     // ...and the page reaches the bottom: no empty band under it.
     expect(r.bodyBottom).toBeGreaterThanOrEqual(r.compBottom - 2);
   }, 60000);
+
+  it("a negative at is already in the feed at frame 0; the scene's own event still lands", async () => {
+    // A relay scene opens on the page after the previous scene landed these
+    // live: they are standing on frame 0, with no landing and no timeline shift.
+    const html = await assemble("audience-person-detail", { today: "2026-09-23",
+      activity: [
+        { at: -2, type: "page_view", detail: "/pricing", source: "Website" },
+        { at: -1, type: "form_submitted", verb: "downloaded a customer story", detail: "Alder Coffee" },
+        { at: 0.5, type: "email_clicked", detail: "Clicked: See the report" },
+      ] });
+    const rows = (t: number) => withPage(html, 1920, 1080, async (page) => {
+      await page.evaluate((tt) => { (window as any).__MP_TIMELINE.time(tt); }, t);
+      return page.evaluate(() => {
+        const g0 = document.querySelectorAll(".cap-body h3")[0];
+        return { head: g0.textContent, dur: (window as any).__MP_TIMELINE.duration(),
+          rows: [...g0.nextElementSibling!.children].map((r) => ({ text: r.textContent || "", h: (r as HTMLElement).getBoundingClientRect().height, o: getComputedStyle(r).opacity })) };
+      });
+    });
+    const at0 = await rows(0);
+    expect(at0.head).toBe("Wednesday, September 23, 2026");
+    expect(at0.rows[0].h).toBe(0);                         // the scene's own event: not landed yet
+    expect(at0.rows[1].text).toContain("downloaded a customer story");
+    expect(at0.rows[2].text).toContain("viewed a page");
+    for (const r of at0.rows.slice(1)) { expect(r.h).toBeGreaterThan(20); expect(r.o).toBe("1"); }
+    expect(at0.dur).toBeLessThanOrEqual(6.01);             // no negative-time shift of the clock
+    const at2 = await rows(2);
+    expect(at2.rows[0].text).toContain("clicked a link in an email");
+    expect(at2.rows[0].h).toBeGreaterThan(20);
+  }, 60000);
 });
 
 describe("audience-company-details", () => {
