@@ -8,6 +8,14 @@ since Morph v1 (2026-09-26) any other pair hands off with
 Reference film: the Cosmos promo (x.com/kaolti/status/2103481296018092204),
 rebuilt as `proj_9c829aa3` (13 scenes, 39.5 s, one 18 s oner).
 
+**v2 (2026-09-27): the continuous take.** Marc, on the "develop." launch
+film (x.com/twoclipping/status/2103835273813496100): "a better example of
+the new grammar we just created". It is relay with the punctuation taken
+out: 29 s, square, one continuous take with no cut the eye can find.
+Rebuilt as `proj_790dc4fa`. It is now the DEFAULT dialect; the punctuated
+oners (Cosmos) stay for a film whose argument is a set of short claims.
+See "v2: the continuous take" below.
+
 ## What it is
 
 A film grammar answers one question: what carries the argument? In relay,
@@ -108,3 +116,60 @@ there and a punctuation cut follows.
 - A rack-focus transition that joins two oners.
 - Handoffs across a scene boundary. v1 keeps every handoff inside one scene,
   where both components share a page.
+
+## v2: the continuous take
+
+The reference is 29 s at 120 BPM: 54 beats, and something happens on every
+beat. Nothing fades, blurs or cuts. Objects change shape instead.
+
+The beat map, as rebuilt:
+
+| Film s | What happens | Made from |
+|---|---|---|
+| 0-6 | The wordmark squeezes into its own period. The dot grows into a black pill, and a label rises inside it. A click closes six iris blades over the label, and they open onto a photo. | the wordmark |
+| 6-11.25 | The circle becomes a square and shrinks. The grid unfolds from behind it like a paper map (centre, plus, corners) and reflows into a bento. A click zooms into one tile, landing on the drop. | the iris photo |
+| 11.25-16 | A glass word pops in letter by letter and melts into a droplet that stretches into a glass toolbar. Dragging a slider relights the photo from day to golden hour. The knob lifts into a glass orb, the next photo opens inside it, and the orb expands into a lock screen. | the zoomed tile (full-frame photo) |
+| 16-21.75 | The lock screen pulls back into a phone. The island flies over and grows into a Mac window. The wallpaper is dragged onto a Safari tab and becomes the hero of a landing page, then morphs into a framed print on a product card. The nav button flies down into "Order print". One black shape morphs: Ordered ✓ → Printing % → On its way → Delivered ✓. | the lock screen |
+| 21.75-25.5 | The delivered circle floods the frame, holds black for a beat, and contracts into the framed print hanging on real wall footage (the breakdown). | the delivered circle |
+| 25.5-29 | The iris opens onto the print and closes again. The frame floods and contracts into the pill → the dot → the letters spring back out, on the beat return. The last frame is the first. | the print |
+
+### The rules
+
+- **One take, 3-7 scenes, zero cuts.** A scene boundary is an engineering
+  seam (component count, a new world), never a cut the eye sees. Every
+  `transition_in` is `none`.
+- **Scene joins land on identical frames.** A scene ends on a frame the next
+  scene starts on, pixel for pixel. Two joins do it:
+  - **A full-frame photo.** One scene zooms into a tile until the photo
+    fills the frame; the next scene starts on that photo, full frame.
+  - **The flood / contract.** One scene ends on
+    `color-flood {mode: "flood"}`: a shape grows past the corners (about
+    0.3 s, overscaled, or half the screen changes in one frame) to full
+    black. The next scene starts on
+    `color-flood {mode: "contract"}`: full black shrinking into its first
+    shape.
+- **The cursor drives every change.** Each change is a real click, drag or
+  long-press. Components with clicks take `cursor`, `cursor_from` and
+  `cursor_to`, so the next component picks the cursor up where the last one
+  left it.
+- **A beat on every beat.** Every time sits on the music's grid (0.5 s at
+  120 BPM). No hold is longer than 1 s. The song starts on a downbeat
+  (`trim_start` on the music track), the zoom lands on the drop, the quiet
+  scene sits in the breakdown, and the return lands on the beat.
+- **The film loops.** The close runs the open backwards, so the last frame
+  is the first.
+- **Banned:** crossfades, blur-ins, brightness "developing", 3D flips,
+  particles, glows, holds over 1 s, anything that looks like a template.
+
+### The v2 kit (the handoff geometry, fractions of a square frame)
+
+Every piece meets the next at shared coordinates:
+
+- pill: centre (0.5, 0.5), width 0.30, height 0.085;
+- iris circle: diameter 0.30;
+- hero tile: side 0.46;
+- phone: height 0.52, width 0.52 × 0.485;
+- done circle: centre (0.5, 0.62), diameter 0.12;
+- framed print: 0.30 × 0.40.
+
+<!-- KIT-TABLE -->

@@ -432,7 +432,7 @@ BEFORE GENERATING
   * editorial -- typography-first: huge serif statements alternating with full-bleed proof.
   * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene; real figures only.
   * canvas-tour -- ONE unbroken shot across a single surface; beats are PLACES, type PERFORMED where it lives.
-  * relay -- every beat CARRIED BY AN OBJECT: one becomes the next, or one stays as the through-line.
+  * relay -- every beat CARRIED BY AN OBJECT: one becomes the next, or one stays as the through-line; one take.
   * screencast -- the screen carries it: a real recording, a narrator driving the clock (bubble or voice-only). Set by screencast_source.
   * speaker -- a person carries it: full-bleed on camera, graphics over them, voiceover_text holds the spoken lines. Choosable BEFORE a recording exists.
   * creator-cut -- a person explains, the screen PROVES it: each claim names its proof, cut in full-frame and back.
@@ -2859,6 +2859,7 @@ export function createMcpServer(): McpServer {
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice (default: nova)"),
         volume: z.number().min(0).max(1).optional(),
         start_time: z.number().optional(),
+        trim_start: z.number().min(0).optional().describe("Skip this many seconds of the source before it plays -- land a song's drop on the film's beat (music: the drop at source 17.0 s on film 11.25 s = trim_start 5.75)."),
         loop: z.boolean().optional(),
         fade_in: z.number().optional(),
         fade_out: z.number().optional(),
@@ -2944,8 +2945,9 @@ export function createMcpServer(): McpServer {
           }
         }
 
-        if (!source && params.track.source && params.track.source.startsWith("jamendo:")) {
-          const trackId = params.track.source.replace("jamendo:", "");
+        // (source is the jamendo: id itself here -- the old `!source` test made this dead code)
+        if (source && source.startsWith("jamendo:")) {
+          const trackId = source.replace("jamendo:", "");
           const assetsDir = projectAssetsDir(params.tenant_id, params.project_id);
           const audioDir = path.join(assetsDir, "audio");
           await fs.mkdir(audioDir, { recursive: true });
@@ -2968,6 +2970,7 @@ export function createMcpServer(): McpServer {
           source,
           volume: params.track.volume ?? 1.0,
           start_time: params.track.start_time,
+          ...(params.track.trim_start !== undefined ? { trim_start: params.track.trim_start } : {}),
           loop: params.track.loop,
           fade_in: params.track.fade_in,
           fade_out: params.track.fade_out,
@@ -2994,6 +2997,8 @@ export function createMcpServer(): McpServer {
         if (params.track.volume !== undefined) existing.volume = params.track.volume;
         if (params.track.source !== undefined) existing.source = params.track.source;
         if (params.track.loop !== undefined) existing.loop = params.track.loop;
+        if (params.track.trim_start !== undefined) existing.trim_start = params.track.trim_start;
+        if (params.track.start_time !== undefined) existing.start_time = params.track.start_time;
         if (params.track.fade_in !== undefined) existing.fade_in = params.track.fade_in;
         if (params.track.fade_out !== undefined) existing.fade_out = params.track.fade_out;
       } else if (params.action === "remove") {
@@ -3075,7 +3080,7 @@ export function createMcpServer(): McpServer {
         music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
       })).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc. Accepts an object or a JSON string."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. relay: every beat carried by an OBJECT -- a handoff (the thing ending one beat becomes the start of the next: point -> logo -> dot -> search bar) or a through-line (one object stays while the beats change around it); 1-3 long oners with hard-cut type punctuation between them. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its proof (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. relay: every beat carried by an OBJECT -- a handoff (the thing ending one beat becomes the start of the next: point -> logo -> dot -> search bar) or a through-line (one object stays while the beats change around it); by default ONE continuous take -- scenes join on identical frames (a black flood that contracts into the next shape, or the same full-frame photo), a cursor drives every change, a beat on every beat, the last frame = the first; or 1-3 long oners with hard-cut type punctuation between them. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its proof (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry, and nothing else. 16x9 (default): embeds, landing pages, YouTube. 9x16: Reels, TikTok, Shorts, Stories (top 12% / bottom 18% are platform UI). 4x5: Instagram or LinkedIn feed post (shown whole). 1x1: square. Omit to let the director infer it from where the prompt says the film ships; pass to pin. Explicit canvas_width/canvas_height override it. A frame never changes the grammar."),
       recipe: z.string().optional().describe("The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (presenter-n-things, presenter-split-tour, presenter-location-hop, founder-story-broll, speaker-kinetic-claims, speaker-one-take-cards, story-ad-idea-beats, ask-work-result, founder-bookends-chapters, launch-what-if-features, founder-selfie-punch-cards). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
