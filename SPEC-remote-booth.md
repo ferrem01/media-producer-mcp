@@ -1,6 +1,6 @@
 # SPEC: the remote booth — record from across the room
 
-Status: SHIPPED v1 (2026-09-27): phases 1 and 2, the film picker, the phone booth's Films sheet, and Studio's "Across the room". What was built, and where it differs from the text below, is in **As built (v1)** at the end. Still open: Marc's real wide take by the French doors.
+Status: SHIPPED v1 (2026-09-27): phases 1 and 2, the film picker, the phone Studio's Films link (it replaced the booth's Films sheet on 2026-09-27), and Studio's "Across the room". What was built, and where it differs from the text below, is in **As built (v1)** at the end. Still open: Marc's real wide take by the French doors.
 
 APPROVED by Marc 2026-09-26 ("lets build the remote booth"), with two additions from him: pair ONCE per session (not per film), and move between films from the phone without re-scanning.
 
@@ -65,12 +65,15 @@ scan the QR for each."
   session ends. The laptop's control screen has a **film and scene picker**
   (films that still need a take are listed first). Picking the next film
   retargets the session, and the phone never moves.
-- **Switch from the phone too.** The regular booth (arm's-length, front
-  camera) gets a **Films** button on its ready screen and its review screen.
-  It opens a list of the tenant's person-carried films (speaker and
-  creator-cut) with their scenes and what each still needs. Tapping a scene
-  opens that recording with no QR code and no Studio round trip. The booth's
-  tenant token already scopes this list.
+- **Switch from the phone too.** The phone Studio (`/studio` on a phone)
+  opens on a **← Films** link. It goes to the film library (`/library`),
+  every film as a card, like the desktop. Tapping a card opens that film's
+  phone Studio, and Record opens the booth for a scene. The token rides
+  along, so there is no QR code and no sign-in.
+  (v1 first shipped a **Films** sheet inside the booth that listed only the
+  person-carried films still owed a take. Marc replaced it: "I don't need a
+  film button that only shows me unrecorded film." The booth now stays on
+  one scene.)
 
 ## How it works
 
@@ -257,8 +260,9 @@ the scene split. This covers the true-4K case, whatever the browser allows.
   the control screen.
 - **After Keep**: the control screen offers **Next: Scene N**, the next
   scene of the same film that is still owed a take.
-- **Phone booth Films sheet**: it also appears on the done screen, and it
-  is hidden inside Studio's dialog (`embed=1`), which is one scene's.
+- **Phone Films**: the phone Studio's **← Films** link goes to `/library`.
+  The booth's Films sheet is gone. `GET /api/booth-films` now feeds only
+  the control screen's picker.
 - **Resolution report**: the camera's `hello` is the report. Under test,
   Chromium's fake camera delivered **3840×2160 at 20 fps** to the ideal
   3840×2160 / 30 fps request and recorded at 24 Mbps. A real phone may

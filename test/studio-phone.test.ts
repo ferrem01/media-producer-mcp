@@ -77,6 +77,17 @@ describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
     expect(html).toMatch(/Missing \?project= in the link\./);
   });
 
+  it("opens on a Films link at the top: every film as a card (/library), a tap opens it here", async () => {
+    expect(html).toMatch(/<div class="top">\s*<a class="link films" id="filmsLink" href="\/library">← Films<\/a>/);
+    expect(js).toContain("$('filmsLink').href = '/library?tenant=' + encodeURIComponent(tenant) + (token ? '&token=' + encodeURIComponent(token) : '');");
+    // Set before the missing-project return: a bad link still has a way out.
+    expect(js.indexOf("$('filmsLink').href")).toBeLessThan(js.indexOf("if (!tenant || !project)"));
+    // The library's cards open /studio, which a phone serves as this page.
+    const lib = await read("../src/preview-app/library-app.ts");
+    expect(lib).toMatch(/withToken\('\/studio\?tenant=' \+ encodeURIComponent\(state\.tenant\) \+ '&project=' \+ encodeURIComponent\(id\)\)/);
+    expect(lib).toMatch(/\.search-wrap \{ max-width: none; order: 3; width: 100%; flex: 1 1 100%; \}/);
+  });
+
   it("is sized for a thumb and links back to the desktop Studio", () => {
     expect(html).toMatch(/viewport-fit=cover/);
     expect(html).toMatch(/env\(safe-area-inset-bottom\)/);

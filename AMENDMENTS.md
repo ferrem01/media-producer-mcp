@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — Films on the phone: a link to the library, not a sheet in the booth
+
+Marc, on the booth's Films sheet: "I don't need a film button that only
+shows me unrecorded film." He wanted the phone Studio to open on a Films
+link that shows every film as a card, like the desktop, where a tap opens
+that film's phone Studio.
+
+- `studio-phone.ts`: **← Films** sits at the top and goes to
+  `/library?tenant=&token=`. The library's cards already open `/studio`,
+  and a phone already gets the phone view there, so no new page was
+  needed. The link is set before the missing-project check, so a bad link
+  still has a way out.
+- `library-app.ts`: at phone width the search field takes its own row. It
+  had been squeezed to a sliver beside Select.
+- `take-page.ts`: the Films sheet is gone, along with its buttons on the
+  ready, review and done screens. The booth stays on one scene again.
+  `/api/booth-films` stays for the remote booth's control-screen picker.
+- Checked in a phone-sized Chromium: Studio → Films → a card → that film's
+  Studio.
+
+---
+
 ## 2026-09-27 — The remote booth: record from across the room, pair once, move between films
 
 A wide 16:9 film shot 6-10 ft back breaks the booth's three assumptions.
