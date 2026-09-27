@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — The feed a relay scene opens on: rows that were already there
+
+The Analytics film lands six clicks in Sarah Chen's feed live, then the
+purple flood carries the newest row into the NEXT scene: her full person
+page. That page has to open with the five earlier rows already standing and
+land only the sixth. An event at `at: 0` animates in (height 0 to full over
+0.45 s), and a negative `at` put the tween at a negative position, which
+shifts the whole GSAP timeline: the scene's clock ran 1 s long.
+
+- **Rule:** an activity event with `at < 0` is already in the feed at frame 0
+  (no landing, no wash, its day header standing). Events at `at >= 0` land as
+  before. It is set in `shared/activity-feed.js`, so the person and company
+  pages both have it.
+- **Worth knowing:** a component that enters with a slide (`slide-*`, scene
+  at least 2.5 s long) is CARRIED: its own clock runs `CARRY_LEAD` (1.0 s)
+  ahead, so its entrance has already happened when it arrives. A feed that
+  slides in and lands rows on cue needs each `at` set 1.0 s later than the
+  scene time. That behaviour is deliberate and stays; it is written down here
+  because it cost a measurement to find.
+- **Test:** `test/audience-components.test.ts`: rows with a negative `at` are
+  standing at t=0, the scene's own event is still at height 0, the clock is
+  not shifted, and the event lands by t=2.
+
 ## 2026-09-27 — click-stream: the clicks that fill the feed
 
 The Analytics film needs a person's clicks to arrive in their activity feed.

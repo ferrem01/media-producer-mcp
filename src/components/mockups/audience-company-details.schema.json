@@ -60,7 +60,7 @@
         "properties": {
           "at": {
             "type": "number",
-            "label": "At (s)"
+            "label": "At (s); negative = already in the feed at frame 0"
           },
           "type": {
             "type": "string",
