@@ -3,7 +3,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { chromium } from "playwright";
 import { getPreviewHtml } from "../src/preview-app/preview-app.js";
-import { planRows, planMarkdown, reorderBoard, shotKind } from "../src/core/film-plan.js";
+import { planRows, planMarkdown, reorderBoard, removeBoardScenes, insertBoardScene, shotKind } from "../src/core/film-plan.js";
 
 // THE PLAN: the film as one table -- beat, time, shot, line. The board opens
 // one scene with every field; the plan shows every scene with the four things
@@ -79,6 +79,37 @@ describe("the plan (core/film-plan.ts)", () => {
     expect(p.takes.map((t: any) => [t.id, t.scene_index])).toEqual([["tk0", 1], ["tk2", 0]]);
     expect(p.speaker_track.clips.map((c: any) => [c.source, c.scene_index])).toEqual([["a.webm", 1], ["c.webm", 0]]);
     expect(p.storyboard.estimated_duration).toBe(12);
+  });
+
+  // Merging three short beats into one took the two spare scenes off a board
+  // whose take was already cut per scene; the plain splice left every later
+  // clip on its old index, so each scene after the cut played a recording
+  // two scenes further on (proj_34225c8a).
+  it("removes scenes with their takes and clips, and shifts every later scene's with it", () => {
+    const p = board();
+    expect(removeBoardScenes(p, [1, 9])).toBe(1);
+    expect(p.storyboard.scenes.map((s: any) => s.label)).toEqual(["Hook", "Hidden work"]);
+    expect(p.takes.map((t: any) => [t.id, t.scene_index])).toEqual([["tk0", 0], ["tk2", 1]]);
+    expect(p.speaker_track.clips.map((c: any) => [c.source, c.scene_index])).toEqual([["a.webm", 0], ["c.webm", 1]]);
+    expect(p.storyboard.estimated_duration).toBe(8);
+    // A removed scene's own recording leaves with it.
+    expect(removeBoardScenes(p, [0])).toBe(1);
+    expect(p.takes.map((t: any) => [t.id, t.scene_index])).toEqual([["tk2", 0]]);
+    expect(p.speaker_track.clips.map((c: any) => c.source)).toEqual(["c.webm"]);
+    // A continuous track (no scene_index) is not a scene's clip: it stays.
+    const q = board();
+    q.speaker_track.clips.push({ source: "whole.mp4" });
+    removeBoardScenes(q, [0]);
+    expect(q.speaker_track.clips.map((c: any) => c.source)).toEqual(["c.webm", "whole.mp4"]);
+  });
+
+  it("inserts a scene and moves the takes and clips at and after it up one", () => {
+    const p = board();
+    expect(insertBoardScene(p, 1, { label: "New", duration_seconds: 2, assets: [] })).toBe(1);
+    expect(p.storyboard.scenes.map((s: any) => s.label)).toEqual(["Hook", "New", "Start anywhere", "Hidden work"]);
+    expect(p.takes.map((t: any) => [t.id, t.scene_index])).toEqual([["tk0", 0], ["tk2", 3]]);
+    expect(p.speaker_track.clips.map((c: any) => [c.source, c.scene_index])).toEqual([["a.webm", 0], ["c.webm", 3]]);
+    expect(p.storyboard.estimated_duration).toBe(14);
   });
 });
 

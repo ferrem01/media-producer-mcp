@@ -44,7 +44,7 @@ import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
-import { planMarkdown } from "./core/film-plan.js";
+import { planMarkdown, removeBoardScenes, reorderBoard } from "./core/film-plan.js";
 import { normalizeSoundCues, ensureSoundFiles } from "./core/scene-sfx.js";
 import { retimeScene } from "./core/measured-spine.js";
 import { forgetProject } from "./core/library.js";
@@ -1418,24 +1418,14 @@ export function createMcpServer(): McpServer {
           }
 
           // Remove scenes (process before adds/updates, use descending order)
+          // (takes and speaker clips follow their scenes -- core/film-plan.ts)
           if (params.storyboard.remove_scenes?.length) {
-            const toRemove = [...params.storyboard.remove_scenes].sort((a, b) => b - a);
-            for (const idx of toRemove) {
-              if (idx >= 0 && idx < project.storyboard.scenes.length) {
-                project.storyboard.scenes.splice(idx, 1);
-              }
-            }
+            removeBoardScenes(project, params.storyboard.remove_scenes);
           }
 
           // Reorder scenes
           if (params.storyboard.reorder_scenes?.length) {
-            const order = params.storyboard.reorder_scenes;
-            const reordered = order
-              .filter((i: number) => i >= 0 && i < project.storyboard!.scenes.length)
-              .map((i: number) => project.storyboard!.scenes[i]);
-            if (reordered.length === project.storyboard.scenes.length) {
-              project.storyboard.scenes = reordered;
-            }
+            reorderBoard(project, params.storyboard.reorder_scenes);
           }
 
           // Update or append scenes

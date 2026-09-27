@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — Board edits keep each take on its scene
+
+Merging three short beats of the Old Chimp board (proj_34225c8a) into one
+meant taking two scenes off a board whose booth take was already cut per
+scene. `update storyboard.remove_scenes` spliced the scenes and left every
+take and speaker clip on its old index, so each later scene would have
+played the recording made for the scene two further on. Studio's drag
+reorder already moved takes with their scenes (`reorderBoard`); the MCP
+paths did not.
+
+- **`core/film-plan.ts`:** `removeBoardScenes` and `insertBoardScene` join
+  `reorderBoard`, all through one `followScenes` step: takes and speaker
+  clips follow their scene's new index; a removed scene's takes and clips go
+  with it (the files stay in the assets); a continuous clip with no
+  scene_index is left alone; the board re-clocks.
+- **Wired into** `update storyboard.remove_scenes` / `reorder_scenes`
+  (server.ts; reorder now also refuses a non-permutation instead of silently
+  filtering) and the storyboard tool's `delete_index` / `insert_at`
+  (llm/storyboard-surgical.ts).
+
 ## 2026-09-27 — Quotient metrics and saved reports as library components
 
 Marc captured the product's metrics and report screens as tenant components

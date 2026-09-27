@@ -16,6 +16,7 @@ import { callLLM, type LLMConfig } from "./client.js";
 import type { Project } from "../core/types.js";
 import { normalizeSceneShape } from "./storyboard-builder.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
+import { insertBoardScene, removeBoardScenes } from "../core/film-plan.js";
 
 export interface SurgicalSceneOp {
   /** Revise the scene at this index in place... */
@@ -111,8 +112,8 @@ export async function reviseDraftSceneSurgical(
       throw new Error(`delete_index ${op.delete_index} out of range (${scenes.length} scenes)`);
     }
     if (scenes.length === 1) throw new Error("cannot delete the board's last scene");
-    const [removed] = scenes.splice(di, 1);
-    sb.estimated_duration = scenes.reduce((sum: number, s: any) => sum + (Number(s.duration_seconds) || 0), 0);
+    const removed = scenes[di];
+    removeBoardScenes(project, [di]);
     return removed;
   }
 
@@ -151,8 +152,10 @@ export async function reviseDraftSceneSurgical(
   const notes = normalizeSceneShape(scene, catalog && catalog.length ? new Set(catalog.map((c) => c.type)) : undefined);
   if (notes.length) console.log(`  storyboard-surgical: ${notes.join("; ")}`);
 
-  if (isInsert) scenes.splice(idx, 0, scene);
-  else scenes[idx] = scene;
-  sb.estimated_duration = scenes.reduce((sum: number, s: any) => sum + (Number(s.duration_seconds) || 0), 0);
+  if (isInsert) insertBoardScene(project, idx, scene);
+  else {
+    scenes[idx] = scene;
+    sb.estimated_duration = scenes.reduce((sum: number, s: any) => sum + (Number(s.duration_seconds) || 0), 0);
+  }
   return scene;
 }

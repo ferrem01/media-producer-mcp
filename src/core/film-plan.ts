@@ -163,13 +163,71 @@ export function reorderBoard(project: Project, order: number[]): boolean {
   const newIndexOf = new Map<number, number>();
   order.forEach((oldIdx, newIdx) => newIndexOf.set(oldIdx, newIdx));
   project.storyboard!.scenes = order.map((o) => scenes[o]);
-  for (const t of (project as any).takes || []) {
-    if (typeof t?.scene_index === "number" && newIndexOf.has(t.scene_index)) t.scene_index = newIndexOf.get(t.scene_index);
-  }
-  for (const c of (project as any).speaker_track?.clips || []) {
-    if (typeof c?.scene_index === "number" && newIndexOf.has(c.scene_index)) c.scene_index = newIndexOf.get(c.scene_index);
-  }
-  project.storyboard!.estimated_duration = project.storyboard!.scenes
-    .reduce((sum, s) => sum + (Number(s.duration_seconds) || 0), 0);
+  followScenes(project, (i) => newIndexOf.get(i) ?? i);
   return true;
+}
+
+/**
+ * Take scenes off the board by index. The takes and speaker clips recorded
+ * for a removed scene go with it (the files stay in the project's assets);
+ * every later scene's takes and clips shift down with their scene, so the
+ * scene after a removed one never plays the removed scene's recording.
+ * Out-of-range indices are ignored. Returns how many scenes were removed.
+ */
+export function removeBoardScenes(project: Project, indices: number[]): number {
+  const scenes = project.storyboard?.scenes;
+  if (!scenes) return 0;
+  const gone = new Set(indices.filter((i) => Number.isInteger(i) && i >= 0 && i < scenes.length));
+  if (!gone.size) return 0;
+  const newIndexOf = new Map<number, number>();
+  let k = 0;
+  scenes.forEach((_, i) => { if (!gone.has(i)) newIndexOf.set(i, k++); });
+  project.storyboard!.scenes = scenes.filter((_, i) => !gone.has(i));
+  followScenes(project, (i) => newIndexOf.has(i) ? newIndexOf.get(i)! : null);
+  return gone.size;
+}
+
+/**
+ * Put a scene on the board at `at` (clamped to the ends). Takes and speaker
+ * clips of the scenes at and after `at` move up one with their scenes; the
+ * new scene starts with none. Returns the index it landed at.
+ */
+export function insertBoardScene(project: Project, at: number, scene: any): number {
+  const scenes = project.storyboard?.scenes;
+  if (!scenes) return -1;
+  const idx = Math.max(0, Math.min(scenes.length, Math.floor(Number(at)) || 0));
+  scenes.splice(idx, 0, scene);
+  followScenes(project, (i) => (i >= idx ? i + 1 : i));
+  return idx;
+}
+
+/** Everything that points at a board scene BY POSITION -- the takes recorded
+ *  for it and the speaker clips cut for it -- follows the scene to its new
+ *  index; `next` returns null for a scene that left the board, and those
+ *  takes and clips are dropped. Clips with no scene_index (one continuous
+ *  track for the whole film) are left alone. Re-clocks the board. */
+function followScenes(project: Project, next: (oldIndex: number) => number | null): void {
+  const p = project as any;
+  if (Array.isArray(p.takes)) {
+    p.takes = p.takes.filter((t: any) => {
+      if (typeof t?.scene_index !== "number") return true;
+      const n = next(t.scene_index);
+      if (n === null) return false;
+      t.scene_index = n;
+      return true;
+    });
+  }
+  if (Array.isArray(p.speaker_track?.clips)) {
+    p.speaker_track.clips = p.speaker_track.clips.filter((c: any) => {
+      if (typeof c?.scene_index !== "number") return true;
+      const n = next(c.scene_index);
+      if (n === null) return false;
+      c.scene_index = n;
+      return true;
+    });
+  }
+  if (project.storyboard) {
+    project.storyboard.estimated_duration = project.storyboard.scenes
+      .reduce((sum, s) => sum + (Number(s.duration_seconds) || 0), 0);
+  }
 }
