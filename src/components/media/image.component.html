@@ -37,6 +37,18 @@
     // Set the background image
     if (data.src) {
       bgImage.style.backgroundImage = 'url(' + data.src + ')';
+      // The capture waits for <img> elements only; a CSS background raced
+      // it, so a scene that OPENS on this image rendered its first frame
+      // blank (a relay join landing on a full-frame photo broke). A hidden
+      // <img> of the same URL is waited on, and the background paints from
+      // the cache it fills.
+      var pre = document.createElement('img');
+      pre.className = 'bg-preload';
+      pre.alt = '';
+      pre.setAttribute('aria-hidden', 'true');
+      pre.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;';
+      pre.src = data.src;
+      el.querySelector('.image-component').appendChild(pre);
     }
 
     // For logos/small images: blend mode removes white backgrounds
@@ -66,7 +78,16 @@
 
     // Optional ken-burns drift (a timed image pushes in over its window)
     var drift = data.drift !== false;
-    if (timed) {
+    // entrance "none": the picture STANDS from frame 0 -- no fade, no drift
+    // unless asked. A relay join lands on it (the previous scene ends on
+    // this exact full-frame image), so frame 0 must already be the picture.
+    if (data.entrance === 'none') {
+      gsap.set(root, { autoAlpha: 1 });
+      if (drift && data.drift === true) tl.fromTo(bgImage, { scale: 1 }, { scale: 1.06, duration: ctx.duration, ease: 'none' }, 0);
+      if (isFinite(Number(data.exit_at)) && Number(data.exit_at) < ctx.duration) tl.to(root, { autoAlpha: 0, duration: 0.02, ease: 'none' }, Number(data.exit_at));
+      return tl;
+    }
+    if (timed && drift) {
       gsap.set(bgImage, { scale: 1 });
       tl.to(bgImage, { scale: 1.06, duration: Math.max(0.5, exitAt - at), ease: 'none' }, at);
     } else if (drift && ctx.duration > 2) {

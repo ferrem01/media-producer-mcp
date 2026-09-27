@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — A picture a relay join can land on
+
+Building the Quotient Analytics relay film, the join from the wall's one email
+to the click scene (both the same full-frame image) came out 17 levels apart
+on average: the click scene opened blank.
+
+- **The `image` component faded in over 0.6 s** from scene start, and a timed
+  one started invisible and drifted. `entrance: "none"` stands from frame 0,
+  with no drift unless `drift: true`.
+- **Its picture is a CSS background, and the capture waits only for
+  `<img>`s**, so a scene opening on it could render its first frame before
+  the picture painted. The component now also loads the same URL through a
+  hidden `<img>`, which is waited on and fills the cache the background
+  paints from.
+- **`quotient-report` takes `at`**, which shifts its whole entrance. A flood
+  contracts into its first KPI card, so the performance starts under the join.
+- `test/relay-image-join.test.ts`. After the fix every join in the Analytics
+  film compares equal to within a few cursor pixels.
+
 ## 2026-09-27 — Music clips: one song, two clips (and Studio plays the trim)
 
 Marc wants the Quotient Analytics launch film on "the exact music" of the
