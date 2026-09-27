@@ -98,6 +98,16 @@ to how much the blur is?"
     refs now carry `?v=` set to the grade's time, plus the blur amount for
     the blurred copy. So every version is a new url.
   - The asset route matches the path and ignores the query.
+- **The fill's range, widened.** Marc at fill 85: "it doesn't seem to be
+  doing anything". The files showed the fill applied, and the processed
+  take was clearly lifted against the original. But on the dial, 0 to 50
+  to 100 was a small change.
+  - The curve is now 0.2 -> 0.29 and 0.45 -> 0.55 at 50, and 0.38 / 0.65
+    at 100.
+  - The band reaches a little higher (186/74).
+  - The lifted copy is smoothed too (bilateral scaled by strength), because
+    a bag is a shadow and a texture.
+  - Checked on frame 3 s of his original at 0, 50 and 100.
 
 ---
 

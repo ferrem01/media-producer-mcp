@@ -490,8 +490,9 @@ export function studioGradeFilter(s: TakeStudioStats): TakeStudioCorrection {
  * quarter of the frame's size (it is soft anyway) and scaled up, so the
  * per-pixel expression costs a sixteenth.
  *
- * `strength` 0-1; 0.5 is the level of the side-by-side Marc saw (a curve
- * 0.2 -> 0.27, 0.45 -> 0.52). The face is the take's own (measured region,
+ * `strength` 0-1; at 0.5 a curve 0.2 -> 0.29, 0.45 -> 0.55; at 1, 0.38 /
+ * 0.65. The first range (0.27/0.52 at 0.5) was too timid to see on the
+ * dial: Marc at 85, "it doesn't seem to be doing anything". The face is the take's own (measured region,
  * else the detection); no face, no fill -- the lift is never guessed onto
  * a wall.
  */
@@ -506,14 +507,17 @@ export function faceFillGraph(width: number, height: number, region: { cx: numbe
   const cx = f(region.cx * qw), cy = f((region.cy + 0.15 * region.ry) * qh);
   const rx = f(region.rx * 1.15 * qw), ry = f(region.ry * 1.3 * qh);
   const lift = (x: number, d: number) => `${f(x)}/${f(Math.min(1, x + d * s))}`;
-  const curve = `0/0 ${lift(0.2, 0.14)} ${lift(0.45, 0.14)} ${lift(0.75, 0.04)} 1/1`;
+  const curve = `0/0 ${lift(0.2, 0.18)} ${lift(0.45, 0.2)} ${lift(0.75, 0.06)} 1/1`;
   const ell = `pow(max(0,1-(pow((X-${cx})/${rx},2)+pow((Y-${cy})/${ry},2))),0.5)`;
-  const band = `clip((176-lum(X,Y))/70,0,1)*clip((lum(X,Y)-45)/40,0,1)`;
+  const band = `clip((186-lum(X,Y))/74,0,1)*clip((lum(X,Y)-45)/40,0,1)`;
   return [
     `split=2[fillbase][fillsrc]`,
     `[fillsrc]split=2[filllift0][fillm0]`,
     `[fillm0]scale=${qw}:${qh}:flags=area,format=gray,geq=lum='255*${ell}*${band}',scale=${width}:${height}:flags=bicubic,gblur=sigma=${f(Math.max(2, width / 180))}[fillmask]`,
-    `[filllift0]curves=all='${curve}'[filllift]`,
+    // The lifted copy is smoothed too: a bag is a shadow AND a texture;
+    // lifting the shadow alone left the texture reading (Marc, fill at 85:
+    // "it doesn't seem to be doing anything").
+    `[filllift0]curves=all='${curve}',bilateral=sigmaS=${f(3 + 6 * s)}:sigmaR=${f(0.03 + 0.06 * s)}[filllift]`,
     `[filllift][fillmask]alphamerge[fillover]`,
     `[fillbase][fillover]overlay=format=auto`,
   ].join(";");
