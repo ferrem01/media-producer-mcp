@@ -40,6 +40,7 @@ import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-trac
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
 import { queueTakeMatte } from "./core/take-matte.js";
+import { takeJobsFor } from "./core/take-jobs.js";
 import { queueTakeGrade } from "./core/take-grade.js";
 import { DEFAULT_SOFT_STRENGTH } from "./core/take-sanitize.js";
 import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies } from "./core/speaker-layer.js";
@@ -1251,7 +1252,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -3136,13 +3137,14 @@ Rules:
         return;
       }
 
-      // POST /api/take-look/{tenant}/{project} {scene_index, look, strength, correct?}
+      // POST /api/take-look/{tenant}/{project} {scene_index, look, strength, correct?, fill?}
       // Studio's smoothing dial: re-grade the take behind one scene (every
       // scene cut from the same recording follows -- it is one file) from
       // its kept original. Runs in the background; the project saves when
       // the grade lands and Studio's live sync reloads the take. `correct`
       // (boolean, optional) switches the studio correction; absent keeps
-      // the take's setting (core/take-studio.ts).
+      // the take's setting (core/take-studio.ts). `fill` (0-1, optional) sets
+      // the fill light on the face's shadows; absent keeps the take's own.
       const takeLookMatch = urlPath.match(/^\/api\/take-look\/([^/]+)\/([^/]+)$/);
       if (takeLookMatch && method === "POST") {
         const [, tlTenant, tlProject] = takeLookMatch.map(decodeURIComponent);
@@ -3159,19 +3161,24 @@ Rules:
         const tlRaw = takeCopies(tlTake).raw;
         if (!tlRaw.startsWith(`/assets/${tlTenant}/projects/${tlProject}/assets/`)) { jsonResponse(res, 400, { error: "the take is not a file of this project" }); return; }
         const tlCorrect = typeof tlBody.correct === "boolean" ? tlBody.correct : undefined;
+        const tlFillN = tlBody.fill === undefined || tlBody.fill === null ? undefined : Number(tlBody.fill);
+        if (tlFillN !== undefined && !(tlFillN >= 0 && tlFillN <= 1)) { jsonResponse(res, 400, { error: "fill must be 0-1" }); return; }
         queueTakeGrade({
-          tenantId: tlTenant, projectId: tlProject, rawUrl: tlRaw, look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, correct: tlCorrect, dataDir: config.dataDir,
+          tenantId: tlTenant, projectId: tlProject, rawUrl: tlRaw, look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, correct: tlCorrect, fill: tlFillN, dataDir: config.dataDir,
           resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
           afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
         });
         const tlScenes = (tlProj.takes || []).filter((t) => takeCopies(t).raw === tlRaw).map((t) => t.scene_index + 1);
         console.log(`  take look: ${tlProject} ${path.basename(tlRaw)} -> ${tlLook}${tlLook === "soft" ? ` ${tlStrength}` : ""} (scenes ${tlScenes.join(", ")})`);
-        jsonResponse(res, 200, { ok: true, grading: "running", look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, correct: tlCorrect ?? tlTake.correct !== false, scenes: tlScenes });
+        jsonResponse(res, 200, { ok: true, grading: "running", look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, correct: tlCorrect ?? tlTake.correct !== false, fill: tlFillN ?? tlTake.fill, scenes: tlScenes });
         return;
       }
 
       // ── API: Attach a take ──
-      // POST /api/speaker-background/{tenant}/{project} {scene_index, background}
+      // POST /api/speaker-background/{tenant}/{project} {scene_index, background, strength?}
+      // `strength` (0 light - 1 deep, blur only) sets how far out of focus
+      // the room goes; a new amount re-makes the blurred copy (the old one
+      // plays until it lands).
       // THE SPEAKER IS A COMPONENT (core/speaker-layer.ts): room, blur or
       // alpha on one scene's speaker component. The clips re-point at the
       // copy the scene now wants; a copy that does not exist yet is made by
@@ -3194,13 +3201,18 @@ Rules:
         ensureSpeakerNeeds(sbProj);
         const sbTake = activeTake(sbProj, sbIndex);
         const sbMissing = sbTake ? missingSpeakerCopies(sbProj, sbTake) : { blur: false, alpha: false };
+        const sbStrengthN = sbBody.strength === undefined || sbBody.strength === null ? undefined : Number(sbBody.strength);
+        if (sbStrengthN !== undefined && !(sbStrengthN >= 0 && sbStrengthN <= 1)) { jsonResponse(res, 400, { error: "strength must be 0-1" }); return; }
+        // A new blur amount on a take that already has its blurred copy: make it again.
+        const sbReblur = !!(sbTake && sbMode === "blur" && sbStrengthN !== undefined && Math.abs(sbStrengthN - (typeof sbTake.blur_strength === "number" ? sbTake.blur_strength : 0.6)) > 0.001);
+        if (sbReblur) sbMissing.blur = true;
         sbProj.updated_at = new Date().toISOString();
         await saveProject(sbProj);
         let sbQueued = false;
         if (sbTake && (sbMissing.blur || sbMissing.alpha)) {
           sbQueued = queueTakeMatte({
             tenantId: sbTenant, projectId: sbProject, rawUrl: takeCopies(sbTake).raw, dataDir: config.dataDir,
-            blur: sbMissing.blur, alpha: sbMissing.alpha,
+            blur: sbMissing.blur, alpha: sbMissing.alpha, ...(sbStrengthN !== undefined ? { strength: sbStrengthN } : {}),
             resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
             afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
           });
@@ -3208,6 +3220,29 @@ Rules:
         reshootStoryboardCardsSoon(sbTenant, sbProject);
         console.log(`  speaker background: ${sbProject} scene ${sbIndex + 1} -> ${sbMode}${sbQueued ? " (matte queued)" : sbTake ? "" : " (no take yet)"}`);
         jsonResponse(res, 200, { ok: true, scene_index: sbIndex, background: sbMode, matte: sbQueued ? "running" : null, has_take: !!sbTake, project: sbProj });
+        return;
+      }
+
+      // GET /api/take-status/{tenant}/{project}
+      // What the takes are doing right now (core/take-jobs.ts): the grade and
+      // the matte, running or waiting, with the matte's progress; and the
+      // last failure on each take file. Studio polls it while work runs.
+      const takeStatusMatch = urlPath.match(/^\/api\/take-status\/([^/]+)\/([^/]+)$/);
+      if (takeStatusMatch && method === "GET") {
+        const [, tsTenant, tsProject] = takeStatusMatch.map(decodeURIComponent);
+        const tsProj = await loadProject(tsTenant, tsProject);
+        if (!tsProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scenesOf = (raw: string) => (tsProj.takes || []).filter((t) => takeCopies(t).raw === raw).map((t) => t.scene_index);
+        const jobs = takeJobsFor(tsTenant, tsProject).map((j) => ({ ...j, scenes: scenesOf(j.raw) }));
+        const seen = new Set<string>();
+        const errors: Array<{ raw: string; scenes: number[]; kind: string; message: string; at: string }> = [];
+        for (const t of tsProj.takes || []) {
+          const raw = takeCopies(t).raw;
+          if (!t.job_error || seen.has(raw)) continue;
+          seen.add(raw);
+          errors.push({ raw, scenes: scenesOf(raw), ...t.job_error });
+        }
+        jsonResponse(res, 200, { jobs, errors });
         return;
       }
 

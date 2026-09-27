@@ -828,6 +828,17 @@ export interface Take {
   /** false: the studio correction is off for this take (absent = on;
    *  core/take-studio.ts). Every grade honours it. */
   correct?: boolean;
+  /** The fill light on the face's shadows, 0-1 (absent = the default 0.5;
+   *  0 = off; core/take-studio.ts faceFillGraph). */
+  fill?: number;
+  /** What the last grade applied (0 when there was no detected face). */
+  fill_applied?: number;
+  /** How far out of focus the blurred copy puts the room, 0 (light) - 1
+   *  (deep); absent = 0.6 (core/take-matte.ts). */
+  blur_strength?: number;
+  /** The last background job on this take that failed, until the next run
+   *  of that kind succeeds (core/take-jobs.ts). */
+  job_error?: { kind: "grade" | "matte"; message: string; at: string };
   /** The studio correction, for transparency: what was measured off the
    *  kept original (`measured`, reused by every re-grade) and what was
    *  applied -- white-balance gains, the warm-key pull, stops of exposure,

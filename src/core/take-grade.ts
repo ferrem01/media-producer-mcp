@@ -18,6 +18,14 @@
  * (`take.correct`, on unless set false) unless the job says otherwise, and
  * reuses the stats measured the first time (`take.grade.measured`: the
  * kept original never changes).
+ *
+ * THE FILL LIGHT (core/take-studio.ts, faceFillGraph) rides there too,
+ * between the correction and the look: `take.fill` 0-1, absent = the
+ * default (0.5), 0 = off. A re-grade keeps the take's value unless the job
+ * sets one.
+ *
+ * Studio sees the job while it runs (core/take-jobs.ts) and a failure after
+ * (`take.job_error`).
  */
 
 import path from "node:path";
@@ -25,6 +33,7 @@ import { gradeTake, type TakeLook } from "./take-sanitize.js";
 import { queueTakeMatte } from "./take-matte.js";
 import { takeCopies, syncSpeakerClips, missingSpeakerCopies } from "./speaker-layer.js";
 import { ensureSpeakerNeeds } from "./take-needs.js";
+import { takeJobSet, takeJobDone, markTakeJobError } from "./take-jobs.js";
 
 export interface TakeGradeJob {
   tenantId: string;
@@ -36,6 +45,9 @@ export interface TakeGradeJob {
   /** The studio correction: true/false sets it; absent keeps the take's
    *  own setting (on unless `take.correct === false`). */
   correct?: boolean;
+  /** The fill light, 0-1: a number sets it; absent keeps the take's own
+   *  (the default when it has none). */
+  fill?: number;
   /** The background blur's strength, for the matte the grade queues. */
   matteStrength?: number;
   dataDir: string;
@@ -57,16 +69,19 @@ export function takeGradeRunning(tenantId: string, projectId: string, rawUrl: st
 
 export function queueTakeGrade(job: TakeGradeJob): void {
   const key = `${job.tenantId}/${job.projectId}/${job.rawUrl}`;
-  if (running.has(key)) { waiting.set(key, job); return; }
+  const what = [job.look === "soft" ? `soft ${Math.round((job.strength ?? 0.5) * 100)}` : "natural", ...(typeof job.fill === "number" ? [`fill ${Math.round(job.fill * 100)}`] : [])];
+  if (running.has(key)) { waiting.set(key, job); takeJobSet(job.tenantId, job.projectId, job.rawUrl, "grade", "running", what); return; }
   running.add(key);
+  takeJobSet(job.tenantId, job.projectId, job.rawUrl, "grade", "running", what);
   setTimeout(async () => {
     try {
       const before = await job.loadProject(job.tenantId, job.projectId);
       const owner = (before?.takes || []).find((t: any) => takeCopies(t).raw === job.rawUrl);
       const currentLook: TakeLook = owner?.look === "soft" && !owner?.ungraded ? "soft" : "natural";
       const correct = job.correct ?? (owner?.correct !== false);
+      const fill = typeof job.fill === "number" ? job.fill : typeof owner?.fill === "number" ? owner.fill : undefined;
       const g = await gradeTake(job.resolvePath(job.rawUrl), {
-        look: job.look, strength: job.strength, currentLook, correct,
+        look: job.look, strength: job.strength, currentLook, correct, fill,
         stats: owner?.grade?.measured, face: owner?.face,
       });
       const project = await job.loadProject(job.tenantId, job.projectId);
@@ -83,6 +98,10 @@ export function queueTakeGrade(job: TakeGradeJob): void {
         if (g.baseSoft) t.ungraded_soft = true;
         t.graded_at = stamp;
         if (g.correct) delete t.correct; else t.correct = false;
+        // The dial as set (0 = off); a take that had no face to fill keeps
+        // the setting, and `fill_applied` says what the encode did.
+        if (typeof job.fill === "number") t.fill = job.fill;
+        t.fill_applied = g.fill;
         // What the correction measured (kept either way: a later "on" reuses
         // it) and what it applied.
         const measured = g.studio?.measured || t.grade?.measured;
@@ -99,6 +118,7 @@ export function queueTakeGrade(job: TakeGradeJob): void {
       }
       syncSpeakerClips(project);
       ensureSpeakerNeeds(project);
+      markTakeJobError(project, job.rawUrl, "grade", null, (t) => takeCopies(t).raw);
       for (const t of project.takes || []) {
         if (takeCopies(t).raw !== job.rawUrl) continue;
         const m = missingSpeakerCopies(project, t);
@@ -110,7 +130,7 @@ export function queueTakeGrade(job: TakeGradeJob): void {
       console.log(`  take grade: ${path.basename(job.rawUrl)} -> ${g.look}${g.look === "soft" ? ` ${g.strength}` : ""}${g.baseSoft ? " (over the old base)" : ""}${studioNote} in ${Math.round(g.ms / 1000)}s; ${owned} take(s)`);
       if (rematte.blur || rematte.alpha) {
         queueTakeMatte({
-          tenantId: job.tenantId, projectId: job.projectId, rawUrl: job.rawUrl, dataDir: job.dataDir, strength: job.matteStrength,
+          tenantId: job.tenantId, projectId: job.projectId, rawUrl: job.rawUrl, dataDir: job.dataDir, strength: job.matteStrength ?? (typeof owner?.blur_strength === "number" ? owner.blur_strength : undefined),
           blur: rematte.blur, alpha: rematte.alpha,
           resolvePath: job.resolvePath, loadProject: job.loadProject, saveProject: job.saveProject, afterSave: job.afterSave,
         });
@@ -118,10 +138,18 @@ export function queueTakeGrade(job: TakeGradeJob): void {
       if (job.afterSave) job.afterSave(job.tenantId, job.projectId);
     } catch (e: any) {
       console.warn(`  take grade failed for ${path.basename(job.rawUrl)}: ${e?.message || e}`);
+      try {
+        const project = await job.loadProject(job.tenantId, job.projectId);
+        if (project && markTakeJobError(project, job.rawUrl, "grade", String(e?.message || e), (t) => takeCopies(t).raw)) {
+          project.updated_at = new Date().toISOString();
+          await job.saveProject(project);
+        }
+      } catch { /* the log line above is the record */ }
     } finally {
       running.delete(key);
       const next = waiting.get(key);
       if (next) { waiting.delete(key); queueTakeGrade(next); }
+      else takeJobDone(job.tenantId, job.projectId, job.rawUrl, "grade");
     }
   }, 50);
 }

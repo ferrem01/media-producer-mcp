@@ -41,7 +41,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { measureTake, studioGradeFilter, type FaceHint, type TakeStudioStats, type TakeStudioCorrection } from "./take-studio.js";
+import { measureTake, studioGradeFilter, faceFillGraph, faceEllipse, DEFAULT_FILL_STRENGTH, type FaceHint, type TakeStudioStats, type TakeStudioCorrection } from "./take-studio.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -259,6 +259,8 @@ export interface TakeGradeResult {
   /** What the studio correction measured and applied (absent when not
    *  asked for, or when the take could not be measured). */
   studio?: { measured: TakeStudioStats; applied: TakeStudioCorrection };
+  /** The fill light's strength as applied (0 = off, or no face to fill). */
+  fill: number;
   ms: number;
 }
 
@@ -270,6 +272,8 @@ export interface TakeGradeResult {
  *    balance, a warm key pulled off the skin, exposure, a shadow curve --
  *    measured off the kept original (or `stats`, measured before: the
  *    original never changes, so neither do they);
+ *  - the FILL LIGHT (`fill` 0-1, default 0.5; core/take-studio.ts,
+ *    faceFillGraph): the face's shadows lifted, on a detected face only;
  *  - the LOOK: 'soft' adds the soft grade on its dial; 'natural' adds
  *    nothing.
  * 'natural' without a correction (or with one that measured nothing worth
@@ -278,6 +282,8 @@ export interface TakeGradeResult {
 export async function gradeTake(filePath: string, o: {
   look: TakeLook; strength?: number; currentLook?: TakeLook;
   correct?: boolean; stats?: TakeStudioStats; face?: FaceHint | null;
+  /** The fill light, 0-1 (absent = the default; 0 = off). */
+  fill?: number;
 }): Promise<TakeGradeResult> {
   const t0 = Date.now();
   const ungraded = ungradedPathOf(filePath);
@@ -301,15 +307,27 @@ export async function gradeTake(filePath: string, o: {
     }
   }
   const studioVf = studio && studio.applied.filter !== "null" ? studio.applied.filter : "";
+  // The fill light needs a DETECTED face: the measured region, else the
+  // detection itself. An assumed face is a guess, and a lift in the wrong
+  // place is worse than none.
+  const fillWant = Math.max(0, Math.min(1, Number.isFinite(o.fill as number) ? (o.fill as number) : DEFAULT_FILL_STRENGTH));
+  const measuredFace = studio?.measured.face || o.stats?.face;
+  const region = measuredFace && measuredFace.source === "detected" ? measuredFace : o.face && o.face.size > 0 ? faceEllipse(o.face) : null;
+  let fillVf = "";
+  if (fillWant > 0 && region) {
+    try { const dims = orientedDims(await probeTake(ungraded)); fillVf = faceFillGraph(dims.width, dims.height, region, fillWant); }
+    catch (e: any) { console.warn(`  take grade: fill light skipped for ${path.basename(filePath)}: ${e?.message || e}`); }
+  }
+  const fill = fillVf ? fillWant : 0;
   const ext = path.extname(filePath) || ".mp4";
   const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath, ext)}.grading${ext}`);
-  if (o.look === "natural" && !studioVf) {
+  if (o.look === "natural" && !studioVf && !fillVf) {
     await fs.copyFile(ungraded, tmp);
     await fs.rename(tmp, filePath);
-    return { look: "natural", ungraded, baseSoft, correct, studio, ms: Date.now() - t0 };
+    return { look: "natural", ungraded, baseSoft, correct, studio, fill, ms: Date.now() - t0 };
   }
   const strength = Math.max(0, Math.min(1, o.strength ?? DEFAULT_SOFT_STRENGTH));
-  const chain = (fallback: boolean) => [studioVf, o.look === "soft" ? softLookFilter(strength, { baseSoft, fallback }) : ""].filter((x) => x && x !== "null").join(",") || "null";
+  const chain = (fallback: boolean) => gradeChain(studioVf, fillVf, o.look === "soft" ? softLookFilter(strength, { baseSoft, fallback }) : "");
   const encode = (vf: string) => execFileAsync("ffmpeg", ["-hide_banner", "-y", "-i", ungraded, "-map", "0:v:0", "-map", "0:a:0?",
     "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy",
     ...(ext.toLowerCase() !== ".webm" ? ["-movflags", "+faststart"] : []), tmp], { maxBuffer: 16 * 1024 * 1024 });
@@ -325,8 +343,18 @@ export async function gradeTake(filePath: string, o: {
     throw new Error(`take grade failed: ${String(e?.stderr || e?.message || e).slice(-400)}`);
   }
   return o.look === "soft"
-    ? { look: "soft", strength, ungraded, baseSoft, correct, studio, ms: Date.now() - t0 }
-    : { look: "natural", ungraded, baseSoft, correct, studio, ms: Date.now() - t0 };
+    ? { look: "soft", strength, ungraded, baseSoft, correct, studio, fill, ms: Date.now() - t0 }
+    : { look: "natural", ungraded, baseSoft, correct, studio, fill, ms: Date.now() - t0 };
+}
+
+/** The grade's one -vf graph: the correction (a chain), the fill (a graph
+ *  with its own branches, one input and one output), the look (a chain),
+ *  in that order. */
+export function gradeChain(studioVf: string, fillVf: string, lookVf: string): string {
+  const pre = [studioVf].filter((x) => x && x !== "null").join(",");
+  const post = [lookVf].filter((x) => x && x !== "null").join(",");
+  if (!fillVf) return [pre, post].filter(Boolean).join(",") || "null";
+  return (pre ? pre + "," : "") + fillVf + (post ? "," + post : "");
 }
 
 export async function sanitizeTake(

@@ -466,3 +466,55 @@ export function studioGradeFilter(s: TakeStudioStats): TakeStudioCorrection {
 
   return { wb, skin: skinPull, ...(skinCmy ? { skin_cmy: skinCmy } : {}), ev, contrast, face_rb: faceRb, face_luma: faceLuma, notes, filter: parts.length ? parts.join(",") : "null" };
 }
+
+// ── the fill light ───────────────────────────────────────────────────────
+
+/**
+ * THE FILL LIGHT -- a face-only lift of the shadows, in the grade's encode
+ * between the correction and the soft look.
+ *
+ * Marc on his booth take (2026-09-27, proj_4dfaa63e): "The dark side of my
+ * face looks sunken and I have bags under my eyes." The correction had done
+ * almost nothing (a 3% white balance, a 0.03 curve): it was the light --
+ * a high key from one side and no fill, so the far cheek fell away and the
+ * brow shaded the under-eye. A real fill (a bounce board below the frame)
+ * is the cure on set; this is the same idea after the fact.
+ *
+ * The graph: the frame split in two; one copy lifted by a curve (the
+ * shadows most, the highlights barely); laid back over the frame through a
+ * mask that is (a) an ellipse around the face, a little larger and lower
+ * than the measured one so the cheeks and jaw are in, feathered to nothing
+ * at its edge, times (b) a luma BAND -- full for the skin's shadows
+ * (~45-70% down), fading out above (the lit cheek is left alone) and below
+ * (pupils, brows, beard and hair are not greyed). The mask is computed at a
+ * quarter of the frame's size (it is soft anyway) and scaled up, so the
+ * per-pixel expression costs a sixteenth.
+ *
+ * `strength` 0-1; 0.5 is the level of the side-by-side Marc saw (a curve
+ * 0.2 -> 0.27, 0.45 -> 0.52). The face is the take's own (measured region,
+ * else the detection); no face, no fill -- the lift is never guessed onto
+ * a wall.
+ */
+export const DEFAULT_FILL_STRENGTH = 0.5;
+export function faceFillGraph(width: number, height: number, region: { cx: number; cy: number; rx: number; ry: number }, strength: number = DEFAULT_FILL_STRENGTH): string {
+  const s = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : DEFAULT_FILL_STRENGTH));
+  if (s < 0.01 || !(width > 0 && height > 0) || !(region.rx > 0 && region.ry > 0)) return "";
+  const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+  const qw = even(width / 4), qh = even(height / 4);
+  const f = (n: number) => Math.round(n * 1000) / 1000;
+  // The fill's reach, in quarter-frame pixels.
+  const cx = f(region.cx * qw), cy = f((region.cy + 0.15 * region.ry) * qh);
+  const rx = f(region.rx * 1.15 * qw), ry = f(region.ry * 1.3 * qh);
+  const lift = (x: number, d: number) => `${f(x)}/${f(Math.min(1, x + d * s))}`;
+  const curve = `0/0 ${lift(0.2, 0.14)} ${lift(0.45, 0.14)} ${lift(0.75, 0.04)} 1/1`;
+  const ell = `pow(max(0,1-(pow((X-${cx})/${rx},2)+pow((Y-${cy})/${ry},2))),0.5)`;
+  const band = `clip((176-lum(X,Y))/70,0,1)*clip((lum(X,Y)-45)/40,0,1)`;
+  return [
+    `split=2[fillbase][fillsrc]`,
+    `[fillsrc]split=2[filllift0][fillm0]`,
+    `[fillm0]scale=${qw}:${qh}:flags=area,format=gray,geq=lum='255*${ell}*${band}',scale=${width}:${height}:flags=bicubic,gblur=sigma=${f(Math.max(2, width / 180))}[fillmask]`,
+    `[filllift0]curves=all='${curve}'[filllift]`,
+    `[filllift][fillmask]alphamerge[fillover]`,
+    `[fillbase][fillover]overlay=format=auto`,
+  ].join(";");
+}
