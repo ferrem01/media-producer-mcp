@@ -224,4 +224,22 @@ describe("over a real socket (src/ws.ts)", () => {
     // The non-remote families still answer as before.
     camera.ws.send(JSON.stringify({ type: "nonsense" }));
   });
+
+  it("update-prop is refused for a workspace the socket's token does not own (it used to write anywhere)", async () => {
+    const server = http.createServer((_q, r) => { r.writeHead(404); r.end(); });
+    setupWebSocket(server, { hub: new RemoteBoothHub({ loadTarget }), validate: (t) => ({ tokA: "acme", tokB: "other" } as Record<string, string>)[t] || null, authEnabled: () => true });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    closers.push(() => new Promise<void>((r) => server.close(() => r())));
+    const port = (server.address() as any).port;
+    const reply = (token: string) => new Promise<any>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`);
+      ws.on("open", () => ws.send(JSON.stringify({ type: "update-prop", tenantId: "acme", projectId: "proj_x", sceneId: "s", componentId: "c", data: { text: "pwned" } })));
+      ws.on("message", (raw) => { resolve(JSON.parse(String(raw))); ws.close(); });
+      ws.on("error", reject);
+    });
+    expect((await reply("tokB")).error).toMatch(/forbidden/);
+    expect((await reply("nope")).error).toMatch(/forbidden/);
+    // The owner gets past the check (the project does not exist here, so the write itself reports that).
+    expect((await reply("tokA")).error).not.toMatch(/forbidden/);
+  });
 });

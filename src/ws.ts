@@ -24,7 +24,7 @@ import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { config } from "./config.js";
-import { extractToken, isAuthEnabled, validateToken } from "./auth/auth.js";
+import { extractToken, isAuthEnabled, validateToken, tenantAllowed } from "./auth/auth.js";
 import { RemoteBoothHub, REMOTE_PREFIX, REMOTE_MAX_MESSAGE_BYTES, type RemotePeer, type RemoteTarget, type TargetLoader } from "./core/remote-booth.js";
 
 // ── Helpers ──
@@ -254,7 +254,14 @@ export function setupWebSocket(server: http.Server, opts: RemoteBoothWsOptions =
   const wss = new WebSocketServer({ server, path: "/ws" });
   const hub = attachRemoteBooth(wss, opts);
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, req) => {
+    // update-prop WRITES into a project: the socket's token must be allowed
+    // that tenant -- the HTTP rule (found while building the remote booth:
+    // it wrote into whatever tenant/project the client named).
+    const validate = opts.validate || validateToken;
+    const authOn = opts.authEnabled || isAuthEnabled;
+    const token = extractToken(req);
+    const authed = (token && validate(token)) || undefined;
     ws.on("message", async (raw) => {
       let msg: Record<string, unknown>;
       try {
@@ -268,6 +275,10 @@ export function setupWebSocket(server: http.Server, opts: RemoteBoothWsOptions =
         if (await routeRemoteBooth(ws, msg, raw)) {
           // relayed (or refused) by the remote booth
         } else if (msg.type === "update-prop") {
+          if (!tenantAllowed(authed, String(msg.tenantId || ""), authOn())) {
+            sendJson(ws, { type: "error", error: "forbidden: this token cannot edit that workspace" });
+            return;
+          }
           await handleUpdateProp(ws, msg as any);
         } else if (msg.type === "preview-component") {
           await handlePreviewComponent(ws, msg as any);
