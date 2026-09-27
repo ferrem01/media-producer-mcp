@@ -39,6 +39,7 @@
       "label": "Named cursor positions (refresh, chart)",
       "optional": true
     },
+    "at": { "type": "number", "label": "Shift the whole entrance by this many seconds (negative starts it under a relay join, e.g. -0.35)", "optional": true },
     "docked": {
       "type": "boolean",
       "label": "true = merge into quotient-app-shell's white content card (strips the window border/shadow). Position over the shell's content-card box.",
