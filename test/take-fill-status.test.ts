@@ -24,17 +24,18 @@ describe("the fill light: the face's shadows lifted, nothing else", () => {
     const g = faceFillGraph(1080, 1920, region, 0.5);
     expect(g.startsWith("split=2[fillbase][fillsrc]")).toBe(true);
     expect(g.endsWith("[fillbase][fillover]overlay=format=auto")).toBe(true);
-    // At 0.5, the side-by-side Marc saw: 0.2 -> 0.27, 0.45 -> 0.52.
-    expect(g).toContain("curves=all='0/0 0.2/0.27 0.45/0.52 0.75/0.77 1/1'");
+    // At 0.5: 0.2 -> 0.29, 0.45 -> 0.55 (widened from 0.27/0.52 after Marc
+    // found 50 -> 85 hard to see), and the lifted copy is smoothed.
+    expect(g).toContain("curves=all='0/0 0.2/0.29 0.45/0.55 0.75/0.78 1/1',bilateral=sigmaS=6:sigmaR=0.06[filllift]");
     // The mask: a quarter-size expression, scaled up and softened.
     expect(g).toContain("scale=270:480:flags=area,format=gray,geq=lum='255*pow(max(0,1-");
-    expect(g).toContain("clip((176-lum(X,Y))/70,0,1)*clip((lum(X,Y)-45)/40,0,1)"); // the lit cheek and the pupils/brows left alone
+    expect(g).toContain("clip((186-lum(X,Y))/74,0,1)*clip((lum(X,Y)-45)/40,0,1)"); // the lit cheek and the pupils/brows left alone
     expect(g).toContain("scale=1080:1920:flags=bicubic,gblur=sigma=6");
     expect(DEFAULT_FILL_STRENGTH).toBe(0.5);
   });
 
   it("scales with strength, and is nothing at 0 or without a face", () => {
-    expect(faceFillGraph(1080, 1920, region, 1)).toContain("0.2/0.34 0.45/0.59 0.75/0.79");
+    expect(faceFillGraph(1080, 1920, region, 1)).toContain("0.2/0.38 0.45/0.65 0.75/0.81");
     expect(faceFillGraph(1080, 1920, region, 0)).toBe("");
     expect(faceFillGraph(1080, 1920, { cx: 0.5, cy: 0.5, rx: 0, ry: 0 }, 0.5)).toBe("");
   });
