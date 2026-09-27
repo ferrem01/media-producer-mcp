@@ -109,12 +109,16 @@ ${QUOTIENT_CSS}
   .bar i { display: block; height: 100%; width: 0; background: var(--primary); border-radius: 9999px; transition: width .2s; }
   .top { position: sticky; top: 0; background: var(--background); padding: 6px 0 10px; z-index: 2; }
   a.link { color: var(--muted-foreground); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+  /* Films: every film as a card (the library, /library), a tap opens it
+     here -- moving between films on the phone without a QR per film. */
+  a.link.films { display: inline-block; font: 500 14px/20px var(--font-sans); color: var(--content-primary); text-decoration: none; padding: 4px 0; }
   video { width: 100%; border-radius: var(--radius); background: #000; }
   input[type=file] { display: none; }
 </style>
 </head>
 <body>
 <div class="top">
+  <a class="link films" id="filmsLink" href="/library">← Films</a>
   <h1 id="title">Studio</h1>
   <p class="sub" id="subtitle">Loading…</p>
   <div class="row" id="topActions"></div>
@@ -160,6 +164,7 @@ ${QUOTIENT_CSS}
       tenant = String(pay.tenant_id || pay.tenant || '');
     } catch (eTok) {}
   }
+  $('filmsLink').href = '/library?tenant=' + encodeURIComponent(tenant) + (token ? '&token=' + encodeURIComponent(token) : '');
   if (!tenant || !project) { say(!project ? 'Missing ?project= in the link.' : 'Missing ?tenant= in the link (or a token that carries it).', true); return; }
   $('desktopLink').href = link('/studio', '&desktop=1');
 

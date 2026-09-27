@@ -169,7 +169,7 @@ ${RAIL_CSS}
     .rail-brand, .rail-foot { display: none; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
     .head-top { flex-wrap: wrap; }
-    .search-wrap { max-width: none; order: 3; width: 100%; }
+    .search-wrap { max-width: none; order: 3; width: 100%; flex: 1 1 100%; }
   }
 </style>
 </head>

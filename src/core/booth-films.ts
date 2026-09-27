@@ -5,9 +5,9 @@
  * Marc: "Sometimes I have the rig set up and I want to move from one
  * recording to another between films. I have to remove the camera from the
  * stand and then scan the QR for each." The remote booth's control screen
- * and the arm's-length booth's Films sheet both list the tenant's
- * person-carried films (speaker, creator-cut) with their scenes and what
- * each still needs, and a tap moves the booth there -- no QR, no Studio.
+ * lists the tenant's person-carried films (speaker, creator-cut) with their
+ * scenes and what each still needs, and a tap moves the booth there -- no
+ * QR. (On the phone, the phone Studio's Films link to /library does this.)
  *
  * Pure: projects in, the list out. GET /api/booth-films/{tenant} feeds it
  * the token's own tenant (the HTTP choke point refuses any other), so the

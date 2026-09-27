@@ -7,7 +7,7 @@ import { TAKE_NEED_DESCRIPTION } from "../src/core/take-needs.js";
 
 // GET /api/booth-films/{tenant} (SPEC-remote-booth.md): the tenant's
 // person-carried films with their scenes and what each still needs -- the
-// remote booth's film picker and the phone booth's Films sheet. Marc: "I
+// remote booth's film picker (the phone moves between films in Studio). Marc: "I
 // have to remove the camera from the stand and then scan the QR for each."
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

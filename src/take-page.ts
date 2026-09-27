@@ -192,35 +192,12 @@ ${QUOTIENT_CSS}
   a.btn { display: inline-flex; text-align: center; text-decoration: none; }
   .meta { font-size: 12px; color: var(--muted-foreground); margin-top: 10px; font-variant-numeric: tabular-nums; }
 
-  /* ── films: move to another film or scene from the booth itself ──
-     (Marc: "I have to remove the camera from the stand and then scan the
-     QR for each") -- the tenant's person-carried films, what each scene
-     still needs, one tap to switch; no QR, no Studio round trip. */
-  .toprow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; }
-  .toprow h1 { margin: 0; }
-  .chip { font: 500 13px/18px var(--font-sans); color: var(--content-primary); background: var(--surface-primary); border: 1px solid var(--border-secondary);
-    border-radius: 9999px; padding: 6px 14px; cursor: pointer; box-shadow: var(--shadow-weak); }
-  .fsheet { position: fixed; inset: 0; z-index: 20; background: rgba(10,10,11,.45); display: flex; align-items: flex-end; justify-content: center; }
-  .fsheet[hidden] { display: none; }
-  .fpanel { background: var(--background, #f8f8fa); width: 100%; max-width: 560px; max-height: 86dvh; overflow-y: auto; -webkit-overflow-scrolling: touch;
-    border-radius: 18px 18px 0 0; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); box-shadow: var(--shadow-overlay); }
-  .fhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-  .fhead h1 { margin: 0; }
-  .ffilm { margin: 14px 0 6px; }
-  .ffilm > b { display: block; font-size: 15px; color: var(--content-primary); }
-  .ffilm > small { display: block; color: var(--muted-foreground); font-size: 12px; margin-bottom: 6px; }
-  .fscene { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--border-secondary); border-radius: 12px;
-    padding: 10px 12px; margin: 6px 0; font: 500 14px/20px var(--font-sans); color: var(--content-primary); cursor: pointer; }
-  .fscene.cur { border-color: var(--content-primary); }
-  .fscene small { display: block; color: var(--muted-foreground); font-size: 12px; line-height: 17px; font-weight: 400; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .fdot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex: 0 0 auto; background: var(--gray-50, #cecee1); }
-  .fdot.needed { background: #d48c34; } .fdot.provided { background: #479e66; }
 </style>
 </head>
 <body>
 
 <section id="ready" class="pad on">
-  <p class="toprow"><a class="link" id="studioLinkTop" href="#">← Back to Studio</a><button class="chip" id="filmsBtn" type="button">Films</button></p>
+  <p><a class="link" id="studioLinkTop" href="#">← Back to Studio</a></p>
   <h1 id="title">Loading…</h1>
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
@@ -252,7 +229,7 @@ ${QUOTIENT_CSS}
 </section>
 
 <section id="review" class="pad">
-  <div class="toprow"><h1>Review</h1><button class="chip filmsOpen" id="filmsBtnReview" type="button">Films</button></div>
+  <h1>Review</h1>
   <p class="sub" id="reviewMeta"></p>
   <video id="play" controls playsinline></video>
   <div class="spacer"></div>
@@ -277,16 +254,7 @@ ${QUOTIENT_CSS}
   <div class="spacer"></div>
   <a class="btn" id="studioLink" href="#">Back to Studio</a>
   <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Desktop Studio</a></div>
-  <div class="row"><button class="btn ghost filmsOpen" id="filmsBtnDone" type="button">Another film or scene</button></div>
 </section>
-
-<div id="filmsSheet" class="fsheet" hidden>
-  <div class="fpanel" role="dialog" aria-label="Films">
-    <div class="fhead"><h1>Films</h1><button class="chip" id="filmsClose" type="button">Close</button></div>
-    <p class="sub" id="filmsNote">Your speaker and creator-cut films. Tap a scene to record it here.</p>
-    <div id="filmsList"></div>
-  </div>
-</div>
 
 <section id="err" class="pad">
   <h1>Something went wrong</h1>
@@ -386,9 +354,7 @@ ${QUOTIENT_CSS}
     if (w >= h) st.classList.add('wide'); else st.classList.remove('wide');
   }
 
-
-  // One film's script and frame onto the ready screen. Called at load and
-  // again when the Films sheet switches the booth to another film or scene.
+  // One film's script and frame onto the ready screen.
   function loadFilm() {
   var want = project + '/' + sceneIndex;
   $('recordBtn').disabled = true;
@@ -458,56 +424,6 @@ ${QUOTIENT_CSS}
     .catch(function (e) { fail(e.message || String(e)); });
   }
   loadFilm();
-
-  // ── films: switch the booth to another film or scene in place ─────────
-  // GET /api/booth-films/{tenant} (core/booth-films.ts): the token's own
-  // person-carried films, owed-a-take first. A tap re-points this page --
-  // URL, script, frame -- and keeps the camera it already has open.
-  function escT(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function openFilms() {
-    $('filmsSheet').hidden = false;
-    $('filmsNote').textContent = $('review').classList.contains('on') ? 'Switching throws away the take you have not used. Tap a scene to record it here.' : 'Your speaker and creator-cut films. Tap a scene to record it here.';
-    var list = $('filmsList'); list.innerHTML = '<p class="note">Loading…</p>';
-    fetch(withToken('/api/booth-films/' + encodeURIComponent(tenant)))
-      .then(function (r) { if (!r.ok) throw new Error('Could not load the films (' + r.status + ').'); return r.json(); })
-      .then(function (j) {
-        var films = j.films || [];
-        if (!films.length) { list.innerHTML = '<p class="note">No speaker or creator-cut films yet.</p>'; return; }
-        var h = '';
-        films.forEach(function (f) {
-          h += '<div class="ffilm"><b>' + escT(f.name) + '</b><small>' + escT(f.grammar) + (f.frame ? ' · ' + escT(f.frame) : '') + ' · ' + (f.open ? f.open + (f.open === 1 ? ' scene needs' : ' scenes need') + ' a take' : 'every take is in') + '</small>';
-          f.scenes.forEach(function (sc0) {
-            var cur = f.project_id === project && sc0.index === sceneIndex && !recordAll;
-            var lbl = String(sc0.label || '').replace(/^Scene [0-9]+ *[-–—:·] */i, '');
-            h += '<button type="button" class="fscene' + (cur ? ' cur' : '') + '" data-p="' + escT(f.project_id) + '" data-s="' + sc0.index + '"><i class="fdot ' + escT(sc0.need) + '"></i><span>Scene ' + (sc0.index + 1) + (lbl ? ' · ' + escT(lbl) : '') +
-              '<small>' + (sc0.need === 'needed' ? 'Needs a take' : sc0.need === 'provided' ? 'Has a take' : 'No take asked') + (sc0.lines ? ' · ' + escT(sc0.lines) : '') + '</small></span></button>';
-          });
-          h += '</div>';
-        });
-        list.innerHTML = h;
-        [].forEach.call(list.querySelectorAll('.fscene'), function (b) {
-          b.addEventListener('click', function () { switchTo(b.getAttribute('data-p'), Number(b.getAttribute('data-s'))); });
-        });
-      })
-      .catch(function (e) { list.innerHTML = '<p class="note">' + escT(e.message || e) + '</p>'; });
-  }
-  function closeFilms() { $('filmsSheet').hidden = true; }
-  function switchTo(p, s) {
-    closeFilms();
-    blob = null; chunks = [];
-    try { $('play').removeAttribute('src'); $('play').load(); } catch (eP) {}
-    project = p; sceneIndex = s; recordAll = false;
-    studioHref = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + (token ? '&token=' + encodeURIComponent(token) : '');
-    $('studioLinkTop').href = studioHref;
-    try { history.replaceState(null, '', '/take?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&scene=' + sceneIndex + (token ? '&token=' + encodeURIComponent(token) : '')); } catch (eH) {}
-    $('title').textContent = 'Loading…'; $('subtitle').textContent = ''; $('script').innerHTML = '';
-    show('ready');
-    loadFilm();
-  }
-  $('filmsBtn').addEventListener('click', openFilms);
-  [].forEach.call(document.querySelectorAll('.filmsOpen'), function (b) { b.addEventListener('click', openFilms); if (embedded) b.style.display = 'none'; });
-  $('filmsClose').addEventListener('click', closeFilms);
-  $('filmsSheet').addEventListener('click', function (ev) { if (ev.target === $('filmsSheet')) closeFilms(); });
 
   // ── recording ──────────────────────────────────────────────────────────
   var stream = null, rec = null, chunks = [], mime = '', ext = 'webm';
