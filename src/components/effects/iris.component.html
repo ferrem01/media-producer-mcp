@@ -1,0 +1,218 @@
+<template>
+  <div class="iris">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@600&display=swap">
+    <div class="iris-box">
+      <div class="iris-back"></div>
+      <img class="iris-img" alt="">
+      <div class="iris-label"><span class="iris-label-t"></span></div>
+      <svg class="iris-blades" xmlns="http://www.w3.org/2000/svg"><defs></defs><g class="iris-g"></g></svg>
+      <div class="iris-rim"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* IRIS: a camera iris of six curved-edge blades inside a shape (a circle or
+     a rounded rect). It can grow out of the shape before it (the black pill:
+     the pill swells into the circle while the blades close over its label),
+     closes to a small hexagonal aperture and snaps open onto a photo, which
+     then stays in the shape (object-fit cover). Every blade is rebuilt from
+     the aperture size each frame -- its two vertices, both edge extensions and
+     the short arc between them -- a pure function of the timeline time. */
+  .iris, .iris * { max-width: none; }
+  .iris { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .iris-box { position: absolute; left: 0; top: 0; overflow: hidden; visibility: hidden; transform: translateZ(0); }
+  .iris-back { position: absolute; inset: 0; }
+  .iris-img { position: absolute; left: 0; top: 0; object-fit: cover; display: block; visibility: hidden; }
+  .iris-label { position: absolute; left: 0; top: 0; display: flex; align-items: center; justify-content: center; }
+  .iris-label-t { display: block; color: var(--iris-ink, #ffffff); font-weight: 600; letter-spacing: -0.01em; line-height: 1; white-space: nowrap;
+    font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif; }
+  .iris-blades { position: absolute; left: 0; top: 0; overflow: visible; }
+  .iris-rim { position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07); visibility: hidden; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.iris'), box = el.querySelector('.iris-box');
+    var back = el.querySelector('.iris-back'), img = el.querySelector('.iris-img');
+    var labelBox = el.querySelector('.iris-label'), labelT = el.querySelector('.iris-label-t');
+    var svg = el.querySelector('.iris-blades'), defs = svg && svg.querySelector('defs'), gEl = svg && svg.querySelector('.iris-g');
+    var rim = el.querySelector('.iris-rim');
+    if (!root || !box || !svg) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var has = function (v) { return v !== null && v !== undefined && v !== '' && isFinite(Number(v)); };
+    var W = root.clientWidth || 1920, H = root.clientHeight || 1080, M = Math.min(W, H);
+    var NS = 'http://www.w3.org/2000/svg';
+
+    // ── Geometry: the target shape, and the shape it grows out of ──
+    var shape = data.shape === 'rect' ? 'rect' : 'circle';
+    var tw = W * num(data.w, 0.30);
+    var th = has(data.h) ? H * num(data.h, 0.30) : tw;
+    if (shape === 'circle') { var dd = Math.min(tw, th); tw = dd; th = dd; }
+    var T = { cx: W * num(data.x, 0.5), cy: H * num(data.y, 0.5), w: tw, h: th, r: 0 };
+    T.r = shape === 'circle' ? tw / 2 : Math.min(Math.min(tw, th) / 2, M * num(data.radius, 0.012));
+    var fromD = data.from && typeof data.from === 'object' ? data.from : null;
+    var F = T;
+    if (fromD) {
+      var fw = W * num(fromD.w, 0.30), fh = H * num(fromD.h, 0.085);
+      F = { cx: W * num(fromD.x, 0.5), cy: H * num(fromD.y, 0.5), w: fw, h: fh,
+        r: Math.min(Math.min(fw, fh) / 2, has(fromD.radius) ? M * num(fromD.radius, 0) : 1e9) };
+    }
+    var backdrop = data.backdrop || (fromD ? (fromD.color || '#0b0b0c') : 'transparent');
+    back.style.background = backdrop;
+    var bladeColor = data.blade_color || '#2a2a2e';
+
+    // The label the pill carried (so the handoff from the pill is seamless):
+    // same face, same size rule as wordmark-squeeze -- label_size x the pill height.
+    var lab = String(data.label || '');
+    if (lab) {
+      labelT.textContent = lab;
+      labelT.style.fontSize = (F.h * num(data.label_size, 0.4)) + 'px';
+      if (data.label_color) root.style.setProperty('--iris-ink', data.label_color);
+    } else labelBox.style.display = 'none';
+
+    if (data.image) img.src = String(data.image);
+    else img.style.display = 'none';
+
+    // ── Time ──
+    var at = num(data.at, 0);
+    var morphDur = num(data.morph_duration, 0.3);
+    var closeAt = num(data.close_at, at + 0.1), closeDur = num(data.close_duration, 0.15);
+    var openAt = num(data.open_at, closeAt + closeDur + 0.1), openDur = num(data.open_duration, 0.25);
+    var hideAt = has(data.hide_at) ? num(data.hide_at, 0) : null;
+    var closedAt = closeAt + closeDur;
+
+    var clamp = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var lerp = function (a, b, p) { return a + (b - a) * p; };
+    var io3 = function (p) { p = clamp(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+    var io2 = function (p) { p = clamp(p); return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; };
+    var out3 = function (p) { p = clamp(p); return 1 - Math.pow(1 - p, 3); };
+
+    var boxAt = function (t) {
+      var p = fromD ? io3((t - at) / morphDur) : 1;
+      return { cx: lerp(F.cx, T.cx, p), cy: lerp(F.cy, T.cy, p), w: lerp(F.w, T.w, p), h: lerp(F.h, T.h, p), r: lerp(F.r, T.r, p) };
+    };
+    // Aperture openness: 1 = fully open (blades out of the shape), 0 = the
+    // small closed hexagon.
+    var openness = function (t) {
+      if (t < closeAt) return 1;
+      if (t < closedAt) return 1 - io2((t - closeAt) / closeDur);
+      if (t < openAt) return 0;
+      return out3((t - openAt) / openDur);
+    };
+
+    // Six blades. Per-blade gradients (a little lighter toward the rim, each
+    // blade its own shade so the pinwheel reads).
+    var blades = [], edges = [], grads = [];
+    var shade = function (hex, k) {
+      var m = String(hex).match(/^#?([0-9a-f]{6})$/i); if (!m) return hex;
+      var v = parseInt(m[1], 16), c = [v >> 16, (v >> 8) & 255, v & 255].map(function (x) { return Math.max(0, Math.min(255, Math.round(x * k))); });
+      return 'rgb(' + c.join(',') + ')';
+    };
+    window.__mpIrisN = (window.__mpIrisN || 0) + 1;
+    var uid = 'mpiris' + window.__mpIrisN;
+    for (var i = 0; i < 6; i++) {
+      var lg = document.createElementNS(NS, 'linearGradient');
+      lg.setAttribute('id', uid + 'g' + i); lg.setAttribute('gradientUnits', 'userSpaceOnUse');
+      var tone = [1.0, 0.86, 1.1, 0.92, 1.04, 0.8][i];
+      var s0 = document.createElementNS(NS, 'stop'); s0.setAttribute('offset', '0'); s0.setAttribute('stop-color', shade(bladeColor, 0.62 * tone));
+      var s1 = document.createElementNS(NS, 'stop'); s1.setAttribute('offset', '1'); s1.setAttribute('stop-color', shade(bladeColor, 1.28 * tone));
+      lg.appendChild(s0); lg.appendChild(s1); defs.appendChild(lg); grads.push(lg);
+      var pth = document.createElementNS(NS, 'path'); pth.setAttribute('fill', 'url(#' + uid + 'g' + i + ')');
+      gEl.appendChild(pth); blades.push(pth);
+    }
+    // Edge highlights on top: the leading edge of every blade (vertex -> rim).
+    for (var e = 0; e < 6; e++) {
+      var ln = document.createElementNS(NS, 'path');
+      ln.setAttribute('fill', 'none'); ln.setAttribute('stroke', 'rgba(255,255,255,0.22)'); ln.setAttribute('stroke-linecap', 'round');
+      gEl.appendChild(ln); edges.push(ln);
+    }
+    // A soft top-left sheen over the blades.
+    var sheenG = document.createElementNS(NS, 'radialGradient');
+    sheenG.setAttribute('id', uid + 'sh'); sheenG.setAttribute('cx', '0.3'); sheenG.setAttribute('cy', '0.2'); sheenG.setAttribute('r', '0.9');
+    [['0', 'rgba(255,255,255,0.10)'], ['1', 'rgba(255,255,255,0)']].forEach(function (s) { var st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', s[0]); st.setAttribute('stop-color', s[1]); sheenG.appendChild(st); });
+    defs.appendChild(sheenG);
+    var sheen = document.createElementNS(NS, 'rect'); sheen.setAttribute('fill', 'url(#' + uid + 'sh)');
+    gEl.appendChild(sheen);
+
+    var f2 = function (v) { return (Math.round(v * 100) / 100).toString(); };
+    var drawBlades = function (b, o) {
+      // Aperture circumradius: from the small closed hexagon to one whose
+      // edges clear the whole shape (inradius >= the box's half diagonal).
+      var rr = Math.min(b.r, b.w / 2, b.h / 2);
+      var half = Math.hypot(b.w / 2 - rr, b.h / 2 - rr) + rr;   // the shape's farthest point
+      var aOpen = half / Math.cos(Math.PI / 6) * 1.04;
+      var aMin = Math.min(b.w, b.h) / 2 * num(data.closed_aperture, 0.035);
+      var a = lerp(aMin, aOpen, o);
+      var Rout = aOpen * 1.25 + 2;
+      // The blades turn as they close (a real iris rotates its ring).
+      var th0 = -Math.PI / 2 + (1 - o) * (Math.PI / 180) * num(data.turn, 38);
+      var V = [];
+      for (var k = 0; k < 6; k++) V.push([a * Math.cos(th0 + k * Math.PI / 3), a * Math.sin(th0 + k * Math.PI / 3)]);
+      // E[k]: edge (k-1 -> k) extended beyond V[k] to the rim circle.
+      var ext = function (p, q) {
+        var dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+        var bq = q[0] * dx + q[1] * dy, cq = q[0] * q[0] + q[1] * q[1] - Rout * Rout;
+        var s = -bq + Math.sqrt(Math.max(0, bq * bq - cq));
+        return [q[0] + dx * s, q[1] + dy * s];
+      };
+      var E = [];
+      for (var k2 = 0; k2 < 6; k2++) E[k2] = ext(V[(k2 + 5) % 6], V[k2]);
+      for (var i2 = 0; i2 < 6; i2++) {
+        var v0 = V[i2], v1 = V[(i2 + 1) % 6], e1 = E[(i2 + 1) % 6], e0 = E[i2];
+        // two vertices, the edge extension out to the rim, the SHORT arc back
+        // to the other extension, and home along it.
+        var d = 'M' + f2(v0[0]) + ' ' + f2(v0[1]) + 'L' + f2(v1[0]) + ' ' + f2(v1[1]) + 'L' + f2(e1[0]) + ' ' + f2(e1[1]) +
+          'A' + f2(Rout) + ' ' + f2(Rout) + ' 0 0 ' + (((e1[0] * e0[1] - e1[1] * e0[0]) > 0) ? 1 : 0) + ' ' + f2(e0[0]) + ' ' + f2(e0[1]) + 'Z';
+        blades[i2].setAttribute('d', d);
+        var mid = [(e0[0] + e1[0]) / 2, (e0[1] + e1[1]) / 2];
+        grads[i2].setAttribute('x1', f2(v0[0])); grads[i2].setAttribute('y1', f2(v0[1]));
+        grads[i2].setAttribute('x2', f2(mid[0])); grads[i2].setAttribute('y2', f2(mid[1]));
+        edges[i2].setAttribute('d', 'M' + f2(v0[0]) + ' ' + f2(v0[1]) + 'L' + f2(e1[0]) + ' ' + f2(e1[1]));
+        edges[i2].setAttribute('stroke-width', f2(Math.max(1, M * 0.0016)));
+      }
+      sheen.setAttribute('x', f2(-b.w / 2)); sheen.setAttribute('y', f2(-b.h / 2));
+      sheen.setAttribute('width', f2(b.w)); sheen.setAttribute('height', f2(b.h));
+    };
+
+    var render = function (t) {
+      var on = t >= at && !(hideAt !== null && t >= hideAt);
+      box.style.visibility = on ? 'visible' : 'hidden';
+      if (!on) return;
+      var b = boxAt(t);
+      var L = b.cx - b.w / 2, Tp = b.cy - b.h / 2;
+      box.style.left = L + 'px'; box.style.top = Tp + 'px';
+      box.style.width = b.w + 'px'; box.style.height = b.h + 'px';
+      box.style.borderRadius = b.r + 'px';
+      // The photo sits at the target box in frame space whatever the box is doing.
+      var shown = t >= closedAt;
+      img.style.visibility = shown ? 'inherit' : 'hidden';
+      img.style.left = (T.cx - T.w / 2 - L) + 'px'; img.style.top = (T.cy - T.h / 2 - Tp) + 'px';
+      img.style.width = T.w + 'px'; img.style.height = T.h + 'px';
+      back.style.visibility = shown ? 'hidden' : 'inherit';
+      if (lab) {
+        labelBox.style.visibility = shown ? 'hidden' : 'inherit';
+        labelBox.style.left = (F.cx - F.w / 2 - L) + 'px'; labelBox.style.top = (F.cy - F.h / 2 - Tp) + 'px';
+        labelBox.style.width = F.w + 'px'; labelBox.style.height = F.h + 'px';
+      }
+      var o = openness(t);
+      var bladesOn = o < 0.999;
+      svg.style.visibility = bladesOn ? 'inherit' : 'hidden';
+      rim.style.visibility = bladesOn ? 'inherit' : 'hidden';
+      if (bladesOn) {
+        svg.setAttribute('width', f2(b.w)); svg.setAttribute('height', f2(b.h));
+        svg.setAttribute('viewBox', f2(-b.w / 2) + ' ' + f2(-b.h / 2) + ' ' + f2(b.w) + ' ' + f2(b.h));
+        drawBlades(b, o);
+      }
+    };
+
+    var end = Math.max(num(ctx && ctx.duration, 0), openAt + openDur, at + morphDur, hideAt || 0) + 1;
+    var clock = { t: 0 };
+    render(0);
+    tl.fromTo(clock, { t: 0 }, { t: end, duration: end, ease: 'none', immediateRender: false,
+      onUpdate: function () { render(clock.t); } }, 0);
+    return tl;
+  }
+</script>

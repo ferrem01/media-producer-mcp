@@ -1,6 +1,7 @@
 <template>
   <div class="cfl">
     <div class="cfl-dot"></div>
+    <div class="cfl-shape"></div>
     <div class="cfl-text"><div class="cfl-label"></div><div class="cfl-sub"></div></div>
   </div>
 </template>
@@ -14,6 +15,10 @@
   .cfl { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
     font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
   .cfl-dot { position: absolute; left: 0; top: 0; border-radius: 50%; background: var(--cfl-c, #bc361b); will-change: transform; }
+  /* SHAPE floods (the relay scene joiner): a shape on screen floods the frame
+     (mode "flood"), or the scene opens solid and contracts into its first
+     shape (mode "contract"). */
+  .cfl-shape { position: absolute; left: 0; top: 0; width: 0; height: 0; display: none; background: var(--cfl-c, #0b0b0c); transform-origin: 50% 50%; will-change: transform; }
   .cfl-text { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--cfl-ink, #fff); white-space: nowrap; }
   .cfl-label { font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
   .cfl-sub { font-weight: 500; opacity: 0.92; margin-top: 0.5em; }
@@ -28,6 +33,61 @@
     if (!root || !dot) return tl;
     var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
     var W = root.clientWidth || 1920, H = root.clientHeight || 1080;
+
+    // ── SHAPE modes: the relay's scene joins (flood out / contract in) ──
+    if (data.mode === 'flood' || data.mode === 'contract') {
+      var shp = el.querySelector('.cfl-shape');
+      var M = Math.min(W, H);
+      root.style.setProperty('--cfl-c', data.color || '#0b0b0c');
+      dot.style.display = 'none'; if (text) text.style.display = 'none';
+      // A shape in frame fractions -> a pixel box; radius is a fraction of the
+      // frame's shorter side, capped at fully round (omitted = fully round).
+      var boxOf = function (s) {
+        s = s && typeof s === 'object' ? s : {};
+        var w = W * num(s.w, 0.3), h = H * num(s.h, 0.085);
+        var r = Math.min(Math.min(w, h) / 2, (s.radius === undefined || s.radius === null) ? 1e9 : M * num(s.radius, 0));
+        return { left: W * num(s.x, 0.5) - w / 2, top: H * num(s.y, 0.5) - h / 2, width: w, height: h, borderRadius: r };
+      };
+      var put = function (b) { return { left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px', borderRadius: b.borderRadius + 'px' }; };
+      var hideAt = (data.hide_at !== undefined && data.hide_at !== null && data.hide_at !== '') ? num(data.hide_at, 0) : null;
+      var dur = num(data.duration, num(data.flood_duration, 0.3));
+      if (data.mode === 'flood') {
+        // The shape already on screen floods: it overscales about its centre
+        // until the frame's every corner (with a margin) is inside it.
+        var fb = boxOf(data.from_shape);
+        gsap.set(shp, put(fb));
+        gsap.set(shp, { display: 'block', autoAlpha: 0, scale: 1 });
+        var sat = num(data.at, 0), fat2 = num(data.flood_at, sat);
+        var hw = fb.width / 2, hh = fb.height / 2, rr = fb.borderRadius, cxs = fb.left + hw, cys = fb.top + hh;
+        var pad = 0.03 * Math.max(W, H);
+        var covers = function (k) {
+          var ok = true;
+          [[-pad, -pad], [W + pad, -pad], [-pad, H + pad], [W + pad, H + pad]].forEach(function (c) {
+            var dx = Math.max(0, Math.abs(c[0] - cxs) - k * (hw - rr)), dy = Math.max(0, Math.abs(c[1] - cys) - k * (hh - rr));
+            if (dx * dx + dy * dy > (k * rr) * (k * rr)) ok = false;
+          });
+          return ok;
+        };
+        var lo = 1, hi = 2;
+        while (!covers(hi) && hi < 1e5) hi *= 2;
+        for (var it = 0; it < 40; it++) { var mid = (lo + hi) / 2; if (covers(mid)) hi = mid; else lo = mid; }
+        var reachK = hi * 1.04;
+        if (sat <= 0) gsap.set(shp, { autoAlpha: 1 }); else tl.set(shp, { autoAlpha: 1 }, sat);
+        tl.fromTo(shp, { scale: 1 }, { scale: reachK, duration: dur, ease: data.ease || 'power2.in', immediateRender: false }, fat2);
+        if (hideAt !== null) tl.set(shp, { autoAlpha: 0 }, hideAt);
+        return tl;
+      }
+      // contract: solid from the first frame, then pulls into its first shape.
+      var full = { left: -0.02 * W, top: -0.02 * H, width: W * 1.04, height: H * 1.04, borderRadius: 0 };
+      var tb = boxOf(data.to_shape);
+      gsap.set(shp, put(full));
+      gsap.set(shp, { display: 'block', autoAlpha: 1 });
+      var cat2 = num(data.at, 0.25);
+      tl.fromTo(shp, put(full), Object.assign(put(tb), { duration: dur, ease: data.ease || 'power2.out', immediateRender: false }), cat2);
+      if (hideAt !== null) tl.set(shp, { autoAlpha: 0 }, hideAt);
+      return tl;
+    }
+
     var color = data.color || '#bc361b';
     root.style.setProperty('--cfl-c', color);
     // Ink that reads on the flood: white on a dark colour, near-black on a light one.
