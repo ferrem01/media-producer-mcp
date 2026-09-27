@@ -36,6 +36,7 @@
     "tagline_at": { "type": "number", "label": "return: when the tagline rises back (default spring_at + 0.75)", "optional": true },
     "cursor": { "type": "boolean", "label": "A cursor comes in to press the pill when click_at is set", "optional": true, "default": true },
     "cursor_from": { "type": "array", "items": { "type": "number" }, "label": "Cursor start [x, y], fractions of the frame", "optional": true },
-    "cursor_to": { "type": "array", "items": { "type": "number" }, "label": "Where the cursor presses [x, y] (default just inside the pill)", "optional": true }
+    "cursor_to": { "type": "array", "items": { "type": "number" }, "label": "Where the cursor presses [x, y] (default just inside the pill)", "optional": true },
+    "cursor_size": { "type": "number", "label": "Cursor size, a fraction of the box width (default 0.027 -- the same hand as photo-unfold and cursor-performer)", "optional": true, "default": 0.027 }
   }
 }

@@ -274,7 +274,7 @@
     // The hand that presses the pill (when there is a click): it waits at
     // cursor_from, travels to cursor_to, presses, and hands on at hide_at.
     if (clickAt !== null && data.cursor !== false && typeof createCursor === 'function') {
-      var cur = createCursor(root, { color: '#0b0b0c', size: Math.round(W * 0.02) });
+      var cur = createCursor(root, { color: '#0b0b0c', size: Math.round(W * (Number(data.cursor_size) || 0.027)) });
       var cf = Array.isArray(data.cursor_from) ? data.cursor_from : [0.82, 0.79];
       var ct = Array.isArray(data.cursor_to) ? data.cursor_to : [0.52, 0.51];
       gsap.set(cur, { x: W * num(cf[0], 0.82), y: H * num(cf[1], 0.79), autoAlpha: 0 });
