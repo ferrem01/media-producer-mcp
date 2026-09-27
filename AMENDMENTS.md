@@ -25,6 +25,11 @@ paths did not.
   (server.ts; reorder now also refuses a non-permutation instead of silently
   filtering) and the storyboard tool's `delete_index` / `insert_at`
   (llm/storyboard-surgical.ts).
+- **A monkey in the house set.** The Old Chimp film wanted a monkey sound on
+  "this guy"; the house shelf had none and Freesound needs a key. `monkey`
+  (audio/foley.ts) is a synthesized cartoon chimp -- four "ooh-ooh-AH-AH"
+  hoots: harmonics of a gliding pitch shaped by vowel formants, deterministic
+  like the rest of the set. Listed in the sfx tool and the writer's prompt.
 - **A brand clip in a screencast-frame is still a brand clip.** Adding the
   brand outro to the analytics film as a full-frame `screencast-frame`
   (the shape the pipeline's own bookends use) got it auto-compressed from

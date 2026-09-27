@@ -30,6 +30,20 @@ describe("the house foley set", () => {
     expect(src).not.toMatch(/Math\.random/);
   });
 
+  // The Old Chimp film wanted a monkey on "this guy" and the catalogues had
+  // none without a key: the house set now carries a cartoon chimp.
+  it("has a monkey: four hoots with gaps between, tagged so a search for monkey or chimp finds it", async () => {
+    const { renderFoley } = await import("../src/audio/foley.js");
+    const s = renderFoley("monkey");
+    const sr = 48000;
+    const loud = (a: number, b: number) => { let e = 0; for (let i = Math.round(a * sr); i < Math.round(b * sr); i++) e += s[i] * s[i]; return Math.sqrt(e / ((b - a) * sr)); };
+    // Four voiced hoots with gaps between them.
+    for (const [a, b] of [[0.03, 0.14], [0.23, 0.34], [0.45, 0.6], [0.69, 0.86]]) expect(loud(a, b)).toBeGreaterThan(0.08);
+    for (const [a, b] of [[0.175, 0.195], [0.385, 0.415]]) expect(loud(a, b)).toBeLessThan(0.05);
+    const { FOLEY_SET } = await import("../src/audio/foley.js");
+    expect(FOLEY_SET.find((f) => f.id === "monkey")?.tags).toEqual(expect.arrayContaining(["monkey", "chimp"]));
+  });
+
   it("writes a real WAV: RIFF header, 16-bit mono at 48k, the data length the samples need", async () => {
     const { renderFoley, wavBytes } = await import("../src/audio/foley.js");
     const samples = renderFoley("tick");
