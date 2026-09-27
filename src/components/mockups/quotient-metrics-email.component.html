@@ -1,0 +1,544 @@
+<template>
+  <div class="qme">
+    <div class="qme-card">
+      <div class="qme-top" data-anchor="header">
+        <div class="qme-tabs-wrap">
+          <div class="qme-tabs" data-anchor="tabs" role="tablist"></div>
+        </div>
+        <div class="qme-actions">
+          <button class="qme-sq" data-cursor-target="more"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          <button class="qme-sq" data-cursor-target="share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg></button>
+          <button class="qme-chip qme-camp" data-cursor-target="campaign">
+            <svg class="qme-camp-ico" viewBox="0 0 24 24"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg>
+            <span class="qme-camp-label"></span>
+            <span class="qme-camp-prog"><span class="qme-camp-count"></span><svg class="qme-ring" viewBox="0 0 14 14"><circle class="qme-ring-track" cx="7" cy="7" r="5.5"/><circle class="qme-ring-arc" cx="7" cy="7" r="5.5"/></svg></span>
+          </button>
+          <button class="qme-chip qme-threads" data-cursor-target="threads"><span class="qme-threads-label"></span><svg viewBox="0 0 24 24"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
+          <span class="qme-status" data-cursor-target="status"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg><span class="qme-status-label"></span></span>
+        </div>
+      </div>
+      <div class="qme-body">
+        <div class="qme-kpis" data-anchor="kpis"></div>
+        <div class="qme-panel qme-funnel" data-anchor="funnel">
+          <h3 class="qme-ftitle"></h3>
+          <div class="qme-chart" data-anchor="chart">
+            <div class="qme-yaxis"></div>
+            <div class="qme-plot">
+              <div class="qme-grid"></div>
+              <div class="qme-bars"></div>
+            </div>
+            <div class="qme-xaxis"></div>
+          </div>
+        </div>
+        <div class="qme-panel qme-foot" data-anchor="footer">
+          <div class="qme-foot-copy">
+            <p class="qme-foot-title"></p>
+            <p class="qme-foot-text"></p>
+          </div>
+          <div class="qme-foot-btns">
+            <span class="qme-btn qme-btn-outline" data-cursor-target="open-reports"><span class="qme-foot-sec"></span><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+            <span class="qme-btn qme-btn-dark" data-cursor-target="ask-agent"><svg viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg><span class="qme-foot-pri"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  /* QUOTIENT EMAIL BROADCAST -- METRICS TAB. Hand-authored from the real
+     screen (getquotient.ai email-broadcasts/<id>/metrics, 1288px wide):
+     tabs + action chips, four KPI tiles, the "Broadcast Engagement Funnel"
+     bar chart and the "Want to dig deeper?" card below the fold. Every size
+     is written in the capture's own CSS px as calc(N * var(--u)); the script
+     sets --u from the box (1300u across), so the screen reads the same in the
+     shell's content well, a split half or a full frame. */
+  .qme, .qme * { box-sizing: border-box; max-width: none; }
+  .qme {
+    --u: 1px;
+    --qme-accent: #393bf5;
+    position: absolute; inset: 0;
+    font-family: Inter, 'Inter Fallback', system-ui, -apple-system, sans-serif;
+    color: #17171c; font-size: calc(16 * var(--u)); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 6px 4px;
+  }
+  .qme svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex: none; }
+  .qme button { font-family: inherit; color: inherit; margin: 0; }
+  .qme p, .qme h3 { margin: 0; }
+
+  .qme-card {
+    position: relative; width: 100%; height: 100%;
+    background: #fff;
+    /* >= 1.5px border + >= 0.12-alpha shadow: the ghost-panel gate's visible
+       edge at video scale (same treatment as quotient-report). */
+    border: 2px solid #dedcd6; border-radius: calc(14 * var(--u));
+    box-shadow: 0 10px 32px rgba(23, 23, 28, 0.16);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .qme.is-docked { padding: 0; }
+  .qme.is-docked .qme-card { border: 0; box-shadow: none; }
+
+  /* ── top bar ── */
+  .qme-top {
+    flex: none; position: relative; z-index: 2;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: calc(8 * var(--u));
+    height: calc(56 * var(--u)); padding: 0 calc(8 * var(--u));
+    border-bottom: 1px solid #eff0f6; background: #fff; font-weight: 500;
+  }
+  .qme-tabs-wrap { flex: none; display: flex; align-items: flex-end; padding-left: calc(16 * var(--u)); }
+  .qme-tabs { display: flex; align-items: center; border-bottom: 1px solid #eff0f6; transform: translateY(calc(1.5 * var(--u))); }
+  .qme-tab {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    height: calc(34 * var(--u)); padding: calc(6 * var(--u)) calc(12 * var(--u));
+    border-bottom: calc(2 * var(--u)) solid transparent;
+    color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); white-space: nowrap;
+  }
+  .qme-tab svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-right: calc(8 * var(--u)); }
+  .qme-tab.is-active { color: #17171c; border-bottom-color: #17171c; }
+
+  .qme-actions { flex: none; align-self: center; display: flex; align-items: center; gap: calc(8 * var(--u)); }
+  .qme-sq, .qme-chip {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    height: calc(36 * var(--u)); background: #fff;
+    border: 1px solid #eff0f6; border-radius: calc(12 * var(--u));
+    box-shadow: 0 calc(1.5 * var(--u)) calc(1.5 * var(--u)) rgba(44, 51, 69, 0.04), 0 calc(0.5 * var(--u)) calc(0.5 * var(--u)) rgba(154, 157, 166, 0.03);
+    font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; white-space: nowrap; padding: 0;
+  }
+  .qme-sq { width: calc(36 * var(--u)); }
+  .qme-sq svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .qme-chip { padding: 0 calc(12 * var(--u)); gap: calc(8 * var(--u)); }
+  .qme-camp-ico { width: calc(14 * var(--u)); height: calc(14 * var(--u)); color: #1c82ff; }
+  .qme-camp-label { display: block; max-width: calc(128 * var(--u)); overflow: hidden; text-overflow: ellipsis; }
+  .qme-camp-prog { display: flex; align-items: center; gap: calc(4 * var(--u)); margin-left: calc(4 * var(--u));
+                   color: #54545f; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); font-variant-numeric: tabular-nums; }
+  .qme-ring { width: calc(14 * var(--u)); height: calc(14 * var(--u)); transform: rotate(-90deg); overflow: visible; }
+  .qme-ring circle { fill: none; stroke-width: 3; }
+  .qme-ring-track { stroke: #e6e7ee; }
+  .qme-ring-arc { stroke: #22a447; stroke-linecap: round; }
+  .qme-threads svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .qme-status { display: flex; align-items: center; gap: calc(8 * var(--u)); height: calc(36 * var(--u));
+                font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); white-space: nowrap; padding-right: calc(8 * var(--u)); }
+  .qme-status svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); color: #479e66; }
+
+  /* ── body ── */
+  .qme-body {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; gap: calc(24 * var(--u));
+    padding: calc(28 * var(--u)) calc(32 * var(--u)) calc(24 * var(--u));
+  }
+  .qme-kpis { flex: none; display: grid; grid-template-columns: repeat(var(--qme-cols, 4), minmax(0, 1fr)); gap: calc(16 * var(--u)); }
+  .qme-kpi, .qme-panel {
+    position: relative; background: #fff;
+    border: 1px solid #eff0f6; border-radius: calc(12 * var(--u));
+    box-shadow: 0 calc(8 * var(--u)) calc(8 * var(--u)) rgba(25, 44, 128, 0.02), 0 calc(2 * var(--u)) calc(4 * var(--u)) rgba(196, 196, 215, 0.17), 0 calc(1 * var(--u)) calc(2 * var(--u)) rgba(196, 196, 215, 0.25);
+  }
+  .qme-kpi {
+    display: flex; flex-direction: column; justify-content: space-between;
+    height: calc(var(--qme-tile-h, 124) * var(--u)); padding: calc(24 * var(--u));
+  }
+  .qme-kpi-label { display: flex; align-items: flex-start; gap: calc(8 * var(--u)); font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500;
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qme-kpi-label svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-top: calc(2 * var(--u)); }
+  .qme-kpi-value { font-size: calc(24 * var(--u)); line-height: calc(32 * var(--u)); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .qme-funnel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: calc(24 * var(--u)) calc(24 * var(--u)) calc(20 * var(--u)); }
+  .qme-ftitle { flex: none; font-size: calc(18 * var(--u)); line-height: calc(18 * var(--u)); font-weight: 500; letter-spacing: calc(-0.45 * var(--u)); }
+  .qme-chart { position: relative; flex: 1; min-height: 0; margin-top: calc(22 * var(--u)); font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); color: #54545f; }
+  .qme-plot { position: absolute; left: calc(65 * var(--u)); right: calc(5 * var(--u)); top: calc(5 * var(--u)); bottom: calc(35 * var(--u)); }
+  .qme-grid, .qme-bars { position: absolute; inset: 0; }
+  .qme-gl { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid #eef0f4; }
+  .qme-yaxis { position: absolute; left: 0; width: calc(57 * var(--u)); top: calc(5 * var(--u)); bottom: calc(35 * var(--u)); }
+  .qme-yt { position: absolute; right: 0; transform: translateY(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .qme-xaxis { position: absolute; left: calc(65 * var(--u)); right: calc(5 * var(--u)); bottom: 0; height: calc(19 * var(--u)); display: flex; }
+  .qme-xt { flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qme-col { position: absolute; top: 0; bottom: 0; }
+  .qme-bar { position: absolute; left: 10%; right: 10%; bottom: 0; height: 0; background: var(--qme-bar, #3b82f6); }
+  .qme-bar-val { position: absolute; left: 0; right: 0; bottom: 100%; padding-bottom: calc(6 * var(--u)); text-align: center;
+                 color: #17171c; font-size: calc(13 * var(--u)); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .qme-foot { flex: none; display: flex; align-items: center; gap: calc(16 * var(--u)); padding: calc(18 * var(--u)) calc(24 * var(--u)); }
+  .qme-foot-copy { flex: 1 1 0; min-width: 0; }
+  .qme-foot-title { font-weight: 500; font-size: calc(16 * var(--u)); line-height: calc(24 * var(--u)); }
+  .qme-foot-text { color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qme-foot-btns { flex: none; display: flex; align-items: center; gap: calc(8 * var(--u)); }
+  .qme-btn { position: relative; display: flex; align-items: center; justify-content: center; gap: calc(6 * var(--u));
+             height: calc(36 * var(--u)); padding: 0 calc(12 * var(--u)); border-radius: calc(12 * var(--u));
+             font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; white-space: nowrap; }
+  .qme-btn svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .qme-btn-outline { background: #fff; border: 1px solid #eff0f6;
+                     box-shadow: 0 calc(1.5 * var(--u)) calc(1.5 * var(--u)) rgba(44, 51, 69, 0.04); }
+  .qme-btn-dark { background: #17171c; color: #fff; }
+
+  /* highlight ring (script verb) */
+  .qme-hl { position: absolute; inset: calc(-3 * var(--u)); border-radius: inherit; pointer-events: none; z-index: 3;
+            border: calc(2.5 * var(--u)) solid var(--qme-accent); opacity: 0; visibility: hidden; }
+  .qme-col .qme-hl { left: 6%; right: 6%; top: auto; border-radius: calc(6 * var(--u)); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.qme');
+    var card = el.querySelector('.qme-card');
+    var docked = !!data.docked;
+    if (docked) root.classList.add('is-docked');
+    var num = function (v, d) { var n = Number(v); return isFinite(n) ? n : d; };
+    var norm = function (s) { return String(s == null ? '' : s).toLowerCase().replace(/^\s*\d+\.\s*/, '').replace(/[^a-z0-9%]+/g, ' ').trim(); };
+    var slug = function (s) { return norm(s).replace(/\s+/g, '-'); };
+    var accent = data.accent || '#393bf5';
+    root.style.setProperty('--qme-accent', accent);
+    if (data.bar_color) root.style.setProperty('--qme-bar', data.bar_color);
+    if (data.card_background) card.style.background = data.card_background;
+
+    // ── Size: 1u = one CSS px of the real 1300px-wide screen. The funnel
+    // card flexes, so the height only has to hold the fixed rows. ──
+    var fit = function () {
+      var w = el.clientWidth || root.clientWidth || 1800, h = el.clientHeight || root.clientHeight || 960;
+      var u = Math.max(0.55, Math.min(w / 1300, h / 620) * num(data.scale, 1));
+      root.style.setProperty('--u', u.toFixed(4) + 'px');
+    };
+    fit();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { fit(); }).observe(el);
+
+    var ICONS = {
+      metrics: '<path d="M12 16v5"/><path d="M16 14v7"/><path d="M20 10v11"/><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15"/><path d="M4 18v3"/><path d="M8 14v7"/>',
+      recipients: '<path d="M11 5h10"/><path d="M11 12h10"/><path d="M11 19h10"/><path d="M4 4h1v5"/><path d="M4 9h2"/><path d="M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"/>',
+      details: '<path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/>',
+      editor: '<path d="m11 10 3 3"/><path d="M6.5 21A3.5 3.5 0 1 0 3 17.5a2.62 2.62 0 0 1-.708 1.792A1 1 0 0 0 3 21z"/><path d="M9.969 17.031 21.378 5.624a1 1 0 0 0-3.002-3.002L6.967 14.031"/>',
+      send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+      check: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+      open: '<path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z"/><path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/>',
+      click: '<path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/>',
+      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      reply: '<polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>',
+      dollar: '<line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      trending: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+      bounce: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+      eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>'
+    };
+    ICONS.delivered = ICONS.check; ICONS['mail-open'] = ICONS.open; ICONS.pointer = ICONS.click; ICONS.sent = ICONS.send;
+    var svg = function (key) { return '<svg viewBox="0 0 24 24">' + (ICONS[key] || '') + '</svg>'; };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+
+    // ── number formatting (count-ups roll THROUGH the final format) ──
+    var parseVal = function (v) {
+      if (typeof v === 'number') return { n: v };
+      var s = String(v == null ? '' : v).trim(), out = { n: 0 };
+      var m = s.replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+      if (m) out.n = parseFloat(m[0]);
+      if (/%/.test(s)) { out.format = 'percent'; out.decimals = m && m[1] ? m[1].length - 1 : 0; }
+      else if (/^\$/.test(s)) out.format = 'currency';
+      if (/k$/i.test(s)) out.n *= 1e3; else if (/m$/i.test(s)) out.n *= 1e6;
+      return out;
+    };
+    var group = function (n, d) { return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); };
+    var fmt = function (spec, v) {
+      var f = spec.format || 'number', d = spec.decimals, s;
+      if (f === 'percent') s = v.toFixed(d == null ? 2 : d) + '%';
+      else if (f === 'currency') s = '$' + group(v, d == null ? 0 : d);
+      else if (f === 'compact') {
+        var a = Math.abs(v);
+        s = a >= 1e6 ? (v / 1e6).toFixed(d == null ? 1 : d) + 'M' : a >= 1e3 ? (v / 1e3).toFixed(d == null ? 1 : d) + 'K' : group(v, 0);
+      } else s = group(v, d == null ? 0 : d);
+      return (spec.prefix || '') + s + (spec.suffix || '');
+    };
+    var specOf = function (k) {
+      var p = parseVal(k.value);
+      return { value: p.n, format: k.format || p.format || (/rate/i.test(k.label || '') ? 'percent' : 'number'),
+        decimals: k.decimals != null ? k.decimals : p.decimals, prefix: k.prefix, suffix: k.suffix };
+    };
+
+    // ── top bar ──
+    var tabDefs = (Array.isArray(data.tabs) && data.tabs.length ? data.tabs : ['Metrics', 'Recipients', 'Details', 'Editor'])
+      .map(function (t) { return typeof t === 'string' ? { label: t } : (t || {}); });
+    var activeName = norm(data.active_tab || tabDefs[0].label);
+    var tabsWrap = el.querySelector('.qme-tabs');
+    var tabs = tabDefs.map(function (t, i) {
+      var a = document.createElement('div');
+      a.className = 'qme-tab'; a.setAttribute('role', 'tab');
+      a.setAttribute('data-cursor-target', 'tab-' + slug(t.label));
+      a.innerHTML = svg(t.icon || norm(t.label)) + '<span class="qme-tab-label">' + esc(t.label) + '</span>';
+      if (!ICONS[t.icon || norm(t.label)]) a.querySelector('svg').style.display = 'none';
+      tabsWrap.appendChild(a);
+      return { el: a, name: norm(t.label) };
+    });
+    if (!tabs.some(function (t) { return t.name === activeName; })) activeName = tabs[0].name;
+    tabs.forEach(function (t) { if (t.name === activeName) t.el.classList.add('is-active'); });
+
+    var campaign = data.campaign != null ? data.campaign : 'Q3 Flows Launch';
+    el.querySelector('.qme-camp-label').textContent = campaign;
+    var prog = String(data.campaign_progress != null ? data.campaign_progress : '4/4');
+    el.querySelector('.qme-camp-count').textContent = prog;
+    var pm = prog.match(/(\d+)\s*\/\s*(\d+)/);
+    var frac = data.campaign_ring != null ? num(data.campaign_ring, 1) : (pm && +pm[2] ? +pm[1] / +pm[2] : 1);
+    frac = Math.max(0, Math.min(1, frac));
+    var arc = el.querySelector('.qme-ring-arc'), C = 2 * Math.PI * 5.5;
+    arc.style.strokeDasharray = C.toFixed(3);
+    arc.style.strokeDashoffset = (C * (1 - frac)).toFixed(3);
+    if (data.campaign === false) el.querySelector('.qme-camp').style.display = 'none';
+    var threadsLabel = data.threads_label || ('Threads (' + (data.threads != null ? data.threads : 3) + ')');
+    el.querySelector('.qme-threads-label').textContent = threadsLabel;
+    if (data.threads === false) el.querySelector('.qme-threads').style.display = 'none';
+    el.querySelector('.qme-status-label').textContent = data.status != null ? data.status : 'Sent 3 days ago';
+    if (data.status === false) el.querySelector('.qme-status').style.display = 'none';
+
+    // ── KPI tiles ──
+    var kpiDefs = Array.isArray(data.kpis) && data.kpis.length ? data.kpis : [
+      { label: 'Total Emails Sent', icon: 'send', value: 18400 },
+      { label: 'Delivery Rate', icon: 'check', value: 99.2, format: 'percent' },
+      { label: 'Open Rate', icon: 'open', value: 52.4, format: 'percent' },
+      { label: 'Click Rate', icon: 'click', value: 11.8, format: 'percent' }
+    ];
+    var DEFAULT_KPI_ICONS = ['send', 'check', 'open', 'click'];
+    var kpiWrap = el.querySelector('.qme-kpis');
+    root.style.setProperty('--qme-cols', String(Math.min(6, kpiDefs.length)));
+    if (data.tile_height) root.style.setProperty('--qme-tile-h', String(num(data.tile_height, 124)));
+    var kpis = kpiDefs.map(function (k, i) {
+      var spec = specOf(k);
+      var tile = document.createElement('div');
+      tile.className = 'qme-kpi';
+      tile.setAttribute('data-anchor', 'kpi-' + i);
+      tile.setAttribute('data-cursor-target', 'kpi-' + i);
+      var icon = k.icon === false ? '' : svg(k.icon || DEFAULT_KPI_ICONS[i] || 'trending');
+      tile.innerHTML = '<div class="qme-kpi-label">' + icon + '<span>' + esc(k.label || '') + '</span></div>' +
+        '<div class="qme-kpi-value"></div>';
+      kpiWrap.appendChild(tile);
+      var valueEl = tile.querySelector('.qme-kpi-value');
+      var finalText = k.display != null ? String(k.display) : fmt(spec, spec.value);
+      valueEl.textContent = finalText;
+      return { tile: tile, valueEl: valueEl, spec: spec, label: norm(k.label), finalText: finalText,
+        start: k.from != null ? parseVal(k.from).n : 0, last: spec.value, lastText: finalText };
+    });
+
+    // ── funnel ──
+    el.querySelector('.qme-ftitle').textContent = data.funnel_title != null ? data.funnel_title : 'Broadcast Engagement Funnel';
+    var stageDefs = Array.isArray(data.funnel) && data.funnel.length ? data.funnel : [
+      { label: 'Sent', value: 18400 },
+      { label: 'Delivered', value: 18253 },
+      { label: 'Opened', value: 9565 },
+      { label: 'Clicked', value: 2154 }
+    ];
+    var stages = stageDefs.map(function (s, i) {
+      var v = parseVal(s.value).n;
+      var lbl = String(s.label || '');
+      var shown = (data.number_stages === false || /^\s*\d+\./.test(lbl)) ? lbl : (i + 1) + '. ' + lbl;
+      return { v: v, label: shown, name: norm(lbl) };
+    });
+    // Nice axis like recharts: 4 intervals of a 1/2/2.5/5/7.5 x 10^n step.
+    var peak = Math.max.apply(null, stages.map(function (s) { return s.v; }).concat([1]));
+    var intervals = Math.max(1, Math.round(num(data.axis_ticks, 4)));
+    var axisMax = num(data.axis_max, 0);
+    if (!(axisMax > 0)) {
+      var raw = peak / intervals, mag = Math.pow(10, Math.floor(Math.log10(raw))), steps = [1, 2, 2.5, 5, 7.5, 10], step = 10 * mag;
+      for (var si = 0; si < steps.length; si++) { if (steps[si] * mag >= raw - 1e-9) { step = steps[si] * mag; break; } }
+      axisMax = step * intervals;
+    }
+    var axisFmt = function (v) { return data.axis_format === 'compact' ? fmt({ format: 'compact', decimals: 0 }, v) : data.axis_format === 'comma' ? group(v, 0) : String(Math.round(v * 100) / 100); };
+    var grid = el.querySelector('.qme-grid'), yaxis = el.querySelector('.qme-yaxis');
+    var gridEls = [], tickEls = [];
+    for (var ti = 0; ti <= intervals; ti++) {
+      var pct = (ti / intervals) * 100;
+      var gl = document.createElement('div'); gl.className = 'qme-gl'; gl.style.bottom = pct + '%'; grid.appendChild(gl); gridEls.push(gl);
+      var yt = document.createElement('div'); yt.className = 'qme-yt'; yt.style.top = (100 - pct) + '%'; yt.textContent = axisFmt(axisMax * ti / intervals); yaxis.appendChild(yt); tickEls.push(yt);
+    }
+    var barsWrap = el.querySelector('.qme-bars'), xaxis = el.querySelector('.qme-xaxis');
+    var showVals = !!data.bar_values;
+    var hPct = function (v) { return Math.max(0, Math.min(100, (v / axisMax) * 100)); };
+    stages.forEach(function (s, i) {
+      var col = document.createElement('div'); col.className = 'qme-col';
+      col.style.left = (i / stages.length * 100) + '%'; col.style.width = (100 / stages.length) + '%';
+      col.setAttribute('data-anchor', 'stage-' + i);
+      col.setAttribute('data-cursor-target', 'stage-' + i);
+      var bar = document.createElement('div'); bar.className = 'qme-bar'; col.appendChild(bar);
+      if (showVals) { var bv = document.createElement('div'); bv.className = 'qme-bar-val'; bar.appendChild(bv); s.valEl = bv; bv.textContent = group(s.v, 0); }
+      barsWrap.appendChild(col);
+      var xt = document.createElement('div'); xt.className = 'qme-xt'; xt.textContent = s.label; xaxis.appendChild(xt);
+      s.col = col; s.bar = bar; s.last = s.v;
+      bar.style.height = hPct(s.v) + '%';
+    });
+
+    // ── footer card (below the product's fold) ──
+    var foot = data.footer || {};
+    var footEl = el.querySelector('.qme-foot');
+    if (data.show_footer === false || data.footer === false) footEl.style.display = 'none';
+    el.querySelector('.qme-foot-title').textContent = foot.title != null ? foot.title : 'Want to dig deeper?';
+    el.querySelector('.qme-foot-text').textContent = foot.text != null ? foot.text : 'Ask the agent a question about these numbers, or build a report of your own.';
+    el.querySelector('.qme-foot-sec').textContent = foot.secondary != null ? foot.secondary : 'Open reports';
+    el.querySelector('.qme-foot-pri').textContent = foot.primary != null ? foot.primary : 'Ask the agent';
+
+    // ── ENTRANCE: tiles land and ROLL UP, the funnel bars GROW from the
+    // baseline one after another. All tweens on tl (scrub-safe). ──
+    var AT = num(data.at, 0);
+    var P = function (t) { return Math.max(0, t + AT); };
+    var entrance = data.entrance || 'rise';
+    var uPx = function () { return parseFloat(getComputedStyle(root).getPropertyValue('--u')) || 1; };
+    if (entrance !== 'none') {
+      var u = uPx();
+      if (!docked) {
+        gsap.set(card, { autoAlpha: 0, y: 16 * u });
+        tl.to(card, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, P(0.05));
+      }
+      var topBits = [].slice.call(el.querySelectorAll('.qme-tab, .qme-actions > *'));
+      gsap.set(topBits, { autoAlpha: 0, y: 6 * u });
+      tl.to(topBits, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power2.out', stagger: 0.035 }, P(0.15));
+      gsap.set(arc, { strokeDashoffset: C });
+      tl.to(arc, { strokeDashoffset: C * (1 - frac), duration: 0.8, ease: 'power2.inOut' }, P(0.45));
+
+      kpis.forEach(function (k, i) {
+        var at = 0.3 + i * 0.1;
+        gsap.set(k.tile, { autoAlpha: 0, y: 14 * u });
+        tl.to(k.tile, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power3.out' }, P(at));
+        var o = { v: k.start };
+        k.valueEl.textContent = fmt(k.spec, k.start);
+        tl.fromTo(o, { v: k.start }, { v: k.spec.value, duration: 1.2, ease: 'power2.out', immediateRender: false,
+          onUpdate: function () { k.valueEl.textContent = this.progress() >= 1 ? k.finalText : fmt(k.spec, o.v); } }, P(at + 0.08));
+      });
+
+      var funnel = el.querySelector('.qme-funnel');
+      gsap.set(funnel, { autoAlpha: 0, y: 14 * u });
+      tl.to(funnel, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power3.out' }, P(0.6));
+      gsap.set(gridEls.concat(tickEls), { autoAlpha: 0 });
+      tl.to(gridEls.concat(tickEls), { autoAlpha: 1, duration: 0.4, stagger: 0.03 }, P(0.75));
+      stages.forEach(function (s, i) {
+        var at = 0.95 + i * 0.22;
+        gsap.set(s.bar, { height: '0%' });
+        tl.to(s.bar, { height: hPct(s.v) + '%', duration: 0.75, ease: 'power3.out' }, P(at));
+        if (s.valEl) {
+          var o = { v: 0 };
+          s.valEl.textContent = '0';
+          tl.fromTo(o, { v: 0 }, { v: s.v, duration: 0.75, ease: 'power3.out', immediateRender: false,
+            onUpdate: function () { s.valEl.textContent = group(Math.round(o.v), 0); } }, P(at));
+        }
+      });
+      if (footEl.style.display !== 'none') {
+        gsap.set(footEl, { autoAlpha: 0, y: 12 * u });
+        tl.to(footEl, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power3.out' }, P(1.75));
+      }
+    }
+
+    // ── SCRIPT ──
+    var findKpi = function (t) {
+      if (t == null) return null;
+      var m = String(t).match(/^kpi-(\d+)$/); if (m) return kpis[+m[1]] || null;
+      var n = norm(t);
+      return kpis.filter(function (k) { return k.label === n; })[0] || kpis.filter(function (k) { return n && k.label.indexOf(n) >= 0; })[0] || null;
+    };
+    var findStage = function (t) {
+      if (t == null) return null;
+      var m = String(t).match(/^stage-(\d+)$/); if (m) return stages[+m[1]] || null;
+      var n = norm(t);
+      return stages.filter(function (s) { return s.name === n; })[0] || null;
+    };
+    var findTab = function (t) { var n = norm(t); return tabs.filter(function (x) { return x.name === n; })[0] || null; };
+    var REGIONS = { kpis: '.qme-kpis', funnel: '.qme-funnel', chart: '.qme-chart', tabs: '.qme-tabs', header: '.qme-top', footer: '.qme-foot',
+      campaign: '.qme-camp', threads: '.qme-threads', status: '.qme-status', share: '[data-cursor-target="share"]',
+      'open reports': '[data-cursor-target="open-reports"]', 'ask the agent': '[data-cursor-target="ask-agent"]' };
+    var findEl = function (t) {
+      var k = findKpi(t); if (k) return k.tile;
+      var s = findStage(t); if (s) return s.col;
+      var tb = findTab(t); if (tb) return tb.el;
+      var r = REGIONS[norm(t)]; if (r) return el.querySelector(r);
+      var n = norm(t); if (!n) return null;
+      var all = el.querySelectorAll('.qme-card *'), best = null;
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].children.length === 0 && norm(all[i].textContent) === n) { best = all[i]; break; }
+      }
+      return best;
+    };
+    // Slug for the shared cursor runner: "Ask the agent" -> its marked element.
+    var cursorSlug = function (t) {
+      if (t == null) return t;
+      var k = findKpi(t); if (k) return k.tile.getAttribute('data-cursor-target');
+      var s = findStage(t); if (s) return s.col.getAttribute('data-cursor-target');
+      var tb = findTab(t); if (tb) return tb.el.getAttribute('data-cursor-target');
+      var e = findEl(t);
+      while (e && e !== root) { if (e.getAttribute && e.getAttribute('data-cursor-target')) return e.getAttribute('data-cursor-target'); e = e.parentNode; }
+      return t;
+    };
+
+    var script = (Array.isArray(data.script) ? data.script : []).filter(Boolean).slice()
+      .sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+    var passOn = [];
+    script.forEach(function (a) {
+      var at = Math.max(0, num(a.at, 0));
+      var act = a.action;
+      if (act === 'count' || act === 'count-up') {
+        var tgt = a.target != null ? a.target : a.text;
+        var k = findKpi(tgt);
+        var dur = num(a.duration, 1.2);
+        if (k) {
+          var toSpec = parseVal(a.to), to = toSpec.n, from = k.last, fromText = k.lastText;
+          var endText = a.display != null ? String(a.display) : fmt(k.spec, to);
+          var o = { v: from };
+          tl.fromTo(o, { v: from }, { v: to, duration: dur, ease: a.ease || 'power2.out', immediateRender: false,
+            onUpdate: function () { var p = this.progress(); k.valueEl.textContent = p >= 1 ? endText : p <= 0 ? fromText : fmt(k.spec, o.v); } }, at);
+          k.last = to; k.lastText = endText;
+          return;
+        }
+        var s = findStage(tgt);
+        if (s) {
+          var sTo = parseVal(a.to).n, sFrom = s.last;
+          tl.fromTo(s.bar, { height: hPct(sFrom) + '%' }, { height: hPct(sTo) + '%', duration: dur, ease: a.ease || 'power2.out', immediateRender: false }, at);
+          if (s.valEl) {
+            var so = { v: sFrom }, ve = s.valEl;
+            tl.fromTo(so, { v: sFrom }, { v: sTo, duration: dur, ease: a.ease || 'power2.out', immediateRender: false,
+              onUpdate: function () { ve.textContent = group(Math.round(so.v), 0); } }, at);
+          }
+          s.last = sTo;
+        }
+        return;
+      }
+      if (act === 'highlight') {
+        var host = findEl(a.target != null ? a.target : a.text);
+        if (!host) return;
+        if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+        var ring = document.createElement('div'); ring.className = 'qme-hl';
+        var col = a.color || accent;
+        ring.style.borderColor = col;
+        ring.style.background = (function (c) {
+          var m = /^#?([0-9a-f]{6})$/i.exec(c); if (!m) return 'transparent';
+          var n = parseInt(m[1], 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',0.07)';
+        })(col);
+        if (host.classList.contains('qme-col')) {
+          var sv = stages.filter(function (x) { return x.col === host; })[0];
+          ring.style.bottom = '-' + (6 * uPx()) + 'px';
+          ring.style.height = 'calc(' + hPct(sv ? sv.last : 0) + '% + ' + (12 * uPx()) + 'px)';
+        }
+        host.appendChild(ring);
+        var hold = num(a.duration, 1.6);
+        tl.fromTo(ring, { autoAlpha: 0, scale: 1.04 }, { autoAlpha: 1, scale: 1, duration: 0.25, ease: 'power2.out', immediateRender: false }, at);
+        if (a.hold !== true) tl.to(ring, { autoAlpha: 0, duration: 0.35, ease: 'power1.in' }, at + 0.25 + hold);
+        return;
+      }
+      if (act === 'switch-tab') {
+        var target = findTab(a.to != null ? a.to : a.target);
+        if (!target) return;
+        tabs.forEach(function (t) {
+          var on = t === target;
+          tl.to(t.el, { color: on ? '#17171c' : '#54545f', borderBottomColor: on ? '#17171c' : 'rgba(23,23,28,0)', duration: 0.2, ease: 'power1.out' }, at);
+        });
+        return;
+      }
+      if (act === 'set-text') {
+        var te = findEl(a.target != null ? a.target : a.text);
+        if (!te) return;
+        var was = te.textContent, now = String(a.to != null ? a.to : '');
+        var sw = { p: 0 };
+        tl.fromTo(sw, { p: 0 }, { p: 1, duration: 0.01, immediateRender: false,
+          onUpdate: function () { te.textContent = this.progress() > 0 ? now : was; } }, at);
+        return;
+      }
+      var copy = {}; for (var key in a) copy[key] = a[key];
+      if (copy.target != null) copy.target = cursorSlug(copy.target);
+      passOn.push(copy);
+    });
+    if (passOn.length) runScript(tl, el, passOn, data.cursor_targets || {}, ctx, {});
+
+    return tl;
+  }
+</script>
