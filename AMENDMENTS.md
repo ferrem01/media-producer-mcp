@@ -6,6 +6,30 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — type-relay: the words of a relay film
+
+In a relay film every beat is carried by an object, and the type beats had
+no piece of their own: no type card could come out of the shape before it or
+turn into the shape after it. `wordmark-squeeze` already turned one word
+into a pill. `type-relay` (titles) does the same for any card of 1-3 lines.
+
+- **What it does:** the words come out of an object and turn back into one.
+  With `from`, frame `from.at` is exactly `from.shape`: a feed row, a pill, a
+  dot, or the whole frame after a flood. The shape morphs onto the accent
+  word, pulls off it to the right, and the other words radiate out of it.
+  `to` hands the words on: `squeeze` condenses the block like an accordion
+  into `to.shape` and ends exactly on that box; `flood` grows the accent
+  word's box to cover the frame; `lift` and `scatter` clear it.
+- **The geometry is published:** the word boxes depend on the face, so the
+  root carries the measured boxes (`data-word-boxes`, `data-text-box`,
+  `data-accent-box`). They are re-measured if Geist lands after the build.
+  The sizes are fractions of the box's shorter side, so a 9:16 card wraps
+  inside its box instead of shrinking.
+- **Worth knowing:** the morph does not dissolve with a fade. A fade left a
+  lavender ghost box behind the accent word, and a crossfade is on relay's
+  banned list. It wipes off the word instead.
+- **Test:** `test/relay-type.test.ts`.
+
 ## 2026-09-27 — The feed a relay scene opens on: rows that were already there
 
 The Analytics film lands six clicks in Sarah Chen's feed live, then the
