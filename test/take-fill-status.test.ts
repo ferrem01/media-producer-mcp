@@ -210,3 +210,16 @@ describe("the blur amount, previewed on one frame", () => {
     expect(html).toMatch(/if \(regraded\) \{\s*hideBlurPreview\(\);/);
   });
 });
+
+describe("a take re-made in place plays its new version (Marc: \"I just changed the fill light and it did not update the video in Studio\")", () => {
+  it("Studio's speaker urls carry ?v= the grade's time (plus the blur amount for the blurred copy)", () => {
+    const html = getPreviewHtml();
+    expect(html).toContain("if (source.startsWith('/assets/')) return takeVersioned(source);");
+    expect(html).toContain("var v = t.graded_at + (url === t.blur && t.blur_strength != null ? ':' + t.blur_strength : '');");
+  });
+  it("the composite's speaker refs are versioned the same way; the asset route matches the path, not the query", async () => {
+    const idx = await fs.readFile(path.join(HERE, "../src/index.ts"), "utf8");
+    expect(idx).toContain("const u0 = ref0 ? ver(ref0.source, speakerUrlFromSource(ref0.source)) : undefined;");
+    expect(idx).toContain('const urlPath = url.split("?")[0];');
+  });
+});

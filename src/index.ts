@@ -2028,8 +2028,17 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const speakerRefs: Record<string, { url: string; offset: number; alpha?: string }> = {};
         project.scenes.forEach((sc0, i0) => {
           const ref0 = speakerClipForScene(project.speaker_track?.clips, project.scenes, i0);
-          const u0 = ref0 ? speakerUrlFromSource(ref0.source) : undefined;
-          const a0 = ref0?.alpha ? speakerUrlFromSource(ref0.alpha) : undefined;
+          // Versioned like Studio's own speaker urls: a take re-made in place
+          // (re-grade, new blur amount) must not play from the browser's copy.
+          const ver = (src: string, u: string | undefined) => {
+            if (!u) return u;
+            const t = [...(project.takes || [])].reverse().find((k: any) => k.source === src || k.blur === src || k.alpha === src) as any;
+            if (!t?.graded_at) return u;
+            const v = t.graded_at + (src === t.blur && t.blur_strength != null ? `:${t.blur_strength}` : "");
+            return `${u}${u.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
+          };
+          const u0 = ref0 ? ver(ref0.source, speakerUrlFromSource(ref0.source)) : undefined;
+          const a0 = ref0?.alpha ? ver(ref0.alpha, speakerUrlFromSource(ref0.alpha)) : undefined;
           if (u0) speakerRefs[sc0.id] = { url: u0, offset: ref0!.offset, ...(a0 ? { alpha: a0 } : {}) };
         });
         const html = await assembleComposite({

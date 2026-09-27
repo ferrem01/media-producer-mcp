@@ -89,6 +89,15 @@ to how much the blur is?"
   - A film opened while work is already running shows the pill from the
     start.
   - The inspector's status line is gone.
+- **The new version now plays.** Marc: "I just changed the fill light and
+  it did not update the video in Studio after it was done." On the server
+  it had worked: fill 0.85 applied at 04:03, and the new blurred copy
+  landed at 04:08. But the take and its copies are re-made in place at the
+  same url, and the browser's video kept what it had.
+  - Studio's speaker urls (`takeVersioned`) and the composite's speaker
+    refs now carry `?v=` set to the grade's time, plus the blur amount for
+    the blurred copy. So every version is a new url.
+  - The asset route matches the path and ignores the query.
 
 ---
 

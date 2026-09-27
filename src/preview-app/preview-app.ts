@@ -5888,8 +5888,22 @@ ${QUOTIENT_CSS}
       var rel = source.replace('/data/media-producer/', '');
       return '/assets/' + rel;
     }
-    if (source.startsWith('/assets/')) return source;
+    if (source.startsWith('/assets/')) return takeVersioned(source);
     return source;
+  }
+  // A booth take and its copies are re-made IN PLACE at the same url (a
+  // re-grade, a new blur amount). The video element kept playing the copy
+  // it had (Marc: "I just changed the fill light and it did not update the
+  // video in Studio after it was done"), so each version gets its own url:
+  // ?v= the grade's time, plus the blur amount for the blurred copy. The
+  // server matches the path and ignores the query.
+  function takeVersioned(url) {
+    var takes = (state.currentProject && state.currentProject.takes) || [];
+    var t = null;
+    for (var i = takes.length - 1; i >= 0; i--) { var k = takes[i]; if (k && (k.source === url || k.blur === url || k.alpha === url)) { t = k; break; } }
+    if (!t || !t.graded_at) return url;
+    var v = t.graded_at + (url === t.blur && t.blur_strength != null ? ':' + t.blur_strength : '');
+    return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(v);
   }
   // ── the blur amount, previewed on the frame on screen ─────────────────
   // POST /api/blur-preview: this frame, matted and blurred at the new
