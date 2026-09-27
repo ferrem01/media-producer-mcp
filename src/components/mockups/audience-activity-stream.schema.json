@@ -1,0 +1,189 @@
+{
+  "type": "audience-activity-stream",
+  "label": "Quotient Audience — Activity stream (column card)",
+  "category": "mockups",
+  "description": "One person's Quotient activity feed as a CARD BUILT FOR A COLUMN: the person up top (avatar initials, name, 'title · company', lead score), a 'Recent Activity' tab with a Live pill, today's day header, then the feed rows in the product's row design (event icon, title, source pill, 'Just now', detail link). It lays itself out at the width it is given (1em = box width / 38), so it reads the same in a third of a 16:9 frame, a split's half or a phone -- use it wherever the feed is a PANEL next to something else (the person page, audience-person-detail, is a 2307px capture made for full frame; squeezed into a column it has to be scaled and cropped). New events LAND at their `at`: a row opens at the top (the rows under it slide down) with an accent wash; a row not yet landed takes no space; a negative `at` is already in the feed at frame 0; the feed can start empty. Rows use the shared event types (email_clicked, page_view, meeting_booked, deal_stage_changed, crm_event, signup, custom...) with `verb`/`name`/`title` overrides, `source` (a pill: 'LinkedIn Ads', 'Calendly', 'Salesforce'), `detail` (the link line) and `icon` (a logo image instead of the event icon). The lead score can count: score -> score_to at score_at. Publishes data-top-row ('cx,cy,w,h', box fractions: the slot every new row lands in -- aim click-stream's chip_to at it, grow a color-flood from it) and data-land-times. Example (a live feed beside a click-stream): {\"person_name\":\"Sarah Chen\",\"person_title\":\"VP Marketing\",\"company\":\"Northwind\",\"score\":62,\"today\":\"2026-09-27\",\"activity\":[{\"at\":4.1,\"type\":\"custom\",\"verb\":\"clicked an ad on X\",\"detail\":\"Orbitly Maps\",\"source\":\"X Ads\"},{\"at\":5.35,\"type\":\"page_view\",\"detail\":\"/pricing\",\"source\":\"Website\"}]}.",
+  "data": {
+    "person_name": {
+      "type": "string",
+      "label": "Person name",
+      "optional": true,
+      "placeholder": "Sarah Chen"
+    },
+    "person_title": {
+      "type": "string",
+      "label": "Job title",
+      "optional": true,
+      "placeholder": "VP Marketing"
+    },
+    "company": {
+      "type": "string",
+      "label": "Company",
+      "optional": true,
+      "placeholder": "Northwind"
+    },
+    "person_email": {
+      "type": "string",
+      "label": "Email (shown when no title/company)",
+      "optional": true
+    },
+    "avatar": {
+      "type": "string",
+      "label": "Avatar image URL (default: initials)",
+      "optional": true
+    },
+    "score": {
+      "type": "number",
+      "label": "Lead score (omit to hide)",
+      "optional": true
+    },
+    "score_to": {
+      "type": "number",
+      "label": "Lead score counts to",
+      "optional": true
+    },
+    "score_at": {
+      "type": "number",
+      "label": "Count starts at (s)",
+      "optional": true
+    },
+    "tab": {
+      "type": "string",
+      "label": "Tab label",
+      "optional": true,
+      "placeholder": "Recent Activity"
+    },
+    "live": {
+      "type": "boolean",
+      "label": "Show the Live pill",
+      "optional": true
+    },
+    "today": {
+      "type": "string",
+      "label": "Today (for the day header)",
+      "optional": true,
+      "placeholder": "2026-09-27"
+    },
+    "day_label": {
+      "type": "string",
+      "label": "Day header (override)",
+      "optional": true
+    },
+    "activity": {
+      "type": "array",
+      "label": "Events (land at their `at`; negative = already there)",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number",
+            "label": "At (s); negative = already in the feed at frame 0"
+          },
+          "type": {
+            "type": "string",
+            "label": "Event type",
+            "enum": [
+              "email_sent",
+              "email_delivered",
+              "email_opened",
+              "email_clicked",
+              "email_replied",
+              "email_bounced",
+              "unsubscribed",
+              "page_view",
+              "form_submitted",
+              "signup",
+              "meeting_booked",
+              "deal_stage_changed",
+              "crm_event",
+              "lead_score_changed",
+              "list_added",
+              "property_updated",
+              "flow_entered",
+              "product_event",
+              "custom"
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "label": "Actor (default: the person's first name)"
+          },
+          "verb": {
+            "type": "string",
+            "label": "Verb (override)"
+          },
+          "name": {
+            "type": "string",
+            "label": "Event name (custom / CRM / product)"
+          },
+          "title": {
+            "type": "string",
+            "label": "Whole line (override)"
+          },
+          "detail": {
+            "type": "string",
+            "label": "Detail line"
+          },
+          "source": {
+            "type": "string",
+            "label": "Source pill"
+          },
+          "time": {
+            "type": "string",
+            "label": "Time",
+            "placeholder": "Just now"
+          },
+          "icon": {
+            "type": "string",
+            "label": "Logo image instead of the event icon"
+          }
+        }
+      }
+    },
+    "short_titles": {
+      "type": "boolean",
+      "label": "First name in titles (default true)",
+      "optional": true
+    },
+    "highlight": {
+      "type": "boolean",
+      "label": "Accent wash on landing (default true)",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Accent color",
+      "optional": true,
+      "placeholder": "#393bf5"
+    },
+    "inset": {
+      "type": "number",
+      "label": "Card inset (fraction of the box)",
+      "optional": true,
+      "placeholder": "0.04"
+    },
+    "scale": {
+      "type": "number",
+      "label": "Type scale",
+      "optional": true,
+      "placeholder": "1"
+    },
+    "card_background": {
+      "type": "string",
+      "label": "Card background",
+      "optional": true
+    },
+    "entrance": {
+      "type": "string",
+      "label": "Entrance",
+      "optional": true,
+      "placeholder": "none (default) | rise"
+    },
+    "at": {
+      "type": "number",
+      "label": "Entrance at (s)",
+      "optional": true
+    }
+  }
+}

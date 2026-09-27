@@ -6,6 +6,38 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — The activity feed as a column: audience-activity-stream
+
+Scene two of the Analytics story cut puts Sarah Chen's feed in the right
+third of the frame while the clicks land. It was the person page
+(`audience-person-detail`, a 2307px capture) with `focus: "feed"`, and in
+Studio it rendered as a smooshed, several-times-zoomed slice ("3/25/2026 ago",
+"Recent Act…"). Marc: "the activity component is getting smooshed because it
+was not meant to be 1/3." A full-frame capture scaled and cropped into a
+column is the wrong tool, whatever the fit math does.
+
+- **New:** `mockups/audience-activity-stream`. One person's feed as a card
+  built for a column: the person up top (initials, name, "title · company",
+  lead score that can count), a "Recent Activity" tab with a Live pill, today's
+  day header, and the product's row design (event icon, title, source pill,
+  time, detail line). It is sized from its box (1em = width / 38) and row
+  heights are fixed in em, so it reads the same in a third, a half or a phone
+  frame, and a font that loads late cannot move it. Events land at `at`; a
+  negative `at` is already there; a waiting row takes no space. It publishes
+  `data-top-row` (the slot every new row lands in: aim chips at it, grow a
+  flood from it). It uses the shared event types and icons.
+- **Feed fixes (person and company pages):**
+  - A row that has not landed takes no space: its padding, border and margins
+    collapse with its height. A waiting row used to leave a gap above the
+    newest one.
+  - `history: false` starts the feed empty, so only the film's events show and
+    the captured rows no longer read as clutter.
+  - The focus fit measures in the page's own units, so a scaled ancestor no
+    longer inflates the zoom.
+- **Rule:** when the feed is a panel next to something else, use the stream
+  card. The person page stays for full-frame beats.
+- **Test:** `test/audience-components.test.ts`.
+
 ## 2026-09-27 — click-stream float: the customer journey
 
 Marc wants the journey beat of the Analytics film to feel different from the

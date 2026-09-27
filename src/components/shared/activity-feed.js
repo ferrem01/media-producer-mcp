@@ -184,12 +184,20 @@ function capActivityFeed(tl, root, events, opts) {
   var groups = activityGroups(root);
   if (!groups.length) return;
   var groupsParent = groups[0].el.parentElement;
+  var groupsTail = groups[groups.length - 1].el.nextSibling;
   activityFreeHeights([groupsParent]);
   groups.forEach(function (g) { activityFreeHeights([g.el, g.rows]); });
   var rowTemplate = groups[0].rows.firstElementChild;
   if (!rowTemplate) return;
   rowTemplate = rowTemplate.cloneNode(true);
   var groupTemplate = groups[0].el.cloneNode(true);
+  // history: false -- the feed starts EMPTY and holds only this film's
+  // events: the captured rows are someone's old activity, and next to the
+  // rows a film lands they read as clutter.
+  if (opts.history === false) {
+    groups.forEach(function (g) { if (g.el.parentNode) g.el.parentNode.removeChild(g.el); });
+    groups = [];
+  }
   var accent = opts.accent || '#393bf5';
   var today = opts.today ? activityResolveDate(opts.today, new Date()) : new Date();
   var person = opts.person || '';
@@ -219,7 +227,7 @@ function capActivityFeed(tl, root, events, opts) {
       while (grows.firstChild) grows.removeChild(grows.firstChild);
       var before = null;
       for (var gj = 0; gj < groups.length; gj++) if (groups[gj].date < date) { before = groups[gj]; break; }
-      groupsParent.insertBefore(gel, before ? before.el : null);
+      groupsParent.insertBefore(gel, before ? before.el : (groupsTail && groupsTail.parentNode === groupsParent ? groupsTail : null));
       activityFreeHeights([gel, grows]);
       group = { el: gel, header: gh, rows: grows, date: date };
       groups.push(group);
@@ -278,15 +286,25 @@ function capActivityFeed(tl, root, events, opts) {
     // timeline seeks cleanly to any frame.
     if (at < 0) return;
     row.style.overflow = 'hidden';
-    var h = row.offsetHeight;
-    gsap.set(row, { height: 0, autoAlpha: 0 });
+    // A row that has not landed takes NO space: its padding, border and
+    // margins collapse with its height, or a waiting row left a gap above
+    // the newest one (the feed looked broken while it grew).
+    var box = function (e) {
+      var cs = getComputedStyle(e);
+      return { height: e.offsetHeight, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom,
+               marginTop: cs.marginTop, marginBottom: cs.marginBottom,
+               borderTopWidth: cs.borderTopWidth, borderBottomWidth: cs.borderBottomWidth };
+    };
+    var ZERO = { height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0, marginBottom: 0, borderTopWidth: 0, borderBottomWidth: 0, autoAlpha: 0 };
+    var rb = box(row);
+    gsap.set(row, ZERO);
     if (newGroup) {
-      var hh = group.header.offsetHeight;
       group.header.style.overflow = 'hidden';
-      gsap.set(group.header, { height: 0, autoAlpha: 0 });
-      tl.to(group.header, { height: hh, autoAlpha: 1, duration: 0.35, ease: 'power2.out' }, Math.max(0, at - 0.2));
+      var hb = box(group.header);
+      gsap.set(group.header, ZERO);
+      tl.to(group.header, Object.assign({}, hb, { autoAlpha: 1, duration: 0.35, ease: 'power2.out' }), Math.max(0, at - 0.2));
     }
-    tl.to(row, { height: h, autoAlpha: 1, duration: 0.45, ease: 'power3.out' }, at);
+    tl.to(row, Object.assign({}, rb, { autoAlpha: 1, duration: 0.45, ease: 'power3.out' }), at);
     if (ev.highlight !== false) {
       tl.fromTo(row, { backgroundColor: activityRgba(accent, 0.12) },
         { backgroundColor: activityRgba(accent, 0), duration: 1.8, ease: 'power1.in', immediateRender: false }, at + 0.35);
@@ -359,8 +377,14 @@ function capFitFocusOnce(el, frame, nativeW, nativeH, focus, zoom, regions) {
   frame.style.transform = 'none';
   var fr = frame.getBoundingClientRect();
   var r = pick.getBoundingClientRect();
+  // Rects are in SCREEN pixels: any scaled ancestor (Studio's player shrinks
+  // the whole stage to fit its panel) shrinks them too, and the fit came out
+  // 1/scale too big -- the feed rendered 3-4x zoomed in Studio while a render
+  // looked right. Back to the page's own units first.
+  var k = (frame.offsetWidth && fr.width) ? fr.width / frame.offsetWidth : 1;
+  if (!(k > 0)) k = 1;
   var pad = 56;
-  var rx = r.left - fr.left - pad, ry = r.top - fr.top - pad, rw = r.width + pad * 2;
+  var rx = (r.left - fr.left) / k - pad, ry = (r.top - fr.top) / k - pad, rw = r.width / k + pad * 2;
   // Fill the box: its width with the region, or its height with everything
   // from the region's top down, whichever is bigger -- a tall box (a split's
   // top half) must not end in an empty band. When that is wider than the box

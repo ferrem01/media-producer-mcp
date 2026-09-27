@@ -246,3 +246,76 @@ describe("focus + zoom", () => {
     expect(r.fontPx).toBeGreaterThan(22);
   }, 60000);
 });
+
+// The person page is a 2307px capture made for full frame; squeezed into a
+// third of a 16:9 frame it had to be scaled and cropped (Marc: "the activity
+// component is getting smooshed because it was not meant to be 1/3"). The
+// stream card lays itself out at the width it is given.
+describe("audience-activity-stream", () => {
+  const COLUMN = { x: "62%", y: "0%", width: "38%", height: "100%" };
+  const data = {
+    person_name: "Sarah Chen", person_title: "VP Marketing", company: "Northwind", score: 62, score_to: 88, score_at: 3,
+    today: "2026-09-27",
+    activity: [
+      { at: -1, type: "page_view", detail: "/pricing", source: "Website" },
+      { at: 1.0, type: "email_clicked", detail: "Clicked: See the report" },
+      { at: 2.0, type: "meeting_booked", detail: "Demo with Northwind", source: "Calendly" },
+    ],
+  };
+  it("fits a third of the frame, lands rows at their at (a waiting row takes no space), and publishes its top-row slot", async () => {
+    const html = await assemble("audience-activity-stream", data, 1920, 1080, COLUMN);
+    const at = (t: number) => withPage(html, 1920, 1080, async (page) => {
+      await page.evaluate((tt) => { (window as any).__MP_TIMELINE.time(tt); }, t);
+      return page.evaluate(() => {
+        const comp = document.querySelector(".mp-component")!.getBoundingClientRect();
+        const card = document.querySelector(".aas-card")!.getBoundingClientRect();
+        const rows = [...document.querySelectorAll(".aas-row")].map((r) => ({
+          text: r.textContent || "", h: (r as HTMLElement).getBoundingClientRect().height,
+          overflowX: (r as HTMLElement).scrollWidth > (r as HTMLElement).clientWidth + 1 }));
+        const titles = [...document.querySelectorAll(".aas-title")].map((t) => (t as HTMLElement).getBoundingClientRect().right);
+        return { comp: [comp.left, comp.right], card: [card.left, card.right, card.top, card.bottom], rows, titles,
+          name: document.querySelector(".aas-name")!.textContent, score: document.querySelector(".aas-score-val")!.textContent,
+          top: document.querySelector(".aas")!.getAttribute("data-top-row"),
+          font: parseFloat(getComputedStyle(document.querySelector(".aas") as Element).fontSize) };
+      });
+    });
+    const r0 = await at(0);
+    expect(r0.name).toBe("Sarah Chen");
+    // Newest on top: the two scene events are waiting (no height at all),
+    // the earlier one is standing.
+    expect(r0.rows.map((r) => r.h)).toEqual([0, 0, expect.any(Number)]);
+    expect(r0.rows[2].h).toBeGreaterThan(40);
+    expect(r0.rows[2].text).toContain("Sarah viewed a page");
+    // The card sits inside its column; type is sized from the column width.
+    expect(r0.card[0]).toBeGreaterThanOrEqual(r0.comp[0]);
+    expect(r0.card[1]).toBeLessThanOrEqual(r0.comp[1]);
+    expect(r0.font).toBeGreaterThan(16);
+    for (const right of r0.titles) expect(right).toBeLessThanOrEqual(r0.card[1]);
+    const top = (r0.top || "").split(",").map(Number);
+    expect(top).toHaveLength(4);
+    expect(top[2]).toBeGreaterThan(0.8);   // a row spans the card, in box fractions
+    const r4 = await at(4);
+    expect(r4.rows.every((r) => r.h > 40)).toBe(true);
+    expect(r4.rows[0].text).toContain("booked a meeting");
+    expect(r4.rows[0].text).toContain("Calendly");
+    expect(r4.rows.some((r) => r.overflowX)).toBe(false);
+    expect(r4.score).toBe("88");
+  }, 60000);
+});
+
+describe("audience-person-detail feed: history false", () => {
+  it("starts empty and holds only the film's events", async () => {
+    const html = await assemble("audience-person-detail", { today: "2026-09-23", focus: "feed", history: false,
+      activity: [{ at: 0.4, type: "page_view", detail: "/pricing", source: "Website" }] });
+    const r = await withPage(html, 1920, 1080, async (page) => {
+      await page.evaluate(() => { (window as any).__MP_TIMELINE.time(2); });
+      return page.evaluate(() => {
+        const heads = [...document.querySelectorAll(".cap-body h3")].map((h) => h.textContent!.trim()).filter((t) => /\d{4}/.test(t));
+        const g0 = document.querySelectorAll(".cap-body h3")[0];
+        return { heads, rows: g0 ? g0.nextElementSibling!.children.length : 0 };
+      });
+    });
+    expect(r.heads).toEqual(["Wednesday, September 23, 2026"]);
+    expect(r.rows).toBe(1);
+  }, 60000);
+});

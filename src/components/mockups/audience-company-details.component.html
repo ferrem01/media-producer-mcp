@@ -79,7 +79,7 @@
     // ---- New activity landing in the feed (shared/activity-feed.js). A
     // company feed is many people: give each event an actor. ----
     var split = capSplitActivityScript(data);
-    capActivityFeed(tl, root, split.feed, { person: data.default_actor || 'Jordan Lee', today: data.today, accent: data.accent });
+    capActivityFeed(tl, root, split.feed, { person: data.default_actor || 'Jordan Lee', today: data.today, accent: data.accent, history: data.history });
 
     var frame = el.querySelector('.cap-frame');
     capFitFocus(el, frame, 2305, 1245, data.focus, data.zoom, {
