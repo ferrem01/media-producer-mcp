@@ -1,0 +1,57 @@
+{
+  "type": "print-shop",
+  "label": "Print shop (hero -> framed print -> order)",
+  "category": "ui-mocks",
+  "description": "The relay beat after desktop-stage: it STARTS on desktop-stage's last frame (the same Safari window at left 0.015, top 0.144, width 0.969 of the frame, the same hero box and silk stage). At scroll_at the page scrolls: the landing copy rises away, a product card rises in, and the hero MORPHS into a framed print on it -- the photo shrinks into a portrait while a white MAT and a thin frame MOLDING grow out of its edge; the product panel (title, description, frame swatches, size segmented control, price) arrives on the right and the camera pushes onto the card; at cta_at the nav's black Order button FLIES DOWN and becomes the full-width 'Order print'. The cursor clicks a frame swatch at frame_at (the new colour PAINTS along the molding, 0.25 s), a size at size_at (the segment slides), and 'Order print' at order_at; from zoom_at the camera pushes onto the button (zoom 1.5) and the ONE black shape morphs through its states (default: spinner -> check Ordered -> Printing n% with a progress line -> On its way / today with a van on a route -> a black done circle with a check drawn in). HANDOFF: the done circle ENDS at the done geometry in frame coordinates -- centre (0.5, 0.62), diameter 0.12 -- ready for a flood. All *_at are scene seconds and default to `at` + the reference offset (scroll 0.25, cta 1.0, frame 1.25, size 1.75, order 2.1, ordered 2.5, printing 2.9-3.7, route 4.0-4.5, done 4.75; ~5 s). Example: {\"at\":16.5,\"image\":\"/assets/astronaut.jpg\",\"site\":{\"brand\":\"develop\",\"cta\":\"Order\"},\"product\":{\"title\":\"the print\",\"desc\":\"archival pigment on cotton rag. framed by hand, ready to hang.\",\"frames\":[{\"name\":\"oak\",\"color\":\"#c9a27a\"},{\"name\":\"black\",\"color\":\"#111\"},{\"name\":\"white\",\"color\":\"#f4f3ef\"}],\"sizes\":[\"30×40\",\"50×70\",\"70×100\"],\"price\":\"$129\",\"cta\":\"Order print\"},\"pick_frame\":1,\"pick_size\":2,\"cursor_from\":[0.735,0.71]}.",
+  "data": {
+    "image": { "type": "string", "label": "The photo (URL) -- the same one desktop-stage dropped as its hero", "required": true },
+    "at": { "type": "number", "label": "Scene second the beat starts (default 0); every *_at defaults relative to it", "optional": true },
+    "stage": { "type": "string", "label": "The backdrop, as desktop-stage: silk | none", "enum": ["silk", "none"], "optional": true, "default": "silk" },
+    "site": {
+      "type": "object", "label": "The landing page it starts on (same shape as desktop-stage's site)", "optional": true,
+      "properties": {
+        "brand": { "type": "string" }, "nav": { "type": "array", "items": { "type": "string" } }, "cta": { "type": "string" },
+        "headline": { "type": "string" }, "sub": { "type": "string" }
+      }
+    },
+    "product": {
+      "type": "object", "label": "The product card", "optional": true,
+      "properties": {
+        "title": { "type": "string", "label": "Default 'the print'" },
+        "desc": { "type": "string", "label": "Two lines under the title" },
+        "frames": { "type": "array", "label": "Frame swatches", "items": { "type": "object", "properties": { "name": { "type": "string" }, "color": { "type": "string" } } } },
+        "sizes": { "type": "array", "label": "Segmented size control", "items": { "type": "string" } },
+        "price": { "type": "string", "label": "Default $129" },
+        "cta": { "type": "string", "label": "The full-width button (default 'Order print')" },
+        "frame_start": { "type": "number", "label": "Swatch selected at first (index, default 0)" },
+        "size_start": { "type": "number", "label": "Size selected at first (index, default 1)" }
+      }
+    },
+    "pick_frame": { "type": "number", "label": "The swatch the cursor picks (index, default 1 = black)", "optional": true },
+    "pick_size": { "type": "number", "label": "The size the cursor picks (index, default 2 = 70×100)", "optional": true },
+    "states": {
+      "type": "array", "label": "The order button's morph, in order (scene seconds)", "optional": true,
+      "items": { "type": "object", "properties": {
+        "kind": { "type": "string", "enum": ["spinner", "label", "progress", "route", "done"] },
+        "at": { "type": "number" }, "to": { "type": "number", "label": "progress/route: when the bar or the van arrives" },
+        "text": { "type": "string" }, "right": { "type": "string", "label": "route: the grey right-hand word (default today)" },
+        "icon": { "type": "string", "label": "label: check | progress: printer" }
+      } }
+    },
+    "scroll_at": { "type": "number", "label": "The scroll + hero -> framed print morph (default at+0.25)", "optional": true },
+    "cta_at": { "type": "number", "label": "The nav button flies down into 'Order print' (default at+1.0)", "optional": true },
+    "frame_at": { "type": "number", "label": "Click on the swatch; the colour paints along the molding (default at+1.25)", "optional": true },
+    "size_at": { "type": "number", "label": "Click on the size (default at+1.75)", "optional": true },
+    "order_at": { "type": "number", "label": "Click on 'Order print' (default at+2.1)", "optional": true },
+    "ordered_at": { "type": "number", "label": "'Ordered' (default at+2.5; used by the default states)", "optional": true },
+    "done_at": { "type": "number", "label": "The done circle (default at+4.75; used by the default states)", "optional": true },
+    "zoom_at": { "type": "number", "label": "The camera push onto the button starts (default order_at-0.1, 0.6 s)", "optional": true },
+    "zoom": { "type": "number", "label": "That push's scale (default 1.5); the done circle still lands on (0.5, 0.62) d 0.12", "optional": true },
+    "zoom_card": { "type": "number", "label": "The first push onto the product card at cta_at (default 1.25)", "optional": true },
+    "stage_zoom": { "type": "number", "label": "desktop-stage's zoom (default 1.7) -- sets the starting window size", "optional": true },
+    "cursor": { "type": "boolean", "label": "Show the built-in cursor (default true)", "optional": true },
+    "cursor_from": { "type": "array", "label": "Cursor start [x, y], frame fractions (default [0.735, 0.71] = desktop-stage's cursor_to)", "items": { "type": "number" }, "optional": true },
+    "cursor_to": { "type": "array", "label": "Cursor rest at the end [x, y], frame fractions (default [0.72, 0.8])", "items": { "type": "number" }, "optional": true },
+    "cursor_scale": { "type": "number", "label": "Cursor size at the start relative to the base (default sqrt(stage_zoom) = desktop-stage's end size)", "optional": true }
+  }
+}

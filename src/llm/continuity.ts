@@ -24,7 +24,7 @@ import type { Scene } from "../core/types.js";
 const NON_SURFACE_TYPES = new Set([
   "lottie-accent", "sticker-prop", "sticker-rain", "color-flood", "cursor-performer", "floating-pills",
   "ghost-type", "mesh-gradient", "webgl-backdrop", "gradient-background",
-  "liquid-background", "grain-overlay", "narration-track",
+  "liquid-background", "grain-overlay", "narration-track", "iris",
 ]);
 /** Editorial copy: never pinned across cuts (its frame is role-driven), but
  *  it IS an obstacle -- a pinned window must not bury a caption column. */

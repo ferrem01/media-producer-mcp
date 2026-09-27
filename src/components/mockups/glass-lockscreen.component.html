@@ -1,0 +1,436 @@
+<template>
+  <div class="gls">
+    <div class="gls-stage">
+      <svg class="gls-silk" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="gls-phone">
+      <div class="gls-screen">
+        <img class="gls-wall" alt="" />
+        <div class="gls-date"></div>
+        <svg class="gls-glass gls-glass-d" xmlns="http://www.w3.org/2000/svg"></svg>
+        <svg class="gls-glass gls-glass-p" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="gls-player">
+          <div class="gls-meta"><div class="gls-track"></div><div class="gls-artist"></div></div>
+          <div class="gls-ctrls">
+            <div class="gls-btn gls-prev"></div>
+            <div class="gls-btn gls-play"></div>
+            <div class="gls-btn gls-next"></div>
+          </div>
+          <div class="gls-prog"><div class="gls-prog-fill"></div></div>
+        </div>
+        <div class="gls-home"></div>
+        <div class="gls-island"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* GLASS LOCK SCREEN: a full-frame photo becomes an iOS-26 lock screen --
+     big liquid-glass clock digits over the wallpaper, the date above them;
+     a home bar stretches up into a glass music player; the cursor presses
+     play. Then the whole screen PULLS BACK into a phone: the black bezel
+     grows out of the screen edge, the corners round, the Dynamic Island
+     appears -- landing on a pale stage with a flowing blue silk swoosh.
+     The lock screen re-lays itself as the screen goes from square to tall. */
+  .gls, .gls * { max-width: none; box-sizing: border-box; }
+  .gls { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    font-family: 'Geist', var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .gls-stage { position: absolute; inset: 0; background: #ecebf5; overflow: hidden; }
+  .gls-silk { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+  .gls-phone { position: absolute; left: 0; top: 0; background: #0b0b0c; will-change: transform; }
+  .gls-screen { position: absolute; overflow: hidden; background: #0b0b0c; isolation: isolate; }
+  .gls-wall { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }
+  .gls-glass { position: absolute; left: 0; top: 0; overflow: visible; }
+  .gls-date { position: absolute; left: 0; top: 0; white-space: nowrap; color: rgba(255,255,255,0.94); font-weight: 600;
+    letter-spacing: -0.005em; text-shadow: 0 1px 3px rgba(0,0,0,0.22); transform-origin: 50% 50%; }
+  .gls-player { position: absolute; left: 0; top: 0; overflow: hidden; color: #fff; }
+  .gls-meta { position: absolute; left: 0; top: 0; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+  .gls-track { font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
+  .gls-artist { font-weight: 400; opacity: 0.72; line-height: 1.2; }
+  .gls-ctrls { position: absolute; left: 0; top: 0; display: flex; align-items: center; }
+  .gls-btn { position: relative; display: block; }
+  .gls-btn svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.25)); }
+  .gls-prog { position: absolute; left: 0; top: 0; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
+  .gls-prog-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #fff; border-radius: 999px; }
+  .gls-home { position: absolute; left: 0; top: 0; border-radius: 999px; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,0.15); }
+  .gls-island { position: absolute; left: 0; top: 0; border-radius: 999px; background: #000; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.gls');
+    if (!root) return tl;
+    var q = function (s) { return root.querySelector(s); };
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || 1080, H = root.clientHeight || 1080;
+    // THE FRAME, not the box: a full-frame slot rides the camera layer, which
+    // overhangs the frame; the phone lands on frame fractions (centred box).
+    var FW = W, FH = H;
+    if (ctx && ctx.canvas && W >= ctx.canvas.width && H >= ctx.canvas.height) { FW = ctx.canvas.width; FH = ctx.canvas.height; }
+    var FX = (W - FW) / 2, FY = (H - FH) / 2;
+    var U = Math.min(FW, FH);
+    var NS = 'http://www.w3.org/2000/svg';
+    var cid = ((el.closest && el.closest('[data-cid]')) || el).getAttribute('data-cid') || 'x';
+    var uid = 'gls' + String(cid).replace(/[^a-zA-Z0-9]/g, '') + (window.__glsN = (window.__glsN || 0) + 1);
+
+    if (!document.getElementById('mp-font-geist')) {
+      var lk = document.createElement('link');
+      lk.id = 'mp-font-geist'; lk.rel = 'stylesheet';
+      lk.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap';
+      document.head.appendChild(lk);
+    }
+
+    // ── Times (scene seconds; defaults relative to `at`) ──
+    var at = num(data.at, 0);
+    var T = {
+      clock: num(data.clock_at, at + 0.5),
+      bar: num(data.bar_at, at + 1.0),
+      click: num(data.click_at, at + 1.6),
+      pull: num(data.pullback_at, at + 2.0)
+    };
+    T.player = num(data.player_at, T.bar + 0.12);
+    T.pullEnd = T.pull + num(data.pullback_duration, 0.5);
+    var END = T.pullEnd + 1.0;
+
+    // ── Data ──
+    var wallSrc = data.wallpaper || data.image || '';
+    var dateTxt = String(data.date == null ? 'Friday, September 25' : data.date);
+    var timeTxt = String(data.time == null ? '9:41' : data.time);
+    var trackTxt = String(data.track == null ? 'motion study 04' : data.track);
+    var artistTxt = String(data.artist == null ? 'made in code' : data.artist);
+    var showIsland = data.phone_island !== false;
+    var useCursor = data.cursor !== false;
+    var cFrom = Array.isArray(data.cursor_from) ? data.cursor_from : [0.8, 0.74];
+    var cTo = Array.isArray(data.cursor_to) ? data.cursor_to : [0.82, 0.77];
+    var stage = data.stage || {};
+    if (typeof stage === 'string') stage = { color: stage };
+
+    // ── The phone it pulls back into (fractions of the frame; the handoff contract) ──
+    var PH = { cx: FX + FW * num(data.phone_x, 0.5), cy: FY + FH * num(data.phone_y, 0.5), h: U * num(data.phone_height, 0.52) };
+    PH.w = PH.h * num(data.phone_aspect, 0.485);
+    PH.r = PH.w * 0.11;
+    PH.b = U * num(data.bezel, 0.012);
+    var ASPECT = (PH.h - 2 * PH.b) / (PH.w - 2 * PH.b);
+
+    // ── Stage: lavender ground + a flowing blue silk swoosh (layered blurred bands) ──
+    var stageEl = q('.gls-stage');
+    stageEl.style.background = stage.color || '#ecebf5';
+    var silk = q('.gls-silk');
+    var S = function (tag, attrs, parent) {
+      var n = document.createElementNS(NS, tag);
+      for (var k in attrs) if (attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+      if (parent) parent.appendChild(n);
+      return n;
+    };
+    var A = function (n, attrs) { for (var k in attrs) n.setAttribute(k, attrs[k]); };
+    if (stage.silk !== false) {
+      A(silk, { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none' });
+      var sd = S('defs', {}, silk);
+      var blurF = function (id, sdv) { var f = S('filter', { id: id, x: '-20%', y: '-20%', width: '140%', height: '140%' }, sd); S('feGaussianBlur', { stdDeviation: sdv }, f); return 'url(#' + id + ')'; };
+      var grad = function (id, stops) { var g = S('linearGradient', { id: id, x1: 0, y1: 1, x2: 1, y2: 0 }, sd); stops.forEach(function (s) { S('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] == null ? 1 : s[2] }, g); }); return 'url(#' + id + ')'; };
+      var hue = stage.silk_color || '#2d5bff';
+      // A band = a thick stroked curve from the lower left, rising across to the right.
+      var band = function (o) {
+        var x0 = -0.15 * W, x3 = 1.15 * W;
+        var d = 'M' + x0 + ' ' + (H * o.y0) + ' C ' + (W * 0.3) + ' ' + (H * o.c1) + ', ' + (W * 0.62) + ' ' + (H * o.c2) + ', ' + x3 + ' ' + (H * o.y1);
+        return S('path', { d: d, fill: 'none', stroke: o.stroke, 'stroke-width': U * o.w, 'stroke-linecap': 'round', opacity: o.o, filter: o.blur ? blurF(uid + 'b' + o.id, U * o.blur) : undefined, style: o.blend ? 'mix-blend-mode:' + o.blend : undefined }, silk);
+      };
+      var gDeep = grad(uid + 'g1', [[0, '#1d3fd6'], [0.5, hue], [1, '#7f9bff']]);
+      var gMid = grad(uid + 'g2', [[0, '#3a63f0'], [0.6, '#6f8dff'], [1, '#c3cffc']]);
+      var gPale = grad(uid + 'g3', [[0, '#9fb4ff', 0.9], [1, '#e1e6fb', 0.4]]);
+      band({ id: 1, y0: 1.02, c1: 0.95, c2: 0.62, y1: 0.36, w: 0.34, stroke: gPale, o: 0.55, blur: 0.04 });
+      band({ id: 2, y0: 1.1, c1: 1.0, c2: 0.72, y1: 0.44, w: 0.2, stroke: gDeep, o: 0.9, blur: 0.018 });
+      band({ id: 3, y0: 1.0, c1: 0.9, c2: 0.64, y1: 0.4, w: 0.07, stroke: gMid, o: 0.85, blur: 0.008 });
+      band({ id: 4, y0: 1.16, c1: 1.06, c2: 0.8, y1: 0.52, w: 0.1, stroke: '#1837b8', o: 0.55, blur: 0.02, blend: 'multiply' });
+      // Sheen threads: the silk's folds catching the light (seeded spacing, not a ruler).
+      var offs = [0, 0.011, 0.027, 0.034, 0.052, 0.071, 0.079, 0.1];
+      for (var si = 0; si < offs.length; si++) {
+        var off = offs[si], wob = ((si * 37) % 7) / 7 - 0.5;
+        band({ id: 10 + si, y0: 1.0 + off + wob * 0.02, c1: 0.92 + off - wob * 0.03, c2: 0.66 + off * 0.85 + wob * 0.02, y1: 0.4 + off * 0.75, w: 0.002 + ((si * 5) % 3) * 0.0022, stroke: '#ffffff', o: 0.18 + ((si * 3) % 4) * 0.1, blur: 0.001 + ((si * 7) % 3) * 0.0012 });
+      }
+      band({ id: 40, y0: 1.12, c1: 1.02, c2: 0.76, y1: 0.49, w: 0.035, stroke: '#0f2a9e', o: 0.35, blur: 0.012, blend: 'multiply' });
+      band({ id: 30, y0: 0.93, c1: 0.84, c2: 0.58, y1: 0.33, w: 0.012, stroke: '#ffffff', o: 0.5, blur: 0.004 });
+    }
+
+    // ── Elements ──
+    var phone = q('.gls-phone'), screen = q('.gls-screen'), wall = q('.gls-wall'), dateEl = q('.gls-date');
+    var player = q('.gls-player'), meta = q('.gls-meta'), ctrls = q('.gls-ctrls'), prog = q('.gls-prog'), progFill = q('.gls-prog-fill');
+    var home = q('.gls-home'), island = q('.gls-island');
+    if (wallSrc) wall.src = wallSrc; else wall.style.display = 'none';
+    dateEl.textContent = dateTxt;
+    q('.gls-track').textContent = trackTxt;
+    q('.gls-artist').textContent = artistTxt;
+    var ICON_PREV = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M11.6 12 20 6.5v11z"/><path d="M3.4 12l8.4-5.5v11z"/></svg>';
+    var ICON_NEXT = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12.4 12 4 6.5v11z"/><path d="M20.6 12l-8.4-5.5v11z"/></svg>';
+    var ICON_PLAY = '<svg class="gls-i-play" viewBox="0 0 24 24" fill="#fff"><path d="M7 4.8v14.4a.8.8 0 0 0 1.2.7l11.3-7.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg>';
+    var ICON_PAUSE = '<svg class="gls-i-pause" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>';
+    q('.gls-prev').innerHTML = ICON_PREV; q('.gls-next').innerHTML = ICON_NEXT;
+    var playBtn = q('.gls-play');
+    playBtn.innerHTML = ICON_PLAY + ICON_PAUSE;
+    var iPlay = playBtn.querySelector('.gls-i-play'), iPause = playBtn.querySelector('.gls-i-pause');
+    var btns = [q('.gls-prev'), playBtn, q('.gls-next')];
+
+    // ── Liquid glass kit (sized to the screen box, which changes every frame) ──
+    function glassKit(svg, id) {
+      var defs = S('defs', {}, svg);
+      var mask = S('mask', { id: id + '-m', maskUnits: 'userSpaceOnUse' }, defs);
+      var shapes = S('g', {}, mask);
+      var f = S('filter', { id: id + '-f', filterUnits: 'userSpaceOnUse', x: 0, y: 0, width: 10, height: 10, 'color-interpolation-filters': 'sRGB' }, defs);
+      var P = {};
+      P.b = S('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: 6, result: 'b' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 1 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1', result: 'bx' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 -1 1  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1', result: 'bxn' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 0 0  0 0 0 1 0  0 0 0 0 0  0 0 0 0 1', result: 'by' }, f);
+      S('feColorMatrix', { in: 'b', type: 'matrix', values: '0 0 0 0 0  0 0 0 -1 1  0 0 0 0 0  0 0 0 0 1', result: 'byn' }, f);
+      P.ox1 = S('feOffset', { in: 'bx', dx: -3, dy: 0, result: 'bxR' }, f);
+      P.ox2 = S('feOffset', { in: 'bxn', dx: 3, dy: 0, result: 'bxnL' }, f);
+      P.oy1 = S('feOffset', { in: 'by', dx: 0, dy: -3, result: 'byD' }, f);
+      P.oy2 = S('feOffset', { in: 'byn', dx: 0, dy: 3, result: 'bynU' }, f);
+      var K = 2.6;
+      S('feComposite', { in: 'bxR', in2: 'bxnL', operator: 'arithmetic', k1: 0, k2: K / 2, k3: K / 2, k4: 0.5 - K / 2, result: 'gx' }, f);
+      S('feComposite', { in: 'byD', in2: 'bynU', operator: 'arithmetic', k1: 0, k2: K / 2, k3: K / 2, k4: 0.5 - K / 2, result: 'gy' }, f);
+      S('feComposite', { in: 'gx', in2: 'gy', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'map' }, f);
+      P.dR = S('feDisplacementMap', { in: 'SourceGraphic', in2: 'map', scale: 20, xChannelSelector: 'R', yChannelSelector: 'G', result: 'dR' }, f);
+      P.dG = S('feDisplacementMap', { in: 'SourceGraphic', in2: 'map', scale: 18, xChannelSelector: 'R', yChannelSelector: 'G', result: 'dG' }, f);
+      P.dB = S('feDisplacementMap', { in: 'SourceGraphic', in2: 'map', scale: 16, xChannelSelector: 'R', yChannelSelector: 'G', result: 'dB' }, f);
+      S('feColorMatrix', { in: 'dR', type: 'matrix', values: '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0', result: 'cR' }, f);
+      S('feColorMatrix', { in: 'dG', type: 'matrix', values: '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0', result: 'cG' }, f);
+      S('feColorMatrix', { in: 'dB', type: 'matrix', values: '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0', result: 'cB' }, f);
+      S('feComposite', { in: 'cR', in2: 'cG', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'cRG' }, f);
+      S('feComposite', { in: 'cRG', in2: 'cB', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'disp' }, f);
+      P.frost = S('feGaussianBlur', { in: 'disp', stdDeviation: 1, result: 'frost' }, f);
+      P.sat = S('feColorMatrix', { in: 'frost', type: 'saturate', values: 1.3, result: 'sat' }, f);
+      P.bri = S('feComponentTransfer', { in: 'sat', result: 'bri' }, f);
+      P.briF = ['feFuncR', 'feFuncG', 'feFuncB'].map(function (n) { return S(n, { type: 'linear', slope: 1.1, intercept: 0.04 }, P.bri); });
+      S('feComposite', { in: 'bri', in2: 'SourceAlpha', operator: 'in', result: 'body' }, f);
+      P.tint = S('feFlood', { 'flood-color': '#ffffff', 'flood-opacity': 0.18, result: 'tintc' }, f);
+      S('feComposite', { in: 'tintc', in2: 'SourceAlpha', operator: 'in', result: 'tint' }, f);
+      P.spec = S('feSpecularLighting', { in: 'b', surfaceScale: 3, specularConstant: 0.9, specularExponent: 28, 'lighting-color': '#ffffff', result: 'spec0' }, f);
+      S('feDistantLight', { azimuth: 235, elevation: 42 }, P.spec);
+      P.specA = S('feComponentTransfer', { in: 'spec0', result: 'spec1' }, f);
+      P.specAA = S('feFuncA', { type: 'linear', slope: 0.85, intercept: 0 }, P.specA);
+      S('feComposite', { in: 'spec1', in2: 'SourceAlpha', operator: 'in', result: 'spec' }, f);
+      P.rt = S('feOffset', { in: 'SourceAlpha', dx: 1, dy: 1.6, result: 'sT' }, f);
+      S('feComposite', { in: 'SourceAlpha', in2: 'sT', operator: 'out', result: 'rT0' }, f);
+      P.rtc = S('feFlood', { 'flood-color': '#ffffff', 'flood-opacity': 0.8, result: 'rTc' }, f);
+      S('feComposite', { in: 'rTc', in2: 'rT0', operator: 'in', result: 'rimT' }, f);
+      P.rb = S('feOffset', { in: 'SourceAlpha', dx: -1, dy: -1.6, result: 'sB' }, f);
+      S('feComposite', { in: 'SourceAlpha', in2: 'sB', operator: 'out', result: 'rB0' }, f);
+      P.rbc = S('feFlood', { 'flood-color': '#ffffff', 'flood-opacity': 0.35, result: 'rBc' }, f);
+      S('feComposite', { in: 'rBc', in2: 'rB0', operator: 'in', result: 'rimB' }, f);
+      P.sh = S('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: 6, result: 'sh0' }, f);
+      P.sho = S('feOffset', { in: 'sh0', dx: 0, dy: 4, result: 'sh1' }, f);
+      P.shc = S('feFlood', { 'flood-color': '#000000', 'flood-opacity': 0.14, result: 'shc' }, f);
+      S('feComposite', { in: 'shc', in2: 'sh1', operator: 'in', result: 'sh2' }, f);
+      S('feComposite', { in: 'sh2', in2: 'SourceAlpha', operator: 'out', result: 'shadow' }, f);
+      var mg = S('feMerge', {}, f);
+      ['shadow', 'body', 'tint', 'spec', 'rimB', 'rimT'].forEach(function (r) { S('feMergeNode', { in: r }, mg); });
+      var outer = S('g', { filter: 'url(#' + id + '-f)' }, svg);
+      var inner = S('g', { mask: 'url(#' + id + '-m)' }, outer);
+      var floor = S('rect', { fill: '#0b0b0c' }, inner);
+      var mag = S('g', {}, inner);
+      var copy = wallSrc ? S('image', { href: wallSrc, x: 0, y: 0, preserveAspectRatio: 'xMidYMid slice' }, mag) : S('rect', { x: 0, y: 0, fill: '#445' }, mag);
+      return { svg: svg, f: f, P: P, mask: mask, shapes: shapes, floor: floor, mag: mag, copy: copy };
+    }
+    function glassSize(k, w, h) {
+      A(k.svg, { viewBox: '0 0 ' + w + ' ' + h, width: w, height: h });
+      k.svg.style.width = w + 'px'; k.svg.style.height = h + 'px';
+      A(k.mask, { x: -w, y: -h, width: w * 3, height: h * 3 });
+      A(k.floor, { x: -w, y: -h, width: w * 3, height: h * 3 });
+      A(k.copy, { width: w, height: h });
+    }
+    function glassParams(k, o) {
+      var P = k.P, E = Math.max(0.4, o.E), d = Math.max(0.4, E * 0.6), s = o.S, ch = o.ch == null ? 0.2 : o.ch;
+      A(P.b, { stdDeviation: E });
+      A(P.ox1, { dx: -d }); A(P.ox2, { dx: d }); A(P.oy1, { dy: -d }); A(P.oy2, { dy: d });
+      A(P.dR, { scale: s }); A(P.dG, { scale: s * (1 - ch / 2) }); A(P.dB, { scale: s * (1 - ch) });
+      A(P.frost, { stdDeviation: Math.max(0, o.frost) });
+      A(P.sat, { values: o.sat });
+      P.briF.forEach(function (n) { A(n, { slope: o.bright, intercept: o.lift }); });
+      A(P.tint, { 'flood-opacity': o.tint });
+      A(P.spec, { surfaceScale: o.ss });
+      A(P.specAA, { slope: o.spec });
+      A(P.rt, { dx: o.rim * 0.45, dy: o.rim }); A(P.rb, { dx: -o.rim * 0.45, dy: -o.rim });
+      A(P.rtc, { 'flood-opacity': o.rimTop }); A(P.rbc, { 'flood-opacity': o.rimBot });
+      A(P.sh, { stdDeviation: o.shBlur }); A(P.sho, { dy: o.shY }); A(P.shc, { 'flood-opacity': o.shadow });
+    }
+    function region(k, x0, y0, x1, y1, m) { A(k.f, { x: x0 - m, y: y0 - m, width: Math.max(1, x1 - x0 + 2 * m), height: Math.max(1, y1 - y0 + 2 * m) }); }
+    function magnify(k, cx, cy, m) { k.mag.setAttribute('transform', 'translate(' + cx + ' ' + cy + ') scale(' + m + ') translate(' + (-cx) + ' ' + (-cy) + ')'); }
+
+    var gD = glassKit(q('.gls-glass-d'), uid + 'd');
+    var gP = glassKit(q('.gls-glass-p'), uid + 'p');
+    var fontFam = "Geist, " + ((getComputedStyle(root).getPropertyValue('--mp-font-family') || '').trim() || 'Inter') + ", system-ui, sans-serif";
+    var digits = [];
+    for (var di = 0; di < timeTxt.length; di++) {
+      var tx = S('text', { x: 0, y: 0, fill: '#fff', 'text-anchor': 'middle', 'font-weight': 700, style: 'font-family:' + fontFam }, gD.shapes);
+      tx.textContent = timeTxt.charAt(di);
+      digits.push(tx);
+    }
+    var pill = S('rect', { fill: '#fff' }, gP.shapes);
+    var mc = document.createElement('canvas').getContext('2d');
+    function measure(fs) {
+      mc.font = '700 ' + fs + 'px ' + fontFam;
+      var track = -0.045 * fs;
+      var adv = digits.map(function (d) { return mc.measureText(d.textContent).width; });
+      var tot = adv.reduce(function (a, b) { return a + b; }, 0) + track * (adv.length - 1);
+      return { adv: adv, tot: tot, track: track };
+    }
+
+    // ── Cursor ──
+    var CS = Math.round(U * 0.026), cur = null, ring = null;
+    if (useCursor) {
+      if (typeof createCursor === 'function') cur = createCursor(root, { color: '#0b0b0c', size: CS, zIndex: 50 });
+      else {
+        cur = document.createElement('div');
+        cur.style.cssText = 'position:absolute;left:0;top:0;width:' + CS + 'px;height:' + CS + 'px;z-index:50';
+        cur.innerHTML = '<svg width="' + CS + '" height="' + CS + '" viewBox="0 0 24 24"><path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.45 0 .67-.53.35-.85L5.85 2.35a.5.5 0 0 0-.35.86z" fill="#0b0b0c" stroke="#fff" stroke-width="1.5"/></svg>';
+        root.appendChild(cur);
+      }
+      cur.classList.add('gls-cursor');
+      ring = cur.querySelector('.mp-cursor-ring');
+      gsap.set(cur, { autoAlpha: 1, transformOrigin: (5.5 / 24 * 100) + '% ' + (3.2 / 24 * 100) + '%' });
+    }
+
+    var E = { io2: gsap.parseEase('power2.inOut'), io3: gsap.parseEase('power3.inOut'), o2: gsap.parseEase('power2.out'), o3: gsap.parseEase('power3.out'),
+      i2: gsap.parseEase('power2.in'), back: gsap.parseEase('back.out(2)'), back1: gsap.parseEase('back.out(1.25)') };
+    var cl = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+    var P01 = function (t, t0, d) { return cl((t - t0) / d, 0, 1); };
+    var lerp = function (a, b, p) { return a + (b - a) * p; };
+
+    // Layout of the lock screen in a screen box (sw x sh): a = 0 square, 1 phone.
+    function layout(sw, sh, ox, oy) {
+      var a = cl((sh / sw - 1) / (ASPECT - 1), 0, 1);
+      return {
+        a: a, cx: ox + sw / 2,
+        dateY: oy + sh * lerp(0.105, 0.098, a), dateFs: sw * lerp(0.036, 0.05, a),
+        clockY: oy + sh * lerp(0.262, 0.19, a), clockFs: sw * lerp(0.29, 0.34, a),
+        pCx: ox + sw * 0.5, pCy: oy + sh * lerp(0.855, 0.845, a), pW: sw * lerp(0.64, 0.88, a), pH: sw * lerp(0.12, 0.17, a), pR: sw * lerp(0.036, 0.05, a),
+        hY: oy + sh * lerp(0.972, 0.975, a), hW: sw * lerp(0.13, 0.34, a), hH: sw * lerp(0.0075, 0.013, a)
+      };
+    }
+
+    function render(t) {
+      // ── phone / screen box ──
+      var pp = E.io3(P01(t, T.pull, T.pullEnd - T.pull));
+      var ow = lerp(W, PH.w, pp), oh = lerp(H, PH.h, pp), ocx = lerp(W / 2, PH.cx, pp), ocy = lerp(H / 2, PH.cy, pp);
+      var br = PH.b * E.o2(P01(t, T.pull + 0.05, 0.4));
+      var orr = lerp(0, PH.r, E.o2(pp));
+      phone.style.left = (ocx - ow / 2) + 'px'; phone.style.top = (ocy - oh / 2) + 'px';
+      phone.style.width = ow + 'px'; phone.style.height = oh + 'px';
+      phone.style.borderRadius = orr + 'px';
+      phone.style.boxShadow = pp > 0 ? '0 ' + (U * 0.03 * pp) + 'px ' + (U * 0.06 * pp) + 'px rgba(20,24,60,' + (0.28 * pp) + '), 0 ' + (U * 0.004 * pp) + 'px ' + (U * 0.01 * pp) + 'px rgba(20,24,60,' + (0.2 * pp) + ')' : 'none';
+      var sw = ow - 2 * br, sh = oh - 2 * br;
+      screen.style.left = br + 'px'; screen.style.top = br + 'px'; screen.style.width = sw + 'px'; screen.style.height = sh + 'px';
+      screen.style.borderRadius = Math.max(0, orr - br) + 'px';
+      // Lay the lock screen out in the part of the screen the frame shows.
+      var sx0 = ocx - ow / 2 + br, sy0 = ocy - oh / 2 + br;
+      var vx = Math.max(0, FX - sx0), vy = Math.max(0, FY - sy0);
+      var vw = Math.min(sw, FX + FW - sx0) - vx, vh = Math.min(sh, FY + FH - sy0) - vy;
+      if (vw < 10 || vh < 10) { vx = 0; vy = 0; vw = sw; vh = sh; }
+      var L = layout(vw, vh, vx, vy);
+
+      // ── date + glass clock ──
+      var dIn = E.o3(P01(t, T.clock + 0.1, 0.4));
+      dateEl.style.fontSize = L.dateFs + 'px';
+      var dw = dateEl.offsetWidth, dh = dateEl.offsetHeight;
+      gsap.set(dateEl, { x: L.cx - dw / 2, y: L.dateY - dh / 2 + (1 - dIn) * L.dateFs * 0.9, autoAlpha: t >= T.clock + 0.1 ? 1 : 0 });
+      dateEl.style.clipPath = 'inset(-20% -5% ' + ((1 - dIn) * 100) + '% -5%)';
+
+      glassSize(gD, sw, sh); glassSize(gP, sw, sh);
+      var m = measure(L.clockFs), x = L.cx - m.tot / 2, any = false;
+      var base = L.clockY + L.clockFs * 0.355;
+      for (var i = 0; i < digits.length; i++) {
+        var tp = T.clock + i * 0.06, s = t < tp ? 0 : E.back(P01(t, tp, 0.36));
+        var cx = x + m.adv[i] / 2;
+        x += m.adv[i] + m.track;
+        if (s <= 0.001) { digits[i].setAttribute('display', 'none'); continue; }
+        any = true;
+        digits[i].removeAttribute('display');
+        A(digits[i], { x: cx, y: base, 'font-size': L.clockFs, transform: 'translate(' + cx + ' ' + L.clockY + ') scale(' + s + ') translate(' + (-cx) + ' ' + (-L.clockY) + ')' });
+      }
+      gD.svg.style.display = any ? 'block' : 'none';
+      if (any) {
+        var fs = L.clockFs;
+        glassParams(gD, { E: fs * 0.04, S: fs * 0.2, ch: 0.22, frost: fs * 0.012, tint: 0.2, ss: 3, spec: 0.9, rim: Math.max(0.8, fs * 0.006), rimTop: 0.85, rimBot: 0.35, shadow: 0.12, shBlur: fs * 0.03, shY: fs * 0.015, sat: 1.25, bright: 1.12, lift: 0.05 });
+        magnify(gD, L.cx, L.clockY, 1.05);
+        region(gD, L.cx - m.tot / 2, L.clockY - fs * 0.5, L.cx + m.tot / 2, L.clockY + fs * 0.5, fs * 0.2);
+      }
+
+      // ── home bar -> glass player ──
+      var hs = E.back(P01(t, T.bar, 0.25));
+      home.style.display = hs > 0.001 ? 'block' : 'none';
+      home.style.width = L.hW + 'px'; home.style.height = L.hH + 'px';
+      gsap.set(home, { x: L.cx - L.hW / 2, y: L.hY - L.hH / 2, scaleX: hs, scaleY: Math.min(1, hs * 1.4) });
+      var R = null;
+      if (t >= T.player) {
+        var sp = P01(t, T.player, T.bar + 0.4 - T.player);
+        var ew = E.back1(sp), eh = E.o3(cl(sp * 1.15, 0, 1)), ey = E.io2(cl(sp * 1.3, 0, 1));
+        R = { cx: L.pCx, cy: lerp(L.hY, L.pCy, ey), w: lerp(L.hW, L.pW, ew), h: lerp(L.hH, L.pH, eh), r: lerp(L.hH / 2, L.pR, eh) };
+      }
+      if (R) {
+        gP.svg.style.display = 'block';
+        A(pill, { x: R.cx - R.w / 2, y: R.cy - R.h / 2, width: R.w, height: R.h, rx: Math.min(R.r, R.h / 2), ry: Math.min(R.r, R.h / 2) });
+        var gs = vw / U;
+        glassParams(gP, { E: U * 0.008 * gs, S: U * 0.04 * gs, ch: 0.2, frost: 2.2 * gs, tint: 0.12, ss: 3, spec: 0.75, rim: Math.max(0.7, 1.4 * gs), rimTop: 0.8, rimBot: 0.35, shadow: 0.2, shBlur: U * 0.008 * gs, shY: U * 0.005 * gs, sat: 1.35, bright: 1.1, lift: 0.04 });
+        magnify(gP, R.cx, R.cy, 1.04);
+        region(gP, R.cx - R.w / 2, R.cy - R.h / 2, R.cx + R.w / 2, R.cy + R.h / 2, U * 0.04 * gs);
+        // player content, anchored to the final pill, revealed by the pill's own box
+        player.style.display = 'block';
+        player.style.left = (R.cx - R.w / 2) + 'px'; player.style.top = (R.cy - R.h / 2) + 'px';
+        player.style.width = R.w + 'px'; player.style.height = R.h + 'px';
+        player.style.borderRadius = Math.min(R.r, R.h / 2) + 'px';
+        var ox = (L.pCx - L.pW / 2) - (R.cx - R.w / 2), oy = (L.pCy - L.pH / 2) - (R.cy - R.h / 2);
+        var pad = L.pW * 0.06, cIn = E.o3(P01(t, T.bar + 0.28, 0.3));
+        var tFs = L.pH * 0.2;
+        meta.style.fontSize = tFs + 'px';
+        gsap.set(meta, { x: ox + pad, y: oy + L.pH * 0.2 + (1 - cIn) * L.pH * 0.3, autoAlpha: cIn > 0 ? 1 : 0 });
+        var bs = L.pH * 0.2, gap = bs * 0.9;
+        btns.forEach(function (b, bi) { b.style.width = b.style.height = (bi === 1 ? bs * 1.15 : bs) + 'px'; b.style.marginLeft = bi ? gap + 'px' : '0'; });
+        var cw = bs * 3.15 + gap * 2;
+        var bIn = E.back(P01(t, T.bar + 0.32, 0.3));
+        gsap.set(ctrls, { x: ox + L.pW - pad - cw, y: oy + L.pH * 0.42 - bs * 0.575, height: bs * 1.15, scale: bIn, transformOrigin: '50% 50%', autoAlpha: bIn > 0.01 ? 1 : 0 });
+        var playing = t >= T.click + 0.06;
+        iPlay.style.display = playing ? 'none' : 'block';
+        iPause.style.display = playing ? 'block' : 'none';
+        var pop = 1 - 0.2 * Math.sin(Math.PI * P01(t, T.click, 0.16));
+        gsap.set(playBtn, { scale: pop });
+        var pw = L.pW - pad * 2, ph = Math.max(1.5, L.pH * 0.035);
+        prog.style.width = pw + 'px'; prog.style.height = ph + 'px';
+        gsap.set(prog, { x: ox + pad, y: oy + L.pH * 0.8 - ph / 2, scaleX: E.o3(P01(t, T.bar + 0.3, 0.35)), transformOrigin: '0 50%' });
+        var prog0 = 0.34 + (playing ? (t - T.click) * 0.02 : 0);
+        progFill.style.width = (cl(prog0, 0, 1) * 100) + '%';
+      } else { gP.svg.style.display = 'none'; player.style.display = 'none'; }
+
+      // ── Dynamic Island ──
+      var ip = showIsland ? E.back1(P01(t, T.pull + 0.22, 0.28)) : 0;
+      island.style.display = ip > 0.001 ? 'block' : 'none';
+      var iw = sw * 0.3 * ip, ih = sw * 0.085 * Math.min(1, ip * 1.3);
+      island.style.width = Math.max(0, iw) + 'px'; island.style.height = Math.max(0, ih) + 'px';
+      gsap.set(island, { x: sw / 2 - iw / 2, y: sw * 0.035 });
+
+      // ── Cursor ──
+      if (cur) {
+        // the play button's centre in the final player layout (root px)
+        var bsz = L.pH * 0.2, bgap = bsz * 0.9, bpad = L.pW * 0.06, bcw = bsz * 3.15 + bgap * 2;
+        var tgt = { x: (ocx - ow / 2) + br + L.pCx + L.pW / 2 - bpad - bcw + bsz + bgap + bsz * 0.575 + bsz * 0.1,
+                    y: (ocy - oh / 2) + br + L.pCy - L.pH / 2 + L.pH * 0.42 + bsz * 0.15 };
+        var p1 = E.io2(P01(t, T.click - 0.4, 0.36)), p2 = E.io2(P01(t, T.click + 0.18, T.pull + 0.1 - T.click - 0.18));
+        var cx2 = lerp(lerp(FX + FW * cFrom[0], tgt.x, p1), FX + FW * cTo[0], p2), cy2 = lerp(lerp(FY + FH * cFrom[1], tgt.y, p1), FY + FH * cTo[1], p2);
+        var press = (t >= T.click && t < T.click + 0.16) ? 1 - 0.15 * Math.sin(Math.PI * (t - T.click) / 0.16) : 1;
+        gsap.set(cur, { x: cx2 - CS * 5.5 / 24, y: cy2 - CS * 3.2 / 24, scale: press });
+        if (ring) {
+          if (t >= T.click && t < T.click + 0.42) { var rq = E.o2((t - T.click) / 0.42); gsap.set(ring, { autoAlpha: 0.8 * (1 - rq), scale: 0.25 + 1.3 * rq }); }
+          else gsap.set(ring, { autoAlpha: 0 });
+        }
+      }
+    }
+
+    var clock = { t: 0 };
+    render(0);
+    tl.to(clock, { t: END, duration: END, ease: 'none', onUpdate: function () { render(clock.t); } }, 0);
+    return tl;
+  }
+</script>
