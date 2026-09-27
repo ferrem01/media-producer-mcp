@@ -1,0 +1,447 @@
+<template>
+  <div class="sfl">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@600&display=swap">
+    <div class="sfl-stage"></div>
+    <div class="sfl-labels"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* SCREEN FLASH: a carousel of product screens that never stops moving (a
+     ring seen slightly from above, or a receding rail), and on each cue the
+     screen at the front LIFTS out, punches up to fill the frame, holds, and
+     drops back into its slot in the still-moving carousel. Then the next.
+     Every card is its own flat perspective projection (one shared vanishing
+     point, the box centre) and the depth order is a z-index sort, so cards
+     never slice through each other. Every style is a pure function of the
+     time; the flash schedule is published on the root. */
+  .sfl, .sfl * { max-width: none; box-sizing: border-box; }
+  .sfl { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .sfl-stage { position: absolute; inset: 0; }
+  .sfl-card { position: absolute; left: 0; top: 0; overflow: hidden; background: #ffffff; visibility: hidden;
+    transform-origin: 50% 50%; will-change: transform; backface-visibility: hidden; }
+  .sfl-card img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sfl-fog, .sfl-pop { position: absolute; inset: 0; opacity: 0; }
+  .sfl-pop { background: #ffffff; }
+  .sfl-labels { position: absolute; inset: 0; z-index: 5000; }
+  .sfl-label { position: absolute; left: 0; top: 0; overflow: hidden; visibility: hidden; }
+  .sfl-label span { display: block; white-space: nowrap; font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif; font-weight: 600;
+    letter-spacing: -0.01em; line-height: 1; padding: 0.62em 1.05em; border-radius: 999px; will-change: transform; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.sfl'), stage = el.querySelector('.sfl-stage'), labelLayer = el.querySelector('.sfl-labels');
+    if (!root || !stage || !labelLayer) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var has = function (v) { return v !== null && v !== undefined && v !== ''; };
+    var clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+    var out3 = function (p) { p = clamp01(p); return 1 - Math.pow(1 - p, 3); };
+    var in3 = function (p) { p = clamp01(p); return p * p * p; };
+    var inOut3 = function (p) { p = clamp01(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+    var out2 = function (p) { p = clamp01(p); return 1 - (1 - p) * (1 - p); };
+    var W = root.clientWidth || el.clientWidth || 1920, H = root.clientHeight || el.clientHeight || 1080;
+    var CX = W / 2, CY = H / 2;
+    var D2R = Math.PI / 180;
+
+    // ── The visible frame inside the box (a full-frame slot overhangs the frame by 20 px).
+    var rc = root.getBoundingClientRect(), bs = rc.width / W || 1;
+    var ox = clamp(Math.max(0, -rc.left, rc.right - window.innerWidth) / bs, 0, W * 0.2);
+    var oy = clamp(Math.max(0, -rc.top, rc.bottom - window.innerHeight) / bs, 0, H * 0.2);
+    var VW = W - 2 * ox, VH = H - 2 * oy;
+    var tall = H > W * 1.1;
+
+    // ── Screens.
+    var labelsIn = Array.isArray(data.labels) ? data.labels : [];
+    var screens = (Array.isArray(data.screens) ? data.screens : []).map(function (s, i) {
+      if (typeof s === 'string') s = { src: s };
+      if (!s || typeof s !== 'object' || !s.src) return null;
+      return { src: String(s.src), w: Math.max(1, num(s.w, 1920)), h: Math.max(1, num(s.h, 1080)),
+        label: has(s.label) ? String(s.label) : (has(labelsIn[i]) ? String(labelsIn[i]) : ''),
+        focus: Array.isArray(s.focus) ? [clamp01(num(s.focus[0], 0.5)), clamp01(num(s.focus[1], 0.5))] : null };
+    }).filter(Boolean).slice(0, 10);
+    if (!screens.length) return tl;
+    var N = screens.length;
+    var ASP = num(data.aspect, screens[0].w / screens[0].h);
+    var SHAPE = data.shape === 'rail' ? 'rail' : 'ring';
+
+    // ── Projection: a card is `perspective(P) translate3d(x,y,z) rotateX(rx) rotateY(ry) scale(s)`
+    // about the box centre. proj() mirrors CSS for one local point of that card.
+    var P = Math.max(W, H) * num(data.perspective, data.shape === 'rail' ? 1.4 : 1.9);
+    var proj = function (pose, lx, ly) {
+      var s = pose.s, x = lx * s, y = ly * s, z = 0;
+      var cy = Math.cos(pose.ry * D2R), sy = Math.sin(pose.ry * D2R);
+      var x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+      var cx = Math.cos(pose.rx * D2R), sx = Math.sin(pose.rx * D2R);
+      var y2 = y * cx - z1 * sx, z2 = y * sx + z1 * cx;
+      var X = x1 + pose.x, Y = y2 + pose.y, Z = z2 + pose.z, k = P / Math.max(1, P - Z);
+      return { x: CX + X * k, y: CY + Y * k };
+    };
+    var bounds = function (pose) {
+      var hw = pose.w / 2, hh = pose.h / 2, b = { l: 1e9, r: -1e9, t: 1e9, b: -1e9 };
+      [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(function (c) {
+        var p = proj(pose, c[0], c[1]);
+        b.l = Math.min(b.l, p.x); b.r = Math.max(b.r, p.x); b.t = Math.min(b.t, p.y); b.b = Math.max(b.b, p.y);
+      });
+      return b;
+    };
+
+    // ── Carousel geometry. u = a card's slot coordinate (0 = the front slot).
+    // A ring turns about the vertical axis (axis 'y', the default in a wide box) or, in a tall
+    // box, about the horizontal one (axis 'x': a wheel whose screens roll up over the top).
+    var AXIS = data.axis === 'x' || data.axis === 'y' ? data.axis : (tall ? 'x' : 'y');
+    var TILT = num(data.tilt, AXIS === 'x' ? 8 : 10);
+    var TURN = num(data.turn, 40);
+    var cw, ch, R = 0, Xc = 0, Yc = 0, Zc = 0, TOT = N, U_LO = 0, SP = 1, YAW = 0, FX = 0, FY = 0, DFOG = 1;
+    var ringPose = function (u, w, h) {
+      var th = u * 2 * Math.PI / N;
+      var la = R * Math.sin(th), lz = R * Math.cos(th);
+      var ct = Math.cos(TILT * D2R), st = Math.sin(TILT * D2R);
+      // The ring tilts toward the camera about its centre: seen from above (the back rises)
+      // or, for a wheel, from the left (the back slides right).
+      if (AXIS === 'x') return { x: Xc + lz * st, y: Yc + la, z: Zc + lz * ct, rx: -TURN * Math.sin(th), ry: -TILT, w: w, h: h, s: 1 };
+      return { x: Xc + la, y: Yc + lz * st, z: Zc + lz * ct, rx: -TILT, ry: TURN * Math.sin(th), w: w, h: h, s: 1 };
+    };
+    var railPose = function (u, w, h) {
+      var s = u * SP, cyw = Math.cos(YAW * D2R), syw = Math.sin(YAW * D2R);
+      return { x: FX + s * cyw, y: FY, z: -s * syw, rx: -TILT, ry: YAW, w: w, h: h, s: 1 };
+    };
+    if (SHAPE === 'ring') {
+      // Spacing runs along the card's width (axis y) or height (axis x).
+      var rFactor = num(data.ring_radius, Math.max(1.0, N * (AXIS === 'x' ? 1.32 : 1.14) / (2 * Math.PI)));
+      var fitW = AXIS === 'x' ? 0.9 : 0.98, fitH = AXIS === 'x' ? 0.9 : 0.88;
+      var ringExtent = function (w) {
+        cw = w; ch = w / ASP; R = rFactor * (AXIS === 'x' ? ch : cw); Zc = -R * Math.cos(TILT * D2R); Xc = 0; Yc = 0;
+        var b = { l: 1e9, r: -1e9, t: 1e9, b: -1e9 };
+        for (var a = 0; a < 48; a++) {
+          var bb = bounds(ringPose(a / 48 * N, cw, ch));
+          b.l = Math.min(b.l, bb.l); b.r = Math.max(b.r, bb.r); b.t = Math.min(b.t, bb.t); b.b = Math.max(b.b, bb.b);
+        }
+        return b;
+      };
+      var w0;
+      if (has(data.size)) w0 = W * num(data.size, 0.4);
+      else {
+        // The largest front card whose swept ring fits fitW of the frame's width and fitH of its height.
+        // (A wheel's card stays at most 0.64 of the width, so its flash is still a real punch.)
+        var lo = W * 0.05, hi = W * (AXIS === 'x' ? 0.64 : 0.46);
+        for (var it = 0; it < 22; it++) {
+          var mid = (lo + hi) / 2, e = ringExtent(mid);
+          if (e.r - e.l <= VW * fitW && e.b - e.t <= VH * fitH) lo = mid; else hi = mid;
+        }
+        w0 = lo;
+      }
+      var ext = ringExtent(w0);
+      // Centre the ring's swept bounds (plus data.x / data.y).
+      // A wheel keeps its front slot on the centre line (its swept bounds lean with the tilt).
+      Xc = (AXIS === 'x' ? -R * Math.sin(TILT * D2R) : CX - (ext.l + ext.r) / 2) + W * num(data.x, 0);
+      Yc = CY - (ext.t + ext.b) / 2 + H * num(data.y, 0);
+      DFOG = 2 * R * Math.cos(TILT * D2R);
+    } else {
+      YAW = num(data.yaw, 32);
+      cw = W * num(data.size, tall ? 0.62 : 0.36); ch = cw / ASP;
+      FX = W * (num(data.front_x, tall ? 0.5 : 0.4) - 0.5);
+      FY = H * num(data.y, 0);
+      SP = 1;
+      // Where a card is wholly off the frame on the left (near) and the right (far).
+      var railB = function (s) { return bounds({ x: FX + s * Math.cos(YAW * D2R), y: FY, z: -s * Math.sin(YAW * D2R), rx: -TILT, ry: YAW, w: cw, h: ch, s: 1 }); };
+      var sLo = 0, sHi = 0, m = W * 0.02;
+      while (sLo > -W * 8 && -sLo * Math.sin(YAW * D2R) < P * 0.6 && railB(sLo).r > ox - m) sLo -= cw * 0.05;
+      while (sHi < W * 20 && railB(sHi).l < W - ox + m) sHi += cw * 0.05;
+      var gapR = num(data.gap, 0.08);
+      var minSp = cw * (1 + gapR);
+      var copies = Math.max(1, Math.ceil((sHi - sLo + cw) / (minSp * N)));
+      TOT = N * copies;
+      SP = Math.max(minSp, (sHi - sLo + cw * 0.2) / TOT);
+      U_LO = (sLo - cw * 0.1) / SP;
+      DFOG = Math.max(1, sHi * Math.sin(YAW * D2R));
+    }
+    var slotPose = SHAPE === 'ring' ? ringPose : railPose;
+    var wrapU = function (u) {
+      if (SHAPE === 'ring') { var v = ((u % N) + N) % N; return v > N / 2 ? v - N : v; }
+      return ((((u - U_LO) % TOT) + TOT) % TOT) + U_LO;
+    };
+    var CORNER = Math.max(0, num(data.corner, 0.018));
+    var radOf = function (w) { return w * CORNER; };
+
+    // ── The flash target: 'full' = exactly the component box; a fraction = the screen fitted
+    // (contain) into that fraction of the visible frame, centred.
+    var FIT = data.flash_fit;
+    if (!has(FIT)) FIT = (tall && ASP > 1) ? 0.92 : 'full';
+    var FULL = FIT === 'full' || num(FIT, 1) >= 1;
+    var TW, TH;
+    if (FULL) { TW = W; TH = H; }
+    else { var ff = clamp(num(FIT, 0.86), 0.2, 0.999), kf = Math.min(ff * VW / ASP, ff * VH); TH = kf; TW = kf * ASP; }
+    var flatPose = { x: 0, y: 0, z: 0, rx: 0, ry: 0, w: TW, h: TH, s: 1, rad: FULL ? 0 : radOf(TW) };
+
+    // ── Enter.
+    var ENTER = data.enter === 'fade' || data.enter === 'none' ? data.enter : (data.enter === 'point' ? 'point' : 'none');
+    var ENTER_AT = num(data.enter_at, 0), ENTER_D = Math.max(0.1, num(data.enter_duration, ENTER === 'fade' ? 0.6 : 0.8));
+    var ENTER_SPREAD = Math.max(0, num(data.enter_stagger, ENTER === 'point' ? 0.18 : 0.12));
+    var pt = function (v, dx, dy) { return Array.isArray(v) && v.length >= 2 ? { x: W * num(v[0], dx) - CX, y: H * num(v[1], dy) - CY } : { x: W * dx - CX, y: H * dy - CY }; };
+    var FROM = pt(data.from, 0.5, 0.5), TO = pt(data.to, 0.5, 0.5);
+    var enterEnd = ENTER === 'none' ? ENTER_AT : ENTER_AT + ENTER_SPREAD + ENTER_D;
+
+    // ── The flash schedule. `at` is the ARRIVAL (the screen lands full, the hit on the beat).
+    var FIN = Math.max(0.05, num(data.flash_in, 0.28)), FOUT = Math.max(0.05, num(data.flash_out, 0.35));
+    var HOLD = Math.max(0.05, num(data.hold, 0.7));
+    var STRIDE = Math.max(1, Math.round(num(data.stride, 1)));
+    var START = ((Math.round(num(data.start_index, 0)) % N) + N) % N;
+    var flashes = [];
+    if (Array.isArray(data.flashes) && data.flashes.length) {
+      data.flashes.forEach(function (f) {
+        if (!f || typeof f !== 'object' || !isFinite(Number(f.at))) return;
+        flashes.push({ at: Number(f.at), hold: Math.max(0.05, num(f.hold, HOLD)), index: has(f.index) ? ((Math.round(num(f.index, 0)) % N) + N) % N : null });
+      });
+    } else if (Array.isArray(data.flash_times) && data.flash_times.length) {
+      data.flash_times.forEach(function (v) { if (isFinite(Number(v))) flashes.push({ at: Number(v), hold: HOLD, index: null }); });
+    } else {
+      // The helper: holds and carousel gaps each run geometrically first -> last.
+      var cnt = Math.max(0, Math.min(40, Math.round(num(data.count, N))));
+      var H0 = Math.max(0.05, num(data.first_hold, HOLD)), H1 = Math.max(0.05, num(data.last_hold, H0));
+      var G0 = Math.max(0, num(data.gap_time, 0.55)), G1 = Math.max(0, num(data.last_gap_time, G0));
+      var geo = function (a, b, i, n) { return n <= 1 || a <= 0 ? a : a * Math.pow(b / a, i / (n - 1)); };
+      var geoG = function (a, b, i, n) { return (n <= 1) ? a : (a > 0 && b > 0 ? a * Math.pow(b / a, i / (n - 1)) : a + (b - a) * i / (n - 1)); };
+      var first = num(data.first_at, (ENTER === 'none' ? ENTER_AT + 0.8 : enterEnd + 0.35) + FIN);
+      var prevRet = 0;
+      for (var q = 0; q < cnt; q++) {
+        var hq = geo(H0, H1, q, cnt);
+        var aq = q === 0 ? first : prevRet + geoG(G0, G1, q - 1, cnt - 1) + FIN;
+        flashes.push({ at: aq, hold: hq, index: null });
+        prevRet = aq + hq + FOUT;
+      }
+    }
+    flashes.sort(function (a, b) { return a.at - b.at; });
+    var F = flashes.length;
+    var prevIdx = START - STRIDE;
+    flashes.forEach(function (f) {
+      if (f.index === null) f.index = (((prevIdx + STRIDE) % N) + N) % N;
+      prevIdx = f.index;
+      f.lift = f.at - FIN; f.leave = f.at + f.hold; f.ret = f.leave + FOUT;
+    });
+
+    // ── The phase: phi(t) in slots, always moving forward, with phi(lift_k) == the knot p_k
+    // (p_k = index_k mod N): the flashed screen sits exactly in the front slot as it lifts.
+    var knots = [];
+    var V = num(data.speed, NaN);
+    if (!isFinite(V)) V = F >= 2 ? STRIDE / Math.max(0.3, (flashes[F - 1].lift - flashes[0].lift) / (F - 1)) : 0.25;
+    V = Math.max(0, V);
+    flashes.forEach(function (f, k) {
+      var p;
+      if (k === 0) p = f.index;
+      else {
+        var pp = knots[k - 1].p, dt = f.lift - knots[k - 1].t;
+        var exp = pp + V * dt, minP = pp + Math.min(0.5, V * dt * 0.5);
+        p = f.index + N * Math.ceil((minP - f.index) / N);
+        // The congruent phase nearest the expected one, never behind the minimum.
+        while (Math.abs(p + N - exp) < Math.abs(p - exp)) p += N;
+      }
+      knots.push({ t: f.lift, p: p });
+      f.p = p;
+    });
+    // Monotone cubic (Fritsch-Carlson) through the knots; slope V outside them.
+    var tang = [];
+    if (knots.length >= 2) {
+      var dl = [];
+      for (var k = 0; k < knots.length - 1; k++) dl.push((knots[k + 1].p - knots[k].p) / Math.max(1e-3, knots[k + 1].t - knots[k].t));
+      for (k = 0; k < knots.length; k++) tang.push(k === 0 || k === knots.length - 1 ? V : (dl[k - 1] * dl[k] <= 0 ? 0 : (dl[k - 1] + dl[k]) / 2));
+      for (k = 0; k < dl.length; k++) {
+        if (dl[k] === 0) { tang[k] = tang[k + 1] = 0; continue; }
+        var al = tang[k] / dl[k], be = tang[k + 1] / dl[k], ss = al * al + be * be;
+        if (ss > 9) { var tt = 3 / Math.sqrt(ss); tang[k] = tt * al * dl[k]; tang[k + 1] = tt * be * dl[k]; }
+      }
+    }
+    var phi = function (t) {
+      if (!knots.length) return START + V * t;
+      if (t <= knots[0].t) return knots[0].p + V * (t - knots[0].t);
+      var L = knots.length - 1;
+      if (t >= knots[L].t) return knots[L].p + V * (t - knots[L].t);
+      var j = 0; while (j < L - 1 && t > knots[j + 1].t) j++;
+      var a = knots[j], b = knots[j + 1], h = b.t - a.t, s = (t - a.t) / h;
+      var h00 = 2 * s * s * s - 3 * s * s + 1, h10 = s * s * s - 2 * s * s + s, h01 = -2 * s * s * s + 3 * s * s, h11 = s * s * s - s * s;
+      return h00 * a.p + h10 * h * tang[j] + h01 * b.p + h11 * h * tang[j + 1];
+    };
+    var itemOfPhase = function (p) { return ((Math.round(p) % TOT) + TOT) % TOT; };
+    flashes.forEach(function (f) { f.item = itemOfPhase(f.p); });
+
+    // ── End.
+    var END_MODE = data.end === 'collapse' || data.end === 'full' ? data.end : 'hold';
+    if (END_MODE === 'full' && !F) END_MODE = 'hold';
+    var lastRet = F ? flashes[F - 1].ret : enterEnd;
+    var END_AT = num(data.end_at, (END_MODE === 'collapse' ? lastRet + 0.3 : 0));
+    var COL_D = Math.max(0.1, num(data.collapse_duration, 0.5)), COL_SPREAD = Math.max(0, num(data.collapse_stagger, 0.12));
+    var SETTLE = END_MODE === 'collapse' ? END_AT + COL_SPREAD + COL_D : END_MODE === 'full' ? flashes[F - 1].at : lastRet;
+
+    // ── DOM.
+    var fogColor = String(data.fog_color || '');
+    if (!fogColor) {
+      var bg = getComputedStyle(document.body).backgroundColor;
+      var pc = window.mpParseColor ? mpParseColor(bg) : null;
+      fogColor = pc && pc.a > 0.5 ? bg : '#efeeea';
+    }
+    var FOG = clamp01(num(data.depth_fade, 0.28));
+    var items = [];
+    for (var j = 0; j < TOT; j++) {
+      var sc = screens[j % N];
+      var d = document.createElement('div');
+      d.className = 'sfl-card';
+      d.setAttribute('data-screen', String(j % N));
+      d.setAttribute('data-item', String(j));
+      var im = document.createElement('img'); im.alt = ''; im.src = sc.src; im.decoding = 'sync';
+      if (sc.focus) im.style.objectPosition = (sc.focus[0] * 100) + '% ' + (sc.focus[1] * 100) + '%';
+      d.appendChild(im);
+      var fog = document.createElement('div'); fog.className = 'sfl-fog'; fog.style.background = fogColor; d.appendChild(fog);
+      var pop = document.createElement('div'); pop.className = 'sfl-pop'; d.appendChild(pop);
+      stage.appendChild(d);
+      items.push({ el: d, j: j, scr: j % N, fog: fog, pop: pop, last: {} });
+    }
+    // Per-flash labels (a screen can flash twice).
+    var LBG = String(data.label_bg || 'rgba(14,14,18,0.88)'), LINK = String(data.label_ink || '#ffffff');
+    var LU = tall ? VW / 1080 : VH / 1080;
+    var LFS = has(data.label_size) ? W * num(data.label_size, 0.017) : 34 * LU;
+    var LM = Math.max(VW, VH) * 0.026;
+    var tRect = { l: CX - TW / 2, t: CY - TH / 2, r: CX + TW / 2, b: CY + TH / 2 };
+    var labL = Math.max(tRect.l, ox) + LM, labB = Math.min(tRect.b, H - oy) - LM;
+    flashes.forEach(function (f, k) {
+      var txt = screens[f.index].label;
+      if (!txt) return;
+      var wrap = document.createElement('div'); wrap.className = 'sfl-label'; wrap.setAttribute('data-flash', String(k));
+      var sp = document.createElement('span'); sp.textContent = txt;
+      sp.style.fontSize = LFS.toFixed(2) + 'px'; sp.style.background = LBG; sp.style.color = LINK;
+      wrap.appendChild(sp); labelLayer.appendChild(wrap);
+      f.label = wrap; f.labelSpan = sp;
+    });
+
+    // Stagger orders (fixed at build time, from the deterministic phase): enter front-first,
+    // collapse back-first.
+    var depthAt = function (t) { var ph = phi(t); return items.map(function (it) { return slotPose(wrapU(it.j - ph), cw, ch).z; }); };
+    var rankBy = function (zs, desc) {
+      var ord = zs.map(function (z, i) { return i; }).sort(function (a, b) { return desc ? zs[b] - zs[a] : zs[a] - zs[b]; });
+      var r = []; ord.forEach(function (i, k) { r[i] = TOT > 1 ? k / (TOT - 1) : 0; }); return r;
+    };
+    var enterRank = rankBy(depthAt(enterEnd), true), colRank = rankBy(depthAt(END_AT), false);
+
+    // ── Published contract.
+    var t3 = function (a) { return a.map(function (v) { return (Math.round(v * 1000) / 1000).toString(); }).join(','); };
+    var f4 = function (v) { return (Math.round(v * 10000) / 10000).toString(); };
+    root.setAttribute('data-flash-times', t3(flashes.map(function (f) { return f.at; })));
+    root.setAttribute('data-lift-times', t3(flashes.map(function (f) { return f.lift; })));
+    root.setAttribute('data-leave-times', t3(flashes.map(function (f) { return f.leave; })));
+    root.setAttribute('data-return-times', t3(flashes.map(function (f) { return f.ret; })));
+    root.setAttribute('data-flash-indexes', flashes.map(function (f) { return f.index; }).join(','));
+    root.setAttribute('data-settle-time', t3([SETTLE]));
+    var fs0 = slotPose(0, cw, ch);
+    root.setAttribute('data-front-slot', [f4((CX + fs0.x) / W), f4((CY + fs0.y) / H), f4(cw / W), f4(ch / H)].join(','));
+    root.setAttribute('data-flash-box', [f4(0.5), f4(0.5), f4(TW / W), f4(TH / H)].join(','));
+    root.setAttribute('data-from', f4((FROM.x + CX) / W) + ',' + f4((FROM.y + CY) / H));
+    root.setAttribute('data-to', f4((TO.x + CX) / W) + ',' + f4((TO.y + CY) / H));
+    root.setAttribute('data-count', String(N));
+
+    // ── Pose helpers.
+    var lerp = function (a, b, e) { return a + (b - a) * e; };
+    var lerpPose = function (a, b, e) {
+      return { x: lerp(a.x, b.x, e), y: lerp(a.y, b.y, e), z: lerp(a.z, b.z, e), rx: lerp(a.rx, b.rx, e), ry: lerp(a.ry, b.ry, e),
+        w: lerp(a.w, b.w, e), h: lerp(a.h, b.h, e), s: lerp(a.s, b.s, e), rad: lerp(a.rad, b.rad, e) };
+    };
+    var pointPose = function (p, ref) { return { x: p.x, y: p.y, z: 0, rx: 0, ry: 0, w: ref.w, h: ref.h, s: 0, rad: ref.rad }; };
+    // The flash weight of item j at t: 0 in the carousel, 1 full frame.
+    var flashOf = function (j, t) {
+      for (var k = F - 1; k >= 0; k--) {
+        var f = flashes[k];
+        if (f.item !== j || t < f.lift) continue;
+        var e;
+        if (t < f.at) e = out3((t - f.lift) / FIN);
+        else if (t < f.leave || (END_MODE === 'full' && k === F - 1)) e = 1;
+        else if (t < f.ret) e = 1 - inOut3((t - f.leave) / FOUT);
+        else continue;
+        return { e: e, k: k, f: f };
+      }
+      return null;
+    };
+    var shadow = function (h, f) {
+      return '0 ' + (h * 0.03).toFixed(1) + 'px ' + (h * 0.085).toFixed(1) + 'px rgba(18,18,28,' + (0.2 * f).toFixed(3) + '), 0 ' +
+        (h * 0.006).toFixed(1) + 'px ' + (h * 0.018).toFixed(1) + 'px rgba(18,18,28,' + (0.12 * f).toFixed(3) + '), 0 0 0 1px rgba(18,18,28,' + (0.06 * f).toFixed(3) + ')';
+    };
+    var POP = data.flash_pop === true;
+
+    function render(t) {
+      var ph = phi(t);
+      var keys = [];
+      items.forEach(function (it) {
+        var base = slotPose(wrapU(it.j - ph), cw, ch);
+        base.rad = radOf(cw);
+        var pose = base, boost = 0, popA = 0;
+        var fl = flashOf(it.j, t);
+        if (fl) {
+          pose = lerpPose(base, flatPose, fl.e);
+          // Above everything while lifted; hands back to the depth sort as it seats.
+          boost = fl.e > 0.002 ? 1e7 + fl.k * 1e4 : 0;
+          if (POP) {
+            var dp = t - fl.f.at;
+            popA = dp < -0.06 || dp > 0.24 ? 0 : dp < 0 ? 0.7 * (1 + dp / 0.06) : 0.7 * (1 - out2(dp / 0.24));
+          }
+        }
+        var op = 1;
+        if (ENTER === 'point' && t < enterEnd) {
+          var t0 = ENTER_AT + enterRank[it.j] * ENTER_SPREAD;
+          pose = lerpPose(pointPose(FROM, pose), pose, out3((t - t0) / ENTER_D));
+        } else if (ENTER === 'fade' && t < enterEnd) {
+          var t1 = ENTER_AT + enterRank[it.j] * ENTER_SPREAD, ef = out2((t - t1) / ENTER_D);
+          op = ef; pose.y += (1 - ef) * H * 0.04;
+        }
+        if (END_MODE === 'collapse' && t >= END_AT) {
+          var t2 = END_AT + colRank[it.j] * COL_SPREAD;
+          var ec = t < t2 ? 0 : inOut3((t - t2) / COL_D) * 0.25 + in3((t - t2) / COL_D) * 0.75;
+          if ((t - t2) >= COL_D) ec = 1;
+          pose = lerpPose(pose, pointPose(TO, pose), ec);
+        }
+        var e = it.el, st = e.style;
+        var hidden = pose.s < 0.002 || op <= 0.002;
+        if (!hidden && SHAPE === 'rail' && !boost) {
+          var b = bounds(pose);
+          if (b.r < -W * 0.02 || b.l > W * 1.02) hidden = true;
+        }
+        if (hidden) { st.visibility = 'hidden'; keys.push({ it: it, k: -1e9 }); return; }
+        st.visibility = 'inherit';
+        var w = pose.w, h = pose.h;
+        if (it.last.w !== w || it.last.h !== h) {
+          st.width = w.toFixed(2) + 'px'; st.height = h.toFixed(2) + 'px';
+          st.left = (CX - w / 2).toFixed(2) + 'px'; st.top = (CY - h / 2).toFixed(2) + 'px';
+          st.boxShadow = shadow(h, 1);
+          it.last.w = w; it.last.h = h;
+        }
+        st.borderRadius = pose.rad.toFixed(2) + 'px';
+        st.opacity = op < 1 ? op.toFixed(3) : '';
+        st.transform = 'perspective(' + P.toFixed(1) + 'px) translate3d(' + pose.x.toFixed(2) + 'px,' + pose.y.toFixed(2) + 'px,' + pose.z.toFixed(2) + 'px) rotateX(' +
+          pose.rx.toFixed(3) + 'deg) rotateY(' + pose.ry.toFixed(3) + 'deg) scale(' + pose.s.toFixed(4) + ')';
+        it.fog.style.opacity = FOG > 0 ? (FOG * clamp01(-pose.z / DFOG)).toFixed(3) : '0';
+        it.pop.style.opacity = popA > 0 ? popA.toFixed(3) : '0';
+        keys.push({ it: it, k: pose.z + boost });
+      });
+      keys.sort(function (a, b) { return a.k - b.k; });
+      keys.forEach(function (o, r) { o.it.el.style.zIndex = String(r + 1); });
+      // Labels: a caption rises out of its own baseline as the flash lands, drops as it leaves.
+      flashes.forEach(function (f, k) {
+        if (!f.label) return;
+        var a0 = f.at - 0.06, a1 = Math.max(a0 + 0.2, f.leave - 0.18);
+        var stays = END_MODE === 'full' && k === F - 1 && data.label_stays === true;
+        if (t < a0 || (!stays && t >= a1 + 0.18)) { f.label.style.visibility = 'hidden'; return; }
+        var yIn = (t < a1 || stays) ? 1 - out3((t - a0) / 0.32) : in3((t - a1) / 0.18);
+        f.label.style.visibility = 'inherit';
+        var lh = f.label.offsetHeight || LFS * 2.24;
+        f.label.style.transform = 'translate(' + labL.toFixed(2) + 'px,' + (labB - lh).toFixed(2) + 'px)';
+        f.labelSpan.style.transform = 'translateY(' + (yIn * 105).toFixed(2) + '%)';
+      });
+    }
+
+    var END = Math.max(num(ctx && ctx.duration, 0), SETTLE + 0.5);
+    var st0 = { t: 0 };
+    tl.to(st0, { t: END, duration: END, ease: 'none' }, 0);
+    tl.eventCallback('onUpdate', function () { render(st0.t); });
+    render(0);
+    return tl;
+  }
+</script>

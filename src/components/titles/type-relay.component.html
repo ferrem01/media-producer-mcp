@@ -1,0 +1,472 @@
+<template>
+  <div class="trl">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Instrument+Serif:ital,wght@1,400&display=swap">
+    <div class="trl-block"></div>
+    <div class="trl-caret"></div>
+    <div class="trl-from"></div>
+    <div class="trl-to"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* TYPE RELAY: the words of a relay film. A full-frame type card whose
+     words come FROM an object (a feed row, a pill, a dot, a solid frame
+     morphs onto the accent word and the line comes out of it) and turn back
+     INTO one (the block squeezes into a pill, the accent word floods the
+     frame, the lines lift out, the words scatter into a field). Every style
+     is a pure function of the time (one clock), so a seek anywhere renders
+     the same frame; the geometry the next piece needs is published on the
+     root. */
+  .trl, .trl * { max-width: none; box-sizing: border-box; }
+  .trl { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .trl-block { position: absolute; left: 0; top: 0; width: max-content; color: var(--trl-ink, #0b0b0c);
+    font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif; font-weight: 600;
+    font-kerning: normal; font-feature-settings: 'kern' 1; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; will-change: transform; }
+  .trl-line { display: block; white-space: normal; overflow-wrap: normal; }
+  .trl-line.trl-mask { overflow: hidden; padding: 0.12em 0.25em 0.26em 0.25em; margin: -0.12em -0.25em -0.26em -0.25em; }
+  .trl-word { display: inline-block; white-space: nowrap; vertical-align: baseline; transform-origin: 50% 60%; will-change: transform; }
+  .trl-gword { display: inline-block; white-space: nowrap; vertical-align: baseline; }
+  .trl-ghost { z-index: 0; }
+  .trl-acc { color: var(--trl-accent, #393bf5); }
+  .trl-acc.trl-it { font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400;
+    font-size: 1.1em; letter-spacing: -0.012em; line-height: 0; }
+  .trl-caret { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; background: var(--trl-accent, #393bf5); }
+  .trl-from, .trl-to { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; will-change: left, top, width, height; }
+  .trl-from { z-index: 3; }
+  .trl-to { z-index: 4; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.trl'), block = el.querySelector('.trl-block');
+    var caret = el.querySelector('.trl-caret'), fromEl = el.querySelector('.trl-from'), toEl = el.querySelector('.trl-to');
+    if (!root || !block) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || typeof v === 'boolean' || !isFinite(n)) ? d : n; };
+    var has = function (v) { return v !== null && v !== undefined && v !== '' && typeof v !== 'boolean' && isFinite(Number(v)); };
+    var clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var lerp = function (a, b, p) { return a + (b - a) * p; };
+    var in2 = function (p) { p = clamp01(p); return p * p; };
+    var in3 = function (p) { p = clamp01(p); return p * p * p; };
+    var out2 = function (p) { p = clamp01(p); return 1 - (1 - p) * (1 - p); };
+    var out3 = function (p) { p = clamp01(p); return 1 - Math.pow(1 - p, 3); };
+    var inOut3 = function (p) { p = clamp01(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+    // A closed-form spring (0 -> 1), blended onto exactly 1 at p = 1.
+    var spring = function (p, zeta, omega) {
+      if (p <= 0) return 0; if (p >= 1) return 1;
+      var wd = omega * Math.sqrt(1 - zeta * zeta);
+      var v = 1 - Math.exp(-zeta * omega * p) * (Math.cos(wd * p) + (zeta * omega / wd) * Math.sin(wd * p));
+      var b = clamp01((p - 0.7) / 0.3); b = b * b * (3 - 2 * b);
+      return v + (1 - v) * b;
+    };
+    var W = root.clientWidth || el.clientWidth || 1920, H = root.clientHeight || el.clientHeight || 1080;
+    var M = Math.min(W, H);
+    var seed = num(data.seed, 3);
+    var rnd = function (i, k) { var x = Math.sin((i + 1) * 12.9898 + k * 78.233 + seed * 37.719) * 43758.5453; return x - Math.floor(x); };
+
+    var ink = String(data.ink || '#0b0b0c'), accent = String(data.accent || '#393bf5');
+    root.style.setProperty('--trl-ink', ink);
+    root.style.setProperty('--trl-accent', accent);
+    if (data.background) root.style.background = String(data.background);
+    if (has(data.weight)) block.style.fontWeight = String(num(data.weight, 600));
+    var rgb = function (c) {
+      var m = String(c).trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      if (!m) return null;
+      var h = m[1]; if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      var v = parseInt(h, 16); return [v >> 16, (v >> 8) & 255, v & 255];
+    };
+    var mix = function (a, b, p) {
+      if (p <= 0) return a; if (p >= 1) return b;
+      var A = rgb(a), B = rgb(b);
+      if (!A || !B) return p < 0.5 ? a : b;
+      return 'rgb(' + Math.round(lerp(A[0], B[0], p)) + ',' + Math.round(lerp(A[1], B[1], p)) + ',' + Math.round(lerp(A[2], B[2], p)) + ')';
+    };
+
+    // ── Lines (1-3).
+    var rawLines = Array.isArray(data.lines) ? data.lines : (data.text ? [data.text] : []);
+    var lines = rawLines.map(function (l) {
+      if (typeof l === 'string' || typeof l === 'number') return { text: String(l) };
+      return l && typeof l === 'object' && l.text !== undefined && l.text !== null ? l : null;
+    }).filter(function (l) { return l && String(l.text).trim(); }).slice(0, 3);
+    if (!lines.length) return tl;
+    var SIZES = { xl: 0.15, l: 0.1, m: 0.068 };
+    var TRACK = { xl: -0.042, l: -0.034, m: -0.024 };
+    var LH = num(data.line_height, 1.04);
+    var SCALE = num(data.scale, 1);
+    var REVEAL = data.reveal === 'lines' || data.reveal === 'type' ? data.reveal : 'words';
+    var ALIGN = data.align === 'center' ? 'center' : 'left';
+    var X = W * num(data.x, ALIGN === 'center' ? 0.5 : 0.08), Y = H * num(data.y, 0.5);
+    var MAXW = W * num(data.max_width, ALIGN === 'center' ? 0.84 : Math.max(0.2, 1 - 2 * num(data.x, 0.08)));
+    block.style.textAlign = ALIGN;
+
+    // ── DOM: line > word (inline-block) > run (accent or plain) > char.
+    var words = [], chars = [], accLine = -1;
+    lines.forEach(function (ln, li) {
+      var text = String(ln.text).replace(/\s+/g, ' ').trim();
+      var size = SIZES[ln.size] ? ln.size : (li === 0 ? 'xl' : 'l');
+      ln._size = size; ln._text = text;
+      var a0 = -1, a1 = -1;
+      if (ln.accent) {
+        var acc = String(ln.accent);
+        a0 = text.indexOf(acc);
+        if (a0 < 0) a0 = text.toLowerCase().indexOf(acc.toLowerCase());
+        if (a0 >= 0) { a1 = a0 + acc.length; if (accLine < 0) accLine = li; }
+      }
+      var ld = document.createElement('div');
+      ld.className = 'trl-line' + (REVEAL === 'lines' ? ' trl-mask' : '');
+      ld.style.letterSpacing = num(data.tracking, TRACK[size]) + 'em';
+      block.appendChild(ld);
+      ln._el = ld; ln._words = [];
+      var re = /\S+/g, m, wi = 0;
+      while ((m = re.exec(text))) {
+        if (wi > 0) ld.appendChild(document.createTextNode(' '));
+        var wd = document.createElement('span'); wd.className = 'trl-word';
+        var w = { el: wd, line: li, idx: wi, text: m[0], chars: [], runs: [], acc: false, start: m.index };
+        var run = null, runAcc = null;
+        for (var k = 0; k < m[0].length; k++) {
+          var ci = m.index + k, isAcc = a0 >= 0 && ci >= a0 && ci < a1;
+          if (!run || runAcc !== isAcc) {
+            run = document.createElement('span');
+            run.className = isAcc ? 'trl-run trl-acc' + (ln.italic_accent ? ' trl-it' : '') : 'trl-run';
+            wd.appendChild(run); runAcc = isAcc;
+            w.runs.push({ el: run, acc: isAcc });
+            if (isAcc) w.acc = true;
+          }
+          var ch = document.createElement('span'); ch.className = 'trl-ch'; ch.textContent = m[0][k];
+          run.appendChild(ch);
+          var c = { el: ch, word: w, line: li, pos: ci, acc: isAcc };
+          w.chars.push(c); chars.push(c);
+        }
+        ld.appendChild(wd);
+        words.push(w); ln._words.push(w);
+        wi++;
+      }
+    });
+    if (!words.length) return tl;
+
+    // ── Layout (measured with every transform cleared; re-run when a face lands late).
+    var fit = 1, TB = null, ACC = null, lastSig = '';
+    var boxUnion = function (list) {
+      var l = 1e9, t = 1e9, r = -1e9, b = -1e9;
+      list.forEach(function (q) { l = Math.min(l, q.x); t = Math.min(t, q.y); r = Math.max(r, q.x + q.w); b = Math.max(b, q.y + q.h); });
+      return { x: l, y: t, w: r - l, h: b - t, cx: (l + r) / 2, cy: (t + b) / 2 };
+    };
+    var f4 = function (v) { return (Math.round(v * 10000) / 10000).toString(); };
+    var applySizes = function () {
+      lines.forEach(function (ln) {
+        var fs = M * SIZES[ln._size] * SCALE * fit;
+        ln._fs = fs;
+        ln._el.style.fontSize = fs.toFixed(2) + 'px';
+        ln._el.style.lineHeight = (fs * LH).toFixed(2) + 'px';
+      });
+      block.style.maxWidth = MAXW.toFixed(1) + 'px';
+    };
+    var layout = function () {
+      words.forEach(function (w) { w.el.style.transform = 'none'; w.el.style.filter = 'none'; w.el.style.opacity = '1'; });
+      block.style.transform = 'none';
+      block.style.left = '0px'; block.style.top = '0px';
+      fit = 1;
+      for (var pass = 0; pass < 4; pass++) {
+        applySizes();
+        var widest = 0;
+        words.forEach(function (w) { widest = Math.max(widest, w.el.offsetWidth); });
+        var k = 1;
+        if (widest > MAXW) k = Math.min(k, MAXW / widest * 0.98);
+        if (block.offsetHeight > H * 0.9) k = Math.min(k, H * 0.9 / block.offsetHeight);
+        if (k >= 0.999) break;
+        fit *= k;
+      }
+      var bw = block.offsetWidth, bh = block.offsetHeight;
+      var left = ALIGN === 'center' ? X - bw / 2 : X, top = Y - bh / 2;
+      block.style.left = left.toFixed(2) + 'px'; block.style.top = top.toFixed(2) + 'px';
+      // Rects relative to the block, undoing any scale a wrapper is playing.
+      var BR = block.getBoundingClientRect(), s = bw > 0 ? BR.width / bw : 1;
+      if (!(s > 0)) s = 1;
+      var rel = function (n) { var r = n.getBoundingClientRect(); return { x: left + (r.left - BR.left) / s, y: top + (r.top - BR.top) / s, w: r.width / s, h: r.height / s }; };
+      words.forEach(function (w) {
+        var r = rel(w.el); w.x = r.x; w.y = r.y; w.w = r.w; w.h = r.h;
+        w.cx = r.x + r.w / 2; w.cy = r.y + r.h / 2;
+        w.chars.forEach(function (c) { var q = rel(c.el); c.x = q.x; c.w = q.w; });
+        w.runs.forEach(function (ru) { var q = rel(ru.el); ru.x = q.x; ru.w = q.w; });
+      });
+      TB = boxUnion(words);
+      // The accent box: the accent runs of the first accented line, the word's full height, a little air.
+      var accWords = accLine >= 0 ? words.filter(function (w) { return w.line === accLine && w.acc; }) : [];
+      if (accWords.length) {
+        var parts = [];
+        accWords.forEach(function (w) { w.runs.forEach(function (ru) { if (ru.acc) parts.push({ x: ru.x, y: w.y, w: ru.w, h: w.h }); }); });
+        var u = boxUnion(parts), padX = lines[accLine]._fs * 0.08;
+        ACC = { x: u.x - padX, y: u.y, w: u.w + 2 * padX, h: u.h };
+      } else ACC = { x: TB.x - lines[0]._fs * 0.08, y: TB.y, w: TB.w + lines[0]._fs * 0.16, h: TB.h };
+      ACC.cx = ACC.x + ACC.w / 2; ACC.cy = ACC.y + ACC.h / 2;
+      root.setAttribute('data-word-boxes', JSON.stringify(words.map(function (w) {
+        return { text: w.text, cx: +f4(w.cx / W), cy: +f4(w.cy / H), w: +f4(w.w / W), h: +f4(w.h / H) };
+      })));
+      root.setAttribute('data-text-box', [f4(TB.cx / W), f4(TB.cy / H), f4(TB.w / W), f4(TB.h / H)].join(','));
+      root.setAttribute('data-accent-box', [f4(ACC.cx / W), f4(ACC.cy / H), f4(ACC.w / W), f4(ACC.h / H)].join(','));
+      root.setAttribute('data-font-px', lines.map(function (ln) { return ln._fs.toFixed(1); }).join(','));
+      lastSig = bw + 'x' + bh;
+      placeTargets();
+      // The squeeze's motion smear: two copies of the settled block under it.
+      ghosts.forEach(function (g) { if (g.parentNode) g.parentNode.removeChild(g); });
+      ghosts = [];
+      if (TMODE === 'squeeze') {
+        for (var gi = 0; gi < 2; gi++) {
+          var g = block.cloneNode(true);
+          g.classList.add('trl-ghost'); g.setAttribute('aria-hidden', 'true');
+          g.style.opacity = String([0.2, 0.1][gi]); g.style.visibility = 'hidden';
+          g.querySelectorAll('.trl-word').forEach(function (n) { n.className = 'trl-gword'; n.style.visibility = ''; n.style.transform = 'none'; n.style.filter = 'none'; n.style.opacity = '1'; });
+          g.querySelectorAll('.trl-ch').forEach(function (n) { n.className = 'trl-gch'; n.style.visibility = ''; });
+          root.insertBefore(g, block);
+          ghosts.push(g);
+        }
+      }
+    };
+    var ghosts = [], SMEAR = 0.006;
+    var sqAt = function (ex) {
+      // The squeeze leads (power2.in), the travel follows (power3.in): it condenses, then drops in.
+      var p = clamp01(ex / (0.62 * TD)), e = in2(p), et = in3(p), s = 1 - (1 - SQ.sEnd) * e;
+      return { s: s, sy: Math.pow(s, SQ.gamma), cx: lerp(TB.cx, SQ.band.x + SQ.band.w / 2, et), cy: lerp(TB.cy, SQ.band.y + SQ.band.h / 2, et) };
+    };
+    var sqOrigin = function () { return (TB.cx - parseFloat(block.style.left)).toFixed(2) + 'px ' + (TB.cy - parseFloat(block.style.top)).toFixed(2) + 'px'; };
+    var sqTransform = function (q) { return 'translate(' + (q.cx - TB.cx).toFixed(2) + 'px,' + (q.cy - TB.cy).toFixed(2) + 'px) scale(' + q.s.toFixed(5) + ',' + q.sy.toFixed(5) + ')'; };
+
+    // ── Shapes: {x, y (centre), w, h, radius?} fractions of the box; radius a
+    // fraction of the box's shorter side, omitted = fully round.
+    var shapeOf = function (s, dflt) {
+      if (Array.isArray(s)) s = { x: s[0], y: s[1], w: s[2], h: s[3], radius: s[4] };
+      s = s && typeof s === 'object' ? s : dflt;
+      var w = W * num(s.w, dflt.w), h = H * num(s.h, dflt.h);
+      var rr = (s.radius === undefined || s.radius === null || s.radius === '') ? 1e9 : M * num(s.radius, 0);
+      return { x: W * num(s.x, dflt.x) - w / 2, y: H * num(s.y, dflt.y) - h / 2, w: w, h: h, r: Math.min(Math.min(w, h) / 2, rr) };
+    };
+    var put = function (n, b, color) {
+      n.style.left = b.x.toFixed(2) + 'px'; n.style.top = b.y.toFixed(2) + 'px';
+      n.style.width = Math.max(0, b.w).toFixed(2) + 'px'; n.style.height = Math.max(0, b.h).toFixed(2) + 'px';
+      n.style.borderRadius = Math.max(0, b.r).toFixed(2) + 'px';
+      if (color) n.style.background = color;
+    };
+    var lerpBox = function (a, b, e) { return { x: lerp(a.x, b.x, e), y: lerp(a.y, b.y, e), w: lerp(a.w, b.w, e), h: lerp(a.h, b.h, e), r: lerp(a.r, b.r, e) }; };
+
+    // ── Time: the reveal.
+    var AT = num(data.at, 0);
+    var STAG = Math.max(0, num(data.word_stagger, 0.06));
+    var CPS = Math.max(4, num(data.type_speed, 32));
+    var REV = REVEAL === 'lines' ? 0.6 : 0.55;
+    var BLUR = data.blur !== false;
+    var F = null;
+    if (data.from && typeof data.from === 'object') {
+      F = { at: num(data.from.at, AT), dur: Math.max(0.05, num(data.from.duration, 0.45)), color: String(data.from.color || accent), raw: data.from.shape || data.from };
+      F.end = F.at + F.dur;
+      F.wipe = Math.max(0.05, num(data.from.wipe, 0.28));
+    }
+    // Each line's start: its own `at`, else after the previous line (after the morph with `from`).
+    var LS = [];
+    lines.forEach(function (ln, li) {
+      if (has(ln.at)) { LS[li] = num(ln.at, 0); return; }
+      if (li === 0) { LS[li] = F ? F.end : AT; return; }
+      var prev = lines[li - 1];
+      var gap = REVEAL === 'type' ? prev._text.length / CPS + 0.12 : REVEAL === 'lines' ? 0.16 : prev._words.length * STAG + 0.1;
+      LS[li] = LS[li - 1] + gap;
+    });
+    var accentFirst = F && accLine >= 0;
+    // Word reveal starts. With `from`, the words come out of the object: the
+    // accent is already there under it, the rest radiate from it in order of
+    // distance (lines with their own later `at` keep their own stagger).
+    var planReveal = function () {
+      words.forEach(function (w) { w.rs = LS[w.line] + (REVEAL === 'words' ? w.idx * STAG : 0); w.instant = false; });
+      chars.forEach(function (c) { c.ts = LS[c.line] + c.pos / CPS; });
+      if (!F) return;
+      var cx = ACC.cx, cy = ACC.cy;
+      var free = words.filter(function (w) { return !has(lines[w.line].at) || num(lines[w.line].at, 0) <= F.end; });
+      free.sort(function (a, b) { return Math.hypot(a.cx - cx, a.cy - cy) - Math.hypot(b.cx - cx, b.cy - cy); });
+      var rank = 0;
+      free.forEach(function (w) {
+        if (accentFirst && w.acc && w.line === accLine) { w.rs = F.end - REV; w.instant = true; w.chars.forEach(function (c) { c.ts = F.end - 1e-3; }); return; }
+        w.rs = F.end + (accentFirst ? 0.04 : -0.12) + rank * STAG * 0.8;
+        var t0 = w.rs;
+        w.chars.forEach(function (c, k) { c.ts = t0 + k / CPS; });
+        rank++;
+      });
+    };
+
+    // ── Time: the hand-off out.
+    var TO = { mode: 'hold' };
+    if (data.to && typeof data.to === 'object') TO = data.to;
+    else if (typeof data.to === 'string') TO = { mode: data.to };
+    var TMODE = ['squeeze', 'flood', 'lift', 'scatter'].indexOf(TO.mode) >= 0 ? TO.mode : 'hold';
+    var TD = Math.max(0.05, num(TO.duration, { squeeze: 0.5, flood: 0.45, lift: 0.5, scatter: 0.6 }[TMODE] || 0.5));
+    var TCOLOR = String(TO.color || (TMODE === 'flood' ? accent : ink));
+    var THIDE = has(TO.hide_at) ? num(TO.hide_at, 0) : null;
+    var SQ = null, FL = null, FROMS = null, FROMT = null, TAT = 0, SETTLE = 0;
+    var placeTargets = function () {
+      planReveal();
+      SETTLE = 0;
+      words.forEach(function (w) {
+        var end = REVEAL === 'type' ? (w.chars.length ? w.chars[w.chars.length - 1].ts : w.rs) : (w.instant ? F.end + F.wipe : w.rs + REV);
+        SETTLE = Math.max(SETTLE, end);
+      });
+      TAT = num(TO.at, SETTLE + 1);
+      root.setAttribute('data-settle-time', (Math.round(SETTLE * 1000) / 1000).toString());
+      root.setAttribute('data-end-time', (Math.round((TMODE === 'hold' ? SETTLE : TAT + TD) * 1000) / 1000).toString());
+      if (F) {
+        FROMS = shapeOf(F.raw, { x: ACC.cx / W, y: ACC.cy / H, w: 0.02 * M / W, h: 0.02 * M / H });
+        FROMT = { x: ACC.x, y: ACC.y, w: ACC.w, h: ACC.h, r: Math.max(ACC.h * 0.1, Math.min(ACC.h / 2, FROMS.r)) };
+      }
+      if (TMODE === 'squeeze') {
+        var T = shapeOf(TO.shape, { x: 0.5, y: 0.5, w: 0.3, h: 0.085 });
+        // The text first condenses to a band inside the target, then the solid shape springs onto it.
+        var band = { x: T.x + T.w * 0.14, y: T.y + T.h * 0.24, w: T.w * 0.72, h: T.h * 0.52 };
+        // Accordion: width s from 1 to band.w / text w, height s^gamma, so both land on the band together.
+        var sEnd = Math.min(1, band.w / TB.w), hEnd = Math.min(1, band.h / TB.h);
+        var gamma = sEnd < 0.999 && hEnd < 0.999 ? Math.log(hEnd) / Math.log(sEnd) : 1;
+        SQ = { T: T, band: band, sEnd: sEnd, gamma: Math.max(0.15, Math.min(1.5, gamma)) };
+        root.setAttribute('data-to-box', [f4((T.x + T.w / 2) / W), f4((T.y + T.h / 2) / H), f4(T.w / W), f4(T.h / H)].join(','));
+      } else if (TMODE === 'flood') {
+        var pad = 0.012 * Math.max(W, H);
+        FL = { from: { x: ACC.x, y: ACC.y, w: ACC.w, h: ACC.h, r: ACC.h * 0.06 }, full: { x: -pad, y: -pad, w: W + 2 * pad, h: H + 2 * pad, r: 0 } };
+        root.setAttribute('data-to-box', '0.5,0.5,1,1');
+      }
+    };
+    layout();
+
+    // Scatter vectors (per word, seeded): outward from the text centre, half toward the camera.
+    var diag = Math.hypot(W, H);
+    words.forEach(function (w, i) {
+      var dx = w.cx - TB.cx, dy = w.cy - TB.cy, len = Math.hypot(dx, dy);
+      var ang = len > 1 ? Math.atan2(dy * 1.6, dx) : rnd(i, 1) * Math.PI * 2;
+      ang += (rnd(i, 2) - 0.5) * 0.7;
+      var near = rnd(i, 3) < 0.5;
+      w.sc = { ang: ang, near: near, dist: diag * (near ? 0.75 : 0.5) * (0.85 + 0.3 * rnd(i, 4)),
+        scale: near ? 2.2 + 1.4 * rnd(i, 5) : 0.3 + 0.2 * rnd(i, 5), rot: (rnd(i, 6) - 0.5) * 24, lag: rnd(i, 7) * 0.12 };
+    });
+
+    // ── Render: every style from t.
+    var render = function (t) {
+      if (block.offsetWidth + 'x' + block.offsetHeight !== lastSig) layout();
+      // Exit progress.
+      var ex = t - TAT, exOn = TMODE !== 'hold' && ex >= 0;
+      var sqA = 0, sqGone = false;
+      if (TMODE === 'squeeze' && exOn) { sqA = clamp01(ex / (0.62 * TD)); sqGone = ex >= 0.62 * TD; }
+      var liftGone = (TMODE === 'lift' || TMODE === 'scatter') && ex >= TD + 0.13;
+      // Words.
+      words.forEach(function (w) {
+        var fs = lines[w.line]._fs, tx = 0, ty = 0, sc = 1, rot = 0, blur = 0, op = 1, vis = true;
+        if (REVEAL === 'type') {
+          vis = t >= w.chars[0].ts;
+          w.chars.forEach(function (c) { c.el.style.visibility = t >= c.ts ? 'inherit' : 'hidden'; });
+        } else if (w.instant) {
+          vis = t >= F.end - 1e-4;
+        } else {
+          var p = (t - w.rs) / REV;
+          if (p <= 0) vis = false;
+          else if (REVEAL === 'lines') ty = (1 - out3(p)) * fs * LH * 1.25;
+          else {
+            var e = out3(p);
+            ty = (1 - e) * fs * 0.34;
+            if (BLUR) blur = (1 - e) * fs * 0.08;
+            op = out2(p / 0.55);
+          }
+        }
+        if (exOn && TMODE === 'lift') {
+          var lp = in3((ex - w.line * 0.045) / TD);
+          ty -= (w.y + w.h + 0.06 * H) * lp;
+        } else if (exOn && TMODE === 'scatter') {
+          var sp = in2((ex - w.sc.lag) / (TD - 0.12));
+          tx += Math.cos(w.sc.ang) * w.sc.dist * sp; ty += Math.sin(w.sc.ang) * w.sc.dist * sp;
+          sc = lerp(1, w.sc.scale, sp); rot = w.sc.rot * sp;
+          if (w.sc.near) blur += fs * 0.05 * sp * sp; else op *= 1 - clamp01((sp - 0.55) / 0.45);
+        }
+        if (liftGone || sqGone || (THIDE !== null && t >= THIDE && TMODE !== 'hold')) vis = false;
+        w.el.style.visibility = vis ? 'inherit' : 'hidden';
+        w.el.style.transform = (tx || ty) || sc !== 1 || rot ? 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) scale(' + sc.toFixed(4) + ') rotate(' + rot.toFixed(2) + 'deg)' : 'none';
+        w.el.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none';
+        w.el.style.opacity = op < 0.999 ? op.toFixed(3) : '1';
+      });
+      // Squeeze: the whole block condenses like an accordion (letters narrow
+      // faster than they shorten) into the band inside the target, taking the
+      // shape's colour; two lagged copies smear it while it moves.
+      if (TMODE === 'squeeze' && exOn) {
+        var sq = sqAt(ex), cp = out2(sqA / 0.7), cc = mix(ink, TCOLOR, cp);
+        block.style.transformOrigin = sqOrigin();
+        block.style.transform = sqTransform(sq);
+        block.style.color = cc;
+        root.style.setProperty('--trl-accent', mix(accent, TCOLOR, cp));
+        ghosts.forEach(function (g, gi) {
+          var sg = sqAt(ex - SMEAR * (gi + 1));
+          var mv = !sqGone && Math.abs(sg.s - sq.s) > 0.004;
+          g.style.visibility = mv ? 'inherit' : 'hidden';
+          if (mv) { g.style.transformOrigin = block.style.transformOrigin; g.style.transform = sqTransform(sg); g.style.color = cc; }
+        });
+      } else {
+        block.style.transform = 'none';
+        block.style.color = '';
+        root.style.setProperty('--trl-accent', accent);
+        ghosts.forEach(function (g) { g.style.visibility = 'hidden'; });
+      }
+      // The object the words came from.
+      if (F && t >= F.at - 1e-4) {
+        // It lands on the accent word, then pulls off it to the right like a
+        // highlighter lifting, uncovering the word that was under it.
+        var fe = inOut3((t - F.at) / F.dur);
+        var fw = t < F.end ? 0 : inOut3((t - F.end) / F.wipe);
+        var fbx = lerpBox(FROMS, FROMT, fe);
+        if (fw > 0) { var cut = fbx.w * fw; fbx.x += cut; fbx.w -= cut; fbx.r = Math.min(fbx.r, fbx.w / 2); }
+        // (a sliver under 0.03 em would read as a caret: it is gone by then)
+        if (fw >= 1 || (fw > 0 && fbx.w < ACC.h * 0.03)) fromEl.style.visibility = 'hidden';
+        else {
+          put(fromEl, fbx, F.color);
+          fromEl.style.visibility = 'inherit';
+        }
+      } else fromEl.style.visibility = 'hidden';
+      // The object the words become.
+      var toOn = false;
+      if (TMODE === 'squeeze' && exOn && ex >= 0.62 * TD) {
+        var pb = (ex - 0.62 * TD) / (0.38 * TD), sb = spring(pb, 0.62, 9);
+        // It starts as the condensed text's own box and springs onto the target.
+        var q0 = sqAt(0.62 * TD), bw0 = TB.w * q0.s, bh0 = TB.h * q0.sy;
+        var Bb = { x: q0.cx - bw0 / 2, y: q0.cy - bh0 / 2, w: bw0, h: bh0, r: Math.min(bw0, bh0) / 2 * (SQ.T.r / (Math.min(SQ.T.w, SQ.T.h) / 2 || 1)) };
+        put(toEl, lerpBox(Bb, SQ.T, sb), TCOLOR);
+        toOn = true;
+      } else if (TMODE === 'flood' && exOn) {
+        var wipe = Math.min(0.12, TD * 0.3), fb;
+        if (ex < wipe) { var we = out2(ex / wipe); fb = { x: FL.from.x, y: FL.from.y, w: FL.from.w * we, h: FL.from.h, r: FL.from.r }; }
+        else fb = lerpBox(FL.from, FL.full, inOut3((ex - wipe) / (TD - wipe)));
+        put(toEl, fb, TCOLOR);
+        toOn = true;
+      }
+      if (THIDE !== null && t >= THIDE) toOn = false;
+      toEl.style.visibility = toOn ? 'inherit' : 'hidden';
+      // The typewriter's caret: after the last typed character, solid while typing, blinking once done.
+      if (REVEAL === 'type' && caret) {
+        var lastC = null;
+        for (var i = 0; i < chars.length; i++) if (t >= chars[i].ts && (!lastC || chars[i].ts >= lastC.ts)) lastC = chars[i];
+        var cOn = !!lastC && !exOn && t < SETTLE + 1.2 && (t < SETTLE + 0.05 || Math.floor((t - SETTLE) / 0.4) % 2 === 1);
+        if (cOn) {
+          var cw2 = lines[lastC.line]._fs;
+          caret.style.left = (lastC.x + lastC.w + cw2 * 0.04).toFixed(2) + 'px';
+          caret.style.top = (lastC.word.y + lastC.word.h * 0.14).toFixed(2) + 'px';
+          caret.style.width = Math.max(2, cw2 * 0.055).toFixed(2) + 'px';
+          caret.style.height = (lastC.word.h * 0.74).toFixed(2) + 'px';
+        }
+        caret.style.visibility = cOn ? 'inherit' : 'hidden';
+      }
+    };
+
+    var END = Math.max(num(ctx && ctx.duration, 0), SETTLE + 0.5, TAT + TD + 0.5, F ? F.end + 0.5 : 0);
+    var clock = { t: 0 };
+    render(0);
+    // A face that lands after the build re-lays the words out and redraws the current time.
+    try {
+      var relayout = function () { layout(); render(clock.t); };
+      if (document.fonts) {
+        if (document.fonts.ready) document.fonts.ready.then(relayout, function () {});
+        if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', relayout);
+      }
+    } catch (e) {}
+    tl.fromTo(clock, { t: 0 }, { t: END, duration: END, ease: 'none', immediateRender: false,
+      onUpdate: function () { render(clock.t); } }, 0);
+    return tl;
+  }
+</script>

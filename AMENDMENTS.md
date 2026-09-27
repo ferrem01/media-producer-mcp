@@ -6,6 +6,120 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — click-stream float: the customer journey
+
+Marc wants the journey beat of the Analytics film to feel different from the
+rush: "the mouse is sort of floating through the air, up and down, and it
+finds a landing page, click; it finds an email, click; it finds a social
+post, click; it finds an ad, click."
+
+- **`layout: "float"`:** the stops and the stream sit in a 3D field inside
+  the region. Pieces are scattered wider than the region at different
+  depths, with slight tilts and a slow seeded bob. Far pieces sink into a
+  haze of the canvas colour (`fog`), so depth reads without making anything
+  transparent. The camera travels from stop to stop and breathes out a
+  little on the way. Each stop comes forward, flat, to the same fit box the
+  strip uses, so the click, the target and `data-last-target` work exactly
+  as before. The cursor moves between targets on a cubic arc, bowing over
+  or under the straight line and alternating, and settles on the target
+  before the click. The default stays `strip`. Its every style was compared
+  against the previous build at 10 fps and is identical.
+- **The schedule is the same formula.** In float, `arrive` is when the stop
+  lies flat and `leave` is when it starts to recede. Float reads calmer with
+  longer travels (`travel: 0.6, last_travel: 0.4`). The default travels are
+  the strip's and are unchanged.
+- **The first frame is defined.** With `start: "drift"` the field is at
+  opacity 0 at `at`, so the region is empty. With `start: "burst"` every
+  piece sits at `burst_from` at scale 0 and flies out to its place, for a
+  join from a word or a dot.
+- **Captions and drops (both layouts).** `stops[i].caption` puts a label on
+  a white pill at the stop's top-left corner while the stop holds. `drops`
+  are system events from outside marketing: a logo tile ("Meeting booked ·
+  Calendly") pops in, holds for `drop_hold`, then flies the chip's arc to
+  `chip_to`. It lands at `at + chip_pop + drop_hold + chip_travel`, published
+  as `data-drop-land-times`. By default a drop pops in on the band away from
+  the target clicked nearest in time: the first placement landed one on top
+  of the cursor.
+- **Hand-offs:** `data-click-points` gives each target's centre at its
+  click, in box fractions.
+- **A bug the look pass caught:** the float entrance read a variable that the
+  zoom end declares again later, so with `end_mode:"zoom"` every piece's
+  position was NaN until stop 0 arrived. It is renamed, and the burst test
+  runs with the zoom end.
+- **Test:** `test/relay-click-stream.test.ts`: the float schedule matches
+  the formula; each stop is flat in its fit box with the cursor tip on its
+  target before every click; the path between targets bows off the chord;
+  captions are fully in during holds and gone mid-travel; every chip and
+  every drop lands centred on `chip_to` at its time, in both layouts; the
+  float zoom end; the burst first frame; no page errors.
+## 2026-09-27 — The product pages load their own font again
+
+The Quotient mockups (report, campaign, app shell, chat, social) load Inter
+with `@import url(...)` at the top of their own `<style>`. The assembler
+concatenates every component's styles into ONE sheet, so the import landed in
+the middle of it, and a browser ignores an `@import` that is not at the top:
+every captured product page rendered in the system fallback font. Found while
+rendering the Analytics screens for the Quotient Analytics film.
+
+- **Rule:** `hoistCssImports` (scene-assembler) lifts every `@import` out of
+  the `<style>` blocks into a `<link rel="stylesheet">` in the head, once per
+  URL, on both assembly paths. Script text is never touched.
+- **Test:** `test/css-import-hoist.test.ts`.
+
+## 2026-09-27 — type-relay: the words of a relay film
+
+In a relay film every beat is carried by an object, and the type beats had
+no piece of their own: no type card could come out of the shape before it or
+turn into the shape after it. `wordmark-squeeze` already turned one word
+into a pill. `type-relay` (titles) does the same for any card of 1-3 lines.
+
+- **What it does:** the words come out of an object and turn back into one.
+  With `from`, frame `from.at` is exactly `from.shape`: a feed row, a pill, a
+  dot, or the whole frame after a flood. The shape morphs onto the accent
+  word, pulls off it to the right, and the other words radiate out of it.
+  `to` hands the words on: `squeeze` condenses the block like an accordion
+  into `to.shape` and ends exactly on that box; `flood` grows the accent
+  word's box to cover the frame; `lift` and `scatter` clear it.
+- **The geometry is published:** the word boxes depend on the face, so the
+  root carries the measured boxes (`data-word-boxes`, `data-text-box`,
+  `data-accent-box`). They are re-measured if Geist lands after the build.
+  The sizes are fractions of the box's shorter side, so a 9:16 card wraps
+  inside its box instead of shrinking.
+- **Worth knowing:** the morph does not dissolve with a fade. A fade left a
+  lavender ghost box behind the accent word, and a crossfade is on relay's
+  banned list. It wipes off the word instead.
+- **Test:** `test/relay-type.test.ts`.
+## 2026-09-27 — screen-flash: a carousel that flashes one screen at a time
+
+A product launch asked for "a moving carousel that flashes one screen, goes
+back into the carousel, and flashes the next thing". `screen-flash` (media)
+is that piece, for relay films.
+
+- **What it does:** 4-10 screenshots stand in a carousel that never stops
+  moving: a ring seen slightly from above (a wheel in a tall frame) or a
+  receding rail. On each cue the front screen lifts out and fills the frame
+  (`flash_fit:"full"` is exactly the component box; a fraction keeps a
+  margin), holds, and drops back into its slot while the carousel keeps
+  turning.
+- **The screen due next is exactly in the front slot as it lifts.** The
+  carousel's position is a monotone spline through those moments, so it only
+  ever turns forward, and it speeds up when the schedule does. An explicit
+  `index` makes it turn to that screen.
+- **No screen slices through another.** Each card is its own flat
+  perspective projection with one shared vanishing point, and the depth
+  order is a z-index sort. In a shared 3D scene (`preserve-3d`), the lifting
+  screen would cut through its neighbours on its way to the frame. Measured
+  at 30 fps: no frame-to-frame spike anywhere in a five-flash cycle.
+- **The schedule is published:** `at` is the arrival (the hit on the beat).
+  The root carries `data-flash-times`, `data-return-times` and
+  `data-settle-time`. The helper's formula is in the schema.
+- **Joins:** enter from a point (`from`), collapse into a point (`to`), or
+  `end:"full"`, where the last screen stays full-frame for the next scene to
+  open on.
+- **Test:** `test/relay-screen-flash.test.ts`. It checks that the flashed
+  screen covers the box within 2 px, that all N are back after each return,
+  that a seek out of order renders the same frame, the rail, and 9:16.
+
 ## 2026-09-27 — The feed a relay scene opens on: rows that were already there
 
 The Analytics film lands six clicks in Sarah Chen's feed live, then the

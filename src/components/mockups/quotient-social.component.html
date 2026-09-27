@@ -619,9 +619,11 @@
     if (authorAvatarUrl) {
       var img = document.createElement('img');
       img.className = 'qsp-ava-img';
-      img.src = authorAvatarUrl;
-      img.onload = function() { avaTxt.style.visibility = 'hidden'; };
+      // Hidden from the start, not on load: a gate that measured before the
+      // photo's onload (a slow font request ahead of it) still saw "MF".
+      avaTxt.style.visibility = 'hidden';
       img.onerror = function() { this.remove(); avaTxt.style.visibility = 'visible'; };
+      img.src = authorAvatarUrl;
       ava.appendChild(img);
     }
     var avaBadge = el.querySelector('.qsp-ava-badge');

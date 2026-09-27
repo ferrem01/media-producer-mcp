@@ -1,7 +1,7 @@
 <template>
   <div class="cks">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@600&display=swap">
-    <div class="cks-region"><div class="cks-strip"></div></div>
+    <div class="cks-region"><div class="cks-strip"></div><div class="cks-caps"></div></div>
     <div class="cks-chips"></div>
   </div>
 </template>
@@ -14,7 +14,9 @@
      point (where the film's activity feed receives it as a new row). Five to
      seven stops, each shorter than the last. Nothing fades or blurs: pieces
      move, scale and get covered. Every style is a pure function of the time,
-     and the click / landing schedule is published on the root. */
+     and the click / landing schedule is published on the root.
+     layout "float" is the same journey through a 3D field (see below); both
+     layouts take stop captions and cursorless "drops" (system events). */
   .cks, .cks * { max-width: none; box-sizing: border-box; }
   .cks { position: absolute; inset: 0; overflow: hidden; pointer-events: none; visibility: hidden; }
   /* Stacking: the region (its own context) < the chips < the cursor. */
@@ -29,6 +31,20 @@
     color: #ffffff; font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif; font-weight: 600;
     letter-spacing: -0.005em; line-height: 1; border-radius: 999px; transform-origin: 50% 50%; will-change: transform; }
   .cks-dot { display: inline-block; flex: none; border-radius: 50%; background: #ffffff; }
+  /* FLOAT: the same pieces scattered through a 3D field (depth, tilt, a slow
+     bob); the camera travels from stop to stop and each stop comes forward,
+     flat, to the same resting box as the strip. Far pieces sit in a light
+     haze of the canvas colour (.cks-fog), so depth reads without opacity. */
+  .cks-fog { position: absolute; inset: 0; pointer-events: none; }
+  .cks-caps { position: absolute; inset: 0; z-index: 40; }
+  .cks-cap { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; display: flex; align-items: center;
+    color: #17171c; background: rgba(255,255,255,0.95); font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif;
+    font-weight: 600; letter-spacing: -0.01em; line-height: 1; border-radius: 999px; will-change: transform, opacity; }
+  /* A drop: a system event from outside marketing (a logo tile + its label). */
+  .cks-drop { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; display: flex; align-items: center;
+    color: #17171c; background: #ffffff; font-family: 'Geist', var(--mp-font-family, system-ui), sans-serif; font-weight: 600;
+    letter-spacing: -0.01em; line-height: 1; transform-origin: 50% 50%; will-change: transform; }
+  .cks-drop img { display: block; flex: none; object-fit: contain; background: #ffffff; }
 </style>
 
 <script>
@@ -65,6 +81,8 @@
     var stream = (Array.isArray(data.stream) ? data.stream : []).map(norm).filter(Boolean);
     if (!stops.length) return tl;
     var N = stops.length;
+    // strip (default): pieces on one sliding line. float: pieces scattered through a 3D field.
+    var FLOAT = data.layout === 'float';
 
     // ── The region the stream plays in (fractions of the box; default the whole box).
     var rg = data.region;
@@ -118,8 +136,9 @@
     }
     for (i = 0; i < N; i++) land[i] = click[i] + POP + FLY;
 
-    // ── The strip: [lead x2] stop0 [between] stop1 ... stopN-1 [tail x2], laid on one line.
     var FW = num(data.fit_w, 0.9), FH = num(data.fit_h, 0.85);
+    if (!FLOAT) {
+    // ── The strip: [lead x2] stop0 [between] stop1 ... stopN-1 [tail x2], laid on one line.
     var BETWEEN = Math.max(0, Math.min(6, Math.round(num(data.between, 3))));
     var RUSH = clamp(num(data.rush_scale, 0.5), 0.2, 1);
     var items = [], si = 0;
@@ -163,6 +182,74 @@
     };
     // The entrance starts with the strip's first piece just past the region's right edge.
     var camStartAt = function () { return items[0].sx - items[0].w / 2 - (RW / 2) / RUSH - 0.02 * RW; };
+    } else {
+    // ── The float field (region px at camera zoom 1). A piece at world (wx, wy)
+    // with depth factor f draws at region (RCX + (wx - camX) f z, RCY + (wy - camY) f z)
+    // at f z times its base size (z = the camera's zoom). Stops rest at f ~ rest_scale
+    // and come forward to f = 1 (their fit box) when visited; stream pieces live
+    // deeper (f 0.34 / 0.25 / 0.18), so they drift slower: parallax.
+    var items = [], si = 0, stopItems = [];
+    var ZP = clamp(num(data.float_zoom, 0.84), 0.4, 1);
+    var REST = clamp(num(data.rest_scale, 0.44), 0.15, 0.9);
+    var BOB = Math.max(0, num(data.bob, 1));
+    var DENS = clamp(num(data.density, 1), 0, 3);
+    var START = data.start === 'burst' ? 'burst' : 'drift';
+    var px = 0, py = 0, sg = rnd(0, 11) < 0.5 ? 1 : -1;
+    stops.forEach(function (s, idx) {
+      var k = Math.min(FW * RW / s.w, FH * RH / s.h);
+      if (idx > 0) {
+        // Each stop lies on to the right, alternately up and down: a journey, not a line.
+        var ang = sg * (0.36 + 0.26 * rnd(idx, 13)), D = RW * (1.3 + 0.25 * rnd(idx, 14));
+        px += D * Math.cos(ang); py += D * Math.sin(ang); sg = -sg;
+      }
+      var it = { kind: 'stop', idx: idx, src: s.src, w: s.w * k, h: s.h * k, k: k, s: s, wx: px, wy: py,
+        f: REST * (0.9 + 0.2 * rnd(idx, 12)),
+        ry: (rnd(idx, 15) < 0.5 ? -1 : 1) * (8 + 6 * rnd(idx, 16)), rx: (rnd(idx, 17) - 0.5) * 10, rz: (rnd(idx, 18) - 0.5) * 5,
+        ph: rnd(idx, 19) * 6.2832, per: 4.2 + 2.2 * rnd(idx, 20), z: 12 };
+      items.push(it); stopItems.push(it);
+    });
+    var fs0 = stopItems[0];
+    var camStart = START === 'burst' ? { x: fs0.wx, y: fs0.wy, z: 0.9 } : { x: fs0.wx - 0.3 * RW, y: fs0.wy + 0.12 * RH, z: ZP };
+    var bfr = Array.isArray(data.burst_from) ? data.burst_from : null;
+    var BP = bfr ? { x: W * num(bfr[0], 0.5) - RX, y: H * num(bfr[1], 0.5) - RY } : { x: RCX, y: RCY };
+    // The camera's path (for culling pieces it never sees).
+    var camPts = [camStart];
+    for (i = 0; i < N; i++) {
+      if (i > 0) for (var u = 1; u < 8; u++) camPts.push({ x: stopItems[i - 1].wx + (stopItems[i].wx - stopItems[i - 1].wx) * u / 8, y: stopItems[i - 1].wy + (stopItems[i].wy - stopItems[i - 1].wy) * u / 8 });
+      camPts.push({ x: stopItems[i].wx, y: stopItems[i].wy });
+    }
+    var ZMIN = Math.min(ZP, camStart.z);
+    var bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, by1 = -Infinity;
+    camPts.forEach(function (c) { bx0 = Math.min(bx0, c.x); bx1 = Math.max(bx1, c.x); by0 = Math.min(by0, c.y); by1 = Math.max(by1, c.y); });
+    // Stream: a jittered grid per depth layer, the same density ON SCREEN in every layer.
+    var LAYERS = [0.34, 0.25, 0.18], gk = 0, MAXS = Math.round(70 * Math.max(0.3, DENS));
+    var cellW = 0.52 * RW / Math.sqrt(DENS || 1), cellH = 0.46 * RH / Math.sqrt(DENS || 1);
+    if (DENS > 0 && stream.length) LAYERS.forEach(function (f, L) {
+      var gw = cellW / f, gh = cellH / f;
+      var mx = RW / (2 * f * ZMIN) + gw, my = RH / (2 * f * ZMIN) + gh;
+      for (var gx = Math.floor((bx0 - mx) / gw); gx <= Math.ceil((bx1 + mx) / gw); gx++) {
+        for (var gy = Math.floor((by0 - my) / gh); gy <= Math.ceil((by1 + my) / gh); gy++) {
+          var k = gk++;
+          if (rnd(k, 21) < 0.3) continue;
+          var wx = (gx + 0.5 + (rnd(k, 22) - 0.5) * 0.8 + L * 0.37) * gw, wy = (gy + 0.5 + (rnd(k, 23) - 0.5) * 0.8 + L * 0.29) * gh;
+          var sIn = stream[si % stream.length];
+          var hb = RH * (0.62 + 0.2 * rnd(k, 24)), wb = hb * sIn.w / sIn.h;
+          if (wb > RW * 0.95) { wb = RW * 0.95; hb = wb * sIn.h / sIn.w; }
+          var seen = camPts.some(function (c) {
+            return Math.abs(wx - c.x) * f * ZMIN < RW / 2 + wb * f / 2 + 0.03 * RH && Math.abs(wy - c.y) * f * ZMIN < RH / 2 + hb * f / 2 + 0.03 * RH;
+          });
+          if (!seen || items.length - N >= MAXS) continue;
+          si++;
+          items.push({ kind: 'stream', src: sIn.src, wb: wb, hb: hb, wx: wx, wy: wy, f: f * (0.94 + 0.12 * rnd(k, 25)),
+            ry: (rnd(k, 26) - 0.5) * 22, rx: (rnd(k, 27) - 0.5) * 12, rz: (rnd(k, 28) - 0.5) * 7,
+            ph: rnd(k, 29) * 6.2832, per: 4 + 2.6 * rnd(k, 30), z: 1 });
+        }
+      }
+    });
+    // burst: each piece leaves the burst point on its own beat (all home by arrive_0).
+    var BW = Math.max(0.1, arrive[0] - AT);
+    items.forEach(function (it, j) { it.bd = BW * 0.22 * rnd(j, 33); it.bdur = BW * 0.78; });
+    }
 
     // ── Target boxes: the stop's own pixels -> region px at its resting size.
     var targetOf = function (s) {
@@ -219,6 +306,12 @@
       var d = document.createElement('div');
       d.className = 'cks-piece cks-' + it.kind;
       var im = document.createElement('img'); im.alt = ''; im.src = it.src; d.appendChild(im);
+      if (FLOAT) {
+        var fg = document.createElement('div');
+        fg.className = 'cks-fog';
+        d.appendChild(fg);
+        it.fog = fg;
+      }
       if (it.kind === 'stop') {
         d.setAttribute('data-stop', String(it.idx));
         var hl = document.createElement('div');
@@ -260,11 +353,76 @@
     });
     var chipH = chipFs * 2.24;   // 1em line + 0.62em padding top and bottom
 
+    // ── Captions (either layout): a label on a soft white pill above the stop's
+    // top-left corner (or straddling that edge when there is no room above), in
+    // round the arrive, out round the leave.
+    var capLayer = el.querySelector('.cks-caps');
+    var capFs = W * num(data.caption_size, 0.0102), capH = capFs * 2.1;
+    var caps = stopItems.map(function (it) {
+      var txt = it.s.caption;
+      if (!capLayer || txt === undefined || txt === null || String(txt).trim() === '') return null;
+      var c = document.createElement('div');
+      c.className = 'cks-cap';
+      c.setAttribute('data-caption', String(it.idx));
+      c.style.fontSize = capFs + 'px';
+      c.style.height = capH.toFixed(2) + 'px';
+      c.style.padding = '0 0.85em 0 0.7em';
+      c.style.gap = '0.5em';
+      c.style.boxShadow = '0 0.25em 0.9em rgba(24,20,16,0.10), 0 0 0 1px rgba(24,20,16,0.06)';
+      var dot = document.createElement('span');
+      dot.className = 'cks-dot';
+      dot.style.width = dot.style.height = '0.42em';
+      dot.style.background = chipColor;
+      c.appendChild(dot);
+      var tx = document.createElement('span');
+      tx.textContent = String(txt).trim();
+      c.appendChild(tx);
+      capLayer.appendChild(c);
+      return c;
+    });
+
+    // ── Drops (either layout): cursorless system events from outside marketing.
+    // A logo tile + label pops in at its own point, holds, then flies to chip_to on
+    // the chip's arc: land = at + chip_pop + drop_hold + chip_travel.
+    var DHOLD = Math.max(0, num(data.drop_hold, 0.35));
+    var dropFs = chipFs, dropH = dropFs * 2.5;
+    var drops = (Array.isArray(data.drops) ? data.drops : []).filter(function (d) { return d && typeof d === 'object' && isFinite(Number(d.at)); }).slice(0, 12).map(function (d, j) {
+      var at = Number(d.at);
+      // Seeded: the region's right side (toward the feed), in the band (upper or lower)
+      // away from the target clicked nearest in time, so it never lands on the cursor.
+      var near = 0;
+      for (var q = 1; q < N; q++) if (Math.abs(click[q] - at) < Math.abs(click[near] - at)) near = q;
+      var low = stopItems[near].tc.y < RH * 0.5;
+      var from = Array.isArray(d.from) && d.from.length >= 2 ? { x: W * num(d.from[0], 0.5), y: H * num(d.from[1], 0.5) }
+        : { x: RX + RW * (0.58 + 0.2 * rnd(j, 41)), y: RY + RH * (low ? 0.68 + 0.16 * rnd(j, 42) : 0.14 + 0.16 * rnd(j, 42)) };
+      var c = document.createElement('div');
+      c.className = 'cks-drop';
+      c.setAttribute('data-drop', String(j));
+      c.style.fontSize = dropFs + 'px';
+      c.style.height = dropH.toFixed(2) + 'px';
+      c.style.padding = '0 1em 0 0.42em';
+      c.style.gap = '0.6em';
+      c.style.borderRadius = '0.62em';
+      c.style.boxShadow = '0 0.5em 1.6em rgba(24,20,16,0.16), 0 0.08em 0.25em rgba(24,20,16,0.12), 0 0 0 1px rgba(24,20,16,0.05)';
+      if (d.icon) {
+        var im = document.createElement('img'); im.alt = ''; im.src = String(d.icon);
+        im.style.width = im.style.height = '1.66em';
+        im.style.borderRadius = '0.36em';
+        c.appendChild(im);
+      }
+      var tx = document.createElement('span');
+      tx.textContent = String(d.label || '');
+      c.appendChild(tx);
+      chipLayer.appendChild(c);
+      return { el: c, at: at, P: from, land: at + POP + DHOLD + FLY };
+    });
+    if (drops.length) root.setAttribute('data-drop-land-times', t3(drops.map(function (d) { return d.land; })));
+
     // ── Cursor (the shared helper), tip-anchored; above the chips.
     var useCursor = data.cursor !== false && typeof createCursor === 'function';
     var csz = W * num(data.cursor_size, 0.027), tipX = csz * 5.5 / 24, tipY = csz * 3.2 / 24;
     var pt = function (v) { return Array.isArray(v) && v.length >= 2 ? { x: W * num(v[0], 0.5), y: H * num(v[1], 0.5) } : null; };
-    var cFrom = pt(data.cursor_from) || { x: RX + RW * 0.8, y: RY + RH * 0.84 };
+    var cFrom = pt(data.cursor_from) || (FLOAT && START === 'burst' ? { x: RX + BP.x, y: RY + BP.y } : { x: RX + RW * 0.8, y: RY + RH * 0.84 });
     var cTo = pt(data.cursor_to);
     var cToAt = num(data.cursor_to_at, END_MODE === 'zoom' ? ZAT + ZD : click[N - 1] + 0.3);
     var cExit = (data.cursor_exit_at !== undefined && data.cursor_exit_at !== null && data.cursor_exit_at !== '') ? num(data.cursor_exit_at, 1e9) : 1e9;
@@ -281,7 +439,39 @@
       if (i === N - 1 && cover) { var r = lastRect(t); return { x: RX + r.left + (lt.x + lt.w / 2) * r.k, y: RY + r.top + (lt.y + lt.h / 2) * r.k }; }
       return { x: RX + it.tc.x, y: RY + it.tc.y };
     };
+    // Every target's centre at its click, fractions of the box ("cx,cy;cx,cy;...").
+    root.setAttribute('data-layout', FLOAT ? 'float' : 'strip');
+    root.setAttribute('data-click-points', stopItems.map(function (it, i) { var p = targetScreen(i, click[i]); return f4(p.x / W) + ',' + f4(p.y / H); }).join(';'));
+    // FLOAT: the cursor floats between targets on a cubic arc (an arch over or
+    // under the straight line, alternating), eased in and out, so it lifts off,
+    // drifts and settles onto the next target before the click.
+    var CARC = RH * num(data.cursor_arc, 0.2), ARC0 = rnd(0, 43) < 0.5 ? 0 : 1;
+    var floatArc = function (A, B, t, ta, tb, j) {
+      var p = clamp01((t - ta) / Math.max(0.05, tb - ta)), e = 0.5 - 0.5 * Math.cos(Math.PI * p);
+      var dx = B.x - A.x, dy = B.y - A.y;
+      var up = (j + ARC0) % 2 === 0, midY = (A.y + B.y) / 2 - RY;
+      if (up && midY < CARC + 0.1 * RH) up = false; else if (!up && RH - midY < CARC + 0.1 * RH) up = true;
+      var sg = up ? 1 : -1;
+      var hs = Math.abs(dx) > 0.06 * RW ? (dx > 0 ? 1 : -1) : (j % 2 ? 1 : -1);
+      var cx = function (v) { return clamp(v, RX + 0.03 * RW, RX + 0.97 * RW); }, cy = function (v) { return clamp(v, RY + 0.05 * RH, RY + 0.95 * RH); };
+      var c1x = cx(A.x + dx * 0.2 - hs * 0.07 * RW), c1y = cy(A.y + dy * 0.2 - sg * CARC);
+      var c2x = cx(A.x + dx * 0.8 + hs * 0.07 * RW), c2y = cy(A.y + dy * 0.8 - sg * CARC * 0.85);
+      var v = 1 - e;
+      return { x: v * v * v * A.x + 3 * v * v * e * c1x + 3 * v * e * e * c2x + e * e * e * B.x,
+               y: v * v * v * A.y + 3 * v * v * e * c1y + 3 * v * e * e * c2y + e * e * e * B.y };
+    };
     var cursorAt = function (t) {
+      if (FLOAT) {
+        if (t < click[0] - 0.08) return floatArc(cFrom, targetScreen(0, click[0] - 0.08), t, AT, click[0] - 0.08, 0);
+        for (var j = 1; j < N; j++) {
+          var ta = click[j - 1] + 0.14, tb = click[j] - 0.08;
+          if (t < ta) return targetScreen(j - 1, t);
+          if (t < tb) return floatArc(targetScreen(j - 1, ta), targetScreen(j, tb), t, ta, tb, j);
+        }
+        var FL = targetScreen(N - 1, t);
+        if (cTo && t >= cToAt) return floatArc(targetScreen(N - 1, cToAt), cTo, t, cToAt, cToAt + 0.5, N);
+        return FL;
+      }
       // Before the first click: from cursor_from to the first target.
       if (t < click[0] - 0.08) {
         var a = targetScreen(0, t), p = inOut3((t - AT) / Math.max(0.1, click[0] - 0.08 - AT));
@@ -326,8 +516,87 @@
       return { camX: stopItems[N - 1].sx, s: 1 };
     };
 
+    // ── FLOAT camera at time t: {x, y (world), z (zoom), a/pa, b/pb: the stops
+    // coming forward and how far (0 in the field .. 1 at the fit box, flat)}.
+    var camFloat = function (t) {
+      if (t < arrive[0]) {
+        // The entrance: from the start pose to stop 0 as it comes forward.
+        var p = clamp01((t - AT) / Math.max(0.05, arrive[0] - AT)), e = out3(p);
+        return { x: camStart.x + (fs0.wx - camStart.x) * e, y: camStart.y + (fs0.wy - camStart.y) * e, z: camStart.z + (1 - camStart.z) * e, a: 0, pa: inOut3(p), b: -1, pb: 0 };
+      }
+      for (var i = 0; i < N; i++) {
+        if (t < leave[i] || i === N - 1) return { x: stopItems[i].wx, y: stopItems[i].wy, z: 1, a: i, pa: 1, b: -1, pb: 0 };
+        if (t < arrive[i + 1]) {
+          // Travel: the camera glides to the next stop and breathes out a little on the way;
+          // the stop it leaves recedes as the next one comes forward.
+          var q = clamp01((t - leave[i]) / Math.max(0.05, arrive[i + 1] - leave[i])), e2 = inOut3(q), A = stopItems[i], B = stopItems[i + 1];
+          return { x: A.wx + (B.wx - A.wx) * e2, y: A.wy + (B.wy - A.wy) * e2, z: 1 - (1 - ZP) * Math.pow(Math.sin(Math.PI * q), 2),
+            a: i, pa: 1 - inOut3(q / 0.65), b: i + 1, pb: inOut3((q - 0.35) / 0.65) };
+        }
+      }
+      return { x: stopItems[N - 1].wx, y: stopItems[N - 1].wy, z: 1, a: N - 1, pa: 1, b: -1, pb: 0 };
+    };
+    var fogColor = String(data.fog || data.background || '#efeeea');
+    var FADE = Math.min(0.45, 0.8 * Math.max(0.1, arrive[0] - AT));
+    var fogAt = function (fe) { return clamp01((0.7 - fe) / 0.55) * 0.5; };
+    if (FLOAT) items.forEach(function (it) { it.fog.style.background = fogColor; });
+    var put3 = function (it, cx, cy, w, h, rx, ry, rz) {
+      var e = it.el, left = cx - w / 2, top = cy - h / 2;
+      e.style.visibility = 'inherit';
+      e.style.width = w.toFixed(2) + 'px'; e.style.height = h.toFixed(2) + 'px';
+      // A flat piece (a stop at its fit box) is a plain translate: its target is exact.
+      var tilt = Math.abs(rx) > 0.005 || Math.abs(ry) > 0.005;
+      e.style.transform = 'translate(' + left.toFixed(2) + 'px,' + top.toFixed(2) + 'px)' +
+        (tilt ? ' perspective(' + (Math.max(w, h) * 3).toFixed(0) + 'px) rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg)' : '') +
+        (Math.abs(rz) > 0.005 ? ' rotate(' + rz.toFixed(2) + 'deg)' : '');
+      it.cur = { left: left, top: top, w: w, h: h };
+    };
+    function renderFloat(t) {
+      var cam = camFloat(t);
+      strip.style.opacity = START === 'drift' ? out2((t - AT) / FADE).toFixed(4) : '1';
+      var burst = START === 'burst' && t < arrive[0];
+      items.forEach(function (it) {
+        if (it === lastIt && cover && t >= ZAT) {
+          var r = lastRect(t);
+          put3(it, r.left + r.w / 2, r.top + r.h / 2, r.w, r.h, 0, 0, 0);
+          it.sk = r.k;
+          it.el.style.borderRadius = (Math.min(r.w, r.h) * 0.014 * (1 - r.e)).toFixed(2) + 'px';
+          it.el.style.boxShadow = shadow(r.h, 1 - r.e);
+          it.fog.style.opacity = '0';
+          it.el.style.zIndex = '30';
+          return;
+        }
+        var stop = it.kind === 'stop';
+        var phi = stop ? (it.idx === cam.a ? cam.pa : it.idx === cam.b ? cam.pb : 0) : 0;
+        var fe = it.f + (1 - it.f) * phi, sc = fe * cam.z, loose = 1 - phi;
+        var w = (stop ? it.w : it.wb) * sc, h = (stop ? it.h : it.hb) * sc;
+        // The bob: a slow drift and sway, gone on a stop as it comes forward.
+        var ang = 6.2832 * t / it.per + it.ph, bob = BOB * RH * 0.012 * sc * loose;
+        var cx = RCX + (it.wx - cam.x) * sc + bob * 0.55 * Math.cos(ang * 0.8 + 1.7);
+        var cy = RCY + (it.wy - cam.y) * sc + bob * Math.sin(ang);
+        var rx = (it.rx + BOB * 1.2 * Math.sin(ang * 0.9 + 0.6)) * loose;
+        var ry = (it.ry + BOB * 1.6 * Math.cos(ang * 0.7)) * loose;
+        var rz = (it.rz + BOB * 0.6 * Math.sin(ang * 1.1 + 2.1)) * loose;
+        if (burst) {
+          var b = clamp01((t - AT - it.bd) / it.bdur); b = 1 - Math.pow(1 - b, 4);
+          if (b <= 0.002) { it.el.style.visibility = 'hidden'; return; }
+          cx = BP.x + (cx - BP.x) * b; cy = BP.y + (cy - BP.y) * b; w *= b; h *= b;
+          rz += (1 - b) * 20 * (it.rz >= 0 ? 1 : -1);
+        }
+        var half = Math.hypot(w, h) / 2;
+        if (cx + half < 0 || cx - half > RW || cy + half < 0 || cy - half > RH) { it.el.style.visibility = 'hidden'; return; }
+        put3(it, cx, cy, w, h, rx, ry, rz);
+        if (stop) it.sk = w / it.s.w;
+        it.el.style.borderRadius = (Math.min(w, h) * 0.014).toFixed(2) + 'px';
+        it.el.style.boxShadow = shadow(h, 0.35 + 0.65 * fe);
+        it.fog.style.opacity = fogAt(fe).toFixed(3);
+        it.el.style.zIndex = String(stop ? (phi > 0 ? 20 + Math.round(phi * 8) : 10 + Math.round(fe * 8)) : 1 + Math.round(fe * 16));
+      });
+    }
+
     var put = function (it, left, top, w, h, rot) {
       var e = it.el;
+      it.cur = { left: left, top: top, w: w, h: h };
       e.style.visibility = 'inherit';
       e.style.width = w.toFixed(2) + 'px'; e.style.height = h.toFixed(2) + 'px';
       e.style.transform = 'translate(' + left.toFixed(2) + 'px,' + top.toFixed(2) + 'px)' + (rot ? ' rotate(' + rot.toFixed(2) + 'deg)' : '');
@@ -338,7 +607,11 @@
 
     function render(t) {
       root.style.visibility = t >= AT - 1e-4 ? 'inherit' : 'hidden';
-      var cam = camAt(t), s = cam.s;
+      var s = 1;
+      if (FLOAT) renderFloat(t);
+      else {
+      var cam = camAt(t);
+      s = cam.s;
       items.forEach(function (it) {
         if (it === lastIt && cover && t >= ZAT) {
           var r = lastRect(t);
@@ -356,11 +629,12 @@
         it.el.style.borderRadius = (Math.min(w, h) * 0.012).toFixed(2) + 'px';
         it.el.style.boxShadow = shadow(h, 1);
       });
+      }
       // Target highlight: a press ring on the clicked thing.
       stopItems.forEach(function (it, i) {
         var hl = it.hl, dt = t - click[i];
         if (dt < 0 || dt > 0.5) { hl.style.visibility = 'hidden'; return; }
-        var k = (it === lastIt && cover) ? lastRect(t).k : it.k * (t >= leave[i] ? s : 1);
+        var k = (it === lastIt && cover) ? lastRect(t).k : FLOAT ? (it.sk || it.k) : it.k * (t >= leave[i] ? s : 1);
         var th = Math.min(it.t.w, it.t.h) * k;
         var e = out2(dt / 0.5);
         var press = dt < 0.12 ? 1 - 0.05 * Math.sin(Math.PI * dt / 0.12) : 1;
@@ -395,6 +669,39 @@
         // Centred on (x, y): the pill's own size is left to its text and font.
         c.style.transform = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px) translate(-50%,-50%) scale(' + sc.toFixed(4) + ')';
       });
+      // Captions: ride the stop's box; in from arrive - 0.14 (0.3 s), out from leave - 0.06 (0.18 s).
+      caps.forEach(function (c, i) {
+        if (!c) return;
+        var it = stopItems[i], cur = it.cur;
+        var lv = i === N - 1 ? (cover ? ZAT : Infinity) : leave[i];
+        var a = out2((t - (arrive[i] - 0.14)) / 0.3), b = clamp01((t - (lv - 0.06)) / 0.18), o = a * (1 - b);
+        if (!cur || o <= 0.001 || it.el.style.visibility === 'hidden') { c.style.visibility = 'hidden'; return; }
+        var top = cur.top - 0.012 * RH - capH, left = cur.left;
+        // No room above (a tall stop fills the height): the pill straddles the top edge, inset like a tab.
+        if (top < 0.045 * RH) { top = cur.top - capH / 2; left = cur.left + capFs * 0.9; }
+        top += (1 - a) * capFs * 0.6 - b * capFs * 0.4;
+        c.style.visibility = 'inherit';
+        c.style.opacity = o.toFixed(3);
+        c.style.transform = 'translate(' + left.toFixed(2) + 'px,' + top.toFixed(2) + 'px)';
+      });
+      // Drops: pop in at their point, hold, fly the chip's arc to chip_to, gone.
+      drops.forEach(function (d, j) {
+        var c = d.el, dt = t - d.at;
+        if (dt < 0 || t > d.land + CHOLD + 1e-3) { c.style.visibility = 'hidden'; return; }
+        var P = d.P, x, y, sc;
+        if (dt < POP) { x = P.x; y = P.y + dropH * 0.4 * (1 - out3(dt / POP)); sc = Math.max(0, sPop(dt / POP)); }
+        else if (dt < POP + DHOLD) { x = P.x; y = P.y; sc = 1; }
+        else {
+          var q = clamp01((dt - POP - DHOLD) / FLY), f = inOut3(q);
+          var mx = (P.x + CTX) / 2, my = Math.max(dropH, Math.min(P.y, CTY) - ARC), u = 1 - f;
+          x = u * u * P.x + 2 * u * f * mx + f * f * CTX;
+          y = u * u * P.y + 2 * u * f * my + f * f * CTY;
+          sc = 1 - (1 - CLAND) * inOut3((q - 0.6) / 0.4);
+        }
+        c.style.visibility = 'inherit';
+        c.style.zIndex = String(30 + j);
+        c.style.transform = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px) translate(-50%,-50%) scale(' + sc.toFixed(4) + ')';
+      });
       // Cursor: position, press and ring from the last click.
       if (cursor) {
         var vis = t >= AT - 1e-4 && t < cExit;
@@ -412,6 +719,7 @@
     }
 
     var END = Math.max(num(ctx && ctx.duration, 0), SETTLE + 0.5, land[N - 1] + 0.1);
+    drops.forEach(function (d) { END = Math.max(END, d.land + CHOLD + 0.1); });
     var st = { t: 0 };
     tl.to(st, { t: END, duration: END, ease: 'none' }, 0);
     tl.eventCallback('onUpdate', function () { render(st.t); });

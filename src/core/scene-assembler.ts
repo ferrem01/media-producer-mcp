@@ -236,6 +236,29 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
 /**
  * Assemble a scene into a self-contained HTML document.
  */
+/**
+ * A component's `@import url(...)` (the Quotient mockups load Inter this way)
+ * lands in the MIDDLE of the one combined <style>, and a browser ignores an
+ * @import that is not at the top of its sheet -- so the font never loaded and
+ * every captured product page rendered in the system fallback. Lift each
+ * import out of the <style> blocks into a <link> in the head (deduplicated).
+ */
+export function hoistCssImports(html: string): string {
+  const hrefs: string[] = [];
+  // A quoted URL may itself contain ';' (Google Fonts: wght@400;500;700), so
+  // match the quotes, not the first ';'. Unquoted url(...) runs to its ')'.
+  const IMPORT = /@import\s+(?:url\(\s*(["'])(.*?)\1\s*\)|(["'])(.*?)\3|url\(\s*([^"')\s]+)\s*\))[^;{}]*;/g;
+  const out = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, (block) =>
+    block.replace(IMPORT, (_m, _q1, u1, _q2, u2, u3) => {
+      const href = String(u1 ?? u2 ?? u3);
+      if (!hrefs.includes(href)) hrefs.push(href);
+      return "";
+    }));
+  if (!hrefs.length) return out;
+  const links = hrefs.map((h) => `<link rel="stylesheet" href="${h.replace(/"/g, "&quot;")}">`).join("\n");
+  return out.replace(/<meta charset="utf-8">/i, (m) => `${m}\n${links}`);
+}
+
 export async function assembleScene(options: AssembleOptions): Promise<string> {
   const { scene, components, canvas, preview, speakerUrl } = options;
   // Resolve brand fonts FIRST so the font links and --mp-font-family agree
@@ -541,7 +564,7 @@ ${motionPhysicsScript(scene.motion_physics, scene.duration_seconds)}
 </body>
 </html>`;
 
-  const resolved = resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
+  const resolved = resolveHtmlAssetUrls(normalizeHtmlUrls(hoistCssImports(html)), preview);
   // Preview surfaces must not eagerly decode scene videos (mobile tab-kill).
   return preview ? stripEagerVideoLoading(resolved) : resolved;
 }
@@ -1961,7 +1984,7 @@ ${motionPhysicsScript(options.motionPhysics, duration)}
 </body>
 </html>`;
 
-  const resolved = resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
+  const resolved = resolveHtmlAssetUrls(normalizeHtmlUrls(hoistCssImports(html)), preview);
   // Preview surfaces must not eagerly decode scene videos (mobile tab-kill).
   return preview ? stripEagerVideoLoading(resolved) : resolved;
 }
