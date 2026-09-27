@@ -108,7 +108,7 @@
 
     // ---- New activity landing in the feed (shared/activity-feed.js) ----
     var split = capSplitActivityScript(data);
-    capActivityFeed(tl, root, split.feed, { person: personName, today: data.today, accent: data.accent });
+    capActivityFeed(tl, root, split.feed, { person: personName, today: data.today, accent: data.accent, history: data.history });
 
     // ---- Fit: all of it (default), or fill the box with the feed or the
     // details column ----

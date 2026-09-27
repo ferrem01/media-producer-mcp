@@ -1,0 +1,192 @@
+<template>
+  <div class="aas">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <div class="aas-card">
+      <div class="aas-head">
+        <div class="aas-ava"><span class="aas-ava-txt"></span></div>
+        <div class="aas-who">
+          <div class="aas-name"></div>
+          <div class="aas-role"></div>
+        </div>
+        <div class="aas-score"><span class="aas-score-lbl">Lead score</span><span class="aas-score-val"></span></div>
+      </div>
+      <div class="aas-bar">
+        <div class="aas-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg><span class="aas-tab-txt"></span></div>
+        <div class="aas-live"><i></i>Live</div>
+      </div>
+      <div class="aas-day"></div>
+      <div class="aas-list"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* AUDIENCE ACTIVITY STREAM: one person's activity feed as a card built for
+     a COLUMN. The person page (audience-person-detail) is a 2307px capture:
+     squeezed into a third of the frame it had to be scaled and cropped, and
+     read as a smooshed slice of a page. This card lays itself out at the
+     width it is given -- the person up top, then the feed -- in the page's
+     own row design (icon, title, source pill, detail link, time), and new
+     events land at the top at their `at`. Everything is sized from the box
+     width (the root font size), so it reads the same in a 1/3 column, a
+     split's half or a full frame. */
+  .aas, .aas * { box-sizing: border-box; max-width: none; }
+  .aas { position: absolute; inset: 0; font-family: Inter, 'Helvetica Neue', Arial, sans-serif; color: #17171c;
+         -webkit-font-smoothing: antialiased; }
+  .aas-card { position: absolute; overflow: hidden; background: #fff; border-radius: 1.1em;
+              box-shadow: 0 0.2em 0.6em rgba(10, 10, 30, 0.06), 0 1.6em 3.2em rgba(10, 10, 30, 0.16);
+              display: flex; flex-direction: column; }
+  .aas-head { display: flex; align-items: center; gap: 0.8em; padding: 1.25em 1.3em 1em; border-bottom: 1px solid #ececf2; }
+  .aas-ava { width: 2.9em; height: 2.9em; border-radius: 50%; background: #eeeeff; color: var(--aas-accent, #393bf5);
+             display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1em; flex: none; overflow: hidden; position: relative; }
+  .aas-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .aas-who { flex: 1; min-width: 0; }
+  .aas-name { font-weight: 600; font-size: 1.25em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .aas-role { color: #6e6e7e; font-size: 0.92em; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .aas-score { flex: none; display: flex; flex-direction: column; align-items: flex-end; }
+  .aas-score-lbl { color: #8f8f9f; font-size: 0.72em; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; }
+  .aas-score-val { font-weight: 700; font-size: 1.45em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .aas-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 1.3em; border-bottom: 1px solid #ececf2; }
+  .aas-tab { display: flex; align-items: center; gap: 0.45em; font-weight: 600; font-size: 0.98em; padding: 0.85em 0 0.75em;
+             border-bottom: 0.14em solid #17171c; margin-bottom: -1px; }
+  .aas-tab svg { width: 1.05em; height: 1.05em; }
+  .aas-live { display: flex; align-items: center; gap: 0.4em; font-size: 0.8em; font-weight: 600; color: #1a7f4b;
+              background: #e8f6ee; border-radius: 99em; padding: 0.22em 0.7em; }
+  .aas-live i { width: 0.5em; height: 0.5em; border-radius: 50%; background: #22a35a; display: block; }
+  .aas-day { color: #6e6e7e; font-size: 0.86em; font-weight: 500; padding: 0.95em 1.3em 0.35em; }
+  .aas-list { position: relative; flex: 1; overflow: hidden; }
+  .aas-row { display: flex; gap: 0.75em; padding: 0.7em 1.3em; overflow: hidden; }
+  .aas-ico { flex: none; width: 1.9em; height: 1.9em; border-radius: 0.55em; background: #f4f4f7; color: #54545f;
+             display: flex; align-items: center; justify-content: center; margin-top: 0.05em; }
+  .aas-ico svg { width: 1.05em; height: 1.05em; }
+  .aas-ico img { width: 1.15em; height: 1.15em; object-fit: contain; }
+  .aas-body { flex: 1; min-width: 0; }
+  .aas-l1 { display: flex; align-items: center; gap: 0.5em; height: 1.35em; }
+  .aas-title { font-weight: 500; font-size: 1em; line-height: 1.35em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .aas-pill { flex: none; font-size: 0.72em; font-weight: 500; color: #54545f; border: 1px solid #e4e4ec; border-radius: 0.45em;
+              padding: 0 0.5em; line-height: 1.6em; }
+  .aas-time { flex: none; margin-left: auto; color: #8f8f9f; font-size: 0.78em; white-space: nowrap; }
+  .aas-l2 { color: #54545f; font-size: 0.88em; line-height: 1.45em; height: 1.45em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            text-decoration: underline; text-decoration-color: #c9c9d6; text-underline-offset: 0.18em; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.aas');
+    var card = el.querySelector('.aas-card');
+    var list = el.querySelector('.aas-list');
+    var num = function (v, d) { var n = Number(v); return isFinite(n) ? n : d; };
+    var accent = data.accent || '#393bf5';
+    root.style.setProperty('--aas-accent', accent);
+
+    // Size everything from the box: 1em = box width / 38 (about 20px in a
+    // third of a 1920 frame), never under 11px.
+    var W = el.clientWidth || root.clientWidth || 745, H = el.clientHeight || root.clientHeight || 1120;
+    var em = 0;
+    var fit = function () {
+      var w = el.clientWidth || W, h = el.clientHeight || H;
+      em = Math.max(11, num(data.scale, 1) * w / 38);
+      root.style.fontSize = em + 'px';
+      var inset = num(data.inset, 0.04);
+      var ix = Math.round(w * inset), iy = Math.round(Math.min(w, h) * inset);
+      card.style.left = ix + 'px'; card.style.right = ix + 'px'; card.style.top = iy + 'px'; card.style.bottom = iy + 'px';
+    };
+    fit();
+    // The box can be sized after the build (a layout pass): refit then.
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { fit(); }).observe(el);
+    if (data.card_background) card.style.background = data.card_background;
+
+    // The person.
+    var name = data.person_name || 'Sarah Chen';
+    el.querySelector('.aas-name').textContent = name;
+    var role = [data.person_title || data.title_line || '', data.company || ''].filter(Boolean).join(' · ');
+    el.querySelector('.aas-role').textContent = role || (data.person_email || '');
+    var avaTxt = el.querySelector('.aas-ava-txt');
+    avaTxt.textContent = activityInitials(name);
+    if (data.avatar) {
+      var img = document.createElement('img');
+      img.alt = ''; avaTxt.style.visibility = 'hidden';
+      img.onerror = function () { this.remove(); avaTxt.style.visibility = 'visible'; };
+      img.src = data.avatar; el.querySelector('.aas-ava').appendChild(img);
+    }
+    var scoreBox = el.querySelector('.aas-score'), scoreVal = el.querySelector('.aas-score-val');
+    if (data.score == null || data.score === false) scoreBox.style.display = 'none';
+    else scoreVal.textContent = String(data.score);
+    el.querySelector('.aas-tab-txt').textContent = data.tab || 'Recent Activity';
+    if (data.live === false) el.querySelector('.aas-live').style.display = 'none';
+    var today = data.today ? activityResolveDate(data.today, new Date()) : new Date();
+    el.querySelector('.aas-day').textContent = data.day_label || ('Today · ' + activityFormatHeader(today));
+
+    // The rows, newest on top. Each is built now at full size, so it can be
+    // measured; one that lands later is then collapsed to nothing (height,
+    // padding and all -- a waiting row takes no space) and opens at its `at`.
+    var ICON = function (key) {
+      var paths = ACTIVITY_ICON_PATHS[key] || ACTIVITY_ICON_PATHS.custom;
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
+    };
+    var events = (Array.isArray(data.activity) ? data.activity : []).filter(Boolean).slice()
+      .sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+    var rows = events.map(function (ev) {
+      var type = ACTIVITY_TYPE_ALIASES[ev.type] || ev.type || 'custom';
+      var spec = ACTIVITY_TYPES[type] || ACTIVITY_TYPES.custom;
+      var verb = ev.verb || spec.verb;
+      if (!ev.verb && (type === 'custom' || type === 'product_event' || type === 'crm_event') && ev.name) verb = 'triggered “' + ev.name + '”';
+      var actor = ev.actor || (data.short_titles === false ? name : name.split(/\s+/)[0]);
+      var row = document.createElement('div'); row.className = 'aas-row';
+      var ico = document.createElement('div'); ico.className = 'aas-ico';
+      if (ev.icon) { var ii = document.createElement('img'); ii.alt = ''; ii.src = ev.icon; ico.appendChild(ii); }
+      else ico.innerHTML = ICON(spec.icon);
+      var body = document.createElement('div'); body.className = 'aas-body';
+      var l1 = document.createElement('div'); l1.className = 'aas-l1';
+      var t = document.createElement('div'); t.className = 'aas-title'; t.textContent = ev.title || (actor + ' ' + verb);
+      l1.appendChild(t);
+      if (ev.source) { var p = document.createElement('span'); p.className = 'aas-pill'; p.textContent = ev.source; l1.appendChild(p); }
+      var tm = document.createElement('span'); tm.className = 'aas-time'; tm.textContent = ev.time || 'Just now'; l1.appendChild(tm);
+      body.appendChild(l1);
+      if (ev.detail) { var l2 = document.createElement('div'); l2.className = 'aas-l2'; l2.textContent = ev.detail; body.appendChild(l2); }
+      row.appendChild(ico); row.appendChild(body);
+      // Heights are fixed in em (single-line title and detail), so a font
+      // that loads late cannot change them and a resized box scales them.
+      row.style.height = (ev.detail ? 4.03 : 3.35) + 'em';
+      list.insertBefore(row, list.firstChild);
+      return { row: row, at: num(ev.at, 0), h: (ev.detail ? 4.03 : 3.35) };
+    });
+
+    // The newest row's slot (where a chip lands, where a flood grows from),
+    // published as box fractions "cx,cy,w,h". Every row shares the first slot.
+    var er = el.getBoundingClientRect(), k = (el.offsetWidth && er.width) ? er.width / el.offsetWidth : 1;
+    if (rows.length) {
+      var top = list.firstChild.getBoundingClientRect();
+      var fx = function (v) { return Math.round(v * 10000) / 10000; };
+      var bw = el.offsetWidth || W, bh = el.offsetHeight || H;
+      root.setAttribute('data-top-row', [fx(((top.left - er.left) / k + top.width / k / 2) / bw), fx(((top.top - er.top) / k + top.height / k / 2) / bh),
+        fx(top.width / k / bw), fx(top.height / k / bh)].join(','));
+    }
+
+    var boxes = rows.map(function (r) { return { height: r.h + 'em', paddingTop: '0.7em', paddingBottom: '0.7em' }; });
+    var wash = activityRgba(accent, 0.12), clear = activityRgba(accent, 0);
+    rows.forEach(function (r, i) {
+      if (r.at < 0) return;                       // already in the feed at frame 0
+      gsap.set(r.row, { height: 0, paddingTop: 0, paddingBottom: 0, autoAlpha: 0 });
+      tl.to(r.row, Object.assign({}, boxes[i], { autoAlpha: 1, duration: 0.45, ease: 'power3.out' }), r.at);
+      if (data.highlight !== false) {
+        tl.fromTo(r.row, { backgroundColor: wash }, { backgroundColor: clear, duration: 1.8, ease: 'power1.in', immediateRender: false }, r.at + 0.35);
+      }
+    });
+    root.setAttribute('data-land-times', rows.filter(function (r) { return r.at >= 0; }).map(function (r) { return Math.round(r.at * 1000) / 1000; }).join(','));
+
+    // The lead score can move: score_to at score_at.
+    if (data.score_to != null && data.score != null) {
+      var from = num(data.score, 0), to = num(data.score_to, from), o = { v: from };
+      tl.to(o, { v: to, duration: num(data.score_duration, 0.7), ease: 'power2.out',
+        onUpdate: function () { scoreVal.textContent = String(Math.round(o.v)); } }, num(data.score_at, 1));
+    }
+
+    if (data.entrance === 'rise') {
+      gsap.set(card, { autoAlpha: 0, y: em * 1.2 });
+      tl.to(card, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, num(data.at, 0));
+    }
+    return tl;
+  }
+</script>

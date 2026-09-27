@@ -136,6 +136,12 @@
         }
       }
     },
+    "history": {
+      "type": "boolean",
+      "label": "Keep the captured rows (false = the feed starts empty; only these events)",
+      "optional": true,
+      "placeholder": "true (default) | false"
+    },
     "details": {
       "type": "object",
       "label": "Details values (label -> value)",
