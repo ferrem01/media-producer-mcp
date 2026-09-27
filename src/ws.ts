@@ -6,6 +6,13 @@
  *   the scene HTML, and pushes it back to the client.
  * - "preview-component": assembles a standalone component preview (used by the
  *   Playground) and pushes the HTML back.
+ *
+ * And one family, "remote-booth:*" (SPEC-remote-booth.md): the relay between
+ * the remote booth's control screen and the phone that is its camera. The
+ * socket is authenticated with the SAME tenant token as HTTP (?token= on the
+ * /ws URL, or the session cookie), and core/remote-booth.ts keeps every
+ * message inside its session's room -- a socket whose token belongs to
+ * another tenant cannot join.
  */
 
 import http from "node:http";
@@ -17,6 +24,8 @@ import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { config } from "./config.js";
+import { extractToken, isAuthEnabled, validateToken, tenantAllowed } from "./auth/auth.js";
+import { RemoteBoothHub, REMOTE_PREFIX, REMOTE_MAX_MESSAGE_BYTES, type RemotePeer, type RemoteTarget, type TargetLoader } from "./core/remote-booth.js";
 
 // ── Helpers ──
 
@@ -155,12 +164,104 @@ async function handlePreviewComponent(ws: WebSocket, msg: {
   }
 }
 
+// ── Remote booth (SPEC-remote-booth.md) ──
+
+/** The film a remote session points at, read from the SESSION's tenant:
+ *  the canvas (the phone records at its aspect), the name, and the lines. */
+export const loadRemoteTarget: TargetLoader = async (tenant, projectId, scene) => {
+  const p = await loadProject(tenant, projectId);
+  if (!p || (p.tenant_id && p.tenant_id !== tenant)) return null;
+  const sb = p.storyboard?.scenes || [];
+  if (scene !== "all" && !sb[scene] && !(p.scenes || [])[scene]) return null;
+  const lines = scene === "all"
+    ? sb.map((s) => String(s.voiceover_text || "").trim()).filter(Boolean).join("\n")
+    : String(sb[scene]?.voiceover_text || "").trim();
+  const t: RemoteTarget = {
+    project: projectId, scene, name: p.name || projectId,
+    canvas: p.canvas ? { width: Number(p.canvas.width) || 1920, height: Number(p.canvas.height) || 1080 } : { width: 1920, height: 1080 },
+    frame: (p.treatment as any)?.frame, grammar: (p.treatment as any)?.filmGrammar, lines,
+  };
+  return t;
+};
+
+export interface RemoteBoothWsOptions {
+  hub?: RemoteBoothHub;
+  /** token -> tenant (default: validateToken, the HTTP rule). */
+  validate?: (token: string) => string | null;
+  authEnabled?: () => boolean;
+}
+
+/** One socket's remote-booth messages. The token was read at the upgrade. */
+async function handleRemoteBooth(ws: WebSocket, peer: RemotePeer, authed: string | undefined, hub: RemoteBoothHub, authEnabled: boolean, msg: Record<string, unknown>): Promise<void> {
+  const type = String(msg.type || "");
+  const name = type.slice(REMOTE_PREFIX.length);
+  if (name === "ping") { sendJson(ws, { type: REMOTE_PREFIX + "pong" }); return; }
+  if (name === "join") {
+    const role = msg.role === "camera" ? "camera" : msg.role === "control" ? "control" : null;
+    if (!role) { sendJson(ws, { type: REMOTE_PREFIX + "error", code: "bad-request", error: "role must be control or camera" }); return; }
+    const r = hub.join(peer, role, typeof msg.session === "string" && msg.session ? msg.session : undefined, typeof msg.tenant === "string" ? msg.tenant : "", authed, authEnabled);
+    if (!r.ok) { sendJson(ws, { type: REMOTE_PREFIX + "error", code: r.code, error: r.error }); return; }
+    const s = r.session;
+    sendJson(ws, { type: REMOTE_PREFIX + "joined", session: s.id, role, tenant: s.tenant, target: s.target, created: r.created,
+      peers: { control: !!s.peers.control, camera: !!s.peers.camera } });
+    return;
+  }
+  if (name === "target") {
+    const r = await hub.retarget(peer, String(msg.project || ""), msg.scene);
+    if (!r.ok) sendJson(ws, { type: REMOTE_PREFIX + "error", code: "target", error: r.error });
+    return;
+  }
+  const why = hub.relay(peer, msg);
+  // A refused preview is not worth a reply 4 times a second.
+  if (why && name !== "preview") sendJson(ws, { type: REMOTE_PREFIX + "error", code: "relay", error: why });
+}
+
+/** Wire a WebSocketServer's remote-booth traffic to a hub. setupWebSocket
+ *  uses it; the tests call it on their own server with their own tokens. */
+export function attachRemoteBooth(wss: WebSocketServer, opts: RemoteBoothWsOptions = {}): RemoteBoothHub {
+  const hub = opts.hub || new RemoteBoothHub({ loadTarget: loadRemoteTarget });
+  const validate = opts.validate || validateToken;
+  const authOn = opts.authEnabled || isAuthEnabled;
+  wss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
+    const token = extractToken(req);
+    const authed = (token && validate(token)) || undefined;
+    const peer: RemotePeer = { send: (m) => sendJson(ws, m) };
+    (ws as any).__remoteBooth = async (msg: Record<string, unknown>, bytes: number) => {
+      if (bytes > REMOTE_MAX_MESSAGE_BYTES) { sendJson(ws, { type: REMOTE_PREFIX + "error", code: "too-big", error: "message too large" }); return; }
+      await handleRemoteBooth(ws, peer, authed, hub, authOn(), msg);
+    };
+    ws.on("close", () => hub.leave(peer));
+  });
+  // Idle sessions go on their own (a morning's shoot fits in the limit).
+  const sweeper = setInterval(() => hub.sweep(), 10 * 60 * 1000);
+  sweeper.unref?.();
+  wss.on("close", () => clearInterval(sweeper));
+  return hub;
+}
+
+/** Route one parsed message: remote-booth traffic to its relay. Returns
+ *  false when the message is not remote-booth (the caller handles it). */
+export async function routeRemoteBooth(ws: WebSocket, msg: Record<string, unknown>, raw: unknown): Promise<boolean> {
+  if (typeof msg.type !== "string" || !msg.type.startsWith(REMOTE_PREFIX)) return false;
+  const bytes = Array.isArray(raw) ? raw.reduce((a: number, b: Buffer) => a + b.length, 0) : Buffer.isBuffer(raw) ? raw.byteLength : raw instanceof ArrayBuffer ? raw.byteLength : 0;
+  await (ws as any).__remoteBooth?.(msg, bytes);
+  return true;
+}
+
 // ── Setup ──
 
-export function setupWebSocket(server: http.Server): void {
+export function setupWebSocket(server: http.Server, opts: RemoteBoothWsOptions = {}): RemoteBoothHub {
   const wss = new WebSocketServer({ server, path: "/ws" });
+  const hub = attachRemoteBooth(wss, opts);
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, req) => {
+    // update-prop WRITES into a project: the socket's token must be allowed
+    // that tenant -- the HTTP rule (found while building the remote booth:
+    // it wrote into whatever tenant/project the client named).
+    const validate = opts.validate || validateToken;
+    const authOn = opts.authEnabled || isAuthEnabled;
+    const token = extractToken(req);
+    const authed = (token && validate(token)) || undefined;
     ws.on("message", async (raw) => {
       let msg: Record<string, unknown>;
       try {
@@ -171,7 +272,13 @@ export function setupWebSocket(server: http.Server): void {
       }
 
       try {
-        if (msg.type === "update-prop") {
+        if (await routeRemoteBooth(ws, msg, raw)) {
+          // relayed (or refused) by the remote booth
+        } else if (msg.type === "update-prop") {
+          if (!tenantAllowed(authed, String(msg.tenantId || ""), authOn())) {
+            sendJson(ws, { type: "error", error: "forbidden: this token cannot edit that workspace" });
+            return;
+          }
           await handleUpdateProp(ws, msg as any);
         } else if (msg.type === "preview-component") {
           await handlePreviewComponent(ws, msg as any);
@@ -190,4 +297,5 @@ export function setupWebSocket(server: http.Server): void {
   });
 
   console.error("WebSocket server on /ws");
+  return hub;
 }

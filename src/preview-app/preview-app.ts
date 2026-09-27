@@ -4378,8 +4378,11 @@ ${QUOTIENT_CSS}
   // the board. Record and Upload have their own paths; find (Pexels) and
   // draw (image generation) open a panel under the row and end in the
   // same write an upload makes (need-source -> provideAsset).
-  var NP_SOURCES = { camera_video: ['booth', 'phone', 'upload'], screen_recording: ['recorder', 'upload'], screenshot: ['recorder', 'upload'], stock_footage: ['find', 'upload'], illustration: ['draw', 'upload'], mockup: ['draw', 'upload'] };
-  var NP_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Record with the Recorder', booth: 'Record here', phone: 'On your phone' };
+  // ACROSS THE ROOM (SPEC-remote-booth.md): a wide take from 6-10 ft --
+  // the phone on a tripod is the camera, this screen the prompter and the
+  // remote. It opens the remote booth in its own tab for the scene.
+  var NP_SOURCES = { camera_video: ['booth', 'phone', 'room', 'upload'], screen_recording: ['recorder', 'upload'], screenshot: ['recorder', 'upload'], stock_footage: ['find', 'upload'], illustration: ['draw', 'upload'], mockup: ['draw', 'upload'] };
+  var NP_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Record with the Recorder', booth: 'Record here', phone: 'On your phone', room: 'Across the room' };
   var npPick = null;
   function sceneNeedsHtml(project, si) {
     var s = ((project.storyboard && project.storyboard.scenes) || [])[si];
@@ -4497,6 +4500,15 @@ ${QUOTIENT_CSS}
       var qrUrl = withToken('/api/take-qr/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '?scene=' + si);
       panel.innerHTML = '<div class="np-phone"><img src="' + escAttr(qrUrl) + '" alt="Scan to record scene ' + (si + 1) + ' on your phone" width="220" height="220">' +
         '<div class="np-hint">Scan with your phone\u2019s camera. It opens the recorder for <b>scene ' + (si + 1) + '</b>, lines on screen; stop, and the take lands here. The code carries your sign-in, so don\u2019t share it.</div></div>';
+      return;
+    }
+    if (src === 'room') {
+      // ACROSS THE ROOM: the remote booth for this scene, in a new tab (it
+      // takes the whole screen: the prompter is read from 8-10 ft). The
+      // phone pairs once there and follows the booth between films.
+      var roomUrl = withToken('/remote-booth?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si);
+      try { window.open(roomUrl, '_blank', 'noopener'); } catch (eW) {}
+      panel.innerHTML = '<div class="np-hint">The remote booth opened in a new tab for <b>scene ' + (si + 1) + '</b>: scan its code with the phone on the tripod, then run the take from this screen, prompter and all. The take lands here when you keep it. <a href="' + escAttr(roomUrl) + '" target="_blank" rel="noopener">Open it again</a> if the tab was blocked.</div>';
       return;
     }
     if (src === 'recorder') {
@@ -10184,6 +10196,7 @@ ${QUOTIENT_CSS}
         '<div class="np-tabs">' +
           '<button class="np-btn active" data-np-src="booth" data-np-scene="' + si + '" data-np-asset="' + ai + '">Record here</button>' +
           '<button class="np-btn" data-np-src="phone" data-np-scene="' + si + '" data-np-asset="' + ai + '">On your phone</button>' +
+          '<button class="np-btn" data-np-src="room" data-np-scene="' + si + '" data-np-asset="' + ai + '">Across the room</button>' +
           '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="camera_video">Upload a file</button>' +
         '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div>' +
         '<div class="sm-actions"><button class="sm-btn" id="np-picker-close">Close</button></div>');

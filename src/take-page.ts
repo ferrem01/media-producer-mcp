@@ -22,6 +22,7 @@
  */
 import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
 import { LIGHT_CHECK_JS } from "./core/light-check.js";
+import { PROMPTER_TIMING_JS, PROMPTER_VIEW_JS } from "./core/prompter.js";
 
 export function getTakeHtml(): string {
   return `<!DOCTYPE html>
@@ -190,12 +191,36 @@ ${QUOTIENT_CSS}
   .big { font-size: 40px; margin: 0 0 8px; color: #0d542b; }
   a.btn { display: inline-flex; text-align: center; text-decoration: none; }
   .meta { font-size: 12px; color: var(--muted-foreground); margin-top: 10px; font-variant-numeric: tabular-nums; }
+
+  /* ── films: move to another film or scene from the booth itself ──
+     (Marc: "I have to remove the camera from the stand and then scan the
+     QR for each") -- the tenant's person-carried films, what each scene
+     still needs, one tap to switch; no QR, no Studio round trip. */
+  .toprow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; }
+  .toprow h1 { margin: 0; }
+  .chip { font: 500 13px/18px var(--font-sans); color: var(--content-primary); background: var(--surface-primary); border: 1px solid var(--border-secondary);
+    border-radius: 9999px; padding: 6px 14px; cursor: pointer; box-shadow: var(--shadow-weak); }
+  .fsheet { position: fixed; inset: 0; z-index: 20; background: rgba(10,10,11,.45); display: flex; align-items: flex-end; justify-content: center; }
+  .fsheet[hidden] { display: none; }
+  .fpanel { background: var(--background, #f8f8fa); width: 100%; max-width: 560px; max-height: 86dvh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    border-radius: 18px 18px 0 0; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); box-shadow: var(--shadow-overlay); }
+  .fhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .fhead h1 { margin: 0; }
+  .ffilm { margin: 14px 0 6px; }
+  .ffilm > b { display: block; font-size: 15px; color: var(--content-primary); }
+  .ffilm > small { display: block; color: var(--muted-foreground); font-size: 12px; margin-bottom: 6px; }
+  .fscene { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--border-secondary); border-radius: 12px;
+    padding: 10px 12px; margin: 6px 0; font: 500 14px/20px var(--font-sans); color: var(--content-primary); cursor: pointer; }
+  .fscene.cur { border-color: var(--content-primary); }
+  .fscene small { display: block; color: var(--muted-foreground); font-size: 12px; line-height: 17px; font-weight: 400; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .fdot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex: 0 0 auto; background: var(--gray-50, #cecee1); }
+  .fdot.needed { background: #d48c34; } .fdot.provided { background: #479e66; }
 </style>
 </head>
 <body>
 
 <section id="ready" class="pad on">
-  <p><a class="link" id="studioLinkTop" href="#">← Back to Studio</a></p>
+  <p class="toprow"><a class="link" id="studioLinkTop" href="#">← Back to Studio</a><button class="chip" id="filmsBtn" type="button">Films</button></p>
   <h1 id="title">Loading…</h1>
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
@@ -227,7 +252,7 @@ ${QUOTIENT_CSS}
 </section>
 
 <section id="review" class="pad">
-  <h1>Review</h1>
+  <div class="toprow"><h1>Review</h1><button class="chip filmsOpen" id="filmsBtnReview" type="button">Films</button></div>
   <p class="sub" id="reviewMeta"></p>
   <video id="play" controls playsinline></video>
   <div class="spacer"></div>
@@ -252,7 +277,16 @@ ${QUOTIENT_CSS}
   <div class="spacer"></div>
   <a class="btn" id="studioLink" href="#">Back to Studio</a>
   <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Desktop Studio</a></div>
+  <div class="row"><button class="btn ghost filmsOpen" id="filmsBtnDone" type="button">Another film or scene</button></div>
 </section>
+
+<div id="filmsSheet" class="fsheet" hidden>
+  <div class="fpanel" role="dialog" aria-label="Films">
+    <div class="fhead"><h1>Films</h1><button class="chip" id="filmsClose" type="button">Close</button></div>
+    <p class="sub" id="filmsNote">Your speaker and creator-cut films. Tap a scene to record it here.</p>
+    <div id="filmsList"></div>
+  </div>
+</div>
 
 <section id="err" class="pad">
   <h1>Something went wrong</h1>
@@ -302,7 +336,7 @@ ${QUOTIENT_CSS}
     window.addEventListener('load', postSize);
   }
   if (embedded) { ['studioLinkTop'].forEach(function (id) { var el = document.getElementById(id); if (el && el.parentNode) el.parentNode.style.display = 'none'; }); document.querySelectorAll('#studioLink').forEach(function (el) { el.style.display = 'none'; }); }
-  var WORDS_PER_SEC = 2.4;
+  ${PROMPTER_TIMING_JS}
 
   function show(id) {
     ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
@@ -352,82 +386,16 @@ ${QUOTIENT_CSS}
     if (w >= h) st.classList.add('wide'); else st.classList.remove('wide');
   }
 
-  // Cues follow the script's own notation: one sentence per line (a line
-  // break is a breath, ~0.3s) and a line that says only (pause) is a held
-  // beat (~1s) the prompter shows as "•••". Silences come out of the
-  // scene's duration first; the words share what is left.
-  var BREATH_S = 0.3, PAUSE_S = 1.0, PAUSE_GLYPH = '\u2022\u2022\u2022';
-  var PAUSE_LINE = /^\\(\\s*pause\\s*\\)[.,!?]*$/i;
-  // Per-word timing: a word's time is its share of the pace by length;
-  // an EMPHASIZED word (the board's emphasis list, or *word* in the line)
-  // is held EMPH_K longer; punctuation carries its beat AFTER the word --
-  // a comma a small one, a dash or an ellipsis a longer one (Marc: "will it
-  // understand that I emphasize certain words, that I pause on certain
-  // words?"). A scene change adds NOTHING: the talk track is continuous.
-  var EMPH_K = 1.4, COMMA_S = 0.2, DASH_S = 0.4;
-  function wordBeat(w) {
-    var last = w.charAt(w.length - 1);
-    if (w === '-' || w === '–' || w === '—' || last === '—' || last === '–' || last === '…' || w.slice(-3) === '...') return DASH_S;
-    if (last === ',' || last === ';' || last === ':') return COMMA_S;
-    return 0;
-  }
-  function bare(w) { return String(w).toLowerCase().split('').filter(function (ch) { return ch.toLowerCase() !== ch.toUpperCase() || (ch >= '0' && ch <= '9') || ch === "'"; }).join(''); }
-  function timeLine(text, emph) {
-    // Split on spaces; lift *stars* (the writer's emphasis) off each word.
-    var raw = String(text).split(' ').filter(function (w) { return w.length; });
-    var toks = [];
-    var starOpen = false;
-    raw.forEach(function (w) {
-      var open = w.charAt(0) === '*', close = w.length > 1 && (w.charAt(w.length - 1) === '*' || /\\*[.,!?;:…]+$/.test(w));
-      var clean = w.split('*').join('');
-      var marked = open || starOpen || close;
-      if (open && !close) starOpen = true;
-      if (close) starOpen = false;
-      if (!clean) return;
-      var isDash = clean === '-' || clean === '–' || clean === '—';
-      toks.push({ t: clean, emph: !isDash && (marked || emph.indexOf(bare(clean)) >= 0), dash: isDash });
-    });
-    var perWord = 1 / WORDS_PER_SEC;
-    var lens = toks.filter(function (k) { return !k.dash; }).map(function (k) { return Math.max(2, bare(k.t).length || k.t.length); });
-    var avg = lens.length ? lens.reduce(function (a, b) { return a + b; }, 0) / lens.length : 4;
-    var at = 0;
-    toks.forEach(function (k) {
-      k.start = at;
-      if (k.dash) { k.end = at; at += DASH_S; return; }
-      var len = Math.max(2, bare(k.t).length || k.t.length);
-      var t = perWord * (0.55 + 0.45 * len / avg) * (k.emph ? EMPH_K : 1);
-      at += t; k.end = at;
-      at += wordBeat(k.t);
-    });
-    return { toks: toks, spoken: at };
-  }
-  function buildCues(scenes) {
-    var out = [];
-    (scenes || []).forEach(function (s, i) {
-      var text = String(s.voiceover_text || '').trim();
-      if (!text) return;
-      var emph = (Array.isArray(s.emphasis) ? s.emphasis : []).map(bare).filter(Boolean);
-      var lines = text.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { return l.trim(); }).filter(Boolean);
-      lines.forEach(function (ln) {
-        if (PAUSE_LINE.test(ln)) { out.push({ text: PAUSE_GLYPH, toks: [], dur: PAUSE_S, gap: PAUSE_S, beat: i }); return; }
-        var parts = ln.match(/[^.!?…]+[.!?…]+["')\\]]*|[^.!?…]+$/g) || [ln];
-        parts.forEach(function (p0, k) {
-          var t = p0.trim(); if (!t) return;
-          var tl = timeLine(t, emph);
-          // Every sentence ends on the same short breath -- inside a scene
-          // or at its end alike (no scene-boundary pause).
-          var gap = k === parts.length - 1 ? BREATH_S : 0;
-          out.push({ text: tl.toks.map(function (x) { return x.t; }).join(' '), toks: tl.toks, dur: Math.max(0.6, tl.spoken + gap), gap: gap, beat: i });
-        });
-      });
-    });
-    if (out.length) out[out.length - 1].gap = 0;
-    return out;
-  }
 
-  fetch(withToken('/api/projects/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)))
+  // One film's script and frame onto the ready screen. Called at load and
+  // again when the Films sheet switches the booth to another film or scene.
+  function loadFilm() {
+  var want = project + '/' + sceneIndex;
+  $('recordBtn').disabled = true;
+  return fetch(withToken('/api/projects/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)))
     .then(function (r) { if (!r.ok) throw new Error('Could not load the project (' + r.status + '). Is the link still valid?'); return r.json(); })
     .then(function (p) {
+      if (want !== project + '/' + sceneIndex) return; // switched again meanwhile
       projectName = p.name || project;
       setFrame(p.canvas);
       // The scene's own setting is the default (the speaker component,
@@ -445,6 +413,9 @@ ${QUOTIENT_CSS}
       // film no person carries) records a live-action moment that lands as
       // a video on the scene -- room/blur/alpha do not apply.
       try {
+        // A switch starts clean: the last film's clip note goes, the choice returns.
+        var oldNote = $('clipNote'); if (oldNote && oldNote.parentNode) oldNote.parentNode.removeChild(oldNote);
+        if ($('bgChoice')) $('bgChoice').style.display = '';
         var sbSc = sceneIndex >= 0 ? allScenes[sceneIndex] : null;
         var grammarP = (p.treatment && p.treatment.filmGrammar) || '';
         var clipNeed = !!(sbSc && (sbSc.assets || []).some(function (a0) { return a0 && a0.type === 'camera_video' && a0.use === 'clip'; }))
@@ -485,6 +456,58 @@ ${QUOTIENT_CSS}
       $('recordBtn').disabled = false;
     })
     .catch(function (e) { fail(e.message || String(e)); });
+  }
+  loadFilm();
+
+  // ── films: switch the booth to another film or scene in place ─────────
+  // GET /api/booth-films/{tenant} (core/booth-films.ts): the token's own
+  // person-carried films, owed-a-take first. A tap re-points this page --
+  // URL, script, frame -- and keeps the camera it already has open.
+  function escT(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function openFilms() {
+    $('filmsSheet').hidden = false;
+    $('filmsNote').textContent = $('review').classList.contains('on') ? 'Switching throws away the take you have not used. Tap a scene to record it here.' : 'Your speaker and creator-cut films. Tap a scene to record it here.';
+    var list = $('filmsList'); list.innerHTML = '<p class="note">Loading…</p>';
+    fetch(withToken('/api/booth-films/' + encodeURIComponent(tenant)))
+      .then(function (r) { if (!r.ok) throw new Error('Could not load the films (' + r.status + ').'); return r.json(); })
+      .then(function (j) {
+        var films = j.films || [];
+        if (!films.length) { list.innerHTML = '<p class="note">No speaker or creator-cut films yet.</p>'; return; }
+        var h = '';
+        films.forEach(function (f) {
+          h += '<div class="ffilm"><b>' + escT(f.name) + '</b><small>' + escT(f.grammar) + (f.frame ? ' · ' + escT(f.frame) : '') + ' · ' + (f.open ? f.open + (f.open === 1 ? ' scene needs' : ' scenes need') + ' a take' : 'every take is in') + '</small>';
+          f.scenes.forEach(function (sc0) {
+            var cur = f.project_id === project && sc0.index === sceneIndex && !recordAll;
+            var lbl = String(sc0.label || '').replace(/^Scene [0-9]+ *[-–—:·] */i, '');
+            h += '<button type="button" class="fscene' + (cur ? ' cur' : '') + '" data-p="' + escT(f.project_id) + '" data-s="' + sc0.index + '"><i class="fdot ' + escT(sc0.need) + '"></i><span>Scene ' + (sc0.index + 1) + (lbl ? ' · ' + escT(lbl) : '') +
+              '<small>' + (sc0.need === 'needed' ? 'Needs a take' : sc0.need === 'provided' ? 'Has a take' : 'No take asked') + (sc0.lines ? ' · ' + escT(sc0.lines) : '') + '</small></span></button>';
+          });
+          h += '</div>';
+        });
+        list.innerHTML = h;
+        [].forEach.call(list.querySelectorAll('.fscene'), function (b) {
+          b.addEventListener('click', function () { switchTo(b.getAttribute('data-p'), Number(b.getAttribute('data-s'))); });
+        });
+      })
+      .catch(function (e) { list.innerHTML = '<p class="note">' + escT(e.message || e) + '</p>'; });
+  }
+  function closeFilms() { $('filmsSheet').hidden = true; }
+  function switchTo(p, s) {
+    closeFilms();
+    blob = null; chunks = [];
+    try { $('play').removeAttribute('src'); $('play').load(); } catch (eP) {}
+    project = p; sceneIndex = s; recordAll = false;
+    studioHref = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + (token ? '&token=' + encodeURIComponent(token) : '');
+    $('studioLinkTop').href = studioHref;
+    try { history.replaceState(null, '', '/take?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&scene=' + sceneIndex + (token ? '&token=' + encodeURIComponent(token) : '')); } catch (eH) {}
+    $('title').textContent = 'Loading…'; $('subtitle').textContent = ''; $('script').innerHTML = '';
+    show('ready');
+    loadFilm();
+  }
+  $('filmsBtn').addEventListener('click', openFilms);
+  [].forEach.call(document.querySelectorAll('.filmsOpen'), function (b) { b.addEventListener('click', openFilms); if (embedded) b.style.display = 'none'; });
+  $('filmsClose').addEventListener('click', closeFilms);
+  $('filmsSheet').addEventListener('click', function (ev) { if (ev.target === $('filmsSheet')) closeFilms(); });
 
   // ── recording ──────────────────────────────────────────────────────────
   var stream = null, rec = null, chunks = [], mime = '', ext = 'webm';
@@ -529,42 +552,9 @@ ${QUOTIENT_CSS}
     $('meter').style.width = '0%'; $('meterWrap').classList.remove('silent'); $('silent').style.display = 'none';
   }
 
-  // One cue at a time, each on its own clock; a TAP on the stage jumps to
-  // the next line and the clock restarts from there, so the prompter can
-  // never run ahead of the person reading it.
-  var cueIdx = -1, cueTimer = null;
-  var kRaf = 0;
-  function stopKaraoke() { if (kRaf) cancelAnimationFrame(kRaf); kRaf = 0; }
-  function showCue(i) {
-    if (cueTimer) clearTimeout(cueTimer); cueTimer = null;
-    stopKaraoke();
-    cueIdx = i;
-    if (i >= cues.length) { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; $('next2').textContent = ''; return; }
-    var c = cues[i];
-    // The line's words, each lit when its own precomputed turn begins
-    // (timeLine: length share, emphasis hold, punctuation beats).
-    var cueEl = $('cue'); cueEl.textContent = '';
-    var toks = c.toks || [];
-    var spans = toks.map(function (k, j) {
-      var sp = document.createElement('span'); sp.className = 'w' + (k.emph ? ' em' : '') + (k.dash ? ' dash' : ''); sp.textContent = k.t;
-      cueEl.appendChild(sp); if (j < toks.length - 1) cueEl.appendChild(document.createTextNode(' '));
-      return sp;
-    });
-    if (!toks.length) cueEl.textContent = c.text;
-    var start = performance.now();
-    var lastStart = toks.length ? toks[toks.length - 1].start : 0;
-    (function paint() {
-      var el = (performance.now() - start) / 1000;
-      for (var k = 0; k < spans.length; k++) { if (el >= toks[k].start) spans[k].classList.add('on'); }
-      if (el < lastStart) kRaf = requestAnimationFrame(paint);
-    })();
-    $('next').textContent = cues[i + 1] ? cues[i + 1].text : '';
-    $('next2').textContent = cues[i + 2] ? cues[i + 2].text : '';
-    cueTimer = setTimeout(function () { showCue(i + 1); }, c.dur * 1000);
-  }
+  ${PROMPTER_VIEW_JS}
   function runPrompter() { $('barFill').style.width = '0%'; showCue(0); }
   function advanceCue() { if (rec && rec.state === 'recording' && cueIdx >= 0 && cueIdx < cues.length) showCue(cueIdx + 1); }
-  function clearPrompter() { if (cueTimer) clearTimeout(cueTimer); cueTimer = null; stopKaraoke(); cueIdx = -1; $('cue').textContent = ''; $('next').textContent = ''; $('next2').textContent = ''; }
   $('stage').addEventListener('click', function (ev) { if (ev.target && (ev.target.id === 'stopBtn' || ev.target.id === 'againRecBtn' || ev.target.closest && ev.target.closest('#stopWrap'))) return; advanceCue(); });
 
   // ── portrait canvas capture ────────────────────────────────────────────

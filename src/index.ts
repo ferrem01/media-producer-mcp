@@ -18,6 +18,8 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
+import { getRemoteBoothHtml, getRemoteCameraHtml } from "./remote-booth-page.js";
+import { boothFilms } from "./core/booth-films.js";
 import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
 import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries, dropVoiceUnderTakes, clipNeedOf, ensureClipNeed } from "./core/take-needs.js";
@@ -56,7 +58,7 @@ import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, updateProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
+import { listProjects, loadProjects, loadProject, saveProject, updateProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
 import { searchLibrary, forgetProject } from "./core/library.js";
 import { planRows, reorderBoard } from "./core/film-plan.js";
 import { normalizeSoundCues, ensureSoundFiles, hasCueWithoutFile } from "./core/scene-sfx.js";
@@ -1249,7 +1251,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|speaker-background|take-look|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1274,6 +1276,36 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       if (urlPath === "/take") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getTakeHtml());
+        return;
+      }
+
+      // ── The remote booth (SPEC-remote-booth.md): the phone is only the
+      // camera (/remote-camera, opened from the control screen's QR), a big
+      // screen is the prompter and the remote (/remote-booth, opened from
+      // Studio). They pair over the /ws relay, authenticated with the same
+      // token as every request here. Same token-in-the-link auth as /take. ──
+      if (urlPath === "/remote-booth") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getRemoteBoothHtml());
+        return;
+      }
+      if (urlPath === "/remote-camera") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getRemoteCameraHtml());
+        return;
+      }
+
+      // ── API: THE BOOTH'S FILMS (SPEC-remote-booth.md) ──
+      // GET /api/booth-films/{tenant} -> the tenant's person-carried films
+      // (speaker, creator-cut), scenes, lines and what each still needs,
+      // films owed a take first. The remote booth's film picker and the
+      // phone booth's Films sheet read it; the choke point above has
+      // already refused a token of any other tenant.
+      const boothFilmsMatch = urlPath.match(/^\/api\/booth-films\/([^/]+)$/);
+      if (boothFilmsMatch && method === "GET") {
+        const bfTenant = decodeURIComponent(boothFilmsMatch[1]);
+        try { jsonResponse(res, 200, { ok: true, tenant: bfTenant, films: boothFilms(await loadProjects(bfTenant)) }); }
+        catch (e: any) { jsonResponse(res, 500, { error: e?.message || String(e) }); }
         return;
       }
 
@@ -3047,6 +3079,7 @@ Rules:
 
       // ── API: THE PHONE CODE -- the take link for one scene as a QR (SVG) ──
       // GET /api/take-qr/{tenant}/{project}?scene=N  (drawn here: the link carries the token)
+      //     /api/take-qr/{tenant}/{project}?session=rb_...  (the remote booth's camera link)
       const takeQrMatch = urlPath.match(/^\/api\/take-qr\/([^/]+)\/([^/]+)$/);
       if (takeQrMatch && method === "GET") {
         const [, tqTenant, tqProject] = takeQrMatch.map(decodeURIComponent);
@@ -3056,7 +3089,15 @@ Rules:
         const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
         const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
         if (!host) { jsonResponse(res, 400, { error: "No host to build the link on" }); return; }
-        const link = `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+        // ?session=rb_...: the REMOTE BOOTH's pairing code -- the phone
+        // opens as the camera of that session (SPEC-remote-booth.md). The
+        // session, not the film, is what the phone joins: the laptop moves
+        // it between films and the phone never re-scans.
+        const session = q.get("session") || "";
+        if (session && !/^rb_[A-Za-z0-9_-]{16,64}$/.test(session)) { jsonResponse(res, 400, { error: "bad session id" }); return; }
+        const link = session
+          ? `${proto}://${host}/remote-camera?tenant=${encodeURIComponent(tqTenant)}&session=${encodeURIComponent(session)}${token ? `&token=${encodeURIComponent(token)}` : ""}`
+          : `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
         try {
           const svg = qrSvg(link, { size: 360 });
           res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });

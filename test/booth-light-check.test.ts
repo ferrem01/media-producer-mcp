@@ -219,3 +219,46 @@ describe("the light check in a browser (fake camera)", () => {
   }, 90000);
 });
 
+
+describe("shot size: the oval follows how much of the person the frame holds (the remote booth)", () => {
+  it("close is the booth's oval exactly; medium and wide shrink the face and raise the eyes", () => {
+    for (const [w, h] of [[1080, 1920], [1920, 1080], [320, 180]]) {
+      expect(guideOval(w, h, "close")).toEqual(guideOval(w, h));
+      const c = guideOval(w, h, "close"), m = guideOval(w, h, "medium"), wd = guideOval(w, h, "wide");
+      expect(m.ry / c.ry).toBeCloseTo(0.62, 5);
+      expect(wd.ry / c.ry).toBeCloseTo(0.36, 5);
+      expect(wd.rx).toBeLessThan(m.rx);
+      expect(m.eyeY).toBeCloseTo(h * 0.3, 5);
+      expect(wd.eyeY).toBeCloseTo(h * 0.25, 5);
+      expect(wd.cx).toBe(w / 2);
+    }
+    // Anything else reads as close (a stray value never breaks the maths).
+    expect(guideOval(1920, 1080, "constructor" as any)).toEqual(guideOval(1920, 1080));
+  });
+
+  it("measures the face where the oval is: a small bright face in a wide frame is read as a face, not as the room", () => {
+    const w = 320, h = 180;
+    const px = new Uint8ClampedArray(w * h * 4);
+    const o = guideOval(w, h, "wide");
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const inFace = ((x + 0.5 - o.cx) / o.rx) ** 2 + ((y + 0.5 - o.cy) / o.ry) ** 2 <= 1;
+      const c = inFace ? [200, 160, 130] : [60, 60, 62];
+      px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = 255;
+    }
+    const wide = lightStats(px, w, h, "wide");
+    expect(wide.faceLuma).toBeGreaterThan(150);
+    expect(wide.bgLuma).toBeLessThan(70);
+    // Read with the close oval, the same frame's "face" is mostly room.
+    const asClose = lightStats(px, w, h);
+    expect(asClose.faceLuma).toBeLessThan(wide.faceLuma - 40);
+  });
+
+  it("the control screen inlines the same source and measures at the chosen shot size", async () => {
+    const { getRemoteBoothHtml } = await import("../src/remote-booth-page.js");
+    const html = getRemoteBoothHtml();
+    expect(html).toContain(LIGHT_CHECK_JS.trim().split("\n")[0]);
+    expect(html).toMatch(/lightStats\(ctx\.getImageData\(0, 0, w, h\)\.data, w, h, prefs\.shot\)/);
+    expect(html).toMatch(/guideOval\(r\.width, r\.height, prefs\.shot\)/);
+  });
+});

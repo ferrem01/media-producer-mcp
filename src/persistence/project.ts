@@ -253,6 +253,23 @@ export function ensureStoryboardScene(project: Project, sceneIndex: number): Sto
   return sb.scenes[sceneIndex];
 }
 
+/** Every project of a tenant, loaded whole (the booth's film list reads
+ *  each board's needs, which the summary listing below drops). */
+export async function loadProjects(tenantId: string): Promise<Project[]> {
+  try {
+    const entries = await fs.readdir(projectsDir(tenantId), { withFileTypes: true });
+    const out: Project[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith("proj_")) continue;
+      const p = await loadProject(tenantId, entry.name);
+      if (p) out.push(p);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number; updated_at?: string }>> {
   const dir = projectsDir(tenantId);
   try {
