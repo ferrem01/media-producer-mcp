@@ -25,6 +25,12 @@ paths did not.
   (server.ts; reorder now also refuses a non-permutation instead of silently
   filtering) and the storyboard tool's `delete_index` / `insert_at`
   (llm/storyboard-surgical.ts).
+- **A brand clip in a screencast-frame is still a brand clip.** Adding the
+  brand outro to the analytics film as a full-frame `screencast-frame`
+  (the shape the pipeline's own bookends use) got it auto-compressed from
+  5.18s to 3.3s, the same loss #747 fixed for a bare `video`.
+  `isBrandClipScene` now also takes a single component whose source is a
+  `/brand-kit/` asset.
 
 ## 2026-09-27 — Quotient metrics and saved reports as library components
 

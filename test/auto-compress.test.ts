@@ -91,6 +91,18 @@ describe("proposeSceneCompression", () => {
     expect(scene.duration_seconds).toBe(8);
   });
 
+  it("leaves a brand-kit clip alone, bare video or in a screencast-frame", async () => {
+    for (const comp of [
+      { id: "v", type: "video", data: { src: "/assets/t/projects/p/assets/idle-clip.mp4" } },
+      { id: "o", type: "screencast-frame", data: { video_url: "/assets/t/brand-kit/outro/idle-clip.mp4", frame_style: "none" } },
+    ]) {
+      const scene = { id: "outro", label: "Brand outro", duration_seconds: 5.2, components: [comp] } as unknown as Scene;
+      const res = await proposeSceneCompression(scene);
+      expect(res.applied).toEqual([]);
+      expect(scene.duration_seconds).toBe(5.2);
+    }
+  });
+
   it("without a window keeps the old behaviour: the waiting runs at 8x", async () => {
     const scene = clip("idle-clip", 5.6);
     const res = await proposeSceneCompression(scene);
