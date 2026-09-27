@@ -35,7 +35,7 @@ to how much the blur is?"
     lifted, lit skin and wall untouched, and off returning the original
     byte for byte.
 - **Blur amount**:
-  - `matteBlurRadius` now spans 3 px (light, the room still reads) to 32
+  - `matteBlurRadius` now spans 5 px (light, the room still reads) to 32
     (deep) at 1080 wide; the 0.6 default is about what shipped.
   - `take.blur_strength` holds the setting. `POST /api/speaker-background`
     takes `strength`, and a new amount re-makes the blurred copy. The old
@@ -56,6 +56,24 @@ to how much the blur is?"
 - **Studio dials**: **fill light** (on/off + 5-100) under soft look, and
   **blur amount** (0-100) when the scene's background is blur.
   `edit_speaker` `look` takes `fill`.
+- **Found live on the first try, fixed the same day.** Marc: "As I'm
+  changing the blur levels, I don't see the actual thing changing." He also
+  saw the speaker lane striped as "take needed". Three causes:
+  - **A stranded clip.** A re-grade drops the take's copies, but it left
+    scene 1's clip on the dropped blur copy. No take owned that file, so
+    the scene read as needing a take, and nothing asked for the copy again.
+    - The grade now puts clips back on the raw take first.
+    - `takeOwns` owns a copy by its NAME, so a project already stranded
+      heals on its next sync.
+  - **Dropped requests.** A matte asked for while one runs was dropped
+    (`queueTakeMatte` returned false). It now waits and runs next; waiting
+    requests merge, and the newest blur amount wins.
+  - **No feedback for minutes.** A new blur amount takes minutes to make.
+    `POST /api/blur-preview` now mattes the ONE frame on screen at the new
+    amount, the same model and graph as the copy, in about 0.7 s (5 s the
+    first time, while the model loads). Studio lays it over the speaker
+    video until the new copy lands or playback starts.
+  - The light end moved from 3 px to 5, because 3 read as no blur at all.
 
 ---
 

@@ -111,7 +111,11 @@ export function queueTakeGrade(job: TakeGradeJob): void {
         } else if (measured) t.grade = { measured, off: true };
         else delete t.grade;
         // The copies were cut from the old grade: drop them; the matte
-        // makes them again from this one.
+        // makes them again from this one. A clip playing a dropped copy goes
+        // back to the raw take first (left on the copy, no take owned it).
+        for (const c of project.speaker_track?.clips || []) {
+          if (c.source && (c.source === t.blur || c.source === t.alpha)) c.source = job.rawUrl;
+        }
         if (t.blur) { delete t.blur; }
         if (t.alpha) { delete t.alpha; }
         owned++;

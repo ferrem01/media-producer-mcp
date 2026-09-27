@@ -188,7 +188,10 @@ describe("the take's copies and the speaker track", () => {
     expect(takeCopies({ source: raw, blur, alpha })).toEqual({ raw, blur, alpha });
     expect(takeCopies({ source: blur, background: { mode: "blur", source_raw: raw } })).toEqual({ raw, blur });
     expect(takeOwns({ source: raw, blur }, blur)).toBe(true);
-    expect(takeOwns({ source: raw }, blur)).toBe(false);
+    // A copy the take no longer lists is still its own by NAME (a re-grade
+    // drops the list; a clip left on the copy must not lose its take).
+    expect(takeOwns({ source: raw }, blur)).toBe(true);
+    expect(takeOwns({ source: "/assets/t/projects/p/assets/other.mp4" }, blur)).toBe(false);
   });
   it("points each clip at the copy its scene's setting wants; a missing copy leaves the raw take", () => {
     const project: any = {

@@ -228,11 +228,25 @@ export function takeCopies(take: TakeLike | null | undefined): { raw: string; bl
   return { raw, ...((take.blur || legacyBlur) ? { blur: take.blur || legacyBlur } : {}), ...(take.alpha ? { alpha: take.alpha } : {}) };
 }
 
-/** True when the url is one of the take's files. */
+/** The names the matte gives a take's copies (core/take-matte.ts:
+ *  take.mp4 -> take-blur.mp4, take-alpha.webm). */
+function copyNamesOf(raw: string): string[] {
+  const m = raw.match(/^(.*?)(\.[^./]+)?$/);
+  const stem = m ? m[1] : raw;
+  return [`${stem}-blur.mp4`, `${stem}-alpha.webm`];
+}
+
+/** True when the url is one of the take's files -- including a copy the
+ *  take no longer lists. A re-grade drops the copies (they were cut from
+ *  the old grade) and, until 2026-09-27, left a clip pointing at the
+ *  dropped copy: no take owned it, the scene read as needing a take, and
+ *  nothing re-made the copy (Marc's Instagram take, scene 1). Owning the
+ *  copy's NAME lets syncSpeakerClips put such a clip back on the raw take
+ *  and the matte make the copy again. */
 export function takeOwns(take: TakeLike | null | undefined, url: string | undefined): boolean {
   if (!take || !url) return false;
   const c = takeCopies(take);
-  return url === c.raw || url === c.blur || url === c.alpha;
+  return url === c.raw || url === c.blur || url === c.alpha || (!!c.raw && copyNamesOf(c.raw).includes(url));
 }
 
 /** The newest take behind a clip. */
