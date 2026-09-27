@@ -1,0 +1,59 @@
+{
+  "type": "quotient-metrics-campaign",
+  "label": "Quotient campaign Metrics tab (KPI tiles + traffic charts)",
+  "category": "mockups",
+  "description": "A Quotient CAMPAIGN's METRICS TAB, hand-built from the product: the campaign tab bar (Brief / Tasks / Activation / Deliverables / Metrics [active, underlined] / Chats) with a kebab and 'Go to thread' on the right; SIX KPI TILES with icons (Page Views, Sessions, Email Opens, Email Clicks, Social Impressions, Social Likes); two chart cards -- 'Traffic over time' (smoothed Page Views blue + Sessions green lines, legend, dated x-axis, gridlines, 'View data') and 'Traffic by deliverable' (vertical blue bars with truncated deliverable names, 'Top series only.', 'View data'); and the 'Want to dig deeper?' footer with 'Open reports ->' and a black 'Ask the agent' button. Every word and number comes from data (defaults: the Q3 Flows launch -- a campaign that took off at launch). ENTRANCE (on the timeline, scrub-safe): the card rises, tiles land with a stagger while their numbers ROLL UP (formatted), the chart cards rise, the lines DRAW left to right, the bars GROW from the baseline, the footer rises. data.at shifts it all; entrance:'none' shows the settled page from frame 0 (stills). SCRIPT verbs: count {target: tile label, to, display?, format?, duration?} rolls a tile from its current value to a new one; highlight {target: tile label | deliverable name | 'traffic' | 'deliverables' | tab | button text, duration?, color?} = accent ring + wash on a tile/card/tab/button (a tile's number turns accent), or on a deliverable bar: the other bars dim and a value tag pops above it; switch-tab {tab} moves the underline; set-text {target, text} swaps a tile label / bar name / tab / chart title / button text; plus the shared cursor verbs (move-cursor, click, hover, wait ...) whose target may be any of those names (tiles, tabs 'metrics', 'ask the agent', 'open reports', 'go to thread', 'view data', 'bar-3'). CAMERA ANCHORS: tabs, kpis, kpi-0..kpi-5, traffic, deliverables, footer. PLACEMENT: sized off its box (one native px of the product = min(boxW/1288, boxH/826)), so it reads the same at any size; the charts take the height left over. In the Quotient desktop: quotient-app-shell at x 1.2%, y 2%, width 97.6%, height 96% with show_panel:false, nav_active:'campaigns', breadcrumbs ['Campaigns', '<campaign name>'], and this component docked:true at x 4.7%, y 8%, width 93.7%, height 89% (z above the shell). Standalone (docked unset) it is a white rounded card with a visible border + shadow. Example data: {\"docked\": true, \"kpis\": [{\"label\": \"Page Views\", \"icon\": \"eye\", \"value\": 48210}, {\"label\": \"Sessions\", \"icon\": \"activity\", \"value\": 31904}, {\"label\": \"Email Opens\", \"icon\": \"mail\", \"value\": 15605}, {\"label\": \"Email Clicks\", \"icon\": \"click\", \"value\": 3284}, {\"label\": \"Social Impressions\", \"icon\": \"globe\", \"value\": 186420}, {\"label\": \"Social Likes\", \"icon\": \"heart\", \"value\": 4812}], \"deliverables\": [{\"name\": \"Q3 launch email · Try Flows free\", \"value\": 9840}, {\"name\": \"Flows launch webinar\", \"value\": 7420}], \"script\": [{\"action\": \"count\", \"target\": \"Page Views\", \"to\": 61480, \"at\": 3.5}, {\"action\": \"highlight\", \"target\": \"Page Views\", \"at\": 3.5, \"duration\": 1.8}, {\"action\": \"highlight\", \"target\": \"Flows launch webinar\", \"at\": 5}, {\"action\": \"click\", \"target\": \"Ask the agent\", \"at\": 6.5}]}",
+  "data": {
+    "tabs": {
+      "type": "array",
+      "label": "Campaign tabs: strings or {label, icon} (icons: brief, tasks, activation, deliverables, metrics, chats). Default Brief / Tasks / Activation / Deliverables / Metrics / Chats",
+      "optional": true
+    },
+    "active_tab": { "type": "string", "label": "The underlined tab (default 'Metrics')", "optional": true },
+    "thread_label": { "type": "string", "label": "Top-right button text (default 'Go to thread')", "optional": true },
+    "show_thread": { "type": "boolean", "label": "false hides the kebab + 'Go to thread' buttons", "optional": true },
+    "kpis": {
+      "type": "array",
+      "label": "KPI tiles: [{label, icon (eye|activity|mail|click|globe|heart|users|trending|dollar|target|share|message|calendar|file), value: number (rolls up), display?: final text override e.g. '186K', format?: 'number'|'compact'|'percent'|'currency', decimals?, prefix?, suffix?}] -- six fill the row (default the Q3 Flows launch: Page Views 48,210, Sessions 31,904, Email Opens 15,605, Email Clicks 3,284, Social Impressions 186,420, Social Likes 4,812)",
+      "optional": true
+    },
+    "kpi_columns": { "type": "number", "label": "Tiles per row (default: all in one row)", "optional": true },
+    "traffic": {
+      "type": "object",
+      "label": "'Traffic over time': {title?, series: [{name, color?, points: [numbers]}] (default Page Views blue + Sessions green, weekly), labels?: x labels -- one per point (every Nth is shown, plus the last) or a short list spread evenly, label_every?, y_max?}",
+      "optional": true
+    },
+    "deliverables": {
+      "type": "array",
+      "label": "'Traffic by deliverable' bars: [{name, value}] (names truncate under the bars; ~10 fit)",
+      "optional": true
+    },
+    "deliverables_title": { "type": "string", "label": "Bar card title (default 'Traffic by deliverable')", "optional": true },
+    "deliverables_note": { "type": "string", "label": "Note under the bars (default 'Top series only.'; false hides it)", "optional": true },
+    "deliverables_y_max": { "type": "number", "label": "Bar axis max (default: a nice number over the top bar)", "optional": true },
+    "view_data_label": { "type": "string", "label": "Chart footer button text (default 'View data')", "optional": true },
+    "show_view_data": { "type": "boolean", "label": "false hides both 'View data' buttons", "optional": true },
+    "show_legend": { "type": "boolean", "label": "false hides the line chart legend", "optional": true },
+    "footer": {
+      "type": "object",
+      "label": "Ask-the-agent footer: {title?, text?, secondary? ('Open reports'), primary? ('Ask the agent')}; false hides it",
+      "optional": true
+    },
+    "accent": { "type": "string", "label": "Highlight ring color (default #393bf5)", "optional": true },
+    "script": {
+      "type": "array",
+      "label": "Timed actions [{action, at, ...}]: count {target, to, display?, format?, duration?}, highlight {target, duration?, color?}, switch-tab {tab}, set-text {target, text}, and cursor verbs move-cursor / click / hover / wait {target}",
+      "optional": true
+    },
+    "cursor_targets": { "type": "object", "label": "Named cursor positions overriding the built-in element targets", "optional": true },
+    "at": { "type": "number", "label": "Shift the whole entrance by this many seconds (negative starts it under a join)", "optional": true },
+    "entrance": { "type": "string", "label": "'none' = settled final state from frame 0 (stills); default plays the entrance", "optional": true },
+    "scale": { "type": "number", "label": "Multiply the fitted size (default 1)", "optional": true },
+    "docked": {
+      "type": "boolean",
+      "label": "true = sits flush in quotient-app-shell's content well (no outer border/shadow). Place at the shell's content region.",
+      "optional": true
+    }
+  },
+  "tier": "performable-surface"
+}
