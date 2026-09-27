@@ -1002,6 +1002,26 @@ ${QUOTIENT_CSS}
   #studio-toast.ok { background: rgba(5,102,72,0.94); color: #d1fae5; }
   #studio-toast.warn { background: rgba(146,64,14,0.94); color: var(--orange-200); }
   #studio-toast.err { background: rgba(153,27,27,0.94); color: var(--red-200); }
+  /* THE JOB PILL: the take's background work (re-grade, blur, cut-out)
+     where the toast lives, and it STAYS until the work is done -- Marc: "have
+     it stay there until it's done, to remind the user that there's a
+     process happening in the background". Toasts stack above it. */
+  #job-pill {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(8px);
+    z-index: 9996; max-width: min(900px, 92vw); padding: 8px 16px 10px; border-radius: 999px; overflow: hidden;
+    background: rgba(17,24,39,0.94); color: #f3f4f6; font-size: 12px; line-height: 18px; white-space: nowrap;
+    box-shadow: 0 8px 24px rgb(44 51 69 / 0.25);
+    opacity: 0; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  #job-pill.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  #job-pill.done { background: rgba(5,102,72,0.94); color: #d1fae5; }
+  #job-pill.err { background: rgba(153,27,27,0.94); color: #fecaca; white-space: normal; border-radius: 16px; }
+  #job-pill .jp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-right: 8px; vertical-align: 0; animation: jpPulse 1.2s ease-in-out infinite; }
+  @keyframes jpPulse { 50% { opacity: .35; } }
+  #job-pill .jp-note { opacity: .65; margin-left: 8px; }
+  #job-pill .jp-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: #f59e0b; transition: width .6s ease; }
+  #job-pill a { color: inherit; text-decoration: underline; margin-left: 10px; cursor: pointer; }
+  body.has-job-pill #studio-toast { bottom: 62px; }
   /* Storyboard button on each scene row */
   .scene-sb-btn {
     flex: 0 0 auto; border: none; background: none; color: var(--content-tertiary);
@@ -1358,6 +1378,7 @@ ${QUOTIENT_CSS}
 <div id="prompter-bar"><div id="prompter-cur"></div><div id="prompter-next"></div></div>
 
 <div id="studio-toast"></div>
+<div id="job-pill"></div>
 <div id="rendering-banner">&#9881; Rendering&#8230; editing is paused until the render finishes &#8212; edits made now would not appear in the MP4 anyway.</div>
 <div id="render-menu">
   <button data-quality="production">&#127916; Production render <span style="color:var(--content-tertiary);">&#8212; full quality</span></button>
@@ -2790,6 +2811,10 @@ ${QUOTIENT_CSS}
     api('/projects/' + state.tenantId + '/' + projectId).then(function(project) {
       state.currentProject = project;
       showProjectName(project);
+      // Work already running on this film's takes (another tab, the booth,
+      // the agent) shows in the job pill from the start.
+      jobPillHide(); takeStatus.wasBusy = false;
+      setTimeout(watchTakeStatus, 0);
       liveSync.known = project.updated_at || null;
       liveSync.suppressUntil = 0;
       state.currentSceneIndex = -1;
@@ -3863,7 +3888,7 @@ ${QUOTIENT_CSS}
       // WHAT THE TAKE IS DOING (core/take-jobs.ts): the re-grade and the
       // blur run for minutes in the background; this line says so, counts,
       // and says when one failed (Marc: "I wonder if it actually worked").
-      html += '<div class="prop-take-status" style="font-size:12px;line-height:1.4;color:var(--content-secondary);margin:6px 0 2px;min-height:0;"></div>';
+
     }
     html += '</div>';
     els.propEditor.innerHTML = html;
@@ -5927,38 +5952,65 @@ ${QUOTIENT_CSS}
       renderTakeStatus(jobs, errors);
     }).catch(function() {});
   }
+  function sceneRange(sc) {
+    var xs = (sc || []).slice().sort(function(x, y) { return x - y; });
+    if (!xs.length) return '';
+    if (xs.length === 1) return 'scene ' + (xs[0] + 1);
+    var contiguous = xs[xs.length - 1] - xs[0] === xs.length - 1;
+    return 'scenes ' + (contiguous ? (xs[0] + 1) + '\u2013' + (xs[xs.length - 1] + 1) : xs.map(function(x) { return x + 1; }).join(', '));
+  }
+  function jobPillHide() {
+    var pill = document.getElementById('job-pill');
+    if (pill) { pill.className = ''; pill.innerHTML = ''; }
+    document.body.classList.remove('has-job-pill');
+  }
   function renderTakeStatus(jobs, errors) {
-    var box = els.propEditor && els.propEditor.querySelector('.prop-take-status');
-    var si = state.currentSceneIndex;
-    var mine = function(x) { return (x.scenes || []).indexOf(si) >= 0; };
-    var myJobs = jobs.filter(mine), myErr = errors.filter(mine)[0];
-    var lines = [];
-    myJobs.forEach(function(j) {
-      takeStatus.seen[j.raw + j.kind] = true;
-      var what = j.kind === 'grade' ? 'Applying the look' + (j.what && j.what.length ? ' (' + j.what.join(' \u00b7 ') + ')' : '')
-        : ((j.what || []).indexOf('alpha') >= 0 && (j.what || []).indexOf('blur') < 0 ? 'Cutting you out' : 'Blurring the background');
-      lines.push('<span class="tk-spin" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:6px;vertical-align:1px;"></span>' + escHtml(what) + '\u2026 ' + (typeof j.pct === 'number' ? j.pct + '%' : '') + ' <span style="opacity:.7">' + fmtAgo(j.started_at) + '</span>');
-    });
-    if (!myJobs.length && myErr) {
-      lines.push('<span style="color:#dc2626">' + (myErr.kind === 'matte' ? 'The background copy failed' : 'The re-grade failed') + ': ' + escHtml(String(myErr.message || '').slice(0, 140)) + '</span> <a href="#" class="tk-retry" style="color:inherit;text-decoration:underline;">Retry</a>');
+    var pill = document.getElementById('job-pill');
+    if (!pill) return;
+    var dismissed = takeStatus.dismissed || {};
+    var err = errors.filter(function(e) { return !dismissed[e.raw + e.at]; })[0];
+    if (jobs.length) {
+      takeStatus.wasBusy = true;
+      var parts = jobs.map(function(j) {
+        takeStatus.seen[j.raw + j.kind] = true;
+        var what = j.kind === 'grade' ? 'Applying the look' + (j.what && j.what.length ? ' (' + j.what.join(' \u00b7 ') + ')' : '')
+          : ((j.what || []).indexOf('alpha') >= 0 && (j.what || []).indexOf('blur') < 0 ? 'Cutting you out' : 'Blurring the background');
+        return escHtml(what) + (j.scenes && j.scenes.length ? ' \u2014 ' + sceneRange(j.scenes) : '') + (typeof j.pct === 'number' ? ' \u00b7 <b>' + j.pct + '%</b>' : '') + ' \u00b7 ' + fmtAgo(j.started_at);
+      });
+      var pct = jobs.filter(function(j) { return typeof j.pct === 'number'; }).map(function(j) { return j.pct; })[0];
+      pill.className = 'show';
+      pill.innerHTML = '<span class="jp-dot"></span>' + parts.join(' &nbsp;\u00b7&nbsp; ') +
+        '<span class="jp-note">edits to this take wait their turn</span>' +
+        (typeof pct === 'number' ? '<span class="jp-bar" style="width:' + pct + '%"></span>' : '');
+      document.body.classList.add('has-job-pill');
+      return;
     }
-    if (!myJobs.length && !myErr) {
-      var tk = sceneTakeFor(si);
-      var was = tk && (takeStatus.seen[tk.source + 'grade'] || takeStatus.seen[tk.source + 'matte']);
-      if (was) lines.push('<span style="color:#16a34a">\u2713 Done \u2014 the preview has the new version.</span>');
+    if (err) {
+      pill.className = 'show err';
+      pill.innerHTML = escHtml((err.kind === 'matte' ? 'The background copy failed' : 'The re-grade failed') + (err.scenes && err.scenes.length ? ' (' + sceneRange(err.scenes) + ')' : '') + ': ' + String(err.message || '').slice(0, 160)) +
+        '<a class="jp-retry">Retry</a><a class="jp-close">Dismiss</a>';
+      document.body.classList.add('has-job-pill');
+      pill.querySelector('.jp-close').addEventListener('click', function() { takeStatus.dismissed = takeStatus.dismissed || {}; takeStatus.dismissed[err.raw + err.at] = true; jobPillHide(); });
+      pill.querySelector('.jp-retry').addEventListener('click', function() {
+        var p = state.currentProject, si = (err.scenes || [0])[0], tk = sceneTakeFor(si) || {};
+        var comp0 = ((p.scenes[si] || {}).components || []).filter(function(c) { return c && c.type === 'video' && c.data && (c.data.src === 'speaker' || c.data.src === 'speaker-alpha'); })[0];
+        var req = err.kind === 'matte'
+          ? api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_index: si, background: (comp0 && comp0.data.background) || 'blur' })
+          : api('POST', '/take-look/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), tk.look === 'soft' ? { scene_index: si, look: 'soft', strength: typeof tk.soft_strength === 'number' ? tk.soft_strength : 0.5 } : { scene_index: si, look: 'natural' });
+        pill.innerHTML = 'Retrying\u2026';
+        req.then(function() { watchTakeStatus(); }).catch(function(e) { studioStatus('Retry: ' + (e.message || String(e)), 'err'); });
+      });
+      return;
     }
-    if (!box) return;
-    box.innerHTML = lines.join('<br>');
-    var retry = box.querySelector('.tk-retry');
-    if (retry && myErr) retry.addEventListener('click', function(ev) {
-      ev.preventDefault();
-      var p = state.currentProject, tk = sceneTakeFor(si) || {};
-      var comp0 = ((p.scenes[si] || {}).components || []).filter(function(c) { return c && c.type === 'video' && c.data && (c.data.src === 'speaker' || c.data.src === 'speaker-alpha'); })[0];
-      var req = myErr.kind === 'matte'
-        ? api('POST', '/speaker-background/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_index: si, background: (comp0 && comp0.data.background) || 'blur' })
-        : api('POST', '/take-look/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), tk.look === 'soft' ? { scene_index: si, look: 'soft', strength: typeof tk.soft_strength === 'number' ? tk.soft_strength : 0.5 } : { scene_index: si, look: 'natural' });
-      req.then(function() { studioStatus('Retrying\u2026', 'ok'); watchTakeStatus(); }).catch(function(e) { studioStatus('Retry: ' + (e.message || String(e)), 'err'); });
-    });
+    if (takeStatus.wasBusy) {
+      takeStatus.wasBusy = false;
+      pill.className = 'show done';
+      pill.innerHTML = '\u2713 Done \u2014 the preview has the new version.';
+      document.body.classList.add('has-job-pill');
+      setTimeout(function() { if (pill.className === 'show done') jobPillHide(); }, 4500);
+      return;
+    }
+    if (pill.className.indexOf('done') < 0) jobPillHide();
   }
   function getSpeakerClipUrl() {
     var project = state.currentProject;
