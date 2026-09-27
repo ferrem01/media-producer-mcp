@@ -226,3 +226,221 @@ describe("click-stream: a cursor works through the internet, each click throws a
     });
   }, 60000);
 });
+
+// ── layout "float": the customer journey. The same stops scattered through a 3D
+// field of web content; the camera travels stop to stop, each stop comes forward
+// flat to the strip's fit box, the cursor floats between targets on arcs.
+// CLICK_STREAM_POOL here also needs l01/l04/a01/a04/c02.jpg, northwind-full.png
+// and logo-calendly/salesforce.png (the QA pool); without it, synthetic pages.
+const FREGION = { x: 0, y: 0, w: 0.6175, h: 1 };
+const FCHIP = [0.7755, 0.2433];
+const FSPEC: [string, number, number, number[], string, string][] = [
+  ["l01.jpg", 1600, 1000, [613, 675, 373, 60], "Visited · Pricing — Northwind", "Landing page"],
+  ["c02.jpg", 1080, 1350, [72, 1132, 304, 90], "Registered · Webinar — Tidewell", "Email"],
+  ["a04.jpg", 1080, 1250, [802, 967, 191, 68], "Clicked · Try it free — Orbitly", "Social post"],
+  ["l04.jpg", 1600, 1000, [64, 662, 315, 62], "Read · Alder Coffee story", "Blog"],
+  ["a01.jpg", 1080, 1350, [788, 1084, 216, 64], "Clicked ad · Brightfield", "Ad"],
+  ["northwind-full.png", 1920, 1080, [552, 812, 360, 92], "Clicked · See the report — Northwind", "Email"],
+];
+const FSTOPS = FSPEC.map(([f, w, h, target, chip, caption], i) => ({ src: POOL ? real(f) : page_(i * 55, w, h, target), w, h, target, chip, caption }));
+const logo = (f: string, hue: number) => POOL ? real(f) : "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="14" fill="hsl(${hue},70%,50%)"/></svg>`);
+const DROPS: { icon: string; label: string; at: number; from?: number[] }[] = [
+  { icon: logo("logo-calendly.png", 210), label: "Meeting booked · Calendly", at: 3.1 },
+  { icon: logo("logo-salesforce.png", 200), label: "Opportunity created · Salesforce", at: 5.6, from: [0.3, 0.4] },
+];
+const FBASE = { layout: "float", stops: FSTOPS, stream: STREAM, region: FREGION, at: 0.25, chip_to: FCHIP };
+const styleOf = (page: Page, sel: string) => page.evaluate((s) => {
+  const n = document.querySelector(s) as HTMLElement | null;
+  return n ? { transform: n.style.transform, opacity: +getComputedStyle(n).opacity, vis: getComputedStyle(n).visibility } : null;
+}, sel);
+const visiblePieces = (page: Page, rl: number, rr: number) => page.evaluate(([l, r]) => [...document.querySelectorAll(".cks-piece")].filter((n) => {
+  if (getComputedStyle(n).visibility === "hidden") return false;
+  const b = n.getBoundingClientRect(); return b.right > l && b.left < r && b.width > 4;
+}).length, [rl, rr]);
+
+describe("click-stream layout float: a cursor floating through a space of web content", () => {
+  it("keeps the formula; each stop comes forward flat to the fit box; the cursor floats on arcs and is on the target before every click; captions hold with the stop", async () => {
+    await still({ ...FBASE, drops: DROPS }, async (page, seek) => {
+      const N = FSTOPS.length, want = schedule(N, { at: 0.25 });
+      expect(await attr(page, "data-layout")).toBe("float");
+      const clicks = nums(await attr(page, "data-click-times")), lands = nums(await attr(page, "data-land-times"));
+      const arrives = nums(await attr(page, "data-arrive-times")), leaves = nums(await attr(page, "data-leave-times"));
+      clicks.forEach((c, i) => expect(c).toBeCloseTo(want.click[i], 2));
+      lands.forEach((c, i) => expect(c).toBeCloseTo(want.land[i], 2));
+      arrives.forEach((c, i) => expect(c).toBeCloseTo(want.arrive[i], 2));
+      leaves.forEach((c, i) => expect(c).toBeCloseTo(want.leave[i], 2));
+      const B = await cbox(page);
+      const RL = B.l + FREGION.x * B.w, RW = FREGION.w * B.w, RH = FREGION.h * B.h, RT = B.t + FREGION.y * B.h;
+      const RCX = RL + RW / 2, RCY = RT + RH / 2;
+      // Where each target sits at its click: the strip's fit box, centred in the region.
+      const pts = (await attr(page, "data-click-points")).split(";").map(nums);
+      FSTOPS.forEach((s, i) => {
+        const k = Math.min(0.9 * RW / s.w, 0.85 * RH / s.h);
+        const x = (RW / 2 - s.w * k / 2 + (s.target[0] + s.target[2] / 2) * k) / B.w, y = (RH / 2 - s.h * k / 2 + (s.target[1] + s.target[3] / 2) * k) / B.h;
+        expect(Math.abs(pts[i][0] - (FREGION.x + x))).toBeLessThan(0.0005);
+        expect(Math.abs(pts[i][1] - (FREGION.y + y))).toBeLessThan(0.0005);
+      });
+
+      // Before `at` nothing; at `at` (start "drift") the field is at opacity 0: an empty region, the cursor at cursor_from.
+      await seek(0.2);
+      expect((await box(page, '[data-cid="cs"] .cks'))!.vis).toBe(false);
+      await seek(0.25);
+      expect((await styleOf(page, ".cks-strip"))!.opacity).toBe(0);
+      const c0 = await tip(page);
+      expect(Math.abs(c0.x - (RL + 0.8 * RW))).toBeLessThan(2);
+      expect(Math.abs(c0.y - (RT + 0.84 * RH))).toBeLessThan(2);
+      await seek(0.5);
+      await shot(page, "fl-enter.png");
+      expect((await styleOf(page, ".cks-strip"))!.opacity).toBeGreaterThan(0.3);
+
+      for (let i = 0; i < N; i++) {
+        const s = FSTOPS[i];
+        for (const dt of [-0.07, -0.02]) {
+          await seek(clicks[i] + dt);
+          const b = (await box(page, `.cks-piece[data-stop="${i}"]`))!;
+          expect(Math.abs(b.x - RCX)).toBeLessThan(1.5);
+          expect(Math.abs(b.y - RCY)).toBeLessThan(1.5);
+          expect(Math.abs(b.w - 0.9 * RW) < 2 || Math.abs(b.h - 0.85 * RH) < 2).toBe(true);
+          // Flat: a plain translate, no tilt, no bob.
+          expect((await styleOf(page, `.cks-piece[data-stop="${i}"]`))!.transform).not.toMatch(/rotate|perspective/);
+          const k = b.w / s.w, tc = { x: b.l + (s.target[0] + s.target[2] / 2) * k, y: b.t + (s.target[1] + s.target[3] / 2) * k };
+          const cp = await tip(page);
+          expect(Math.hypot(cp.x - tc.x, cp.y - tc.y)).toBeLessThan(2);
+          expect(Math.abs(cp.x - (B.l + pts[i][0] * B.w))).toBeLessThan(2);
+          // The caption: fully in, at the stop's top-left corner (above it, or straddling the edge).
+          const cs = (await styleOf(page, `.cks-cap[data-caption="${i}"]`))!, cb = (await box(page, `.cks-cap[data-caption="${i}"]`))!;
+          expect(cs.vis).toBe("visible");
+          expect(cs.opacity).toBeGreaterThan(0.99);
+          expect(cb.l).toBeGreaterThanOrEqual(b.l - 1);
+          expect(cb.l).toBeLessThan(b.l + 0.04 * B.w);
+          expect(cb.b).toBeLessThanOrEqual(b.t + cb.h / 2 + 1);
+          expect(cb.b).toBeGreaterThan(b.t - 0.05 * RH);
+          expect(cb.t).toBeGreaterThanOrEqual(RT);
+        }
+        if (i === 0) await shot(page, "fl-stop0.png");
+        await seek(clicks[i] + 0.1);
+        if (i === 2) await shot(page, "fl-click2.png");
+        expect((await box(page, `.cks-chip[data-chip="${i}"]`))!.vis).toBe(true);
+        expect((await box(page, `[data-stop="${i}"] .cks-hl`))!.vis).toBe(true);
+        await seek(lands[i]);
+        const c = (await box(page, `.cks-chip[data-chip="${i}"]`))!;
+        expect(c.vis).toBe(true);
+        expect(Math.abs(c.x - (B.l + FCHIP[0] * B.w))).toBeLessThan(1.5);
+        expect(Math.abs(c.y - (B.t + FCHIP[1] * B.h))).toBeLessThan(1.5);
+        await seek(lands[i] + 0.04);
+        expect((await box(page, `.cks-chip[data-chip="${i}"]`))!.vis).toBe(false);
+        if (i === N - 1) break;
+        // The travel: the field around the camera, the caption gone.
+        await seek((leaves[i] + arrives[i + 1]) / 2);
+        await shot(page, `fl-travel${i}.png`);
+        expect(await visiblePieces(page, RL, RL + RW)).toBeGreaterThanOrEqual(4);
+        const cap = (await styleOf(page, `.cks-cap[data-caption="${i}"]`))!;
+        expect(cap.vis === "hidden" || cap.opacity < 0.05).toBe(true);
+        // Floating, not a straight line: the path between two targets bows well off the chord.
+        const ta = clicks[i] + 0.14, tb = clicks[i + 1] - 0.08;
+        await seek(ta); const A = await tip(page);
+        await seek(tb); const Bp = await tip(page);
+        let off = 0;
+        for (let u = 1; u < 8; u++) {
+          await seek(ta + (tb - ta) * u / 8);
+          const p = await tip(page);
+          const len = Math.hypot(Bp.x - A.x, Bp.y - A.y) || 1;
+          off = Math.max(off, Math.abs((Bp.x - A.x) * (A.y - p.y) - (A.x - p.x) * (Bp.y - A.y)) / len);
+        }
+        expect(off).toBeGreaterThan(0.08 * RH);
+      }
+      if (process.env.CLICK_STREAM_SHOTS) for (let f = 0; f <= 72; f++) { await seek(f / 8); await shot(page, `fl-seq-${String(f).padStart(3, "0")}.png`); }
+      // Hold: the last stop stays in its fit box with its caption; the field keeps breathing around it.
+      await seek(8.5);
+      await shot(page, "fl-hold-end.png");
+      const e = (await box(page, `.cks-piece[data-stop="${N - 1}"]`))!;
+      expect(Math.abs(e.x - RCX)).toBeLessThan(1.5);
+      expect((await styleOf(page, `.cks-cap[data-caption="${N - 1}"]`))!.opacity).toBeGreaterThan(0.99);
+      const exp = lastTarget(FSTOPS[N - 1] as Stop, FREGION, "hold", B.w, B.h);
+      nums(await attr(page, "data-last-target")).forEach((v, i) => expect(Math.abs(v - exp[i])).toBeLessThan(0.0005));
+    }, 10);
+  }, 180000);
+
+  it("drops: a system event pops in, holds drop_hold, then lands centred on chip_to at at + chip_pop + drop_hold + chip_travel (both layouts)", async () => {
+    for (const layout of ["float", "strip"]) {
+      await still({ ...FBASE, layout, drops: DROPS }, async (page, seek) => {
+        const B = await cbox(page);
+        const lands = nums(await attr(page, "data-drop-land-times"));
+        DROPS.forEach((d, j) => expect(lands[j]).toBeCloseTo(d.at + 0.15 + 0.35 + 0.45, 3));
+        for (let j = 0; j < DROPS.length; j++) {
+          const sel = `.cks-drop[data-drop="${j}"]`, from = DROPS[j].from;
+          await seek(DROPS[j].at - 0.02);
+          expect((await box(page, sel))!.vis).toBe(false);
+          await seek(DROPS[j].at + 0.3);
+          expect((await box(page, sel))!.vis).toBe(true);
+          if (from) {
+            const h = (await box(page, sel))!;
+            expect(Math.abs(h.x - (B.l + from[0] * B.w))).toBeLessThan(1.5);
+            expect(Math.abs(h.y - (B.t + from[1] * B.h))).toBeLessThan(1.5);
+          }
+          if (j === 0) await shot(page, `drop-${layout}-hold.png`);
+          await seek(DROPS[j].at + 0.15 + 0.35 + 0.2);
+          if (j === 0) await shot(page, `drop-${layout}-fly.png`);
+          await seek(lands[j]);
+          const c = (await box(page, sel))!;
+          expect(c.vis).toBe(true);
+          expect(Math.abs(c.x - (B.l + FCHIP[0] * B.w))).toBeLessThan(1.5);
+          expect(Math.abs(c.y - (B.t + FCHIP[1] * B.h))).toBeLessThan(1.5);
+          await seek(lands[j] + 0.04);
+          expect((await box(page, sel))!.vis).toBe(false);
+        }
+      }, 10);
+    }
+  }, 120000);
+
+  it("float end_mode zoom: the last stop grows to cover the region, frozen, the cursor on the target", async () => {
+    await still({ ...FBASE, end_mode: "zoom" }, async (page, seek) => {
+      const N = FSTOPS.length, want = schedule(N, { at: 0.25 });
+      const settle = nums(await attr(page, "data-settle-time"))[0];
+      expect(settle).toBeCloseTo(want.leave[N - 1] + 0.5, 2);
+      const B = await cbox(page);
+      const lt = nums(await attr(page, "data-last-target"));
+      const exp = lastTarget(FSTOPS[N - 1] as Stop, FREGION, "zoom", B.w, B.h);
+      lt.forEach((v, i) => expect(Math.abs(v - exp[i])).toBeLessThan(0.0005));
+      await seek(settle - 0.25);
+      await shot(page, "fl-zoom-mid.png");
+      // The caption leaves as the zoom starts.
+      expect((await styleOf(page, `.cks-cap[data-caption="${N - 1}"]`))!.vis).toBe("hidden");
+      for (const t of [settle, 9.4]) {
+        await seek(t);
+        const b = (await box(page, `.cks-piece[data-stop="${N - 1}"]`))!;
+        expect(b.l).toBeLessThanOrEqual(B.l + 0.5); expect(b.t).toBeLessThanOrEqual(B.t + 0.5);
+        expect(b.r).toBeGreaterThanOrEqual(B.l + FREGION.w * B.w - 0.5); expect(b.b).toBeGreaterThanOrEqual(B.t + B.h - 0.5);
+        const cp = await tip(page);
+        expect(cp.vis).toBe(true);
+        expect(Math.abs(cp.x - (B.l + lt[0] * B.w))).toBeLessThan(1.5);
+        expect(Math.abs(cp.y - (B.t + lt[1] * B.h))).toBeLessThan(1.5);
+      }
+      await shot(page, "fl-zoom-end.png");
+    }, 10);
+  }, 120000);
+
+  it("start burst: at `at` every piece sits at burst_from at scale 0 (an empty region, the cursor on the point); by arrive_0 the first stop is home", async () => {
+    // With the zoom end: the entrance once read a variable the zoom block re-declares.
+    await still({ ...FBASE, start: "burst", burst_from: [0.3, 0.5], end_mode: "zoom" }, async (page, seek) => {
+      const B = await cbox(page);
+      const arrives = nums(await attr(page, "data-arrive-times")), clicks = nums(await attr(page, "data-click-times"));
+      await seek(0.25);
+      const shown = await page.evaluate(() => [...document.querySelectorAll(".cks-piece")].filter((n) => getComputedStyle(n).visibility !== "hidden" && n.getBoundingClientRect().width > 1).length);
+      expect(shown).toBe(0);
+      const c0 = await tip(page);
+      expect(Math.abs(c0.x - (B.l + 0.3 * B.w))).toBeLessThan(2);
+      expect(Math.abs(c0.y - (B.t + 0.5 * B.h))).toBeLessThan(2);
+      await seek(0.4);
+      await shot(page, "fl-burst.png");
+      const RL = B.l, RW = FREGION.w * B.w;
+      expect(await visiblePieces(page, RL, RL + RW)).toBeGreaterThanOrEqual(6);
+      await seek(arrives[0]);
+      const b = (await box(page, '.cks-piece[data-stop="0"]'))!;
+      expect(Math.abs(b.x - (RL + RW / 2))).toBeLessThan(1.5);
+      await seek(clicks[0] - 0.05);
+      const s = FSTOPS[0], k = b.w / s.w, cp = await tip(page);
+      expect(Math.hypot(cp.x - (b.l + (s.target[0] + s.target[2] / 2) * k), cp.y - (b.t + (s.target[1] + s.target[3] / 2) * k))).toBeLessThan(2);
+    }, 10);
+  }, 120000);
+});

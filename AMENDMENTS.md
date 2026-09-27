@@ -6,6 +6,52 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — click-stream float: the customer journey
+
+Marc wants the journey beat of the Analytics film to feel different from the
+rush: "the mouse is sort of floating through the air, up and down, and it
+finds a landing page, click; it finds an email, click; it finds a social
+post, click; it finds an ad, click."
+
+- **`layout: "float"`:** the stops and the stream sit in a 3D field inside
+  the region. Pieces are scattered wider than the region at different
+  depths, with slight tilts and a slow seeded bob. Far pieces sink into a
+  haze of the canvas colour (`fog`), so depth reads without making anything
+  transparent. The camera travels from stop to stop and breathes out a
+  little on the way. Each stop comes forward, flat, to the same fit box the
+  strip uses, so the click, the target and `data-last-target` work exactly
+  as before. The cursor moves between targets on a cubic arc, bowing over
+  or under the straight line and alternating, and settles on the target
+  before the click. The default stays `strip`. Its every style was compared
+  against the previous build at 10 fps and is identical.
+- **The schedule is the same formula.** In float, `arrive` is when the stop
+  lies flat and `leave` is when it starts to recede. Float reads calmer with
+  longer travels (`travel: 0.6, last_travel: 0.4`). The default travels are
+  the strip's and are unchanged.
+- **The first frame is defined.** With `start: "drift"` the field is at
+  opacity 0 at `at`, so the region is empty. With `start: "burst"` every
+  piece sits at `burst_from` at scale 0 and flies out to its place, for a
+  join from a word or a dot.
+- **Captions and drops (both layouts).** `stops[i].caption` puts a label on
+  a white pill at the stop's top-left corner while the stop holds. `drops`
+  are system events from outside marketing: a logo tile ("Meeting booked ·
+  Calendly") pops in, holds for `drop_hold`, then flies the chip's arc to
+  `chip_to`. It lands at `at + chip_pop + drop_hold + chip_travel`, published
+  as `data-drop-land-times`. By default a drop pops in on the band away from
+  the target clicked nearest in time: the first placement landed one on top
+  of the cursor.
+- **Hand-offs:** `data-click-points` gives each target's centre at its
+  click, in box fractions.
+- **A bug the look pass caught:** the float entrance read a variable that the
+  zoom end declares again later, so with `end_mode:"zoom"` every piece's
+  position was NaN until stop 0 arrived. It is renamed, and the burst test
+  runs with the zoom end.
+- **Test:** `test/relay-click-stream.test.ts`: the float schedule matches
+  the formula; each stop is flat in its fit box with the cursor tip on its
+  target before every click; the path between targets bows off the chord;
+  captions are fully in during holds and gone mid-travel; every chip and
+  every drop lands centred on `chip_to` at its time, in both layouts; the
+  float zoom end; the burst first frame; no page errors.
 ## 2026-09-27 — The product pages load their own font again
 
 The Quotient mockups (report, campaign, app shell, chat, social) load Inter
