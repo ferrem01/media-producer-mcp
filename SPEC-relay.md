@@ -182,4 +182,21 @@ Every piece meets the next at shared coordinates:
 - done circle: centre (0.5, 0.62), diameter 0.12;
 - framed print: 0.30 × 0.40.
 
-<!-- KIT-TABLE -->
+| Piece | What it performs | Joins |
+|---|---|---|
+| `wordmark-squeeze` | `mode:"open"`: the wordmark squeezes into its own period, the dot grows into the pill, a label rises, a click. `mode:"return"`: pill → dot → the letters spring back out. | Open ends on the pill (`hide_at`); return's last frame = open's first frame. |
+| `iris` | Six blades close over a shape (from the pill, or a rect) and snap open onto a photo. | `from` = the pill box; after the open, a photo in the circle (d 0.30) or the print rect. |
+| `photo-unfold` | Circle → rounded square → shrink → the grid unfolds like a paper map → bento → a click zooms one tile to full frame. | Starts as the iris circle; ends on a plain full-frame photo (a scene join). |
+| `glass-relight` | A glass word melts into a toolbar; a slider relights day → golden hour (two aligned shots); the knob becomes a lens, lifts into an orb, and the next photo expands to full frame. | Starts and ends on full-frame photos (two scene joins). |
+| `glass-lockscreen` | The full-frame photo becomes a lock screen (glass clock, a home bar that stretches into a player) and pulls back into a phone. | Ends on the phone geometry, the silk stage. |
+| `desktop-stage` | The island pinches off into a Mac window that rolls up onto Safari; the wallpaper is long-pressed, dragged in, dropped as a landing-page hero. | Starts on the phone; ends on the window + hero box. |
+| `print-shop` | The hero morphs into a framed print on a product card; frame colour paints on, size slides, "Order print"; one black shape runs Ordered → Printing % → On its way → done. | Starts on desktop-stage's last frame; ends on the done circle (0.5, 0.62) d 0.12. |
+| `status-morph` | The same one-shape state machine, standalone. | Its done circle defaults to the done geometry. |
+| `color-flood` `mode:"flood"` / `"contract"` | A shape floods the frame to black; black contracts into the next first shape. | The scene joiner. |
+| `framed-print` | A print on the wall footage (or plaster): mat and molding, a slow push to the photo, a flood. | Starts as the black print rect a contract lands on; ends on a flood. |
+
+Times inside these pieces default to the reference's 120 BPM offsets. On any other tempo, write every `*_at` explicitly (the rebuild scaled all of them by 120/123), and end each scene's last move at least one frame before its end, or the join lands mid-move (measured: a zoom still finishing on the last frame left a 2-level mean difference at the join; after the fix, 0.05).
+
+### The rebuild, measured
+
+`proj_790dc4fa`: 5 scenes, 28.3 s on a 123 BPM bed ("Nothing More To Say", Jamendo 1332110, `trim_start` 11.13 so the drop lands on the zoom at 5.85 s). All four joins and the loop compare equal to within a few cursor pixels (mean difference ≤ 0.05 of 255) in local stills. The bed has no quiet section where the wall sits; the reference's breakdown is not reproduced.
