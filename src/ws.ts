@@ -191,6 +191,18 @@ export interface RemoteBoothWsOptions {
   authEnabled?: () => boolean;
 }
 
+/** The tenant a socket's token belongs to (?token= on the /ws URL, a Bearer
+ *  header, or the session cookie -- extractToken, the HTTP rule), resolved
+ *  once at the upgrade and shared by every family on that socket. */
+const socketTenants = new WeakMap<WebSocket, string | undefined>();
+function socketTenant(ws: WebSocket, req: http.IncomingMessage, opts: RemoteBoothWsOptions): string | undefined {
+  if (socketTenants.has(ws)) return socketTenants.get(ws);
+  const token = extractToken(req);
+  const authed = (token && (opts.validate || validateToken)(token)) || undefined;
+  socketTenants.set(ws, authed);
+  return authed;
+}
+
 /** One socket's remote-booth messages. The token was read at the upgrade. */
 async function handleRemoteBooth(ws: WebSocket, peer: RemotePeer, authed: string | undefined, hub: RemoteBoothHub, authEnabled: boolean, msg: Record<string, unknown>): Promise<void> {
   const type = String(msg.type || "");
@@ -220,11 +232,9 @@ async function handleRemoteBooth(ws: WebSocket, peer: RemotePeer, authed: string
  *  uses it; the tests call it on their own server with their own tokens. */
 export function attachRemoteBooth(wss: WebSocketServer, opts: RemoteBoothWsOptions = {}): RemoteBoothHub {
   const hub = opts.hub || new RemoteBoothHub({ loadTarget: loadRemoteTarget });
-  const validate = opts.validate || validateToken;
   const authOn = opts.authEnabled || isAuthEnabled;
   wss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
-    const token = extractToken(req);
-    const authed = (token && validate(token)) || undefined;
+    const authed = socketTenant(ws, req, opts);
     const peer: RemotePeer = { send: (m) => sendJson(ws, m) };
     (ws as any).__remoteBooth = async (msg: Record<string, unknown>, bytes: number) => {
       if (bytes > REMOTE_MAX_MESSAGE_BYTES) { sendJson(ws, { type: REMOTE_PREFIX + "error", code: "too-big", error: "message too large" }); return; }
@@ -257,11 +267,10 @@ export function setupWebSocket(server: http.Server, opts: RemoteBoothWsOptions =
   wss.on("connection", (ws, req) => {
     // update-prop WRITES into a project: the socket's token must be allowed
     // that tenant -- the HTTP rule (found while building the remote booth:
-    // it wrote into whatever tenant/project the client named).
-    const validate = opts.validate || validateToken;
+    // it wrote into whatever tenant/project the client named). Auth off
+    // (dev) passes, as on HTTP. preview-component reads no tenant data.
     const authOn = opts.authEnabled || isAuthEnabled;
-    const token = extractToken(req);
-    const authed = (token && validate(token)) || undefined;
+    const authed = socketTenant(ws, req, opts);
     ws.on("message", async (raw) => {
       let msg: Record<string, unknown>;
       try {
