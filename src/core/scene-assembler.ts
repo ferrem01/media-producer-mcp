@@ -245,9 +245,15 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
  */
 export function hoistCssImports(html: string): string {
   const hrefs: string[] = [];
-  const IMPORT = /@import\s+(?:url\(\s*)?["']?([^"')\s;]+)["']?\s*\)?[^;{}]*;/g;
+  // A quoted URL may itself contain ';' (Google Fonts: wght@400;500;700), so
+  // match the quotes, not the first ';'. Unquoted url(...) runs to its ')'.
+  const IMPORT = /@import\s+(?:url\(\s*(["'])(.*?)\1\s*\)|(["'])(.*?)\3|url\(\s*([^"')\s]+)\s*\))[^;{}]*;/g;
   const out = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, (block) =>
-    block.replace(IMPORT, (_m, href: string) => { if (!hrefs.includes(href)) hrefs.push(href); return ""; }));
+    block.replace(IMPORT, (_m, _q1, u1, _q2, u2, u3) => {
+      const href = String(u1 ?? u2 ?? u3);
+      if (!hrefs.includes(href)) hrefs.push(href);
+      return "";
+    }));
   if (!hrefs.length) return out;
   const links = hrefs.map((h) => `<link rel="stylesheet" href="${h.replace(/"/g, "&quot;")}">`).join("\n");
   return out.replace(/<meta charset="utf-8">/i, (m) => `${m}\n${links}`);

@@ -30,6 +30,10 @@ describe("a component's CSS @import", () => {
     const head = html.slice(0, html.indexOf("</head>"));
     const links = head.match(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2\?family=Inter[^"]*">/g) || [];
     expect(links).toHaveLength(1);
+    // The whole URL: a Google Fonts URL carries ';' between its weights, and
+    // cutting it there left the rest of the rule as junk in the stylesheet.
+    expect(links[0]).toContain("wght@400;500;600;700&display=swap");
+    expect(styles.join("\n")).not.toMatch(/500;600;700/);
     // Before the sheet that uses it.
     expect(head.indexOf(links[0])).toBeLessThan(head.indexOf("<style"));
   });
@@ -42,5 +46,8 @@ describe("a component's CSS @import", () => {
     expect(out).toContain(`<link rel="stylesheet" href="y.css">`);
     expect(out).toContain(`var s = "@import url(x.css);"`);
     expect(out).not.toMatch(/<style>[^<]*@import/);
+    const unq = hoistCssImports(`<head><meta charset="utf-8"><style>@import url(https://a.b/c.css?x=1;y=2); d{}</style></head>`);
+    expect(unq).toContain(`<link rel="stylesheet" href="https://a.b/c.css?x=1;y=2">`);
+    expect(unq).toContain(`<style> d{}</style>`);
   });
 });
