@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — The product pages load their own font again
+
+The Quotient mockups (report, campaign, app shell, chat, social) load Inter
+with `@import url(...)` at the top of their own `<style>`. The assembler
+concatenates every component's styles into ONE sheet, so the import landed in
+the middle of it, and a browser ignores an `@import` that is not at the top:
+every captured product page rendered in the system fallback font. Found while
+rendering the Analytics screens for the Quotient Analytics film.
+
+- **Rule:** `hoistCssImports` (scene-assembler) lifts every `@import` out of
+  the `<style>` blocks into a `<link rel="stylesheet">` in the head, once per
+  URL, on both assembly paths. Script text is never touched.
+- **Test:** `test/css-import-hoist.test.ts`.
+
 ## 2026-09-27 — type-relay: the words of a relay film
 
 In a relay film every beat is carried by an object, and the type beats had
