@@ -22,6 +22,10 @@ on average: the click scene opened blank.
   paints from.
 - **`quotient-report` takes `at`**, which shifts its whole entrance. A flood
   contracts into its first KPI card, so the performance starts under the join.
+- **The motion probe** (`get target:'motion'`) counted only text, svg, img,
+  video and canvas as content, so it called the image component "never
+  visible" once its only `<img>` was the hidden preload. A CSS background
+  picture now counts, and `aria-hidden` helpers are skipped.
 - `test/relay-image-join.test.ts`. After the fix every join in the Analytics
   film compares equal to within a few cursor pixels.
 

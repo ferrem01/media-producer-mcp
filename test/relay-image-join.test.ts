@@ -52,4 +52,10 @@ describe("relay picture joins", () => {
       expect(errors).toEqual([]);
     } finally { await browser.close(); }
   }, 60000);
+
+  it("the motion probe counts a CSS background picture as content and skips hidden helpers", async () => {
+    const mi = await fs.readFile(path.resolve(__dirname, "../src/core/motion-inspect.ts"), "utf-8");
+    expect(mi).toContain('getAttribute("aria-hidden") === "true") return;');
+    expect(mi).toMatch(/hasText \|\| hasBgImage \|\|/);
+  });
 });
