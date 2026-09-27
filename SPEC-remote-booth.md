@@ -1,6 +1,6 @@
 # SPEC: the remote booth — record from across the room
 
-Status: SHIPPED v1 (2026-09-27): phases 1 and 2, the film picker, the phone Studio's Films link (it replaced the booth's Films sheet on 2026-09-27), and Studio's "Across the room". What was built, and where it differs from the text below, is in **As built (v1)** at the end. Still open: Marc's real wide take by the French doors.
+Status: SHIPPED v1 (2026-09-27): phases 1 and 2, the way back to Studio with a scene picker (it replaced the control screen's film drawer on 2026-09-27), the phone Studio's Films link (it replaced the booth's Films sheet on 2026-09-27), and Studio's "Across the room". What was built, and where it differs from the text below, is in **As built (v1)** at the end. Still open: Marc's real wide take by the French doors.
 
 APPROVED by Marc 2026-09-26 ("lets build the remote booth"), with two additions from him: pair ONCE per session (not per film), and move between films from the phone without re-scanning.
 
@@ -62,9 +62,13 @@ scan the QR for each."
 
 - **Pair once.** A remote session belongs to the TENANT and the device pair,
   not to one film or scene. The phone stays paired as the camera until the
-  session ends. The laptop's control screen has a **film and scene picker**
-  (films that still need a take are listed first). Picking the next film
-  retargets the session, and the phone never moves.
+  session ends. The laptop's control screen has **← Studio**, which goes back
+  to the film in Studio, and a **scene picker** for the film's own scenes.
+  Another film is picked in Studio: its **Across the room** opens the booth
+  in the same tab, the stored session rejoins, the new film becomes the
+  target, and the phone never moves. (v1 first shipped a film drawer that
+  listed every film still owed a take. Marc: "once I am in this screen on
+  my laptop I have no way to get back out to the film I was working on.")
 - **Switch from the phone too.** The phone Studio (`/studio` on a phone)
   opens on a **← Films** link. It goes to the film library (`/library`),
   every film as a card, like the desktop. Tapping a card opens that film's
@@ -179,8 +183,8 @@ the scene split. This covers the true-4K case, whatever the browser allows.
 
 ### Pages and routes
 - `/remote-booth?tenant&project&scene&token`: the control screen
-  (`src/remote-booth-page.ts`, `getRemoteBoothHtml`). Studio opens it in a
-  new tab from the **Across the room** source on a camera take
+  (`src/remote-booth-page.ts`, `getRemoteBoothHtml`). Studio opens it in
+  the same tab from the **Across the room** source on a camera take
   (`src/preview-app/preview-app.ts`, desktop only; the phone Studio is
   unchanged).
 - `/remote-camera?tenant&session&token`: the camera page
@@ -235,8 +239,12 @@ the scene split. This covers the true-4K case, whatever the browser allows.
 - **Recording**: the phone records the RAW camera track when its aspect
   already matches the film (full resolution, no canvas). Otherwise it draws
   the centre crop into a canvas at the track's own resolution, with the
-  long side capped at 3840. The bitrate is 24 Mbps when the short side is
-  2160 or more, 12 below that.
+  long side capped at 3840. The bitrate follows the pixel count: 12 Mbps
+  at 1080p rising to 24 at 3840×2160, and about 18 for a 3024×1700 crop.
+  The first rule, 24 only when the short side reached 2160, sent 3K crops
+  at 12. The camera request carries the film's `aspectRatio` along with
+  the size, because a bare 3840×2160 ask got 3024×2160 (7:5) from Marc's
+  iPhone.
 - **Keep**: the phone attaches, as specified, through `POST /api/take` with
   `capture: 'remote'` and the take's `scene_index`. If the phone has left
   by then, the laptop attaches the uploaded file itself through the same
@@ -262,7 +270,7 @@ the scene split. This covers the true-4K case, whatever the browser allows.
   scene of the same film that is still owed a take.
 - **Phone Films**: the phone Studio's **← Films** link goes to `/library`.
   The booth's Films sheet is gone. `GET /api/booth-films` now feeds only
-  the control screen's picker.
+  the control screen's **Next: Scene N**.
 - **Resolution report**: the camera's `hello` is the report. Under test,
   Chromium's fake camera delivered **3840×2160 at 20 fps** to the ideal
   3840×2160 / 30 fps request and recorded at 24 Mbps. A real phone may

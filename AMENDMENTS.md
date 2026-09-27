@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — The remote booth: a way back to Studio, and the camera's bitrate
+
+Marc's first real pairing worked ("worked really well. amazing"), and it
+surfaced three things.
+
+- **No way out.** "Once I am in this screen on my laptop I have no way to
+  get back out to the film I was working on. That giant list of todos is
+  still here."
+  - The control screen's film drawer (every film still owed a take) is
+    gone.
+  - In its place: **← Studio** goes back to the film, and a scene picker
+    covers the film's own scenes.
+  - Another film is picked in Studio, as on the phone. **Across the room**
+    now opens the booth in the same tab rather than a new one. The stored
+    session rejoins, the link's film wins, and the phone follows.
+- **3024×2160, not 3840×2160.** The laptop pill showed what iPhone Safari
+  gives for a bare 3840×2160 ask. The request now carries the film's
+  `aspectRatio` too. Whether iOS then picks true 4K is confirmed on the
+  next pairing.
+- **3K recorded at 12 Mbps.** The bitrate rule gave 24 Mbps only when the
+  short side reached 2160, so every in-between crop fell to 12. It now
+  follows the pixel count: 12 Mbps at 1080p, about 18 at 3024×1700, 24 at
+  4K.
+
+---
+
 ## 2026-09-27 — Films on the phone: a link to the library, not a sheet in the booth
 
 Marc, on the booth's Films sheet: "I don't need a film button that only
