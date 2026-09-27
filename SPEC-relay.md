@@ -5,8 +5,12 @@ Status: SHIPPED 2026-09-26 (Marc: "Yes on grammar"). The grammar the parked
 are coordinates between library components. It needed no morph runtime;
 since Morph v1 (2026-09-26) any other pair hands off with
 `enter {effect: "morph", from}`.
-Reference film: the Cosmos promo (x.com/kaolti/status/2103481296018092204),
-rebuilt as `proj_9c829aa3` (13 scenes, 39.5 s, one 18 s oner).
+**THE reference film: "develop."** (x.com/twoclipping/status/2103835273813496100),
+rebuilt as `proj_790dc4fa` (5 scenes, 29 s, square, one continuous take).
+Marc, 2026-09-27: "make this the reference video for relay". The first
+reference, the Cosmos promo (x.com/kaolti/status/2103481296018092204,
+rebuilt as `proj_9c829aa3`: 13 scenes, 39.5 s, one 18 s oner), stays as
+the reference for the punctuated-oners dialect only.
 
 **v2 (2026-09-27): the continuous take.** Marc, on the "develop." launch
 film (x.com/twoclipping/status/2103835273813496100): "a better example of

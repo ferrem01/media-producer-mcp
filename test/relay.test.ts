@@ -80,6 +80,10 @@ describe("relay grammar", () => {
     expect(sv).toContain("one stays as the through-line; one take.");
     const spec = await read("../SPEC-relay.md");
     expect(spec).toMatch(/## v2: the continuous take/);
+    // Marc: "make this the reference video for relay".
+    expect(spec).toContain('**THE reference film: "develop."**');
+    expect(sb).toContain('THE reference: the "develop." launch film rebuilt as proj_790dc4fa');
+    expect(cd).toContain('THE reference is the "develop." launch film');
   });
 
   it("lets a music bed land its drop on the film's beat (trim_start), and jamendo: ids download", async () => {
