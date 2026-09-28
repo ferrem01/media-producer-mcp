@@ -168,7 +168,7 @@ ${QUOTIENT_CSS}
   if (!tenant || !project) { say(!project ? 'Missing ?project= in the link.' : 'Missing ?tenant= in the link (or a token that carries it).', true); return; }
   $('desktopLink').href = link('/studio', '&desktop=1');
 
-  var P = null, pickingScene = -1, jobTimer = null, editing = -1, pickingProof = null;
+  var P = null, RS = null, shareUrl = '', pickingScene = -1, jobTimer = null, editing = -1, pickingProof = null;
   // The proof a claim asked for (SPEC-creator-cut.md): every need on the
   // scene that is not the camera take, listed with its index for Upload.
   var EV_LABELS = { screenshot: 'Screenshot', screen_recording: 'Screen recording', stock_footage: 'B-roll', mockup: 'Product mock', illustration: 'Illustration' };
@@ -391,6 +391,20 @@ ${QUOTIENT_CSS}
     }
 
     var top = $('topActions'); top.innerHTML = '';
+    // WATCH and SHARE sit at the top: the film card is at the bottom of a
+    // long page, and on a phone watching is the first thing you want.
+    if (RS && RS.rendered) {
+      var watch = document.createElement('button'); watch.className = 'btn'; watch.textContent = 'Watch';
+      watch.onclick = function () {
+        var fv = $('filmVideo'); if (!fv) return;
+        $('filmCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        var pr = fv.play(); if (pr && pr.catch) pr.catch(function () {});
+      };
+      top.appendChild(watch);
+      var shareB = document.createElement('button'); shareB.className = 'btn ghost'; shareB.textContent = 'Share';
+      shareB.onclick = function () { shareFilm(shareB); };
+      top.appendChild(shareB);
+    }
     var teamA = document.createElement('a'); teamA.className = 'btn small'; teamA.textContent = 'Team';
     teamA.href = '/team?tenant=' + encodeURIComponent(tenant) + (token ? '&token=' + encodeURIComponent(token) : '');
     top.appendChild(teamA);
@@ -492,10 +506,15 @@ ${QUOTIENT_CSS}
     var built = (P.scenes || []).length > 0;
     $('filmMeta').textContent = P.status || '';
     var body = $('filmBody'); body.innerHTML = '';
-    if (P.status === 'rendered') {
-      var v = document.createElement('video'); v.controls = true; v.playsInline = true; v.preload = 'metadata';
-      v.src = withToken('/output/' + encodeURIComponent(tenant) + '/projects/' + encodeURIComponent(project) + '/output.mp4?v=' + encodeURIComponent(P.updated_at || ''));
+    // The player follows the FILE, not P.status: any edit after a render
+    // moves the status on, and the film was still there to watch.
+    if (RS && RS.rendered) {
+      var v = document.createElement('video'); v.id = 'filmVideo'; v.controls = true; v.playsInline = true; v.preload = 'metadata';
+      v.src = withToken(RS.output_url + '?v=' + encodeURIComponent(RS.completed_at || ''));
       body.appendChild(v);
+      var when = document.createElement('div'); when.className = RS.stale ? 'stale' : 'meta';
+      when.textContent = 'Rendered ' + ago(RS.completed_at) + (RS.stale ? ' \u00b7 edited since; render again to include the edits.' : '');
+      body.appendChild(when);
     } else {
       var hint = document.createElement('div'); hint.className = 'meta';
       var proofOpen = openProof(scenes);
@@ -513,9 +532,50 @@ ${QUOTIENT_CSS}
   }
 
   function load() {
-    return api('GET', '/projects/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project))
-      .then(function (p) { P = p; render(); })
+    var tp = encodeURIComponent(tenant) + '/' + encodeURIComponent(project);
+    var rs = api('GET', '/render-status/' + tp).catch(function () { return null; });
+    var sh = api('GET', '/share/' + tp).catch(function () { return null; });
+    return api('GET', '/projects/' + tp)
+      .then(function (p) { return Promise.all([rs, sh]).then(function (r) { P = p; RS = r[0]; shareUrl = currentShare(r[1] && r[1].shares); render(); }); })
       .catch(function (e) { say(e.message || String(e), true); });
+  }
+  function ago(iso) {
+    var t = Date.parse(iso || ''); if (!t) return '';
+    var m = Math.round((Date.now() - t) / 60000);
+    return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : new Date(t).toLocaleDateString();
+  }
+  // A link already made from THIS render is reused; a link to an older
+  // render is not (a share is a snapshot of the render it was made from).
+  function currentShare(list) {
+    var at = Date.parse((RS && RS.completed_at) || '');
+    var hit = (list || []).filter(function (x) { return at && Math.abs(Date.parse(x.rendered_at) - at) < 2000; })[0];
+    return hit ? hit.url : '';
+  }
+  // Share: the phone's own share sheet (Messages, Slack, Mail) with the
+  // /watch link -- it plays in any browser, no login, full quality.
+  // A known link shares at once (the share sheet needs the tap's
+  // activation); a new one is made first, and if the browser refuses the
+  // late sheet, the link is copied and the next tap shares it.
+  function shareFilm(btn) {
+    var title = P.name || 'A film';
+    function hand(url) {
+      if (navigator.share) {
+        return navigator.share({ title: title, url: url }).then(function () { say(''); }).catch(function (e) {
+          if (e && e.name === 'AbortError') return;
+          copy(url, 'Link ready: ' + url + ' \u2014 tap Share again to send it.');
+        });
+      }
+      copy(url, 'Link copied: ' + url);
+    }
+    function copy(url, msg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { say(msg); }, function () { say(msg.replace('Link copied', 'Your link')); });
+      else say(msg.replace('Link copied', 'Your link'));
+    }
+    if (shareUrl) return hand(shareUrl);
+    btn.disabled = true; say('Making a link\u2026');
+    api('POST', '/share/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project), { title: title })
+      .then(function (r) { btn.disabled = false; shareUrl = r.url; hand(r.url); })
+      .catch(function (e) { btn.disabled = false; say(e.message || String(e), true); });
   }
 
   // ── jobs ──

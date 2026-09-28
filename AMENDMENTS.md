@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-28 — Watch and Share on the phone Studio
+
+Marc, on his phone: "How can I see the film?" The phone Studio had a
+player, but only while `P.status === 'rendered'` (any edit moves the
+status on) and at the bottom of a long page -- hidden in practice.
+
+- The player now follows the file: `load()` reads `/api/render-status`
+  and the film card plays `output.mp4` whenever one exists, with when it
+  was rendered and a note when the film was edited since.
+- **Watch** and **Share** sit at the top. Watch scrolls to the player and
+  plays. Share opens the phone's share sheet with a `/watch` link
+  (core/shares.ts), reusing a link already made from this render; a new
+  one is made first, and if the browser refuses the late share sheet the
+  link is copied and the next tap shares it.
+
 ## 2026-09-28 — Share links, streaming output, web-ready renders
 
 Marc: "I'm downloading the file and then uploading it to Slack and it's
