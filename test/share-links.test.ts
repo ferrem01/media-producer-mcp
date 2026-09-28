@@ -138,6 +138,8 @@ describe("share links", () => {
     expect(idx).toMatch(/\|render-status\|share\|job\|/);
     expect(idx).toMatch(/serveFile\(req, res, fullPath, \{ contentType: contentTypeFor\(fullPath\) \}\)/);
     expect(idx).toMatch(/\(\^\|\\\/\)shares\\\//);
+    // A render from before the fix is made web-ready on first download: no re-render needed.
+    expect(idx).toMatch(/if \(\/\^output\\\.mp4\$\/\.test\(outPath\) && fullPath\.startsWith\(outDir \+ path\.sep\)\) \{\s*\n\s*await ensureFaststart\(fullPath\)/);
     // The public routes sit before the auth wall.
     expect(idx.indexOf("const watchMatch")).toBeLessThan(idx.indexOf("// ── Auth for all non-health routes ──"));
     const studio = await fs.readFile(path.resolve(__dirname, "../src/preview-app/preview-app.ts"), "utf-8");

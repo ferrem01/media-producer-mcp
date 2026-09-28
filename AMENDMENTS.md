@@ -21,7 +21,9 @@ request with all 19 MB (read into memory, always 200).
   atoms, remuxes with stream copy only when moov trails mdat).
 - **Streaming output.** `core/serve-file.ts` streams from disk with byte
   ranges (206 / 416 / HEAD / ETag). /output uses it; share snapshots under
-  output/shares/ are not reachable there.
+  output/shares/ are not reachable there. A render made before the fix is
+  made web-ready on its first /output request (ensureFaststart, a no-op
+  after), so no re-render is needed to get a file that plays.
 - **Share links.** `core/shares.ts`: POST /api/share/{tenant}/{project}
   snapshots the latest output.mp4 (so a re-render never changes a link
   someone has), makes it web-ready, grabs a poster frame, and returns

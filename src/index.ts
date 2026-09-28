@@ -81,6 +81,7 @@ import os from "node:os";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled, requireTenant, tenantAllowed } from "./auth/auth.js";
 import { serveFile, contentTypeFor } from "./core/serve-file.js";
+import { ensureFaststart } from "./core/encode.js";
 import { createShare, getShare, listShares, revokeShare, shareFiles, watchPageHtml, type Share } from "./core/shares.js";
 import { protectedResourceMetadata, authorizationServerMetadata, registerClient, wwwAuthenticateChallenge } from "./auth/mcp-oauth.js";
 import { readTraces, dailyDigest } from "./trace/index.js";
@@ -1064,6 +1065,12 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         // Streamed with byte ranges (core/serve-file.ts): a <video> seeks,
         // and an iPhone will not play an MP4 served without them. Share
         // snapshots are only reachable through their /watch link.
+        // A render made before the web-ready fix gets its index moved to
+        // the front on first request (stream copy, seconds; a no-op after)
+        // -- no re-render needed to get a file that plays in Slack.
+        if (/^output\.mp4$/.test(outPath) && fullPath.startsWith(outDir + path.sep)) {
+          await ensureFaststart(fullPath).catch(() => false);
+        }
         if (!fullPath.startsWith(outDir + path.sep) || /(^|\/)shares\//.test(outPath) || !(await serveFile(req, res, fullPath, { contentType: contentTypeFor(fullPath) }))) {
           res.writeHead(404);
           res.end("Output not found");
