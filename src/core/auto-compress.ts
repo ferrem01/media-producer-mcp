@@ -68,7 +68,15 @@ const VIDEO_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
  */
 export function isBrandClipScene(scene: Scene): boolean {
   const comps = (scene.components || []) as SceneComponent[];
-  return comps.length === 1 && comps[0]?.type === "video";
+  if (comps.length !== 1) return false;
+  if (comps[0]?.type === "video") return true;
+  // The pipeline's own bookends (narrated-screencast videoScene) and a
+  // hand-added outro play the clip in a full-frame screencast-frame: it is
+  // still the brand kit's sting. Added that way to the analytics film, the
+  // same 5.18s outro came back at 3.3s a second time.
+  const data = (comps[0]?.data || {}) as Record<string, unknown>;
+  const src = data.video_url ?? data.source ?? data.src;
+  return typeof src === "string" && /\/brand-kit\//.test(src);
 }
 
 export function findSceneScreencasts(scene: Scene): { target: string; src: string }[] {

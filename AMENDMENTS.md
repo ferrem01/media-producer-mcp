@@ -6,6 +6,45 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-27 — Board edits keep each take on its scene
+
+Merging three short beats of the Old Chimp board (proj_34225c8a) into one
+meant taking two scenes off a board whose booth take was already cut per
+scene. `update storyboard.remove_scenes` spliced the scenes and left every
+take and speaker clip on its old index, so each later scene would have
+played the recording made for the scene two further on. Studio's drag
+reorder already moved takes with their scenes (`reorderBoard`); the MCP
+paths did not.
+
+- **`core/film-plan.ts`:** `removeBoardScenes` and `insertBoardScene` join
+  `reorderBoard`, all through one `followScenes` step: takes and speaker
+  clips follow their scene's new index; a removed scene's takes and clips go
+  with it (the files stay in the assets); a continuous clip with no
+  scene_index is left alone; the board re-clocks.
+- **Wired into** `update storyboard.remove_scenes` / `reorder_scenes`
+  (server.ts; reorder now also refuses a non-permutation instead of silently
+  filtering) and the storyboard tool's `delete_index` / `insert_at`
+  (llm/storyboard-surgical.ts).
+- **Record-all finds a scene said loosely.** The one-take split cuts where
+  each scene's opener is heard, matched word for word. Marc read
+  "Drag-and-drop templates" as "Drop and drag templates" and "Your list?" as
+  "Your lists", so both openers fell back to the proportional guess and
+  landed at the end of the scene before (scene 6 came out 2.2s, its three
+  cutaways stacked). `splitByScripts` now tries a loose match before the
+  guess: plurals and one-letter slips, a compound's parts in any order,
+  backed by the previous scene's last words heard just before.
+- **A monkey in the house set.** The Old Chimp film wanted a monkey sound on
+  "this guy"; the house shelf had none and Freesound needs a key. `monkey`
+  (audio/foley.ts) is a synthesized cartoon chimp -- four "ooh-ooh-AH-AH"
+  hoots: harmonics of a gliding pitch shaped by vowel formants, deterministic
+  like the rest of the set. Listed in the sfx tool and the writer's prompt.
+- **A brand clip in a screencast-frame is still a brand clip.** Adding the
+  brand outro to the analytics film as a full-frame `screencast-frame`
+  (the shape the pipeline's own bookends use) got it auto-compressed from
+  5.18s to 3.3s, the same loss #747 fixed for a bare `video`.
+  `isBrandClipScene` now also takes a single component whose source is a
+  `/brand-kit/` asset.
+
 ## 2026-09-27 — Quotient metrics and saved reports as library components
 
 Marc captured the product's metrics and report screens as tenant components

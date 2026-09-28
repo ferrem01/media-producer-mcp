@@ -182,6 +182,35 @@ export function renderFoley(id: string): Float32Array {
         v = (Math.sin(2 * Math.PI * f * wobble * t) * 0.8 + Math.sin(2 * Math.PI * f * 2 * t) * 0.15) * env(t, spec.duration, 0.01, 1.6);
         break;
       }
+      case "monkey": {
+        // The cartoon chimp: "ooh-ooh-AH-AH". Four hoots of a buzzy voice
+        // (harmonics of a gliding pitch) shaped by vowel formants -- two
+        // rounded "ooh"s swooping up, then two open "ah"s, louder and
+        // higher. The gag sound for a chimp sticker landing on a word.
+        const HOOTS = [
+          { t0: 0.0, d: 0.17, f0: [330, 560], f1: 330, f2: 820, g: 0.7 },
+          { t0: 0.2, d: 0.17, f0: [380, 620], f1: 330, f2: 820, g: 0.75 },
+          { t0: 0.42, d: 0.2, f0: [720, 900], f1: 820, f2: 1250, g: 1.0 },
+          { t0: 0.66, d: 0.24, f0: [760, 640], f1: 820, f2: 1250, g: 0.95 },
+        ];
+        for (const h of HOOTS) {
+          const u = t - h.t0;
+          if (u <= 0 || u >= h.d) continue;
+          const q = u / h.d;
+          const f0 = lerp(h.f0[0], h.f0[1], Math.sin(q * Math.PI / 2)) * (1 + 0.025 * Math.sin(2 * Math.PI * 23 * t));
+          // Phase from the integral of the glide keeps the pitch sweep clean.
+          const ph = 2 * Math.PI * (h.f0[0] * u + (h.f0[1] - h.f0[0]) * (h.d / (Math.PI / 2)) * (1 - Math.cos(q * Math.PI / 2)));
+          let voice = 0;
+          for (let k = 1; k <= 12; k++) {
+            const fk = f0 * k;
+            const res = Math.exp(-Math.pow((fk - h.f1) / 180, 2)) + 0.7 * Math.exp(-Math.pow((fk - h.f2) / 260, 2)) + 0.05;
+            voice += Math.sin(ph * k) * res / Math.sqrt(k);
+          }
+          const breath = svf(rnd() * 2 - 1, st, h.f2, 3).bp * 0.12;
+          v += (voice * 0.35 + breath) * h.g * env(u, h.d, 0.03, 1.3);
+        }
+        break;
+      }
       case "room-tone": {
         // THE FILM IS NEVER DIGITALLY SILENT. A scored film with gaps of
         // absolute silence reads as broken audio (measured on the sketch:
@@ -259,6 +288,7 @@ export const FOLEY_SET: FoleySpec[] = [
   { id: "deflate", label: "Deflate", tags: ["deflate", "fail", "sad", "gag", "down"], duration: 0.9 },
   { id: "room-tone", label: "Room tone (loop)", tags: ["room", "tone", "ambience", "bed", "silence", "loop", "air"], duration: 4.0 },
   { id: "camera-shutter", label: "Camera shutter", tags: ["camera", "shutter", "photo", "snap"], duration: 0.16 },
+  { id: "monkey", label: "Monkey (ooh-ooh-ah-ah)", tags: ["monkey", "chimp", "ape", "animal", "gag", "funny", "cartoon"], duration: 0.95 },
 ];
 
 export interface FoleyManifestEntry extends FoleySpec { file: string; source: "house"; license: "house"; }

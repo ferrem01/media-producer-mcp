@@ -169,6 +169,24 @@ describe("record all: cutting one recording into scenes", () => {
     for (const x of w) expect(x.end - x.start).toBeGreaterThan(0.3);
   });
 
+  it("finds a scene whose opener was said loosely: a compound read backwards, a plural", () => {
+    // Measured live (proj_34225c8a): "Drag-and-drop templates" was read "Drop
+    // and drag templates" and "Your list?" as "Your lists" -- the proportional
+    // guess left both openers at the end of the scene before.
+    const said = "At this point, he's about 100 years old. Drop and drag templates, blast the whole list, hope for the best. Quotient is a marketing automation platform rebuilt with AI. It writes it. Your lists, deliverability, segments, timing, all handled."
+      .split(" ");
+    const ws = said.map((t, i) => ({ text: t, start: round1(0.5 + i * 0.3), end: round1(0.7 + i * 0.3) }));
+    const at = (word: string, nth = 1) => { let seen = 0; const i = said.findIndex((t) => normalizeToken(t) === word && ++seen === nth); return round1(ws[i].start - 0.1); };
+    const w = splitByScripts([
+      "At this point, he's about a hundred years old.",
+      "Drag-and-drop templates. Blast the whole list. Hope for the best.",
+      "Quotient is a marketing automation platform, rebuilt with AI.",
+      "It writes it.",
+      "Your list? Deliverability? Segments? Timing? All handled.",
+    ], ws, 20);
+    expect(w.map((x) => x.start)).toEqual([0, at("drop"), at("quotient"), at("it"), at("your")]);
+  });
+
   it("falls back to a proportional cut for a scene whose words were never heard", () => {
     const w = splitByScripts(["You're juggling tools.", "Synergy paradigm shift.", "Go to getquotient.ai."], words, 8);
     expect(w[0].start).toBe(0);
@@ -209,3 +227,5 @@ describe("de-airing a take", () => {
     expect(deAirWindow([], { start: 0, end: 5 })).toEqual({ start: 0, end: 5, head: 0, tail: 0 });
   });
 });
+
+function round1(n: number): number { return Math.round(n * 1000) / 1000; }
