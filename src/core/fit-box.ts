@@ -54,6 +54,10 @@ export const FIT_RANGES: Record<string, [number, number, number?]> = {
   "quotient-chat": [480, 760], "quotient-campaign": [1000, 1300],
 };
 
+/** How much larger a widget's type reads on a tall (phone) frame than its
+ *  slot alone would make it -- the same factor the tall frame's zoom uses. */
+export const TALL_READ = 1.8;
+
 function toPx(v: string | number | undefined, total: number, dflt: number): number {
   if (v === undefined || v === null || v === "") return dflt;
   if (typeof v === "number") return v;
@@ -83,7 +87,15 @@ export function fitBoxFor(
   // below its minimum height; a height-limited box just gets wider.
   // The height floor only CAPS the scale-up; it never pushes a widget below
   // 1:1 (measured: short 80%x40% slots shrank cards that fit fine as they were).
-  const sW = bw / Math.min(range[1], Math.max(range[0], bw));
+  // A TALL frame is watched on a phone: web-size type scaled only to the
+  // slot is unreadable there (measured, proj_34225c8a: quotient-chat and
+  // email-compose full-frame on 9x16 laid out 760px wide -- 19px type on a
+  // 1080px frame). Lay out as if the slot were TALL_READ times narrower
+  // (never below the widget's minimum), so the type grows with the phone
+  // the way the tall frame's zoom grows fixed-pixel stickers.
+  const tall = canvas.height > canvas.width * 1.2;
+  const target = tall ? bw / TALL_READ : bw;
+  const sW = bw / Math.min(range[1], Math.max(range[0], target));
   const s = Math.min(sW, Math.max(bh / minH, Math.min(1, sW)));
   if (Math.abs(s - 1) < 0.02) return null;
   return { w: Math.round(bw / s), h: Math.round(bh / s), s: +s.toFixed(4) };
