@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-28 — Product widgets read on a phone
+
+On the Old Chimp film (9x16) Marc: "quotient email and quotient chat just
+are not fitting. Period." The fit box (core/fit-box.ts) lays a legacy
+widget out at the slot width clamped to its range, then scales it to the
+slot -- so full-frame on a 1080px-wide frame quotient-chat laid out 760px
+wide and its 14px type landed at 19px, and a component `zoom` (the tall
+frame's fix for fixed-pixel stickers) is cancelled by the fit, which scales
+into the visible slot. On a tall frame the design width is now the slot
+width / TALL_READ (1.8, the tall zoom), never below the widget's minimum:
+the chat full-frame reads at ~25px, like the em-sized activity feed Marc
+said works. Wide frames are unchanged. The captured `quotient-email`
+(a frozen desktop editor) still cannot shrink to a phone; the film uses
+`email-compose` for that beat.
+
 ## 2026-09-27 — Board edits keep each take on its scene
 
 Merging three short beats of the Old Chimp board (proj_34225c8a) into one

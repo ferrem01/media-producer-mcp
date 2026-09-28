@@ -36,6 +36,21 @@ describe("fitBoxFor", () => {
     expect(fitBoxFor({ type: "quotient-home" }, C)).toBeNull();
     expect(fitBoxFor({ type: "progress-bar", data: { fit: false }, position: { x: 0, y: 0, width: "90%", height: "90%" } }, C)).toBeNull();
   });
+
+  // proj_34225c8a: on a 9x16 film the chat and the compose window laid out
+  // 760px wide full-frame -- 19px type on a phone. A tall frame lays them
+  // out narrower (never below the minimum) so the type reads.
+  it("lays a widget out narrower on a tall frame, so its type reads on a phone", () => {
+    const T = { width: 1080, height: 1920 };
+    const chat = fitBoxFor({ type: "quotient-chat", position: { x: "4%", y: "6%", width: "92%", height: "74%" } }, T)!;
+    expect(chat.w).toBeLessThan(600);
+    expect(chat.s).toBeGreaterThan(1.7);
+    const mail = fitBoxFor({ type: "email-compose", position: { x: "4%", y: "8%", width: "92%", height: "64%" } }, T)!;
+    expect(mail.w).toBe(620);                      // the widget's minimum, not narrower
+    // The same slot on a wide frame keeps the wide rule (height-capped scale, a wide design box).
+    const wide = fitBoxFor({ type: "quotient-chat", position: { x: "4%", y: "6%", width: "92%", height: "74%" } }, C)!;
+    expect(wide.w).toBeGreaterThan(1000);
+  });
 });
 
 describe("in the page", () => {
