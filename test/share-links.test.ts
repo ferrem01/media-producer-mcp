@@ -135,7 +135,7 @@ describe("share links", () => {
   it("is wired: public /watch routes, a tenant-scoped /api/share, streaming /output that hides snapshots, and a Share button in Studio", async () => {
     const idx = await fs.readFile(path.resolve(__dirname, "../src/index.ts"), "utf-8");
     expect(idx).toMatch(/const watchMatch = urlPath\.match\(/);
-    expect(idx).toMatch(/\|team\|share\)\\\/\(\[\^\/\]\+\)\//);
+    expect(idx).toMatch(/\|render-status\|share\|job\|/);
     expect(idx).toMatch(/serveFile\(req, res, fullPath, \{ contentType: contentTypeFor\(fullPath\) \}\)/);
     expect(idx).toMatch(/\(\^\|\\\/\)shares\\\//);
     // The public routes sit before the auth wall.
