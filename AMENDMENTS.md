@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-28 — Studio follows a render it did not start
+
+Marc: "I could have sworn it showed the percentage of the render." It does
+-- "⏳ Rendering… N%" on the button -- but only in the tab that clicked
+Render. Reload, leave the film and come back, or start the render from the
+phone or the agent, and Studio did not know a render was running: no
+progress, editing not paused, and the last finished MP4 offered as if it
+were done. Reproduced in a browser against a local server (render calls
+faked; nothing rendered).
+- `/api/render-status` now carries `active_job` ({id, status, percent,
+  step} from `activeRender`, or null).
+- Desktop Studio's `renderStatusRefresh` adopts it: progress on the
+  button, the rendering banner, polling to the Download button.
+- Phone Studio's `load()` follows it with the same job poll as its own
+  Render button.
+- Test: `test/studio-phone.test.ts`.
+
 ## 2026-09-28 — The prompter at ad pace, with a speed control
 
 Feedback on the Old Chimp ad: too slow, no snap. Marc: "I was reading it at

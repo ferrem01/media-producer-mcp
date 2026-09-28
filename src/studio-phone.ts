@@ -536,7 +536,12 @@ ${QUOTIENT_CSS}
     var rs = api('GET', '/render-status/' + tp).catch(function () { return null; });
     var sh = api('GET', '/share/' + tp).catch(function () { return null; });
     return api('GET', '/projects/' + tp)
-      .then(function (p) { return Promise.all([rs, sh]).then(function (r) { P = p; RS = r[0]; shareUrl = currentShare(r[1] && r[1].shares); render(); }); })
+      .then(function (p) { return Promise.all([rs, sh]).then(function (r) {
+        P = p; RS = r[0]; shareUrl = currentShare(r[1] && r[1].shares);
+        // A render already running (a reload, the desktop, the agent): follow it.
+        if (RS && RS.active_job && !jobTimer) pollJob(RS.active_job.id, 'render');
+        render();
+      }); })
       .catch(function (e) { say(e.message || String(e), true); });
   }
   function ago(iso) {
