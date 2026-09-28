@@ -48,7 +48,7 @@ describe("what the booth does", () => {
   it("cues the prompter by line: a (pause) line is a held beat shown as •••, a line break a breath", () => {
     const js = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
     expect(js).toMatch(/PAUSE_LINE = \/\^\\\(\\s\*pause\\s\*\\\)\[\.,!\?\]\*\$\/i/);
-    expect(js).toMatch(/BREATH_S = 0\.3, PAUSE_S = 1\.0/);
+    expect(js).toMatch(/BREATH_S = 0\.15, PAUSE_S = 1\.0/);
     expect(js).toMatch(/text\.split\(\/\\r\?\\n\/\)/);
     expect(js).toMatch(/out\.push\(\{ text: PAUSE_GLYPH, toks: \[\], dur: PAUSE_S, gap: PAUSE_S, beat: i \}\)/);
     expect(html).toMatch(/\.beat \{[^}]*white-space:pre-line/);
@@ -97,14 +97,14 @@ describe("what the booth does", () => {
   it("paces the prompter at speaking pace, never faster than the board's words allow, splitting a long beat by word share", () => {
     expect(html).toMatch(/voiceover_text/);
     expect(html).toMatch(/duration_seconds/);
-    expect(html).toMatch(/WORDS_PER_SEC = 2\.4/);
+    expect(html).toMatch(/WORDS_PER_SEC = 3\.0/); // ad pace, 180 wpm (Marc: "it was too slow")
     // The board's number is the cut, never the mouth, BOTH ways: 24 words in a 4s scene raced the prompter,
     // and a 10s creator-cut scene with 4s of words held its last line (Marc: "reading, then pausing").
     expect(html).not.toMatch(/Math\.max\(Number\(s\.duration_seconds\)/);
     // A scene change adds nothing: the talk track is continuous (Marc).
     expect(html).not.toMatch(/SCENE_BREATH/);
     // Emphasis holds, punctuation beats.
-    expect(html).toMatch(/var EMPH_K = 1\.4, COMMA_S = 0\.2, DASH_S = 0\.4;/);
+    expect(html).toMatch(/var EMPH_K = 1\.3, COMMA_S = 0\.12, DASH_S = 0\.3;/);
   });
 
   it("shows one cue at a time on its own clock, and a tap on the stage jumps to the next line", () => {
@@ -279,7 +279,13 @@ describe("the prompter in a browser (fake camera)", () => {
       await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x`);
       await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
       // The whole script runs at speaking pace: well under the board's 22s.
-      expect(await page.evaluate(() => document.getElementById("subtitle")!.textContent)).toMatch(/about 0:0[2-6] at speaking pace/);
+      expect(await page.evaluate(() => document.getElementById("subtitle")!.textContent)).toMatch(/about 0:0[2-6] at 180 wpm/);
+      // The speed control re-times the script and says the new pace.
+      await page.click("#fasterBtn"); await page.click("#fasterBtn");
+      expect(await page.evaluate(() => document.getElementById("speedWpm")!.textContent)).toBe("216 wpm");
+      expect(await page.evaluate(() => document.getElementById("subtitle")!.textContent)).toMatch(/at 216 wpm/);
+      expect(await page.evaluate(() => localStorage.getItem("mp.prompter.speed.p"))).toBe("1.2");
+      await page.click("#slowerBtn"); await page.click("#slowerBtn");
       await page.click("#recordBtn");
       // The camera opens on the light check (booth-light-check.test.ts);
       // Start recording rolls the count-in.
@@ -315,6 +321,32 @@ describe("the booth keeps to one scene: films are chosen in Studio (SPEC-remote-
     expect(cues.map((c) => c.text)).toEqual(["One brief, every surface.", "•••", "It ships."]);
     expect(cues[0].toks.filter((t) => t.emph).map((t) => t.t)).toEqual(["brief,"]);
     expect(cues[1].dur).toBe(1);
+  });
+
+  it("a domain or a decimal is one word, not a sentence break (\"getquotient.\" then \"ai.\" cost a second)", async () => {
+    const { buildCues } = await import("../src/core/prompter.js");
+    const cues = buildCues([{ voiceover_text: "Try it free at getquotient.ai. It is 3.5x faster! Really?" }]);
+    expect(cues.map((c) => c.text)).toEqual(["Try it free at getquotient.ai.", "It is 3.5x faster!", "Really?"]);
+  });
+
+  it("the speed control scales the whole pace but keeps a written (pause) at a second", async () => {
+    const { buildCues, clampSpeed, speedWpm } = await import("../src/core/prompter.js");
+    const sc = [{ voiceover_text: "Drag-and-drop templates, blast the whole list, hope for the best.\n(pause)\nLet the old guy retire." }];
+    const sum = (sp: number) => buildCues(sc, sp).reduce((a, c) => a + c.dur, 0);
+    const base = sum(1), fast = sum(1.2);
+    expect(fast).toBeLessThan(base);
+    expect(fast - 1).toBeCloseTo((base - 1) / 1.2, 1);
+    expect(buildCues(sc, 1.2)[1].dur).toBe(1);
+    expect(clampSpeed(9)).toBe(1.5);
+    expect(clampSpeed(0.1)).toBe(0.7);
+    expect(speedWpm(1)).toBe(180);
+    // Both booths carry the control.
+    const booth = (await import("../src/remote-booth-page.js")).getRemoteBoothHtml();
+    for (const h of [getTakeHtml(), booth]) {
+      expect(h).toContain('id="slowerBtn"');
+      expect(h).toContain('id="fasterBtn"');
+      expect(h).toMatch(/cues = buildCues\(cueScenes, speed\)/);
+    }
   });
 
   it("has no Films sheet: moving between films is the phone Studio's Films link (Marc: \"I don't need a film button that only shows me unrecorded film\")", () => {

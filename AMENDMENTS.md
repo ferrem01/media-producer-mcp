@@ -6,6 +6,39 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-28 — The prompter at ad pace, with a speed control
+
+Feedback on the Old Chimp ad: too slow, no snap. Marc: "I was reading it at
+the exact pace of the teleprompter. If not faster." Measured on the take
+(ffmpeg silencedetect against the prompter's own cue clock):
+- The prompter ran 35.9s; the take 36.5s. Every line began within ~0.5s of
+  its cue, so the prompter's clock WAS the film's pace: ~120 wpm effective
+  (2.4 w/s nominal, plus 0.3s breaths, comma beats and emphasis holds).
+- Inside sentences Marc spoke faster than the cue ("At this point, he's
+  about a hundred years old": 2.6s spoken, 4.2s cued), then waited for the
+  next line: 6.6s of sentence-end silence, ~27% of the take silent.
+- Not the scenes (the cut is the continuous take end to end) and not the
+  music beats.
+
+Changes (core/prompter.ts, shared by both booths):
+- **Ad pace by default:** 3.0 w/s (180 wpm; Scale Army measured ~175),
+  breath 0.15s, comma 0.12s, dash 0.3s, emphasis x1.3. The Old Chimp script
+  cues at 27.4s instead of 35.9s. A written `(pause)` is still a second.
+- **Speed control:** `buildCues(scenes, speed)` scales words, breaths and
+  beats (0.7-1.5, steps of 0.1, shown as wpm). The arm's-length booth has
+  −/+ on the ready screen; the remote booth has them in the header, and a
+  change mid-take re-times the lines still to come. Remembered per film on
+  the device (`mp.prompter.speed.<project>`), the last speed set anywhere
+  starting a film not read yet.
+- **Sentence split fix:** a sentence ends at `.!?…` followed by a space or
+  the line's end, so "getquotient.ai." is one cue, not "getquotient." then
+  "ai." (a second lost at the CTA).
+- Left alone: the storyboard builder still estimates a board at 2.4 w/s --
+  raising it would let the writer pack more words per scene; the take
+  re-times the board anyway.
+- Tests: `test/take-page.test.ts` (pace constants, the split, speed scaling,
+  both booths carry the control, the ready screen's −/+ in a browser).
+
 ## 2026-09-28 — Watch and Share on the phone Studio
 
 Marc, on his phone: "How can I see the film?" The phone Studio had a

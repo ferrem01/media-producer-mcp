@@ -23,13 +23,19 @@ export interface PrompterToken { t: string; emph: boolean; dash: boolean; start:
 export interface PrompterCue { text: string; toks: PrompterToken[]; dur: number; gap: number; beat: number }
 
 export const PROMPTER_TIMING_JS = `
-  var WORDS_PER_SEC = 2.4;
+  // Ad pace (Marc, 2026-09-28: "it was too slow ... I was reading it at
+  // the exact pace of the teleprompter"). At 2.4 w/s with 0.3s breaths the
+  // Old Chimp take measured ~120 wpm with 6.6s of sentence-end silence --
+  // he finished each line early and waited for the next. Ads run 160-180
+  // wpm (the Scale Army ad measured ~175): 3 w/s, short breaths and beats.
+  // The reader tunes it from here with the booth's speed control.
+  var WORDS_PER_SEC = 3.0;
 
   // Cues follow the script's own notation: one sentence per line (a line
   // break is a breath, ~0.3s) and a line that says only (pause) is a held
   // beat (~1s) the prompter shows as "•••". Silences come out of the
   // scene's duration first; the words share what is left.
-  var BREATH_S = 0.3, PAUSE_S = 1.0, PAUSE_GLYPH = '\u2022\u2022\u2022';
+  var BREATH_S = 0.15, PAUSE_S = 1.0, PAUSE_GLYPH = '\u2022\u2022\u2022';
   var PAUSE_LINE = /^\\(\\s*pause\\s*\\)[.,!?]*$/i;
   // Per-word timing: a word's time is its share of the pace by length;
   // an EMPHASIZED word (the board's emphasis list, or *word* in the line)
@@ -37,7 +43,7 @@ export const PROMPTER_TIMING_JS = `
   // a comma a small one, a dash or an ellipsis a longer one (Marc: "will it
   // understand that I emphasize certain words, that I pause on certain
   // words?"). A scene change adds NOTHING: the talk track is continuous.
-  var EMPH_K = 1.4, COMMA_S = 0.2, DASH_S = 0.4;
+  var EMPH_K = 1.3, COMMA_S = 0.12, DASH_S = 0.3;
   function wordBeat(w) {
     var last = w.charAt(w.length - 1);
     if (w === '-' || w === '–' || w === '—' || last === '—' || last === '–' || last === '…' || w.slice(-3) === '...') return DASH_S;
@@ -74,7 +80,13 @@ export const PROMPTER_TIMING_JS = `
     });
     return { toks: toks, spoken: at };
   }
-  function buildCues(scenes) {
+  // THE SPEED CONTROL: the reader's multiplier on the whole pace (words,
+  // breaths, beats; a written (pause) stays a full second). Steps of 10%.
+  var SPEED_MIN = 0.7, SPEED_MAX = 1.5;
+  function clampSpeed(v) { v = Math.round((Number(v) || 1) * 10) / 10; return Math.min(SPEED_MAX, Math.max(SPEED_MIN, v)); }
+  function speedWpm(v) { return Math.round(WORDS_PER_SEC * 60 * clampSpeed(v)); }
+  function buildCues(scenes, speed) {
+    var sp = clampSpeed(speed === undefined ? 1 : speed);
     var out = [];
     (scenes || []).forEach(function (s, i) {
       var text = String(s.voiceover_text || '').trim();
@@ -83,14 +95,17 @@ export const PROMPTER_TIMING_JS = `
       var lines = text.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { return l.trim(); }).filter(Boolean);
       lines.forEach(function (ln) {
         if (PAUSE_LINE.test(ln)) { out.push({ text: PAUSE_GLYPH, toks: [], dur: PAUSE_S, gap: PAUSE_S, beat: i }); return; }
-        var parts = ln.match(/[^.!?…]+[.!?…]+["')\\]]*|[^.!?…]+$/g) || [ln];
+        // A sentence ends at .!?… followed by a space or the line's end, so
+        // "getquotient.ai." or "3.5x" stays one word, one cue.
+        var parts = ln.match(/.+?(?:[.!?…]+["')\\]]*(?=\\s|$)|$)/g) || [ln];
         parts.forEach(function (p0, k) {
           var t = p0.trim(); if (!t) return;
           var tl = timeLine(t, emph);
+          if (sp !== 1) tl.toks.forEach(function (x) { x.start /= sp; x.end /= sp; });
           // Every sentence ends on the same short breath -- inside a scene
           // or at its end alike (no scene-boundary pause).
-          var gap = k === parts.length - 1 ? BREATH_S : 0;
-          out.push({ text: tl.toks.map(function (x) { return x.t; }).join(' '), toks: tl.toks, dur: Math.max(0.6, tl.spoken + gap), gap: gap, beat: i });
+          var gap = k === parts.length - 1 ? BREATH_S / sp : 0;
+          out.push({ text: tl.toks.map(function (x) { return x.t; }).join(' '), toks: tl.toks, dur: Math.max(0.5, tl.spoken / sp + gap), gap: gap, beat: i });
         });
       });
     });
@@ -133,15 +148,23 @@ export const PROMPTER_VIEW_JS = `
     $('next2').textContent = cues[i + 2] ? cues[i + 2].text : '';
     cueTimer = setTimeout(function () { showCue(i + 1); }, c.dur * 1000);
   }
+  // The reader's speed, remembered per film on this device; the last speed
+  // set anywhere is the start for a film not read yet.
+  function loadSpeed(project) { try { return clampSpeed(localStorage.getItem('mp.prompter.speed.' + project) || localStorage.getItem('mp.prompter.speed') || 1); } catch (e) { return 1; } }
+  function saveSpeed(project, v) { try { localStorage.setItem('mp.prompter.speed.' + project, String(v)); localStorage.setItem('mp.prompter.speed', String(v)); } catch (e) {} }
   function clearPrompter() { if (cueTimer) clearTimeout(cueTimer); cueTimer = null; stopKaraoke(); cueIdx = -1; $('cue').textContent = ''; $('next').textContent = ''; $('next2').textContent = ''; }
 `;
 
 interface PrompterApi {
   WORDS_PER_SEC: number;
-  buildCues(scenes: Array<{ voiceover_text?: string; emphasis?: string[] }>): PrompterCue[];
+  buildCues(scenes: Array<{ voiceover_text?: string; emphasis?: string[] }>, speed?: number): PrompterCue[];
+  clampSpeed(v: number): number;
+  speedWpm(v: number): number;
 }
 
-const api = new Function(`${PROMPTER_TIMING_JS}\nreturn { WORDS_PER_SEC: WORDS_PER_SEC, buildCues: buildCues };`)() as PrompterApi;
+const api = new Function(`${PROMPTER_TIMING_JS}\nreturn { WORDS_PER_SEC: WORDS_PER_SEC, buildCues: buildCues, clampSpeed: clampSpeed, speedWpm: speedWpm };`)() as PrompterApi;
 
 export const WORDS_PER_SEC = api.WORDS_PER_SEC;
 export const buildCues = api.buildCues;
+export const clampSpeed = api.clampSpeed;
+export const speedWpm = api.speedWpm;

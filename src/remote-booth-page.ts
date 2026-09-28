@@ -124,6 +124,7 @@ ${QUOTIENT_CSS}
   .seg button { border-radius: 0; margin-left: -1px; }
   .seg button:first-child { border-radius: 10px 0 0 10px; margin-left: 0; }
   .seg button:last-child { border-radius: 0 10px 10px 0; }
+  #speedWpm { min-width: 84px; font-variant-numeric: tabular-nums; opacity: 1; cursor: default; }
   .grow { flex: 1; }
   #main { flex: 1; display: grid; grid-template-columns: minmax(300px, 34vw) 1fr; min-height: 0; }
   #side { border-right: 1px solid rgba(255,255,255,.08); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
@@ -192,6 +193,7 @@ ${QUOTIENT_CSS}
   <span class="grow"></span>
   <span class="seg" id="shotSeg" role="group" aria-label="Shot size"><button type="button" data-shot="close">Close</button><button type="button" data-shot="medium">Medium</button><button type="button" data-shot="wide">Wide</button></span>
   <button id="mirrorBtn" type="button" aria-pressed="false" title="Mirror the prompter for teleprompter glass">Mirror</button>
+  <span class="seg" title="Prompter speed"><button id="slowerBtn" type="button" title="Slower">−</button><button id="speedWpm" type="button" disabled></button><button id="fasterBtn" type="button" title="Faster">+</button></span>
   <span class="seg"><button id="smallerBtn" type="button" title="Smaller type">A−</button><button id="biggerBtn" type="button" title="Bigger type">A+</button></span>
 </header>
 <main id="main">
@@ -284,6 +286,16 @@ ${QUOTIENT_CSS}
     placeGuide(); lcSmooth = null; lcShown = null;
   }
   $('smallerBtn').addEventListener('click', function () { prefs.pt -= 8; applyPrefs(); savePrefs(); });
+  // Prompter speed (core/prompter.ts), remembered per film on this screen.
+  // Changing it mid-take re-times the lines still to come.
+  var speed = 1, cueScenes = [];
+  function applySpeed() {
+    cues = buildCues(cueScenes, speed);
+    total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
+    $('speedWpm').textContent = speedWpm(speed) + ' wpm';
+  }
+  $('slowerBtn').addEventListener('click', function () { speed = clampSpeed(speed - 0.1); saveSpeed(project, speed); applySpeed(); });
+  $('fasterBtn').addEventListener('click', function () { speed = clampSpeed(speed + 0.1); saveSpeed(project, speed); applySpeed(); });
   $('biggerBtn').addEventListener('click', function () { prefs.pt += 8; applyPrefs(); savePrefs(); });
   $('mirrorBtn').addEventListener('click', function () { prefs.mirror = !prefs.mirror; applyPrefs(); savePrefs(); });
   [].forEach.call(document.querySelectorAll('#shotSeg button'), function (b) { b.addEventListener('click', function () { prefs.shot = b.getAttribute('data-shot'); applyPrefs(); savePrefs(); }); });
@@ -357,8 +369,8 @@ ${QUOTIENT_CSS}
         var scenes = scene === 'all' ? all : (all[scene] ? [all[scene]] : []);
         var grammar = (p.treatment && p.treatment.filmGrammar) || '';
         st.film = { name: p.name || project, canvas: p.canvas, grammar: grammar, sceneCount: all.length };
-        cues = buildCues(scenes);
-        total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
+        cueScenes = scenes; speed = loadSpeed(project);
+        applySpeed();
         $('filmName').textContent = st.film.name;
         fillScenes(all);
         document.title = st.film.name + ' — remote booth';
@@ -370,7 +382,7 @@ ${QUOTIENT_CSS}
         $('bg').value = spk ? (spk.data.background || (spk.data.src === 'speaker-alpha' ? 'alpha' : 'room')) : 'room';
         $('bgRow').style.display = (grammar === 'speaker' || grammar === 'creator-cut') ? '' : 'none';
         showIdle();
-        status(cues.length ? (cues.length + (cues.length === 1 ? ' line' : ' lines') + ' · about ' + fmt(total) + ' at speaking pace. ' + (st.cameraPresent ? 'Press Start or the space bar.' : 'Pair the phone, or press Start for the prompter alone.')) : 'This scene has no spoken lines. You can still record.');
+        status(cues.length ? (cues.length + (cues.length === 1 ? ' line' : ' lines') + ' · about ' + fmt(total) + ' at ' + speedWpm(speed) + ' wpm. ' + (st.cameraPresent ? 'Press Start or the space bar.' : 'Pair the phone, or press Start for the prompter alone.')) : 'This scene has no spoken lines. You can still record.');
         pairUi();
       })
       .catch(function (e) { status(e.message || String(e), 'err'); });
