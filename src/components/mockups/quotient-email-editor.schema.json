@@ -1,0 +1,83 @@
+{
+  "type": "quotient-email-editor",
+  "label": "Quotient email editor (the email writes itself)",
+  "category": "mockups",
+  "description": "The Quotient EMAIL-BROADCAST EDITOR, hand-built from captures of the real app: the dotted canvas with the email column centred on its body-background frame, the blue-600 SELECTION OUTLINE on the block being edited, and (show_panel) the RIGHT PANEL -- collapse button, Layers / Styles / Preview tabs, Color (Background, Text), Border (Color, Radius, Width, Style), Spacing (Padding/Margin, Mode Uniform, All Sides px) and Text (Font, Size, Weight, Align) sections. The email is a data-driven MARKETING email: blocks render in order -- logo, eyebrow, hero (image URL or a designed brand-gradient panel with a 3-step flow diagram), headline, text, button (brand CTA pill), features (icon + title + one line), card (image + link title + body), quote (purple left rule), divider, footer (small print + social icons). Default = the Flows trial email: 'Your trial ends in 3 days' / 'Keep my workspace'. THE ENTRANCE IS THE PERFORMANCE (scrub-safe; data.at shifts it; entrance:'none' = the finished email for stills): a 'Drafted with Quotient' chip pops, blocks arrive top to bottom with a short rise, the headline and text TYPE in, the hero's flow cards pop and their connectors draw, the button POPS LAST; the selection outline moves to each block as it is written and the panel's values (hex swatches, radius, width, padding, font size/weight, Layers row) follow the selected block; on a box shorter than the email the canvas scrolls to follow the writing and settles back with the button in view. Default write time 2.2s (write_time, pace). SIZING: phone-first -- on a TALL box (taller than wide) the panel hides and the email column fills the width (1em = column width / 30: ~26px body, ~57px headline on a 1080-wide frame), the canvas a thin dotted margin, docked by default; on a WIDE box the canvas + centred column + panel sit side by side like the product. Sizes itself from its box (em + ResizeObserver) -- no fit box. SHELL PLACEMENT: quotient-app-shell at x 1.2%, y 2%, width 97.6%, height 96% with show_panel:false, and this component docked:true at x 4.7%, y 8%, width 93.7%, height 89%. Full-frame 9:16: no position (full frame). SCRIPT VERBS: select {block}, set-text {block|target, to}, type {block, text}, scroll {to: block|px|'top'|'bottom'}, highlight {block}, count {target|block, to}, switch-tab {tab}, plus move-cursor/click/wait (blocks and tabs are cursor targets). CAMERA ANCHORS: email, panel, canvas, block-0..block-N, and the first block of each kind by kind name (headline, hero, button, text, features, footer...), plus a block's own `id`.",
+  "data": {
+    "brand": {
+      "type": "object",
+      "label": "{name: 'Quotient', color: '#393bf5' (buttons, eyebrow, icons, hero gradient), color_2?: gradient partner, logo?: URL (default the Quotient app icon)}",
+      "optional": true
+    },
+    "blocks": {
+      "type": "array",
+      "label": "The email, in order: [{kind: 'logo'|'eyebrow'|'hero'|'headline'|'text'|'button'|'features'|'card'|'quote'|'divider'|'footer', ...}]. logo {text?, logo?}; eyebrow {text}; hero {image?: URL | steps?: [{icon, title, sub}] (3 flow cards), label?, height?}; headline {text}; text {text}; button {text, color?, align?:'center', arrow?:false}; features {items: [{icon: zap|pen|chart|users|mail|clock|send|check|trend|bell|shield|calendar, title, text}]}; card {image?, title, text}; quote {label, text}; divider {}; footer {copyright?, text?, social?: ['x','linkedin','instagram','youtube'], unsubscribe?}. Any block: id? (extra anchor/target name), layer? (Layers-tab name), style? {background, color, border_color, radius, border_width, padding, font_size, font_weight, align} (what the panel shows when it is selected). '--' in copy renders as an em dash.",
+      "optional": true
+    },
+    "show_panel": {
+      "type": "boolean",
+      "label": "Show the right props panel (default: true on a wide box, false on a tall one)",
+      "optional": true
+    },
+    "panel_tab": {
+      "type": "string",
+      "label": "Panel tab at open: Layers | Styles (default) | Preview",
+      "optional": true
+    },
+    "subject": { "type": "string", "label": "Preview tab subject line (default: the headline)", "optional": true },
+    "preheader": { "type": "string", "label": "Preview tab preview text (default: the first text block)", "optional": true },
+    "entrance": {
+      "type": "string",
+      "label": "'write' (default: the email writes itself) | 'none' (the finished email from frame 0 -- stills)",
+      "optional": true
+    },
+    "at": { "type": "number", "label": "Shift the whole write performance by this many seconds", "optional": true },
+    "write_time": { "type": "number", "label": "Seconds the email takes to write itself (default 2.2)", "optional": true },
+    "pace": { "type": "number", "label": "Multiplies the write time (0.5 = twice as fast, 2 = twice as slow)", "optional": true },
+    "selected": {
+      "type": "string",
+      "label": "Block selected when settled (index, 'block-N', kind or text; 'none' = no outline). Default: the button",
+      "optional": true
+    },
+    "chip": {
+      "type": "string",
+      "label": "The sparkle chip's text (default 'Drafted with Quotient'); false hides it",
+      "optional": true
+    },
+    "follow": { "type": "boolean", "label": "Scroll the canvas to follow the writing when the email is taller than the box (default true)", "optional": true },
+    "font": { "type": "string", "label": "Email font family (default Inter; shown in the panel's Font field)", "optional": true },
+    "scale": { "type": "number", "label": "Email type scale multiplier (default 1)", "optional": true },
+    "column": { "type": "number", "label": "Wide box: email column width as a fraction of the canvas (default 0.5)", "optional": true },
+    "panel_width": { "type": "number", "label": "Panel width as a fraction of the box (default 0.19)", "optional": true },
+    "docked": {
+      "type": "boolean",
+      "label": "true = no outer card border/shadow (sits flush in quotient-app-shell's content well). Default: true on a tall box, false (white rounded card) on a wide one",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "label": "Performance: select {block, at}; set-text {block?|target?, to, slot?, at} (target = text to replace); type {block, text, speed?|duration?, at} (retypes the block, selects it); scroll {to: block|px|'top'|'bottom', duration?, at}; highlight {block, duration?, color?, at}; count {target: '1,284' | block, to, from?, duration?, display?, at} (rolls a number in the copy); switch-tab {tab: 'Layers'|'Styles'|'Preview', at}; plus move-cursor / click / wait (targets: block-N, kind names, Layers/Styles/Preview, collapse, send-test)",
+      "optional": true
+    },
+    "cursor_targets": { "type": "object", "label": "Named cursor positions (override the built-in block/tab targets)", "optional": true }
+  },
+  "script_actions": [
+    { "action": "select", "description": "Move the selection outline to a block; the panel follows", "params": { "block": "index | 'block-N' | kind | text" } },
+    { "action": "set-text", "description": "Swap copy instantly", "params": { "block": "block ref (optional)", "target": "text to replace (optional)", "to": "string", "slot": "slot name, e.g. 'title-1' in features (optional)" } },
+    { "action": "type", "description": "Retype a block's text with a caret (selects it)", "params": { "block": "block ref", "text": "string", "speed": "sec/char (default 0.03)" } },
+    { "action": "scroll", "description": "Scroll the canvas", "params": { "to": "block ref | px | 'top' | 'bottom'", "duration": "seconds (default 0.8)" } },
+    { "action": "highlight", "description": "Accent wash + ring on a block", "params": { "block": "block ref", "duration": "seconds (default 1.4)", "color": "hex" } },
+    { "action": "count", "description": "Roll a number in the copy from its value to a new one", "params": { "target": "the number as shown, e.g. '1,284'", "block": "block ref (optional)", "to": "number", "duration": "seconds (default 1)", "display": "final text override" } },
+    { "action": "switch-tab", "description": "Switch the panel tab", "params": { "tab": "Layers | Styles | Preview" } }
+  ],
+  "example": {
+    "brand": { "name": "Quotient", "color": "#393bf5" },
+    "docked": true,
+    "script": [
+      { "action": "count", "target": "1,284", "to": 2410, "at": 3.2 },
+      { "action": "switch-tab", "tab": "Layers", "at": 4.2 },
+      { "action": "highlight", "block": "headline", "at": 4.4 }
+    ]
+  },
+  "tier": "performable-surface"
+}

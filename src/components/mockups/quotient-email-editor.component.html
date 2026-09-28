@@ -1,0 +1,908 @@
+<template>
+  <div class="qee">
+    <div class="qee-canvas" data-anchor="canvas">
+      <div class="qee-scroll">
+        <div class="qee-frame">
+          <div class="qee-col" data-anchor="email">
+            <div class="qee-blocks"></div>
+            <div class="qee-sel"></div>
+            <div class="qee-chip"><svg viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4M22 5h-4"/></svg><span class="qee-chip-txt"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="qee-panel" data-anchor="panel">
+      <div class="qee-pin"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  /* QUOTIENT EMAIL EDITOR: the email-broadcast editor, hand-built from two
+     captures of the real app -- the dotted CANVAS with the email column
+     centred on its body-background frame (selection = a 2px blue-600 ring),
+     and the RIGHT PANEL (collapse button, Layers / Styles / Preview tabs,
+     Color / Border / Spacing / Text sections: Inter 12px labels, 30px inputs
+     with a 1px #eff0f6 border and 10px radius). The email itself is a
+     data-driven marketing email that WRITES ITSELF on the timeline.
+     Sizing: the email column's font size is 1em = column width / 30 (a 600px
+     email's 16px body is 0.8em); on a tall box the panel hides and the column
+     fills the width; on a wide box the panel (designed at 254px, scaled) sits
+     on the right. A ResizeObserver refits it all. */
+  .qee, .qee * { box-sizing: border-box; max-width: none; }
+  .qee { position: absolute; inset: 0; overflow: hidden; font-family: Inter, 'Helvetica Neue', Arial, sans-serif; color: #17171c;
+         -webkit-font-smoothing: antialiased; background: #fff;
+         /* >= 1.5px border + >= 0.12-alpha shadow when standalone (ghost-panel gate). */
+         border: 2px solid #dedcd6; border-radius: 14px; box-shadow: 0 10px 32px rgba(23,23,28,0.16); }
+  .qee.is-docked { border: 0; box-shadow: none; border-radius: 12px; }
+  .qee svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+  .qee-canvas { position: absolute; left: 0; top: 0; bottom: 0; overflow: hidden; background-color: #fff;
+                background-image: radial-gradient(circle, rgba(23, 23, 28, 0.255) var(--qee-dot, 0.85px), rgba(0, 0, 0, 0) var(--qee-dot, 0.85px)); }
+  .qee-scroll { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+  .qee-frame { position: relative; margin: 0 auto; background: #fcfcfc; border-radius: 0.5em;
+               box-shadow: rgba(25, 44, 128, 0.02) 0 0.4em 0.8em, rgba(196, 196, 215, 0.25) 0 0.2em 0.4em, rgba(196, 196, 215, 0.17) 0 0.1em 0.2em, rgba(0, 0, 0, 0.04) 0 0 0 1px; }
+  .qee.is-tall .qee-frame { background: transparent; box-shadow: none; }
+  .qee-col { position: relative; margin: 0 auto; background: #fff; color: #17171b; padding: 0 1em 1.1em;
+             font-family: var(--qee-font, Inter), 'Helvetica Neue', Arial, sans-serif; }
+  .qee.is-tall .qee-col { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 0.3em 1.2em rgba(25, 44, 128, 0.07); border-radius: 0.35em; }
+  .qee-blocks { position: relative; }
+
+  /* the selection outline (captured: box-shadow 0 0 0 2px lab(44 29 -86) = #155dfc) */
+  .qee-sel { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 5;
+             border: max(2px, 0.07em) solid #155dfc; border-radius: 0.12em; visibility: hidden; }
+  .qee-sel::before, .qee-sel::after { content: ''; position: absolute; width: 0.28em; height: 0.28em; background: #fff;
+             border: max(1.5px, 0.05em) solid #155dfc; border-radius: 0.06em; }
+  .qee-sel::before { left: -0.18em; top: -0.18em; }
+  .qee-sel::after { right: -0.18em; bottom: -0.18em; }
+
+  .qee-chip { position: absolute; top: 1.05em; right: 1em; z-index: 6; display: flex; align-items: center; gap: 0.3em;
+              font-family: Inter, 'Helvetica Neue', Arial, sans-serif; font-size: 0.5em; font-weight: 600; color: var(--qee-brand, #393bf5);
+              background: #fff; border: 1px solid var(--qee-brand-20, rgba(57,59,245,0.2)); border-radius: 99em; padding: 0.42em 0.95em 0.42em 0.75em;
+              box-shadow: 0 0.3em 0.9em var(--qee-brand-15, rgba(57,59,245,0.15)); white-space: nowrap; }
+  .qee-chip svg { width: 1.25em; height: 1.25em; stroke-width: 1.8; fill: var(--qee-brand-15, rgba(57,59,245,0.15)); }
+
+  /* ---- blocks (em = column width / 30) ---- */
+  .qee-b { position: relative; }
+  .qee-anc { position: absolute; inset: 0; pointer-events: none; }
+  .qee-hl { position: absolute; inset: -0.3em; border-radius: 0.35em; pointer-events: none; visibility: hidden; opacity: 0;
+            background: var(--qee-hl-bg, rgba(57,59,245,0.08)); box-shadow: 0 0 0 max(2px, 0.08em) var(--qee-hl-ring, rgba(57,59,245,0.5)); }
+  .qee-b-headline > .qee-hl { inset: -0.2em -0.17em; border-radius: 0.2em; }
+  .qee-b-text > .qee-hl, .qee-b-eyebrow > .qee-hl { inset: -0.3em -0.35em; }
+  .qee-caret { display: inline-block; width: 0.07em; min-width: 2px; height: 1em; margin-left: 0.04em; vertical-align: -0.12em;
+               background: var(--qee-brand, #393bf5); }
+  .qee-ghost { visibility: hidden; }
+
+  .qee-b-logo { display: flex; align-items: center; gap: 0.42em; padding: 1.15em 0 0.2em; min-height: 3.1em; }
+  .qee-logo-mark { width: 1.45em; height: 1.45em; border-radius: 0.36em; flex: none; position: relative; overflow: hidden;
+                   background: linear-gradient(135deg, var(--qee-brand, #393bf5), var(--qee-brand-2, #7a5cff)); color: #fff;
+                   display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1em; }
+  .qee-logo-mark img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .qee-logo-name { font-weight: 700; font-size: 1.02em; letter-spacing: -0.015em; color: #17171b; }
+
+  .qee-b-eyebrow { margin-top: 1.1em; font-size: 0.64em; font-weight: 600; letter-spacing: 0.02em; color: var(--qee-brand, #393bf5); line-height: 1.5; }
+
+  .qee-b-hero { margin-top: 0.6em; }
+  .qee-hero { position: relative; height: 12.6em; border-radius: 0.7em; overflow: hidden;
+              background: linear-gradient(135deg, var(--qee-tint, #eceeff) 0%, var(--qee-tint-2, #f4eeff) 100%); }
+  .qee-hero img.qee-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .qee-hero-glow { position: absolute; inset: 0;
+                   background: radial-gradient(60% 70% at 88% 12%, var(--qee-brand-25, rgba(57,59,245,0.25)), transparent 70%),
+                               radial-gradient(50% 60% at 6% 100%, var(--qee-brand-2-20, rgba(122,92,255,0.2)), transparent 70%); }
+  .qee-hero-dots { position: absolute; inset: 0; opacity: 0.55;
+                   background-image: radial-gradient(circle, var(--qee-brand-20, rgba(57,59,245,0.2)) 0.05em, transparent 0.06em); background-size: 0.9em 0.9em; }
+  .qee-hero-label { position: absolute; left: 1em; top: 0.9em; display: flex; align-items: center; gap: 0.35em; font-size: 0.52em; font-weight: 600;
+                    color: var(--qee-brand, #393bf5); background: rgba(255,255,255,0.75); border-radius: 99em; padding: 0.35em 0.8em 0.35em 0.6em; }
+  .qee-hero-label svg { width: 1.2em; height: 1.2em; }
+  .qee-hero-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .qee-hero-svg path { fill: none; stroke: var(--qee-brand, #393bf5); stroke-width: 0.9; stroke-linecap: round; opacity: 0.55; }
+  .qee-hero-svg circle { fill: var(--qee-brand, #393bf5); stroke: none; }
+  .qee-step { position: absolute; width: 8.3em; display: flex; align-items: center; gap: 0.5em; background: #fff; border-radius: 0.5em;
+              padding: 0.55em 0.6em; box-shadow: 0 0 0 1px rgba(23,23,28,0.05), 0 0.35em 0.9em rgba(25,44,128,0.12); }
+  .qee-step-ico { width: 1.5em; height: 1.5em; border-radius: 0.4em; flex: none; display: flex; align-items: center; justify-content: center;
+                  background: var(--qee-brand, #393bf5); color: #fff; }
+  .qee-step-ico svg { width: 0.9em; height: 0.9em; }
+  .qee-step:nth-of-type(2) .qee-step-ico { background: linear-gradient(135deg, var(--qee-brand, #393bf5), var(--qee-brand-2, #7a5cff)); }
+  .qee-step-txt { min-width: 0; }
+  .qee-step-t { font-size: 0.54em; font-weight: 700; line-height: 1.25; color: #17171b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qee-step-s { font-size: 0.44em; font-weight: 500; line-height: 1.35; color: #8f8f9f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .qee-b-headline { margin-top: 0.85em; font-size: 1.72em; line-height: 1.12; font-weight: 800; letter-spacing: -0.028em; color: #17171b; }
+  .qee-b-text { margin-top: 0.62em; font-size: 0.8em; line-height: 1.55; color: #6a6a78; }
+  .qee-b-button { margin-top: 1.05em; display: flex; }
+  .qee-btn { display: inline-flex; align-items: center; gap: 0.5em; font-size: 0.8em; font-weight: 700; color: #fff; background: var(--qee-btn, #393bf5);
+             border-radius: 99em; padding: 0.9em 1.65em; letter-spacing: -0.005em;
+             box-shadow: 0 0.5em 1.2em var(--qee-btn-30, rgba(57,59,245,0.3)), inset 0 1px 0 rgba(255,255,255,0.18); }
+  .qee-btn svg { width: 1em; height: 1em; stroke-width: 2.4; }
+
+  .qee-b-features { margin-top: 1.3em; border-top: 1px solid #efeff6; padding-top: 0.35em; }
+  .qee-feat { display: flex; align-items: center; gap: 0.75em; padding: 0.6em 0; }
+  .qee-feat-ico { width: 2em; height: 2em; border-radius: 0.55em; flex: none; display: flex; align-items: center; justify-content: center;
+                  background: var(--qee-tint, #eceeff); color: var(--qee-brand, #393bf5); }
+  .qee-feat-ico svg { width: 1em; height: 1em; }
+  .qee-feat-txt { min-width: 0; }
+  .qee-feat-t { font-size: 0.78em; font-weight: 700; line-height: 1.3; color: #17171b; }
+  .qee-feat-d { font-size: 0.66em; line-height: 1.45; color: #6a6a78; }
+
+  .qee-b-card { margin-top: 1em; border: 1px solid #dfdfed; border-radius: 0.6em; padding: 0.7em; }
+  .qee-card-img { height: 7.6em; border-radius: 0.4em; overflow: hidden; position: relative;
+                  background: linear-gradient(135deg, var(--qee-tint, #eceeff), var(--qee-tint-2, #f4eeff)); display: flex; align-items: center; justify-content: center;
+                  color: var(--qee-brand, #393bf5); }
+  .qee-card-img svg { width: 2.4em; height: 2.4em; stroke-width: 1.5; opacity: 0.7; }
+  .qee-card-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .qee-card-t { margin-top: 0.65em; font-size: 0.9em; font-weight: 700; line-height: 1.35; color: var(--qee-brand, #393bf5);
+                text-decoration: underline; text-underline-offset: 0.15em; }
+  .qee-card-d { margin-top: 0.45em; font-size: 0.7em; line-height: 1.55; color: #6a6a78; }
+
+  .qee-b-quote { margin-top: 1em; border-left: 0.3em solid #5027cb; padding-left: 0.6em; font-size: 0.72em; line-height: 1.55; color: #17171b; }
+  .qee-quote-l { font-weight: 700; }
+  .qee-b-divider { margin-top: 1.1em; height: 1px; background: #efeff6; }
+
+  .qee-b-footer { margin-top: 1.3em; background: #f9f9fb; border-radius: 0.6em; padding: 1em 1.1em 1.05em; color: #8f8f9f; }
+  .qee-foot-l { font-size: 0.55em; line-height: 1.6; }
+  .qee-social { display: flex; gap: 0.6em; margin: 0.65em 0; color: #17171b; }
+  .qee-social svg { width: 0.95em; height: 0.95em; }
+  .qee-social .fill { fill: currentColor; stroke: none; }
+  .qee-unsub { font-size: 0.55em; margin-top: 0.45em; text-decoration: underline; text-underline-offset: 0.15em; }
+
+  /* ---- right panel (designed at 254px wide, scaled from the box) ---- */
+  .qee-panel { position: absolute; top: 0; right: 0; bottom: 0; background: #fff; border-left: 1px solid #eff0f6; overflow: hidden; }
+  .qee-pin { position: absolute; left: 0; top: 0; width: 254px; transform-origin: 0 0; font-size: 12px; line-height: 16px; color: #17171c; }
+  .qp-head { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px 0 10px; }
+  .qp-collapse { width: 34px; height: 30px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #fff;
+                 box-shadow: rgba(25,44,128,0.02) 0 8px 16px, rgba(196,196,215,0.25) 0 4px 8px, rgba(196,196,215,0.17) 0 2px 4px, rgba(0,0,0,0.04) 0 0 0 1px; }
+  .qp-collapse svg { width: 16px; height: 16px; }
+  .qp-tabs { position: relative; display: flex; height: 32px; padding: 4px; border-radius: 8px; background: #f9f9fb; color: #54545f;
+             box-shadow: rgba(44,51,69,0.04) 0 1.5px 1.5px, rgba(154,157,166,0.03) 0 0.5px 0.5px; }
+  .qp-tab-bg { position: absolute; top: 4px; height: 24px; border-radius: 8px; background: #fff; box-shadow: rgba(0,0,0,0.05) 0 1px 2px; }
+  .qp-tab { position: relative; height: 24px; padding: 4px 8px; font-size: 12px; font-weight: 500; line-height: 16px; white-space: nowrap; }
+  .qp-tab.on { color: #17171c; }
+  .qp-view { display: none; }
+  .qp-view.on { display: block; }
+  .qp-sec { padding: 8px 16px 12px; border-top: 1px solid #eff0f6; }
+  .qp-sec:first-child { border-top: 0; }
+  .qp-sh { height: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; line-height: 20px; font-weight: 500; }
+  .qp-sh svg { width: 10px; height: 10px; }
+  .qp-body { padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .qp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .qp-lbl { font-size: 12px; font-weight: 500; line-height: 16px; white-space: nowrap; }
+  .qp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .qp-stack { display: flex; flex-direction: column; gap: 8px; }
+  .qp-in { height: 30px; border: 1px solid #eff0f6; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 8px;
+           padding: 0 10px 0 6px; font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; }
+  .qp-in.w107 { width: 107px; flex: none; }
+  .qp-in.pop { height: 32px; border-radius: 12px; padding: 0 10px 0 12px; box-shadow: rgba(44,51,69,0.04) 0 1.5px 1.5px, rgba(154,157,166,0.03) 0 0.5px 0.5px; }
+  .qp-in .v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .qp-in .v.ph { color: #8f8f9f; }
+  .qp-in svg { width: 16px; height: 16px; flex: none; }
+  .qp-in .chev { width: 14px; height: 14px; }
+  .qp-in .chev.light { color: #a3a3b1; }
+  .qp-sw { width: 16px; height: 16px; border-radius: 10px; border: 1px solid #eff0f6; flex: none; background: #000; }
+  .qp-ib { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .qp-ib.on { background: #f1f1f5; }
+  .qp-ib svg { width: 16px; height: 16px; }
+  .qp-seg { display: flex; height: 32px; padding: 4px; border-radius: 8px; background: #f9f9fb; color: #54545f;
+            box-shadow: rgba(44,51,69,0.04) 0 1.5px 1.5px, rgba(154,157,166,0.03) 0 0.5px 0.5px; }
+  .qp-seg > div { flex: 1; height: 24px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; gap: 6px; }
+  .qp-seg > div.on { background: #fff; color: #17171c; box-shadow: rgba(0,0,0,0.05) 0 1px 2px; }
+  .qp-seg svg { width: 14px; height: 14px; }
+  .qp-px { display: flex; align-items: center; gap: 4px; font-weight: 500; margin-left: auto; }
+  .qp-layers { padding: 4px 8px; }
+  .qp-lrow { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 22px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #54545f; }
+  .qp-lrow svg { width: 14px; height: 14px; flex: none; }
+  .qp-lrow.root { padding-left: 6px; color: #17171c; }
+  .qp-lrow.on { background: var(--qee-brand-10, rgba(57,59,245,0.1)); color: var(--qee-brand, #393bf5); }
+  .qp-lrow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qp-text { height: auto; min-height: 30px; padding: 7px 10px; white-space: normal; line-height: 16px; }
+  .qp-send { height: 32px; border-radius: 10px; background: #17171c; color: #fff; display: flex; align-items: center; justify-content: center; gap: 6px;
+             font-size: 12px; font-weight: 600; }
+  .qp-send svg { width: 14px; height: 14px; }
+  .qp-inbox { border: 1px solid #eff0f6; border-radius: 10px; padding: 10px; display: flex; gap: 8px; }
+  .qp-inbox-ava { width: 26px; height: 26px; border-radius: 7px; flex: none; background: linear-gradient(135deg, var(--qee-brand, #393bf5), var(--qee-brand-2, #7a5cff));
+                  color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .qp-inbox-t { font-weight: 600; font-size: 12px; }
+  .qp-inbox-s { font-size: 11.5px; font-weight: 600; color: #17171c; }
+  .qp-inbox-p { font-size: 11px; color: #8f8f9f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.qee');
+    var canvas = el.querySelector('.qee-canvas');
+    var scroller = el.querySelector('.qee-scroll');
+    var frame = el.querySelector('.qee-frame');
+    var col = el.querySelector('.qee-col');
+    var wrap = el.querySelector('.qee-blocks');
+    var sel = el.querySelector('.qee-sel');
+    var chip = el.querySelector('.qee-chip');
+    var panel = el.querySelector('.qee-panel');
+    var pin = el.querySelector('.qee-pin');
+    var num = function (v, d) { var n = Number(v); return isFinite(n) ? n : d; };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+
+    // ── brand + colours ──
+    var brand = data.brand || {};
+    var B = /^#[0-9a-f]{6}$/i.test(brand.color || data.accent || '') ? (brand.color || data.accent) : '#393bf5';
+    var hexRgb = function (h) { h = h.replace('#', ''); if (h.length === 3) h = h.replace(/(.)/g, '$1$1'); var n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+    var rgba = function (h, a) { var c = hexRgb(h); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; };
+    var toHex = function (c) { return '#' + c.map(function (v) { return ('0' + Math.round(Math.max(0, Math.min(255, v))).toString(16)).slice(-2); }).join('').toUpperCase(); };
+    var mix = function (h, w, t) { var a = hexRgb(h), b = hexRgb(w); return toHex([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]); };
+    var B2 = brand.color_2 || mix(B, '#b14cff', 0.45);
+    var tint = mix(B, '#ffffff', 0.9), tint2 = mix(B2, '#ffffff', 0.9);
+    var vars = { '--qee-brand': B, '--qee-brand-2': B2, '--qee-brand-10': rgba(B, 0.1), '--qee-brand-15': rgba(B, 0.15), '--qee-brand-20': rgba(B, 0.2),
+      '--qee-brand-25': rgba(B, 0.25), '--qee-brand-2-20': rgba(B2, 0.2), '--qee-tint': tint, '--qee-tint-2': tint2,
+      '--qee-hl-bg': rgba(B, 0.08), '--qee-hl-ring': rgba(B, 0.5) };
+    Object.keys(vars).forEach(function (k) { root.style.setProperty(k, vars[k]); });
+    var fontName = data.font || 'Inter';
+    root.style.setProperty('--qee-font', /[\s,]/.test(fontName) && !/^['"]/.test(fontName) && fontName.indexOf(',') < 0 ? "'" + fontName + "'" : fontName);
+    var brandName = brand.name || 'Quotient';
+    var brandLogo = brand.logo || brand.logo_url || data.logo_url || (brand.name ? '' : 'https://img.logo.dev/getquotient.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128');
+
+    // ── icons (lucide) ──
+    var P = {
+      clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+      sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4M22 5h-4"/>',
+      send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+      zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+      pen: '<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
+      chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
+      mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+      check: '<path d="M20 6 9 17l-5-5"/>',
+      workflow: '<rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/>',
+      image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+      type: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
+      heading: '<path d="M6 12h12M6 20V4M18 20V4"/>',
+      text: '<path d="M17 6.1H3M21 12.1H3M15.1 18H3"/>',
+      button: '<rect width="20" height="12" x="2" y="6" rx="6"/>',
+      list: '<path d="M3 12h.01M3 18h.01M3 6h.01M8 12h13M8 18h13M8 6h13"/>',
+      quote: '<path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/>',
+      minus: '<path d="M5 12h14"/>',
+      square: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
+      panel: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 15h18"/>',
+      arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
+      trend: '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
+      bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+      shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+      calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'
+    };
+    var svg = function (k, cls) { return '<svg viewBox="0 0 24 24"' + (cls ? ' class="' + cls + '"' : '') + '>' + (P[k] || P[k === undefined ? 'sparkles' : 'sparkles']) + '</svg>'; };
+    var icon = function (k) { return P[k] ? svg(k) : svg('sparkles'); };
+
+    // ── the email: blocks, rendered in order ──
+    var DEFAULT_BLOCKS = [
+      { kind: 'logo' },
+      { kind: 'eyebrow', text: 'Your Flows trial' },
+      { kind: 'hero' },
+      { kind: 'headline', text: 'Your trial ends in 3 days' },
+      { kind: 'text', text: 'Hey Sarah -- your flows ran 1,284 times this week. Keep them running: everything you built stays exactly where it is.' },
+      { kind: 'button', text: 'Keep my workspace' },
+      { kind: 'features', items: [
+        { icon: 'zap', title: 'Flows that run themselves', text: 'Triggers, waits and branches run around the clock.' },
+        { icon: 'pen', title: 'Emails written in your voice', text: 'Every draft sounds like your team wrote it.' },
+        { icon: 'chart', title: 'See what every send drove', text: 'Opens, clicks and pipeline for every email.' }
+      ] },
+      { kind: 'footer' }
+    ];
+    var specs = (Array.isArray(data.blocks) && data.blocks.length ? data.blocks : DEFAULT_BLOCKS).filter(Boolean).map(function (b) {
+      if (typeof b === 'string') return { kind: b };
+      var o = Object.assign({}, b); o.kind = String(o.kind || o.type || 'text').toLowerCase(); return o;
+    });
+    // "--" in copy reads as an em dash
+    var dash = function (s) { return String(s == null ? '' : s).replace(/ -- /g, ' — ').replace(/--/g, '—'); };
+
+    var blocks = [];     // {el, kind, spec, slots:[], parts:{}}
+    var slots = [];      // every text slot: {el, base, block, name, events:[], typeIn, cur}
+    var mkSlot = function (blk, elx, text, name) {
+      var s = { el: elx, base: dash(text), block: blk, name: name || ('s' + blk.slots.length), events: [], typeIn: null, counts: [], cur: null };
+      elx.textContent = s.base; blk.slots.push(s); slots.push(s); return s;
+    };
+    var div = function (cls, html) { var d = document.createElement('div'); d.className = cls; if (html != null) d.innerHTML = html; return d; };
+    var inner = function (b) { var sp = document.createElement('span'); sp.className = 'qee-t'; b.appendChild(sp); return sp; };
+    var kindSeen = {};
+    specs.forEach(function (sp, i) {
+      var k = sp.kind;
+      var b = div('qee-b qee-b-' + k);
+      b.setAttribute('data-anchor', 'block-' + i);
+      b.setAttribute('data-kind', k);
+      var blk = { el: b, kind: k, spec: sp, slots: [], parts: {}, index: i };
+      if (k === 'logo') {
+        var mark = div('qee-logo-mark');
+        var nm = sp.text || sp.name || brandName;
+        mark.textContent = nm.charAt(0).toUpperCase();
+        var src = sp.logo || sp.image || brandLogo;
+        if (src) { var im = document.createElement('img'); im.alt = ''; im.onerror = function () { this.remove(); }; im.src = src; mark.appendChild(im); }
+        b.appendChild(mark);
+        var nmEl = div('qee-logo-name'); b.appendChild(nmEl); mkSlot(blk, nmEl, nm, 'name');
+      } else if (k === 'eyebrow') {
+        mkSlot(blk, inner(b), sp.text != null ? sp.text : 'Product update', 'text');
+      } else if (k === 'hero') {
+        var hero = div('qee-hero'); b.appendChild(hero);
+        if (sp.height) hero.style.height = num(sp.height, 12.6) + 'em';
+        if (sp.image || sp.src) {
+          var hi = document.createElement('img'); hi.className = 'qee-hero-img'; hi.alt = ''; hi.src = sp.image || sp.src; hero.appendChild(hi);
+        } else {
+          hero.appendChild(div('qee-hero-glow')); hero.appendChild(div('qee-hero-dots'));
+          var steps = Array.isArray(sp.steps) && sp.steps.length ? sp.steps.slice(0, 3) : [
+            { icon: 'clock', title: 'Trial ends in 3 days', sub: 'Trigger' },
+            { icon: 'sparkles', title: 'Write in your voice', sub: 'Quotient AI' },
+            { icon: 'send', title: 'Send the reminder', sub: 'Email · 9:00 AM' }
+          ];
+          var lab = sp.label != null ? sp.label : 'Trial reminder flow';
+          if (lab) { var le = div('qee-hero-label', icon('workflow') + '<span></span>'); hero.appendChild(le); mkSlot(blk, le.querySelector('span'), lab, 'label'); }
+          // staggered diagonal: 28em x 12.6em, 10 svg units per em
+          var HH = num(sp.height, 12.6);
+          var n = steps.length, pos = [];
+          for (var si = 0; si < n; si++) {
+            var fx = n === 1 ? 9.85 : 1.2 + si * ((28 - 2.4 - 8.3) / (n - 1));
+            var fy = n === 1 ? HH / 2 - 1.4 : (HH * 0.2) + si * ((HH - 1.4 - 2.8 - HH * 0.2) / (n - 1));
+            pos.push([fx, fy]);
+          }
+          var sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          sv.setAttribute('class', 'qee-hero-svg'); sv.setAttribute('viewBox', '0 0 280 ' + (HH * 10)); sv.setAttribute('preserveAspectRatio', 'none');
+          hero.appendChild(sv);
+          blk.parts.lines = []; blk.parts.steps = []; blk.parts.dots = [];
+          for (var li = 0; li < n - 1; li++) {
+            var a = pos[li], c = pos[li + 1];
+            var x1 = (a[0] + 2.2) * 10, y1 = (a[1] + 2.75) * 10, x2 = (c[0] - 0.15) * 10, y2 = (c[1] + 1.38) * 10, rr = Math.min(7, (y2 - y1) * 0.8);
+            var pth = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            pth.setAttribute('d', 'M' + x1 + ' ' + y1 + ' V' + (y2 - rr) + ' Q' + x1 + ' ' + y2 + ' ' + (x1 + rr) + ' ' + y2 + ' H' + x2);
+            sv.appendChild(pth);
+            var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            dot.setAttribute('cx', x2); dot.setAttribute('cy', y2); dot.setAttribute('r', 1.6); sv.appendChild(dot);
+            blk.parts.lines.push(pth); blk.parts.dots.push(dot);
+          }
+          steps.forEach(function (st, j) {
+            var cd = div('qee-step', '<div class="qee-step-ico">' + icon(st.icon || ['clock', 'sparkles', 'send'][j]) + '</div><div class="qee-step-txt"><div class="qee-step-t"></div><div class="qee-step-s"></div></div>');
+            cd.style.left = pos[j][0] + 'em'; cd.style.top = pos[j][1] + 'em';
+            hero.appendChild(cd);
+            mkSlot(blk, cd.querySelector('.qee-step-t'), st.title || '', 'step-' + j);
+            mkSlot(blk, cd.querySelector('.qee-step-s'), st.sub || st.text || '', 'step-' + j + '-sub');
+            blk.parts.steps.push(cd);
+          });
+        }
+      } else if (k === 'headline' || k === 'title') {
+        blk.kind = k = 'headline'; b.className = 'qee-b qee-b-headline'; b.setAttribute('data-kind', k);
+        mkSlot(blk, inner(b), sp.text != null ? sp.text : 'Something new is here', 'text');
+      } else if (k === 'button' || k === 'cta') {
+        blk.kind = k = 'button'; b.className = 'qee-b qee-b-button'; b.setAttribute('data-kind', k);
+        var bt = div('qee-btn', '<span></span>' + (sp.arrow === false ? '' : icon('arrow')));
+        if (sp.color && /^#[0-9a-f]{6}$/i.test(sp.color)) { bt.style.setProperty('--qee-btn', sp.color); bt.style.setProperty('--qee-btn-30', rgba(sp.color, 0.3)); }
+        else { root.style.setProperty('--qee-btn', B); root.style.setProperty('--qee-btn-30', rgba(B, 0.3)); }
+        if (sp.align === 'center') b.style.justifyContent = 'center';
+        b.appendChild(bt); blk.parts.btn = bt;
+        mkSlot(blk, bt.querySelector('span'), sp.text != null ? sp.text : 'Get started', 'text');
+      } else if (k === 'features') {
+        var items = Array.isArray(sp.items) && sp.items.length ? sp.items : [{ icon: 'zap', title: 'Feature', text: 'One line about it.' }];
+        blk.parts.rows = [];
+        items.slice(0, 4).forEach(function (it, j) {
+          var r = div('qee-feat', '<div class="qee-feat-ico">' + icon(it.icon || ['zap', 'pen', 'chart', 'users'][j]) + '</div><div class="qee-feat-txt"><div class="qee-feat-t"></div><div class="qee-feat-d"></div></div>');
+          b.appendChild(r); blk.parts.rows.push(r);
+          mkSlot(blk, r.querySelector('.qee-feat-t'), it.title || '', 'title-' + j);
+          var d = r.querySelector('.qee-feat-d');
+          if (it.text || it.desc) mkSlot(blk, d, it.text || it.desc, 'text-' + j); else d.remove();
+        });
+      } else if (k === 'card' || k === 'article') {
+        blk.kind = k = 'card'; b.className = 'qee-b qee-b-card'; b.setAttribute('data-kind', k);
+        var ci = div('qee-card-img', icon(sp.icon || 'image'));
+        if (sp.image) { var cim = document.createElement('img'); cim.alt = ''; cim.src = sp.image; ci.appendChild(cim); }
+        if (sp.image !== false) b.appendChild(ci);
+        var ct = div('qee-card-t'); b.appendChild(ct); mkSlot(blk, ct, sp.title || 'Read the story', 'title');
+        if (sp.text || sp.body) { var cdd = div('qee-card-d'); b.appendChild(cdd); mkSlot(blk, cdd, sp.text || sp.body, 'text'); }
+      } else if (k === 'quote') {
+        if (sp.label !== '' && sp.label !== false) { var ql = document.createElement('span'); ql.className = 'qee-quote-l'; b.appendChild(ql); mkSlot(blk, ql, (sp.label || 'Our take') + ':', 'label'); b.appendChild(document.createTextNode(' ')); }
+        var qt = document.createElement('span'); b.appendChild(qt); mkSlot(blk, qt, sp.text || '', 'text');
+      } else if (k === 'divider') {
+        // a rule: nothing to write
+      } else if (k === 'footer') {
+        var year = sp.year || 2026;
+        var l1 = div('qee-foot-l'); b.appendChild(l1); mkSlot(blk, l1, sp.copyright || ('© ' + year + ' ' + brandName + '. All rights reserved.'), 'copyright');
+        var socials = Array.isArray(sp.social) ? sp.social : ['x', 'linkedin', 'instagram'];
+        if (socials.length) {
+          var SOC = {
+            x: '<svg viewBox="0 0 24 24"><path class="fill" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+            linkedin: '<svg viewBox="0 0 24 24"><rect class="fill" x="2" y="2" width="20" height="20" rx="3"/><path d="M7.5 10v7M7.5 7v.01M11.5 17v-4a2.5 2.5 0 0 1 5 0v4M11.5 10v7" style="stroke:#fff;stroke-width:2.2"/></svg>',
+            instagram: '<svg viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37zM17.5 6.5h.01"/></svg>',
+            youtube: '<svg viewBox="0 0 24 24"><path class="fill" d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z" style="fill:#f9f9fb;stroke:none"/></svg>'
+          };
+          b.appendChild(div('qee-social', socials.map(function (s) { return SOC[s] || ''; }).join('')));
+        }
+        var l2 = div('qee-foot-l'); b.appendChild(l2);
+        mkSlot(blk, l2, sp.text != null ? sp.text : ('You’re receiving this because you started a Flows trial with ' + brandName + '.'), 'text');
+        var un = div('qee-unsub'); b.appendChild(un); mkSlot(blk, un, sp.unsubscribe || 'Unsubscribe', 'unsubscribe');
+      } else {
+        blk.kind = k = 'text'; b.className = 'qee-b qee-b-text'; b.setAttribute('data-kind', k);
+        mkSlot(blk, inner(b), sp.text != null ? sp.text : '', 'text');
+      }
+      if (sp.align === 'center' && k !== 'button') b.style.textAlign = 'center';
+      // camera anchors: block-N on the block; its kind (first of each) and a custom id on overlay children
+      var anc = [];
+      if (!kindSeen[k]) { kindSeen[k] = true; anc.push(k); }
+      if (sp.id) anc.push(String(sp.id));
+      anc.forEach(function (a) { var x = div('qee-anc'); x.setAttribute('data-anchor', a); b.appendChild(x); });
+      var hl = div('qee-hl'); b.appendChild(hl); blk.hl = hl;
+      wrap.appendChild(b);
+      blocks.push(blk);
+    });
+
+    chip.querySelector('.qee-chip-txt').textContent = typeof data.chip === 'string' ? data.chip : 'Drafted with Quotient';
+    if (data.chip === false) chip.style.display = 'none';
+
+    // ── block lookup: index | 'block-N' | kind | custom id | visible text ──
+    var findBlock = function (ref) {
+      if (ref == null || ref === 'none') return -1;
+      if (typeof ref === 'number') return ref >= 0 && ref < blocks.length ? ref : -1;
+      var s = String(ref), m = /^block-(\d+)$/.exec(s);
+      if (m) return num(m[1], -1) < blocks.length ? num(m[1], -1) : -1;
+      if (/^\d+$/.test(s)) return num(s, -1) < blocks.length ? num(s, -1) : -1;
+      var low = s.toLowerCase(), i;
+      var alias = { title: 'headline', cta: 'button', image: 'hero', body: 'text', article: 'card' };
+      for (i = 0; i < blocks.length; i++) if (blocks[i].kind === low || blocks[i].kind === alias[low] || String(blocks[i].spec.id || '') === s) return i;
+      for (i = 0; i < blocks.length; i++) if ((blocks[i].el.textContent || '').indexOf(s) >= 0) return i;
+      for (i = 0; i < blocks.length; i++) if ((blocks[i].el.textContent || '').toLowerCase().indexOf(low) >= 0) return i;
+      return -1;
+    };
+    var slotOf = function (bi, which) {
+      var blk = blocks[bi]; if (!blk || !blk.slots.length) return null;
+      if (which == null) {
+        for (var i = 0; i < blk.slots.length; i++) if (blk.slots[i].name === 'text' || blk.slots[i].name === 'title') return blk.slots[i];
+        return blk.slots[0];
+      }
+      if (typeof which === 'number') return blk.slots[which] || null;
+      for (var j = 0; j < blk.slots.length; j++) if (blk.slots[j].name === which) return blk.slots[j];
+      return null;
+    };
+    var slotWith = function (txt, bi) {
+      var pool = bi >= 0 ? blocks[bi].slots : slots;
+      for (var i = 0; i < pool.length; i++) if (pool[i].base.indexOf(txt) >= 0) return pool[i];
+      for (var j = 0; j < pool.length; j++) if (pool[j].base.toLowerCase().indexOf(String(txt).toLowerCase()) >= 0) return pool[j];
+      return null;
+    };
+
+    // ── panel ──
+    var panelTabs = ['Layers', 'Styles', 'Preview'];
+    var CHEV_UP = '<svg viewBox="0 0 24 24" style="stroke-width:2"><path d="m18 15-6-6-6 6"/></svg>';
+    var CHEV = '<svg viewBox="0 0 24 24" class="chev"><path d="m6 9 6 6 6-6"/></svg>';
+    var CHEV_L = '<svg viewBox="0 0 24 24" class="chev light"><path d="m6 9 6 6 6-6"/></svg>';
+    var RADIUS = '<svg viewBox="0 0 24 24"><path d="M20.34 17.52a10 10 0 1 0-2.82 2.82"/><circle cx="19" cy="19" r="2"/><path d="m13.41 13.41 4.18 4.18"/><circle cx="12" cy="12" r="2"/></svg>';
+    var colorIn = function (key, w) { return '<div class="qp-in' + (w ? ' w107' : '') + '"><i class="qp-sw" data-v="' + key + '-sw"></i><span class="v" data-v="' + key + '"></span></div>'; };
+    var LAYER_ICON = { logo: 'image', eyebrow: 'type', hero: 'image', headline: 'heading', text: 'text', button: 'button', features: 'list', card: 'panel', quote: 'quote', divider: 'minus', footer: 'panel' };
+    var LAYER_NAME = { logo: 'Logo', eyebrow: 'Eyebrow', hero: 'Hero', headline: 'Headline', text: 'Text', button: 'Button', features: 'Features', card: 'Card', quote: 'Quote', divider: 'Divider', footer: 'Footer' };
+    var subject = data.subject || (function () { var h = blocks.filter(function (b) { return b.kind === 'headline'; })[0]; return h ? h.slots[0].base : 'A note from ' + brandName; })();
+    var preheader = data.preheader || (function () { var t = blocks.filter(function (b) { return b.kind === 'text'; })[0]; return t ? t.slots[0].base : ''; })();
+    pin.innerHTML =
+      '<div class="qp-head"><div class="qp-collapse" data-cursor-target="collapse"><svg viewBox="0 0 24 24"><path d="m14 10 7-7M20 10h-6V4M3 21l7-7M4 14h6v6"/></svg></div>' +
+      '<div class="qp-tabs"><div class="qp-tab-bg"></div>' + panelTabs.map(function (t) { return '<div class="qp-tab" data-tab="' + t + '" data-cursor-target="' + t + '">' + t + '</div>'; }).join('') + '</div></div>' +
+      // STYLES
+      '<div class="qp-view" data-view="Styles">' +
+        '<div class="qp-sec"><div class="qp-sh"><span>Color</span>' + CHEV_UP + '</div><div class="qp-body">' +
+          '<div class="qp-row"><span class="qp-lbl">Background</span>' + colorIn('bg', true) + '</div>' +
+          '<div class="qp-row"><span class="qp-lbl">Text</span>' + colorIn('fg', true) + '</div></div></div>' +
+        '<div class="qp-sec"><div class="qp-sh"><span>Border</span>' + CHEV_UP + '</div><div class="qp-body">' +
+          '<div class="qp-grid2"><div class="qp-stack"><span class="qp-lbl">Color</span>' + colorIn('bc') + '</div>' +
+            '<div class="qp-stack"><span class="qp-lbl">Radius</span><div class="qp-in">' + RADIUS + '<span class="v" data-v="radius"></span>' + CHEV + '</div></div></div>' +
+          '<div class="qp-stack"><span class="qp-lbl">Width</span><div class="qp-row" style="gap:8px"><div class="qp-in" style="flex:1;padding-left:12px"><span class="v" data-v="bw"></span>' + CHEV + '</div>' +
+            '<div class="qp-ib on">' + svg('square') + '</div><div class="qp-ib"><svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></div></div></div>' +
+          '<div class="qp-row" style="gap:16px"><span class="qp-lbl">Style</span><div class="qp-in pop" style="flex:1"><span class="v" data-v="bs"></span>' + CHEV_L + '</div></div></div></div>' +
+        '<div class="qp-sec"><div class="qp-sh"><span>Spacing</span>' + CHEV_UP + '</div><div class="qp-body">' +
+          '<div class="qp-seg"><div class="on">Padding</div><div>Margin</div></div>' +
+          '<div class="qp-row"><span class="qp-lbl">Mode</span><div class="qp-in pop" style="width:181px"><span class="v">Uniform</span>' + CHEV + '</div></div>' +
+          '<div class="qp-row" style="gap:16px"><span class="qp-lbl">All Sides</span><div class="qp-in" style="width:137px;height:34px;padding-left:12px"><span class="v" data-v="pad"></span><span class="qp-px">px ' + CHEV + '</span></div></div></div></div>' +
+        '<div class="qp-sec"><div class="qp-sh"><span>Text</span>' + CHEV_UP + '</div><div class="qp-body">' +
+          '<div class="qp-row"><span class="qp-lbl">Font</span><div class="qp-in pop" style="width:160px"><span class="v" data-v="font"></span>' + CHEV + '</div></div>' +
+          '<div class="qp-grid2"><div class="qp-stack"><span class="qp-lbl">Size</span><div class="qp-in" style="padding-left:12px"><span class="v" data-v="size"></span><span class="qp-px">px</span></div></div>' +
+            '<div class="qp-stack"><span class="qp-lbl">Weight</span><div class="qp-in" style="padding-left:12px"><span class="v" data-v="weight"></span>' + CHEV + '</div></div></div>' +
+          '<div class="qp-seg" data-v="align"><div data-a="left"><svg viewBox="0 0 24 24"><path d="M21 6H3M15 12H3M17 18H3"/></svg></div><div data-a="center"><svg viewBox="0 0 24 24"><path d="M21 6H3M17 12H7M19 18H5"/></svg></div><div data-a="right"><svg viewBox="0 0 24 24"><path d="M21 6H3M21 12H9M21 18H7"/></svg></div></div>' +
+        '</div></div>' +
+      '</div>' +
+      // LAYERS
+      '<div class="qp-view" data-view="Layers"><div class="qp-layers"><div class="qp-lrow root">' + CHEV.replace('class="chev"', '') + svg('mail') + '<span>Email</span></div>' +
+        blocks.map(function (b, i) { return '<div class="qp-lrow" data-layer="' + i + '">' + svg(LAYER_ICON[b.kind] || 'square') + '<span>' + esc(b.spec.layer || LAYER_NAME[b.kind] || b.kind) + '</span></div>'; }).join('') +
+      '</div></div>' +
+      // PREVIEW
+      '<div class="qp-view" data-view="Preview"><div class="qp-sec"><div class="qp-body" style="padding-top:4px">' +
+        '<div class="qp-seg"><div class="on">Desktop</div><div>Mobile</div></div>' +
+        '<div class="qp-stack"><span class="qp-lbl">Subject</span><div class="qp-in qp-text" data-v="subject"></div></div>' +
+        '<div class="qp-stack"><span class="qp-lbl">Preview text</span><div class="qp-in qp-text" data-v="preheader"></div></div>' +
+        '<div class="qp-stack"><span class="qp-lbl">Inbox</span><div class="qp-inbox"><div class="qp-inbox-ava">' + esc(brandName.charAt(0).toUpperCase()) + '</div><div style="min-width:0">' +
+          '<div class="qp-inbox-t">' + esc(brandName) + '</div><div class="qp-inbox-s" data-v="subject2"></div><div class="qp-inbox-p" data-v="preheader2"></div></div></div></div>' +
+        '<div class="qp-send" data-cursor-target="send-test">' + svg('send') + 'Send test email</div>' +
+      '</div></div></div>';
+    var pv = {};
+    [].forEach.call(pin.querySelectorAll('[data-v]'), function (n) { pv[n.getAttribute('data-v')] = n; });
+    pv.subject.textContent = subject; pv.subject2.textContent = subject;
+    pv.preheader.textContent = preheader; pv.preheader2.textContent = preheader;
+    var tabEls = {}, viewEls = {};
+    [].forEach.call(pin.querySelectorAll('.qp-tab'), function (n) { tabEls[n.getAttribute('data-tab')] = n; });
+    [].forEach.call(pin.querySelectorAll('.qp-view'), function (n) { viewEls[n.getAttribute('data-view')] = n; });
+    var tabBg = pin.querySelector('.qp-tab-bg');
+    var layerRows = [].slice.call(pin.querySelectorAll('.qp-lrow[data-layer]'));
+
+    // What the panel shows for each block (overridable per block via `style`).
+    var bHex = B.toUpperCase();
+    var STY = {
+      none:     ['#FFFFFF', '#17171B', '#000000', 0, 0, 0, 16, 'Regular', 'left'],
+      logo:     ['#FFFFFF', '#17171B', '#000000', 0, 0, 16, 20, 'Bold', 'left'],
+      eyebrow:  ['#FFFFFF', bHex, '#000000', 0, 0, 0, 13, 'Semibold', 'left'],
+      hero:     [tint, '#17171B', '#DFDFED', 14, 0, 0, 14, 'Semibold', 'left'],
+      headline: ['#FFFFFF', '#17171B', '#000000', 0, 0, 0, 34, 'Extra Bold', 'left'],
+      text:     ['#FFFFFF', '#6A6A78', '#000000', 0, 0, 0, 16, 'Regular', 'left'],
+      button:   [bHex, '#FFFFFF', bHex, 24, 0, 16, 16, 'Bold', 'left'],
+      features: ['#FFFFFF', '#17171B', '#EFEFF6', 0, 1, 12, 16, 'Semibold', 'left'],
+      card:     ['#FFFFFF', '#6A6A78', '#DFDFED', 12, 1, 14, 14, 'Regular', 'left'],
+      quote:    ['#FFFFFF', '#17171B', '#5027CB', 0, 6, 12, 14, 'Regular', 'left'],
+      divider:  ['#FFFFFF', '#17171B', '#EFEFF6', 0, 1, 0, 16, 'Regular', 'left'],
+      footer:   ['#F9F9FB', '#8F8F9F', '#000000', 12, 0, 20, 11, 'Regular', 'left']
+    };
+    var styleOf = function (bi) {
+      var blk = blocks[bi], d = STY[blk ? blk.kind : 'none'] || STY.none, o = (blk && blk.spec.style) || {};
+      if (blk && blk.kind === 'button' && blk.spec.color) { d = d.slice(); d[0] = d[2] = String(blk.spec.color).toUpperCase(); }
+      return { bg: String(o.background || d[0]).toUpperCase(), fg: String(o.color || o.text || d[1]).toUpperCase(), bc: String(o.border_color || d[2]).toUpperCase(),
+        radius: o.radius != null ? o.radius : d[3], bw: o.border_width != null ? o.border_width : d[4], pad: o.padding != null ? o.padding : d[5],
+        size: o.font_size != null ? o.font_size : d[6], weight: o.font_weight || d[7], align: o.align || (blk && blk.spec.align) || d[8],
+        bs: o.border_style || ((o.border_width != null ? o.border_width : d[4]) ? 'Solid' : 'Border style') };
+    };
+    var setV = function (k, v, ph) { var n = pv[k]; if (!n) return; var s = String(v); if (n.textContent !== s) n.textContent = s; n.classList.toggle('ph', !!ph); };
+    var lastPanelKey = null;
+    var paintPanel = function (bi) {
+      if (bi === lastPanelKey) return; lastPanelKey = bi;
+      var s = styleOf(bi);
+      setV('bg', s.bg); pv['bg-sw'].style.background = s.bg;
+      setV('fg', s.fg); pv['fg-sw'].style.background = s.fg;
+      setV('bc', s.bc); pv['bc-sw'].style.background = s.bc;
+      setV('radius', s.radius); setV('bw', s.bw, !Number(s.bw)); setV('bs', s.bs, s.bs === 'Border style');
+      setV('pad', s.pad, !Number(s.pad)); setV('font', fontName); setV('size', s.size); setV('weight', s.weight);
+      [].forEach.call(pv.align.children, function (c) { c.classList.toggle('on', c.getAttribute('data-a') === s.align); });
+      layerRows.forEach(function (r, i) { r.classList.toggle('on', i === bi); });
+    };
+
+    // ── sizing: everything from the box ──
+    var W = 0, H = 0, tall = false, showPanel = false, colW = 0, em = 0, panelW = 0, viewH = 0, contentH = 0, tabRects = {};
+    var dockedOpt = data.docked;
+    var fit = function () {
+      W = el.clientWidth || root.clientWidth || 1600; H = el.clientHeight || root.clientHeight || 900;
+      tall = H > W;
+      var docked = dockedOpt != null ? !!dockedOpt : tall;
+      root.classList.toggle('is-docked', docked);
+      root.classList.toggle('is-tall', tall);
+      showPanel = data.show_panel != null ? !!data.show_panel : !tall;
+      var bw = docked ? 0 : 4;            // the standalone card's borders
+      var iw = W - bw, ih = H - bw;
+      panelW = showPanel ? Math.round(Math.max(220, Math.min(430, iw * num(data.panel_width, tall ? 0.34 : 0.19)))) : 0;
+      panel.style.display = showPanel ? 'block' : 'none';
+      panel.style.width = panelW + 'px';
+      var k = panelW / 254;
+      pin.style.transform = 'scale(' + k + ')';
+      pin.style.height = (ih / (k || 1)) + 'px';
+      var C = iw - panelW;
+      canvas.style.width = C + 'px';
+      var dotGap = Math.max(10, Math.min(C, ih) / 72);
+      canvas.style.backgroundSize = dotGap + 'px ' + dotGap + 'px';
+      root.style.setProperty('--qee-dot', Math.max(0.8, dotGap * 0.068) + 'px');
+      var margin, framePad;
+      if (tall) {
+        margin = Math.round(C * num(data.margin, 0.035));
+        colW = C - 2 * margin; framePad = 0;
+      } else {
+        colW = Math.min(C * num(data.column, 0.5), ih * 0.82, C - 40);
+        framePad = colW * 0.16;
+        margin = Math.round(ih * 0.035);
+      }
+      em = colW / 30 * num(data.scale, 1);
+      col.style.width = colW + 'px';
+      col.style.fontSize = em + 'px';
+      frame.style.width = (colW + 2 * framePad) + 'px';
+      frame.style.fontSize = em + 'px';
+      frame.style.padding = tall ? '0' : (0.55 * em) + 'px ' + framePad + 'px';
+      viewH = ih;
+      var fh = frame.offsetHeight;
+      var top = Math.max(margin, (ih - fh) / 2);
+      frame.style.marginTop = top + 'px';
+      contentH = top + fh + margin;
+      scroller.style.height = contentH + 'px';
+      panelTabs.forEach(function (t) { var n = tabEls[t]; tabRects[t] = [n.offsetLeft, n.offsetWidth]; });
+    };
+    fit();
+
+    // offset of a node inside an ancestor (layout px; transforms ignored)
+    var posIn = function (node, anc) {
+      var x = 0, y = 0, n = node;
+      while (n && n !== anc) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+      return { x: x, y: y, w: node.offsetWidth, h: node.offsetHeight };
+    };
+    var ease3 = function (p) { p = Math.max(0, Math.min(1, p)); return 1 - Math.pow(1 - p, 3); };
+    var easeIO = function (p) { p = Math.max(0, Math.min(1, p)); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+
+    // ── the performance: events on the timeline, rendered by one state pass ──
+    var entrance = data.entrance !== 'none';
+    var AT = num(data.at, 0);
+    var WT = num(data.write_time, 2.2) * num(data.pace, 1);
+    var selEvents = [], scrollEvents = [], tabEvents = [];
+    var follow = data.follow !== false;
+    var WEIGHT = { logo: 0.16, eyebrow: 0.14, hero: 0.32, headline: 0.42, text: 0.56, button: 0.22, features: 0.34, card: 0.3, quote: 0.3, divider: 0.08, footer: 0.16 };
+    var order = blocks.filter(function (b) { return b.kind !== 'button'; }).concat(blocks.filter(function (b) { return b.kind === 'button'; }));
+    var endT = AT;
+    if (entrance) {
+      var wsum = order.reduce(function (s, b) { return s + (WEIGHT[b.kind] || 0.2); }, 0) || 1;
+      var t = AT + 0.12;
+      if (data.chip !== false) {
+        gsap.set(chip, { autoAlpha: 0, scale: 0.7, transformOrigin: '100% 50%' });
+        tl.to(chip, { autoAlpha: 1, scale: 1, duration: 0.35, ease: 'back.out(2)' }, Math.max(0, AT));
+        tl.fromTo(chip.querySelector('svg'), { rotate: -90 }, { rotate: 0, duration: 0.6, ease: 'power3.out', immediateRender: false }, Math.max(0, AT));
+      }
+      order.forEach(function (blk) {
+        var d = (WEIGHT[blk.kind] || 0.2) / wsum * WT;
+        var s = t, b = blk.el, rise = 0.55 * em;
+        if (blk.kind === 'button') {
+          gsap.set(blk.parts.btn, { autoAlpha: 0, scale: 0.55, transformOrigin: '0% 50%' });
+          if (blk.spec.align === 'center') gsap.set(blk.parts.btn, { transformOrigin: '50% 50%' });
+          tl.to(blk.parts.btn, { autoAlpha: 1, duration: 0.14, ease: 'none' }, s);
+          tl.to(blk.parts.btn, { scale: 1, duration: 0.5, ease: 'back.out(2.6)' }, s);
+        } else {
+          gsap.set(b, { autoAlpha: 0, y: rise });
+          tl.to(b, { autoAlpha: 1, y: 0, duration: Math.min(0.34, d + 0.14), ease: 'power3.out' }, s);
+        }
+        selEvents.push({ t: s, bi: blk.index });
+        if (follow) scrollEvents.push({ t: s, bi: blk.index, mode: 'follow', dur: 0.55 });
+        if (blk.kind === 'headline' || blk.kind === 'text') {
+          blk.slots.forEach(function (sl) { sl.typeIn = { t0: s + 0.04, t1: s + d }; });
+        }
+        if (blk.kind === 'hero' && blk.parts.steps) {
+          blk.parts.steps.forEach(function (st, j) {
+            gsap.set(st, { autoAlpha: 0, scale: 0.8, y: 0.4 * em });
+            tl.to(st, { autoAlpha: 1, scale: 1, y: 0, duration: 0.36, ease: 'back.out(1.8)' }, s + 0.06 + j * d * 0.3);
+          });
+          blk.parts.lines.forEach(function (ln, j) {
+            var L = ln.getTotalLength ? ln.getTotalLength() : 60;
+            gsap.set(ln, { strokeDasharray: L, strokeDashoffset: L });
+            tl.to(ln, { strokeDashoffset: 0, duration: d * 0.45, ease: 'power2.inOut' }, s + 0.14 + j * d * 0.3);
+            gsap.set(blk.parts.dots[j], { autoAlpha: 0 });
+            tl.to(blk.parts.dots[j], { autoAlpha: 1, duration: 0.1 }, s + 0.14 + j * d * 0.3 + d * 0.4);
+          });
+        }
+        if (blk.kind === 'features' && blk.parts.rows) {
+          blk.parts.rows.forEach(function (r, j) {
+            gsap.set(r, { autoAlpha: 0, x: -0.5 * em });
+            tl.to(r, { autoAlpha: 1, x: 0, duration: 0.3, ease: 'power3.out' }, s + j * d / Math.max(1, blk.parts.rows.length));
+          });
+        }
+        t += d;
+      });
+      endT = t + 0.5;
+      for (var ri = scrollEvents.length - 1; ri >= 0; ri--) if (scrollEvents[ri].mode === 'follow') { scrollEvents[ri].mode = 'rest'; scrollEvents[ri].dur = 0.7; break; }
+    }
+    root.setAttribute('data-write-end', String(Math.round((entrance ? endT - 0.5 : AT) * 1000) / 1000));
+    root.setAttribute('data-block-order', order.map(function (b) { return b.index; }).join(','));
+
+    // initial selection (entrance none) / resting selection
+    var initialSel = -1;
+    if (!entrance) {
+      initialSel = data.selected != null ? findBlock(data.selected) : findBlock('button');
+    } else if (data.selected != null) {
+      selEvents.push({ t: endT - 0.3, bi: findBlock(data.selected) });
+    }
+    var initialTab = panelTabs.indexOf(data.panel_tab) >= 0 ? data.panel_tab : 'Styles';
+
+    // ── script: this screen's verbs; the rest (cursor) goes to runScript ──
+    var MINE = { 'select': 1, 'set-text': 1, 'type': 1, 'scroll': 1, 'highlight': 1, 'count': 1, 'switch-tab': 1 };
+    var script = Array.isArray(data.script) ? data.script.filter(Boolean) : [];
+    var others = [];
+    var lastT = 0;
+    script.slice().sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); }).forEach(function (a) {
+      var at = num(a.at, 0);
+      lastT = Math.max(lastT, at + num(a.duration, 1));
+      if (!MINE[a.action]) { others.push(a); return; }
+      var bi = findBlock(a.block != null ? a.block : null);
+      if (a.action === 'select') {
+        bi = findBlock(a.block != null ? a.block : a.target);
+        selEvents.push({ t: at, bi: bi });
+        if (a.scroll !== false && bi >= 0) scrollEvents.push({ t: at, bi: bi, mode: 'follow', dur: 0.55 });
+      } else if (a.action === 'switch-tab') {
+        var tb = String(a.tab || a.to || a.target || 'Styles'); tb = tb.charAt(0).toUpperCase() + tb.slice(1).toLowerCase();
+        if (panelTabs.indexOf(tb) >= 0) tabEvents.push({ t: at, tab: tb });
+      } else if (a.action === 'scroll') {
+        var to = a.to != null ? a.to : (a.block != null ? a.block : (a.y != null ? a.y : a.scrollY));
+        var ev = { t: at, dur: num(a.duration, 0.8), mode: 'to' };
+        if (typeof to === 'number') ev.px = to;
+        else if (to === 'top') ev.px = 0;
+        else if (to === 'bottom') ev.px = 1e9;
+        else if (/^\d+(px)?$/.test(String(to))) ev.px = num(parseFloat(to), 0);
+        else ev.bi = findBlock(to);
+        if (ev.px != null || ev.bi >= 0) scrollEvents.push(ev);
+      } else if (a.action === 'highlight') {
+        bi = findBlock(a.block != null ? a.block : a.target);
+        if (bi < 0) return;
+        var hl = blocks[bi].hl;
+        if (a.color && /^#[0-9a-f]{6}$/i.test(a.color)) { hl.style.background = rgba(a.color, 0.08); hl.style.boxShadow = '0 0 0 max(2px, 0.08em) ' + rgba(a.color, 0.55); }
+        var hd = num(a.duration, 1.4);
+        tl.fromTo(hl, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.25, ease: 'power2.out', immediateRender: false }, at);
+        tl.to(hl, { autoAlpha: 0, duration: 0.35, ease: 'power2.in' }, at + Math.max(0.3, hd - 0.35));
+        if (a.scroll !== false) scrollEvents.push({ t: at, bi: bi, mode: 'follow', dur: 0.55 });
+      } else if (a.action === 'set-text') {
+        var sl = null, find = null;
+        if (a.block != null && bi >= 0) {
+          if (a.target != null) { sl = slotWith(String(a.target), bi); find = String(a.target); }
+          else sl = slotOf(bi, a.slot != null ? a.slot : a.field);
+        } else if (a.target != null) { sl = slotWith(String(a.target), -1); find = String(a.target); }
+        if (sl) sl.events.push({ at: at, kind: 'set', find: find && sl.base !== find ? dash(find) : null, to: dash(a.to != null ? a.to : a.text || '') });
+      } else if (a.action === 'type') {
+        if (bi < 0 && a.target != null) { var sw = slotWith(String(a.target), -1); if (sw) bi = sw.block.index; }
+        var st = bi >= 0 ? slotOf(bi, a.slot != null ? a.slot : a.field) : null;
+        if (!st) return;
+        var txt = dash(a.text != null ? a.text : a.to || '');
+        var dur = a.duration != null ? num(a.duration, 1) : Math.max(0.2, txt.length * num(a.speed, 0.03));
+        st.events.push({ at: at, kind: 'type', to: txt, dur: dur });
+        lastT = Math.max(lastT, at + dur);
+        if (a.select !== false) { selEvents.push({ t: at, bi: bi }); scrollEvents.push({ t: at, bi: bi, mode: 'follow', dur: 0.55 }); }
+      } else if (a.action === 'count') {
+        var cs = null, tokIdx = 0;
+        if (a.target != null) {
+          cs = slotWith(String(a.target), bi);
+          if (cs) { var mm = String(a.target).match(/\d[\d,]*(\.\d+)?/); if (mm) { var toks = cs.base.match(/[$€£]?\d[\d,]*(?:\.\d+)?[%KMk+]?/g) || []; for (var q = 0; q < toks.length; q++) if (toks[q].indexOf(mm[0]) >= 0) { tokIdx = q; break; } } }
+        } else {
+          var pool = bi >= 0 ? blocks[bi].slots : slots;
+          for (var pi = 0; pi < pool.length; pi++) if (/\d/.test(pool[pi].base)) { cs = pool[pi]; break; }
+        }
+        if (cs && a.to != null) { cs.counts.push({ at: at, to: num(a.to, 0), from: a.from, dur: num(a.duration, 1), display: a.display, idx: tokIdx }); lastT = Math.max(lastT, at + num(a.duration, 1)); }
+      }
+    });
+    // counts chain: each starts from where the previous one landed
+    var TOK = /[$€£]?\d[\d,]*(?:\.\d+)?[%KMk+]?/g;
+    var parseTok = function (s) { return num(String(s).replace(/[^\d.]/g, ''), 0); };
+    slots.forEach(function (sl) {
+      var prev = {};
+      sl.counts.forEach(function (c) {
+        var toks = sl.base.match(TOK) || [], tok = toks[c.idx] || '0';
+        c.tok = tok; c.pre = (/^[$€£]/.exec(tok) || [''])[0]; c.suf = (/[%KMk+]$/.exec(tok) || [''])[0];
+        c.comma = tok.indexOf(',') >= 0 || Math.abs(c.to) >= 10000;
+        c.dec = (String(c.to).split('.')[1] || '').length;
+        if (c.from == null) c.from = prev[c.idx] != null ? prev[c.idx] : parseTok(tok);
+        prev[c.idx] = c.to;
+      });
+      sl.events.sort(function (a, b) { return a.at - b.at; });
+    });
+    var fmt = function (c, v) {
+      var s = c.comma ? v.toLocaleString('en-US', { minimumFractionDigits: c.dec, maximumFractionDigits: c.dec }) : v.toFixed(c.dec);
+      return c.pre + s + c.suf;
+    };
+    selEvents.sort(function (a, b) { return a.t - b.t; });
+    scrollEvents.sort(function (a, b) { return a.t - b.t; });
+    tabEvents.sort(function (a, b) { return a.t - b.t; });
+
+    // ── state at time t: text, selection outline + panel, scroll, tab ──
+    var slotText = function (sl, t) {
+      var str = sl.base, shown = -1;
+      if (sl.typeIn && entrance) {
+        if (t < sl.typeIn.t0) shown = 0;
+        else if (t < sl.typeIn.t1) shown = Math.floor(str.length * (t - sl.typeIn.t0) / (sl.typeIn.t1 - sl.typeIn.t0));
+      }
+      for (var i = 0; i < sl.events.length; i++) {
+        var e = sl.events[i]; if (e.at > t) break;
+        if (e.kind === 'set') { str = e.find ? str.split(e.find).join(e.to) : e.to; shown = -1; }
+        else if (e.kind === 'type') { var p = (t - e.at) / e.dur; str = e.to; shown = p < 1 ? Math.floor(str.length * p) : -1; }
+      }
+      var cur = null;
+      for (var j = 0; j < sl.counts.length; j++) if (sl.counts[j].at <= t) cur = sl.counts[j];
+      if (cur) {
+        var pp = (t - cur.at) / cur.dur, v = cur.from + (cur.to - cur.from) * ease3(pp);
+        var rep = (pp >= 1 && cur.display != null) ? String(cur.display) : fmt(cur, pp >= 1 ? cur.to : (cur.dec ? v : Math.round(v)));
+        var n = -1;
+        str = str.replace(TOK, function (m) { n++; return n === cur.idx ? rep : m; });
+      }
+      return { str: str, shown: shown };
+    };
+    var renderSlot = function (sl, t) {
+      var st = slotText(sl, t), key = st.shown + '|' + st.str;
+      if (key === sl.cur) return; sl.cur = key;
+      if (st.shown < 0) { sl.el.textContent = st.str; return; }
+      sl.el.innerHTML = esc(st.str.slice(0, st.shown)) + '<span class="qee-caret"></span><span class="qee-ghost">' + esc(st.str.slice(st.shown)) + '</span>';
+    };
+    var selRectOf = function (bi) {
+      var blk = blocks[bi]; if (!blk) return null;
+      var r = posIn(blk.el, col), o = 0.28 * em;
+      if (blk.kind === 'button' && blk.parts.btn) { var rb = posIn(blk.parts.btn, col); r = { x: rb.x, y: rb.y, w: rb.w, h: rb.h }; }
+      return { x: r.x - o, y: r.y - o, w: r.w + 2 * o, h: r.h + 2 * o };
+    };
+    var selAt = function (t) {
+      var cur = initialSel, prev = -1, t0 = -1;
+      for (var i = 0; i < selEvents.length; i++) { if (selEvents[i].t > t) break; prev = cur; cur = selEvents[i].bi; t0 = selEvents[i].t; }
+      return { cur: cur, prev: prev, p: t0 < 0 ? 1 : ease3((t - t0) / 0.24) };
+    };
+    var maxScroll = function () { return Math.max(0, contentH - viewH); };
+    var clampS = function (v) { return Math.max(0, Math.min(maxScroll(), v)); };
+    var scrollAt = function (t) {
+      var cur = { from: 0, to: 0, t0: 0, dur: 0 }, val = function (c, tt) { return c.dur ? c.from + (c.to - c.from) * easeIO((tt - c.t0) / c.dur) : c.to; };
+      if (!maxScroll()) return 0;
+      for (var i = 0; i < scrollEvents.length; i++) {
+        var e = scrollEvents[i]; if (e.t > t) break;
+        var start = val(cur, e.t), target = start;
+        var fTop = frame.offsetTop;
+        if (e.px != null) target = e.px;
+        else if (e.bi >= 0) {
+          var r = posIn(blocks[e.bi].el, scroller), pad = 0.08 * viewH;
+          if (e.mode === 'rest') {
+            // settle as high as possible while the block stays fully in view
+            target = Math.min(start, Math.max(0, r.y + r.h - viewH + pad));
+            if (r.y < target + pad) target = r.y - pad;
+          } else if (e.mode === 'follow') {
+            if (r.y + r.h > start + viewH - pad) target = r.y + r.h - viewH + pad;
+            if (r.y < start + pad) target = r.y - pad;
+            if (r.h > viewH - 2 * pad) target = r.y - pad;
+          } else target = r.y - 0.15 * viewH;
+          if (e.bi === 0 && target < fTop) target = 0;
+        }
+        cur = { from: start, to: clampS(target), t0: e.t, dur: e.dur };
+      }
+      return val(cur, t);
+    };
+    var tabAt = function (t) {
+      var cur = initialTab, prev = initialTab, t0 = -1;
+      for (var i = 0; i < tabEvents.length; i++) { if (tabEvents[i].t > t) break; prev = cur; cur = tabEvents[i].tab; t0 = tabEvents[i].t; }
+      return { cur: cur, prev: prev, p: t0 < 0 ? 1 : ease3((t - t0) / 0.22) };
+    };
+    var nowT = 0, lastTab = null;
+    var apply = function (t) {
+      nowT = t;
+      for (var i = 0; i < slots.length; i++) renderSlot(slots[i], t);
+      // selection outline + panel
+      var s = selAt(t);
+      var a = s.cur >= 0 ? selRectOf(s.cur) : null;
+      if (!a) { sel.style.visibility = 'hidden'; }
+      else {
+        var b = s.prev >= 0 ? selRectOf(s.prev) : null, p = b ? s.p : 1;
+        if (!b) b = a;
+        sel.style.visibility = 'visible';
+        sel.style.left = (b.x + (a.x - b.x) * p) + 'px'; sel.style.top = (b.y + (a.y - b.y) * p) + 'px';
+        sel.style.width = (b.w + (a.w - b.w) * p) + 'px'; sel.style.height = (b.h + (a.h - b.h) * p) + 'px';
+      }
+      root.setAttribute('data-selected', s.cur >= 0 ? 'block-' + s.cur : 'none');
+      paintPanel(s.cur);
+      // scroll
+      var sy = scrollAt(t);
+      scroller.style.transform = 'translate3d(0,' + (-sy) + 'px,0)';
+      root.setAttribute('data-scroll', String(Math.round(sy)));
+      // tab
+      var tb = tabAt(t);
+      if (tb.cur !== lastTab) {
+        lastTab = tb.cur;
+        panelTabs.forEach(function (n) { tabEls[n].classList.toggle('on', n === tb.cur); viewEls[n].classList.toggle('on', n === tb.cur); });
+        root.setAttribute('data-tab', tb.cur);
+      }
+      var r0 = tabRects[tb.prev] || [0, 0], r1 = tabRects[tb.cur] || [0, 0];
+      tabBg.style.left = (r0[0] + (r1[0] - r0[0]) * tb.p) + 'px'; tabBg.style.width = (r0[1] + (r1[1] - r0[1]) * tb.p) + 'px';
+    };
+
+    // one tween drives the state pass: scrub-safe in both directions
+    var D = Math.max(endT, lastT, AT) + 1;
+    var proxy = { v: 0 };
+    tl.to(proxy, { v: 1, duration: D, ease: 'none', onUpdate: function () { apply(this.time()); } }, 0);
+    apply(0);
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { fit(); lastPanelKey = null; apply(nowT); }).observe(el);
+    // web fonts can change line breaks: refit once they land
+    try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fit(); apply(nowT); }); } catch (e) {}
+
+    // ── cursor verbs via the shared runner; blocks resolve where they are at that moment ──
+    if (others.length) {
+      var targets = {};
+      var blockTarget = function (bi) {
+        return function (at) {
+          var r = posIn(blocks[bi].kind === 'button' && blocks[bi].parts.btn ? blocks[bi].parts.btn : blocks[bi].el, scroller);
+          var y = r.y - scrollAt(at);
+          return { x: canvas.offsetLeft + scroller.offsetLeft + r.x + r.w / 2, y: y + r.h / 2, w: r.w, h: r.h };
+        };
+      };
+      blocks.forEach(function (b, i) {
+        targets['block-' + i] = blockTarget(i);
+        if (!targets[b.kind]) targets[b.kind] = blockTarget(i);
+        if (b.spec.id) targets[String(b.spec.id)] = blockTarget(i);
+      });
+      targets.email = { x: (canvas.offsetWidth / 2) + 'px', y: '40%' };
+      if (data.cursor_targets) { Object.assign(targets, data.cursor_targets); targets.__explicit = true; }
+      runScript(tl, el, others, targets, ctx, {});
+    }
+    return tl;
+  }
+</script>

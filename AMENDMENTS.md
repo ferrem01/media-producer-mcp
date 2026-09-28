@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-28 — The Quotient email editor as a library component
+
+On the Old Chimp film the "writes the campaign" beat used email-compose (a
+Gmail-style window: Marc, "it looks like you're just composing a regular
+Gmail... we need something more like a marketing email") and the captured
+Quotient editor could not fit a phone. Marc captured the real editor canvas
+and its Layers/Styles/Preview panel; `mockups/quotient-email-editor` is the
+full-treatment rebuild: dotted canvas, email column, the selection outline,
+the props panel (hidden on a tall box). The email is data-driven marketing
+blocks (logo, eyebrow, hero -- a designed default or an image -- headline,
+text, button, features, card, quote, divider, footer) that WRITE THEMSELVES:
+blocks rise in order, text types, the button pops last (~2.2s), the outline
+and the panel follow each block. Sized in em off the column (not the fit
+box), so on 9x16 the body reads ~27px. Script verbs select / set-text /
+type / scroll / highlight / count / switch-tab plus the cursor verbs;
+anchors per block. Defaults are generic (none of the captured newsletter).
+
 ## 2026-09-28 — Product widgets read on a phone
 
 On the Old Chimp film (9x16) Marc: "quotient email and quotient chat just
