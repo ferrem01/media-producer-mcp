@@ -3,6 +3,12 @@ import http from "node:http";
 import { WebSocket } from "ws";
 import { RemoteBoothHub, REMOTE_PREFIX, REMOTE_IDLE_MS, type RemotePeer, type RemoteTarget } from "../src/core/remote-booth.js";
 import { setupWebSocket } from "../src/ws.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { config } from "../src/config.js";
+import { createProject, addScene, addComponent, loadProject } from "../src/persistence/project.js";
+import { projectJsonPath } from "../src/persistence/paths.js";
 
 // The remote booth's relay (SPEC-remote-booth.md): a session is the
 // tenant's and the device pair's, not a film's (Marc: "I have to remove the
@@ -225,21 +231,58 @@ describe("over a real socket (src/ws.ts)", () => {
     camera.ws.send(JSON.stringify({ type: "nonsense" }));
   });
 
-  it("update-prop is refused for a workspace the socket's token does not own (it used to write anywhere)", async () => {
-    const server = http.createServer((_q, r) => { r.writeHead(404); r.end(); });
-    setupWebSocket(server, { hub: new RemoteBoothHub({ loadTarget }), validate: (t) => ({ tokA: "acme", tokB: "other" } as Record<string, string>)[t] || null, authEnabled: () => true });
-    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
-    closers.push(() => new Promise<void>((r) => server.close(() => r())));
-    const port = (server.address() as any).port;
-    const reply = (token: string) => new Promise<any>((resolve, reject) => {
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`);
-      ws.on("open", () => ws.send(JSON.stringify({ type: "update-prop", tenantId: "acme", projectId: "proj_x", sceneId: "s", componentId: "c", data: { text: "pwned" } })));
+  it("update-prop is refused for a workspace the socket's token does not own, and the project file is left as it was", async () => {
+    // A real project on disk, so a refusal is proven by the bytes, not the reply.
+    const prevDataDir = config.dataDir;
+    config.dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "mp-ws-auth-"));
+    closers.push(async () => { await fs.rm(config.dataDir, { recursive: true, force: true }); config.dataDir = prevDataDir; });
+    const project = await createProject({ tenant_id: "acme", name: "Launch", format: "video" });
+    await addScene("acme", project.project_id, { id: "s1", label: "One", duration_seconds: 3, components: [] });
+    await addComponent("acme", project.project_id, "s1", { id: "c1", type: "title-slide", data: { title: "Ours" }, z_index: 1 });
+    const file = projectJsonPath("acme", project.project_id);
+    const before = await fs.readFile(file, "utf-8");
+
+    const serve = async (authOn: boolean) => {
+      const server = http.createServer((_q, r) => { r.writeHead(404); r.end(); });
+      setupWebSocket(server, { hub: new RemoteBoothHub({ loadTarget }), validate: (t) => ({ tokA: "acme", tokB: "other" } as Record<string, string>)[t] || null, authEnabled: () => authOn });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+      closers.push(() => new Promise<void>((r) => server.close(() => r())));
+      return (server.address() as any).port as number;
+    };
+    const reply = (port: number, token: string | null, title: string) => new Promise<any>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws${token ? `?token=${token}` : ""}`);
+      ws.on("open", () => ws.send(JSON.stringify({ type: "update-prop", tenantId: "acme", projectId: project.project_id, sceneId: "s1", componentId: "c1", data: { title } })));
       ws.on("message", (raw) => { resolve(JSON.parse(String(raw))); ws.close(); });
       ws.on("error", reject);
     });
-    expect((await reply("tokB")).error).toMatch(/forbidden/);
-    expect((await reply("nope")).error).toMatch(/forbidden/);
-    // The owner gets past the check (the project does not exist here, so the write itself reports that).
-    expect((await reply("tokA")).error).not.toMatch(/forbidden/);
+
+    const port = await serve(true);
+    // Another tenant's token, an unknown token, and no token at all: refused, file untouched.
+    for (const token of ["tokB", "nope", null]) {
+      const r = await reply(port, token, "pwned");
+      expect(r.type).toBe("error");
+      expect(r.error).toMatch(/forbidden/);
+    }
+    expect(await fs.readFile(file, "utf-8")).toBe(before);
+
+    // Its OWN tenant, but a project id that climbs out of its folder into acme's: refused, file untouched.
+    const climb = await new Promise<any>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=tokB`);
+      ws.on("open", () => ws.send(JSON.stringify({ type: "update-prop", tenantId: "other", projectId: `../../acme/projects/${project.project_id}`, sceneId: "s1", componentId: "c1", data: { title: "pwned" } })));
+      ws.on("message", (raw) => { resolve(JSON.parse(String(raw))); ws.close(); });
+      ws.on("error", reject);
+    });
+    expect(climb.type).toBe("error");
+    expect(await fs.readFile(file, "utf-8")).toBe(before);
+
+    // The owner writes, and gets the re-assembled scene back.
+    const ok = await reply(port, "tokA", "Updated");
+    expect(ok.error).toBeUndefined();
+    expect(ok).toMatchObject({ type: "scene-html", sceneId: "s1" });
+    expect((await loadProject("acme", project.project_id))!.scenes[0].components[0].data).toMatchObject({ title: "Updated" });
+
+    // Auth off (local dev): the socket passes without a token, as HTTP does.
+    const devPort = await serve(false);
+    expect((await reply(devPort, null, "Dev")).type).toBe("scene-html");
   });
 });
