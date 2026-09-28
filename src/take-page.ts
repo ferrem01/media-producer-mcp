@@ -97,6 +97,11 @@ ${QUOTIENT_CSS}
   #bgChoice label { margin: 0 6px 0 2px; }
   .toggle input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--primary); }
   .toggle .hint { color: var(--muted-foreground); font-size: 13px; }
+  /* Prompter speed: the reader sets the pace before the take (Marc: "it
+     was too slow ... I was reading at the pace of the teleprompter"). */
+  #speedRow { align-items: center; }
+  #speedRow .spd { width: 36px; height: 32px; border-radius: 8px; border: 1px solid var(--border-secondary); background: var(--surface-primary); color: var(--content-primary); font: 600 17px/1 var(--font-sans); cursor: pointer; }
+  #speedRow b { min-width: 72px; text-align: center; font-variant-numeric: tabular-nums; }
   /* The smoothing dial sits under Soft look; off with it. */
   #softDial { align-items: center; margin-top: -4px; }
   #softDial input[type=range] { width: auto; height: auto; flex: 1; min-width: 0; margin: 0; }
@@ -201,6 +206,7 @@ ${QUOTIENT_CSS}
   <h1 id="title">Loading…</h1>
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
+  <div class="toggle" id="speedRow" style="display:none">Prompter speed <button type="button" class="spd" id="slowerBtn" aria-label="Slower">−</button><b id="speedWpm"></b><button type="button" class="spd" id="fasterBtn" aria-label="Faster">+</button></div>
   <div class="spacer"></div>
   <p class="note" id="readyNote">Hold your phone upright. Tap Record: the camera opens with a quick light check. Tap Start recording for a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
   <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(skin smoothing and warmth, applied when the take is processed; change it later in Studio)</span></label>
@@ -338,6 +344,17 @@ ${QUOTIENT_CSS}
   // of the beat's seconds by word count, so a single 15s line still paces.
   var cues = [];
   var total = 0;
+  // The reader's speed (core/prompter.ts): rebuilds the cues from the same
+  // scenes, remembered per film on this phone.
+  var speed = loadSpeed(project), cueScenes = [], paceNote = function () {};
+  function applySpeed() {
+    cues = buildCues(cueScenes, speed);
+    total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
+    $('speedWpm').textContent = speedWpm(speed) + ' wpm';
+    paceNote();
+  }
+  $('slowerBtn').addEventListener('click', function () { speed = clampSpeed(speed - 0.1); saveSpeed(project, speed); applySpeed(); });
+  $('fasterBtn').addEventListener('click', function () { speed = clampSpeed(speed + 0.1); saveSpeed(project, speed); applySpeed(); });
   var projectName = '';
   // THE TAKE FOLLOWS THE FILM'S FRAME (Marc, on a laptop: "why did it record
   // it as if it was an iPhone?"): a 9x16 film records 1080x1920, a 16x9 film
@@ -395,8 +412,8 @@ ${QUOTIENT_CSS}
       } catch (eClip) {}
       var scenes = sceneIndex >= 0 && allScenes[sceneIndex] ? [allScenes[sceneIndex]] : allScenes;
       sceneLabel = sceneIndex >= 0 && allScenes[sceneIndex] ? ('Scene ' + (sceneIndex + 1) + (allScenes[sceneIndex].label ? ' · ' + allScenes[sceneIndex].label : '')) : '';
-      cues = buildCues(scenes);
-      total = cues.reduce(function (a, c) { return a + c.dur; }, 0);
+      cueScenes = scenes;
+      applySpeed();
       // In Studio's dialog the header already names the project and the
       // scene; here only the scene's own label. Alone in a tab, both.
       $('title').textContent = embedded ? ((sceneLabel ? sceneLabel.replace(/^Scene \\d+ · /, '').replace(/^Scene \\d+\\s*[-–—:·]\\s*/i, '') : projectName)) : (projectName + (sceneLabel ? ' — ' + sceneLabel : ''));
@@ -406,9 +423,13 @@ ${QUOTIENT_CSS}
       if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Click Record: the camera opens with a quick light check; Start recording gives a 3-second count-in, then your lines one at a time at speaking pace. Click anywhere to jump to the next line.';
       var g = (p.treatment && p.treatment.filmGrammar) || '';
       var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
-      $('subtitle').textContent = beats
-        ? beats + (beats === 1 ? ' beat' : ' beats') + ' · about ' + fmt(total) + ' at speaking pace' + (g ? ' · ' + g : '')
-        : 'This film has no spoken lines' + (g ? ' (grammar: ' + g + ')' : '') + '. You can still record; there will be no prompter.';
+      paceNote = function () {
+        $('subtitle').textContent = beats
+          ? beats + (beats === 1 ? ' beat' : ' beats') + ' · about ' + fmt(total) + ' at ' + speedWpm(speed) + ' wpm' + (g ? ' · ' + g : '')
+          : 'This film has no spoken lines' + (g ? ' (grammar: ' + g + ')' : '') + '. You can still record; there will be no prompter.';
+      };
+      paceNote();
+      $('speedRow').style.display = beats ? '' : 'none';
       var sc = $('script'); sc.innerHTML = '';
       if (!beats) { sc.innerHTML = '<p class="note">No script on this film.</p>'; }
       scenes.forEach(function (s, i) {
