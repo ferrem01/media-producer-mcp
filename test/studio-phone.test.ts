@@ -120,4 +120,14 @@ describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
     expect(desktop).toMatch(/'\/provide-asset\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/'\/take\/' \+ encodeURIComponent\(state\.tenantId\)/);
   });
+  it("Watch and Share at the top whenever a render file exists, not only while status says rendered", () => {
+    expect(js).toMatch(/api\('GET', '\/render-status\/' \+ tp\)/);
+    expect(js).toMatch(/if \(RS && RS\.rendered\) \{\s*var v = document\.createElement\('video'\)/);
+    expect(js).not.toMatch(/P\.status === 'rendered'/);
+    expect(js).toMatch(/watch\.textContent = 'Watch'/);
+    expect(js).toMatch(/shareB\.textContent = 'Share'/);
+    expect(js).toMatch(/api\('POST', '\/share\/' \+ encodeURIComponent\(tenant\)/);
+    expect(js).toMatch(/navigator\.share\(\{ title: title, url: url \}\)/);
+    expect(js).toMatch(/edited since; render again/);
+  });
 });
