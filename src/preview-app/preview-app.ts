@@ -113,6 +113,16 @@ ${QUOTIENT_CSS}
   #render-menu button { display: block; width: 100%; text-align: left; border: none; background: none;
     font-size: 12px; padding: 7px 12px; border-radius: var(--radius-sm); cursor: pointer; color: var(--content-primary); }
   #render-menu button:hover { background: var(--surface-tertiary); }
+  #share-pop { position: fixed; z-index: 200; width: 360px; background: #fff; border: 1px solid var(--border-secondary); border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgb(44 51 69 / 0.14); padding: 12px; display: none; font-size: 12px; color: var(--content-primary); }
+  #share-pop h4 { margin: 0 0 4px; font-size: 13px; }
+  #share-pop .sp-note { color: var(--content-secondary); margin: 0 0 10px; line-height: 1.4; }
+  #share-pop .sp-note.stale { color: var(--orange-500, #c2410c); }
+  #share-pop .sp-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+  #share-pop .sp-row input { flex: 1; min-width: 0; font-size: 12px; padding: 5px 7px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--surface-secondary, #f7f7f9); }
+  #share-pop .sp-row button, #share-pop .sp-create { font-size: 12px; padding: 5px 9px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--border-secondary); background: #fff; }
+  #share-pop .sp-create { width: 100%; background: var(--blue-500, #2563eb); color: #fff; border-color: transparent; font-weight: 600; padding: 7px 10px; }
+  #share-pop .sp-meta { color: var(--content-tertiary); font-size: 11px; margin-top: 3px; }
   #rendering-banner { display: none; position: fixed; top: 48px; left: 0; right: 0; z-index: 90;
     background: #eff6ff; border-bottom: 1px solid var(--blue-200); color: var(--blue-500); font-size: 12px; font-weight: 500;
     text-align: center; padding: 5px 0; }
@@ -1275,6 +1285,7 @@ ${QUOTIENT_CSS}
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
         <button class="btn btn-primary" id="render-menu-btn" title="Render options">&#9662;</button>
         <a class="btn btn-primary" id="download-btn" style="display:none;text-decoration:none;" download>&#8681; Download MP4</a>
+        <button class="btn btn-secondary" id="share-btn" style="display:none;" title="Get a link anyone can watch -- full quality, no download">&#128279; Share</button>
         <button class="btn btn-secondary" id="rerender-btn" style="display:none;" title="Render again with the latest edits">&#8635; Re-render</button>
       </span>
       <span id="user-chip" style="display:none;align-items:center;gap:6px;margin-left:12px;font-size:11px;color:var(--content-secondary);">
@@ -1380,6 +1391,7 @@ ${QUOTIENT_CSS}
 <div id="studio-toast"></div>
 <div id="job-pill"></div>
 <div id="rendering-banner">&#9881; Rendering&#8230; editing is paused until the render finishes &#8212; edits made now would not appear in the MP4 anyway.</div>
+<div id="share-pop"></div>
 <div id="render-menu">
   <button data-quality="production">&#127916; Production render <span style="color:var(--content-tertiary);">&#8212; full quality</span></button>
   <button data-quality="preview">&#9193; Preview render <span style="color:var(--content-tertiary);">&#8212; faster, lower res</span></button>
@@ -4323,6 +4335,7 @@ ${QUOTIENT_CSS}
       menuBtn: document.getElementById('render-menu-btn'),
       menu: document.getElementById('render-menu'),
       dl: document.getElementById('download-btn'),
+      share: document.getElementById('share-btn'),
       rr: document.getElementById('rerender-btn')
     };
   }
@@ -4345,6 +4358,7 @@ ${QUOTIENT_CSS}
       r.menuBtn.style.display = 'none';
       r.dl.style.display = 'none';
       r.rr.style.display = 'none';
+      if (r.share) r.share.style.display = 'none';
       return;
     }
     var rs = render.status;
@@ -4362,6 +4376,7 @@ ${QUOTIENT_CSS}
         ? 'The film changed after this MP4 was rendered — re-render to pick up the latest edits'
         : 'Download the rendered film (' + fmtMB(rs.size_bytes) + ')';
       r.rr.style.display = '';
+      if (r.share) r.share.style.display = '';
     } else {
       r.btn.style.display = '';
       r.btn.className = 'btn btn-primary' + (render.lastFailed ? ' failed' : '');
@@ -4369,6 +4384,7 @@ ${QUOTIENT_CSS}
       r.menuBtn.style.display = '';
       r.dl.style.display = 'none';
       r.rr.style.display = 'none';
+      if (r.share) r.share.style.display = 'none';
     }
   }
   function fmtMB(bytes) {
@@ -4446,6 +4462,70 @@ ${QUOTIENT_CSS}
       });
     });
     document.addEventListener('click', function() { r.menu.style.display = 'none'; });
+
+    // ── Share: a link anyone can watch (core/shares.ts). Each link is a
+    // snapshot of the render it was made from; turning it off kills it. ──
+    var sp = document.getElementById('share-pop');
+    function spEl(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+    function spCopy(url, btn) {
+      var done = function() { btn.textContent = 'Copied'; setTimeout(function() { btn.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function() { window.prompt('Copy this link', url); });
+      else window.prompt('Copy this link', url);
+    }
+    function spRender(shares, busy) {
+      var p = state.currentProject; var rs = render.status || {};
+      sp.innerHTML = '';
+      sp.appendChild(spEl('h4', '', 'Share this film'));
+      sp.appendChild(spEl('p', 'sp-note' + (rs.stale ? ' stale' : ''), rs.stale
+        ? 'The film changed after the last render. A new link shares that last render -- re-render first to include your latest edits.'
+        : 'Anyone with the link can watch it, full quality, on any device. A link keeps the render it was made from.'));
+      var create = spEl('button', 'sp-create', busy ? 'Creating link…' : 'Create a link');
+      create.disabled = !!busy;
+      create.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        spRender(shares, true);
+        api('POST', '/share/' + state.tenantId + '/' + p.project_id, { title: p.name || '' }).then(function(sh) {
+          var next = [sh].concat(shares || []);
+          spRender(next);
+          var btn = sp.querySelector('.sp-row button');
+          if (btn) spCopy(sh.url, btn);
+          studioStatus('Share link copied: ' + sh.url, 'ok');
+        }).catch(function(e) { spRender(shares); studioStatus('Could not create a link: ' + (e && e.message || e), 'err'); });
+      });
+      sp.appendChild(create);
+      (shares || []).forEach(function(sh) {
+        var row = spEl('div', 'sp-row');
+        var input = spEl('input'); input.readOnly = true; input.value = sh.url;
+        input.addEventListener('click', function(ev) { ev.stopPropagation(); input.select(); });
+        var copy = spEl('button', '', 'Copy');
+        copy.addEventListener('click', function(ev) { ev.stopPropagation(); spCopy(sh.url, copy); });
+        var off = spEl('button', '', 'Turn off');
+        off.title = 'The link stops working';
+        off.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          api('DELETE', '/share/' + state.tenantId + '/' + p.project_id + '/' + sh.token).then(function() {
+            spRender((shares || []).filter(function(x) { return x.token !== sh.token; }));
+          }).catch(function(e) { studioStatus('Could not turn the link off: ' + (e && e.message || e), 'err'); });
+        });
+        row.appendChild(input); row.appendChild(copy); row.appendChild(off);
+        sp.appendChild(row);
+        var when = new Date(sh.rendered_at || sh.created_at);
+        sp.appendChild(spEl('div', 'sp-meta', 'Render of ' + when.toLocaleString() + (sh.duration ? ' · ' + Math.round(sh.duration) + 's' : '')));
+      });
+    }
+    if (r.share) r.share.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      if (sp.style.display === 'block') { sp.style.display = 'none'; return; }
+      var p = state.currentProject; if (!p) return;
+      var rect = r.share.getBoundingClientRect();
+      sp.style.top = (rect.bottom + 4) + 'px';
+      sp.style.left = Math.max(8, Math.min(window.innerWidth - 372, rect.right - 360)) + 'px';
+      sp.style.display = 'block';
+      spRender([], false);
+      api('/share/' + state.tenantId + '/' + p.project_id).then(function(res) { spRender(res.shares || []); }).catch(function() {});
+    });
+    sp.addEventListener('click', function(ev) { ev.stopPropagation(); });
+    document.addEventListener('click', function() { sp.style.display = 'none'; });
   })();
 
   // ── Storyboard draft view: THE TRUE STORYBOARD, one card at a time ──

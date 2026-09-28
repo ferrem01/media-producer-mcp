@@ -218,6 +218,9 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
     "-c:v", "copy",
     "-c:a", "aac",
     "-b:a", "192k",
+    // The index first: a player starts at once instead of after the whole
+    // download (core/encode.ts ensureFaststart).
+    "-movflags", "+faststart",
     "-y",
     opts.outputPath,
   ];

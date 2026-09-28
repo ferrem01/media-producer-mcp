@@ -176,6 +176,7 @@ async function concatSimple(scenes: string[], outputPath: string): Promise<strin
     "-safe", "0",
     "-i", listPath,
     "-c", "copy",
+    "-movflags", "+faststart",
     outputPath,
   ];
 
@@ -323,4 +324,54 @@ async function getVideoDuration(videoPath: string): Promise<number> {
     videoPath,
   ]);
   return parseFloat(stdout.trim());
+}
+
+/**
+ * WEB-READY: the MP4's index (moov) must come BEFORE its media (mdat), or a
+ * player downloads the whole file before the first frame. The final audio
+ * mux and a stream-copy concat wrote it last (measured on the analytics
+ * film: ftyp, free, mdat 19 MB, then moov) -- Slack and browsers stalled.
+ * Checks the top-level atom order and, only when the index trails, remuxes
+ * in place with +faststart (stream copy: seconds, no re-encode). Returns
+ * true when it moved the index.
+ */
+export async function ensureFaststart(filePath: string): Promise<boolean> {
+  if (!/\.(mp4|mov|m4v)$/i.test(filePath)) return false;
+  const order = await topLevelAtoms(filePath).catch(() => [] as string[]);
+  const moov = order.indexOf("moov"), mdat = order.indexOf("mdat");
+  if (moov < 0 || mdat < 0 || moov < mdat) return false;
+  const tmp = filePath.replace(/(\.[a-z0-9]+)$/i, ".faststart$1");
+  try {
+    await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", filePath, "-map", "0", "-c", "copy", "-movflags", "+faststart", tmp], { maxBuffer: 10 * 1024 * 1024 });
+    await fs.rename(tmp, filePath);
+    return true;
+  } catch (e) {
+    await fs.unlink(tmp).catch(() => {});
+    console.warn(`  faststart: left as is (${(e as Error).message?.slice(0, 200)})`);
+    return false;
+  }
+}
+
+/** The file's top-level MP4 atom types, in order (reads headers only). */
+export async function topLevelAtoms(filePath: string): Promise<string[]> {
+  const fh = await fs.open(filePath, "r");
+  try {
+    const { size } = await fh.stat();
+    const out: string[] = [];
+    let pos = 0;
+    const hdr = Buffer.alloc(16);
+    while (pos + 8 <= size && out.length < 64) {
+      await fh.read(hdr, 0, 16, pos);
+      let len = hdr.readUInt32BE(0);
+      const type = hdr.toString("latin1", 4, 8);
+      if (len === 1) len = Number(hdr.readBigUInt64BE(8));
+      else if (len === 0) len = size - pos;
+      if (len < 8) break;
+      out.push(type);
+      pos += len;
+    }
+    return out;
+  } finally {
+    await fh.close();
+  }
 }

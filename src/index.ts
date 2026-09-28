@@ -80,6 +80,8 @@ import path from "node:path";
 import os from "node:os";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled, requireTenant, tenantAllowed } from "./auth/auth.js";
+import { serveFile, contentTypeFor } from "./core/serve-file.js";
+import { createShare, getShare, listShares, revokeShare, shareFiles, watchPageHtml, type Share } from "./core/shares.js";
 import { protectedResourceMetadata, authorizationServerMetadata, registerClient, wwwAuthenticateChallenge } from "./auth/mcp-oauth.js";
 import { readTraces, dailyDigest } from "./trace/index.js";
 import { generateImage, DEFAULT_IMAGE_MODEL } from "./media/image-gen.js";
@@ -1057,22 +1059,40 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       const outputMatch = urlPath.match(/^\/output\/([^/]+)\/projects\/([^/]+)\/(.+)$/);
       if (outputMatch && (method === "GET" || method === "HEAD")) {
         const [, outTenantId, outProjectId, outPath] = outputMatch.map(decodeURIComponent);
-        const fullPath = path.join(config.dataDir, outTenantId, "projects", outProjectId, "output", outPath);
-        try {
-          const data = await fs.readFile(fullPath);
-          const ext = path.extname(fullPath).toLowerCase();
-          const contentType = ext === ".mp4" ? "video/mp4" : ext === ".webm" ? "video/webm" : ext === ".mp3" ? "audio/mpeg" : ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".pdf" ? "application/pdf" : "application/octet-stream";
-          res.writeHead(200, {
-            "Content-Type": contentType,
-            "Content-Length": data.length,
-            "Content-Disposition": "inline",
-            "Cache-Control": "no-cache",
-          });
-          res.end(data);
-        } catch {
+        const outDir = path.join(config.dataDir, outTenantId, "projects", outProjectId, "output");
+        const fullPath = path.join(outDir, outPath);
+        // Streamed with byte ranges (core/serve-file.ts): a <video> seeks,
+        // and an iPhone will not play an MP4 served without them. Share
+        // snapshots are only reachable through their /watch link.
+        if (!fullPath.startsWith(outDir + path.sep) || /(^|\/)shares\//.test(outPath) || !(await serveFile(req, res, fullPath, { contentType: contentTypeFor(fullPath) }))) {
           res.writeHead(404);
           res.end("Output not found");
         }
+        return;
+      }
+
+      // ── Share links: the public watch page (core/shares.ts) ──
+      // GET /watch/{token}            the page (title, poster, the film)
+      // GET /watch/{token}/video.mp4  the snapshot, streamed with ranges
+      // GET /watch/{token}/poster.jpg the link-preview frame
+      const watchMatch = urlPath.match(/^\/watch\/([A-Za-z0-9_-]+)(?:\/(video\.mp4|poster\.jpg))?\/?$/);
+      if (watchMatch && (method === "GET" || method === "HEAD")) {
+        const share = await getShare(watchMatch[1]);
+        if (!share) {
+          res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+          res.end('<!doctype html><meta charset="utf-8"><title>Not found</title><body style="font-family:system-ui;background:#0b0b0c;color:#a9adb6;display:grid;place-items:center;height:100vh;margin:0">This link has been turned off or does not exist.</body>');
+          return;
+        }
+        const files = shareFiles(share);
+        if (watchMatch[2]) {
+          const file = watchMatch[2] === "video.mp4" ? files.video : files.poster;
+          if (!(await serveFile(req, res, file, { contentType: contentTypeFor(file), cacheControl: "public, max-age=86400" }))) {
+            res.writeHead(404); res.end("Not found");
+          }
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+        res.end(watchPageHtml(share, publicOrigin(req)));
         return;
       }
 
@@ -1252,7 +1272,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team|share)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2664,6 +2684,40 @@ Rules:
         const jmRaw = getJob(jmId);
         if (jmRaw?.type === "take" && jmRaw.status === "running") (jmJob as any).status = "waiting";
         jsonResponse(res, 200, jmJob);
+        return;
+      }
+
+      // ── API: Share links (core/shares.ts) ──
+      // POST   /api/share/{tenant}/{project} {title?}  snapshot the latest render, return the link
+      // GET    /api/share/{tenant}/{project}           the project's live links
+      // DELETE /api/share/{tenant}/{project}/{token}   turn a link off
+      const shareApi = urlPath.match(/^\/api\/share\/([^/]+)\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
+      if (shareApi) {
+        const [, shTenant, shProject, shToken] = shareApi.map((x) => (x === undefined ? x : decodeURIComponent(x)));
+        const origin = publicOrigin(req);
+        const withUrl = (s: Share) => ({ ...s, url: `${origin}/watch/${s.token}` });
+        try {
+          if (method === "POST" && !shToken) {
+            const body = await parseBody(req).catch(() => ({} as any));
+            const proj = await loadProject(shTenant, shProject);
+            if (!proj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+            const share = await createShare(shTenant, shProject, typeof body.title === "string" && body.title.trim() ? body.title : proj.name || "A film");
+            jsonResponse(res, 200, withUrl(share));
+            return;
+          }
+          if (method === "GET" && !shToken) {
+            jsonResponse(res, 200, { shares: (await listShares(shTenant, shProject)).map(withUrl) });
+            return;
+          }
+          if (method === "DELETE" && shToken) {
+            const ok = await revokeShare(shTenant, shProject, shToken);
+            jsonResponse(res, ok ? 200 : 404, ok ? { ok: true, revoked: shToken } : { error: "Share not found" });
+            return;
+          }
+          jsonResponse(res, 405, { error: "Method not allowed" });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
         return;
       }
 
