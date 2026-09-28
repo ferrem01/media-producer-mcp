@@ -21,6 +21,15 @@ said works. Wide frames are unchanged. The captured `quotient-email`
 (a frozen desktop editor) still cannot shrink to a phone; the film uses
 `email-compose` for that beat.
 
+A built film also carried the builder's tall-frame framing on the chat
+(`frame_anchor: "composer"`: the wrapper scaled so the composer fills the
+width, meant for a desktop-width mock). With the fit box already laying
+the chat out for the phone, the two scaled it 2.3x, off the side. The
+builder now skips the framing for a widget the fit box makes readable on
+its own (`readsOnTallFrame`: its minimum design width reaches slot /
+TALL_READ); desktop-wide widgets (quotient-campaign, quotient-social) are
+still framed.
+
 ## 2026-09-27 — Board edits keep each take on its scene
 
 Merging three short beats of the Old Chimp board (proj_34225c8a) into one

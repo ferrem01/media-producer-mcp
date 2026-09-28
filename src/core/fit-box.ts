@@ -58,6 +58,18 @@ export const FIT_RANGES: Record<string, [number, number, number?]> = {
  *  slot alone would make it -- the same factor the tall frame's zoom uses. */
 export const TALL_READ = 1.8;
 
+/**
+ * Does the fit box alone make this widget read on a tall frame at this slot
+ * width? True when its minimum design width reaches the phone scale (the
+ * slot / TALL_READ, with a little give). Such a widget needs no framing on
+ * one of its regions -- framing it as well scales it twice (measured,
+ * proj_34225c8a: quotient-chat framed on its composer at 2.3x, off the side).
+ */
+export function readsOnTallFrame(type: string, slotWidthPx: number): boolean {
+  const range = FIT_RANGES[type];
+  return !!range && slotWidthPx > 0 && range[0] <= (slotWidthPx / TALL_READ) * 1.15;
+}
+
 function toPx(v: string | number | undefined, total: number, dflt: number): number {
   if (v === undefined || v === null || v === "") return dflt;
   if (typeof v === "number") return v;
