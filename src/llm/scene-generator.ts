@@ -20,6 +20,7 @@ import type { Treatment } from "./creative-director.js";
 import { loadAssetIntel } from "../core/asset-intel.js";
 import { recoverAssetUrl, resolveVideoPath } from "../core/video-path.js";
 import { isProofSurface } from "../core/asset-needs.js";
+import { readsOnTallFrame } from "../core/fit-box.js";
 import { hexIsLight, worldBackground } from "./world.js";
 
 // ── Types ──
@@ -1383,7 +1384,11 @@ export function buildAuthoredCompositionScene(
     // the camera's own moves ride on top.
     var slotW = lay ? parseFloat(String((lay.position as any).width)) : 0;
     var ownsWidth = !speakerBase && Number.isFinite(slotW) && slotW >= 80;
-    var frameAnchor = tallFrame && isProofSurface(c.type) && (isCutaway(c as any) || ownsWidth) ? frameAnchorFor(c.type, data) : null;
+    // A widget the fit box already lays out for the phone is not framed too
+    // (core/fit-box.ts readsOnTallFrame): the two scale it twice.
+    var slotPx = Number.isFinite(slotW) ? (slotW / 100) * opts.canvas.width : 0;
+    var fitReads = readsOnTallFrame(c.type, slotPx);
+    var frameAnchor = tallFrame && !fitReads && isProofSurface(c.type) && (isCutaway(c as any) || ownsWidth) ? frameAnchorFor(c.type, data) : null;
     if (frameAnchor) console.log(`    ${c.type}: ${isCutaway(c as any) ? "a cutaway" : "a full-width surface"} on a tall frame -- framed on its "${frameAnchor}" region`);
     components.push({
       id, type: c.type, data, position: hasAuthoredPos ? authoredPos : lay.position, z_index: lay.z_index,

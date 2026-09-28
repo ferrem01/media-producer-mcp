@@ -387,7 +387,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     const gen = await read("../src/llm/scene-generator.ts");
     expect(gen).toMatch(/z_index: isProofSurface\(t\) \? 36 : 39/);
     expect(gen).toMatch(/var ownsWidth = !speakerBase && Number\.isFinite\(slotW\) && slotW >= 80;/);
-    expect(gen).toMatch(/tallFrame && isProofSurface\(c\.type\) && \(isCutaway\(c as any\) \|\| ownsWidth\) \? frameAnchorFor\(c\.type, data\) : null;/);
+    expect(gen).toMatch(/tallFrame && !fitReads && isProofSurface\(c\.type\) && \(isCutaway\(c as any\) \|\| ownsWidth\) \? frameAnchorFor\(c\.type, data\) : null;/);
     // The camera rule never emits the same move twice (a label and a mock cut in on one word did).
     const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
     const twice: any[] = [
@@ -539,7 +539,14 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(frameAnchorFor("image", {}, anchorsOf)).toBeNull();
     // The generator stamps it on tall-frame cutaways; the assembler frames the wrapper at mount.
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/var frameAnchor = tallFrame && isProofSurface\(c\.type\) && \(isCutaway\(c as any\) \|\| ownsWidth\) \? frameAnchorFor\(c\.type, data\) : null;/);
+    expect(gen).toMatch(/var frameAnchor = tallFrame && !fitReads && isProofSurface\(c\.type\) && \(isCutaway\(c as any\) \|\| ownsWidth\) \? frameAnchorFor\(c\.type, data\) : null;/);
+    // ...except a widget the fit box already lays out for the phone: framing it too scaled
+    // quotient-chat 2.3x off the side (proj_34225c8a). A desktop-wide widget is still framed.
+    const { readsOnTallFrame } = await import("../src/core/fit-box.js");
+    expect(readsOnTallFrame("quotient-chat", 994)).toBe(true);
+    expect(readsOnTallFrame("email-compose", 994)).toBe(true);
+    expect(readsOnTallFrame("quotient-campaign", 994)).toBe(false);
+    expect(readsOnTallFrame("quotient-social", 994)).toBe(false);
     expect(gen).toMatch(/\.\.\.\(frameAnchor \? \{ frame_anchor: frameAnchor \} : \{\}\)/);
     const asm = await read("../src/core/scene-assembler.ts");
     expect(asm).toMatch(/frame: \(c as any\)\.frame_anchor \|\| null,/);
