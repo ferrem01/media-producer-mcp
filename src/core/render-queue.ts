@@ -215,6 +215,11 @@ async function runRender(
     };
 
     const result = await renderProjectCore(renderOpts);
+    // Web-ready whatever path wrote it: the index before the media.
+    if (result.outputPath) {
+      const { ensureFaststart } = await import("./encode.js");
+      if (await ensureFaststart(result.outputPath)) console.log(`  render: moved the MP4 index to the front (${path.basename(result.outputPath)})`);
+    }
 
     // Update job with results
     job.status = "completed";

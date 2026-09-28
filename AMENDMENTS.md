@@ -6,6 +6,33 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-28 — Share links, streaming output, web-ready renders
+
+Marc: "I'm downloading the file and then uploading it to Slack and it's
+losing resolution and it's all bad and slow... the videos we're producing
+are not playing in Slack correctly." Measured on the analytics film's
+render: H.264 High / yuv420p / AAC (fine), but the atoms were ftyp, free,
+mdat (19 MB), moov -- the index LAST -- and /output answered a 64 KB Range
+request with all 19 MB (read into memory, always 200).
+
+- **Web-ready renders.** The final audio mux (audio/mixer.ts) and the
+  stream-copy concat (encode.ts) write `+faststart`; and every completed
+  render goes through `ensureFaststart` (core/encode.ts: reads the top-level
+  atoms, remuxes with stream copy only when moov trails mdat).
+- **Streaming output.** `core/serve-file.ts` streams from disk with byte
+  ranges (206 / 416 / HEAD / ETag). /output uses it; share snapshots under
+  output/shares/ are not reachable there. A render made before the fix is
+  made web-ready on its first /output request (ensureFaststart, a no-op
+  after), so no re-render is needed to get a file that plays.
+- **Share links.** `core/shares.ts`: POST /api/share/{tenant}/{project}
+  snapshots the latest output.mp4 (so a re-render never changes a link
+  someone has), makes it web-ready, grabs a poster frame, and returns
+  /watch/{token} -- a random 16-char token, no tenant or project id in the
+  link. The public watch page plays it full quality (playsinline, poster)
+  with Open Graph / Twitter tags so Slack previews it. GET lists a
+  project's links; DELETE turns one off (record and files go, the link
+  404s). Studio: a Share button beside Download (create, copy, turn off).
+
 ## 2026-09-28 — The Quotient email editor as a library component
 
 On the Old Chimp film the "writes the campaign" beat used email-compose (a
