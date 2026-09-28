@@ -4396,6 +4396,15 @@ ${QUOTIENT_CSS}
     if (!p || !state.tenantId) return;
     api('/render-status/' + state.tenantId + '/' + p.project_id).then(function(rs) {
       render.status = rs;
+      // A render already running (started before a reload, from the phone,
+      // or by the agent): pick it up -- progress on the button, editing
+      // paused -- instead of offering the last finished MP4 as if done.
+      if (rs && rs.active_job && !render.job && state.currentProject === p) {
+        render.job = { id: rs.active_job.id, percent: rs.active_job.percent || 0 };
+        renderLock(true);
+        studioStatus('A render of this film is running — progress is on the Render button.', 'ok');
+        render.timer = setTimeout(pollRenderJob, 3000);
+      }
       updateRenderUI();
     }).catch(function() { updateRenderUI(); });
   }

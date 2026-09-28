@@ -66,7 +66,7 @@ import { normalizeSoundCues, ensureSoundFiles, hasCueWithoutFile } from "./core/
 import { getLibraryHtml } from "./preview-app/library-app.js";
 import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
-import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
+import { queueRender, getJobStatus, listJobs, activeRender } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, generateBrandCSS, generateFontLinks, type ComponentSource } from "./core/scene-assembler.js";
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
@@ -2737,7 +2737,12 @@ Rules:
           const outPath = path.join(config.dataDir, rsTenant, "projects", rsProject, "output", "output.mp4");
           const st = await fs.stat(outPath).catch(() => null);
           const rsProj = await loadProject(rsTenant, rsProject);
+          // A render in flight, so any Studio that opens the film mid-render
+          // (a reload, the phone, a render the agent started) shows its
+          // progress instead of the last finished MP4.
+          const rsJob = activeRender(rsTenant, rsProject);
           jsonResponse(res, 200, {
+            active_job: rsJob ? { id: rsJob.id, status: rsJob.status, percent: rsJob.progress?.percent || 0, step: rsJob.progress?.step || null } : null,
             rendered: !!st,
             completed_at: st ? st.mtime.toISOString() : null,
             size_bytes: st ? st.size : 0,

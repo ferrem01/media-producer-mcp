@@ -130,4 +130,13 @@ describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
     expect(js).toMatch(/navigator\.share\(\{ title: title, url: url \}\)/);
     expect(js).toMatch(/edited since; render again/);
   });
+  it("a render already running shows its progress in both Studios (a reload, the phone, or the agent started it)", async () => {
+    expect(js).toMatch(/if \(RS && RS\.active_job && !jobTimer\) pollJob\(RS\.active_job\.id, 'render'\)/);
+    const app = await read("../src/preview-app/preview-app.ts");
+    expect(app).toMatch(/if \(rs && rs\.active_job && !render\.job && state\.currentProject === p\) \{/);
+    expect(app).toMatch(/render\.job = \{ id: rs\.active_job\.id, percent: rs\.active_job\.percent \|\| 0 \};/);
+    const server = await read("../src/index.ts");
+    expect(server).toMatch(/const rsJob = activeRender\(rsTenant, rsProject\);/);
+    expect(server).toMatch(/active_job: rsJob \? \{ id: rsJob\.id/);
+  });
 });
