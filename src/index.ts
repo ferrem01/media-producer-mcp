@@ -1075,6 +1075,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         // -- no re-render needed to get a file that plays in Slack.
         if (/^output\.mp4$/.test(outPath) && fullPath.startsWith(outDir + path.sep)) {
           await ensureFaststart(fullPath).catch(() => false);
+          // A render made from a one-sided take before the centering fix,
+          // with its other side silent, plays on both sides (audio/channels.ts).
+          await ensureCenteredTake(fullPath).catch(() => {});
         }
         if (!fullPath.startsWith(outDir + path.sep) || /(^|\/)shares\//.test(outPath) || !(await serveFile(req, res, fullPath, { contentType: contentTypeFor(fullPath) }))) {
           res.writeHead(404);
@@ -1098,6 +1101,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const files = shareFiles(share);
         if (watchMatch[2]) {
           const file = watchMatch[2] === "video.mp4" ? files.video : files.poster;
+          if (watchMatch[2] === "video.mp4") await ensureCenteredTake(file).catch(() => {});
           if (!(await serveFile(req, res, file, { contentType: contentTypeFor(file), cacheControl: "public, max-age=86400" }))) {
             res.writeHead(404); res.end("Not found");
           }

@@ -68,6 +68,9 @@ describe("a voice on one channel plays centered", () => {
     expect((await fs.stat(take)).mtimeMs).toBe(m1);
     const idx = await fs.readFile(path.join(__dirname, "..", "src", "index.ts"), "utf8");
     expect(idx).toMatch(/if \(isTakeAsset\(assetSubPath\)\) await ensureCenteredTake\(fullPath\)/);
+    // A render (and its share snapshot) with one silent side plays on both.
+    expect(idx).toMatch(/await ensureFaststart\(fullPath\)\.catch\(\(\) => false\);\s*\/\/[^\n]*\n[^\n]*\n\s*await ensureCenteredTake\(fullPath\)/);
+    expect(idx).toMatch(/if \(watchMatch\[2\] === "video\.mp4"\) await ensureCenteredTake\(file\)/);
   }, 30000);
 
   it("is wired where a take arrives and where the speaker's voice enters a render", async () => {

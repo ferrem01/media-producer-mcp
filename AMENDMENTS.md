@@ -21,6 +21,11 @@ before it.
   one-sided take in place (live channel to both sides, picture copied);
   later requests are a lookup, and concurrent first requests share one pass.
 - `centerDeadChannel` picks the audio codec by container (Opus for WebM).
+- The rendered film too: proj_86591051's output.mp4 had its right channel
+  at -inf (voice and music). `/output/.../output.mp4` and a share's
+  `/watch/{token}/video.mp4` center a one-dead-side file on first request --
+  no re-render, the picture untouched. (A render whose right side carries
+  the music has two live sides and is left alone; that one re-renders.)
 - Test: `test/audio-channels.test.ts`.
 
 ## 2026-09-29 — Actor test: one fixed face across scenes (Wan S2V, video_from)
