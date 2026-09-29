@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — Actor test: Seedance from text (reference faces are refused)
+
+The first Seedance run failed: fal returned ByteDance's content-policy 422,
+"may contain likenesses of real people" (partner validation) -- realistic
+faces are refused as references, even a generated one. Prompts do not get
+around it.
+- `seedance-t2v`: text-to-video, no portrait and no audio. The man, the walk
+  and the line (the scene's voiceover_text, quoted in the prompt) are all
+  words; Seedance invents the face and the voice. A test run with
+  `image: ""` needs no portrait.
+- Provider errors are now the provider's own message, one short line: the
+  422 echoed every data URI sent (350 KB of base64 into status.json).
+
 ## 2026-09-29 — Actor test: Seedance, a full AI actor
 
 Marc: "what about full AI actors with Seedance... someone walking delivering

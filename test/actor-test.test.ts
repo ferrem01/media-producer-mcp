@@ -146,6 +146,41 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     expect(st.files.seedance).toBe("seedance.mp4");
   }, 60000);
 
+  it("seedance from text: no portrait, the scene's line in the prompt; a refusal reads as one short line", async () => {
+    const projFile = path.join(DATA, T, "projects", P, "project.json");
+    const pj = JSON.parse(await fs.readFile(projFile, "utf8"));
+    pj.storyboard = { scenes: [{ voiceover_text: "Are you really still sending your email with this guy?" }] };
+    await fs.writeFile(projFile, JSON.stringify(pj));
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    let body: any = null, refuse = false;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json" } });
+      if (u === "https://queue.fal.run/bytedance/seedance-2.0/text-to-video") { body = JSON.parse(init.body); return json({ request_id: "t", status_url: "https://q/s4", response_url: "https://q/r4" }); }
+      if (u === "https://q/s4") return json({ status: "COMPLETED" });
+      if (u === "https://q/r4") return refuse
+        ? json({ detail: [{ loc: ["body", "image_urls"], msg: "may contain likenesses of real people", type: "content_policy_violation", input: { image_urls: ["data:image/jpeg;base64," + "A".repeat(5000)] } }] }, 422)
+        : json({ video: { url: "https://cdn/t2v.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.FAL_KEY = "fk";
+    const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    const wait = async (id: string) => { let st = (await getActorTest(T, P, id))!; for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, id))!; } return st; };
+    const ok = await wait((await startActorTest({ tenant: T, project: P, scene_index: 0, image: "", providers: ["seedance-t2v"], voice: false })).id);
+    expect(ok.status, ok.error || JSON.stringify(ok.steps)).toBe("done");
+    expect(body.image_urls).toBeUndefined();
+    expect(body.prompt).toContain('He says: "Are you really still sending your email with this guy?"');
+    expect(body).toMatchObject({ aspect_ratio: "9:16", generate_audio: true });
+    expect(ok.files.actor).toBeUndefined();
+    refuse = true;
+    const bad = await wait((await startActorTest({ tenant: T, project: P, scene_index: 0, image: "", providers: ["seedance-t2v"], voice: false })).id);
+    const err = bad.steps["seedance-t2v"].error || "";
+    expect(err).toContain("likenesses of real people");
+    expect(err.length).toBeLessThan(400);
+    expect(err).not.toContain("AAAAAAAA");
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
