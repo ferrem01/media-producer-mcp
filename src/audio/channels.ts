@@ -13,6 +13,7 @@
 import fs from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { keepFileDate } from "../core/encode.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -66,9 +67,11 @@ export async function centerDeadChannel(file: string): Promise<boolean> {
   try {
     // The container decides the codec: a WebM take cannot carry AAC.
     const codec = /\.webm$/i.test(file) ? ["-c:a", "libopus", "-b:a", "128k"] : ["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"];
+    const before = await fs.stat(file);
     await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", file, "-map", "0:v?", "-map", "0:a:0", "-c:v", "copy",
       "-af", pan, ...codec, tmp], { maxBuffer: 16 * 1024 * 1024 });
     await fs.rename(tmp, file);
+    await keepFileDate(file, before);
     return true;
   } catch (e: any) {
     await fs.unlink(tmp).catch(() => {});

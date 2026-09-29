@@ -28,6 +28,18 @@ before it.
   the music has two live sides and is left alone; that one re-renders.)
 - Test: `test/audio-channels.test.ts`.
 
+## 2026-09-29 — A rewrite keeps the file's date
+
+Chasing the voice on proj_86591051: its output.mp4 "rendered 21:10 today"
+was 1080x1350 at 47 fps with no voice -- an OLD render from when the film
+was 4:5. It read as fresh because the first request moved its index to the
+front (web-ready fix), and that rewrite set the mtime to now; render-status
+reads the mtime as when it was rendered, so no "edited since" warning.
+- `keepFileDate` (core/encode.ts): `ensureFaststart` and `centerDeadChannel`
+  restore the file's date after rewriting (+1 ms, so the size+mtime cache tag
+  still changes; the stale check's 2 s tolerance reads the same date).
+- proj_86591051's date is already lost; it needs a fresh render.
+
 ## 2026-09-29 — Actor test: one fixed face across scenes (Wan S2V, video_from)
 
 Marc on the Seedance couch shot: "Really can't tell it is AI" -- but how do

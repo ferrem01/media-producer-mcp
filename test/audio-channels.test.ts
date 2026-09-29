@@ -73,6 +73,26 @@ describe("a voice on one channel plays centered", () => {
     expect(idx).toMatch(/if \(watchMatch\[2\] === "video\.mp4"\) await ensureCenteredTake\(file\)/);
   }, 30000);
 
+  it("a rewrite keeps the file's date: an old render must not read as rendered just now", async () => {
+    // proj_86591051: an old 4:5 render with no voice was moved to web-ready
+    // on first request, its mtime became "now", and render-status called it fresh.
+    const { ensureFaststart } = await import("../src/core/encode.js");
+    const old = new Date("2026-09-20T10:00:00Z");
+    const f1 = await clip("dated.mp4", "sine=frequency=300:duration=2", "anullsrc=r=48000:cl=mono:d=2");
+    await fs.utimes(f1, old, old);
+    const s1 = await fs.stat(f1);
+    expect(await centerDeadChannel(f1)).toBe(true);
+    const s2 = await fs.stat(f1);
+    expect(Math.abs(s2.mtimeMs - old.getTime())).toBeLessThan(2000);            // the stale check's tolerance
+    expect(`${s2.size}-${Math.floor(s2.mtimeMs)}`).not.toBe(`${s1.size}-${Math.floor(s1.mtimeMs)}`); // the cache tag still changes
+    // A file with its index at the end (ffmpeg's default without +faststart).
+    const f2 = path.join(DIR, "trailing.mp4");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=160x90:rate=30:duration=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", f2]);
+    await fs.utimes(f2, old, old);
+    expect(await ensureFaststart(f2)).toBe(true);
+    expect(Math.abs((await fs.stat(f2)).mtimeMs - old.getTime())).toBeLessThan(2000);
+  }, 30000);
+
   it("is wired where a take arrives and where the speaker's voice enters a render", async () => {
     const src = (f: string) => fs.readFile(path.join(__dirname, "..", "src", f), "utf8");
     expect(await src("core/take-sanitize.ts")).toMatch(/const pan = await deadChannelPan\(filePath\);/);

@@ -342,8 +342,10 @@ export async function ensureFaststart(filePath: string): Promise<boolean> {
   if (moov < 0 || mdat < 0 || moov < mdat) return false;
   const tmp = filePath.replace(/(\.[a-z0-9]+)$/i, ".faststart$1");
   try {
+    const before = await fs.stat(filePath);
     await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", filePath, "-map", "0", "-c", "copy", "-movflags", "+faststart", tmp], { maxBuffer: 10 * 1024 * 1024 });
     await fs.rename(tmp, filePath);
+    await keepFileDate(filePath, before);
     return true;
   } catch (e) {
     await fs.unlink(tmp).catch(() => {});
@@ -374,4 +376,15 @@ export async function topLevelAtoms(filePath: string): Promise<string[]> {
   } finally {
     await fh.close();
   }
+}
+
+/** A rewrite that does not change WHAT the file is (the index moved, the
+ *  voice centered) keeps the file's date: render-status reads the MP4's
+ *  mtime as "when it was rendered", and a first-request rewrite of an old
+ *  render made it read as rendered just now -- an old 4:5 render with no
+ *  voice showed as fresh (measured on proj_86591051). +1 ms so the cache tag
+ *  (size + mtime) still changes and no browser mixes old and new bytes;
+ *  the stale check's 2 s tolerance reads it as the same date. */
+export async function keepFileDate(filePath: string, before: { atime: Date; mtimeMs: number }): Promise<void> {
+  await fs.utimes(filePath, before.atime, new Date(before.mtimeMs + 1)).catch(() => {});
 }
