@@ -181,6 +181,35 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     expect(err).not.toContain("AAAAAAAA");
   }, 60000);
 
+  it("wan-s2v: one still from an earlier test + the voice; video_from swaps the performance source", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    const bodies: Record<string, any> = {};
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://queue.fal.run/fal-ai/wan/v2.2-14b/speech-to-video") { bodies.s2v = JSON.parse(init.body); return json({ request_id: "a", status_url: "https://q/s5", response_url: "https://q/r5" }); }
+      if (u === "https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/replace") { bodies.rep = JSON.parse(init.body); return json({ request_id: "b", status_url: "https://q/s5", response_url: "https://q/r5" }); }
+      if (u === "https://q/s5") return json({ status: "COMPLETED" });
+      if (u === "https://q/r5") return json({ video: { url: "https://cdn/x.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.FAL_KEY = "fk";
+    const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    const wait = async (id: string) => { let st = (await getActorTest(T, P, id))!; for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, id))!; } return st; };
+    const s2v = await wait((await startActorTest({ tenant: T, project: P, scene_index: 0, image: "", image_from: { test: firstId, file: "wan.mp4", at: 0.5 }, providers: ["wan-s2v"], voice: false })).id);
+    expect(s2v.status, s2v.error || JSON.stringify(s2v.steps)).toBe("done");
+    expect(s2v.image).toBe(`${firstId}/wan.mp4@0.5`);
+    expect(bodies.s2v.image_url).toMatch(/^data:image\/jpeg;base64,/);
+    expect(bodies.s2v.audio_url).toMatch(/^data:audio\/mpeg;base64,/);
+    expect(bodies.s2v.num_frames % 4).toBe(0);
+    expect(bodies.s2v.num_frames).toBeLessThanOrEqual(120);
+    const rep = await wait((await startActorTest({ tenant: T, project: P, scene_index: 7, image: "", image_from: { test: firstId, file: "wan.mp4", at: 0.2 }, video_from: { test: s2v.id, file: "wan-s2v.mp4" }, providers: ["wan"], voice: false })).id);
+    expect(rep.status, rep.error || JSON.stringify(rep.steps)).toBe("done"); // scene 8 has no speaker clip: video_from stands in
+    expect(bodies.rep.video_url).toMatch(/^data:video\/mp4;base64,/);
+    await expect(startActorTest({ tenant: T, project: P, scene_index: 0, image: "", image_from: { test: "../../x", file: "a" }, providers: ["wan-s2v"] })).rejects.toThrow(/bad reference/);
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
