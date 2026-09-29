@@ -75,6 +75,7 @@ import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiti
 import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import { startActorTest, startVoiceLineup, getActorTest, type ActorTest } from "./core/actor-test.js";
+import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -951,6 +952,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const [, assetTenantId, assetProjectId, assetSubPath] = assetMatch.map(decodeURIComponent);
         if (assetSubPath.includes("..")) { res.writeHead(403); res.end("Forbidden"); return; }
         const fullPath = path.join(config.dataDir, assetTenantId, "projects", assetProjectId, assetSubPath);
+        // A take recorded with the voice on one channel is centered on its
+        // first request, so Studio plays it centered too (audio/channels.ts).
+        if (isTakeAsset(assetSubPath)) await ensureCenteredTake(fullPath).catch(() => {});
         try {
           await streamFile(req, res, fullPath);
         } catch {

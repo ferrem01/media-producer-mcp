@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { channelLevels, panForLevels, centerDeadChannel } from "../src/audio/channels.js";
+import { channelLevels, panForLevels, centerDeadChannel, ensureCenteredTake, isTakeAsset } from "../src/audio/channels.js";
 
 // Marc, on an actor test: "my voice seems to be coming from the upper
 // left-hand corner." Measured: his lav receiver records mono into the LEFT
@@ -50,6 +50,24 @@ describe("a voice on one channel plays centered", () => {
     const st = await fs.stat(stereo);
     expect(await centerDeadChannel(stereo)).toBe(false);
     expect((await fs.stat(stereo)).mtimeMs).toBe(st.mtimeMs);
+  }, 30000);
+
+  it("Studio's take files are centered on first request (a take recorded before the fix), once", async () => {
+    // Marc's marketing lead heard music and sfx in Studio but not his voice:
+    // Studio plays the take file itself, and it was left-only.
+    expect(isTakeAsset("assets/take-2026-09-25T21-59-11-665Z.mp4")).toBe(true);
+    expect(isTakeAsset("assets/.take-2026-09-27T22-04-50-448Z.ungraded.mp4")).toBe(true);
+    expect(isTakeAsset("assets/img_1.png")).toBe(false);
+    expect(isTakeAsset("assets/../project.json")).toBe(false);
+    const take = await clip("take-old.mp4", "sine=frequency=250:duration=2", "anullsrc=r=48000:cl=mono:d=2");
+    await Promise.all([ensureCenteredTake(take), ensureCenteredTake(take), ensureCenteredTake(take)]); // concurrent first requests
+    const lv = (await channelLevels(take))!;
+    expect(lv[1]).toBeGreaterThan(-30);
+    const m1 = (await fs.stat(take)).mtimeMs;
+    await ensureCenteredTake(take);
+    expect((await fs.stat(take)).mtimeMs).toBe(m1);
+    const idx = await fs.readFile(path.join(__dirname, "..", "src", "index.ts"), "utf8");
+    expect(idx).toMatch(/if \(isTakeAsset\(assetSubPath\)\) await ensureCenteredTake\(fullPath\)/);
   }, 30000);
 
   it("is wired where a take arrives and where the speaker's voice enters a render", async () => {

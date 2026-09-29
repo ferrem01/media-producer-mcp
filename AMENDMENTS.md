@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — Studio plays one-sided takes centered too
+
+Marc's marketing lead, in Studio on her laptop (proj_86591051): music and
+sound effects, no voice. Marc's machine: fine. Her Studio log showed the
+take playing unmuted and in sync; the film's render had the right channel
+at -inf -- the take is left-only (the lav receiver). Her audio came out of
+the right side only (one earbud, a speaker, a balance setting), so the
+voice was on a side she could not hear. The earlier fix centered new takes
+and renders, but Studio plays the ORIGINAL take file of every film recorded
+before it.
+- `/assets/{t}/projects/{p}/assets/take-*` (and dot-copies) call
+  `ensureCenteredTake` before serving: the first request centers a
+  one-sided take in place (live channel to both sides, picture copied);
+  later requests are a lookup, and concurrent first requests share one pass.
+- `centerDeadChannel` picks the audio codec by container (Opus for WebM).
+- Test: `test/audio-channels.test.ts`.
+
 ## 2026-09-29 — Actor test: one fixed face across scenes (Wan S2V, video_from)
 
 Marc on the Seedance couch shot: "Really can't tell it is AI" -- but how do

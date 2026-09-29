@@ -64,8 +64,10 @@ export async function centerDeadChannel(file: string): Promise<boolean> {
   if (!pan) return false;
   const tmp = file.replace(/(\.[^.]+)$/, ".centered$1");
   try {
+    // The container decides the codec: a WebM take cannot carry AAC.
+    const codec = /\.webm$/i.test(file) ? ["-c:a", "libopus", "-b:a", "128k"] : ["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"];
     await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", file, "-map", "0:v?", "-map", "0:a:0", "-c:v", "copy",
-      "-af", pan, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", tmp], { maxBuffer: 16 * 1024 * 1024 });
+      "-af", pan, ...codec, tmp], { maxBuffer: 16 * 1024 * 1024 });
     await fs.rename(tmp, file);
     return true;
   } catch (e: any) {
@@ -73,4 +75,34 @@ export async function centerDeadChannel(file: string): Promise<boolean> {
     console.warn(`  channels: could not center ${file}: ${String(e?.stderr || e?.message || e).slice(-200)}`);
     return false;
   }
+}
+
+/** TAKES RECORDED BEFORE THE FIX. Studio plays the take file itself, so a
+ *  one-sided take was still one-sided there: Marc's marketing lead heard
+ *  the music and sound effects but not his voice (her audio came out of
+ *  the right side only; the voice lived on the left). The asset route calls
+ *  this before serving a take file: the first request centers it in place,
+ *  every later one is a lookup. Concurrent first requests share one pass. */
+const checked = new Map<string, number>();
+const inFlight = new Map<string, Promise<void>>();
+export async function ensureCenteredTake(file: string): Promise<void> {
+  let st;
+  try { st = await fs.stat(file); } catch { return; }
+  if (checked.get(file) === st.mtimeMs) return;
+  const running = inFlight.get(file);
+  if (running) return running;
+  const job = (async () => {
+    try {
+      if (await centerDeadChannel(file)) console.log(`  channels: centered a one-sided take (${file.split("/").pop()})`);
+      const after = await fs.stat(file);
+      checked.set(file, after.mtimeMs);
+    } catch { /* serve it as it is */ }
+  })().finally(() => inFlight.delete(file));
+  inFlight.set(file, job);
+  return job;
+}
+
+/** A take file or one of its copies (graded, blur, alpha) under a project's assets. */
+export function isTakeAsset(subPath: string): boolean {
+  return /^assets\/\.?take-[^/]+\.(mp4|mov|m4v|webm)$/i.test(subPath);
 }
