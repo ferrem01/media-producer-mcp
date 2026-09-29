@@ -17,6 +17,7 @@ const DATA = path.join(os.tmpdir(), `mp-actor-${process.pid}`);
 process.env.MP_DATA_DIR = DATA;
 process.env.MP_ACTOR_POLL_MS = "20";
 const T = "t", P = "p";
+let firstId = "";
 
 async function film(file: string, size: string, secs: number): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true });
@@ -61,6 +62,7 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
     const t = await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png" });
     expect(t.providers).toEqual(["wan", "runway"]);
+    firstId = t.id;
     let st = t;
     for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, t.id))!; }
     expect(st.status, (st.error || "") + JSON.stringify(st.steps)).toBe("done");
@@ -83,6 +85,37 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     const [, w, h] = ((await info("compare.mp4")).match(/Video:.*?, (\d{2,5})x(\d{2,5})/) || []).map(Number);
     expect(h).toBe(960);
     expect(w).toBeGreaterThan(3 * 500); // you | wan | runway
+  }, 60000);
+
+  it("the voice lineup lays several voices on one earlier picture; \"move\" goes to Wan's move endpoint", async () => {
+    const calls: string[] = [];
+    const mp3 = (await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=200:duration=2", "-f", "mp3", "-"], { encoding: "buffer" as any, maxBuffer: 1 << 24 })).stdout as unknown as Buffer;
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const u = String(url); calls.push(u);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://api.elevenlabs.io/v1/voices") return json({ voices: [{ voice_id: "b1", name: "Brian - Deep", category: "premade" }, { voice_id: "e1", name: "Eric - Smooth", category: "premade" }] });
+      if (u.startsWith("https://api.elevenlabs.io/v1/speech-to-speech/")) return new Response(mp3, { status: 200 });
+      if (u === "https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/move") return json({ request_id: "m", status_url: "https://q/s2", response_url: "https://q/r2" });
+      if (u === "https://q/s2") return json({ status: "COMPLETED" });
+      if (u === "https://q/r2") return json({ video: { url: "https://cdn/move.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    const { startVoiceLineup, startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    const wait = async (id: string) => { let st = (await getActorTest(T, P, id))!; for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, id))!; } return st; };
+
+    const lu = await wait((await startVoiceLineup({ tenant: T, project: P, from: firstId, voices: ["Brian", "Eric", "Nobody"] })).id);
+    expect(lu.status).toBe("done");
+    expect(Object.keys(lu.files).sort()).toEqual(["voice-brian", "voice-eric", "wan-brian", "wan-eric"]);
+    expect(lu.steps["voice:Nobody"].status).toBe("failed");
+    expect(calls.filter((c) => c.includes("/speech-to-speech/b1")).length).toBe(1);
+    expect(calls.some((c) => c.includes("fal.run"))).toBe(false); // no new video generation
+
+    const mv = await wait((await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png", providers: ["wan-move"], voice: false })).id);
+    expect(mv.status, mv.error || JSON.stringify(mv.steps)).toBe("done");
+    expect(calls).toContain("https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/move");
+    expect(mv.files["wan-move"]).toBe("wan-move.mp4");
   }, 60000);
 
   it("refuses without a provider key, and an image outside the tenant", async () => {

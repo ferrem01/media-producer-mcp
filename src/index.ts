@@ -74,7 +74,7 @@ import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
 import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
-import { startActorTest, getActorTest, type ActorTest } from "./core/actor-test.js";
+import { startActorTest, startVoiceLineup, getActorTest, type ActorTest } from "./core/actor-test.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -2697,6 +2697,7 @@ Rules:
 
       // ── API: Actor test (core/actor-test.ts, an experiment) ──
       // POST /api/actor-test/{tenant}/{project} {scene_index, image, providers?, voice?, voice_id?}
+      //      or {mode:"voices", from: <test id>, voices: [names or ids], picture?}
       // GET  /api/actor-test/{tenant}/{project}/{id}   status, steps, file urls
       const actorApi = urlPath.match(/^\/api\/actor-test\/([^/]+)\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
       if (actorApi) {
@@ -2706,14 +2707,17 @@ Rules:
         try {
           if (method === "POST" && !atId) {
             const body = await parseBody(req).catch(() => ({} as any));
-            const t = await startActorTest({
+            // {mode:"voices", from, voices:[...]} -- one earlier test's picture, several voices.
+            const t = body.mode === "voices"
+              ? await startVoiceLineup({ tenant: atTenant, project: atProject, from: String(body.from || ""), voices: Array.isArray(body.voices) ? body.voices : [], picture: body.picture })
+              : await startActorTest({
               tenant: atTenant, project: atProject,
               scene_index: Number(body.scene_index) || 0,
               image: String(body.image || ""),
               providers: Array.isArray(body.providers) ? body.providers : undefined,
               voice: body.voice === false ? false : undefined,
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
-            });
+              });
             jsonResponse(res, 202, withUrls(t));
             return;
           }

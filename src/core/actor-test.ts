@@ -31,7 +31,7 @@ import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "runway";
+export type ActorProvider = "wan" | "wan-move" | "runway";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -52,7 +52,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", runway: "RUNWAYML_API_SECRET" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -105,10 +105,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const DEADLINE_MS = 25 * 60 * 1000;
 const POLL_MS = Number(process.env.MP_ACTOR_POLL_MS) || 5000;
 
-/** Wan 2.2 Animate "replace" through fal's queue: submit, poll, fetch. */
-async function runWan(src: string, img: string): Promise<string> {
+/** Wan 2.2 Animate through fal's queue: submit, poll, fetch. "replace"
+ *  swaps the person inside the recorded room; "move" animates the portrait
+ *  in the portrait's own setting with the take's motion. */
+async function runWan(src: string, img: string, mode: "replace" | "move"): Promise<string> {
   const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
-  const sub = await okJson(await fetch("https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/replace", {
+  const sub = await okJson(await fetch(`https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/${mode}`, {
     method: "POST", headers,
     body: JSON.stringify({ video_url: src, image_url: img, resolution: "720p", video_quality: "high" }),
   }), "fal submit");
@@ -161,12 +163,24 @@ async function runRunway(src: string, img: string, ratio: string): Promise<strin
   }
 }
 
+async function listVoices(): Promise<any[]> {
+  const headers = { "xi-api-key": String(process.env.ELEVENLABS_API_KEY) };
+  const j = await okJson(await fetch("https://api.elevenlabs.io/v1/voices", { headers }), "elevenlabs voices");
+  return j?.voices || [];
+}
+
+/** A voice by id or by name ("Brian" matches "Brian - Deep, Resonant..."). */
+function findVoice(voices: any[], want: string): { id: string; name: string } | null {
+  const w = want.toLowerCase();
+  const hit = voices.find((v) => v.voice_id === want) || voices.find((v) => String(v.name).toLowerCase() === w)
+    || voices.find((v) => String(v.name).toLowerCase().startsWith(w));
+  return hit ? { id: hit.voice_id, name: hit.name } : null;
+}
+
 /** A stock ElevenLabs voice: the caller's pick, else a premade female voice. */
 async function pickVoice(voiceId?: string): Promise<{ id: string; name: string }> {
   if (voiceId) return { id: voiceId, name: voiceId };
-  const headers = { "xi-api-key": String(process.env.ELEVENLABS_API_KEY) };
-  const j = await okJson(await fetch("https://api.elevenlabs.io/v1/voices", { headers }), "elevenlabs voices");
-  const voices: any[] = j?.voices || [];
+  const voices = await listVoices();
   const female = voices.filter((v) => v.category === "premade" && String(v.labels?.gender || "").toLowerCase() === "female");
   const prefer = ["Sarah", "Jessica", "Laura", "Alice", "Matilda"];
   const hit = prefer.map((n) => female.find((v) => String(v.name).startsWith(n))).find(Boolean) || female[0] || voices[0];
@@ -206,7 +220,7 @@ export async function startActorTest(opts: {
   if (!imgAbs.startsWith(tenantDir + path.sep)) throw new Error("image must be a path inside the tenant");
   await fs.access(imgAbs).catch(() => { throw new Error(`image not found: ${opts.image}`); });
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p) => p === "wan" || p === "runway");
+    .filter((p) => p === "wan" || p === "wan-move" || p === "runway");
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -281,7 +295,7 @@ async function run(test: ActorTest, clipAbs: string, trimStart: number, trimEnd:
       })
     : Promise.resolve(null);
   const provJobs = test.providers.map((p) => step(test, p, async () => {
-    const url = p === "wan" ? await runWan(srcUri, imgUri) : await runRunway(srcUri, imgUri, ratio);
+    const url = p === "runway" ? await runRunway(srcUri, imgUri, ratio) : await runWan(srcUri, imgUri, p === "wan-move" ? "move" : "replace");
     await download(url, f(`${p}-raw.mp4`));
     return p;
   }));
@@ -313,4 +327,60 @@ async function run(test: ActorTest, clipAbs: string, trimStart: number, trimEnd:
   test.finished_at = new Date().toISOString();
   await fs.rm(f("take.wav"), { force: true }).catch(() => {});
   await save(test);
+}
+
+/** THE VOICE LINEUP: one picture, several voices. Takes an earlier test's
+ *  actor video (its raw provider output) and its source audio, converts the
+ *  audio to each voice, and lays each onto the picture -- choosing a voice
+ *  for a face costs seconds, not another video generation. */
+export async function startVoiceLineup(opts: {
+  tenant: string;
+  project: string;
+  from: string;
+  voices: string[];
+  picture?: ActorProvider;
+}): Promise<ActorTest> {
+  if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
+  const from = await getActorTest(opts.tenant, opts.project, opts.from);
+  if (!from) throw new Error(`Actor test not found: ${opts.from}`);
+  const picture = opts.picture || (from.providers.includes("wan") ? "wan" : from.providers[0]);
+  const fromDir = actorTestDir(opts.tenant, opts.project, from.id);
+  const pic = path.join(fromDir, `${picture}-raw.mp4`);
+  await fs.access(pic).catch(() => { throw new Error(`That test has no ${picture} video`); });
+  const wanted = (opts.voices || []).map(String).filter(Boolean).slice(0, 8);
+  if (!wanted.length) throw new Error("voices is empty");
+  const test: ActorTest = {
+    id: crypto.randomBytes(12).toString("base64url"),
+    tenant_id: opts.tenant, project_id: opts.project, scene_index: from.scene_index, image: from.image,
+    providers: [], voice: true, status: "running", started_at: new Date().toISOString(), steps: {}, files: {},
+  };
+  const dir = actorTestDir(opts.tenant, opts.project, test.id);
+  await fs.mkdir(dir, { recursive: true });
+  tests.set(test.id, test);
+  await save(test);
+  void (async () => {
+    const f = (n: string) => path.join(dir, n);
+    await ffmpeg(["-i", path.join(fromDir, "source.mp4"), "-vn", "-ac", "1", "-ar", "44100", f("take.wav")]);
+    const voices = await listVoices();
+    for (const want of wanted) {
+      await step(test, `voice:${want}`, async () => {
+        const v = findVoice(voices, want);
+        if (!v) throw new Error(`no voice named ${want} on the account`);
+        const slug = v.name.split(/[^A-Za-z0-9]+/)[0].toLowerCase() || "voice";
+        await convertVoice(f("take.wav"), f(`voice-${slug}.mp3`), v.id);
+        await ffmpeg(["-i", pic, "-i", f(`voice-${slug}.mp3`), "-map", "0:v:0", "-map", "1:a:0",
+          "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+          "-shortest", "-movflags", "+faststart", f(`${picture}-${slug}.mp4`)]);
+        test.files[`${picture}-${slug}`] = `${picture}-${slug}.mp4`;
+        test.files[`voice-${slug}`] = `voice-${slug}.mp3`;
+      });
+    }
+    const ok = Object.keys(test.files).length > 0;
+    test.status = ok ? "done" : "failed";
+    if (!ok) test.error = "No voice converted";
+    test.finished_at = new Date().toISOString();
+    await fs.rm(f("take.wav"), { force: true }).catch(() => {});
+    await save(test);
+  })().catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
+  return test;
 }
