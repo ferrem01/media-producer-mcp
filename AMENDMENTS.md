@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — Actor test: a scene of the take, performed by a synthetic actor
+
+Marc wants to record anywhere ("on the toilet") and still ship a
+professional film: performance transfer redraws the person, hair, light and
+room from a portrait while keeping his timing, gestures and mouth. An
+experiment first -- nothing in a film changes (`core/actor-test.ts`):
+- `POST /api/actor-test/{tenant}/{project}` `{scene_index, image}` cuts that
+  scene's slice of the speaker take (720 wide) and sends it, with the
+  portrait, as data URIs to each provider that has a key: Wan 2.2 Animate
+  "replace" on fal (`FAL_KEY`; the engine under Higgsfield's Character
+  Swap) and Runway Act-Two (`RUNWAYML_API_SECRET`, `character_performance`,
+  bodyControl on, ratio from the canvas). ElevenLabs speech-to-speech
+  (`ELEVENLABS_API_KEY`, a stock premade voice, never a clone) converts the
+  voice with the delivery kept, so word anchors would still hold.
+- Output in `output/actor-tests/<id>/`: `wan.mp4`, `runway.mp4` (each with
+  the converted voice), `voice.mp3`, and `compare.mp4` -- the take and each
+  actor side by side. `GET .../{id}` reports steps and file URLs.
+- Keys live in pm2's saved environment on the droplet (set with
+  `--update-env` + `pm2 save`; never in `ecosystem.config.cjs`, which is in
+  git).
+- Test: `test/actor-test.test.ts` (providers faked: what is sent, what is
+  made from what comes back, refusals).
+
 ## 2026-09-28 — Studio follows a render it did not start
 
 Marc: "I could have sworn it showed the percentage of the render." It does
