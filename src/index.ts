@@ -2717,6 +2717,7 @@ Rules:
               providers: Array.isArray(body.providers) ? body.providers : undefined,
               voice: body.voice === false ? false : undefined,
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
+              prompt: typeof body.prompt === "string" ? body.prompt : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;
