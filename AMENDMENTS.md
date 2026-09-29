@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — A voice on one channel plays centered
+
+Marc, on an actor test: his own voice "seems to be coming from the upper
+left-hand corner", the converted voices from the center. Measured: his lav
+receiver records mono into the LEFT channel (left -16.7 dB RMS, right
+-113 dB), and the rendered Old Chimp film carried it that way -- voice left
+only, the right side holding just music and sfx. ElevenLabs returns mono,
+which plays centered.
+- `audio/channels.ts`: per-channel RMS from ffmpeg's astats; a stereo track
+  with one live side (> -50 dB) and one dead side (< -60 dB) gets the live
+  channel on both sides. Two live channels (a real stereo take), mono and
+  silence are left alone.
+- Wired where a take arrives (`take-sanitize.ts`, before loudnorm) and where
+  the speaker's voice enters every speaker-track render
+  (`buildSpeakerBase`, both the single-clip and concat paths) -- so takes
+  recorded before the fix come out centered on their next render.
+- Verified on the real clip: [-16.7, -113] -> [-16.7, -16.7].
+- Test: `test/audio-channels.test.ts`.
+
 ## 2026-09-29 — Actor test round two: the voice lineup, and Wan "move"
 
 Two tests on scene 1 of Old Chimp: Wan "replace" beat Runway both times --

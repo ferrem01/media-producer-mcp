@@ -10,6 +10,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { centerDeadChannel } from "../audio/channels.js";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -156,6 +157,7 @@ export async function buildSpeakerBase(opts: {
     const args = buildSingleClipArgs(clip, width, height, totalDuration, outputPath, clipHasVideo, fitSpeedFactor);
     console.log(`  [speaker-track] ffmpeg single-clip: ${args.filter(a => !a.startsWith('-')).join(' ')}`);
     await execFileAsync("ffmpeg", args, { maxBuffer: 50 * 1024 * 1024 });
+    if (await centerDeadChannel(outputPath)) console.log(`  [speaker-track] voice was on one channel -- centered`);
     return outputPath;
   }
 
@@ -221,6 +223,9 @@ export async function buildSpeakerBase(opts: {
   }
   await fs.unlink(concatListPath).catch(() => {});
 
+  // A take recorded with the voice on one channel (a lav receiver's mono
+  // into the left side) plays centered, like every film mix (audio/channels.ts).
+  if (speakerHasAudio && (await centerDeadChannel(outputPath))) console.log(`  [speaker-track] voice was on one channel -- centered`);
   return outputPath;
 }
 

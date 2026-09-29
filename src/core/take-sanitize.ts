@@ -38,6 +38,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { deadChannelPan } from "../audio/channels.js";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -414,7 +415,10 @@ export async function sanitizeTake(
         : `loudnorm=I=${TAKE_LOUDNESS_TARGET_LUFS}:TP=-1.5:LRA=11`;
       // The container decides the codec: a WebM take (Chrome, Firefox) cannot carry AAC.
       const audioCodec = ext.toLowerCase() === ".webm" ? ["-c:a", "libopus", "-b:a", "128k"] : ["-c:a", "aac", "-b:a", "160k"];
-      args.push("-af", filter, ...audioCodec, "-ar", "48000");
+      // A one-sided take (the voice on the left channel only) is centered
+      // before it is measured and stored (audio/channels.ts).
+      const pan = await deadChannelPan(filePath);
+      args.push("-af", pan ? `${pan},${filter}` : filter, ...audioCodec, "-ar", "48000");
       normalizedTo = TAKE_LOUDNESS_TARGET_LUFS;
     } else {
       args.push("-c:a", "copy");
