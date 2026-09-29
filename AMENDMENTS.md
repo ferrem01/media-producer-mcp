@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — Actor test round two: the voice lineup, and Wan "move"
+
+Two tests on scene 1 of Old Chimp: Wan "replace" beat Runway both times --
+it keeps the real room and light and follows the performance closely
+(Runway re-sets the scene in the portrait's office, glossier, with bigger
+expressions). A male actor with a male voice ("Chris") dubbed better than a
+female one; Marc: still sounds dubbed, maybe a better-matched voice.
+Wan's raw output carries the take's own audio -- his voice on the actor's
+face -- kept as `wan-raw.mp4`.
+- **Voice lineup:** `{mode:"voices", from:<test id>, voices:["Brian", ...]}`
+  converts the earlier test's source audio to each voice (by name or id)
+  and lays each on that test's picture: seconds per voice, no new video.
+- **`wan-move`:** Wan 2.2 Animate's move endpoint animates the portrait in
+  the portrait's own setting with the take's motion -- the route to a
+  different room or a couch when the recording is framed to match.
+
 ## 2026-09-29 — Actor test: a scene of the take, performed by a synthetic actor
 
 Marc wants to record anywhere ("on the toilet") and still ship a
