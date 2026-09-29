@@ -31,7 +31,7 @@ import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "wan-move" | "runway";
+export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -52,7 +52,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -129,6 +129,36 @@ async function runWan(src: string, img: string, mode: "replace" | "move"): Promi
   if (!url) throw new Error("fal result: no video url");
   return url;
 }
+
+/** Seedance 2.0 reference-to-video on fal: NOBODY performs -- the model
+ *  invents the shot (a walk down a street, a kitchen) from the portrait and
+ *  the prompt, and lip-syncs the actor to the audio reference. */
+async function runSeedance(img: string, audio: string, prompt: string, seconds: number, aspect: string): Promise<string> {
+  const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
+  const sub = await okJson(await fetch("https://queue.fal.run/bytedance/seedance-2.0/reference-to-video", {
+    method: "POST", headers,
+    body: JSON.stringify({
+      prompt, image_urls: [img], audio_urls: [audio],
+      duration: String(seconds), aspect_ratio: aspect, resolution: "720p", generate_audio: true,
+    }),
+  }), "seedance submit");
+  const statusUrl: string = sub.status_url, responseUrl: string = sub.response_url;
+  if (!statusUrl || !responseUrl) throw new Error("seedance submit: no status_url in the reply");
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > DEADLINE_MS) throw new Error("seedance: timed out");
+    await sleep(POLL_MS);
+    const st = await okJson(await fetch(statusUrl, { headers }), "seedance status");
+    if (st.status === "COMPLETED") break;
+    if (st.status && !["IN_QUEUE", "IN_PROGRESS"].includes(st.status)) throw new Error(`seedance: ${st.status}`);
+  }
+  const res = await okJson(await fetch(responseUrl, { headers }), "seedance result");
+  const url = res?.video?.url;
+  if (!url) throw new Error("seedance result: no video url");
+  return url;
+}
+
+export const SEEDANCE_DEFAULT_PROMPT = "@Image1 is the person. Handheld selfie-style phone video: they walk slowly down a sunny, tree-lined city sidewalk, holding the phone at arm's length, looking into the lens and talking to the camera, saying exactly the words in @Audio1 with their lips in sync with @Audio1. Natural daylight, realistic skin, casual and friendly, real phone footage, no text, no music.";
 
 /** Runway Act-Two: POST /v1/character_performance, poll /v1/tasks/{id}. */
 async function runRunway(src: string, img: string, ratio: string): Promise<string> {
@@ -210,6 +240,8 @@ export async function startActorTest(opts: {
   providers?: ActorProvider[];
   voice?: boolean;
   voice_id?: string;
+  /** seedance: the shot to invent (defaults to a walk down a sunny sidewalk). */
+  prompt?: string;
 }): Promise<ActorTest> {
   const project = await loadProject(opts.tenant, opts.project);
   if (!project) throw new Error("Project not found");
@@ -220,7 +252,7 @@ export async function startActorTest(opts: {
   if (!imgAbs.startsWith(tenantDir + path.sep)) throw new Error("image must be a path inside the tenant");
   await fs.access(imgAbs).catch(() => { throw new Error(`image not found: ${opts.image}`); });
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p) => p === "wan" || p === "wan-move" || p === "runway");
+    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance"].includes(p));
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -246,7 +278,7 @@ export async function startActorTest(opts: {
   const clipAbs = resolveVideoPath(clip.source, config.dataDir);
   // The take is recorded at the film's frame, so the canvas says its shape.
   const frame: [number, number] = [Number((project as any).canvas?.width) || 1080, Number((project as any).canvas?.height) || 1920];
-  void run(test, clipAbs, Number(clip.trim_start) || 0, clip.trim_end == null ? null : Number(clip.trim_end), imgAbs, frame, opts.voice_id)
+  void run(test, clipAbs, Number(clip.trim_start) || 0, clip.trim_end == null ? null : Number(clip.trim_end), imgAbs, frame, opts.voice_id, opts.prompt)
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
   return test;
 }
@@ -267,7 +299,7 @@ async function step<T>(test: ActorTest, name: string, fn: () => Promise<T>): Pro
   }
 }
 
-async function run(test: ActorTest, clipAbs: string, trimStart: number, trimEnd: number | null, imgAbs: string, frame: [number, number], voiceId?: string): Promise<void> {
+async function run(test: ActorTest, clipAbs: string, trimStart: number, trimEnd: number | null, imgAbs: string, frame: [number, number], voiceId?: string, prompt?: string): Promise<void> {
   const dir = actorTestDir(test.tenant_id, test.project_id, test.id);
   const f = (name: string) => path.join(dir, name);
 
@@ -295,7 +327,19 @@ async function run(test: ActorTest, clipAbs: string, trimStart: number, trimEnd:
       })
     : Promise.resolve(null);
   const provJobs = test.providers.map((p) => step(test, p, async () => {
-    const url = p === "runway" ? await runRunway(srcUri, imgUri, ratio) : await runWan(srcUri, imgUri, p === "wan-move" ? "move" : "replace");
+    let url: string;
+    if (p === "seedance") {
+      // Lip-synced to the voice the test settled on: the converted one
+      // when there is one, else the take's own audio.
+      await voiceJob;
+      if (!test.files.voice) await ffmpeg(["-i", f("source.mp4"), "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", f("take.mp3")]);
+      const aud = test.files.voice ? f("voice.mp3") : f("take.mp3");
+      const secs = Math.min(15, Math.max(4, Math.ceil(trimEnd != null ? trimEnd - trimStart : 5)));
+      const aspect = h > w * 1.1 ? (w / h < 0.65 ? "9:16" : "3:4") : w > h * 1.1 ? "16:9" : "1:1";
+      url = await runSeedance(imgUri, await dataUri(aud, "audio/mpeg"), prompt || SEEDANCE_DEFAULT_PROMPT, secs, aspect);
+    } else {
+      url = p === "runway" ? await runRunway(srcUri, imgUri, ratio) : await runWan(srcUri, imgUri, p === "wan-move" ? "move" : "replace");
+    }
     await download(url, f(`${p}-raw.mp4`));
     return p;
   }));
@@ -306,6 +350,13 @@ async function run(test: ActorTest, clipAbs: string, trimStart: number, trimEnd:
   // the take's own audio. The picture is re-encoded so every file streams.
   const audio = test.files.voice ? f("voice.mp3") : f("source.mp4");
   for (const p of done) {
+    if (p === "seedance" && (await hasAudio(f(`${p}-raw.mp4`)))) {
+      // Seedance renders the voice itself, placed where it lip-synced it.
+      await ffmpeg(["-i", f(`${p}-raw.mp4`), "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", f(`${p}.mp4`)]);
+      test.files[p] = `${p}.mp4`;
+      continue;
+    }
     await ffmpeg(["-i", f(`${p}-raw.mp4`), "-i", audio, "-map", "0:v:0", "-map", "1:a:0",
       "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
       "-shortest", "-movflags", "+faststart", f(`${p}.mp4`)]);
@@ -326,7 +377,13 @@ async function run(test: ActorTest, clipAbs: string, trimStart: number, trimEnd:
   if (!done.length) test.error = "No provider returned a video";
   test.finished_at = new Date().toISOString();
   await fs.rm(f("take.wav"), { force: true }).catch(() => {});
+  await fs.rm(f("take.mp3"), { force: true }).catch(() => {});
   await save(test);
+}
+
+async function hasAudio(file: string): Promise<boolean> {
+  try { await execFileAsync("ffmpeg", ["-hide_banner", "-i", file]); return false; }
+  catch (e: any) { return /Stream #\d+:\d+[^\n]*: Audio:/.test(String(e?.stderr || "")); }
 }
 
 /** THE VOICE LINEUP: one picture, several voices. Takes an earlier test's

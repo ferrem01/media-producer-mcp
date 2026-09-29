@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — Actor test: Seedance, a full AI actor
+
+Marc: "what about full AI actors with Seedance... someone walking delivering
+the same talk track?" Performance transfer needs someone to perform the
+shot; Seedance invents it. `providers:["seedance"]` sends the portrait and
+the test's voice (the converted one, else the take's audio) to Seedance 2.0
+reference-to-video on fal (`FAL_KEY`), with a prompt (default: a selfie
+walk down a sunny sidewalk, lips in sync with @Audio1). Duration is the
+scene's length (4-15s), aspect from the canvas. Its output keeps the audio
+Seedance placed, so the lip-sync is its own.
+
 ## 2026-09-29 — A voice on one channel plays centered
 
 Marc, on an actor test: his own voice "seems to be coming from the upper

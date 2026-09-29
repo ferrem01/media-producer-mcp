@@ -118,6 +118,34 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     expect(mv.files["wan-move"]).toBe("wan-move.mp4");
   }, 60000);
 
+  it("seedance invents the shot from the portrait, lip-synced to the converted voice", async () => {
+    let body: any = null;
+    const mp3 = (await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=200:duration=2", "-f", "mp3", "-"], { encoding: "buffer" as any, maxBuffer: 1 << 24 })).stdout as unknown as Buffer;
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    process.env.ELEVENLABS_API_KEY = "ek"; process.env.FAL_KEY = "fk";
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://api.elevenlabs.io/v1/voices") return json({ voices: [] });
+      if (u.startsWith("https://api.elevenlabs.io/v1/speech-to-speech/r1")) return new Response(mp3, { status: 200 });
+      if (u === "https://queue.fal.run/bytedance/seedance-2.0/reference-to-video") { body = JSON.parse(init.body); return json({ request_id: "s", status_url: "https://q/s3", response_url: "https://q/r3" }); }
+      if (u === "https://q/s3") return json({ status: "COMPLETED" });
+      if (u === "https://q/r3") return json({ video: { url: "https://cdn/seed.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    const { startActorTest, getActorTest, SEEDANCE_DEFAULT_PROMPT } = await import("../src/core/actor-test.js");
+    const t = await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png", providers: ["seedance"], voice_id: "r1" });
+    let st = t;
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, t.id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(body.image_urls[0]).toMatch(/^data:image\/jpeg;base64,/);
+    expect(body.audio_urls[0]).toMatch(/^data:audio\/mpeg;base64,/); // the converted voice, not the take
+    expect(body).toMatchObject({ duration: "4", aspect_ratio: "9:16", prompt: SEEDANCE_DEFAULT_PROMPT });
+    expect(SEEDANCE_DEFAULT_PROMPT).toMatch(/@Image1[\s\S]*@Audio1/);
+    expect(st.files.seedance).toBe("seedance.mp4");
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
