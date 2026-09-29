@@ -6,6 +6,40 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — Studio plays one-sided takes centered too
+
+Marc's marketing lead, in Studio on her laptop (proj_86591051): music and
+sound effects, no voice. Marc's machine: fine. Her Studio log showed the
+take playing unmuted and in sync; the film's render had the right channel
+at -inf -- the take is left-only (the lav receiver). Her audio came out of
+the right side only (one earbud, a speaker, a balance setting), so the
+voice was on a side she could not hear. The earlier fix centered new takes
+and renders, but Studio plays the ORIGINAL take file of every film recorded
+before it.
+- `/assets/{t}/projects/{p}/assets/take-*` (and dot-copies) call
+  `ensureCenteredTake` before serving: the first request centers a
+  one-sided take in place (live channel to both sides, picture copied);
+  later requests are a lookup, and concurrent first requests share one pass.
+- `centerDeadChannel` picks the audio codec by container (Opus for WebM).
+- The rendered film too: proj_86591051's output.mp4 had its right channel
+  at -inf (voice and music). `/output/.../output.mp4` and a share's
+  `/watch/{token}/video.mp4` center a one-dead-side file on first request --
+  no re-render, the picture untouched. (A render whose right side carries
+  the music has two live sides and is left alone; that one re-renders.)
+- Test: `test/audio-channels.test.ts`.
+
+## 2026-09-29 — A rewrite keeps the file's date
+
+Chasing the voice on proj_86591051: its output.mp4 "rendered 21:10 today"
+was 1080x1350 at 47 fps with no voice -- an OLD render from when the film
+was 4:5. It read as fresh because the first request moved its index to the
+front (web-ready fix), and that rewrite set the mtime to now; render-status
+reads the mtime as when it was rendered, so no "edited since" warning.
+- `keepFileDate` (core/encode.ts): `ensureFaststart` and `centerDeadChannel`
+  restore the file's date after rewriting (+1 ms, so the size+mtime cache tag
+  still changes; the stale check's 2 s tolerance reads the same date).
+- proj_86591051's date is already lost; it needs a fresh render.
+
 ## 2026-09-29 — Actor test: one fixed face across scenes (Wan S2V, video_from)
 
 Marc on the Seedance couch shot: "Really can't tell it is AI" -- but how do
