@@ -2718,6 +2718,8 @@ Rules:
               voice: body.voice === false ? false : undefined,
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
               prompt: typeof body.prompt === "string" ? body.prompt : undefined,
+              image_from: body.image_from && typeof body.image_from === "object" ? body.image_from : undefined,
+              video_from: body.video_from && typeof body.video_from === "object" ? body.video_from : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;

@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-29 — Actor test: one fixed face across scenes (Wan S2V, video_from)
+
+Marc on the Seedance couch shot: "Really can't tell it is AI" -- but how do
+scenes keep the same man? ByteDance refuses face references, so two routes:
+- **`wan-s2v`:** Wan 2.2 Speech-to-Video -- one still of the actor in the
+  scene plus the voice; he talks, face and body, inside that picture. The
+  same still every scene is the same man in the same room. Frames cap at
+  120, so the frame rate stretches to cover the line.
+- **`video_from` / `image_from`:** a test can take its performance from an
+  earlier test's file (a Seedance shot) and its portrait as a frame of one
+  (`{test, file, at}`) -- so Wan "replace" can give every Seedance scene
+  the face of the first.
+
 ## 2026-09-29 — Actor test: Seedance from text (reference faces are refused)
 
 The first Seedance run failed: fal returned ByteDance's content-policy 422,
