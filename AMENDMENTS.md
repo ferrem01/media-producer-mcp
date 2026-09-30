@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Cast, steps 2-3: the Cast card in the desktop and phone Studio
+
+The Cast feature's surfaces (step 1 is the vendor layer + the `cast` tool).
+- **Desktop** (preview-app.ts): a **Cast** header button on built films a
+  person carries (speaker / creator-cut, or any film with a take), locked
+  while rendering. The card: who performs now (+ **Back to me**); the mode
+  (**Recast my recording** -- disabled without a take -- or **Generate from
+  the script**); the actor grid (cast portraits via the new
+  `GET /api/cast/{t}/{actor}/portrait`, × to remove); **+ Add actor** with
+  four ways in: My HeyGen looks, HeyGen presenters (paged, by gender), a
+  photo (upload + the consent box), a **New look** (a prompt on one of your
+  looks, polled until HeyGen finishes, then cast); the vendor list (every
+  vendor, what it keeps, its catch, minutes per 30 s; the ones a mode cannot
+  use or the server has no key for shown disabled with why); the voice
+  (recast: my recorded voice or an ElevenLabs voice; generate: the look's own
+  HeyGen voice, a HeyGen voice, or ElevenLabs) with a sample button; for
+  generate, **Make a copy of this film first** (on by default -- a generated
+  take replaces the take and re-times the scenes). Progress is polled every
+  4 s while the card is open; done reloads the film.
+- **Phone** (studio-phone.ts): the same card, compact -- a **Cast** button
+  in the top row, portrait chips in a scrolling row, **+ Look** from your
+  HeyGen looks, vendor and voice as selects, Back to me. Generating on a
+  copy moves to the copy's phone Studio with the card open (`&cast=1`).
+- Checked in Chromium against mocked routes (desktop 1400 px, phone 390 px):
+  no page errors, every section renders, the Go label follows the choices.
+
 ## 2026-09-30 — Cast, step 1: the vendor is a choice (performers), the cast tool
 
 Marc: "let's build all this as a feature in megamedia and in studio ...

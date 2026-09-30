@@ -78,7 +78,7 @@ import { startGeneratedTake, getGeneratedTakeStatus, registerTakeAttacher } from
 import { performerList } from "./core/performers/index.js";
 import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, listVoices, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
-import { listCast, addActor, removeActor } from "./core/cast.js";
+import { listCast, addActor, removeActor, getActor, portraitPath } from "./core/cast.js";
 import { startRecast, getRecastStatus, previewRecast } from "./core/recast.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
@@ -2725,11 +2725,22 @@ Rules:
       //        a portrait needs consent: true (this is me, or a person who agreed to be cast)
       // GET    /api/cast/{tenant}/voices          voices to pick: ElevenLabs (stock + clones) and HeyGen (the account's own)
       // DELETE /api/cast/{tenant}/{actor}         remove an actor
-      const castApi = urlPath.match(/^\/api\/cast\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
+      // GET    /api/cast/{tenant}/{actor}/portrait  the actor's picture
+      const castApi = urlPath.match(/^\/api\/cast\/([^/]+)(?:\/([A-Za-z0-9_-]+)(\/portrait)?)?$/);
       if (castApi) {
         const caTenant = decodeURIComponent(castApi[1]);
         const caSub = castApi[2];
         try {
+          if (castApi[3] && method === "GET") {
+            // GET /api/cast/{tenant}/{actor}/portrait   the actor's picture, for the Studio's Cast card
+            const actor = caSub ? await getActor(caTenant, caSub) : null;
+            if (!actor) { jsonResponse(res, 404, { error: "No such actor" }); return; }
+            const img = await fs.readFile(portraitPath(caTenant, actor)).catch(() => null);
+            if (!img) { jsonResponse(res, 404, { error: "No portrait" }); return; }
+            res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=300" });
+            res.end(img);
+            return;
+          }
           if (caSub === "voices" && method === "GET") {
             const [eleven, hey] = await Promise.all([
               process.env.ELEVENLABS_API_KEY ? listVoices().catch(() => []) : Promise.resolve([]),
