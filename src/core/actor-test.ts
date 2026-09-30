@@ -79,11 +79,11 @@ export async function getActorTest(tenant: string, project: string, id: string):
   }
 }
 
-async function ffmpeg(args: string[]): Promise<void> {
+export async function ffmpeg(args: string[]): Promise<void> {
   await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...args], { maxBuffer: 20 * 1024 * 1024 });
 }
 
-async function dataUri(file: string, mime: string): Promise<string> {
+export async function dataUri(file: string, mime: string): Promise<string> {
   return `data:${mime};base64,${(await fs.readFile(file)).toString("base64")}`;
 }
 
@@ -101,7 +101,7 @@ async function okJson(r: Response, what: string): Promise<any> {
   return j;
 }
 
-async function download(url: string, file: string): Promise<void> {
+export async function download(url: string, file: string): Promise<void> {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`download: HTTP ${r.status}`);
   await fs.writeFile(file, Buffer.from(await r.arrayBuffer()));
@@ -114,7 +114,7 @@ const POLL_MS = Number(process.env.MP_ACTOR_POLL_MS) || 5000;
 /** Wan 2.2 Animate through fal's queue: submit, poll, fetch. "replace"
  *  swaps the person inside the recorded room; "move" animates the portrait
  *  in the portrait's own setting with the take's motion. */
-async function runWan(src: string, img: string, mode: "replace" | "move"): Promise<string> {
+export async function runWan(src: string, img: string, mode: "replace" | "move"): Promise<string> {
   const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
   const sub = await okJson(await fetch(`https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/${mode}`, {
     method: "POST", headers,
@@ -236,14 +236,14 @@ async function runRunway(src: string, img: string, ratio: string): Promise<strin
   }
 }
 
-async function listVoices(): Promise<any[]> {
+export async function listVoices(): Promise<any[]> {
   const headers = { "xi-api-key": String(process.env.ELEVENLABS_API_KEY) };
   const j = await okJson(await fetch("https://api.elevenlabs.io/v1/voices", { headers }), "elevenlabs voices");
   return j?.voices || [];
 }
 
 /** A voice by id or by name ("Brian" matches "Brian - Deep, Resonant..."). */
-function findVoice(voices: any[], want: string): { id: string; name: string } | null {
+export function findVoice(voices: any[], want: string): { id: string; name: string } | null {
   const w = want.toLowerCase();
   const hit = voices.find((v) => v.voice_id === want) || voices.find((v) => String(v.name).toLowerCase() === w)
     || voices.find((v) => String(v.name).toLowerCase().startsWith(w));
@@ -262,7 +262,7 @@ async function pickVoice(voiceId?: string): Promise<{ id: string; name: string }
 }
 
 /** ElevenLabs speech-to-speech: the delivery stays, the voice changes. */
-async function convertVoice(wav: string, out: string, voiceId: string): Promise<void> {
+export async function convertVoice(wav: string, out: string, voiceId: string): Promise<void> {
   const form = new FormData();
   form.append("audio", new Blob([await fs.readFile(wav)], { type: "audio/wav" }), "take.wav");
   form.append("model_id", "eleven_multilingual_sts_v2");
@@ -461,7 +461,7 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
   await save(test);
 }
 
-async function durationOf(file: string): Promise<number | null> {
+export async function durationOf(file: string): Promise<number | null> {
   try { await execFileAsync("ffmpeg", ["-hide_banner", "-i", file]); return null; }
   catch (e: any) {
     const m = String(e?.stderr || "").match(/Duration: (\d+):(\d+):([\d.]+)/);

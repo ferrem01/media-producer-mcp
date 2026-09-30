@@ -683,6 +683,10 @@ export interface Project {
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
+  /** Who performs the speaker track (a cast actor id, core/cast.ts): every
+   *  clip plays that actor's recast of its take when one exists. Absent: the
+   *  person who recorded it. */
+  speaker_cast?: string;
   /** Every take delivered for this film (the /take page, or a hand attach).
    *  One take is ACTIVE per scene: the one speaker_track carries. A new take
    *  for the same scene replaces it there; the older record stays here. */
@@ -863,6 +867,11 @@ export interface Take {
   /** The person on a transparent frame (<name>-alpha.webm), written by the
    *  matte when a scene's speaker component is set to alpha. */
   alpha?: string;
+  /** RECAST (core/recast.ts): the take performed by a cast actor -- the
+   *  same timeline redrawn by Wan from the actor's portrait, the voice
+   *  converted when the actor has one. Keyed by actor id. `source` stays
+   *  the raw take; the project's speaker_cast picks which one plays. */
+  actors?: Record<string, { file: string; voice_id?: string; made_at: string }>;
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };

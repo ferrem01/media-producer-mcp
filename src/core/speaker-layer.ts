@@ -52,9 +52,9 @@ export const SPEAKER_SHAPES: readonly SpeakerShape[] = ["rectangle", "rounded", 
 
 type Comp = { id?: string; type?: string; z_index?: number; position?: any; data?: Record<string, any>; enter?: any; exit?: any };
 type SceneLike = { components?: Array<Comp | null> | null; duration_seconds?: number; transparent_background?: boolean };
-type TakeLike = { source: string; blur?: string; alpha?: string; background?: { mode?: string; source_raw?: string } | null; scene_index?: number; silhouette?: { rows: Array<[number, number] | null> } };
+type TakeLike = { source: string; blur?: string; alpha?: string; actors?: Record<string, { file: string }> | null; background?: { mode?: string; source_raw?: string } | null; scene_index?: number; silhouette?: { rows: Array<[number, number] | null> } };
 type ClipLike = { source: string; alpha?: string; scene_index?: number };
-type ProjectLike = { scenes?: SceneLike[] | null; takes?: TakeLike[] | null; speaker_track?: { clips: ClipLike[] } | null };
+type ProjectLike = { scenes?: SceneLike[] | null; takes?: TakeLike[] | null; speaker_track?: { clips: ClipLike[] } | null; speaker_cast?: string | null };
 
 export function asSpeakerBackground(v: unknown): SpeakerBackground | null {
   if (v === "none") return "room";
@@ -246,7 +246,8 @@ function copyNamesOf(raw: string): string[] {
 export function takeOwns(take: TakeLike | null | undefined, url: string | undefined): boolean {
   if (!take || !url) return false;
   const c = takeCopies(take);
-  return url === c.raw || url === c.blur || url === c.alpha || (!!c.raw && copyNamesOf(c.raw).includes(url));
+  return url === c.raw || url === c.blur || url === c.alpha || (!!c.raw && copyNamesOf(c.raw).includes(url))
+    || Object.values(take.actors || {}).some((a) => a && a.file === url);
 }
 
 /** The newest take behind a clip. */
@@ -269,10 +270,15 @@ export function syncSpeakerClips(project: ProjectLike): number {
     if (!take) continue;
     const copies = takeCopies(take);
     const mode = sceneSpeakerBackground((project.scenes || [])[clip.scene_index]);
-    const wantSource = mode === "blur" && copies.blur ? copies.blur : copies.raw;
+    // A cast actor performs the whole track when the take has their recast
+    // (core/recast.ts). The matte's blur and alpha copies are of the person
+    // who recorded, so a recast clip carries neither.
+    const cast = project.speaker_cast ? take.actors?.[project.speaker_cast]?.file : undefined;
+    const wantSource = cast || (mode === "blur" && copies.blur ? copies.blur : copies.raw);
     if (clip.source !== wantSource) { clip.source = wantSource; changed++; }
-    if (copies.alpha && clip.alpha !== copies.alpha) { clip.alpha = copies.alpha; changed++; }
-    if (!copies.alpha && clip.alpha) { delete clip.alpha; changed++; }
+    const wantAlpha = cast ? undefined : copies.alpha;
+    if (wantAlpha && clip.alpha !== wantAlpha) { clip.alpha = wantAlpha; changed++; }
+    if (!wantAlpha && clip.alpha) { delete clip.alpha; changed++; }
     // speaker-3d tucks its side words behind the person: it carries the
     // take's measured silhouette in its data (every render path reads data).
     changed += stampSilhouette((project.scenes || [])[clip.scene_index], take.silhouette);
