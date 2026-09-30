@@ -77,7 +77,7 @@ import { resolveVideoPath } from "./core/video-path.js";
 import { startActorTest, startVoiceLineup, getActorTest, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor } from "./core/cast.js";
-import { startRecast, getRecastStatus } from "./core/recast.js";
+import { startRecast, getRecastStatus, previewRecast } from "./core/recast.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -2728,6 +2728,19 @@ Rules:
       // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
       // POST /api/recast/{tenant}/{project} {actor: id | null}   null puts the recording's person back
       // GET  /api/recast/{tenant}/{project}                       progress and who plays
+      // POST /api/recast/{tenant}/{project}/preview {actor}   the finished chunks stitched, voiced
+      const recastPreview = urlPath.match(/^\/api\/recast\/([^/]+)\/([^/]+)\/preview$/);
+      if (recastPreview && method === "POST") {
+        const [, rpTenant, rpProject] = recastPreview.map(decodeURIComponent);
+        try {
+          const body = await parseBody(req).catch(() => ({} as any));
+          const pv = await previewRecast(rpTenant, rpProject, String(body.actor || ""));
+          jsonResponse(res, 200, { ...pv, url: `${publicOrigin(req)}/output/${encodeURIComponent(rpTenant)}/projects/${encodeURIComponent(rpProject)}/${pv.file}` });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
       const recastApi = urlPath.match(/^\/api\/recast\/([^/]+)\/([^/]+)$/);
       if (recastApi) {
         const [, rcTenant, rcProject] = recastApi.map(decodeURIComponent);
