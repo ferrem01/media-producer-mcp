@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Actor test: the recording, never a recast; a setting for Genjutsu
+
+The first Genjutsu trial came back clean (no face refusal, the mic hand gone,
+one man for 30 s) -- but Marc spotted it was built from the HeyGen video:
+Old Chimp is cast as the sofa look, so its clips point at the recast file,
+and the actor test read `clip.source`. It now reads the take's RAW file
+(`takeCopies(takeForClip(...)).raw`) whatever the film is cast as.
+- `scene_image` (tenant-relative) for `genjutsu`: the setting as a second
+  reference image (Genjutsu takes 1-8), with a prompt placing the actor in
+  it while keeping the motion -- Marc: "Try it with a podcast set
+  background."
+
 ## 2026-09-30 — Higgsfield Genjutsu: a Cast vendor (and why Seedance refused)
 
 The Seedance 2.5 recast trial (`seedance25`, take as @Video1, the generated

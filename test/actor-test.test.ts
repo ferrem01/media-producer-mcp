@@ -364,6 +364,36 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     expect(st.files.seedance25).toBe("seedance25.mp4");
   }, 60000);
 
+  it("a film cast as an actor: the test is fed the RECORDING, never the actor's recast of it", async () => {
+    const P2 = "pcast";
+    const projDir = path.join(DATA, T, "projects", P2);
+    await film(path.join(projDir, "assets", "take.mp4"), "360x640", 4);
+    const raw = `/assets/${T}/projects/${P2}/assets/take.mp4`;
+    const recast = `/assets/${T}/projects/${P2}/assets/take.actor-sofa-heygen.mp4`;   // not on disk: reading it would fail
+    await fs.writeFile(path.join(projDir, "project.json"), JSON.stringify({
+      project_id: P2, tenant_id: T, name: "x", format: "video", status: "generated", scenes: [], canvas: { width: 1080, height: 1920, fps: 30 },
+      takes: [{ id: "t0", scene_index: 0, source: raw, actors: { sofa: { file: recast, performer: "heygen" } } }], speaker_cast: "sofa",
+      speaker_track: { clips: [{ source: recast, start: 0, scene_index: 0, trim_start: 0, trim_end: 4 }] },
+    }));
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://queue.fal.run/fal-ai/kling-video/v3/pro/motion-control") return json({ status_url: "https://q/ks", response_url: "https://q/kr" });
+      if (u === "https://q/ks") return json({ status: "COMPLETED" });
+      if (u === "https://q/kr") return json({ video: { url: "https://cdn/k.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.FAL_KEY = "fk";
+    const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    await expect(startActorTest({ tenant: T, project: P2, scene_index: 0, image: "assets/generated/actor.png", providers: ["genjutsu"], voice: false, scene_image: "../../etc/passwd" })).rejects.toThrow(/inside the tenant|HF_API_KEY/);
+    let st = await startActorTest({ tenant: T, project: P2, scene_index: 0, image: "assets/generated/actor.png", providers: ["kling"], voice: false });
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P2, st.id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");   // the recast file does not exist: only the recording could be read
+    expect(st.files.source).toBe("source.mp4");
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
