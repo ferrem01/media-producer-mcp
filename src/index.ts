@@ -74,7 +74,7 @@ import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
 import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
-import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, type ActorTest } from "./core/actor-test.js";
+import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor } from "./core/cast.js";
 import { startRecast, getRecastStatus, previewRecast } from "./core/recast.js";
@@ -2762,11 +2762,26 @@ Rules:
         return;
       }
 
-      // GET /api/heygen-avatars/{tenant}   the HeyGen account's avatars (id, name, kind), for heygen-avatar tests
-      const hgAvatars = urlPath.match(/^\/api\/heygen-avatars\/([^/]+)$/);
-      if (hgAvatars && method === "GET") {
-        try { jsonResponse(res, 200, { avatars: await listHeygenAvatars() }); }
-        catch (e: any) { jsonResponse(res, 400, { error: e?.message || String(e) }); }
+      // GET  /api/heygen-avatars/{tenant}            the HeyGen account's avatars (id, name, kind), for heygen-avatar tests
+      // GET  /api/heygen-avatars/{tenant}?looks=1    the account's own looks (v3 ids), for heygen-v3 tests
+      // POST /api/heygen-avatars/{tenant}            {prompt, avatar_id | avatar_group_id, name?, aspect_ratio?} -> a new look
+      // GET  /api/heygen-avatars/{tenant}/{look_id}  one look (poll a new one until "completed")
+      const hgAvatars = urlPath.match(/^\/api\/heygen-avatars\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
+      if (hgAvatars) {
+        try {
+          const lookId = hgAvatars[2];
+          if (method === "GET" && lookId) jsonResponse(res, 200, await getHeygenLook(lookId));
+          else if (method === "GET") jsonResponse(res, 200, new URL(url, "http://localhost").searchParams.get("looks") ? { looks: await listHeygenLooks() } : { avatars: await listHeygenAvatars() });
+          else if (method === "POST" && !lookId) {
+            const body = await parseBody(req).catch(() => ({} as any));
+            jsonResponse(res, 202, await createHeygenLook({
+              prompt: String(body.prompt || ""), name: typeof body.name === "string" ? body.name : undefined,
+              avatar_id: typeof body.avatar_id === "string" ? body.avatar_id : undefined,
+              avatar_group_id: typeof body.avatar_group_id === "string" ? body.avatar_group_id : undefined,
+              aspect_ratio: typeof body.aspect_ratio === "string" ? body.aspect_ratio : undefined,
+            }));
+          } else jsonResponse(res, 405, { error: "Method not allowed" });
+        } catch (e: any) { jsonResponse(res, 400, { error: e?.message || String(e) }); }
         return;
       }
 
@@ -2798,6 +2813,8 @@ Rules:
               source_range: body.source_range && typeof body.source_range === "object" ? body.source_range : undefined,
               fps: body.fps != null ? Number(body.fps) : undefined,
               heygen_avatar_id: typeof body.heygen_avatar_id === "string" ? body.heygen_avatar_id : undefined,
+              expressiveness: typeof body.expressiveness === "string" ? body.expressiveness : undefined,
+              engine: typeof body.engine === "string" ? body.engine : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;

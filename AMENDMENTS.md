@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Actor test: HeyGen v3 (looks, motion prompt, expressiveness)
+
+Marc's twin and an Avatar IV still of him, both on his own voice, came back
+"pretty good"; the still read "damn close" except the eyes looked "a little
+angry" and the teeth too white. He wants to try: a softer still, softer
+direction, his "green shirt" photo avatars, and a new look (a couch,
+different clothes) from his avatar.
+- `providers:["heygen-v3"]`: HeyGen's v3 video API (`POST /v3/videos`,
+  audio as a `/v3/assets` upload). `heygen_avatar_id` names a LOOK (the
+  twin, a photo avatar, a generated outfit); without one it animates the
+  portrait. `prompt` -> `motion_prompt`; `expressiveness` (low|medium|high,
+  Avatar IV) and `engine` (avatar_iv|avatar_v|avatar_iii) pass through.
+- `GET /api/heygen-avatars/{tenant}?looks=1` lists the account's own looks
+  (v3 ids, type, group, engines); `POST` `{prompt, avatar_id |
+  avatar_group_id, aspect_ratio?}` generates a new look (`POST /v3/avatars`
+  type "prompt", 9:16 by default); `GET .../{look_id}` polls it.
+- The v2 `heygen` provider already sent `prompt` as Avatar IV's
+  `custom_motion_prompt`; the softer-still runs use that.
+
 ## 2026-09-30 — Actor test: Kling 3.0 Motion Control (one call, 30 s)
 
 Recast v2 held the room and the face across seams but brought a halo around
