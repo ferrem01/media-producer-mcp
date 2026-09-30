@@ -339,6 +339,31 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     delete process.env.HEYGEN_API_KEY;
   }, 60000);
 
+  it("seedance25: the take as @Video1 and the portrait as @Image1 in one reference call (a recast, the Genjutsu idea)", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    let body: any = null;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://queue.fal.run/bytedance/seedance-2.5/reference-to-video") { body = JSON.parse(init.body); return json({ status_url: "https://q/s25", response_url: "https://q/r25" }); }
+      if (u === "https://q/s25") return json({ status: "COMPLETED" });
+      if (u === "https://q/r25") return json({ video: { url: "https://cdn/s25.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.FAL_KEY = "fk";
+    const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    let st = await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png", providers: ["seedance25"], voice: false });
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, st.id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(body.prompt).toMatch(/@Video1/);
+    expect(body.prompt).toMatch(/@Image1/);
+    expect(body.video_urls).toHaveLength(1);
+    expect(body.image_urls).toHaveLength(1);
+    expect(body).toMatchObject({ resolution: "720p", generate_audio: false });
+    expect(st.files.seedance25).toBe("seedance25.mp4");
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;

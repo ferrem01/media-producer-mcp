@@ -60,6 +60,11 @@ ${QUOTIENT_CSS}
   body.watch-mode #playback-bar { height: auto !important; min-height: 0 !important; display: flex; align-items: center; gap: 12px;
     padding: 8px 14px calc(10px + env(safe-area-inset-bottom)); background: #000; border: 0; }
   body.watch-mode #transport-left { display: flex; align-items: center; gap: 10px; width: auto !important; }
+  /* The bar is exactly the screen's width: the editor's zoomed track (width
+     = zoom x 100%, scrolled) ran the scrubber off the right edge on a phone. */
+  body.watch-mode #playback-bar { width: 100%; max-width: 100vw; box-sizing: border-box; overflow: hidden; }
+  body.watch-mode #slider-wrap { overflow-x: hidden !important; width: auto !important; max-width: 100%; }
+  body.watch-mode #timeline-track { width: 100% !important; min-width: 0 !important; left: 0 !important; transform: none !important; }
   body.watch-mode #slider-wrap { flex: 1; min-width: 0; position: relative; display: block; height: auto !important;
     background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
   body.watch-mode #timeline-track { position: relative; height: 28px !important; min-height: 0 !important; }
@@ -1577,6 +1582,41 @@ ${QUOTIENT_CSS}
   // want to watch"). What plays is exactly what the Studio plays, so it
   // matches the render. Tap the picture to play or pause; the slider scrubs.
   var WATCH = new URLSearchParams(window.location.search).get('view') === 'watch';
+  function watchBufferText(msg) {
+    var ov = document.getElementById('buffer-overlay');
+    var ls = ov && ov.querySelector('.loading-state');
+    if (ls && ls.firstChild && ls.firstChild.nodeType === 3) ls.firstChild.nodeValue = msg;
+  }
+  // Inside the user's tap: give the speaker players the opening take and
+  // play/pause them, so the phone lets them play (with sound) later.
+  function watchPrimeMedia() {
+    try {
+      var first = speakerClipForTime(0);
+      var els2 = [els.speakerBg, els.speakerBg2];
+      els2.forEach(function(v) {
+        if (v && first && first.url && (!v.src || v.src === window.location.href)) { v.preload = 'auto'; v.src = first.url; }
+      });
+      // The music / sfx players too (made on load, before any tap).
+      var all = els2.concat(Array.prototype.slice.call(document.querySelectorAll('audio')));
+      all.forEach(function(v) {
+        if (!v || !v.src || v.src === window.location.href) return;
+        var wasMuted = v.muted; v.muted = true; // silent: this only earns the permission
+        var done = function() { try { v.pause(); } catch (e0) {} v.muted = wasMuted; };
+        var pr = v.play();
+        if (pr && pr.then) pr.then(done, done); else done();
+      });
+    } catch (e) {}
+  }
+  // The spinner while a starved take holds the film (watch mode).
+  var watchBufOn = false;
+  function watchBuffering(on) {
+    if (on === watchBufOn) return;
+    watchBufOn = on;
+    var ov = document.getElementById('buffer-overlay');
+    if (!ov) return;
+    if (on) watchBufferText('Loading');
+    ov.style.display = on ? 'flex' : 'none';
+  }
   if (WATCH) {
     document.body.classList.add('watch-mode');
     (function wireWatch() {
@@ -1764,6 +1804,10 @@ ${QUOTIENT_CSS}
   // How long a stalled (seeking/buffering) speaker may hold the film before
   // the wall clock takes over -- a dead connection must not freeze Studio.
   var SPEAKER_STALL_HOLD_MS = 1500;
+  // Watch mode is a video player: a starved speaker holds the film (with a
+  // spinner) until it has data -- on a phone 1.5 s ran the clock on past a
+  // frozen picture ("would play a few seconds and then lock up").
+  if (WATCH) SPEAKER_STALL_HOLD_MS = 120000;
   // A sound cue keeps ringing this long past its window before it is cut:
   // play() starts late, and a 50ms tick that starts 150ms late is still due.
   var CUE_RING_S = 0.6;
@@ -2667,7 +2711,27 @@ ${QUOTIENT_CSS}
   function waitForMediaReady() {
     return new Promise(function(resolve) {
       var videos = [];
-      var timeout = 8000;
+      // Watch mode on a phone: the take streams slower than a desk's pipe;
+      // wait for it (with a % on the overlay) rather than start on nothing.
+      var timeout = WATCH ? 60000 : 8000;
+      if (WATCH && els.speakerBg) {
+        // The take is attached only once playback reaches it -- too late to
+        // buffer. Attach the opening clip now and fetch it before play.
+        try {
+          var sp = els.speakerBg;
+          if (!sp.src || sp.src === window.location.href) { var w0 = speakerClipForTime(0); if (w0 && w0.url) sp.src = w0.url; }
+          sp.preload = 'auto';
+          if (sp.src && sp.readyState === 0) sp.load();
+        } catch (eP) {}
+      }
+      if (WATCH && els.speakerBg && els.speakerBg.src) {
+        var pct = setInterval(function() {
+          var v = els.speakerBg, p = 0;
+          try { if (v.duration && v.buffered.length) p = Math.min(99, Math.round(v.buffered.end(v.buffered.length - 1) / v.duration * 100)); } catch (eB) {}
+          if (els.bufferOverlay.style.display === 'none') { clearInterval(pct); return; }
+          watchBufferText('Loading ' + p + '%');
+        }, 400);
+      }
 
       // Speaker bg
       var spk = els.speakerBg;
@@ -2706,6 +2770,9 @@ ${QUOTIENT_CSS}
           onReady();
         } else {
           v.addEventListener('canplaythrough', onReady, { once: true });
+          // A file that fails to load is not worth waiting on (in watch mode
+          // the wait is a minute): count it done, the transport comes up.
+          v.addEventListener('error', onReady, { once: true });
           // Also trigger a load if the video hasn't started loading
           if (v.readyState === 0 && v.src) {
             v.load();
@@ -2961,7 +3028,15 @@ ${QUOTIENT_CSS}
         els.previewPlaceholder.innerHTML = '<button id="mobile-load-preview" style="font:600 15px Inter,sans-serif;padding:14px 26px;border-radius:999px;border:0;background:var(--accent-blue);color:#fff;cursor:pointer;">' + (WATCH ? '\u25b6 Tap to watch' : '\u25b6 Tap to load preview') + '</button>';
         els.previewPlaceholder.style.display = '';
         var mlp = document.getElementById('mobile-load-preview');
-        if (mlp) mlp.addEventListener('click', function() { startCompositePreview(state.currentProject); }, { once: true });
+        if (mlp) mlp.addEventListener('click', function() {
+          // Watch mode: the tap means PLAY. A phone lets media sound only
+          // from a tap, and the film is ready only seconds later -- so wake
+          // the speaker players inside the tap (attach the opening take,
+          // play + pause: the permission sticks to the element), and start
+          // playback the moment the film is loaded.
+          if (WATCH) { state.watchAutoplay = true; watchPrimeMedia(); }
+          startCompositePreview(state.currentProject);
+        }, { once: true });
         return;
       }
       startCompositePreview(project);
@@ -3025,6 +3100,11 @@ ${QUOTIENT_CSS}
               state.forceSync = true;
               syncMedia(t, false);
               state.forceSync = false;
+              // "Tap to watch" was a request to play: honor it now it's loaded.
+              if (WATCH && state.watchAutoplay) {
+                state.watchAutoplay = false;
+                setTimeout(function() { if (!state.playing && !els.playBtn.disabled) els.playBtn.click(); }, 60);
+              }
             });
           });
         } else {
@@ -7961,7 +8041,7 @@ ${QUOTIENT_CSS}
     state.tlZoom = Math.max(1, Math.min(40, z));
     var track = document.getElementById('timeline-track');
     if (!track) return;
-    track.style.width = (state.tlZoom * 100) + '%';
+    track.style.width = WATCH ? '100%' : (state.tlZoom * 100) + '%';
     renderWaveStrip();
     renderMediaLane(); // chip leveling is pixel-based; recompute at the new zoom
     followPlayhead(true);
@@ -8954,6 +9034,7 @@ ${QUOTIENT_CSS}
   function stopPlayback() {
     state.playing = false;
     state.playAll = false;
+    if (WATCH) watchBuffering(false);
     updatePlayIcon();
     if (state.animFrameId) {
       cancelAnimationFrame(state.animFrameId);
@@ -8992,6 +9073,7 @@ ${QUOTIENT_CSS}
     } else {
       state.masterTime += elapsed;
     }
+    if (WATCH) watchBuffering(!!state._spkStallT0 && now - state._spkStallT0 > 300);
 
     var globalTime = state.masterTime;
     var totalDur = state.totalDuration;
@@ -9833,6 +9915,8 @@ ${QUOTIENT_CSS}
   // Attach hover/click/right-click selection to the (same-origin) iframe document.
   function studioAttach(doc) {
     if (!doc || !doc.body) return;
+    // Watch mode edits nothing: no hover or selection boxes on the film.
+    if (WATCH) return;
     // Idempotent: document.write reuses the SAME document object across reloads,
     // so a one-shot guard flag would persist while the body (and our overlay
     // boxes) get wiped -- leaving the scene unselectable after a revise/regen.
