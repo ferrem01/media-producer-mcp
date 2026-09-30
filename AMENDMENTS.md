@@ -6,6 +6,15 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Recast: Avatar V for every look that offers it
+
+HeyGen's docs say Avatar V is for digital twins only, but every look on
+Marc's account (photo looks included) lists it in `supported_api_engines`,
+and a v3 call with `engine: avatar_v` on the beige-sofa photo look worked.
+Marc: "insanely good. Even my hand motions." (164 s for 30 s vs 104 s on
+Avatar IV; the two runs together cost ~276 API credits.) `heygenRecastFile`
+now asks for Avatar V whenever the look lists it, not only for twins.
+
 ## 2026-09-30 — Recast with a HeyGen look (the actor tests' winner)
 
 Marc on the v3 runs: the beige-sofa photo look and the desk twin on Avatar
