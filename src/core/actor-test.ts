@@ -120,6 +120,8 @@ export async function runWan(src: string, img: string, mode: "replace" | "move",
   /** Called with the request's urls as soon as fal queues it, so a restart can resume. */
   onSubmit?: (req: { status_url: string; response_url: string }) => void | Promise<void>;
   deadlineMs?: number;
+  /** The same seed on every chunk of a take: each run makes the same choices. */
+  seed?: number;
 } = {}): Promise<string> {
   const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
   let statusUrl: string, responseUrl: string;
@@ -128,7 +130,7 @@ export async function runWan(src: string, img: string, mode: "replace" | "move",
   } else {
     const sub = await okJson(await fetch(`https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/${mode}`, {
       method: "POST", headers,
-      body: JSON.stringify({ video_url: src, image_url: img, resolution: "720p", video_quality: "high" }),
+      body: JSON.stringify({ video_url: src, image_url: img, resolution: "720p", video_quality: "high", ...(opts.seed != null ? { seed: opts.seed } : {}) }),
     }), "fal submit");
     statusUrl = sub.status_url; responseUrl = sub.response_url;
     if (!statusUrl || !responseUrl) throw new Error("fal submit: no status_url in the reply");

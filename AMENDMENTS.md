@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Recast v2: one reference, one seed, 8 s chunks, the room kept
+
+The pilot recast of Old Chimp worked end to end (32.17 s, clips pointed, the
+voice converted) but every seam showed: Marc -- "background and his hair and
+face changed a little between each seam", and the handheld mic became a
+different object in every chunk. Each chunk was an independent Wan run
+re-imagining the actor and the room. Four fixes (Marc: "try 1-4 first"):
+1. **One reference.** A short reference pass redraws the take's opening; a
+   frame of it (the actor as he looks in this room and light) is the image
+   every chunk is drawn from, not the portrait.
+2. **One seed** per actor (`actorSeed`) on every Wan call.
+3. **8 s chunks at 16 fps** (Wan's rate; 8.13 s in, 8.13 s out measured):
+   Old Chimp is 6 chunks, not 9. The stitch is interpolated back to 30 fps
+   (`minterpolate` mci/obmc/epzs -- half the cost of aobmc+vsbmc).
+4. **The room kept** (`keepRoom`): the redrawn picture pasted over the
+   recording through the union of both people's mattes (grown, softened),
+   so the room is the recording's everywhere and no edge of the person who
+   recorded shows. The mattes are the matte's VP9 alpha copies (decoded
+   with libvpx; `format=rgba` before `alphaextract`). Falls back to the
+   redrawn room if the matte cannot run.
+- Chunks cut under the old plan are not reused (plan v2). `fresh: true`
+  re-makes a recast that exists.
+- The mic: nothing in the frame fixes an object in the hand -- record with
+  the lav clipped on.
+- Tests: `test/recast.test.ts` (reference pass + chunks, one seed, 30 fps
+  out, the composite's pixels: room red, person blue, the recorder's edge
+  covered).
+
 ## 2026-09-30 — Recast resumes; every chunk at once
 
 The first pilot run (Old Chimp, 9 chunks, 4 at a time) sat at "8 of 9" for
