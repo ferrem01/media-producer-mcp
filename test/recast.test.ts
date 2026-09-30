@@ -99,13 +99,15 @@ describe("recast: a take performed by a cast actor", () => {
       throw new Error("unexpected fetch " + u);
     }));
     const { addActor, listCast } = await import("../src/core/cast.js");
-    const actor = await addActor(T, { name: "Roger guy", image: "assets/p.png", voice_id: "roger-voice", voice_name: "Roger" });
+    await expect(addActor(T, { name: "Roger guy", image: "assets/p.png" })).rejects.toThrow(/consent/);  // a portrait is vouched for
+    const actor = await addActor(T, { name: "Roger guy", image: "assets/p.png", voice_id: "roger-voice", voice_name: "Roger", consent: true });
+    expect(actor.consent?.at).toBeTruthy();
     expect(actor.id).toBe("roger-guy");
     expect((await listCast(T)).map((a) => a.id)).toEqual(["roger-guy"]);
     await expect(fs.access(path.join(DATA, T, "cast", "roger-guy.jpg"))).resolves.toBeUndefined();
 
     const { startRecast, getRecastStatus } = await import("../src/core/recast.js");
-    const st0 = await startRecast(T, P, "roger-guy");
+    const st0 = await startRecast(T, P, "roger-guy", { performer: "wan" });
     expect(st0.files).toHaveLength(1); // one take file behind both clips
     let st = st0;
     for (let i = 0; i < 1200 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getRecastStatus(T, P))!; }
@@ -114,24 +116,27 @@ describe("recast: a take performed by a cast actor", () => {
     expect(new Set(seeds).size).toBe(1); // one seed for every call of the take
     expect(seeds[0]).toBeTypeOf("number");
     expect(stsCalls).toBe(1);   // the voice converted once, the whole take
-    const out = path.join(assets, "take-1.actor-roger-guy.mp4");
+    const out = path.join(assets, "take-1.actor-roger-guy-wan.mp4");
     expect(Math.abs((await dur(out)) - 12)).toBeLessThan(0.1);                  // exactly the take's length
     expect((await info(out))).toMatch(/, 30 fps,/);                               // interpolated back from Wan's 16
     expect((await info(out))).toMatch(/Video:.*360x640/);                         // at the take's resolution
     expect((await info(out))).toMatch(/Audio:.*stereo/);
     const proj = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
     expect(proj.speaker_cast).toBe("roger-guy");
-    expect(proj.speaker_track.clips.map((c: any) => c.source)).toEqual([src.replace(".mp4", ".actor-roger-guy.mp4"), src.replace(".mp4", ".actor-roger-guy.mp4")]);
+    expect(proj.speaker_track.clips.map((c: any) => c.source)).toEqual([src.replace(".mp4", ".actor-roger-guy-wan.mp4"), src.replace(".mp4", ".actor-roger-guy-wan.mp4")]);
     expect(proj.speaker_track.clips.map((c: any) => [c.trim_start, c.trim_end])).toEqual([[0, 5.5], [5.5, 12]]); // the timeline untouched
-    expect(proj.takes.every((t: any) => t.actors["roger-guy"].voice_id === "roger-voice")).toBe(true);
-    await expect(fs.access(path.join(DATA, T, "projects", P, "_work", "recast-roger-guy-0"))).rejects.toThrow(); // pieces cleaned up
+    expect(proj.takes.every((t: any) => t.actors["roger-guy"].voice_id === "roger-voice" && t.actors["roger-guy"].performer === "wan")).toBe(true);
+    await expect(fs.access(path.join(DATA, T, "projects", P, "_work", "recast-roger-guy-wan-0"))).rejects.toThrow(); // pieces cleaned up
 
     // A second recast as the same actor reuses the file; null puts the recording back.
-    const again = await startRecast(T, P, "roger-guy");
+    const again = await startRecast(T, P, "roger-guy", { performer: "wan" });
     expect(again.files[0].status).toBe("reused");
     for (let i = 0; i < 100 && (await getRecastStatus(T, P))!.status === "running"; i++) await new Promise((r) => setTimeout(r, 50));
     expect(wanCalls).toBe(3);
-    const freshSt = await startRecast(T, P, "roger-guy", { fresh: true });
+    // Another voice is another performance: not reused.
+    expect((await startRecast(T, P, "roger-guy", { performer: "wan", voice_id: "mine" })).files[0].status).toBe("running");
+    for (let i = 0; i < 1200 && (await getRecastStatus(T, P))!.status === "running"; i++) await new Promise((r) => setTimeout(r, 100));
+    const freshSt = await startRecast(T, P, "roger-guy", { performer: "wan", fresh: true });
     expect(freshSt.files[0].status).toBe("running");                    // fresh: made again
     for (let i = 0; i < 1200 && (await getRecastStatus(T, P))!.status === "running"; i++) await new Promise((r) => setTimeout(r, 100));
     wanCalls = 3;
@@ -166,7 +171,7 @@ describe("recast: a take performed by a cast actor", () => {
     expect(Math.abs((await dur(path.join(DATA, "resumed.mp4"))) - 12)).toBeLessThan(0.1);
 
     // PREVIEW: the finished chunks stitched while one is still out.
-    const projWork = path.join(DATA, T, "projects", P, "_work", "recast-roger-guy-0");
+    const projWork = path.join(DATA, T, "projects", P, "_work", "recast-roger-guy-wan-0");
     await fs.mkdir(projWork, { recursive: true });
     await fs.cp(work, projWork, { recursive: true });
     await fs.rm(path.join(projWork, "chunk-1.mp4"));
@@ -234,17 +239,22 @@ describe("recast with a HeyGen look: one call, HeyGen draws the whole performanc
     expect(gens).toHaveLength(1);                                           // one call for the whole take
     expect(gens[0]).toMatchObject({ type: "avatar", avatar_id: "lk_twin", audio_asset_id: "aud1", aspect_ratio: "9:16", resolution: "1080p", engine: { type: "avatar_v" } });
     expect(calls.some((c) => c.includes("queue.fal.run"))).toBe(false);     // no Wan
-    const out = path.join(assets, "take-1.actor-marc-at-his-desk.mp4");
+    const out = path.join(assets, "take-1.actor-marc-at-his-desk-heygen.mp4");
     expect(Math.abs((await dur(out)) - 6)).toBeLessThan(0.1);               // exactly the take's length
     expect(await info(out)).toMatch(/Video:.*360x640/);                     // covered to the take's frame
     expect(await info(out)).toMatch(/, 30 fps,/);
     const proj = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P2, "project.json"), "utf8"));
     expect(proj.speaker_cast).toBe("marc-at-his-desk");
-    expect(proj.speaker_track.clips[0].source).toBe(src.replace(".mp4", ".actor-marc-at-his-desk.mp4"));
+    expect(proj.speaker_track.clips[0].source).toBe(src.replace(".mp4", ".actor-marc-at-his-desk-heygen.mp4"));
     expect(proj.takes[0].actors["marc-at-his-desk"].heygen_look_id).toBe("lk_twin");
 
     // RESUME: a video HeyGen already has is collected, not paid for twice.
-    const { heygenRecastFile } = await import("../src/core/recast.js");
+    const { performTakeFile } = await import("../src/core/recast.js");
+    const { getPerformer } = await import("../src/core/performers/index.js");
+    const heygenRecastFile = (o: { rawAbs: string; outAbs: string; workDir: string; lookId: string }) => performTakeFile({
+      rawAbs: o.rawAbs, outAbs: o.outAbs, performer: getPerformer("heygen")!,
+      ctx: { tenant: T, actor: { id: "a", name: "a", portrait: "", heygen_look_id: o.lookId, created_at: "" }, portraitAbs: "", workDir: o.workDir, width: 360, height: 640 },
+    });
     const work = path.join(DATA, "hg-resume");
     await fs.mkdir(work, { recursive: true });
     await fs.writeFile(path.join(work, "heygen.json"), JSON.stringify({ video_id: "v1" }));
@@ -272,6 +282,65 @@ describe("recast with a HeyGen look: one call, HeyGen draws the whole performanc
     }
     delete process.env.HEYGEN_API_KEY;
   }, 120000);
+});
+
+describe("performers: the vendor is a choice", () => {
+  it("lists every vendor with what it keeps and whether it is set up; picks a default per actor", async () => {
+    const { performerList, defaultPerformer } = await import("../src/core/performers/index.js");
+    process.env.FAL_KEY = "fk"; delete process.env.HEYGEN_API_KEY;
+    const list = performerList();
+    expect(list.map((p) => p.id)).toEqual(["heygen", "kling", "runway", "wan"]);
+    expect(list.find((p) => p.id === "heygen")).toMatchObject({ drivenBy: "audio", generate: true, available: false });
+    expect(list.find((p) => p.id === "kling")).toMatchObject({ drivenBy: "video", generate: false, available: true, maxSeconds: 29 });
+    expect(list.find((p) => p.id === "wan")?.experimental).toBe(true);
+    const base = { id: "a", name: "a", portrait: "cast/a.jpg", created_at: "" };
+    expect(defaultPerformer({ ...base, heygen_look_id: "lk" }).id).toBe("heygen");   // a HeyGen look: HeyGen
+    expect(defaultPerformer(base).id).toBe("kling");                                   // a portrait: the best video-driven vendor with a key
+    delete process.env.FAL_KEY;
+  });
+
+  it("a video-driven vendor gets the take cut at its pauses, each stretch held to its length, the take's own sound under it", async () => {
+    const d = path.join(DATA, "kling"); await fs.mkdir(d, { recursive: true });
+    // A 40 s take (over Kling's 29 s a call) with a pause at 20-21 s.
+    const take = path.join(d, "take.mp4");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=180x320:rate=30:duration=40",
+      "-f", "lavfi", "-i", "sine=frequency=300:duration=40", "-af", "volume='if(between(t,20,21),0,1)':eval=frame",
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", take]);
+    const portrait = path.join(d, "p.png");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=gray:s=256x384", "-frames:v", "1", portrait]);
+    // Kling returns a little less than it is given, in its own size.
+    const back = path.join(d, "back.mp4");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=navy:s=292x444:r=24:d=15", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", back]);
+    const mp4 = await fs.readFile(back);
+    const sent: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://queue.fal.run/fal-ai/kling-video/v3/pro/motion-control") { sent.push(JSON.parse(init.body)); return json({ status_url: "https://q/ks", response_url: "https://q/kr" }); }
+      if (u === "https://q/ks") return json({ status: "COMPLETED" });
+      if (u === "https://q/kr") return json({ video: { url: "https://cdn/k.mp4" } });
+      if (u === "https://cdn/k.mp4") return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.FAL_KEY = "fk";
+    const { performTakeFile } = await import("../src/core/recast.js");
+    const { getPerformer } = await import("../src/core/performers/index.js");
+    const chunks: Array<[number, number]> = [];
+    const out = path.join(d, "out.mp4");
+    await performTakeFile({
+      rawAbs: take, outAbs: out, performer: getPerformer("kling")!,
+      ctx: { tenant: T, actor: { id: "a", name: "a", portrait: "", created_at: "" }, portraitAbs: portrait, workDir: path.join(d, "work"), width: 180, height: 320 },
+      onChunk: (done, total) => chunks.push([done, total]),
+    });
+    expect(sent).toHaveLength(2);                                             // cut once, at the pause
+    expect(sent[0]).toMatchObject({ character_orientation: "video" });
+    expect(sent[0].video_url).toMatch(/^data:video\/mp4;base64,/);          // no public address here: inline
+    expect(chunks[chunks.length - 1]).toEqual([2, 2]);
+    expect(Math.abs((await dur(out)) - 40)).toBeLessThan(0.1);               // exactly the take's length
+    expect(await info(out)).toMatch(/Video:.*180x320/);
+    expect(await info(out)).toMatch(/, 30 fps,/);
+    delete process.env.FAL_KEY;
+  }, 180000);
 });
 
 describe("keep the room: the redrawn person over the recording's own room", () => {

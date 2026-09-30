@@ -65,7 +65,8 @@ describe("generated take: the script performed with no recording", () => {
     const { startGeneratedTake, getGeneratedTakeStatus } = await import("../src/core/generated-take.js");
     const attached: string[] = [];
     const attach = async (url: string) => { attached.push(url); return { status: 200, body: { ok: true } }; };
-    await expect(startGeneratedTake(T, P, { actor: "painter" }, attach)).rejects.toThrow(/HeyGen actor/);
+    await expect(startGeneratedTake(T, P, { actor: "painter" }, attach)).rejects.toThrow(/HeyGen voice/);          // a portrait has no HeyGen voice of its own
+    await expect(startGeneratedTake(T, P, { actor: "sofa", performer: "kling" }, attach)).rejects.toThrow(/cannot perform a script/);
     await expect(startGeneratedTake(T, P, { actor: "sofa", voice: "elevenlabs" }, attach)).rejects.toThrow(/ElevenLabs voice/);
 
     // HeyGen's voice: the look's own when none is named.

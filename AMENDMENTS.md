@@ -6,6 +6,38 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Cast, step 1: the vendor is a choice (performers), the cast tool
+
+Marc: "let's build all this as a feature in megamedia and in studio ...
+since we may have other vendors in the future who offer this like Kling and
+runway and HeyGen and WAN we should let the user pick." Step 1 of 3 (then
+the desktop Studio Cast panel, then the phone).
+- `core/performers/`: one file per vendor behind one interface (types.ts).
+  AUDIO-driven (`fromAudio`: HeyGen -- a look, or a portrait via Avatar IV;
+  Avatar V where offered) can recast AND perform a generated take. VIDEO-
+  driven (`fromVideo` + `maxSeconds`: Kling 29 s, Runway 15 s) recasts only;
+  the take is cut at its pauses into calls, each held to its own length.
+  Wan keeps its whole-take method (`recastTake` -> recastFile), marked
+  experimental. `performerList()` feeds the picker (keeps / limits /
+  minutes per 30 s / key present); `defaultPerformer`: HeyGen for a look,
+  else the best video-driven vendor with a key.
+- `performTakeFile` (recast.ts) is the one path: voice (the take's, or the
+  actor's / a named ElevenLabs voice converted; "mine" keeps the take's) ->
+  picture -> fitted to the take's frame, 30 fps, exact length. Recast
+  files are `.actor-<id>-<performer>.mp4`; `take.actors[id].performer` is
+  recorded, and a recast is reused only for the same vendor, voice and look.
+  Large sources go to a vendor by a public URL under output/_cast/.
+- Generated take: `performer` (must be audio-driven); a portrait actor can
+  read too (Avatar IV from the photo) given a HeyGen voice. The take attach
+  is registered from index.ts (`registerTakeAttacher`) so MCP can start one.
+- Cast library: a portrait actor needs `consent: true` (this is me, or a
+  person who agreed to be cast) -- a portrait can be anyone's face; HeyGen
+  looks carry HeyGen's consent. `removeActor`; `GET /api/cast/{t}` returns
+  the performers; `GET /api/cast/{t}/voices` (ElevenLabs + HeyGen);
+  `DELETE /api/cast/{t}/{actor}`; `?public=1` pages HeyGen's stock looks.
+- MCP `cast` tool: list, looks, new_look, look_status, add_actor,
+  remove_actor, voices, recast, generate, status, clear.
+
 ## 2026-09-30 — Generated take: the script performed with no recording
 
 Marc made a HeyGen video from a script in the HeyGen app ("not bad") and

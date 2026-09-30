@@ -221,7 +221,7 @@ export const WAN_S2V_DEFAULT_PROMPT = "The man in the picture talks to the camer
  *  expression mapped onto the character image -- face, clothes and setting
  *  from the image -- in ONE call of up to 30 s (character_orientation
  *  "video"). No chunks, so no seams (the Wan recast's problem). */
-async function runKling(src: string, img: string, prompt?: string): Promise<string> {
+export async function runKling(src: string, img: string, prompt?: string): Promise<string> {
   const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
   const sub = await okJson(await fetch("https://queue.fal.run/fal-ai/kling-video/v3/pro/motion-control", {
     method: "POST", headers,
@@ -343,12 +343,30 @@ export async function listHeygenLooks(): Promise<HeygenLook[]> {
   const out: HeygenLook[] = [];
   let token = "";
   for (let page = 0; page < 20; page++) {
-    const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks?ownership=private&limit=50${token ? `&token=${encodeURIComponent(token)}` : ""}`, { headers: heygenHeaders(false) }), "heygen looks");
-    out.push(...(j?.data || []).map(toLook));
-    if (!j?.has_more || !j?.next_token) break;
-    token = j.next_token;
+    const r = await heygenLookPage({ ownership: "private", token });
+    out.push(...r.looks);
+    if (!r.next_token) break;
+    token = r.next_token;
   }
   return out;
+}
+
+/** One page of looks: the account's own ("private") or HeyGen's stock
+ *  presenters ("public"), optionally by gender, for browsing. */
+export async function heygenLookPage(opts: { ownership: "private" | "public"; token?: string; limit?: number; gender?: string }): Promise<{ looks: HeygenLook[]; next_token: string | null }> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const q = new URLSearchParams({ ownership: opts.ownership, limit: String(Math.max(1, Math.min(50, opts.limit || 50))) });
+  if (opts.token) q.set("token", opts.token);
+  const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks?${q}`, { headers: heygenHeaders(false) }), "heygen looks");
+  let looks: HeygenLook[] = (j?.data || []).map((l: any) => ({ ...toLook(l), ...(l.gender ? { gender: l.gender } : {}) }));
+  if (opts.gender) looks = looks.filter((l: any) => !l.gender || String(l.gender).toLowerCase() === opts.gender!.toLowerCase());
+  return { looks, next_token: j?.has_more && j?.next_token ? j.next_token : null };
+}
+
+export async function getHeygenLook(id: string): Promise<HeygenLook> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks/${encodeURIComponent(id)}`, { headers: heygenHeaders(false) }), "heygen look");
+  return toLook(j?.data || {});
 }
 
 /** The account's own HeyGen voices (voice clones), for a generated take. */
@@ -363,12 +381,6 @@ export async function listHeygenVoices(): Promise<Array<{ id: string; name: stri
     token = j.next_token;
   }
   return out;
-}
-
-export async function getHeygenLook(id: string): Promise<HeygenLook> {
-  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
-  const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks/${encodeURIComponent(id)}`, { headers: heygenHeaders(false) }), "heygen look");
-  return toLook(j?.data || {});
 }
 
 /** A new look from a prompt, based on an existing look (avatar_id) or
@@ -448,7 +460,7 @@ export async function heygenQuota(): Promise<unknown> {
 }
 
 /** Runway Act-Two: POST /v1/character_performance, poll /v1/tasks/{id}. */
-async function runRunway(src: string, img: string, ratio: string): Promise<string> {
+export async function runRunway(src: string, img: string, ratio: string): Promise<string> {
   const headers = {
     Authorization: `Bearer ${process.env.RUNWAYML_API_SECRET}`,
     "X-Runway-Version": "2024-11-06",

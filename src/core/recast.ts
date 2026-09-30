@@ -15,11 +15,11 @@
  * (a short return holds its last frame for the gap). The chunks run side by
  * side and are stitched back to exactly the take's length at its resolution.
  *
- * HEYGEN ACTORS (actor.heygen_look_id) skip all of that: the take's audio
- * (or the actor's converted voice) goes to HeyGen in ONE call, and HeyGen
- * draws the whole performance -- face, body, room -- lip-synced to it
- * (heygenRecastFile). No chunks, no seams, no matte; ~2 min for 30 s. The
- * look's own motion replaces the recording's gestures.
+ * That was the first route. The vendor is now a choice (core/performers):
+ * HeyGen hears the voice and draws the whole person in one call (the actor
+ * tests' winner); Kling and Runway map the recording's motion onto the
+ * portrait, a call per stretch of up to maxSeconds cut at the pauses; Wan
+ * keeps the whole method above. performTakeFile is the common path.
  *
  * A recast is a copy of the take like the matte's blur and alpha copies:
  * take.actors[actorId].file, and project.speaker_cast picks who plays
@@ -32,12 +32,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { config } from "../config.js";
 import { loadProject, saveProject } from "../persistence/project.js";
-import { projectDir } from "../persistence/paths.js";
+import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
 import { takeCopies, takeForClip, syncSpeakerClips } from "./speaker-layer.js";
 import { getActor, portraitPath, type CastActor } from "./cast.js";
-import { ffmpeg, dataUri, download, runWan, convertVoice, durationOf, runHeygenV3, getHeygenLook } from "./actor-test.js";
-import { matteTake, alphaCopyName } from "./take-matte.js";
+import { ffmpeg, dataUri, download, runWan, convertVoice, durationOf } from "./actor-test.js";
+import { PERFORMERS, getPerformer, defaultPerformer, type Performer, type PerformContext } from "./performers/index.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -60,6 +60,8 @@ const CHUNK_DEADLINE_MS = 18 * 60 * 1000;
 export interface RecastStatus {
   project_id: string;
   actor: string | null;
+  performer?: string;
+  voice_id?: string;
   status: "running" | "done" | "failed" | "interrupted";
   started_at: string;
   finished_at?: string;
@@ -92,19 +94,19 @@ async function saveStatus(tenant: string, st: RecastStatus): Promise<void> {
 
 /** Where to cut: at the middle of a pause, as late as fits in CHUNK_MAX, and
  *  never leaving a sliver of a chunk at the end. */
-export function planChunks(duration: number, silences: Array<[number, number]>): Array<[number, number]> {
+export function planChunks(duration: number, silences: Array<[number, number]>, max = CHUNK_MAX, min = CHUNK_MIN): Array<[number, number]> {
   const mids = silences.map(([a, b]) => (a + b) / 2).filter((m) => m > 0 && m < duration);
   const out: Array<[number, number]> = [];
   let pos = 0;
-  while (duration - pos > CHUNK_MAX) {
-    const inWindow = mids.filter((m) => m > pos + CHUNK_MIN && m <= pos + CHUNK_MAX);
-    const cut = inWindow.length ? inWindow[inWindow.length - 1] : pos + CHUNK_MAX;
+  while (duration - pos > max) {
+    const inWindow = mids.filter((m) => m > pos + min && m <= pos + max);
+    const cut = inWindow.length ? inWindow[inWindow.length - 1] : pos + max;
     out.push([pos, cut]);
     pos = cut;
   }
   if (duration - pos > 0.05) {
     // Fold a sliver into the chunk before -- while that chunk still fits a call.
-    if (out.length && duration - pos < 1.2 && duration - out[out.length - 1][0] <= CHUNK_MAX + 0.5) out[out.length - 1][1] = duration;
+    if (out.length && duration - pos < 1.2 && duration - out[out.length - 1][0] <= max + 0.5) out[out.length - 1][1] = duration;
     else out.push([pos, duration]);
   }
   return out;
@@ -300,28 +302,48 @@ export async function recastFile(opts: {
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", duration.toFixed(3), "-movflags", "+faststart", outAbs]);
 }
 
-/** A take performed by a HeyGen look: its audio (the actor's voice when
- *  they have one) sent in one call, the video fitted back to exactly the
- *  take's length, size and rate, the audio laid under it. The submitted
- *  video id is kept in the work dir, so a restart collects it instead of
- *  paying for it twice. */
-export async function heygenRecastFile(opts: {
+/** A public URL for a work file (a vendor fetches a large source by URL
+ *  rather than a data URI): copied into the project's output under _cast/,
+ *  which is served, when the server has a public https address. */
+function castPublicUrl(tenant: string, projectId: string): (file: string) => Promise<string | null> {
+  return async (file) => {
+    if (!config.publicUrl.startsWith("https://")) return null;
+    const dir = path.join(projectOutputDir(tenant, projectId), "_cast");
+    await fs.mkdir(dir, { recursive: true });
+    const name = `${Date.now().toString(36)}-${path.basename(file)}`;
+    await fs.copyFile(file, path.join(dir, name));
+    return `${config.publicUrl}/output/${encodeURIComponent(tenant)}/projects/${encodeURIComponent(projectId)}/_cast/${name}`;
+  };
+}
+
+/** A take performed by a cast actor through one vendor (core/performers):
+ *  the voice made (the take's own, or the actor's converted -- the delivery
+ *  kept), the picture made (audio-driven: one call; video-driven: the take
+ *  cut at its pauses into calls of at most maxSeconds, each held to its own
+ *  length), then fitted to exactly the take's frame, 30 fps and length with
+ *  the voice laid under it. A vendor with its own whole-take method (Wan)
+ *  does all of it itself. */
+export async function performTakeFile(opts: {
   rawAbs: string;
   outAbs: string;
-  workDir: string;
-  lookId: string;
+  performer: Performer;
+  ctx: PerformContext;
   voiceId?: string;
-  onStage?: (stage: string) => void;
+  onChunk?: (done: number, total: number) => void;
 }): Promise<void> {
-  const { rawAbs, outAbs, workDir } = opts;
-  await fs.mkdir(workDir, { recursive: true });
-  const w = (n: string) => path.join(workDir, n);
+  const { rawAbs, outAbs, performer, ctx } = opts;
+  await fs.mkdir(ctx.workDir, { recursive: true });
+  if (performer.recastTake) {
+    await performer.recastTake({ rawAbs, outAbs, voiceId: opts.voiceId, ctx, onChunk: opts.onChunk });
+    return;
+  }
+  const w = (n: string) => path.join(ctx.workDir, n);
   const duration = await durationOf(rawAbs);
   if (!duration) throw new Error("could not read the take's length");
-  const [W, H] = await sizeOf(rawAbs);
+  const [W, H] = [ctx.width, ctx.height];
   const have = async (f: string) => fs.stat(f).then((x) => x.size > 0, () => false);
 
-  opts.onStage?.("voice");
+  ctx.onStage?.("voice");
   let audio = w("take.mp3");
   if (!(await have(audio))) await ffmpeg(["-i", rawAbs, "-vn", "-ac", "1", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "192k", audio]);
   if (opts.voiceId) {
@@ -332,43 +354,62 @@ export async function heygenRecastFile(opts: {
     audio = w("voice.mp3");
   }
 
-  opts.onStage?.("heygen");
-  if (!(await have(w("heygen.mp4")))) {
-    // Avatar V wherever the look offers it -- the twin AND photo looks,
-    // whatever HeyGen's docs say (Marc on the sofa look on V: "insanely
-    // good. Even my hand motions"); HeyGen's default otherwise.
-    const look = await getHeygenLook(opts.lookId).catch(() => null);
-    const engine = look?.engines?.includes("avatar_v") ? "avatar_v" : undefined;
-    const aspect = H > W * 1.1 ? "9:16" : W > H * 1.1 ? "16:9" : "1:1";
-    const req = w("heygen.json");
-    const prior = await fs.readFile(req, "utf8").then((t) => JSON.parse(t)?.video_id as string, () => undefined);
-    const call = (resume?: string) => runHeygenV3({
-      lookId: opts.lookId, audioFile: audio, aspect, engine, resolution: "1080p", resume,
-      onSubmit: async (id) => { await fs.writeFile(req, JSON.stringify({ video_id: id })); },
+  ctx.onStage?.(performer.id);
+  let picture: string;
+  if (performer.fromAudio) {
+    picture = await performer.fromAudio(audio, ctx);
+  } else if (performer.fromVideo) {
+    const max = performer.maxSeconds || 30;
+    const chunks = duration <= max ? [[0, duration] as [number, number]] : planChunks(duration, await silencesOf(rawAbs), max, Math.min(3, max / 2));
+    let done = 0;
+    opts.onChunk?.(0, chunks.length);
+    await pool(chunks, 4, async ([a, b], i) => {
+      const fit = w(`fit-${i}.mp4`);
+      if (!(await have(fit))) {
+        const src = w(`src-${i}.mp4`);
+        await ffmpeg(["-ss", String(a), "-to", String(b), "-i", rawAbs, "-vf", "scale=720:-2", "-r", "30",
+          "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", src]);
+        const made = await performer.fromVideo!(src, `c${i}`, ctx);
+        // Exactly the stretch's length at the take's frame: a short return holds its last frame.
+        await ffmpeg(["-i", made, "-an", "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2`,
+          "-t", (b - a).toFixed(3), "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", fit]);
+      }
+      opts.onChunk?.(++done, chunks.length);
     });
-    let url: string;
-    try { url = await call(prior); }
-    catch (e) {
-      // A resumed video that failed or vanished: submit fresh, once.
-      if (!prior) throw e;
-      await fs.rm(req, { force: true });
-      url = await call();
-    }
-    await download(url, w("heygen.mp4"));
+    await fs.writeFile(w("fit-list.txt"), chunks.map((_, i) => `file '${w(`fit-${i}.mp4`)}'`).join("\n"));
+    await ffmpeg(["-f", "concat", "-safe", "0", "-i", w("fit-list.txt"), "-c", "copy", w("picture.mp4")]);
+    picture = w("picture.mp4");
+  } else {
+    throw new Error(`${performer.label} cannot perform a take`);
   }
 
-  opts.onStage?.("fit");
+  ctx.onStage?.("fit");
   // Exactly the take's frame (cover), rate and length: a short return holds its last frame.
-  await ffmpeg(["-i", w("heygen.mp4"), "-i", opts.voiceId ? audio : rawAbs, "-map", "0:v:0", "-map", "1:a:0",
+  await ffmpeg(["-i", picture, "-i", opts.voiceId ? audio : rawAbs, "-map", "0:v:0", "-map", "1:a:0",
     "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2`,
     "-af", opts.voiceId ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", duration.toFixed(3), "-movflags", "+faststart", outAbs]);
 }
 
+/** The work dir of one take's recast by one actor through one vendor. */
+function recastWorkDir(tenant: string, projectId: string, actorId: string, performer: string, i: number): string {
+  return path.join(projectDir(tenant, projectId), "_work", `recast-${actorId}-${performer}-${i}`);
+}
+
+/** Who performed an existing recast: recorded since vendors became a
+ *  choice; before that a HeyGen look's recast was HeyGen's, any other Wan's. */
+function madeBy(entry: any): string {
+  return entry?.performer || (entry?.heygen_look_id ? "heygen" : "wan");
+}
+
 /** Recast every take the speaker track plays as the actor (or, with null,
- *  put the recording's own person back). Returns at once; the work runs on. */
-export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean } = {}): Promise<RecastStatus> {
+ *  put the recording's own person back). `performer` picks the vendor
+ *  (default: HeyGen for a HeyGen look, else the best video-driven vendor
+ *  with a key); `voice_id` an ElevenLabs voice the delivery is converted to
+ *  ("mine" keeps the recording's voice; omitted, the actor's own voice).
+ *  Returns at once; the work runs on. */
+export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string } = {}): Promise<RecastStatus> {
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A recast of this film is already running");
   const project = await loadProject(tenant, projectId);
@@ -384,8 +425,13 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   }
   const actor = await getActor(tenant, actorId);
   if (!actor) throw new Error(`No cast actor "${actorId}"`);
-  if (actor.heygen_look_id ? !process.env.HEYGEN_API_KEY : !process.env.FAL_KEY) throw new Error(`${actor.heygen_look_id ? "HEYGEN_API_KEY" : "FAL_KEY"} is not set`);
-  if (actor.voice_id && !process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
+  const performer = opts.performer ? getPerformer(opts.performer) : defaultPerformer(actor);
+  if (!performer) throw new Error(`No performer "${opts.performer}" (${PERFORMERS.map((p) => p.id).join(", ")})`);
+  if (!process.env[performer.key]) throw new Error(`${performer.label} is not set up on this server (${performer.key})`);
+  const voiceId = opts.voice_id === undefined ? actor.voice_id : opts.voice_id === "mine" ? undefined : opts.voice_id || undefined;
+  if (voiceId && !process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
+  st.performer = performer.id;
+  if (voiceId) st.voice_id = voiceId;
   // The raw files behind the track's clips (a one-take film is one file).
   const raws = new Set<string>();
   for (const clip of (project as any).speaker_track?.clips || []) {
@@ -394,17 +440,18 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   }
   if (!raws.size) throw new Error("This film has no speaker take to recast");
   for (const raw of raws) {
-    const file = raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}.mp4`);
-    const existing = ((project as any).takes || []).find((t: any) => takeCopies(t).raw === raw && t.actors?.[actor.id]?.file);
-    // fresh: made again (a better method, a new take of the same actor).
-    const reusable = !opts.fresh && existing && existing.actors[actor.id].voice_id === actor.voice_id
-      && existing.actors[actor.id].heygen_look_id === actor.heygen_look_id
-      && (await fs.access(resolveVideoPath(file, config.dataDir)).then(() => true, () => false));
+    const existing = ((project as any).takes || []).find((t: any) => takeCopies(t).raw === raw && t.actors?.[actor.id]?.file)?.actors?.[actor.id];
+    // Reused only when it is the same performance: the same vendor, voice
+    // and look, and the file is still there. fresh: made again regardless.
+    const reusable = !opts.fresh && existing && madeBy(existing) === performer.id && existing.voice_id === voiceId
+      && existing.heygen_look_id === actor.heygen_look_id
+      && (await fs.access(resolveVideoPath(existing.file, config.dataDir)).then(() => true, () => false));
+    const file = reusable ? existing.file : raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`);
     st.files.push({ raw, file, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0 });
   }
   running.set(key, st);
   await saveStatus(tenant, st);
-  void runRecast(tenant, projectId, actor, st).catch(async (e) => {
+  void runRecast(tenant, projectId, actor, performer, voiceId, st).catch(async (e) => {
     st.status = "failed"; st.error = e?.message || String(e); st.finished_at = new Date().toISOString();
     running.delete(key);
     await saveStatus(tenant, st);
@@ -412,42 +459,21 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   return st;
 }
 
-async function runRecast(tenant: string, projectId: string, actor: CastActor, st: RecastStatus): Promise<void> {
+async function runRecast(tenant: string, projectId: string, actor: CastActor, performer: Performer, voiceId: string | undefined, st: RecastStatus): Promise<void> {
   const key = `${tenant}/${projectId}`;
+  const publicUrl = castPublicUrl(tenant, projectId);
   await Promise.all(st.files.map(async (f, i) => {
     if (f.status === "reused") return;
     try {
-      if (actor.heygen_look_id) {
-        await heygenRecastFile({
-          rawAbs: resolveVideoPath(f.raw, config.dataDir),
-          outAbs: resolveVideoPath(f.file, config.dataDir),
-          workDir: path.join(projectDir(tenant, projectId), "_work", `recast-${actor.id}-${i}`),
-          lookId: actor.heygen_look_id,
-          voiceId: actor.voice_id,
+      const rawAbs = resolveVideoPath(f.raw, config.dataDir);
+      const [width, height] = await sizeOf(rawAbs);
+      await performTakeFile({
+        rawAbs, outAbs: resolveVideoPath(f.file, config.dataDir), performer, voiceId,
+        ctx: {
+          tenant, actor, portraitAbs: portraitPath(tenant, actor), width, height, publicUrl,
+          workDir: recastWorkDir(tenant, projectId, actor.id, performer.id, i),
           onStage: (stage) => { f.stage = stage; void saveStatus(tenant, st); },
-        });
-        f.status = "done";
-        await saveStatus(tenant, st);
-        return;
-      }
-      await recastFile({
-        rawAbs: resolveVideoPath(f.raw, config.dataDir),
-        outAbs: resolveVideoPath(f.file, config.dataDir),
-        workDir: path.join(projectDir(tenant, projectId), "_work", `recast-${actor.id}-${i}`),
-        portraitAbs: portraitPath(tenant, actor),
-        voiceId: actor.voice_id,
-        seed: actorSeed(actor.id),
-        keepRoom: true,
-        interpolate: process.env.MP_RECAST_INTERP === "blend" ? "blend" : "mci",
-        // The matte's alpha copy: the take's own (made once, reused) and the redrawn picture's.
-        matte: async (video) => {
-          const alpha = alphaCopyName(video);
-          if (await fs.stat(alpha).then((x) => x.size > 0, () => false)) return alpha;
-          const r = await matteTake(video, { dataDir: config.dataDir, blur: false, alpha: true });
-          if (!r.alpha) throw new Error("the matte made no alpha");
-          return r.alpha;
         },
-        onStage: (stage) => { f.stage = stage; void saveStatus(tenant, st); },
         onChunk: (done, total) => { f.chunks_done = done; f.chunks_total = total; void saveStatus(tenant, st); },
       });
       f.status = "done";
@@ -464,7 +490,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, st
     const now = new Date().toISOString();
     for (const t of (project as any).takes || []) {
       const hit = ok.find((f) => f.raw === takeCopies(t).raw);
-      if (hit) t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, ...(actor.voice_id ? { voice_id: actor.voice_id } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), made_at: now } };
+      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
     // face and half in another is worse than none.
@@ -477,8 +503,9 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, st
   st.finished_at = new Date().toISOString();
   running.delete(key);
   await saveStatus(tenant, st);
-  // The chunks were only a means: keep the recast, drop the pieces.
-  for (let i = 0; i < st.files.length; i++) await fs.rm(path.join(projectDir(tenant, projectId), "_work", `recast-${actor.id}-${i}`), { recursive: true, force: true }).catch(() => {});
+  // The pieces were only a means: keep the recast, drop the pieces.
+  for (let i = 0; i < st.files.length; i++) await fs.rm(recastWorkDir(tenant, projectId, actor.id, performer.id, i), { recursive: true, force: true }).catch(() => {});
+  await fs.rm(path.join(projectOutputDir(tenant, projectId), "_cast"), { recursive: true, force: true }).catch(() => {});
 }
 
 /** A PREVIEW from the chunks that are done: the finished run from the start,
@@ -491,7 +518,7 @@ export async function previewRecast(tenant: string, projectId: string, actorId: 
   if (!project) throw new Error("Project not found");
   const actor = await getActor(tenant, actorId);
   if (!actor) throw new Error(`No cast actor "${actorId}"`);
-  const workDir = path.join(projectDir(tenant, projectId), "_work", `recast-${actor.id}-0`);
+  const workDir = recastWorkDir(tenant, projectId, actor.id, "wan", 0);
   const w = (n: string) => path.join(workDir, n);
   const plan = JSON.parse(await fs.readFile(w("plan.json"), "utf8").catch(() => { throw new Error("No recast of this film has started"); }));
   const chunks: Array<[number, number]> = plan.chunks || [];

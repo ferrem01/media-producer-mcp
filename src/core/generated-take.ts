@@ -19,14 +19,16 @@ import path from "node:path";
 import { config } from "../config.js";
 import { loadProject } from "../persistence/project.js";
 import { projectDir } from "../persistence/paths.js";
-import { getActor } from "./cast.js";
-import { ffmpeg, download, durationOf, runHeygenV3, getHeygenLook } from "./actor-test.js";
+import { getActor, portraitPath, type CastActor } from "./cast.js";
+import { ffmpeg, download, durationOf, getHeygenLook } from "./actor-test.js";
+import { getPerformer, PERFORMERS, type Performer } from "./performers/index.js";
 
 export type VoiceProvider = "heygen" | "elevenlabs";
 
 export interface GeneratedTakeStatus {
   project_id: string;
   actor: string;
+  performer: string;
   voice: { provider: VoiceProvider; id: string };
   status: "running" | "done" | "failed" | "interrupted";
   stage?: string;
@@ -44,6 +46,11 @@ const SCENE_GAP = 0.6;
 const PAUSE = 1.0;
 
 const running = new Map<string, GeneratedTakeStatus>();
+// index.ts owns the take attach (sanitize, transcribe, split, re-time); it
+// registers it here so the MCP tool can start a generated take too.
+type Attacher = (tenant: string, project: string, url: string) => Promise<{ status: number; body: Record<string, unknown> }>;
+let attacher: Attacher | null = null;
+export function registerTakeAttacher(fn: Attacher): void { attacher = fn; }
 const statusFile = (tenant: string, project: string) => path.join(projectDir(tenant, project), "generated-take.json");
 
 export async function getGeneratedTakeStatus(tenant: string, project: string): Promise<GeneratedTakeStatus | null> {
@@ -129,9 +136,14 @@ export async function speakScript(scenes: string[], voice: { provider: VoiceProv
  *  `attach(url)` attaches a project asset as a whole-film take (index.ts). */
 export async function startGeneratedTake(tenant: string, projectId: string, opts: {
   actor: string;
+  /** The vendor that performs it: one driven by audio (default HeyGen). */
+  performer?: string;
   voice?: VoiceProvider;
   voice_id?: string;
-}, attach: (url: string) => Promise<{ status: number; body: Record<string, unknown> }>): Promise<GeneratedTakeStatus> {
+}, attach?: (url: string) => Promise<{ status: number; body: Record<string, unknown> }>): Promise<GeneratedTakeStatus> {
+  const registered = attacher;
+  const doAttach = attach || (registered ? (url: string) => registered(tenant, projectId, url) : null);
+  if (!doAttach) throw new Error("Takes cannot be attached here");
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A generated take for this film is already running");
   const project = await loadProject(tenant, projectId);
@@ -140,8 +152,10 @@ export async function startGeneratedTake(tenant: string, projectId: string, opts
   if (grammar !== "speaker" && grammar !== "creator-cut") throw new Error("A generated take needs a film a person carries (speaker or creator-cut)");
   const actor = await getActor(tenant, opts.actor);
   if (!actor) throw new Error(`No cast actor "${opts.actor}"`);
-  if (!actor.heygen_look_id) throw new Error("A generated take needs a HeyGen actor (a cast actor made from a HeyGen look)");
-  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const performer = getPerformer(opts.performer || "heygen");
+  if (!performer) throw new Error(`No performer "${opts.performer}" (${PERFORMERS.map((p) => p.id).join(", ")})`);
+  if (!performer.fromAudio) throw new Error(`${performer.label} copies a recording's motion, so it cannot perform a script alone -- use a vendor driven by audio (HeyGen)`);
+  if (!process.env[performer.key]) throw new Error(`${performer.label} is not set up on this server (${performer.key})`);
   const scenes = ((project as any).storyboard?.scenes || []).map((s: any) => String(s?.voiceover_text || ""));
   if (!scenes.some((t: string) => spokenParts(t).length)) throw new Error("The storyboard has no lines to read");
   // The voice: HeyGen's (the look's own unless one is named) or ElevenLabs'
@@ -152,14 +166,15 @@ export async function startGeneratedTake(tenant: string, projectId: string, opts
     if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
     voiceId ||= actor.voice_id || "";
     if (!voiceId) throw new Error("Name an ElevenLabs voice (voice_id), or give the actor one");
-  } else if (!voiceId) {
-    voiceId = (await getHeygenLook(actor.heygen_look_id)).default_voice_id || "";
-    if (!voiceId) throw new Error("That HeyGen look has no voice of its own: name one (voice_id)");
+  } else {
+    if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+    if (!voiceId && actor.heygen_look_id) voiceId = (await getHeygenLook(actor.heygen_look_id)).default_voice_id || "";
+    if (!voiceId) throw new Error("Name a HeyGen voice (voice_id): this actor has no HeyGen voice of its own");
   }
-  const st: GeneratedTakeStatus = { project_id: projectId, actor: actor.id, voice: { provider, id: voiceId }, status: "running", started_at: new Date().toISOString() };
+  const st: GeneratedTakeStatus = { project_id: projectId, actor: actor.id, performer: performer.id, voice: { provider, id: voiceId }, status: "running", started_at: new Date().toISOString() };
   running.set(key, st);
   await save(tenant, st);
-  void run(tenant, projectId, actor.heygen_look_id, scenes, st, attach).catch(async (e) => {
+  void run(tenant, projectId, actor, performer, scenes, st, doAttach).catch(async (e) => {
     st.status = "failed"; st.error = String(e?.message || e).slice(0, 300); st.finished_at = new Date().toISOString();
     running.delete(key);
     await save(tenant, st);
@@ -167,37 +182,24 @@ export async function startGeneratedTake(tenant: string, projectId: string, opts
   return st;
 }
 
-async function run(tenant: string, projectId: string, lookId: string, scenes: string[], st: GeneratedTakeStatus,
+async function run(tenant: string, projectId: string, actor: CastActor, performer: Performer, scenes: string[], st: GeneratedTakeStatus,
   attach: (url: string) => Promise<{ status: number; body: Record<string, unknown> }>): Promise<void> {
   const key = `${tenant}/${projectId}`;
-  // One work dir per actor and voice: a restart keeps the lines and the
-  // submitted video; another voice starts clean.
-  const workDir = path.join(projectDir(tenant, projectId), "_work", `generated-take-${st.actor}-${st.voice.provider}-${st.voice.id}`.replace(/[^A-Za-z0-9_.-]/g, "_"));
+  // One work dir per actor, vendor and voice: a restart keeps the lines and
+  // the submitted video; another voice starts clean.
+  const workDir = path.join(projectDir(tenant, projectId), "_work", `generated-take-${actor.id}-${performer.id}-${st.voice.provider}-${st.voice.id}`.replace(/[^A-Za-z0-9_.-]/g, "_"));
   await fs.mkdir(workDir, { recursive: true });
   const w = (n: string) => path.join(workDir, n);
   const stage = async (s: string) => { st.stage = s; await save(tenant, st); };
 
   await stage("voice");
   const wav = await speakScript(scenes, st.voice, workDir);
-  await ffmpeg(["-i", wav, "-c:a", "libmp3lame", "-b:a", "192k", w("voice.mp3")]);
+  if (!(await fs.stat(w("voice.mp3")).then((x) => x.size > 0, () => false))) await ffmpeg(["-i", wav, "-c:a", "libmp3lame", "-b:a", "192k", w("voice.mp3")]);
 
-  await stage("heygen");
+  await stage(performer.id);
   const project = await loadProject(tenant, projectId);
   const W = Number((project as any)?.canvas?.width) || 1080, H = Number((project as any)?.canvas?.height) || 1920;
-  const look = await getHeygenLook(lookId).catch(() => null);
-  const req = w("heygen.json");
-  if (!(await fs.stat(w("heygen.mp4")).then((x) => x.size > 0, () => false))) {
-    const prior = await fs.readFile(req, "utf8").then((t) => JSON.parse(t)?.video_id as string, () => undefined);
-    const call = (resume?: string) => runHeygenV3({
-      lookId, audioFile: w("voice.mp3"), aspect: H > W * 1.1 ? "9:16" : W > H * 1.1 ? "16:9" : "1:1",
-      engine: look?.engines?.includes("avatar_v") ? "avatar_v" : undefined, resolution: "1080p", resume,
-      onSubmit: async (id) => { await fs.writeFile(req, JSON.stringify({ video_id: id })); },
-    });
-    let url: string;
-    try { url = await call(prior); }
-    catch (e) { if (!prior) throw e; await fs.rm(req, { force: true }); url = await call(); }
-    await download(url, w("heygen.mp4"));
-  }
+  const picture = await performer.fromAudio!(w("voice.mp3"), { tenant, actor, portraitAbs: portraitPath(tenant, actor), workDir, width: W, height: H });
 
   await stage("attach");
   // Into the project's assets under a take-* name, the voice laid under the
@@ -205,7 +207,7 @@ async function run(tenant: string, projectId: string, lookId: string, scenes: st
   const name = `take-generated-${new Date().toISOString().replace(/[:.]/g, "-")}.mp4`;
   const assets = path.join(config.dataDir, tenant, "projects", projectId, "assets");
   await fs.mkdir(assets, { recursive: true });
-  await ffmpeg(["-i", w("heygen.mp4"), "-i", wav, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+  await ffmpeg(["-i", picture, "-i", wav, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", "-movflags", "+faststart", path.join(assets, name)]);
   const url = `/assets/${tenant}/projects/${projectId}/assets/${name}`;
   const out = await attach(url);

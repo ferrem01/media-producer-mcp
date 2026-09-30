@@ -1767,6 +1767,81 @@ export function createMcpServer(): McpServer {
   );
 
   tool(
+    "cast",
+    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Runway / Wan copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by a HeyGen-driven actor, attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters) or portraits (need consent). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
+    {
+      tenant_id: z.string(),
+      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "remove_actor", "voices", "recast", "generate", "status", "clear"]),
+      project_id: z.string().optional().describe("recast / generate / status / clear: the film."),
+      actor: z.string().optional().describe("recast / generate / remove_actor: a cast actor id (from list)."),
+      performer: z.enum(["heygen", "kling", "runway", "wan"]).optional().describe("recast / generate: the vendor. Default: HeyGen for a HeyGen look, else the best video-driven vendor configured. generate needs an audio-driven vendor (HeyGen)."),
+      voice: z.enum(["heygen", "elevenlabs"]).optional().describe("generate: who voices the script (default heygen: the look's own voice)."),
+      voice_id: z.string().optional().describe("recast: an ElevenLabs voice the delivery is converted to ('mine' keeps the recording's voice; omitted, the actor's own). generate: the HeyGen or ElevenLabs voice to read with."),
+      fresh: z.boolean().optional().describe("recast: make it again even if this performance exists."),
+      heygen_look_id: z.string().optional().describe("add_actor: a HeyGen look id (from looks). new_look: the look to base the new one on."),
+      image: z.string().optional().describe("add_actor: a portrait, tenant-relative path (needs consent)."),
+      name: z.string().optional().describe("add_actor / new_look: a name."),
+      consent: z.boolean().optional().describe("add_actor with image: the user confirmed this is them, or a person who agreed to be cast."),
+      prompt: z.string().optional().describe("new_look: the setting and clothes ('on a couch in a grey sweater')."),
+      look_id: z.string().optional().describe("look_status: the new look's id."),
+      public: z.boolean().optional().describe("looks: HeyGen's stock presenters instead of the user's own."),
+      gender: z.string().optional().describe("looks with public: 'male' or 'female'."),
+      token: z.string().optional().describe("looks with public: the next page's token."),
+    },
+    async (params) => {
+      const t = params.tenant_id;
+      try {
+        const { listCast, addActor, removeActor } = await import("./core/cast.js");
+        const { performerList } = await import("./core/performers/index.js");
+        const at = await import("./core/actor-test.js");
+        const { startRecast, getRecastStatus } = await import("./core/recast.js");
+        const { startGeneratedTake, getGeneratedTakeStatus } = await import("./core/generated-take.js");
+        const needProject = () => { if (!params.project_id) throw new Error("project_id is required"); return params.project_id as string; };
+        const needActor = () => { if (!params.actor) throw new Error("actor is required (a cast actor id from action='list')"); return params.actor as string; };
+        switch (params.action) {
+          case "list": {
+            const quota = process.env.HEYGEN_API_KEY ? await at.heygenQuota().catch(() => null) : null;
+            return ok({ cast: await listCast(t), performers: performerList(), ...(quota ? { heygen_api_credits: (quota as any)?.details?.api ?? (quota as any)?.remaining_quota } : {}) });
+          }
+          case "looks":
+            return ok(params.public ? await at.heygenLookPage({ ownership: "public", token: params.token, gender: params.gender }) : { looks: await at.listHeygenLooks() });
+          case "new_look":
+            if (!params.heygen_look_id) return err("heygen_look_id is required: the look to base the new one on (from action='looks')");
+            return ok({ ...(await at.createHeygenLook({ prompt: String(params.prompt || ""), name: params.name, avatar_id: params.heygen_look_id })), message: "Generating (usually under a minute). Poll action='look_status' with look_id; when completed, add_actor with heygen_look_id." });
+          case "look_status":
+            if (!params.look_id) return err("look_id is required");
+            return ok(await at.getHeygenLook(params.look_id));
+          case "add_actor":
+            return ok(await addActor(t, { name: params.name, image: params.image, heygen_look_id: params.heygen_look_id, voice_id: params.voice_id, consent: params.consent === true }));
+          case "remove_actor":
+            return ok({ removed: await removeActor(t, needActor()) });
+          case "voices": {
+            const [eleven, hey] = await Promise.all([
+              process.env.ELEVENLABS_API_KEY ? at.listVoices().catch(() => []) : Promise.resolve([]),
+              process.env.HEYGEN_API_KEY ? at.listHeygenVoices().catch(() => []) : Promise.resolve([]),
+            ]);
+            return ok({ elevenlabs: eleven.map((v: any) => ({ id: v.voice_id, name: v.name, category: v.category })), heygen: hey });
+          }
+          case "recast":
+            return ok({ ...(await startRecast(t, needProject(), needActor(), { performer: params.performer, voice_id: params.voice_id, fresh: params.fresh === true })), message: "Running. Poll action='status'." });
+          case "generate":
+            return ok({ ...(await startGeneratedTake(t, needProject(), { actor: needActor(), performer: params.performer, voice: params.voice, voice_id: params.voice_id })), message: "Running: voice, then the performance, then the attach (the scenes re-time to it). Poll action='status'." });
+          case "status": {
+            const pid = needProject();
+            const project = await loadProject(t, pid);
+            if (!project) return err("Project not found");
+            return ok({ speaker_cast: (project as any).speaker_cast || null, recast: await getRecastStatus(t, pid), generated_take: await getGeneratedTakeStatus(t, pid), studio_url: previewUrl(t, pid) });
+          }
+          case "clear":
+            return ok({ ...(await startRecast(t, needProject(), null)), message: "The recording's own person is back." });
+        }
+      } catch (e: any) {
+        return err(e?.message || String(e));
+      }
+    },
+  );
+
+  tool(
     "take",
     "Ask the human for a camera take of a SPEAKER or CREATOR-CUT film (SPEC-take-flow.md). Returns the Studio link to hand them (on a phone it is the phone Studio: what is still needed, Record on each scene, Upload; add scene_index to point the booth at one scene), the open needs, and a job that completes when the take lands -- poll job(action='status'). On arrival the file is sanitized (orientation, frame, dialogue loudness), attached as that scene's base, and the scene's need flips to provided. Then build with generate(mode='full') and render.",
     {
