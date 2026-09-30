@@ -23,5 +23,9 @@ describe("Preview: watch a built film on the phone", () => {
     expect(html).toContain("sl.style.setProperty('--p'");
     expect(html).toContain("if (WATCH) return; // watch mode's Back goes to the phone Studio");
     expect(html).toContain("Tap to watch");
+    // On a phone the editor's zoomed track ran the bar off the screen; watch mode pins it to the width.
+    expect(html).toContain("track.style.width = WATCH ? '100%' : (state.tlZoom * 100) + '%';");
+    // Nothing is edited here: no hover or selection boxes drawn on the film.
+    expect(html).toContain("if (WATCH) return;\n");
   });
 });

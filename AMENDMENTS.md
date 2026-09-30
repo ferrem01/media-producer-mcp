@@ -22,6 +22,11 @@ preview and render". The phone could only play a RENDERED MP4.
   fill following the playhead; **Back** to the phone Studio of the film.
 - Checked in Chromium as an iPhone 13 with a mocked composite: plays, pauses,
   a tap at 80% of the bar lands at 8.2 of 10 s, Back points home; no errors.
+- On Marc's phone the bar ran off the right edge (the editor's zoomed track:
+  width = zoom x 100%, likely a zoom kept from the desktop Studio on that
+  phone) and the editor's blue selection box showed on the film. Watch mode
+  now pins the track to 100% (and the bar to the screen) and skips
+  studioAttach (no hover/selection boxes).
 
 ## 2026-09-30 — Generated take: name the HeyGen speech engine
 

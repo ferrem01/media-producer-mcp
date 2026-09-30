@@ -60,6 +60,11 @@ ${QUOTIENT_CSS}
   body.watch-mode #playback-bar { height: auto !important; min-height: 0 !important; display: flex; align-items: center; gap: 12px;
     padding: 8px 14px calc(10px + env(safe-area-inset-bottom)); background: #000; border: 0; }
   body.watch-mode #transport-left { display: flex; align-items: center; gap: 10px; width: auto !important; }
+  /* The bar is exactly the screen's width: the editor's zoomed track (width
+     = zoom x 100%, scrolled) ran the scrubber off the right edge on a phone. */
+  body.watch-mode #playback-bar { width: 100%; max-width: 100vw; box-sizing: border-box; overflow: hidden; }
+  body.watch-mode #slider-wrap { overflow-x: hidden !important; width: auto !important; max-width: 100%; }
+  body.watch-mode #timeline-track { width: 100% !important; min-width: 0 !important; left: 0 !important; transform: none !important; }
   body.watch-mode #slider-wrap { flex: 1; min-width: 0; position: relative; display: block; height: auto !important;
     background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
   body.watch-mode #timeline-track { position: relative; height: 28px !important; min-height: 0 !important; }
@@ -7961,7 +7966,7 @@ ${QUOTIENT_CSS}
     state.tlZoom = Math.max(1, Math.min(40, z));
     var track = document.getElementById('timeline-track');
     if (!track) return;
-    track.style.width = (state.tlZoom * 100) + '%';
+    track.style.width = WATCH ? '100%' : (state.tlZoom * 100) + '%';
     renderWaveStrip();
     renderMediaLane(); // chip leveling is pixel-based; recompute at the new zoom
     followPlayhead(true);
@@ -9833,6 +9838,8 @@ ${QUOTIENT_CSS}
   // Attach hover/click/right-click selection to the (same-origin) iframe document.
   function studioAttach(doc) {
     if (!doc || !doc.body) return;
+    // Watch mode edits nothing: no hover or selection boxes on the film.
+    if (WATCH) return;
     // Idempotent: document.write reuses the SAME document object across reloads,
     // so a one-shot guard flag would persist while the body (and our overlay
     // boxes) get wiped -- leaving the scene unselectable after a revise/regen.
