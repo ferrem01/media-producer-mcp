@@ -306,6 +306,39 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     delete process.env.HEYGEN_API_KEY;
   }, 60000);
 
+  it("heygen-v3: a look or the portrait, with motion prompt and expressiveness; looks listed and generated from a prompt", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    const gens: any[] = []; let assets = 0; let created: any = null;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://api.heygen.com/v3/assets") { assets++; expect(init.body).toBeInstanceOf(FormData); return json({ data: { asset_id: `as${assets}` } }); }
+      if (u === "https://api.heygen.com/v3/videos") { gens.push(JSON.parse(init.body)); return json({ data: { video_id: `v${gens.length}` } }); }
+      if (u.startsWith("https://api.heygen.com/v3/videos/v")) return json({ data: { status: "completed", video_url: "https://cdn/v3.mp4" } });
+      if (u.startsWith("https://api.heygen.com/v3/avatars/looks?ownership=private")) return json({ data: [{ id: "lk_green", name: "Marc in green shirt", avatar_type: "photo_avatar", group_id: "ag_1", supported_api_engines: ["avatar_iv"], status: "completed" }], has_more: false });
+      if (u === "https://api.heygen.com/v3/avatars") { created = JSON.parse(init.body); return json({ data: { avatar_item: { id: "lk_couch", name: "Couch", avatar_type: "photo_avatar", status: "processing" }, avatar_group: { id: "ag_1" } } }); }
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.HEYGEN_API_KEY = "hk";
+    const { startActorTest, getActorTest, listHeygenLooks, createHeygenLook } = await import("../src/core/actor-test.js");
+    expect((await listHeygenLooks()).map((l) => [l.id, l.type, l.group_id])).toEqual([["lk_green", "photo_avatar", "ag_1"]]);
+    expect(await createHeygenLook({ prompt: "on a couch in a grey sweater", avatar_id: "lk_green" })).toMatchObject({ id: "lk_couch", status: "processing", group_id: "ag_1" });
+    expect(created).toMatchObject({ type: "prompt", prompt: "on a couch in a grey sweater", avatar_id: "lk_green", aspect_ratio: "9:16" });
+    const wait = async (st: any) => { for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, st.id))!; } return st; };
+    // A look: no portrait, the audio uploaded, the look named.
+    let st = await wait(await startActorTest({ tenant: T, project: P, scene_index: 0, image: "", providers: ["heygen-v3"], voice: false, heygen_avatar_id: "lk_couch", prompt: "soft eyes", expressiveness: "low" }));
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(gens[0]).toMatchObject({ type: "avatar", avatar_id: "lk_couch", audio_asset_id: "as1", aspect_ratio: "9:16", motion_prompt: "soft eyes", expressiveness: "low" });
+    // The portrait: uploaded as an image asset.
+    st = await wait(await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png", providers: ["heygen-v3"], voice: false, engine: "avatar_iv" }));
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(gens[1]).toMatchObject({ type: "image", image: { type: "asset_id" }, engine: { type: "avatar_iv" } });
+    expect(gens[1].motion_prompt).toBeUndefined();
+    expect(st.files["heygen-v3"]).toBe("heygen-v3.mp4");
+    delete process.env.HEYGEN_API_KEY;
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;

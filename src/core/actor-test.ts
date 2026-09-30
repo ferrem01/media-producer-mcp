@@ -31,7 +31,7 @@ import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar";
+export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -52,7 +52,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -323,6 +323,96 @@ async function runHeygenAvatar(avatarId: string, audioFile: string, width: numbe
   }
 }
 
+/** HeyGen's v3 API. A LOOK is one outfit/setting of an avatar (a digital
+ *  twin, or a photo avatar like "Marc in green shirt"); its id is what a
+ *  video names. New looks are generated from a prompt on an existing one
+ *  ("on a couch in a grey sweater"). */
+const HEYGEN_V3 = "https://api.heygen.com/v3";
+function heygenHeaders(json = true): Record<string, string> {
+  return { "X-Api-Key": String(process.env.HEYGEN_API_KEY), ...(json ? { "Content-Type": "application/json" } : {}) };
+}
+
+export interface HeygenLook { id: string; name: string; type: string; group_id?: string; status?: string; engines?: string[]; preview?: string; orientation?: string }
+function toLook(l: any): HeygenLook {
+  return { id: l.id, name: l.name, type: l.avatar_type, group_id: l.group_id, status: l.status, engines: l.supported_api_engines, preview: l.preview_image_url, orientation: l.preferred_orientation };
+}
+
+/** The account's own looks (not HeyGen's stock presenters). */
+export async function listHeygenLooks(): Promise<HeygenLook[]> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const out: HeygenLook[] = [];
+  let token = "";
+  for (let page = 0; page < 20; page++) {
+    const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks?ownership=private&limit=50${token ? `&token=${encodeURIComponent(token)}` : ""}`, { headers: heygenHeaders(false) }), "heygen looks");
+    out.push(...(j?.data || []).map(toLook));
+    if (!j?.has_more || !j?.next_token) break;
+    token = j.next_token;
+  }
+  return out;
+}
+
+export async function getHeygenLook(id: string): Promise<HeygenLook> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks/${encodeURIComponent(id)}`, { headers: heygenHeaders(false) }), "heygen look");
+  return toLook(j?.data || {});
+}
+
+/** A new look from a prompt, based on an existing look (avatar_id) or
+ *  group. Returns at once with status "processing"; poll getHeygenLook. */
+export async function createHeygenLook(opts: { prompt: string; name?: string; avatar_id?: string; avatar_group_id?: string; aspect_ratio?: string }): Promise<HeygenLook> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const prompt = String(opts.prompt || "").trim().slice(0, 1000);
+  if (!prompt) throw new Error("prompt is required");
+  if (!opts.avatar_id && !opts.avatar_group_id) throw new Error("avatar_id or avatar_group_id is required");
+  const j = await okJson(await fetch(`${HEYGEN_V3}/avatars`, {
+    method: "POST", headers: heygenHeaders(),
+    body: JSON.stringify({
+      type: "prompt", name: String(opts.name || prompt).slice(0, 60), prompt,
+      ...(opts.avatar_id ? { avatar_id: opts.avatar_id } : { avatar_group_id: opts.avatar_group_id }),
+      aspect_ratio: opts.aspect_ratio || "9:16",
+    }),
+  }), "heygen create look");
+  const item = j?.data?.avatar_item;
+  if (!item?.id) throw new Error(`heygen create look: ${JSON.stringify(j).slice(0, 200)}`);
+  return { id: item.id, name: item.name, type: item.avatar_type, group_id: j.data.avatar_group?.id, status: item.status };
+}
+
+async function heygenAssetV3(file: string, type: string): Promise<string> {
+  const form = new FormData();
+  form.append("file", new Blob([await fs.readFile(file)], { type }), path.basename(file));
+  const j = await okJson(await fetch(`${HEYGEN_V3}/assets`, { method: "POST", headers: heygenHeaders(false), body: form }), "heygen asset");
+  if (!j?.data?.asset_id) throw new Error(`heygen asset: ${JSON.stringify(j).slice(0, 200)}`);
+  return j.data.asset_id;
+}
+
+/** A v3 video: a look (avatar_id) or a portrait, driven by an audio track,
+ *  with an optional motion prompt, expressiveness and engine. */
+async function runHeygenV3(opts: { lookId?: string; imgFile?: string; audioFile: string; aspect: string; motion?: string; expressiveness?: string; engine?: string }): Promise<string> {
+  const audio = await heygenAssetV3(opts.audioFile, "audio/mpeg");
+  const who = opts.lookId
+    ? { type: "avatar", avatar_id: opts.lookId }
+    : { type: "image", image: { type: "asset_id", asset_id: await heygenAssetV3(String(opts.imgFile), "image/jpeg") } };
+  const gen = await okJson(await fetch(`${HEYGEN_V3}/videos`, {
+    method: "POST", headers: heygenHeaders(),
+    body: JSON.stringify({
+      ...who, audio_asset_id: audio, aspect_ratio: opts.aspect, fit: "cover", title: "MegaMedia actor test",
+      ...(opts.motion ? { motion_prompt: opts.motion } : {}),
+      ...(opts.expressiveness ? { expressiveness: opts.expressiveness } : {}),
+      ...(opts.engine ? { engine: { type: opts.engine } } : {}),
+    }),
+  }), "heygen v3 generate");
+  const videoId = gen?.data?.video_id;
+  if (!videoId) throw new Error(`heygen v3 generate: ${JSON.stringify(gen).slice(0, 200)}`);
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > DEADLINE_MS) throw new Error("heygen v3: timed out");
+    await sleep(Math.max(POLL_MS, 20) * 2);
+    const d = (await okJson(await fetch(`${HEYGEN_V3}/videos/${encodeURIComponent(videoId)}`, { headers: heygenHeaders(false) }), "heygen v3 status"))?.data || {};
+    if (d.status === "completed" && d.video_url) return d.video_url;
+    if (d.status === "failed") throw new Error(`heygen v3: ${d.failure_message || d.failure_code || "failed"}`);
+  }
+}
+
 /** Runway Act-Two: POST /v1/character_performance, poll /v1/tasks/{id}. */
 async function runRunway(src: string, img: string, ratio: string): Promise<string> {
   const headers = {
@@ -417,8 +507,13 @@ export async function startActorTest(opts: {
   /** The frame rate the source is sent at (default 30). Wan caps FRAMES, so
    *  a lower rate covers more seconds per call. */
   fps?: number;
-  /** heygen-avatar: the saved HeyGen avatar to drive (a digital twin). */
+  /** heygen-avatar: the saved HeyGen avatar to drive (a digital twin).
+   *  heygen-v3: a look id (listHeygenLooks); without one it animates the portrait. */
   heygen_avatar_id?: string;
+  /** heygen-v3: "low" | "medium" | "high" (Avatar IV). */
+  expressiveness?: string;
+  /** heygen-v3: "avatar_iv" | "avatar_v" | "avatar_iii" (HeyGen's default when omitted). */
+  engine?: string;
 }): Promise<ActorTest> {
   const project = await loadProject(opts.tenant, opts.project);
   if (!project) throw new Error("Project not found");
@@ -432,7 +527,7 @@ export async function startActorTest(opts: {
     return abs;
   };
   // A text-only Seedance shot and a saved HeyGen avatar need no portrait.
-  const textOnly = !!opts.providers?.length && opts.providers.every((p) => p === "seedance-t2v" || p === "heygen-avatar");
+  const textOnly = !!opts.providers?.length && opts.providers.every((p) => p === "seedance-t2v" || p === "heygen-avatar" || (p === "heygen-v3" && !!opts.heygen_avatar_id));
   if (opts.providers?.includes("heygen-avatar") && !opts.heygen_avatar_id) throw new Error("heygen-avatar needs heygen_avatar_id");
   let img: { path: string; at?: number } | null = null;
   if (opts.image_from) img = { path: await fromFile(opts.image_from, "image_from"), at: Math.max(0, Number(opts.image_from.at) || 0) };
@@ -450,7 +545,7 @@ export async function startActorTest(opts: {
   const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar"].includes(p));
+    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3"].includes(p));
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -475,7 +570,7 @@ export async function startActorTest(opts: {
   await save(test);
   // The take is recorded at the film's frame, so the canvas says its shape.
   const frame: [number, number] = [Number((project as any).canvas?.width) || 1080, Number((project as any).canvas?.height) || 1920];
-  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id)
+  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine })
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
   return test;
 }
@@ -496,7 +591,7 @@ async function step<T>(test: ActorTest, name: string, fn: () => Promise<T>): Pro
   }
 }
 
-async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string): Promise<void> {
+async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string } = {}): Promise<void> {
   const dir = actorTestDir(test.tenant_id, test.project_id, test.id);
   const f = (name: string) => path.join(dir, name);
 
@@ -541,6 +636,17 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (!test.files.voice) await ffmpeg(["-i", f("source.mp4"), "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", f("take.mp3")]);
       const [vw, vh] = h > w * 1.1 ? [720, 1280] : w > h * 1.1 ? [1280, 720] : [960, 960];
       url = await runHeygenAvatar(String(heygenAvatarId), test.files.voice ? f("voice.mp3") : f("take.mp3"), vw, vh);
+    } else if (p === "heygen-v3") {
+      // A look (the twin, a photo avatar, a generated outfit) or the portrait.
+      if (!heygenAvatarId && !img) throw new Error("heygen-v3 needs heygen_avatar_id (a look) or a portrait");
+      await voiceJob;
+      if (!test.files.voice) await ffmpeg(["-i", f("source.mp4"), "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", f("take.mp3")]);
+      url = await runHeygenV3({
+        lookId: heygenAvatarId || undefined, imgFile: img ? f("actor.jpg") : undefined,
+        audioFile: test.files.voice ? f("voice.mp3") : f("take.mp3"),
+        aspect: h > w * 1.1 ? "9:16" : w > h * 1.1 ? "16:9" : "1:1",
+        motion: prompt, expressiveness: heygenOpts.expressiveness, engine: heygenOpts.engine,
+      });
     } else if (p === "heygen") {
       // A generated performance from the portrait and the voice the test settled on.
       if (!img) throw new Error("heygen needs a portrait (image or image_from)");
