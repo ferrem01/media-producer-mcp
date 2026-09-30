@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Recast: the speaker take performed by a cast actor (pilot)
+
+The actor tests settled the route: Wan "replace" on the real recording looked
+the most real (the room, the light and the performance are the recording's;
+only the person is redrawn). Marc: build it -- Feature 1, "recast your
+recording"; Feature 2 (a generated performance, no recording) comes later.
+- **The cast** (`core/cast.ts`): per-tenant actors -- a name, a portrait
+  (copied to `cast/<id>.jpg`, from a tenant image or a frame of an actor
+  test) and optionally an ElevenLabs voice. `GET/POST /api/cast/{tenant}`.
+- **A recast is a copy of the take**, like the matte's blur and alpha:
+  `take.actors[id].file`, and `project.speaker_cast` picks who performs.
+  `syncSpeakerClips` points every clip at the actor's file (and drops the
+  alpha, which is of the person who recorded). The raw take is untouched;
+  clearing the cast puts the recording back.
+- **The engine** (`core/recast.ts`): the take cut into chunks of at most 4 s
+  at its pauses (Wan returned 4.31 s for 4.75 s in -- 129 frames at 30 fps --
+  so chunk + 0.25 s overrun stays under it), redrawn 4 at a time, each
+  trimmed to its own length (a short return holds its last frame), stitched
+  to the take's exact length and resolution. The voice is converted once
+  for the whole take (delivery continuous), loudness-normalized, centered.
+  Every word stays where it was, so captions, stickers and anchors land.
+- `POST /api/recast/{tenant}/{project} {actor}` (null to undo), `GET` for
+  progress. The actor performs only when every take file made it.
+- Tests: `test/recast.test.ts` (the chunk plan, the clip switch, a full
+  recast with the providers faked: two chunks, one voice pass, exact length).
+- The actor test gains `source_range` (a span of the take file) and `fps`
+  (the rate the source is sent at), to measure how long one Wan call can
+  run: Wan appears to cap frames (129), so 16 fps may cover ~8 s a call.
+
 ## 2026-09-29 — Studio plays one-sided takes centered too
 
 Marc's marketing lead, in Studio on her laptop (proj_86591051): music and

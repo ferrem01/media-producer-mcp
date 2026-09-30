@@ -79,11 +79,11 @@ export async function getActorTest(tenant: string, project: string, id: string):
   }
 }
 
-async function ffmpeg(args: string[]): Promise<void> {
+export async function ffmpeg(args: string[]): Promise<void> {
   await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...args], { maxBuffer: 20 * 1024 * 1024 });
 }
 
-async function dataUri(file: string, mime: string): Promise<string> {
+export async function dataUri(file: string, mime: string): Promise<string> {
   return `data:${mime};base64,${(await fs.readFile(file)).toString("base64")}`;
 }
 
@@ -101,7 +101,7 @@ async function okJson(r: Response, what: string): Promise<any> {
   return j;
 }
 
-async function download(url: string, file: string): Promise<void> {
+export async function download(url: string, file: string): Promise<void> {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`download: HTTP ${r.status}`);
   await fs.writeFile(file, Buffer.from(await r.arrayBuffer()));
@@ -114,7 +114,7 @@ const POLL_MS = Number(process.env.MP_ACTOR_POLL_MS) || 5000;
 /** Wan 2.2 Animate through fal's queue: submit, poll, fetch. "replace"
  *  swaps the person inside the recorded room; "move" animates the portrait
  *  in the portrait's own setting with the take's motion. */
-async function runWan(src: string, img: string, mode: "replace" | "move"): Promise<string> {
+export async function runWan(src: string, img: string, mode: "replace" | "move"): Promise<string> {
   const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
   const sub = await okJson(await fetch(`https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/${mode}`, {
     method: "POST", headers,
@@ -236,14 +236,14 @@ async function runRunway(src: string, img: string, ratio: string): Promise<strin
   }
 }
 
-async function listVoices(): Promise<any[]> {
+export async function listVoices(): Promise<any[]> {
   const headers = { "xi-api-key": String(process.env.ELEVENLABS_API_KEY) };
   const j = await okJson(await fetch("https://api.elevenlabs.io/v1/voices", { headers }), "elevenlabs voices");
   return j?.voices || [];
 }
 
 /** A voice by id or by name ("Brian" matches "Brian - Deep, Resonant..."). */
-function findVoice(voices: any[], want: string): { id: string; name: string } | null {
+export function findVoice(voices: any[], want: string): { id: string; name: string } | null {
   const w = want.toLowerCase();
   const hit = voices.find((v) => v.voice_id === want) || voices.find((v) => String(v.name).toLowerCase() === w)
     || voices.find((v) => String(v.name).toLowerCase().startsWith(w));
@@ -262,7 +262,7 @@ async function pickVoice(voiceId?: string): Promise<{ id: string; name: string }
 }
 
 /** ElevenLabs speech-to-speech: the delivery stays, the voice changes. */
-async function convertVoice(wav: string, out: string, voiceId: string): Promise<void> {
+export async function convertVoice(wav: string, out: string, voiceId: string): Promise<void> {
   const form = new FormData();
   form.append("audio", new Blob([await fs.readFile(wav)], { type: "audio/wav" }), "take.wav");
   form.append("model_id", "eleven_multilingual_sts_v2");
@@ -290,6 +290,13 @@ export async function startActorTest(opts: {
   /** The performance from an earlier test's file instead of the take -- e.g.
    *  a Seedance shot given one fixed face by Wan "replace". */
   video_from?: { test: string; file: string };
+  /** A span of the scene clip's take file instead of the scene's own trim
+   *  (seconds on that file) -- e.g. a 10 s run to measure how much Wan
+   *  returns in one call. */
+  source_range?: { start: number; end: number };
+  /** The frame rate the source is sent at (default 30). Wan caps FRAMES, so
+   *  a lower rate covers more seconds per call. */
+  fps?: number;
 }): Promise<ActorTest> {
   const project = await loadProject(opts.tenant, opts.project);
   if (!project) throw new Error("Project not found");
@@ -313,7 +320,10 @@ export async function startActorTest(opts: {
   }
   const src = opts.video_from
     ? { path: await fromFile(opts.video_from, "video_from"), start: 0, end: null as number | null }
-    : { path: resolveVideoPath(clip.source, config.dataDir), start: Number(clip.trim_start) || 0, end: clip.trim_end == null ? null : Number(clip.trim_end) };
+    : opts.source_range && Number(opts.source_range.end) > Number(opts.source_range.start)
+      ? { path: resolveVideoPath(clip.source, config.dataDir), start: Math.max(0, Number(opts.source_range.start)), end: Number(opts.source_range.end) }
+      : { path: resolveVideoPath(clip.source, config.dataDir), start: Number(clip.trim_start) || 0, end: clip.trim_end == null ? null : Number(clip.trim_end) };
+  const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
     .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v"].includes(p));
@@ -341,7 +351,7 @@ export async function startActorTest(opts: {
   await save(test);
   // The take is recorded at the film's frame, so the canvas says its shape.
   const frame: [number, number] = [Number((project as any).canvas?.width) || 1080, Number((project as any).canvas?.height) || 1920];
-  void run(test, src, img, frame, opts.voice_id, opts.prompt, line)
+  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps)
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
   return test;
 }
@@ -362,14 +372,14 @@ async function step<T>(test: ActorTest, name: string, fn: () => Promise<T>): Pro
   }
 }
 
-async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = ""): Promise<void> {
+async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30): Promise<void> {
   const dir = actorTestDir(test.tenant_id, test.project_id, test.id);
   const f = (name: string) => path.join(dir, name);
 
   // What every provider sees: the scene's slice of the take at 720 wide,
   // and the portrait as a modest JPEG (both well under the data-URI caps).
   await ffmpeg(["-ss", String(src.start), ...(src.end != null ? ["-to", String(src.end)] : []), "-i", src.path,
-    "-vf", "scale=720:-2", "-r", "30", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
+    "-vf", "scale=720:-2", "-r", String(fps), "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
     "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", f("source.mp4")]);
   test.files.source = "source.mp4";
   if (img) {
@@ -461,7 +471,7 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
   await save(test);
 }
 
-async function durationOf(file: string): Promise<number | null> {
+export async function durationOf(file: string): Promise<number | null> {
   try { await execFileAsync("ffmpeg", ["-hide_banner", "-i", file]); return null; }
   catch (e: any) {
     const m = String(e?.stderr || "").match(/Duration: (\d+):(\d+):([\d.]+)/);

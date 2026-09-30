@@ -76,6 +76,8 @@ import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transc
 import { resolveVideoPath } from "./core/video-path.js";
 import { startActorTest, startVoiceLineup, getActorTest, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
+import { listCast, addActor } from "./core/cast.js";
+import { startRecast, getRecastStatus } from "./core/recast.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -1288,7 +1290,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|cast|recast|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2703,6 +2705,50 @@ Rules:
         return;
       }
 
+      // ── API: The cast (core/cast.ts) ──
+      // GET  /api/cast/{tenant}                 the tenant's actors
+      // POST /api/cast/{tenant} {name, image | from:{project,test,file,at}, voice_id?, voice_name?}
+      const castApi = urlPath.match(/^\/api\/cast\/([^/]+)$/);
+      if (castApi) {
+        const caTenant = decodeURIComponent(castApi[1]);
+        try {
+          if (method === "GET") { jsonResponse(res, 200, { cast: await listCast(caTenant) }); return; }
+          if (method === "POST") {
+            const body = await parseBody(req).catch(() => ({} as any));
+            jsonResponse(res, 200, await addActor(caTenant, { name: body.name, image: body.image, from: body.from, voice_id: body.voice_id, voice_name: body.voice_name }));
+            return;
+          }
+          jsonResponse(res, 405, { error: "Method not allowed" });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
+      // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
+      // POST /api/recast/{tenant}/{project} {actor: id | null}   null puts the recording's person back
+      // GET  /api/recast/{tenant}/{project}                       progress and who plays
+      const recastApi = urlPath.match(/^\/api\/recast\/([^/]+)\/([^/]+)$/);
+      if (recastApi) {
+        const [, rcTenant, rcProject] = recastApi.map(decodeURIComponent);
+        try {
+          if (method === "POST") {
+            const body = await parseBody(req).catch(() => ({} as any));
+            jsonResponse(res, 202, await startRecast(rcTenant, rcProject, body.actor ? String(body.actor) : null));
+            return;
+          }
+          if (method === "GET") {
+            const proj = await loadProject(rcTenant, rcProject);
+            jsonResponse(res, 200, { speaker_cast: (proj as any)?.speaker_cast || null, recast: await getRecastStatus(rcTenant, rcProject) });
+            return;
+          }
+          jsonResponse(res, 405, { error: "Method not allowed" });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Actor test (core/actor-test.ts, an experiment) ──
       // POST /api/actor-test/{tenant}/{project} {scene_index, image, providers?, voice?, voice_id?}
       //      or {mode:"voices", from: <test id>, voices: [names or ids], picture?}
@@ -2728,6 +2774,8 @@ Rules:
               prompt: typeof body.prompt === "string" ? body.prompt : undefined,
               image_from: body.image_from && typeof body.image_from === "object" ? body.image_from : undefined,
               video_from: body.video_from && typeof body.video_from === "object" ? body.video_from : undefined,
+              source_range: body.source_range && typeof body.source_range === "object" ? body.source_range : undefined,
+              fps: body.fps != null ? Number(body.fps) : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;
