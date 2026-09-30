@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Generated take: the script performed with no recording
+
+Marc made a HeyGen video from a script in the HeyGen app ("not bad") and
+wants it as an option beside record-then-recast: "My point is I want the
+option." `POST /api/generated-take/{tenant}/{project} {actor, voice?:
+"heygen"|"elevenlabs", voice_id?}` (core/generated-take.ts):
+- The voice first, one spoken part at a time (a scene's lines, split at
+  "(pause)" lines, emphasis marks dropped): HeyGen's `/v3/voices/speech`
+  (the look's own `default_voice_id` -- his clone on his looks -- unless one
+  is named) or ElevenLabs text-to-speech (the named voice, else the
+  actor's). Parts joined with 0.6 s between scenes and 1 s for a pause.
+- That read goes to HeyGen in ONE v3 call with the cast actor's look (Avatar
+  V when offered, 1080p, the canvas's shape); our read is laid under the
+  picture; the file lands in the project's assets as `take-generated-*.mp4`.
+- Then it is attached exactly like a booth recording of every scene
+  (`attachTakeToScene`, scene_index "all", capture "generated", no grade):
+  transcribed, split into scene windows, scenes re-timed. A recast cast on
+  the old take steps aside (the take IS the actor).
+- Needs a person-carried film (speaker / creator-cut) and a HeyGen cast
+  actor. A restart keeps the voiced lines and the submitted video.
+- `GET /api/heygen-avatars/{tenant}?voices=1` lists the account's own voices.
+
 ## 2026-09-30 — Recast: Avatar V for every look that offers it
 
 HeyGen's docs say Avatar V is for digital twins only, but every look on
