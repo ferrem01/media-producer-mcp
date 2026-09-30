@@ -20,6 +20,12 @@ and the actor test read `clip.source`. It now reads the take's RAW file
 - The first 1080p 30 s run used up the credits Marc had added; a `genjutsu`
   actor test now defaults to 720p (`resolution` to override); the Cast
   performer still renders films at 1080p.
+- CI caught a race: a finished job was dropped from memory BEFORE its final
+  status reached disk, and the write truncated then filled the file -- a
+  poll in between read nothing (Studio would briefly lose the job). Recast
+  and generated-take status writes are now atomic (temp file + rename),
+  serialized per film (a progress write fired without waiting can never land
+  after the final one), and the job leaves memory only after the final write.
 
 ## 2026-09-30 — Higgsfield Genjutsu: a Cast vendor (and why Seedance refused)
 
