@@ -60,14 +60,16 @@ ${QUOTIENT_CSS}
   body.watch-mode #playback-bar { height: auto !important; min-height: 0 !important; display: flex; align-items: center; gap: 12px;
     padding: 8px 14px calc(10px + env(safe-area-inset-bottom)); background: #000; border: 0; }
   body.watch-mode #transport-left { display: flex; align-items: center; gap: 10px; width: auto !important; }
-  body.watch-mode #slider-wrap { flex: 1; min-width: 0; position: relative; display: block; height: auto !important; }
+  body.watch-mode #slider-wrap { flex: 1; min-width: 0; position: relative; display: block; height: auto !important;
+    background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
   body.watch-mode #timeline-track { position: relative; height: 28px !important; min-height: 0 !important; }
-  body.watch-mode #timeline-track { background: transparent !important; border: 0 !important; box-shadow: none !important; }
-  body.watch-mode #timeline-slider { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); width: 100%; margin: 0; opacity: 1; height: 22px; }
-  body.watch-mode #timeline-slider::-webkit-slider-runnable-track { height: 4px; background: rgba(255,255,255,.35); border-radius: 2px; }
-  body.watch-mode #timeline-slider::-moz-range-track { height: 4px; background: rgba(255,255,255,.35); border-radius: 2px; }
-  body.watch-mode #timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #fff; border: 0; }
-  body.watch-mode #timeline-slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  body.watch-mode #timeline-track { background: transparent !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
+  body.watch-mode #timeline-slider { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); width: 100%; margin: 0; opacity: 1;
+    height: 4px; border-radius: 2px; background: linear-gradient(to right, #fff var(--p, 0%), rgba(255,255,255,.3) var(--p, 0%)); }
+  body.watch-mode #timeline-slider::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+  body.watch-mode #timeline-slider::-moz-range-track { height: 4px; background: transparent; }
+  body.watch-mode #timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #fff; border: 0; opacity: 1; }
+  body.watch-mode #timeline-slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; opacity: 1; }
   body.watch-mode .time-display, body.watch-mode #time-cur, body.watch-mode #time-total { color: #fff; }
 
   /* Header */
@@ -1582,6 +1584,11 @@ ${QUOTIENT_CSS}
       var tap = document.createElement('div'); tap.id = 'watch-tap';
       tap.addEventListener('click', function() { var b = document.getElementById('play-btn'); if (b && !b.disabled) b.click(); });
       if (pc) pc.appendChild(tap);
+      // The bar's white fill follows the playhead (the slider's own value).
+      setInterval(function() {
+        var sl = document.getElementById('timeline-slider');
+        if (sl) sl.style.setProperty('--p', ((Number(sl.value) || 0) / (Number(sl.max) || 1) * 100).toFixed(2) + '%');
+      }, 200);
       // Back goes to the phone Studio of the same film (the link without ?desktop).
       var lib = document.getElementById('library-btn');
       if (lib) {
