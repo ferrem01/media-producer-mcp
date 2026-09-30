@@ -114,17 +114,29 @@ const POLL_MS = Number(process.env.MP_ACTOR_POLL_MS) || 5000;
 /** Wan 2.2 Animate through fal's queue: submit, poll, fetch. "replace"
  *  swaps the person inside the recorded room; "move" animates the portrait
  *  in the portrait's own setting with the take's motion. */
-export async function runWan(src: string, img: string, mode: "replace" | "move"): Promise<string> {
+export async function runWan(src: string, img: string, mode: "replace" | "move", opts: {
+  /** A request already submitted (its fal urls): poll it instead of paying again. */
+  resume?: { status_url: string; response_url: string };
+  /** Called with the request's urls as soon as fal queues it, so a restart can resume. */
+  onSubmit?: (req: { status_url: string; response_url: string }) => void | Promise<void>;
+  deadlineMs?: number;
+} = {}): Promise<string> {
   const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
-  const sub = await okJson(await fetch(`https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/${mode}`, {
-    method: "POST", headers,
-    body: JSON.stringify({ video_url: src, image_url: img, resolution: "720p", video_quality: "high" }),
-  }), "fal submit");
-  const statusUrl: string = sub.status_url, responseUrl: string = sub.response_url;
-  if (!statusUrl || !responseUrl) throw new Error("fal submit: no status_url in the reply");
+  let statusUrl: string, responseUrl: string;
+  if (opts.resume?.status_url && opts.resume?.response_url) {
+    statusUrl = opts.resume.status_url; responseUrl = opts.resume.response_url;
+  } else {
+    const sub = await okJson(await fetch(`https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/${mode}`, {
+      method: "POST", headers,
+      body: JSON.stringify({ video_url: src, image_url: img, resolution: "720p", video_quality: "high" }),
+    }), "fal submit");
+    statusUrl = sub.status_url; responseUrl = sub.response_url;
+    if (!statusUrl || !responseUrl) throw new Error("fal submit: no status_url in the reply");
+    await opts.onSubmit?.({ status_url: statusUrl, response_url: responseUrl });
+  }
   const t0 = Date.now();
   for (;;) {
-    if (Date.now() - t0 > DEADLINE_MS) throw new Error("fal: timed out");
+    if (Date.now() - t0 > (opts.deadlineMs || DEADLINE_MS)) throw new Error("fal: timed out");
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), "fal status");
     if (st.status === "COMPLETED") break;

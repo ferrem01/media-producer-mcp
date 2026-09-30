@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Recast resumes; every chunk at once
+
+The first pilot run (Old Chimp, 9 chunks, 4 at a time) sat at "8 of 9" for
+40 minutes -- the last chunk stalled at fal -- and Marc restarted the server
+(to load a new key), which killed the job. The status read "running" forever
+and a second run would have paid for all 9 chunks again.
+- **Resume:** the chunk plan is kept beside the chunks (`plan.json`); a run
+  on the same take keeps every finished chunk, and a chunk whose fal request
+  was already submitted (its urls saved as `wan-<i>.json` the moment fal
+  queues it) is collected, not paid for again. `runWan` takes `resume` and
+  `onSubmit`.
+- **Every chunk at once** (up to 12): one round of Wan, not three.
+- **A stalled chunk gives up at 18 min** and is submitted fresh, once.
+- **"interrupted":** a status left "running" by a dead server says so;
+  starting the recast again resumes it.
+- Tests: `test/recast.test.ts` (a resumed run makes no new Wan request and
+  collects the queued one; a dead run reads as interrupted).
+
 ## 2026-09-30 — Recast: the speaker take performed by a cast actor (pilot)
 
 The actor tests settled the route: Wan "replace" on the real recording looked
