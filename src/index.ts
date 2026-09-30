@@ -74,7 +74,8 @@ import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
 import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
-import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, type ActorTest } from "./core/actor-test.js";
+import { startGeneratedTake, getGeneratedTakeStatus } from "./core/generated-take.js";
+import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor } from "./core/cast.js";
 import { startRecast, getRecastStatus, previewRecast } from "./core/recast.js";
@@ -1290,7 +1291,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|generated-take|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2762,9 +2763,40 @@ Rules:
         return;
       }
 
+      // ── API: Generated take (core/generated-take.ts) ──
+      // POST /api/generated-take/{tenant}/{project} {actor, voice?: "heygen"|"elevenlabs", voice_id?}
+      //      the storyboard read by a HeyGen cast actor in a generated voice, attached as the film's take
+      // GET  /api/generated-take/{tenant}/{project}   progress
+      const genTake = urlPath.match(/^\/api\/generated-take\/([^/]+)\/([^/]+)$/);
+      if (genTake) {
+        const [, gtTenant, gtProject] = genTake.map(decodeURIComponent);
+        try {
+          if (method === "GET") { jsonResponse(res, 200, { generated_take: await getGeneratedTakeStatus(gtTenant, gtProject) }); return; }
+          if (method !== "POST") { jsonResponse(res, 405, { error: "Method not allowed" }); return; }
+          const body = await parseBody(req).catch(() => ({} as any));
+          const st = await startGeneratedTake(gtTenant, gtProject, {
+            actor: String(body.actor || ""),
+            voice: body.voice === "elevenlabs" ? "elevenlabs" : "heygen",
+            voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
+          }, async (url) => {
+            // Attached like a booth recording of every scene; the take IS the
+            // actor, so a recast cast on the old take steps aside.
+            const out = await attachTakeToScene(gtTenant, gtProject, { url, scene_index: "all", capture: "generated", look: "natural", correct: false });
+            if (out.status === 200) {
+              const p = await loadProject(gtTenant, gtProject);
+              if (p && (p as any).speaker_cast) { delete (p as any).speaker_cast; syncSpeakerClips(p as any); await saveProject(p); }
+            }
+            return out;
+          });
+          jsonResponse(res, 202, st);
+        } catch (e: any) { jsonResponse(res, 400, { error: e?.message || String(e) }); }
+        return;
+      }
+
       // GET  /api/heygen-avatars/{tenant}            the HeyGen account's avatars (id, name, kind), for heygen-avatar tests
       // GET  /api/heygen-avatars/{tenant}?looks=1    the account's own looks (v3 ids), for heygen-v3 tests and the cast
       // GET  /api/heygen-avatars/{tenant}?quota=1    the API credit balance (apart from the web app's)
+      // GET  /api/heygen-avatars/{tenant}?voices=1   the account's own voices (clones), for a generated take
       // POST /api/heygen-avatars/{tenant}            {prompt, avatar_id | avatar_group_id, name?, aspect_ratio?} -> a new look
       // GET  /api/heygen-avatars/{tenant}/{look_id}  one look (poll a new one until "completed")
       const hgAvatars = urlPath.match(/^\/api\/heygen-avatars\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
@@ -2774,7 +2806,7 @@ Rules:
           if (method === "GET" && lookId) jsonResponse(res, 200, await getHeygenLook(lookId));
           else if (method === "GET") {
             const q = new URL(url, "http://localhost").searchParams;
-            jsonResponse(res, 200, q.get("quota") ? { quota: await heygenQuota() } : q.get("looks") ? { looks: await listHeygenLooks() } : { avatars: await listHeygenAvatars() });
+            jsonResponse(res, 200, q.get("quota") ? { quota: await heygenQuota() } : q.get("voices") ? { voices: await listHeygenVoices() } : q.get("looks") ? { looks: await listHeygenLooks() } : { avatars: await listHeygenAvatars() });
           }
           else if (method === "POST" && !lookId) {
             const body = await parseBody(req).catch(() => ({} as any));

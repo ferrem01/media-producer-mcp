@@ -332,9 +332,9 @@ function heygenHeaders(json = true): Record<string, string> {
   return { "X-Api-Key": String(process.env.HEYGEN_API_KEY), ...(json ? { "Content-Type": "application/json" } : {}) };
 }
 
-export interface HeygenLook { id: string; name: string; type: string; group_id?: string; status?: string; engines?: string[]; preview?: string; orientation?: string }
+export interface HeygenLook { id: string; name: string; type: string; group_id?: string; status?: string; engines?: string[]; preview?: string; orientation?: string; default_voice_id?: string }
 function toLook(l: any): HeygenLook {
-  return { id: l.id, name: l.name, type: l.avatar_type, group_id: l.group_id, status: l.status, engines: l.supported_api_engines, preview: l.preview_image_url, orientation: l.preferred_orientation };
+  return { id: l.id, name: l.name, type: l.avatar_type, group_id: l.group_id, status: l.status, engines: l.supported_api_engines, preview: l.preview_image_url, orientation: l.preferred_orientation, default_voice_id: l.default_voice_id || undefined };
 }
 
 /** The account's own looks (not HeyGen's stock presenters). */
@@ -345,6 +345,20 @@ export async function listHeygenLooks(): Promise<HeygenLook[]> {
   for (let page = 0; page < 20; page++) {
     const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks?ownership=private&limit=50${token ? `&token=${encodeURIComponent(token)}` : ""}`, { headers: heygenHeaders(false) }), "heygen looks");
     out.push(...(j?.data || []).map(toLook));
+    if (!j?.has_more || !j?.next_token) break;
+    token = j.next_token;
+  }
+  return out;
+}
+
+/** The account's own HeyGen voices (voice clones), for a generated take. */
+export async function listHeygenVoices(): Promise<Array<{ id: string; name: string; language?: string; gender?: string; preview?: string }>> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const out: Array<{ id: string; name: string; language?: string; gender?: string; preview?: string }> = [];
+  let token = "";
+  for (let page = 0; page < 10; page++) {
+    const j = await okJson(await fetch(`${HEYGEN_V3}/voices?type=private&limit=100${token ? `&token=${encodeURIComponent(token)}` : ""}`, { headers: heygenHeaders(false) }), "heygen voices");
+    out.push(...(j?.data || []).map((v: any) => ({ id: v.voice_id, name: v.name, language: v.language, gender: v.gender, preview: v.preview_audio_url || undefined })));
     if (!j?.has_more || !j?.next_token) break;
     token = j.next_token;
   }
