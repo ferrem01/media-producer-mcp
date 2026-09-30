@@ -242,7 +242,8 @@ describe("performers: the vendor is a choice", () => {
     const { performerList, defaultPerformer } = await import("../src/core/performers/index.js");
     process.env.FAL_KEY = "fk"; delete process.env.HEYGEN_API_KEY;
     const list = performerList();
-    expect(list.map((p) => p.id)).toEqual(["heygen", "kling", "runway"]);   // Wan never held: gone
+    expect(list.map((p) => p.id)).toEqual(["heygen", "kling", "higgsfield", "runway"]);   // Wan never held: gone
+    expect(list.find((p) => p.id === "higgsfield")).toMatchObject({ drivenBy: "video", generate: false, maxSeconds: 30 });   // recordings only
     expect(list.find((p) => p.id === "heygen")).toMatchObject({ drivenBy: "audio", generate: true, available: false });
     // Kling and Runway copy a recording's motion AND can animate a portrait from a voice.
     expect(list.find((p) => p.id === "kling")).toMatchObject({ drivenBy: "video", generate: true, available: true, maxSeconds: 29 });
@@ -295,4 +296,39 @@ describe("performers: the vendor is a choice", () => {
     expect(await info(out)).toMatch(/, 30 fps,/);
     delete process.env.FAL_KEY;
   }, 180000);
+
+  it("Higgsfield Genjutsu: the stretch and the portrait by public URL, the job's status URL kept for a restart", async () => {
+    const d = path.join(DATA, "hf"); await fs.mkdir(d, { recursive: true });
+    const take = path.join(d, "take.mp4");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=180x320:rate=30:duration=8",
+      "-f", "lavfi", "-i", "sine=frequency=300:duration=8", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", take]);
+    const portrait = path.join(d, "p.png");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=gray:s=256x384", "-frames:v", "1", portrait]);
+    const back = path.join(d, "back.mp4");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=navy:s=360x640:r=24:d=8", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", back]);
+    const mp4 = await fs.readFile(back);
+    const subs: any[] = []; let auth = "";
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://api.higgsfield.ai/higgsfield/genjutsu/motion-transfer/v1.0") { auth = init.headers.Authorization; subs.push(JSON.parse(init.body)); return json({ status: "queued", request_id: "r1", status_url: "https://api.higgsfield.ai/requests/r1/status" }); }
+      if (u === "https://api.higgsfield.ai/requests/r1/status") return json({ status: "completed", request_id: "r1", video: { url: "https://cdn/hf.mp4" } });
+      if (u === "https://cdn/hf.mp4") return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.HF_API_KEY_ID = "kid"; process.env.HF_API_KEY_SECRET = "ksec";
+    const { performTakeFile } = await import("../src/core/recast.js");
+    const { getPerformer } = await import("../src/core/performers/index.js");
+    const ctx = { tenant: T, actor: { id: "a", name: "a", portrait: "", created_at: "" }, portraitAbs: portrait, workDir: path.join(d, "work"), width: 180, height: 320,
+      publicUrl: async (f: string) => `https://pub.example/${path.basename(f)}` };
+    // No public address: said plainly, nothing sent.
+    await expect(performTakeFile({ rawAbs: take, outAbs: path.join(d, "x.mp4"), performer: getPerformer("higgsfield")!, ctx: { ...ctx, publicUrl: async () => null, workDir: path.join(d, "w0") } })).rejects.toThrow(/public https address/);
+    await performTakeFile({ rawAbs: take, outAbs: path.join(d, "out.mp4"), performer: getPerformer("higgsfield")!, ctx });
+    expect(auth).toBe("Key kid:ksec");
+    expect(subs).toHaveLength(1);
+    expect(subs[0]).toMatchObject({ video_url: "https://pub.example/src-0.mp4", image_urls: ["https://pub.example/portrait.jpg"], resolution: "1080p" });
+    expect(JSON.parse(await fs.readFile(path.join(d, "work", "higgsfield-c0.json"), "utf8"))).toEqual({ status_url: "https://api.higgsfield.ai/requests/r1/status" });
+    expect(Math.abs((await dur(path.join(d, "out.mp4"))) - 8)).toBeLessThan(0.1);
+    delete process.env.HF_API_KEY_ID; delete process.env.HF_API_KEY_SECRET;
+  }, 120000);
 });

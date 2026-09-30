@@ -11401,7 +11401,7 @@ ${QUOTIENT_CSS}
     var ok = function(p) { return p && p.available && (castUi.mode !== 'generate' || p.generate); };
     if (ok(castPerfById(castUi.performer))) return;
     var a = castActorById(castUi.actor);
-    var order = (a && a.heygen_look_id) || castUi.mode === 'generate' ? ['heygen', 'kling', 'runway'] : ['kling', 'heygen', 'runway'];
+    var order = (a && a.heygen_look_id) || castUi.mode === 'generate' ? ['heygen', 'kling', 'runway', 'higgsfield'] : ['kling', 'higgsfield', 'heygen', 'runway'];
     castUi.performer = null;
     for (var i = 0; i < order.length; i++) if (ok(castPerfById(order[i]))) { castUi.performer = order[i]; break; }
   }

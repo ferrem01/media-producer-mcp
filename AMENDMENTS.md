@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Higgsfield Genjutsu: a Cast vendor (and why Seedance refused)
+
+The Seedance 2.5 recast trial (`seedance25`, take as @Video1, the generated
+actor as @Image1) ran 240 s on fal and came back HTTP 422: "The images or
+videos provided may contain likenesses of real people or other private
+information that cannot be processed" -- the same filter as 2.0. ByteDance's
+public API refuses any photoreal face, generated or not. Higgsfield's reels
+do exactly this through Higgsfield's own API, which exposes **Genjutsu
+Motion Transfer** (`POST api.higgsfield.ai/higgsfield/genjutsu/motion-
+transfer/v1.0`: `video_url`, 1-8 `image_urls`, `prompt`, `resolution`;
+public URLs only; 4-30 s, longer trimmed; `Authorization: Key ID:SECRET`;
+async via `status_url`).
+- `performers/higgsfield.ts`: video-driven (recast only), 30 s a call, the
+  stretch and portrait by the server's public URL (`output/_cast/`), 1080p,
+  the status URL kept per stretch so a restart collects the job. Keys:
+  `HF_API_KEY_ID` + `HF_API_KEY_SECRET` (pm2 env, not in git). Default order
+  for a portrait actor: Kling, then Higgsfield.
+- Actor test: `providers:["genjutsu"]` for a side-by-side on Old Chimp.
+- Studio pickers and the MCP `cast` tool list it.
+
 ## 2026-09-30 — Actor test: Seedance 2.5 as a recast (the Higgsfield Genjutsu idea)
 
 Marc, on Higgsfield's Genjutsu reels ("literally doing what we want to do"):
