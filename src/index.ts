@@ -74,7 +74,7 @@ import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
 import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
-import { startActorTest, startVoiceLineup, getActorTest, type ActorTest } from "./core/actor-test.js";
+import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor } from "./core/cast.js";
 import { startRecast, getRecastStatus, previewRecast } from "./core/recast.js";
@@ -1290,7 +1290,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|cast|recast|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2762,6 +2762,14 @@ Rules:
         return;
       }
 
+      // GET /api/heygen-avatars/{tenant}   the HeyGen account's avatars (id, name, kind), for heygen-avatar tests
+      const hgAvatars = urlPath.match(/^\/api\/heygen-avatars\/([^/]+)$/);
+      if (hgAvatars && method === "GET") {
+        try { jsonResponse(res, 200, { avatars: await listHeygenAvatars() }); }
+        catch (e: any) { jsonResponse(res, 400, { error: e?.message || String(e) }); }
+        return;
+      }
+
       // ── API: Actor test (core/actor-test.ts, an experiment) ──
       // POST /api/actor-test/{tenant}/{project} {scene_index, image, providers?, voice?, voice_id?}
       //      or {mode:"voices", from: <test id>, voices: [names or ids], picture?}
@@ -2789,6 +2797,7 @@ Rules:
               video_from: body.video_from && typeof body.video_from === "object" ? body.video_from : undefined,
               source_range: body.source_range && typeof body.source_range === "object" ? body.source_range : undefined,
               fps: body.fps != null ? Number(body.fps) : undefined,
+              heygen_avatar_id: typeof body.heygen_avatar_id === "string" ? body.heygen_avatar_id : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;
