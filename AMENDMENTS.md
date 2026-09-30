@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Recast with a HeyGen look (the actor tests' winner)
+
+Marc on the v3 runs: the beige-sofa photo look and the desk twin on Avatar
+V were "the best I have seen to date. The best eyes and the best mouth ...
+My voice is perfectly lip synced." A stock presenter on his voice (#5) was
+"pretty good too" -- the ad does not have to be him. "Yes build."
+- A cast actor can be a HeyGen look: `POST /api/cast/{tenant}
+  {heygen_look_id, name?, voice_id?}` -- the name defaults to the look's,
+  the portrait is its preview (downloaded only from HeyGen's hosts).
+- `startRecast` with such an actor skips Wan entirely (`heygenRecastFile`):
+  the take's audio (or the actor's converted voice) goes to HeyGen in ONE
+  v3 call at 1080p in the take's shape; a digital twin gets Avatar V, a
+  photo look or stock presenter HeyGen's default. The video is covered to
+  the take's frame, 30 fps, held to exactly the take's length, the audio
+  laid under it -- then the same take.actors / speaker_cast plumbing as the
+  Wan path. The submitted video id is kept in the work dir, so a restart
+  collects it instead of paying twice. The look's own motion replaces the
+  recording's gestures (HeyGen takes no driving video).
+- `GET /api/heygen-avatars/{tenant}?quota=1`: the API credit balance.
+  HeyGen keeps API credits apart from the web app's; the couch run failed
+  "Insufficient credit ... 'api' credits" while the app showed plenty.
+
 ## 2026-09-30 — Actor test: HeyGen v3 (looks, motion prompt, expressiveness)
 
 Marc's twin and an Avatar IV still of him, both on his own voice, came back

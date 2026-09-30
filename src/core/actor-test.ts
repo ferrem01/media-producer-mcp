@@ -387,8 +387,27 @@ async function heygenAssetV3(file: string, type: string): Promise<string> {
 
 /** A v3 video: a look (avatar_id) or a portrait, driven by an audio track,
  *  with an optional motion prompt, expressiveness and engine. */
-async function runHeygenV3(opts: { lookId?: string; imgFile?: string; audioFile: string; aspect: string; motion?: string; expressiveness?: string; engine?: string }): Promise<string> {
-  const audio = await heygenAssetV3(opts.audioFile, "audio/mpeg");
+export async function runHeygenV3(opts: {
+  lookId?: string; imgFile?: string; audioFile: string; aspect: string; motion?: string; expressiveness?: string; engine?: string;
+  resolution?: string;
+  /** A video HeyGen already has (submitted before a restart): collect it. */
+  resume?: string;
+  onSubmit?: (videoId: string) => Promise<void> | void;
+}): Promise<string> {
+  const videoId = opts.resume || await submitHeygenV3(opts);
+  if (!opts.resume) await opts.onSubmit?.(videoId);
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > DEADLINE_MS) throw new Error("heygen v3: timed out");
+    await sleep(Math.max(POLL_MS, 20) * 2);
+    const d = (await okJson(await fetch(`${HEYGEN_V3}/videos/${encodeURIComponent(videoId)}`, { headers: heygenHeaders(false) }), "heygen v3 status"))?.data || {};
+    if (d.status === "completed" && d.video_url) return d.video_url;
+    if (d.status === "failed") throw new Error(`heygen v3: ${d.failure_message || d.failure_code || "failed"}`);
+  }
+}
+
+async function submitHeygenV3(opts: { lookId?: string; imgFile?: string; audioFile: string; aspect: string; motion?: string; expressiveness?: string; engine?: string; resolution?: string }): Promise<string> {
+  const audio = await heygenAssetV3(opts.audioFile, opts.audioFile.endsWith(".wav") ? "audio/wav" : "audio/mpeg");
   const who = opts.lookId
     ? { type: "avatar", avatar_id: opts.lookId }
     : { type: "image", image: { type: "asset_id", asset_id: await heygenAssetV3(String(opts.imgFile), "image/jpeg") } };
@@ -399,18 +418,19 @@ async function runHeygenV3(opts: { lookId?: string; imgFile?: string; audioFile:
       ...(opts.motion ? { motion_prompt: opts.motion } : {}),
       ...(opts.expressiveness ? { expressiveness: opts.expressiveness } : {}),
       ...(opts.engine ? { engine: { type: opts.engine } } : {}),
+      ...(opts.resolution ? { resolution: opts.resolution } : {}),
     }),
   }), "heygen v3 generate");
   const videoId = gen?.data?.video_id;
   if (!videoId) throw new Error(`heygen v3 generate: ${JSON.stringify(gen).slice(0, 200)}`);
-  const t0 = Date.now();
-  for (;;) {
-    if (Date.now() - t0 > DEADLINE_MS) throw new Error("heygen v3: timed out");
-    await sleep(Math.max(POLL_MS, 20) * 2);
-    const d = (await okJson(await fetch(`${HEYGEN_V3}/videos/${encodeURIComponent(videoId)}`, { headers: heygenHeaders(false) }), "heygen v3 status"))?.data || {};
-    if (d.status === "completed" && d.video_url) return d.video_url;
-    if (d.status === "failed") throw new Error(`heygen v3: ${d.failure_message || d.failure_code || "failed"}`);
-  }
+  return videoId;
+}
+
+/** The API balance. HeyGen keeps API credits apart from the web app's, so
+ *  "tons of credits" in the app can still be "Insufficient credit" here. */
+export async function heygenQuota(): Promise<unknown> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  return (await okJson(await fetch("https://api.heygen.com/v2/user/remaining_quota", { headers: heygenHeaders(false) }), "heygen quota"))?.data ?? null;
 }
 
 /** Runway Act-Two: POST /v1/character_performance, poll /v1/tasks/{id}. */

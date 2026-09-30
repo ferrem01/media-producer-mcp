@@ -74,7 +74,7 @@ import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
 import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
-import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, type ActorTest } from "./core/actor-test.js";
+import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor } from "./core/cast.js";
 import { startRecast, getRecastStatus, previewRecast } from "./core/recast.js";
@@ -2707,7 +2707,7 @@ Rules:
 
       // ── API: The cast (core/cast.ts) ──
       // GET  /api/cast/{tenant}                 the tenant's actors
-      // POST /api/cast/{tenant} {name, image | from:{project,test,file,at}, voice_id?, voice_name?}
+      // POST /api/cast/{tenant} {name, image | from:{project,test,file,at} | heygen_look_id, voice_id?, voice_name?}
       const castApi = urlPath.match(/^\/api\/cast\/([^/]+)$/);
       if (castApi) {
         const caTenant = decodeURIComponent(castApi[1]);
@@ -2715,7 +2715,7 @@ Rules:
           if (method === "GET") { jsonResponse(res, 200, { cast: await listCast(caTenant) }); return; }
           if (method === "POST") {
             const body = await parseBody(req).catch(() => ({} as any));
-            jsonResponse(res, 200, await addActor(caTenant, { name: body.name, image: body.image, from: body.from, voice_id: body.voice_id, voice_name: body.voice_name }));
+            jsonResponse(res, 200, await addActor(caTenant, { name: body.name, image: body.image, from: body.from, voice_id: body.voice_id, voice_name: body.voice_name, heygen_look_id: typeof body.heygen_look_id === "string" ? body.heygen_look_id : undefined }));
             return;
           }
           jsonResponse(res, 405, { error: "Method not allowed" });
@@ -2763,7 +2763,8 @@ Rules:
       }
 
       // GET  /api/heygen-avatars/{tenant}            the HeyGen account's avatars (id, name, kind), for heygen-avatar tests
-      // GET  /api/heygen-avatars/{tenant}?looks=1    the account's own looks (v3 ids), for heygen-v3 tests
+      // GET  /api/heygen-avatars/{tenant}?looks=1    the account's own looks (v3 ids), for heygen-v3 tests and the cast
+      // GET  /api/heygen-avatars/{tenant}?quota=1    the API credit balance (apart from the web app's)
       // POST /api/heygen-avatars/{tenant}            {prompt, avatar_id | avatar_group_id, name?, aspect_ratio?} -> a new look
       // GET  /api/heygen-avatars/{tenant}/{look_id}  one look (poll a new one until "completed")
       const hgAvatars = urlPath.match(/^\/api\/heygen-avatars\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
@@ -2771,7 +2772,10 @@ Rules:
         try {
           const lookId = hgAvatars[2];
           if (method === "GET" && lookId) jsonResponse(res, 200, await getHeygenLook(lookId));
-          else if (method === "GET") jsonResponse(res, 200, new URL(url, "http://localhost").searchParams.get("looks") ? { looks: await listHeygenLooks() } : { avatars: await listHeygenAvatars() });
+          else if (method === "GET") {
+            const q = new URL(url, "http://localhost").searchParams;
+            jsonResponse(res, 200, q.get("quota") ? { quota: await heygenQuota() } : q.get("looks") ? { looks: await listHeygenLooks() } : { avatars: await listHeygenAvatars() });
+          }
           else if (method === "POST" && !lookId) {
             const body = await parseBody(req).catch(() => ({} as any));
             jsonResponse(res, 202, await createHeygenLook({
