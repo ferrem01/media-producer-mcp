@@ -17,6 +17,9 @@ and the actor test read `clip.source`. It now reads the take's RAW file
   reference image (Genjutsu takes 1-8), with a prompt placing the actor in
   it while keeping the motion -- Marc: "Try it with a podcast set
   background."
+- The first 1080p 30 s run used up the credits Marc had added; a `genjutsu`
+  actor test now defaults to 720p (`resolution` to override); the Cast
+  performer still renders films at 1080p.
 
 ## 2026-09-30 — Higgsfield Genjutsu: a Cast vendor (and why Seedance refused)
 
