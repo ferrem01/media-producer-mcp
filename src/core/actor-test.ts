@@ -396,13 +396,17 @@ export async function getHeygenLook(id: string): Promise<HeygenLook> {
 }
 
 /** The account's own HeyGen voices (voice clones), for a generated take. */
-export async function listHeygenVoices(): Promise<Array<{ id: string; name: string; language?: string; gender?: string; preview?: string }>> {
+export interface HeygenVoice { id: string; name: string; language?: string; gender?: string; preview?: string; engines?: string[]; default_engine?: string }
+export async function listHeygenVoices(): Promise<HeygenVoice[]> {
   if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
-  const out: Array<{ id: string; name: string; language?: string; gender?: string; preview?: string }> = [];
+  const out: HeygenVoice[] = [];
   let token = "";
   for (let page = 0; page < 10; page++) {
     const j = await okJson(await fetch(`${HEYGEN_V3}/voices?type=private&limit=100${token ? `&token=${encodeURIComponent(token)}` : ""}`, { headers: heygenHeaders(false) }), "heygen voices");
-    out.push(...(j?.data || []).map((v: any) => ({ id: v.voice_id, name: v.name, language: v.language, gender: v.gender, preview: v.preview_audio_url || undefined })));
+    out.push(...(j?.data || []).map((v: any) => ({
+      id: v.voice_id, name: v.name, language: v.language, gender: v.gender, preview: v.preview_audio_url || undefined,
+      engines: Array.isArray(v.available_engines) ? v.available_engines : undefined, default_engine: v.default_engine || undefined,
+    })));
     if (!j?.has_more || !j?.next_token) break;
     token = j.next_token;
   }
