@@ -285,3 +285,41 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, st
   // The chunks were only a means: keep the recast, drop the pieces.
   for (let i = 0; i < st.files.length; i++) await fs.rm(path.join(projectDir(tenant, projectId), "_work", `recast-${actor.id}-${i}`), { recursive: true, force: true }).catch(() => {});
 }
+
+/** A PREVIEW from the chunks that are done: the finished run from the start,
+ *  stitched with the matching span of the voice, written to the project's
+ *  output as recast-preview-<actor>.mp4. For judging the look while a chunk
+ *  is still out (Marc: "skip the last chunk and see if the pilot works").
+ *  The film is not touched. */
+export async function previewRecast(tenant: string, projectId: string, actorId: string): Promise<{ file: string; seconds: number; chunks: number; of: number }> {
+  const project = await loadProject(tenant, projectId);
+  if (!project) throw new Error("Project not found");
+  const actor = await getActor(tenant, actorId);
+  if (!actor) throw new Error(`No cast actor "${actorId}"`);
+  const workDir = path.join(projectDir(tenant, projectId), "_work", `recast-${actor.id}-0`);
+  const w = (n: string) => path.join(workDir, n);
+  const plan = JSON.parse(await fs.readFile(w("plan.json"), "utf8").catch(() => { throw new Error("No recast of this film has started"); }));
+  const chunks: Array<[number, number]> = plan.chunks || [];
+  let n = 0;
+  while (n < chunks.length && (await fs.stat(w(`chunk-${n}.mp4`)).then((x) => x.size > 0, () => false))) n++;
+  if (!n) throw new Error("No chunk is finished yet");
+  const end = chunks[n - 1][1];
+  const raw = ((project as any).takes || []).map((t: any) => takeCopies(t).raw).find((r: string) => path.basename(resolveVideoPath(r, config.dataDir)) === plan.raw);
+  if (!raw) throw new Error("The take behind the recast is gone");
+  const rawAbs = resolveVideoPath(raw, config.dataDir);
+  const outDir = path.join(config.dataDir, tenant, "projects", projectId, "output");
+  await fs.mkdir(outDir, { recursive: true });
+  const out = path.join(outDir, `recast-preview-${actor.id}.mp4`);
+  await fs.writeFile(w("preview-list.txt"), chunks.slice(0, n).map((_, i) => `file '${w(`chunk-${i}.mp4`)}'`).join("\n"));
+  await ffmpeg(["-f", "concat", "-safe", "0", "-i", w("preview-list.txt"), "-c", "copy", w("preview-picture.mp4")]);
+  let audio = rawAbs;
+  if (actor.voice_id) {
+    await ffmpeg(["-i", rawAbs, "-t", end.toFixed(3), "-vn", "-ac", "1", "-ar", "44100", w("preview.wav")]);
+    await convertVoice(w("preview.wav"), w("preview-voice.mp3"), actor.voice_id);
+    audio = w("preview-voice.mp3");
+  }
+  await ffmpeg(["-i", w("preview-picture.mp4"), "-i", audio, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+    "-af", actor.voice_id ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", end.toFixed(3), "-movflags", "+faststart", out]);
+  return { file: `recast-preview-${actor.id}.mp4`, seconds: Number(end.toFixed(2)), chunks: n, of: chunks.length };
+}

@@ -154,6 +154,21 @@ describe("recast: a take performed by a cast actor", () => {
     expect(calls).toContain("https://q/r-old");                                    // the queued request collected
     expect(Math.abs((await dur(path.join(DATA, "resumed.mp4"))) - 7)).toBeLessThan(0.1);
 
+    // PREVIEW: the finished chunks stitched while one is still out.
+    const projWork = path.join(DATA, T, "projects", P, "_work", "recast-roger-guy-0");
+    await fs.mkdir(projWork, { recursive: true });
+    await fs.cp(work, projWork, { recursive: true });
+    await fs.rm(path.join(projWork, "chunk-1.mp4"));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (String(url).startsWith("https://api.elevenlabs.io/v1/speech-to-speech/roger-voice")) return new Response(mp3, { status: 200 });
+      throw new Error("unexpected fetch " + url);
+    }));
+    const { previewRecast } = await import("../src/core/recast.js");
+    const pv = await previewRecast(T, P, "roger-guy");
+    expect(pv).toMatchObject({ chunks: 1, of: 2, file: "recast-preview-roger-guy.mp4" });
+    expect(Math.abs((await dur(path.join(DATA, T, "projects", P, "output", pv.file))) - pv.seconds)).toBeLessThan(0.1);
+    expect(pv.seconds).toBeCloseTo(3.5, 0);
+
     // A status left "running" by a dead server reads as interrupted.
     const sf = path.join(DATA, T, "projects", P, "recast.json");
     const cur = JSON.parse(await fs.readFile(sf, "utf8"));
