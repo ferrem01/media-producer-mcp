@@ -19,6 +19,10 @@ source goes by the test folder's public URL instead of a data URI.
   and the test's voice uploaded as assets, a talking-photo video generated
   (lips to the audio, motion invented: a generated performance, not a
   transfer), status polled; HeyGen's own messages come back on failure.
+- `providers:["heygen-avatar"]` + `heygen_avatar_id`: a SAVED HeyGen avatar
+  (Marc's digital twin) driven by the take's own voice (`voice:false`) via
+  `/v2/video/generate` -- no portrait. `GET /api/heygen-avatars/{tenant}`
+  lists the account's avatars and photo avatars (id, name, preview).
 
 ## 2026-09-30 — Recast v2: one reference, one seed, 8 s chunks, the room kept
 

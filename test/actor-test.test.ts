@@ -280,6 +280,32 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     delete process.env.HEYGEN_API_KEY;
   }, 60000);
 
+  it("heygen-avatar: a saved HeyGen avatar (a digital twin) lip-synced to the take's own voice, no portrait needed", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    let gen: any = null;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://upload.heygen.com/v1/asset") return json({ code: 100, data: { id: "aud9" } });
+      if (u === "https://api.heygen.com/v2/video/generate") { gen = JSON.parse(init.body); return json({ data: { video_id: "v9" } }); }
+      if (u.startsWith("https://api.heygen.com/v1/video_status.get?video_id=v9")) return json({ data: { status: "completed", video_url: "https://cdn/a.mp4" } });
+      if (u === "https://api.heygen.com/v2/avatars") return json({ data: { avatars: [{ avatar_id: "marc_twin", avatar_name: "Marc", preview_image_url: "p" }], talking_photos: [{ talking_photo_id: "tp1", talking_photo_name: "Photo" }] } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.HEYGEN_API_KEY = "hk";
+    const { startActorTest, getActorTest, listHeygenAvatars } = await import("../src/core/actor-test.js");
+    expect(await listHeygenAvatars()).toEqual([{ id: "marc_twin", name: "Marc", kind: "avatar", preview: "p" }, { id: "tp1", name: "Photo", kind: "talking_photo", preview: undefined }]);
+    await expect(startActorTest({ tenant: T, project: P, scene_index: 0, image: "", providers: ["heygen-avatar"], voice: false })).rejects.toThrow(/heygen_avatar_id/);
+    let st = await startActorTest({ tenant: T, project: P, scene_index: 0, image: "", providers: ["heygen-avatar"], voice: false, heygen_avatar_id: "marc_twin" });
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, st.id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(gen.video_inputs[0]).toEqual({ character: { type: "avatar", avatar_id: "marc_twin", avatar_style: "normal" }, voice: { type: "audio", audio_asset_id: "aud9" } });
+    expect(gen.dimension).toEqual({ width: 720, height: 1280 });
+    expect(st.files["heygen-avatar"]).toBe("heygen-avatar.mp4");
+    delete process.env.HEYGEN_API_KEY;
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
