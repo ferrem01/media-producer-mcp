@@ -31,7 +31,7 @@ import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3" | "seedance25";
+export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3" | "seedance25" | "genjutsu";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -52,7 +52,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY", seedance25: "FAL_KEY" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY", seedance25: "FAL_KEY", genjutsu: "HF_API_KEY_ID" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -245,6 +245,41 @@ async function falVideo(route: string, body: Record<string, unknown>, what: stri
  *  -> the portrait talking, lip-synced, its motion Kling's own. */
 export async function runKlingAvatar(img: string, audio: string, prompt?: string): Promise<string> {
   return falVideo("fal-ai/kling-video/ai-avatar/v2/pro", { image_url: img, audio_url: audio, ...(prompt ? { prompt } : {}) }, "kling avatar");
+}
+
+/** HIGGSFIELD GENJUTSU Motion Transfer (api.higgsfield.ai): the recording's
+ *  motion, timing and camera rebuilt with the person in the reference
+ *  image(s) -- the Recast in Higgsfield's reels. Public URLs only; 4-30 s
+ *  (longer is trimmed). A resumable job: `resume` is a status_url saved
+ *  by `onSubmit`. */
+export const GENJUTSU_PROMPT = "Replace the person in the video with the person in the reference image: the same face, hair and clothes. " +
+  "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions, camera and room of the video exactly. Photorealistic.";
+export async function runGenjutsu(video: string, images: string[], opts: { prompt?: string; resolution?: string; resume?: string; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+  const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
+  if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");
+  const headers = { Authorization: `Key ${id}:${secret}`, "Content-Type": "application/json" };
+  let statusUrl = opts.resume;
+  if (!statusUrl) {
+    const sub = await okJson(await fetch("https://api.higgsfield.ai/higgsfield/genjutsu/motion-transfer/v1.0", {
+      method: "POST", headers: { ...headers, "Idempotency-Key": crypto.randomBytes(12).toString("hex") },
+      body: JSON.stringify({ video_url: video, image_urls: images.slice(0, 8), prompt: opts.prompt ?? GENJUTSU_PROMPT, resolution: opts.resolution || "1080p" }),
+    }), "genjutsu submit");
+    statusUrl = sub?.status_url || (sub?.request_id ? `https://api.higgsfield.ai/requests/${sub.request_id}/status` : "");
+    if (!statusUrl) throw new Error(`genjutsu submit: ${JSON.stringify(sub).slice(0, 200)}`);
+    await opts.onSubmit?.(statusUrl);
+  }
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > DEADLINE_MS) throw new Error("genjutsu: timed out");
+    await sleep(POLL_MS);
+    const st = await okJson(await fetch(statusUrl, { headers }), "genjutsu status");
+    if (st.status === "completed") {
+      const url = st?.video?.url || st?.videos?.[0]?.url;
+      if (!url) throw new Error("genjutsu: completed without a video url");
+      return url;
+    }
+    if (["failed", "canceled", "cancelled", "nsfw", "error"].includes(String(st.status))) throw new Error(`genjutsu: ${st.error || st.message || st.status}`);
+  }
 }
 
 /** Seedance 2.5 reference-to-video used as a RECAST (the Higgsfield
@@ -635,7 +670,7 @@ export async function startActorTest(opts: {
   const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3", "seedance25"].includes(p));
+    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3", "seedance25", "genjutsu"].includes(p));
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -743,6 +778,12 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       await voiceJob;
       if (!test.files.voice) await ffmpeg(["-i", f("source.mp4"), "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", f("take.mp3")]);
       url = await runHeygen(f("actor.jpg"), test.files.voice ? f("voice.mp3") : f("take.mp3"), h > w * 1.1 ? "portrait" : w > h * 1.1 ? "landscape" : "square", prompt);
+    } else if (p === "genjutsu") {
+      // URLs only: the test's public folder (source.mp4, actor.jpg).
+      if (!img) throw new Error("genjutsu needs a portrait (image or image_from)");
+      if (!config.publicUrl.startsWith("https://")) throw new Error("genjutsu needs the server's public https address (it fetches the video by URL)");
+      const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
+      url = await runGenjutsu(`${pub}/source.mp4`, [`${pub}/actor.jpg`], { prompt });
     } else if (p === "seedance25") {
       if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");
       const pub = config.publicUrl.startsWith("https://")

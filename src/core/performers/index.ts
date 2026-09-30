@@ -2,12 +2,13 @@
 import { heygen } from "./heygen.js";
 import { kling } from "./kling.js";
 import { runway } from "./runway.js";
+import { higgsfield } from "./higgsfield.js";
 import type { Performer, PerformerId, PerformerInfo } from "./types.js";
 import type { CastActor } from "../cast.js";
 
 export type { Performer, PerformerId, PerformerInfo, PerformContext } from "./types.js";
 
-export const PERFORMERS: Performer[] = [heygen, kling, runway];
+export const PERFORMERS: Performer[] = [heygen, kling, higgsfield, runway];
 
 export function getPerformer(id: string): Performer | undefined {
   return PERFORMERS.find((p) => p.id === id);
@@ -28,5 +29,5 @@ export function performerList(): Array<PerformerInfo & { available: boolean; rec
  *  (the actor tests' winner), else the best video-driven vendor with a key. */
 export function defaultPerformer(actor: CastActor): Performer {
   if (actor.heygen_look_id) return heygen;
-  return [kling, heygen, runway].find((p) => !!process.env[p.key]) || heygen;
+  return [kling, higgsfield, heygen, runway].find((p) => !!process.env[p.key]) || heygen;
 }

@@ -9,13 +9,14 @@
  *            voice and timing ours. This is what performs a GENERATED take
  *            (the script voiced, no recording).
  *   video -- it maps the recording's motion onto the actor (Kling Motion
- *            Control, Runway Act-Two): the gestures are the recording's.
+ *            Control, Higgsfield Genjutsu, Runway Act-Two): the gestures are
+ *            the recording's.
  *            Each call takes at most maxSeconds, so a long take is cut at
  *            its pauses. A recast uses this when the vendor has it.
  */
 import type { CastActor } from "../cast.js";
 
-export type PerformerId = "heygen" | "kling" | "runway";
+export type PerformerId = "heygen" | "kling" | "higgsfield" | "runway";
 
 export interface PerformerInfo {
   id: PerformerId;
