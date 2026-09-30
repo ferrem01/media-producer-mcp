@@ -2726,7 +2726,7 @@ Rules:
       }
 
       // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
-      // POST /api/recast/{tenant}/{project} {actor: id | null}   null puts the recording's person back
+      // POST /api/recast/{tenant}/{project} {actor: id | null, fresh?}   null puts the recording's person back; fresh makes it again
       // GET  /api/recast/{tenant}/{project}                       progress and who plays
       // POST /api/recast/{tenant}/{project}/preview {actor}   the finished chunks stitched, voiced
       const recastPreview = urlPath.match(/^\/api\/recast\/([^/]+)\/([^/]+)\/preview$/);
@@ -2747,7 +2747,7 @@ Rules:
         try {
           if (method === "POST") {
             const body = await parseBody(req).catch(() => ({} as any));
-            jsonResponse(res, 202, await startRecast(rcTenant, rcProject, body.actor ? String(body.actor) : null));
+            jsonResponse(res, 202, await startRecast(rcTenant, rcProject, body.actor ? String(body.actor) : null, { fresh: body.fresh === true }));
             return;
           }
           if (method === "GET") {
