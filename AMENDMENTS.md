@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Actor test: Kling 3.0 Motion Control (one call, 30 s)
+
+Recast v2 held the room and the face across seams but brought a halo around
+the head and a line down the chin, and took 41 minutes for 32 s. Marc:
+"Is there any other solution on the market?" Kling 3.0 Motion Control (on
+fal, the same key) maps a take's motion, timing and expression onto a
+character image in one call of up to 30 s -- no chunks, no seams, no
+composite. `providers:["kling"]` (character_orientation "video"); a long
+source goes by the test folder's public URL instead of a data URI.
+- `providers:["heygen"]`: HeyGen Avatar IV (`HEYGEN_API_KEY`) -- the portrait
+  and the test's voice uploaded as assets, a talking-photo video generated
+  (lips to the audio, motion invented: a generated performance, not a
+  transfer), status polled; HeyGen's own messages come back on failure.
+
 ## 2026-09-30 — Recast v2: one reference, one seed, 8 s chunks, the room kept
 
 The pilot recast of Old Chimp worked end to end (32.17 s, clips pointed, the

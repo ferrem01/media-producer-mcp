@@ -233,6 +233,53 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     expect(err).toMatch(/, 16 fps,/);
   }, 60000);
 
+  it("kling: one call of up to 30 s, the take's motion on the character image", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    let body: any = null;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://queue.fal.run/fal-ai/kling-video/v3/pro/motion-control") { body = JSON.parse(init.body); return json({ request_id: "k", status_url: "https://q/sk", response_url: "https://q/rk" }); }
+      if (u === "https://q/sk") return json({ status: "COMPLETED" });
+      if (u === "https://q/rk") return json({ video: { url: "https://cdn/k.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.FAL_KEY = "fk";
+    const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    let st = await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png", providers: ["kling"], voice: false });
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, st.id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(body).toMatchObject({ character_orientation: "video", keep_original_sound: true });
+    expect(body.video_url).toMatch(/^data:video\/mp4;base64,/); // no public address in a test: inlined
+    expect(body.image_url).toMatch(/^data:image\/jpeg;base64,/);
+    expect(st.files.kling).toBe("kling.mp4");
+  }, 60000);
+
+  it("heygen: the portrait and the voice uploaded, an Avatar IV video generated and collected", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    const seen: Record<string, any> = {}; let uploads = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://upload.heygen.com/v1/asset") { uploads++; seen[init.headers["Content-Type"]] = init.headers["X-Api-Key"]; return json({ code: 100, data: init.headers["Content-Type"].startsWith("image") ? { id: "img1", image_key: "image/abc/original" } : { id: "aud1" } }); }
+      if (u === "https://api.heygen.com/v2/video/av4/generate") { seen.gen = JSON.parse(init.body); return json({ data: { video_id: "v1" } }); }
+      if (u.startsWith("https://api.heygen.com/v1/video_status.get?video_id=v1")) return json({ data: { status: "completed", video_url: "https://cdn/h.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.HEYGEN_API_KEY = "hk";
+    const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    let st = await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png", providers: ["heygen"], voice: false });
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, st.id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(uploads).toBe(2);
+    expect(seen["image/jpeg"]).toBe("hk");
+    expect(seen.gen).toMatchObject({ image_key: "image/abc/original", audio_asset_id: "aud1", video_orientation: "portrait" });
+    expect(st.files.heygen).toBe("heygen.mp4");
+    delete process.env.HEYGEN_API_KEY;
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
