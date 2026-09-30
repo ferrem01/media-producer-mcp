@@ -63,8 +63,17 @@ export async function getRecastStatus(tenant: string, project: string): Promise<
   } catch { return null; }
 }
 
+// Atomic and in order: a status poll never reads a half-written file, and a
+// progress write (fired without waiting) never lands after the final one.
+const saveChains = new Map<string, Promise<void>>();
 async function saveStatus(tenant: string, st: RecastStatus): Promise<void> {
-  await fs.writeFile(statusFile(tenant, st.project_id), JSON.stringify(st, null, 2)).catch(() => {});
+  const f = statusFile(tenant, st.project_id), body = JSON.stringify(st, null, 2);
+  const next = (saveChains.get(f) || Promise.resolve()).then(async () => {
+    const tmp = `${f}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+    await fs.writeFile(tmp, body).then(() => fs.rename(tmp, f)).catch(() => fs.rm(tmp, { force: true }).catch(() => {}));
+  });
+  saveChains.set(f, next);
+  await next;
 }
 
 /** Where to cut a take into calls of at most `max` seconds: at the middle of
@@ -266,8 +275,8 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   await saveStatus(tenant, st);
   void runRecast(tenant, projectId, actor, performer, voiceId, st).catch(async (e) => {
     st.status = "failed"; st.error = e?.message || String(e); st.finished_at = new Date().toISOString();
-    running.delete(key);
     await saveStatus(tenant, st);
+    running.delete(key);
   });
   return st;
 }
@@ -314,8 +323,8 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
   st.status = ok.length === st.files.length ? "done" : "failed";
   if (st.status === "failed") st.error = st.files.find((f) => f.error)?.error || "a take could not be recast";
   st.finished_at = new Date().toISOString();
-  running.delete(key);
   await saveStatus(tenant, st);
+  running.delete(key);
   // The pieces were only a means: keep the recast, drop the pieces.
   for (let i = 0; i < st.files.length; i++) await fs.rm(recastWorkDir(tenant, projectId, actor.id, performer.id, i), { recursive: true, force: true }).catch(() => {});
   await fs.rm(path.join(projectOutputDir(tenant, projectId), "_cast"), { recursive: true, force: true }).catch(() => {});

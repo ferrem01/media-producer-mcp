@@ -642,6 +642,8 @@ export async function startActorTest(opts: {
   /** genjutsu: a SETTING reference (tenant-relative image) -- the actor is
    *  placed there (a podcast set), the motion kept. */
   scene_image?: string;
+  /** genjutsu: "480p" | "720p" | "1080p" (a test defaults to 720p). */
+  resolution?: string;
   /** heygen-v3: "low" | "medium" | "high" (Avatar IV). */
   expressiveness?: string;
   /** heygen-v3: "avatar_iv" | "avatar_v" | "avatar_iii" (HeyGen's default when omitted). */
@@ -712,7 +714,7 @@ export async function startActorTest(opts: {
     if (!sceneAbs.startsWith(tenantDir + path.sep)) throw new Error("scene_image must be a path inside the tenant");
     await fs.access(sceneAbs).catch(() => { throw new Error(`scene_image not found: ${opts.scene_image}`); });
   }
-  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs })
+  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs, resolution: opts.resolution })
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
   return test;
 }
@@ -733,7 +735,7 @@ async function step<T>(test: ActorTest, name: string, fn: () => Promise<T>): Pro
   }
 }
 
-async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string; sceneAbs?: string } = {}): Promise<void> {
+async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string; sceneAbs?: string; resolution?: string } = {}): Promise<void> {
   const dir = actorTestDir(test.tenant_id, test.project_id, test.id);
   const f = (name: string) => path.join(dir, name);
 
@@ -807,7 +809,8 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
         test.files.scene = "scene.jpg";
         images.push(`${pub}/scene.jpg`);
       }
-      url = await runGenjutsu(`${pub}/source.mp4`, images, { prompt: prompt || (heygenOpts.sceneAbs ? GENJUTSU_SCENE_PROMPT : undefined) });
+      // A test judges the look: 720p (cheaper) unless asked; films render at 1080p.
+      url = await runGenjutsu(`${pub}/source.mp4`, images, { prompt: prompt || (heygenOpts.sceneAbs ? GENJUTSU_SCENE_PROMPT : undefined), resolution: heygenOpts.resolution || "720p" });
     } else if (p === "seedance25") {
       if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");
       const pub = config.publicUrl.startsWith("https://")

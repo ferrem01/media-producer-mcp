@@ -63,8 +63,18 @@ export async function getGeneratedTakeStatus(tenant: string, project: string): P
   } catch { return null; }
 }
 
+// Atomic and in order: a reader never sees a half-written file (a status
+// poll landing mid-write read nothing -- measured in CI), and an early
+// progress write can never land after the final one.
+const saveChains = new Map<string, Promise<void>>();
 async function save(tenant: string, st: GeneratedTakeStatus): Promise<void> {
-  await fs.writeFile(statusFile(tenant, st.project_id), JSON.stringify(st, null, 2)).catch(() => {});
+  const f = statusFile(tenant, st.project_id), body = JSON.stringify(st, null, 2);
+  const next = (saveChains.get(f) || Promise.resolve()).then(async () => {
+    const tmp = `${f}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+    await fs.writeFile(tmp, body).then(() => fs.rename(tmp, f)).catch(() => fs.rm(tmp, { force: true }).catch(() => {}));
+  });
+  saveChains.set(f, next);
+  await next;
 }
 
 /** A scene's lines as spoken parts: "(pause)" lines split them, emphasis
@@ -196,8 +206,8 @@ export async function startGeneratedTake(tenant: string, projectId: string, opts
   await save(tenant, st);
   void run(tenant, projectId, actor, performer, scenes, st, doAttach).catch(async (e) => {
     st.status = "failed"; st.error = String(e?.message || e).slice(0, 300); st.finished_at = new Date().toISOString();
-    running.delete(key);
     await save(tenant, st);
+    running.delete(key);
   });
   return st;
 }
@@ -237,7 +247,7 @@ async function run(tenant: string, projectId: string, actor: CastActor, performe
   st.status = "done";
   st.stage = undefined;
   st.finished_at = new Date().toISOString();
-  running.delete(key);
   await save(tenant, st);
+  running.delete(key);
   await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
 }
