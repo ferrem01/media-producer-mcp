@@ -21,6 +21,14 @@ const info = async (f: string) => { try { await run("ffmpeg", ["-hide_banner", "
 const dur = async (f: string) => { const m = (await info(f)).match(/Duration: (\d+):(\d+):([\d.]+)/)!; return +m[1] * 3600 + +m[2] * 60 + +m[3]; };
 
 describe("generated take: the script performed with no recording", () => {
+  it("names a speech engine the HeyGen voice allows: its saved default, else the best it offers", async () => {
+    const { pickHeygenEngine } = await import("../src/core/generated-take.js");
+    expect(pickHeygenEngine({ engines: ["starfish", "elevenlabs_v3"], default_engine: "starfish" })).toBe("starfish");
+    expect(pickHeygenEngine({ engines: ["starfish", "elevenlabs_v3"] })).toBe("elevenlabs_v3");
+    expect(pickHeygenEngine({ engines: ["orca"], default_engine: "elevenlabs" })).toBe("orca");   // a saved engine it no longer allows
+    expect(pickHeygenEngine(undefined)).toBeNull();                                               // unknown: HeyGen's choice
+  });
+
   it("reads lines, not marks: (pause) lines split a scene, asterisks go", async () => {
     const { spokenParts } = await import("../src/core/generated-take.js");
     expect(spokenParts("Old chimps *know* things.\n(pause)\nThey remember.\n\nAll of it.")).toEqual([["Old chimps know things."], ["They remember.", "All of it."]]);
@@ -52,6 +60,7 @@ describe("generated take: the script performed with no recording", () => {
       const u = String(url);
       const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
       if (u === "https://api.heygen.com/v3/avatars/looks/lk_sofa") return json({ data: { id: "lk_sofa", avatar_type: "photo_avatar", supported_api_engines: ["avatar_v"], default_voice_id: "marc_voice", status: "completed" } });
+      if (u.startsWith("https://api.heygen.com/v3/voices?type=private")) return json({ data: [{ voice_id: "marc_voice", name: "Marc", available_engines: ["starfish", "elevenlabs"], default_engine: null }], has_more: false });
       if (u === "https://api.heygen.com/v3/voices/speech") { speech.push(JSON.parse(init.body)); return json({ data: { audio_url: "https://cdn/line.mp3", duration: 1 } }); }
       if (u.startsWith("https://api.elevenlabs.io/v1/text-to-speech/roger")) { tts.push(JSON.parse(init.body).text); return new Response(mp3, { status: 200 }); }
       if (u === "https://cdn/line.mp3") return new Response(mp3, { status: 200 });
@@ -74,7 +83,7 @@ describe("generated take: the script performed with no recording", () => {
     for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getGeneratedTakeStatus(T, P))!; }
     expect(st.status, st.error).toBe("done");
     expect(speech.map((s) => s.text)).toEqual(["First line.", "Second.", "Third."]);   // one call per spoken part, the empty scene skipped
-    expect(speech.every((s) => s.voice_id === "marc_voice")).toBe(true);
+    expect(speech.every((s) => s.voice_id === "marc_voice" && s.engine === "elevenlabs")).toBe(true);   // an engine the voice allows, named
     expect(gens).toHaveLength(1);
     expect(gens[0]).toMatchObject({ type: "avatar", avatar_id: "lk_sofa", audio_asset_id: "aud1", aspect_ratio: "9:16", engine: { type: "avatar_v" }, resolution: "1080p" });
     expect(attached).toHaveLength(1);

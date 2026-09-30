@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Generated take: name the HeyGen speech engine
+
+First live end-to-end run (a copy of Old Chimp, the sofa look, Marc's HeyGen
+clone "marc ferrentino"): `/v3/voices/speech` refused -- "The requested or
+saved voice engine is not available for speech generation. Check this
+voice's available_engines". Each voice now carries `engines` /
+`default_engine` from List Voices, and the speech call names one
+(`pickHeygenEngine`: the saved default when still allowed, else
+elevenlabs_v3 > elevenlabs > starfish > orca).
+
 ## 2026-09-30 — Cast: Wan out; Kling and Runway perform a script too
 
 Marc: "You can remove Wan from the list. It never worked. Also kling, runway

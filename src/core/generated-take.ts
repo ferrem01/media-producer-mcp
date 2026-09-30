@@ -20,7 +20,7 @@ import { config } from "../config.js";
 import { loadProject } from "../persistence/project.js";
 import { projectDir } from "../persistence/paths.js";
 import { getActor, portraitPath, type CastActor } from "./cast.js";
-import { ffmpeg, download, durationOf, getHeygenLook } from "./actor-test.js";
+import { ffmpeg, download, durationOf, getHeygenLook, listHeygenVoices } from "./actor-test.js";
 import { getPerformer, PERFORMERS, type Performer } from "./performers/index.js";
 
 export type VoiceProvider = "heygen" | "elevenlabs";
@@ -80,10 +80,30 @@ export function spokenParts(text: string): string[][] {
   return parts.filter((p) => p.length);
 }
 
+/** The speech engine a HeyGen voice allows: its saved default, else the
+ *  best it offers. HeyGen refuses a voice whose saved engine is not
+ *  available for speech (measured on Marc's clone: "The requested or saved
+ *  voice engine is not available for speech generation"), so one is named. */
+const ENGINE_ORDER = ["elevenlabs_v3", "elevenlabs", "starfish", "orca"];
+const engineMemo = new Map<string, string | null>();
+export function pickHeygenEngine(v: { engines?: string[]; default_engine?: string } | undefined): string | null {
+  const allowed = v?.engines || [];
+  if (v?.default_engine && (!allowed.length || allowed.includes(v.default_engine))) return v.default_engine;
+  return ENGINE_ORDER.find((e) => allowed.includes(e)) || allowed[0] || null;
+}
+async function heygenEngine(voiceId: string): Promise<string | null> {
+  if (engineMemo.has(voiceId)) return engineMemo.get(voiceId)!;
+  const own = await listHeygenVoices().catch(() => []);
+  const engine = pickHeygenEngine(own.find((v) => v.id === voiceId));
+  engineMemo.set(voiceId, engine);
+  return engine;
+}
+
 async function heygenSpeech(text: string, voiceId: string, out: string): Promise<void> {
+  const engine = await heygenEngine(voiceId);
   const r = await fetch("https://api.heygen.com/v3/voices/speech", {
     method: "POST", headers: { "X-Api-Key": String(process.env.HEYGEN_API_KEY), "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice_id: voiceId }),
+    body: JSON.stringify({ text, voice_id: voiceId, ...(engine ? { engine } : {}) }),
   });
   const j: any = await r.json().catch(() => null);
   if (!r.ok || !j?.data?.audio_url) throw new Error(`heygen speech: HTTP ${r.status} ${String(j?.error?.message || j?.message || JSON.stringify(j)).slice(0, 200)}`);
