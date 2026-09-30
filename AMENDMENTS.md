@@ -31,6 +31,9 @@ recording"; Feature 2 (a generated performance, no recording) comes later.
   progress. The actor performs only when every take file made it.
 - Tests: `test/recast.test.ts` (the chunk plan, the clip switch, a full
   recast with the providers faked: two chunks, one voice pass, exact length).
+- The actor test gains `source_range` (a span of the take file) and `fps`
+  (the rate the source is sent at), to measure how long one Wan call can
+  run: Wan appears to cap frames (129), so 16 fps may cover ~8 s a call.
 
 ## 2026-09-29 — Studio plays one-sided takes centered too
 

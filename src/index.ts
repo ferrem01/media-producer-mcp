@@ -2774,6 +2774,8 @@ Rules:
               prompt: typeof body.prompt === "string" ? body.prompt : undefined,
               image_from: body.image_from && typeof body.image_from === "object" ? body.image_from : undefined,
               video_from: body.video_from && typeof body.video_from === "object" ? body.video_from : undefined,
+              source_range: body.source_range && typeof body.source_range === "object" ? body.source_range : undefined,
+              fps: body.fps != null ? Number(body.fps) : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;

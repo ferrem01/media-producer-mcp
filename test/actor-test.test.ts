@@ -210,6 +210,29 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     await expect(startActorTest({ tenant: T, project: P, scene_index: 0, image: "", image_from: { test: "../../x", file: "a" }, providers: ["wan-s2v"] })).rejects.toThrow(/bad reference/);
   }, 60000);
 
+  it("source_range and fps: a span of the take at a chosen frame rate (how long can one Wan call run?)", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u.startsWith("https://queue.fal.run/fal-ai/wan/")) return json({ request_id: "x", status_url: "https://q/s9", response_url: "https://q/r9" });
+      if (u === "https://q/s9") return json({ status: "COMPLETED" });
+      if (u === "https://q/r9") return json({ video: { url: "https://cdn/x.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.FAL_KEY = "fk";
+    const { startActorTest, getActorTest } = await import("../src/core/actor-test.js");
+    let st = await startActorTest({ tenant: T, project: P, scene_index: 0, image: "assets/generated/actor.png", providers: ["wan"], voice: false, source_range: { start: 0.5, end: 3.5 }, fps: 16 });
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getActorTest(T, P, st.id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    let err = "";
+    try { await run("ffmpeg", ["-hide_banner", "-i", path.join(DATA, T, "projects", P, "output", "actor-tests", st.id, "source.mp4")]); } catch (e: any) { err = String(e.stderr || ""); }
+    const m = err.match(/Duration: (\d+):(\d+):([\d.]+)/)!;
+    expect(+m[3]).toBeCloseTo(3, 0);            // the span, not the scene's 2 s trim
+    expect(err).toMatch(/, 16 fps,/);
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
