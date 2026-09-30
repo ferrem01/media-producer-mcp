@@ -39,12 +39,15 @@ const execFileAsync = promisify(execFile);
 export const CHUNK_MAX = 4.0;
 const CHUNK_MIN = 1.5;
 const TAIL = 0.25;
-const PARALLEL = 4;
+// Every chunk at once (a 30 s take is ~9): one round of Wan, not three.
+const PARALLEL = 12;
+// One slow chunk must not hold a film for an hour: give up, submit again.
+const CHUNK_DEADLINE_MS = 18 * 60 * 1000;
 
 export interface RecastStatus {
   project_id: string;
   actor: string | null;
-  status: "running" | "done" | "failed";
+  status: "running" | "done" | "failed" | "interrupted";
   started_at: string;
   finished_at?: string;
   files: Array<{ raw: string; file: string; status: "running" | "done" | "failed" | "reused"; chunks_done: number; chunks_total: number; error?: string }>;
@@ -60,7 +63,14 @@ function statusFile(tenant: string, project: string): string {
 export async function getRecastStatus(tenant: string, project: string): Promise<RecastStatus | null> {
   const live = running.get(`${tenant}/${project}`);
   if (live) return live;
-  try { return JSON.parse(await fs.readFile(statusFile(tenant, project), "utf8")); } catch { return null; }
+  try {
+    const st = JSON.parse(await fs.readFile(statusFile(tenant, project), "utf8")) as RecastStatus;
+    // "running" on disk with nothing running here: the server restarted
+    // under it (measured: a pilot stuck at "8 of 9" forever). Its finished
+    // chunks are still on disk; starting it again resumes from them.
+    if (st.status === "running") st.status = "interrupted";
+    return st;
+  } catch { return null; }
 }
 
 async function saveStatus(tenant: string, st: RecastStatus): Promise<void> {
@@ -129,22 +139,45 @@ export async function recastFile(opts: {
   const w = (n: string) => path.join(workDir, n);
   const duration = await durationOf(rawAbs);
   if (!duration) throw new Error("could not read the take's length");
-  const chunks = planChunks(duration, await silencesOf(rawAbs));
+  // RESUME: a restart (or a stalled chunk) must not throw away chunks
+  // already paid for. The plan is kept beside them; the same take and
+  // length reuse it, and every chunk already on disk is kept.
+  let chunks = planChunks(duration, await silencesOf(rawAbs));
+  const planKey = { raw: path.basename(rawAbs), duration: Number(duration.toFixed(3)) };
+  try {
+    const prev = JSON.parse(await fs.readFile(w("plan.json"), "utf8"));
+    if (prev.raw === planKey.raw && prev.duration === planKey.duration && Array.isArray(prev.chunks)) chunks = prev.chunks;
+    else { await fs.rm(workDir, { recursive: true, force: true }); await fs.mkdir(workDir, { recursive: true }); }
+  } catch { /* first run */ }
+  await fs.writeFile(w("plan.json"), JSON.stringify({ ...planKey, chunks }));
+  const have = async (f: string) => fs.stat(f).then((x) => x.size > 0, () => false);
   const [W, H] = await sizeOf(rawAbs);
   await ffmpeg(["-i", opts.portraitAbs, "-vf", "scale='min(1024,iw)':-2", "-q:v", "3", w("actor.jpg")]);
   const img = await dataUri(w("actor.jpg"), "image/jpeg");
   let done = 0;
-  opts.onChunk?.(0, chunks.length);
+  for (let i = 0; i < chunks.length; i++) if (await have(w(`chunk-${i}.mp4`))) done++;
+  opts.onChunk?.(done, chunks.length);
   await pool(chunks, PARALLEL, async ([a, b], i) => {
     const len = b - a;
-    const src = w(`src-${i}.mp4`), raw = w(`wan-${i}.mp4`), fit = w(`chunk-${i}.mp4`);
-    await ffmpeg(["-ss", String(a), "-to", String(Math.min(duration, b + TAIL)), "-i", rawAbs,
-      "-vf", "scale=720:-2", "-r", "30", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", src]);
-    const uri = await dataUri(src, "video/mp4");
-    let url: string;
-    try { url = await runWan(uri, img, "replace"); }
-    catch { url = await runWan(uri, img, "replace"); } // one retry: a queue hiccup should not sink a take
-    await download(url, raw);
+    const src = w(`src-${i}.mp4`), raw = w(`wan-${i}.mp4`), fit = w(`chunk-${i}.mp4`), req = w(`wan-${i}.json`);
+    if (await have(fit)) return; // finished before a restart
+    if (!(await have(raw))) {
+      await ffmpeg(["-ss", String(a), "-to", String(Math.min(duration, b + TAIL)), "-i", rawAbs,
+        "-vf", "scale=720:-2", "-r", "30", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", src]);
+      const uri = await dataUri(src, "video/mp4");
+      const remember = async (r: { status_url: string; response_url: string }) => { await fs.writeFile(req, JSON.stringify(r)); };
+      const prior = await fs.readFile(req, "utf8").then((t) => JSON.parse(t), () => null);
+      let url: string;
+      try {
+        // A request fal already has (submitted before a restart): collect it.
+        url = await runWan(uri, img, "replace", { resume: prior || undefined, onSubmit: remember, deadlineMs: CHUNK_DEADLINE_MS });
+      } catch {
+        // Stalled or failed: submit fresh, once.
+        await fs.rm(req, { force: true });
+        url = await runWan(uri, img, "replace", { onSubmit: remember, deadlineMs: CHUNK_DEADLINE_MS });
+      }
+      await download(url, raw);
+    }
     // Exactly the chunk's length: the overrun trimmed off, a short return
     // holding its last frame.
     await ffmpeg(["-i", raw, "-an", "-vf", `fps=30,scale=${W}:${H}:flags=lanczos,setsar=1,tpad=stop_mode=clone:stop_duration=${TAIL + 1}`,

@@ -128,5 +128,36 @@ describe("recast: a take performed by a cast actor", () => {
     const back = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
     expect(back.speaker_cast).toBeUndefined();
     expect(back.speaker_track.clips.map((c: any) => c.source)).toEqual([src, src]);
-  }, 120000);
+
+    // RESUME (measured: a restart killed a pilot at "8 of 9", its chunks on
+    // disk). A second run keeps the finished chunks and collects a request
+    // fal already has instead of paying for it again.
+    const { recastFile } = await import("../src/core/recast.js");
+    const work = path.join(DATA, "resume-work");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const u = String(url); calls.push(u);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://queue.fal.run/fal-ai/wan/v2.2-14b/animate/replace") return json({ request_id: "n", status_url: "https://q/s-new", response_url: "https://q/r-new" });
+      if (u === "https://q/s-old" || u === "https://q/s-new") return json({ status: "COMPLETED" });
+      if (u === "https://q/r-old" || u === "https://q/r-new") return json({ video: { url: "https://cdn/w.mp4" } });
+      if (u === "https://cdn/w.mp4") return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    // The first run: chunk 0 finished; chunk 1 submitted, then the server died.
+    await recastFile({ rawAbs: take, outAbs: path.join(DATA, "first.mp4"), workDir: work, portraitAbs: portrait });
+    await fs.rm(path.join(work, "chunk-1.mp4")); await fs.rm(path.join(work, "wan-1.mp4"));
+    await fs.writeFile(path.join(work, "wan-1.json"), JSON.stringify({ status_url: "https://q/s-old", response_url: "https://q/r-old" }));
+    calls.length = 0;
+    await recastFile({ rawAbs: take, outAbs: path.join(DATA, "resumed.mp4"), workDir: work, portraitAbs: portrait });
+    expect(calls.filter((c) => c.endsWith("/animate/replace"))).toHaveLength(0); // nothing paid for twice
+    expect(calls).toContain("https://q/r-old");                                    // the queued request collected
+    expect(Math.abs((await dur(path.join(DATA, "resumed.mp4"))) - 7)).toBeLessThan(0.1);
+
+    // A status left "running" by a dead server reads as interrupted.
+    const sf = path.join(DATA, T, "projects", P, "recast.json");
+    const cur = JSON.parse(await fs.readFile(sf, "utf8"));
+    await fs.writeFile(sf, JSON.stringify({ ...cur, status: "running" }));
+    expect((await getRecastStatus(T, P))!.status).toBe("interrupted");
+  }, 180000);
 });
