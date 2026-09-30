@@ -43,6 +43,35 @@ ${QUOTIENT_CSS}
     height: 100vh;
   }
 
+  /* WATCH MODE (?view=watch): the player alone, full screen, on black --
+     no scene list, inspector, lanes or editing controls. */
+  body.watch-mode #app { grid-template-columns: 1fr; grid-template-rows: 44px 1fr auto; height: 100vh; height: 100dvh; background: #000; }
+  body.watch-mode header { background: #000; }
+  body.watch-mode header h1, body.watch-mode .hdr-sep, body.watch-mode .header-controls { display: none !important; }
+  body.watch-mode #project-name { color: #fff; pointer-events: none; }
+  body.watch-mode #sidebar, body.watch-mode #inspector, body.watch-mode #draft-footer, body.watch-mode #tl-resizer,
+  body.watch-mode .tl-zoom-seg, body.watch-mode #lane-gutter, body.watch-mode #rate-badge, body.watch-mode #vol-control,
+  body.watch-mode #timeline-track > :not(#timeline-slider), body.watch-mode #job-pill, body.watch-mode #rendering-banner,
+  body.watch-mode #prompter-bar, body.watch-mode #booth-overlay { display: none !important; }
+  body.watch-mode #main { grid-column: 1 / -1; border: 0; border-radius: 0; box-shadow: none; background: #000; }
+  body.watch-mode #preview-iframe { box-shadow: none; }
+  body.watch-mode #watch-tap { position: absolute; inset: 0; z-index: 6; cursor: pointer; }
+  body.watch-mode #preview-placeholder { position: relative; z-index: 7; color: #bbb; }
+  body.watch-mode #playback-bar { height: auto !important; min-height: 0 !important; display: flex; align-items: center; gap: 12px;
+    padding: 8px 14px calc(10px + env(safe-area-inset-bottom)); background: #000; border: 0; }
+  body.watch-mode #transport-left { display: flex; align-items: center; gap: 10px; width: auto !important; }
+  body.watch-mode #slider-wrap { flex: 1; min-width: 0; position: relative; display: block; height: auto !important;
+    background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
+  body.watch-mode #timeline-track { position: relative; height: 28px !important; min-height: 0 !important; }
+  body.watch-mode #timeline-track { background: transparent !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
+  body.watch-mode #timeline-slider { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); width: 100%; margin: 0; opacity: 1;
+    height: 4px; border-radius: 2px; background: linear-gradient(to right, #fff var(--p, 0%), rgba(255,255,255,.3) var(--p, 0%)); }
+  body.watch-mode #timeline-slider::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+  body.watch-mode #timeline-slider::-moz-range-track { height: 4px; background: transparent; }
+  body.watch-mode #timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #fff; border: 0; opacity: 1; }
+  body.watch-mode #timeline-slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; opacity: 1; }
+  body.watch-mode .time-display, body.watch-mode #time-cur, body.watch-mode #time-total { color: #fff; }
+
   /* Header */
   /* The top bar: Quotient's 48px bar on the canvas -- transparent, no
      blur, no rule; the white panels below carry the depth. */
@@ -1543,6 +1572,32 @@ ${QUOTIENT_CSS}
       return window.matchMedia('(pointer: coarse)').matches || Math.min(window.screen.width, window.screen.height) < 700;
     } catch (e) { return false; }
   })();
+  // WATCH MODE (?view=watch): the same player, full screen, nothing to edit
+  // -- the phone Studio's Preview (Marc: "I don't want to make edits just
+  // want to watch"). What plays is exactly what the Studio plays, so it
+  // matches the render. Tap the picture to play or pause; the slider scrubs.
+  var WATCH = new URLSearchParams(window.location.search).get('view') === 'watch';
+  if (WATCH) {
+    document.body.classList.add('watch-mode');
+    (function wireWatch() {
+      var pc = document.getElementById('preview-container');
+      var tap = document.createElement('div'); tap.id = 'watch-tap';
+      tap.addEventListener('click', function() { var b = document.getElementById('play-btn'); if (b && !b.disabled) b.click(); });
+      if (pc) pc.appendChild(tap);
+      // The bar's white fill follows the playhead (the slider's own value).
+      setInterval(function() {
+        var sl = document.getElementById('timeline-slider');
+        if (sl) sl.style.setProperty('--p', ((Number(sl.value) || 0) / (Number(sl.max) || 1) * 100).toFixed(2) + '%');
+      }, 200);
+      // Back goes to the phone Studio of the same film (the link without ?desktop).
+      var lib = document.getElementById('library-btn');
+      if (lib) {
+        var q = new URLSearchParams(window.location.search); q.delete('view'); q.delete('desktop');
+        lib.setAttribute('href', '/studio?' + q.toString());
+        lib.innerHTML = '&#8592; Back';
+      }
+    })();
+  }
 
   // Append the URL token as a query param. The Authorization header alone is
   // not enough: proxies and middleboxes routinely strip Authorization from
@@ -2903,7 +2958,7 @@ ${QUOTIENT_CSS}
       // Mobile: don't boot the composite (all scenes' runtimes in one doc)
       // until the user asks for it.
       if (IS_MOBILE) {
-        els.previewPlaceholder.innerHTML = '<button id="mobile-load-preview" style="font:600 15px Inter,sans-serif;padding:14px 26px;border-radius:999px;border:0;background:var(--accent-blue);color:#fff;cursor:pointer;">\u25b6 Tap to load preview</button>';
+        els.previewPlaceholder.innerHTML = '<button id="mobile-load-preview" style="font:600 15px Inter,sans-serif;padding:14px 26px;border-radius:999px;border:0;background:var(--accent-blue);color:#fff;cursor:pointer;">' + (WATCH ? '\u25b6 Tap to watch' : '\u25b6 Tap to load preview') + '</button>';
         els.previewPlaceholder.style.display = '';
         var mlp = document.getElementById('mobile-load-preview');
         if (mlp) mlp.addEventListener('click', function() { startCompositePreview(state.currentProject); }, { once: true });
@@ -3318,7 +3373,7 @@ ${QUOTIENT_CSS}
     var nH = (project && project.canvas && project.canvas.height) || 1080;
 
     var rect = container.getBoundingClientRect();
-    var pad = 24;
+    var pad = WATCH ? 6 : 24;
     var scaleX = (rect.width - pad * 2) / nW;
     var scaleY = (rect.height - pad * 2) / nH;
     var scale = Math.min(scaleX, scaleY, 1);
@@ -9672,6 +9727,7 @@ ${QUOTIENT_CSS}
       (ltok ? (state.tenantId ? '&' : '?') + 'token=' + encodeURIComponent(ltok) : '');
   }
   function wireHomeLink() {
+    if (WATCH) return; // watch mode's Back goes to the phone Studio of this film (wireWatch)
     var lib = document.getElementById('library-btn');
     if (lib) lib.href = homeHref();
   }

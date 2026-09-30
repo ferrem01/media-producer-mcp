@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Phone Studio: Preview (watch a built film without rendering)
+
+Marc, on the desktop Studio squeezed onto his phone: "Is there a way to
+preview the video in a mobile view? I don't want to make edits just want to
+watch" -- and on the phone Studio's film card: "at the bottom there is
+preview and render". The phone could only play a RENDERED MP4.
+- The film card shows **Preview** beside **Render** once scenes are built
+  (Rebuild scenes moves to its own row). Preview opens
+  `/studio?...&desktop=1&view=watch`.
+- **Watch mode** (`?view=watch`, preview-app.ts): the Studio's own player --
+  what plays is what renders -- full screen on black; scene list, inspector,
+  lanes and editing controls hidden; "Tap to watch" (the phone gesture that
+  also unlocks audio); tap the picture to play/pause; a scrubber with a white
+  fill following the playhead; **Back** to the phone Studio of the film.
+- Checked in Chromium as an iPhone 13 with a mocked composite: plays, pauses,
+  a tap at 80% of the bar lands at 8.2 of 10 s, Back points home; no errors.
+
 ## 2026-09-30 — Generated take: name the HeyGen speech engine
 
 First live end-to-end run (a copy of Old Chimp, the sofa look, Marc's HeyGen

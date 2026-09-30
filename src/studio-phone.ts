@@ -534,7 +534,7 @@ ${QUOTIENT_CSS}
       var hint = document.createElement('div'); hint.className = 'meta';
       var proofOpen = openProof(scenes);
       hint.textContent = open.length ? (open.length + ' scene' + (open.length === 1 ? ' still needs' : 's still need') + ' a take before the film can be built.')
-        : built ? 'Scenes are built. Render to watch the film.' : 'Every take is in. Build the scenes, then render.';
+        : built ? 'Scenes are built. Preview plays them now; render for an MP4 to share.' : 'Every take is in. Build the scenes, then render.';
       if (proofOpen && !open.length) hint.textContent += ' ' + proofOpen + ' piece' + (proofOpen === 1 ? '' : 's') + ' of proof still to upload; the build runs without ' + (proofOpen === 1 ? 'it' : 'them') + '.';
       body.appendChild(hint);
     }
@@ -543,7 +543,17 @@ ${QUOTIENT_CSS}
     build.disabled = open.length > 0 || !!jobTimer; build.onclick = function () { startJob('build'); };
     var rend = document.createElement('button'); rend.className = 'btn' + (built ? '' : ' ghost'); rend.textContent = 'Render';
     rend.disabled = !built || !!jobTimer; rend.onclick = function () { startJob('render'); };
-    fa.appendChild(build); fa.appendChild(rend);
+    if (built) {
+      // PREVIEW: the built film played live, no render -- the Studio's own
+      // player in watch mode (full screen, nothing to edit).
+      var prev = document.createElement('a'); prev.className = 'btn ghost'; prev.textContent = 'Preview';
+      prev.href = link('/studio', '&desktop=1&view=watch');
+      fa.appendChild(prev); fa.appendChild(rend);
+      build.className = 'btn small ghost'; build.style.flexBasis = '100%';
+      fa.appendChild(build);
+    } else {
+      fa.appendChild(build); fa.appendChild(rend);
+    }
   }
 
   function load() {
