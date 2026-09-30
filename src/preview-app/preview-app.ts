@@ -128,7 +128,7 @@ ${QUOTIENT_CSS}
     text-align: center; padding: 5px 0; }
   body.mp-rendering #rendering-banner { display: block; }
   body.mp-rendering #slider-wrap, body.mp-rendering #lane-gutter, body.mp-rendering #inspector,
-  body.mp-rendering .scene-sb-btn, body.mp-rendering #booth-btn, body.mp-rendering #inspect-btn {
+  body.mp-rendering .scene-sb-btn, body.mp-rendering #booth-btn, body.mp-rendering #inspect-btn, body.mp-rendering #cast-btn {
     pointer-events: none; opacity: 0.55; }
   .btn-primary:hover { background: color-mix(in srgb, var(--primary) 90%, transparent); }
   .btn-secondary { background: var(--surface-primary); color: var(--content-primary); border: 1px solid var(--border-secondary); box-shadow: var(--shadow-weak); }
@@ -1081,6 +1081,14 @@ ${QUOTIENT_CSS}
   .np-cand small { position: absolute; right: 4px; bottom: 4px; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; }
   .np-cand:hover { border-color: var(--ring); }
   .np-cand.busy { opacity: .5; pointer-events: none; }
+  .cast-actor { position: relative; cursor: pointer; }
+  .cast-actor.sel, .np-cand.sel { outline: 2px solid var(--content-primary); outline-offset: -2px; }
+  .cast-actor .cast-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 13px; line-height: 20px; padding: 0; cursor: pointer; opacity: 0; }
+  .cast-actor:hover .cast-x { opacity: 1; }
+  .cast-add { display: flex; align-items: center; justify-content: center; cursor: pointer; color: #bbb; }
+  .cast-perf { cursor: pointer; }
+  .cast-perf.dis { opacity: .45; cursor: default; }
+  .cast-addp { margin-top: 8px; }
   .np-hint { font-size: 12px; color: var(--content-secondary); line-height: 1.5; }
   .np-hint b { color: var(--foreground); }
   .np-empty { font-size: 12px; color: var(--content-secondary); padding: 6px 0; }
@@ -1280,6 +1288,7 @@ ${QUOTIENT_CSS}
     <div class="header-controls">
       <button class="btn btn-secondary" id="project-delete-btn" style="display:none;" title="Delete this project &#8212; scenes, assets and rendered MP4. Asks first; cannot be undone.">&#128465;</button>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
+      <button class="btn btn-secondary" id="cast-btn" style="display:none;" title="Cast: who performs the person in this film &#8212; you, a recast actor, or a take generated from the script">&#127917; Cast</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <span id="render-wrap" style="display:none;align-items:center;gap:8px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
@@ -2887,6 +2896,9 @@ ${QUOTIENT_CSS}
         boothBtnEl.style.display = (project.scenes || []).length ? '' : 'none';
       }
       try { booth.script = null; } catch (eBS) {} // re-fetch per project
+      // Cast: offered on a built film a person carries (speaker / creator-cut, or any film with a take).
+      var castBtnEl = document.getElementById('cast-btn');
+      if (castBtnEl) castBtnEl.style.display = (project.scenes || []).length && castIsPersonFilm(project) ? '' : 'none';
 
       // Mobile: don't boot the composite (all scenes' runtimes in one doc)
       // until the user asks for it.
@@ -4280,6 +4292,10 @@ ${QUOTIENT_CSS}
       if (el) el.style.outline = on ? '2px solid var(--accent-blue)' : '';
     } catch (e) {}
   }
+  (function wireCast() {
+    var b = document.getElementById('cast-btn');
+    if (b) b.addEventListener('click', function() { if (state.currentProject) openCastCard(state.currentProject); });
+  })();
   (function wireInspector() {
     var btn = document.getElementById('inspect-btn');
     var panel = document.getElementById('inspector');
@@ -11183,6 +11199,366 @@ ${QUOTIENT_CSS}
   }
 
   // ── Studio modal (storyboard editor + regenerate progress) ──
+  // ── CAST (core/performers, core/recast.ts, core/generated-take.ts) ──
+  // Who performs the person in a speaker film: the recording itself; the
+  // recording RECAST as an actor through a vendor (HeyGen hears the voice
+  // and draws the person; Kling / Runway copy the recording's gestures onto
+  // a portrait); or a take GENERATED from the script (no recording; every
+  // vendor can animate the actor from the voice). One card: who plays now, the mode, the actor, the vendor,
+  // the voice, then go -- progress polled while the card is open.
+  var castUi = { project: null, data: null, mode: 'recast', actor: null, performer: null, voice: '', copy: true, timer: null, add: null, looks: null, pub: null, pubToken: null, pubGender: '', voices: null, lookTimer: null };
+  function castT() { return encodeURIComponent(state.tenantId); }
+  function castP() { return encodeURIComponent(castUi.project.project_id); }
+  function castIsPersonFilm(project) {
+    var g = project && project.treatment && project.treatment.filmGrammar;
+    return g === 'speaker' || g === 'creator-cut' || !!(project && project.takes && project.takes.length);
+  }
+  function castSay(msg, cls) { var el = document.getElementById('cast-status'); if (el) { el.textContent = msg || ''; el.className = 'sm-status' + (cls ? ' ' + cls : ''); } }
+  function castStopPoll() { if (castUi.timer) { clearTimeout(castUi.timer); castUi.timer = null; } if (castUi.lookTimer) { clearTimeout(castUi.lookTimer); castUi.lookTimer = null; } }
+  function openCastCard(project) {
+    castStopPoll();
+    castUi.project = project; castUi.add = null; castUi.data = null;
+    studioModalOpen('<h3 class="sm-title">Cast</h3><p class="sm-desc">Who performs the person in this film. Your recording is never changed &#8212; <b>Back to me</b> puts it back.</p>'
+      + '<div id="cast-body"><div class="np-empty">Loading…</div></div><div class="sm-status" id="cast-status"></div>'
+      + '<div class="sm-actions"><button class="sm-btn" id="cast-close">Close</button><button class="sm-btn primary" id="cast-go" disabled>Go</button></div>');
+    document.getElementById('cast-close').addEventListener('click', function() { castStopPoll(); studioModalClose(); });
+    document.getElementById('cast-go').addEventListener('click', castGo);
+    document.getElementById('cast-body').addEventListener('click', castClick);
+    document.getElementById('cast-body').addEventListener('change', castChange);
+    castLoad();
+  }
+  function castLoad() {
+    var p = castUi.project;
+    Promise.all([
+      api('/cast/' + castT()),
+      api('/recast/' + castT() + '/' + castP()),
+      api('/generated-take/' + castT() + '/' + castP()).catch(function() { return {}; }),
+      castUi.voices ? Promise.resolve(castUi.voices) : api('/cast/' + castT() + '/voices').catch(function() { return { elevenlabs: [], heygen: [] }; }),
+    ]).then(function(r) {
+      if (!document.getElementById('cast-body') || castUi.project !== p) return;
+      castUi.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, gen: r[2].generated_take || null };
+      castUi.voices = r[3];
+      if (castUi.actor && !castUi.data.cast.some(function(a) { return a.id === castUi.actor; })) castUi.actor = null;
+      if (!castUi.actor && castUi.data.cast.length) castUi.actor = (castUi.data.speaker_cast && castUi.data.cast.some(function(a) { return a.id === castUi.data.speaker_cast; })) ? castUi.data.speaker_cast : castUi.data.cast[0].id;
+      if (!castHasTake() && castUi.mode === 'recast') castUi.mode = 'generate';
+      castPickPerformer();
+      castRender();
+      if (castRunning()) castPoll();
+    }).catch(function(e) {
+      var body = document.getElementById('cast-body');
+      if (body) body.innerHTML = '<div class="np-empty">' + escHtml(e.message || String(e)) + '</div>';
+    });
+  }
+  function castHasTake() { var p = castUi.project; return !!(p && p.takes && p.takes.length); }
+  function castRunning() { var d = castUi.data; return !!(d && ((d.recast && d.recast.status === 'running') || (d.gen && d.gen.status === 'running'))); }
+  function castActorById(id) { var d = castUi.data; return d ? d.cast.filter(function(a) { return a.id === id; })[0] : null; }
+  function castPerfById(id) { var d = castUi.data; return d ? d.performers.filter(function(p) { return p.id === id; })[0] : null; }
+  // The vendor when the user has not chosen: HeyGen for a HeyGen look (the
+  // actor tests' winner), else the best video-driven vendor that is set up.
+  // Generating needs a vendor driven by audio.
+  function castPickPerformer() {
+    var d = castUi.data; if (!d) return;
+    var ok = function(p) { return p && p.available && (castUi.mode !== 'generate' || p.generate); };
+    if (ok(castPerfById(castUi.performer))) return;
+    var a = castActorById(castUi.actor);
+    var order = (a && a.heygen_look_id) || castUi.mode === 'generate' ? ['heygen', 'kling', 'runway'] : ['kling', 'heygen', 'runway'];
+    castUi.performer = null;
+    for (var i = 0; i < order.length; i++) if (ok(castPerfById(order[i]))) { castUi.performer = order[i]; break; }
+  }
+  function castRender() {
+    var body = document.getElementById('cast-body'); var d = castUi.data;
+    if (!body || !d) return;
+    var h = '';
+    // Who plays now.
+    var now = d.speaker_cast ? castActorById(d.speaker_cast) : null;
+    var nowRc = d.recast && d.recast.actor === d.speaker_cast ? d.recast : null;
+    h += '<div class="np-block"><div class="np-lead">Now performing</div><div class="np-row"><div class="np-what">'
+      + (now ? escHtml(now.name) + '<small>' + escHtml(nowRc && nowRc.performer ? (castPerfById(nowRc.performer) || {}).label || nowRc.performer : 'recast') + '</small>' : (castHasTake() ? 'You &#8212; your recording' : 'Nobody yet &#8212; no take'))
+      + '</div><div class="np-act">' + (d.speaker_cast ? '<button class="np-btn" data-cast-me="1">Back to me</button>' : '') + '</div></div>';
+    if (castRunning()) {
+      var job = d.recast && d.recast.status === 'running' ? d.recast : d.gen;
+      var f = job.files && job.files[0];
+      var stage = (f && f.stage) || job.stage || 'starting';
+      var chunks = f && f.chunks_total ? ' · ' + f.chunks_done + ' of ' + f.chunks_total : '';
+      h += '<div class="np-armed"><span></span>' + (job === d.gen ? 'Generating the take' : 'Recasting') + ' as ' + escHtml((castActorById(job.actor) || {}).name || job.actor) + ' &#8212; ' + escHtml(stage) + chunks + '</div>';
+    } else if (d.recast && d.recast.status === 'failed') {
+      h += '<div class="np-note">Last recast failed: ' + escHtml(d.recast.error || '') + '</div>';
+    } else if (d.gen && d.gen.status === 'failed') {
+      h += '<div class="np-note">Last generated take failed: ' + escHtml(d.gen.error || '') + '</div>';
+    }
+    h += '</div>';
+    // The mode.
+    h += '<div class="np-block"><div class="np-tabs">'
+      + '<button class="np-btn' + (castUi.mode === 'recast' ? ' active' : '') + '" data-cast-mode="recast"' + (castHasTake() ? '' : ' disabled title="Record a take first"') + '>Recast my recording</button>'
+      + '<button class="np-btn' + (castUi.mode === 'generate' ? ' active' : '') + '" data-cast-mode="generate">Generate from the script</button></div>'
+      + '<div class="np-hint">' + (castUi.mode === 'recast'
+        ? 'Your take stays the clock: the same words, timing and cuts, performed by the actor.'
+        : 'No recording: the script is voiced and performed, then attached as this film&#8217;s take.') + '</div></div>';
+    // The actor.
+    h += '<div class="np-block"><div class="np-lead">Actor</div><div class="np-grid">';
+    d.cast.forEach(function(a) {
+      h += '<div class="np-cand tall cast-actor' + (a.id === castUi.actor ? ' sel' : '') + '" data-actor="' + escAttr(a.id) + '">'
+        + '<img src="' + escAttr(withToken('/api/cast/' + castT() + '/' + encodeURIComponent(a.id) + '/portrait')) + '" alt="">'
+        + '<small>' + escHtml(a.name) + (a.heygen_look_id ? ' · HeyGen' : '') + '</small>'
+        + '<button class="cast-x" data-cast-x="' + escAttr(a.id) + '" title="Remove from the cast">×</button></div>';
+    });
+    h += '<div class="np-cand tall cast-add' + (castUi.add ? ' sel' : '') + '" data-cast-add="1"><span>+ Add actor</span></div></div>';
+    if (castUi.add) h += castAddHtml();
+    h += '</div>';
+    // The vendor.
+    h += '<div class="np-block"><div class="np-lead">Performed by</div>';
+    d.performers.forEach(function(p) {
+      var usable = p.available && (castUi.mode !== 'generate' || p.generate);
+      var why = !p.available ? 'not set up on this server' : (!usable ? 'copies a recording, so it cannot perform a script' : '');
+      h += '<label class="np-row cast-perf' + (usable ? '' : ' dis') + '"><div class="np-what"><input type="radio" name="cast-perf" value="' + escAttr(p.id) + '"'
+        + (p.id === castUi.performer ? ' checked' : '') + (usable ? '' : ' disabled') + '> <b>' + escHtml(p.label) + '</b>' + (p.experimental ? ' <small>experimental</small>' : '')
+        + '<small>' + escHtml(p.keeps) + ' · ' + escHtml(p.limits) + ' · ~' + p.minutesPer30s + ' min per 30 s' + (why ? ' · ' + why : '') + '</small></div></label>';
+    });
+    h += '</div>';
+    // The voice.
+    h += '<div class="np-block"><div class="np-lead">Voice</div><div class="np-row"><div class="np-what"><select id="cast-voice" class="np-search">' + castVoiceOptions() + '</select></div>'
+      + '<div class="np-act"><button class="np-btn" data-cast-hear="1" title="Hear this voice">&#9654;</button></div></div></div>';
+    if (castUi.mode === 'generate') {
+      h += '<div class="np-block"><label class="np-row"><div class="np-what"><input type="checkbox" id="cast-copy"' + (castUi.copy ? ' checked' : '') + '> Make a copy of this film first'
+        + '<small>A generated take replaces this film&#8217;s take and re-times its scenes. The copy leaves this one as it is.</small></div></label></div>';
+    }
+    body.innerHTML = h;
+    castGoLabel();
+  }
+  function castVoiceOptions() {
+    var v = castUi.voices || { elevenlabs: [], heygen: [] };
+    var a = castActorById(castUi.actor);
+    var o = '';
+    var opt = function(val, label) { return '<option value="' + escAttr(val) + '"' + (val === castUi.voice ? ' selected' : '') + '>' + escHtml(label) + '</option>'; };
+    if (castUi.mode === 'recast') {
+      if (castUi.voice && castUi.voice.indexOf('eleven:') !== 0) castUi.voice = '';
+      o += opt('', 'My recorded voice');
+    } else {
+      if (!castUi.voice) castUi.voice = a && a.heygen_look_id ? 'look' : ((v.heygen && v.heygen[0]) ? 'heygen:' + v.heygen[0].id : '');
+      if (a && a.heygen_look_id) o += opt('look', 'The look’s own HeyGen voice');
+      (v.heygen || []).forEach(function(x) { o += opt('heygen:' + x.id, 'HeyGen · ' + x.name); });
+    }
+    (v.elevenlabs || []).forEach(function(x) { o += opt('eleven:' + x.id, 'ElevenLabs · ' + x.name + (x.category === 'cloned' ? ' (clone)' : '')); });
+    return o;
+  }
+  function castGoLabel() {
+    var b = document.getElementById('cast-go'); if (!b) return;
+    var a = castActorById(castUi.actor), p = castPerfById(castUi.performer);
+    b.disabled = !a || !p || castRunning() || (castUi.mode === 'recast' && !castHasTake()) || (castUi.mode === 'generate' && !castUi.voice);
+    b.textContent = castUi.mode === 'recast' ? 'Recast as ' + (a ? a.name : '…') + (p ? ' with ' + p.label : '') : 'Generate the take' + (p ? ' with ' + p.label : '');
+  }
+  function castAddHtml() {
+    var h = '<div class="np-panel cast-addp"><div class="np-tabs">';
+    [['looks', 'My HeyGen looks'], ['pub', 'HeyGen presenters'], ['photo', 'A photo'], ['new', 'New look']].forEach(function(t) {
+      h += '<button class="np-btn' + (castUi.add === t[0] ? ' active' : '') + '" data-cast-addtab="' + t[0] + '">' + t[1] + '</button>';
+    });
+    h += '</div>';
+    if (castUi.add === 'looks' || castUi.add === 'new') {
+      if (!castUi.looks) { h += '<div class="np-empty">Loading your looks…</div>'; castLoadLooks(); }
+      else if (!castUi.looks.length) h += '<div class="np-empty">No looks on your HeyGen account.</div>';
+      else {
+        if (castUi.add === 'new') h += '<div class="np-hint">Pick the look to start from, describe the setting and clothes, then Make it. HeyGen keeps your face.</div>'
+          + '<div class="np-row"><div class="np-what"><input id="cast-newprompt" class="np-search" placeholder="On a couch in a warm living room, grey sweater"></div><div class="np-act"><button class="np-btn" data-cast-make="1">Make it</button></div></div>';
+        h += '<div class="np-grid">';
+        castUi.looks.forEach(function(l) {
+          h += '<div class="np-cand tall' + (castUi.add === 'new' && castUi.newBase === l.id ? ' sel' : '') + '" data-' + (castUi.add === 'new' ? 'cast-base' : 'cast-look') + '="' + escAttr(l.id) + '">'
+            + (l.preview ? '<img src="' + escAttr(l.preview) + '" alt="">' : '') + '<small>' + escHtml(l.name || l.id) + (l.type === 'digital_twin' ? ' · twin' : '') + '</small></div>';
+        });
+        h += '</div>';
+      }
+    } else if (castUi.add === 'pub') {
+      h += '<div class="np-tabs">' + [['', 'All'], ['male', 'Men'], ['female', 'Women']].map(function(g) {
+        return '<button class="np-btn' + (castUi.pubGender === g[0] ? ' active' : '') + '" data-cast-gender="' + g[0] + '">' + g[1] + '</button>';
+      }).join('') + '</div>';
+      if (!castUi.pub) { h += '<div class="np-empty">Loading presenters…</div>'; castLoadPub(false); }
+      else {
+        h += '<div class="np-grid">';
+        castUi.pub.forEach(function(l) {
+          h += '<div class="np-cand tall" data-cast-look="' + escAttr(l.id) + '">' + (l.preview ? '<img src="' + escAttr(l.preview) + '" alt="">' : '') + '<small>' + escHtml(l.name || l.id) + '</small></div>';
+        });
+        h += '</div>' + (castUi.pubToken ? '<button class="np-btn" data-cast-more="1">More</button>' : '');
+      }
+    } else if (castUi.add === 'photo') {
+      h += '<div class="np-hint">A clear, front-facing photo. Kling and Runway copy your gestures onto it (or animate it from the voice); HeyGen animates it from the voice.</div>'
+        + '<div class="np-row"><div class="np-what"><input id="cast-photoname" class="np-search" placeholder="Name (e.g. Customer)"></div></div>'
+        + '<label class="np-row"><div class="np-what"><input type="checkbox" id="cast-consent"> This is me, or a person who agreed to be cast.</div></label>'
+        + '<div class="np-row"><div class="np-what"><input type="file" id="cast-photo" accept="image/*"></div></div>';
+    }
+    return h + '</div>';
+  }
+  function castLoadLooks() {
+    api('/heygen-avatars/' + castT() + '?looks=1').then(function(r) {
+      castUi.looks = (r.looks || []).filter(function(l) { return !l.status || l.status === 'completed'; });
+      castRender();
+    }).catch(function(e) { castUi.looks = []; castRender(); castSay(e.message || String(e), 'err'); });
+  }
+  function castLoadPub(more) {
+    var q = '?public=1' + (castUi.pubGender ? '&gender=' + castUi.pubGender : '') + (more && castUi.pubToken ? '&token=' + encodeURIComponent(castUi.pubToken) : '');
+    api('/heygen-avatars/' + castT() + q).then(function(r) {
+      castUi.pub = (more ? castUi.pub || [] : []).concat(r.looks || []);
+      castUi.pubToken = r.next_token || null;
+      castRender();
+    }).catch(function(e) { castUi.pub = []; castRender(); castSay(e.message || String(e), 'err'); });
+  }
+  function castAddActor(body, what) {
+    castSay('Adding ' + what + '…');
+    return api('POST', '/cast/' + castT(), body).then(function(a) {
+      castUi.actor = a.id; castUi.add = null; castUi.performer = null;
+      castSay(a.name + ' is in the cast.', 'ok');
+      castLoad();
+    }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+  }
+  function castClick(ev) {
+    var t = ev.target;
+    var el = function(attr) { var n = t.closest ? t.closest('[' + attr + ']') : null; return n ? n.getAttribute(attr) : null; };
+    var v;
+    if ((v = el('data-cast-x'))) {
+      ev.stopPropagation();
+      var ax = castActorById(v);
+      if (!confirm('Remove ' + (ax ? ax.name : v) + ' from the cast? Recasts already made stay on their films.')) return;
+      api('DELETE', '/cast/' + castT() + '/' + encodeURIComponent(v)).then(function() { castLoad(); }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
+    if ((v = el('data-actor'))) { castUi.actor = v; castUi.add = null; castUi.voice = ''; castUi.performer = null; castPickPerformer(); castRender(); return; }
+    if (el('data-cast-add')) { castUi.add = castUi.add ? null : 'looks'; castRender(); return; }
+    if ((v = el('data-cast-addtab'))) { castUi.add = v; castRender(); return; }
+    if ((v = el('data-cast-mode'))) { castUi.mode = v; castUi.voice = ''; castPickPerformer(); castRender(); return; }
+    if ((v = el('data-cast-look'))) { castAddActor({ heygen_look_id: v }, 'the look'); return; }
+    if ((v = el('data-cast-base'))) { castUi.newBase = v; castRender(); return; }
+    if (el('data-cast-gender') !== null && t.closest && t.closest('[data-cast-gender]')) { castUi.pubGender = el('data-cast-gender'); castUi.pub = null; castUi.pubToken = null; castRender(); return; }
+    if (el('data-cast-more')) { castLoadPub(true); return; }
+    if (el('data-cast-make')) { castMakeLook(); return; }
+    if (el('data-cast-me')) {
+      api('POST', '/recast/' + castT() + '/' + castP(), { actor: null }).then(function() {
+        studioStatus('Back to you: your recording performs again.', 'ok');
+        loadProject(castUi.project.project_id); castLoad();
+      }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
+    if (el('data-cast-hear')) { castHear(); return; }
+  }
+  function castChange(ev) {
+    var t = ev.target;
+    if (t.name === 'cast-perf') { castUi.performer = t.value; castGoLabel(); return; }
+    if (t.id === 'cast-voice') { castUi.voice = t.value; castGoLabel(); return; }
+    if (t.id === 'cast-copy') { castUi.copy = !!t.checked; return; }
+    if (t.id === 'cast-photo') { castUploadPhoto(t); return; }
+  }
+  var castAudio = null;
+  function castHear() {
+    var v = castUi.voices || {}, sel = castUi.voice, url = null;
+    if (!sel) { castSay('Your recorded voice: play the film to hear it.'); return; }
+    if (sel === 'look') { castSay('The look’s own voice has no sample here: generate to hear it.'); return; }
+    var id = sel.slice(sel.indexOf(':') + 1);
+    var list = sel.indexOf('eleven:') === 0 ? v.elevenlabs || [] : v.heygen || [];
+    list.forEach(function(x) { if (x.id === id) url = x.preview; });
+    if (!url) { castSay('No sample for this voice.'); return; }
+    try { if (castAudio) castAudio.pause(); castAudio = new Audio(url); castAudio.play(); } catch (e) {}
+  }
+  function castMakeLook() {
+    var promptEl = document.getElementById('cast-newprompt');
+    var prompt = promptEl ? promptEl.value.trim() : '';
+    if (!castUi.newBase) { castSay('Pick the look to start from.', 'err'); return; }
+    if (!prompt) { castSay('Describe the setting and clothes.', 'err'); return; }
+    castSay('Making the look… (usually under a minute)');
+    api('POST', '/heygen-avatars/' + castT(), { avatar_id: castUi.newBase, prompt: prompt, name: prompt.slice(0, 50), aspect_ratio: '9:16' }).then(function(l) {
+      var tries = 0;
+      var check = function() {
+        api('/heygen-avatars/' + castT() + '/' + encodeURIComponent(l.id)).then(function(s) {
+          if (s.status === 'completed') { castUi.looks = null; castAddActor({ heygen_look_id: l.id, name: prompt.slice(0, 50) }, 'the new look'); return; }
+          if (s.status === 'failed') { castSay('HeyGen could not make that look.', 'err'); return; }
+          if (++tries > 60) { castSay('The look is taking long: it will be under My HeyGen looks when it is ready.', 'warn'); return; }
+          castUi.lookTimer = setTimeout(check, 5000);
+        }).catch(function() { castUi.lookTimer = setTimeout(check, 8000); });
+      };
+      castUi.lookTimer = setTimeout(check, 5000);
+    }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+  }
+  function castUploadPhoto(input) {
+    var file = input.files && input.files[0]; if (!file) return;
+    var consent = document.getElementById('cast-consent');
+    var nameEl = document.getElementById('cast-photoname');
+    if (!consent || !consent.checked) { castSay('Confirm this is you, or a person who agreed to be cast.', 'err'); input.value = ''; return; }
+    var name = (nameEl && nameEl.value.trim()) || file.name.replace(/[.][^.]+$/, '');
+    var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    var fname = 'cast-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
+    var pid = castUi.project.project_id;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', withToken('/api/upload-asset/' + castT() + '/' + encodeURIComponent(pid) + '?name=' + encodeURIComponent(fname)));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (_token) xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+    xhr.onerror = function() { castSay('Upload failed (network).', 'err'); };
+    xhr.onload = function() {
+      var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
+      if (xhr.status < 200 || xhr.status >= 300 || !up.url) { castSay('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), 'err'); return; }
+      // The cast keeps its own copy: the actor outlives this film.
+      var rel = up.url.replace('/assets/' + state.tenantId + '/', '');
+      castAddActor({ name: name, image: rel, consent: true }, name);
+    };
+    castSay('Uploading…');
+    xhr.send(file);
+  }
+  function castGo() {
+    var a = castActorById(castUi.actor), p = castPerfById(castUi.performer);
+    if (!a || !p) return;
+    var go = document.getElementById('cast-go'); if (go) go.disabled = true;
+    var t = state.tenantId;
+    if (castUi.mode === 'recast') {
+      var voiceId = castUi.voice.indexOf('eleven:') === 0 ? castUi.voice.slice(7) : 'mine';
+      castSay('Starting the recast…');
+      api('POST', '/recast/' + castT() + '/' + castP(), { actor: a.id, performer: p.id, voice_id: voiceId }).then(function(st) {
+        castUi.data.recast = st;
+        castSay(st.files && st.files.every(function(f) { return f.status === 'reused'; }) ? 'Already made: switching.' : 'Recasting as ' + a.name + ' with ' + p.label + ' (~' + p.minutesPer30s + ' min per 30 s of take).', 'ok');
+        castRender(); castPoll();
+      }).catch(function(e) { castSay(e.message || String(e), 'err'); castGoLabel(); });
+      return;
+    }
+    var sel = castUi.voice;
+    var body = { actor: a.id, performer: p.id, voice: sel.indexOf('eleven:') === 0 ? 'elevenlabs' : 'heygen' };
+    if (sel !== 'look') body.voice_id = sel.slice(sel.indexOf(':') + 1);
+    var start = function(pid) {
+      return api('POST', '/generated-take/' + encodeURIComponent(t) + '/' + encodeURIComponent(pid), body).then(function(st) {
+        castUi.data.gen = st;
+        castSay('Generating the take: voice, then ' + p.label + ', then it re-times the scenes.', 'ok');
+        castRender(); castPoll();
+      });
+    };
+    var run = castUi.copy
+      ? api('POST', '/projects/' + castT() + '/' + castP() + '/duplicate', { name: (castUi.project.name || 'Film') + ' (generated take)' }).then(function(copy) {
+          var cp = copy.project || copy;
+          castUi.project = cp;
+          studioStatus('Working on a copy: ' + (cp.name || cp.project_id) + '.', 'ok');
+          loadProject(cp.project_id);
+          return start(cp.project_id);
+        })
+      : start(castUi.project.project_id);
+    run.catch(function(e) { castSay(e.message || String(e), 'err'); castGoLabel(); });
+  }
+  function castPoll() {
+    if (castUi.timer) clearTimeout(castUi.timer);
+    var p = castUi.project;
+    castUi.timer = setTimeout(function() {
+      if (!document.getElementById('cast-body') || castUi.project !== p) { castUi.timer = null; return; }
+      var wasRunning = castRunning();
+      Promise.all([
+        api('/recast/' + castT() + '/' + castP()),
+        api('/generated-take/' + castT() + '/' + castP()).catch(function() { return {}; }),
+      ]).then(function(r) {
+        if (!castUi.data || castUi.project !== p) return;
+        castUi.data.speaker_cast = r[0].speaker_cast || null; castUi.data.recast = r[0].recast || null; castUi.data.gen = r[1].generated_take || null;
+        if (castRunning()) { castRender(); castPoll(); return; }
+        castUi.timer = null;
+        if (wasRunning) {
+          var failed = (castUi.data.recast && castUi.data.recast.status === 'failed') || (castUi.data.gen && castUi.data.gen.status === 'failed');
+          if (failed) castSay('It failed: ' + ((castUi.data.gen && castUi.data.gen.error) || (castUi.data.recast && castUi.data.recast.error) || ''), 'err');
+          else { castSay('Done. Play the film to see it; render when you are ready.', 'ok'); studioStatus('Cast: done.', 'ok'); }
+          loadProject(p.project_id);
+        }
+        castRender();
+      }).catch(function() { castPoll(); });
+    }, 4000);
+  }
+
   function studioModalOpen(html) {
     var card = document.getElementById('studio-modal-card');
     var back = document.getElementById('studio-modal');

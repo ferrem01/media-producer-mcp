@@ -102,6 +102,15 @@ ${QUOTIENT_CSS}
   .proof .ev .what { flex: 1 1 auto; font-size: 14px; line-height: 1.35; }
   .proof .ev .what small { display: block; color: var(--muted-foreground); font-size: 12px; }
   .proof .ev img, .proof .ev video { width: 56px; height: 56px; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-tertiary); flex: 0 0 auto; }
+  /* THE CAST card: actors as portrait chips in a scrolling row. */
+  .cast select { width: 100%; box-sizing: border-box; padding: 8px 10px; font: 14px/20px var(--font-sans); border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--card); color: var(--foreground); }
+  .castrow { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 6px; -webkit-overflow-scrolling: touch; }
+  .castpic { flex: 0 0 76px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: #111; padding: 0; overflow: hidden; cursor: pointer; position: relative; aspect-ratio: 4 / 5; }
+  .castpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .castpic span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; line-height: 13px; padding: 2px 4px; background: rgba(0,0,0,.6); color: #fff; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .castpic.sel { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .castpic.add { display: flex; align-items: center; justify-content: center; }
+  .castpic.add span { position: static; background: none; color: #bbb; font-size: 12px; text-align: center; }
   .status { color: var(--muted-foreground); font-size: 14px; margin: 10px 0; }
   .status:empty, #topActions:empty { display: none; }
   .status.err { color: var(--destructive); }
@@ -125,6 +134,7 @@ ${QUOTIENT_CSS}
   <div class="status" id="status"></div>
 </div>
 <div id="needs"></div>
+<div id="cast"></div>
 <div id="cards"></div>
 <div class="card" id="filmCard" style="display:none">
   <div class="head"><div class="label">The film</div><div class="dur" id="filmMeta"></div></div>
@@ -405,6 +415,11 @@ ${QUOTIENT_CSS}
       shareB.onclick = function () { shareFilm(shareB); };
       top.appendChild(shareB);
     }
+    if (speaker && (P.scenes || []).length) {
+      var castB = document.createElement('button'); castB.className = 'btn small' + (C.open ? '' : ' ghost'); castB.textContent = 'Cast';
+      castB.onclick = castToggle;
+      top.appendChild(castB);
+    }
     var teamA = document.createElement('a'); teamA.className = 'btn small'; teamA.textContent = 'Team';
     teamA.href = '/team?tenant=' + encodeURIComponent(tenant) + (token ? '&token=' + encodeURIComponent(token) : '');
     top.appendChild(teamA);
@@ -672,6 +687,167 @@ ${QUOTIENT_CSS}
     };
     xhr.send(f);
   });
+
+  // ── CAST (the desktop Studio's Cast card, compact) ──
+  // Who performs the person: you, your recording recast as an actor
+  // through a vendor, or a take generated from the script. Opened from the
+  // top row; progress polled while it runs.
+  var C = { open: false, data: null, voices: null, mode: 'recast', actor: null, performer: null, voice: '', copy: true, timer: null, looks: null, adding: false };
+  function castTP() { return encodeURIComponent(tenant) + '/' + encodeURIComponent(project); }
+  function castHasTake() { return !!(P && P.takes && P.takes.length); }
+  function castRunning() { var d = C.data; return !!(d && ((d.recast && d.recast.status === 'running') || (d.gen && d.gen.status === 'running'))); }
+  function castActor(id) { return C.data ? C.data.cast.filter(function (a) { return a.id === id; })[0] : null; }
+  function castPerf(id) { return C.data ? C.data.performers.filter(function (p) { return p.id === id; })[0] : null; }
+  function castPick() {
+    var ok = function (p) { return p && p.available && (C.mode !== 'generate' || p.generate); };
+    if (ok(castPerf(C.performer))) return;
+    var a = castActor(C.actor);
+    var order = (a && a.heygen_look_id) || C.mode === 'generate' ? ['heygen', 'kling', 'runway'] : ['kling', 'heygen', 'runway'];
+    C.performer = null;
+    for (var i = 0; i < order.length; i++) if (ok(castPerf(order[i]))) { C.performer = order[i]; break; }
+  }
+  function castLoad() {
+    return Promise.all([
+      api('GET', '/cast/' + encodeURIComponent(tenant)),
+      api('GET', '/recast/' + castTP()),
+      api('GET', '/generated-take/' + castTP()).catch(function () { return {}; }),
+      C.voices ? Promise.resolve(C.voices) : api('GET', '/cast/' + encodeURIComponent(tenant) + '/voices').catch(function () { return { elevenlabs: [], heygen: [] }; }),
+    ]).then(function (r) {
+      C.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, gen: r[2].generated_take || null };
+      C.voices = r[3];
+      if (C.actor && !castActor(C.actor)) C.actor = null;
+      if (!C.actor && C.data.cast.length) C.actor = castActor(C.data.speaker_cast) ? C.data.speaker_cast : C.data.cast[0].id;
+      if (!castHasTake()) C.mode = 'generate';
+      castPick(); castRender();
+      if (castRunning()) castPoll();
+    }).catch(function (e) { say(e.message || String(e), true); });
+  }
+  function castRender() {
+    var box = $('cast'); if (!box) return;
+    if (!C.open) { box.innerHTML = ''; return; }
+    var d = C.data;
+    if (!d) { box.innerHTML = '<div class="music"><div class="now">Loading the cast…</div></div>'; return; }
+    var h = '<div class="music cast">';
+    var now = castActor(d.speaker_cast);
+    h += '<div class="now">' + (now ? 'Performed by <b>' + esc(now.name) + '</b>' : (castHasTake() ? 'Performed by <b>you</b> (your recording)' : 'No take yet')) + '<small>Your recording is never changed; Back to me puts it back.</small></div>';
+    if (d.speaker_cast) h += '<div class="row"><button class="btn small ghost" data-c="me">Back to me</button></div>';
+    if (castRunning()) {
+      var job = d.recast && d.recast.status === 'running' ? d.recast : d.gen, f = job.files && job.files[0];
+      h += '<div class="meta">' + (job === d.gen ? 'Generating the take' : 'Recasting') + ' as ' + esc((castActor(job.actor) || {}).name || job.actor) + ' — ' + esc((f && f.stage) || job.stage || 'starting') + (f && f.chunks_total ? ' · ' + f.chunks_done + ' of ' + f.chunks_total : '') + '</div>';
+    } else if (d.recast && d.recast.status === 'failed') h += '<div class="meta">Last recast failed: ' + esc(d.recast.error || '') + '</div>';
+    else if (d.gen && d.gen.status === 'failed') h += '<div class="meta">Last generated take failed: ' + esc(d.gen.error || '') + '</div>';
+    h += '<div class="row"><button class="btn small' + (C.mode === 'recast' ? '' : ' ghost') + '" data-c="mode:recast"' + (castHasTake() ? '' : ' disabled') + '>Recast my recording</button>'
+      + '<button class="btn small' + (C.mode === 'generate' ? '' : ' ghost') + '" data-c="mode:generate">From the script</button></div>';
+    h += '<div class="group">Actor</div><div class="castrow">';
+    d.cast.forEach(function (a) {
+      h += '<button class="castpic' + (a.id === C.actor ? ' sel' : '') + '" data-c="actor:' + esc(a.id) + '"><img src="' + esc(withToken('/api/cast/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(a.id) + '/portrait')) + '" alt=""><span>' + esc(a.name) + '</span></button>';
+    });
+    h += '<button class="castpic add" data-c="add"><span>+ Look</span></button></div>';
+    if (C.adding) {
+      if (!C.looks) { h += '<div class="meta">Loading your HeyGen looks…</div>'; castLooks(); }
+      else if (!C.looks.length) h += '<div class="meta">No looks on your HeyGen account. Add actors in the desktop Studio.</div>';
+      else {
+        h += '<div class="castrow">';
+        C.looks.forEach(function (l) { h += '<button class="castpic" data-c="look:' + esc(l.id) + '">' + (l.preview ? '<img src="' + esc(l.preview) + '" alt="">' : '') + '<span>' + esc(l.name || l.id) + '</span></button>'; });
+        h += '</div>';
+      }
+    }
+    h += '<div class="group">Performed by</div><select id="castPerf">';
+    d.performers.forEach(function (p) {
+      var usable = p.available && (C.mode !== 'generate' || p.generate);
+      h += '<option value="' + esc(p.id) + '"' + (p.id === C.performer ? ' selected' : '') + (usable ? '' : ' disabled') + '>' + esc(p.label) + (usable ? '' : (p.available ? ' (recordings only)' : ' (not set up)')) + '</option>';
+    });
+    h += '</select>';
+    var perf = castPerf(C.performer);
+    if (perf) h += '<div class="meta">' + esc(perf.keeps) + '. ' + esc(perf.limits) + ' · ~' + perf.minutesPer30s + ' min per 30 s</div>';
+    h += '<div class="group">Voice</div><select id="castVoice">' + castVoiceOpts() + '</select>';
+    if (C.mode === 'generate') h += '<label class="meta"><input type="checkbox" id="castCopy"' + (C.copy ? ' checked' : '') + ' style="display:inline"> Make a copy of this film first (a generated take replaces this film’s take)</label>';
+    var a = castActor(C.actor);
+    var can = a && perf && !castRunning() && (C.mode !== 'recast' || castHasTake()) && (C.mode !== 'generate' || C.voice);
+    h += '<div class="row"><button class="btn" data-c="go"' + (can ? '' : ' disabled') + '>' + (C.mode === 'recast' ? 'Recast as ' + esc(a ? a.name : '…') : 'Generate the take') + '</button></div>';
+    box.innerHTML = h + '</div>';
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function castVoiceOpts() {
+    var v = C.voices || { elevenlabs: [], heygen: [] }, a = castActor(C.actor), o = '';
+    var opt = function (val, label) { return '<option value="' + esc(val) + '"' + (val === C.voice ? ' selected' : '') + '>' + esc(label) + '</option>'; };
+    if (C.mode === 'recast') { if (C.voice && C.voice.indexOf('eleven:') !== 0) C.voice = ''; o += opt('', 'My recorded voice'); }
+    else {
+      if (!C.voice) C.voice = a && a.heygen_look_id ? 'look' : ((v.heygen && v.heygen[0]) ? 'heygen:' + v.heygen[0].id : '');
+      if (a && a.heygen_look_id) o += opt('look', 'The look’s own HeyGen voice');
+      (v.heygen || []).forEach(function (x) { o += opt('heygen:' + x.id, 'HeyGen · ' + x.name); });
+    }
+    (v.elevenlabs || []).forEach(function (x) { o += opt('eleven:' + x.id, 'ElevenLabs · ' + x.name); });
+    return o;
+  }
+  function castLooks() {
+    api('GET', '/heygen-avatars/' + encodeURIComponent(tenant) + '?looks=1').then(function (r) {
+      C.looks = (r.looks || []).filter(function (l) { return !l.status || l.status === 'completed'; }); castRender();
+    }).catch(function (e) { C.looks = []; castRender(); say(e.message || String(e), true); });
+  }
+  function castTap(ev) {
+    var b = ev.target.closest ? ev.target.closest('[data-c]') : null; if (!b) return;
+    var c = b.getAttribute('data-c'), arg = c.slice(c.indexOf(':') + 1);
+    if (c === 'me') {
+      api('POST', '/recast/' + castTP(), { actor: null }).then(function () { say('Back to you: your recording performs again.'); castLoad(); load(); }).catch(function (e) { say(e.message || String(e), true); });
+    } else if (c.indexOf('mode:') === 0) { C.mode = arg; C.voice = ''; castPick(); castRender(); }
+    else if (c.indexOf('actor:') === 0) { C.actor = arg; C.voice = ''; C.performer = null; C.adding = false; castPick(); castRender(); }
+    else if (c === 'add') { C.adding = !C.adding; castRender(); }
+    else if (c.indexOf('look:') === 0) {
+      say('Adding the look…');
+      api('POST', '/cast/' + encodeURIComponent(tenant), { heygen_look_id: arg }).then(function (a) { C.actor = a.id; C.adding = false; C.performer = null; say(a.name + ' is in the cast.'); castLoad(); })
+        .catch(function (e) { say(e.message || String(e), true); });
+    } else if (c === 'go') castGo();
+  }
+  function castChange(ev) {
+    var t = ev.target;
+    if (t.id === 'castPerf') { C.performer = t.value; castRender(); }
+    else if (t.id === 'castVoice') { C.voice = t.value; castRender(); }
+    else if (t.id === 'castCopy') { C.copy = !!t.checked; }
+  }
+  function castGo() {
+    var a = castActor(C.actor), p = castPerf(C.performer); if (!a || !p) return;
+    if (C.mode === 'recast') {
+      say('Starting the recast…');
+      api('POST', '/recast/' + castTP(), { actor: a.id, performer: p.id, voice_id: C.voice.indexOf('eleven:') === 0 ? C.voice.slice(7) : 'mine' })
+        .then(function (st) { C.data.recast = st; say('Recasting as ' + a.name + ' with ' + p.label + '.'); castRender(); castPoll(); })
+        .catch(function (e) { say(e.message || String(e), true); });
+      return;
+    }
+    var body = { actor: a.id, performer: p.id, voice: C.voice.indexOf('eleven:') === 0 ? 'elevenlabs' : 'heygen' };
+    if (C.voice !== 'look') body.voice_id = C.voice.slice(C.voice.indexOf(':') + 1);
+    var start = function (pid) { return api('POST', '/generated-take/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(pid), body); };
+    if (C.copy) {
+      say('Copying the film…');
+      api('POST', '/projects/' + castTP() + '/duplicate', { name: (P.name || 'Film') + ' (generated take)' }).then(function (cp) {
+        return start(cp.project_id).then(function () {
+          // Follow the copy: its Studio shows the take as it lands.
+          location.href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(cp.project_id) + (token ? '&token=' + encodeURIComponent(token) : '') + '&cast=1';
+        });
+      }).catch(function (e) { say(e.message || String(e), true); });
+      return;
+    }
+    say('Generating the take…');
+    start(project).then(function (st) { C.data.gen = st; castRender(); castPoll(); }).catch(function (e) { say(e.message || String(e), true); });
+  }
+  function castPoll() {
+    if (C.timer) clearTimeout(C.timer);
+    C.timer = setTimeout(function () {
+      C.timer = null;
+      var was = castRunning();
+      Promise.all([api('GET', '/recast/' + castTP()), api('GET', '/generated-take/' + castTP()).catch(function () { return {}; })]).then(function (r) {
+        C.data.speaker_cast = r[0].speaker_cast || null; C.data.recast = r[0].recast || null; C.data.gen = r[1].generated_take || null;
+        castRender();
+        if (castRunning()) { castPoll(); return; }
+        if (was) { say((C.data.recast && C.data.recast.status === 'failed') || (C.data.gen && C.data.gen.status === 'failed') ? 'The cast failed — see the Cast card.' : 'Cast: done. Render when you are ready.', false); load(); }
+      }).catch(function () { castPoll(); });
+    }, 4000);
+  }
+  function castToggle() { C.open = !C.open; castRender(); if (C.open) { castLoad(); $('cast').scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
+  $('cast').addEventListener('click', castTap);
+  $('cast').addEventListener('change', castChange);
+  // Opened with &cast=1 (following a copy a generated take runs on): the card open.
+  if (qp.get('cast')) { C.open = true; castLoad(); }
 
   // Coming back from the booth: reload so the card shows the new take.
   document.addEventListener('visibilitychange', function () { if (!document.hidden && !jobTimer) load(); });

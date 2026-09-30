@@ -37,6 +37,9 @@ export interface CastActor {
   voice_name?: string;
   /** A HeyGen look id: HeyGen performs the take (core/recast.ts). */
   heygen_look_id?: string;
+  /** A portrait actor's consent: the person who added it said this is
+   *  them, or someone who agreed to be cast. HeyGen looks carry HeyGen's. */
+  consent?: { at: string };
   created_at: string;
 }
 
@@ -74,7 +77,12 @@ export async function addActor(tenant: string, opts: {
   voice_id?: string;
   voice_name?: string;
   heygen_look_id?: string;
+  /** Required for a portrait: this is me, or a person who agreed to be cast. */
+  consent?: boolean;
 }): Promise<CastActor> {
+  // A portrait can be anyone's face: whoever adds it vouches for it. A
+  // HeyGen look already passed HeyGen's own consent (or is a stock presenter).
+  if (!opts.heygen_look_id && opts.consent !== true) throw new Error("Confirm this is you, or a person who agreed to be cast (consent: true)");
   const look = opts.heygen_look_id ? await getHeygenLook(String(opts.heygen_look_id)) : null;
   if (look && look.status && look.status !== "completed") throw new Error(`That HeyGen look is ${look.status}, not ready yet`);
   const name = String(opts.name || look?.name || "").trim().slice(0, 60);
@@ -115,10 +123,21 @@ export async function addActor(tenant: string, opts: {
   const actor: CastActor = {
     id, name, portrait: rel,
     ...(opts.voice_id ? { voice_id: String(opts.voice_id), voice_name: String(opts.voice_name || opts.voice_id) } : {}),
-    ...(look ? { heygen_look_id: look.id } : {}),
+    ...(look ? { heygen_look_id: look.id } : { consent: { at: new Date().toISOString() } }),
     created_at: new Date().toISOString(),
   };
   cast.push(actor);
   await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast, null, 2));
   return actor;
+}
+
+/** Remove an actor from the cast (and its portrait). Recasts already made
+ *  stay on their takes; a film cast as them keeps playing them until recast. */
+export async function removeActor(tenant: string, id: string): Promise<boolean> {
+  const cast = await listCast(tenant);
+  const actor = cast.find((a) => a.id === id);
+  if (!actor) return false;
+  await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast.filter((a) => a.id !== id), null, 2));
+  await fs.rm(portraitPath(tenant, actor), { force: true }).catch(() => {});
+  return true;
 }
