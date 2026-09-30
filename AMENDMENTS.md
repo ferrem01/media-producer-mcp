@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Actor test: Seedance 2.5 as a recast (the Higgsfield Genjutsu idea)
+
+Marc, on Higgsfield's Genjutsu reels ("literally doing what we want to do"):
+"Still don't know why we got blocked." Our Seedance 2.0 reference-to-video
+call was refused on a realistic face (ByteDance's filter on the public API
+cannot tell a generated actor from a real person). Seedance 2.5 on fal
+(`bytedance/seedance-2.5/reference-to-video`) takes videos as references
+too: `providers:["seedance25"]` sends the take as @Video1 (motion, timing,
+camera, room) and the portrait as @Image1 (who performs it), up to 30 s at
+720p, `generate_audio: false` (the take's own voice goes under). A trial
+provider to measure whether 2.5 accepts the face; a Cast performer if it does.
+
 ## 2026-09-30 — Phone Studio: Preview (watch a built film without rendering)
 
 Marc, on the desktop Studio squeezed onto his phone: "Is there a way to

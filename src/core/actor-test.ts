@@ -31,7 +31,7 @@ import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3";
+export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3" | "seedance25";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -52,7 +52,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY", seedance25: "FAL_KEY" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -245,6 +245,20 @@ async function falVideo(route: string, body: Record<string, unknown>, what: stri
  *  -> the portrait talking, lip-synced, its motion Kling's own. */
 export async function runKlingAvatar(img: string, audio: string, prompt?: string): Promise<string> {
   return falVideo("fal-ai/kling-video/ai-avatar/v2/pro", { image_url: img, audio_url: audio, ...(prompt ? { prompt } : {}) }, "kling avatar");
+}
+
+/** Seedance 2.5 reference-to-video used as a RECAST (the Higgsfield
+ *  Genjutsu idea): the take as @Video1 (its motion, timing, camera, room),
+ *  the actor's portrait as @Image1 (who performs it). Up to 30 s. Our 2.0
+ *  test was refused on a realistic face; this measures whether 2.5 is. */
+const SEEDANCE25_RECAST_PROMPT = "Recast @Video1: replace the person in @Video1 with the person in @Image1 -- the same face, hair and clothes as @Image1. " +
+  "Keep everything else from @Video1 exactly: the motion, gestures, hand positions, head movement, timing, lip movement, expressions, camera framing and the room. " +
+  "Photorealistic, natural skin, no stylization.";
+export async function runSeedance25Recast(video: string, img: string, seconds: number, aspect: string, prompt?: string): Promise<string> {
+  return falVideo("bytedance/seedance-2.5/reference-to-video", {
+    prompt: prompt || SEEDANCE25_RECAST_PROMPT, video_urls: [video], image_urls: [img],
+    duration: String(Math.max(4, Math.min(30, Math.round(seconds)))), aspect_ratio: aspect, resolution: "720p", generate_audio: false,
+  }, "seedance 2.5");
 }
 
 export async function runKling(src: string, img: string, prompt?: string): Promise<string> {
@@ -621,7 +635,7 @@ export async function startActorTest(opts: {
   const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3"].includes(p));
+    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3", "seedance25"].includes(p));
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -729,6 +743,13 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       await voiceJob;
       if (!test.files.voice) await ffmpeg(["-i", f("source.mp4"), "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", f("take.mp3")]);
       url = await runHeygen(f("actor.jpg"), test.files.voice ? f("voice.mp3") : f("take.mp3"), h > w * 1.1 ? "portrait" : w > h * 1.1 ? "landscape" : "square", prompt);
+    } else if (p === "seedance25") {
+      if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");
+      const pub = config.publicUrl.startsWith("https://")
+        ? `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`
+        : "";
+      const aspect = h > w * 1.1 ? "9:16" : w > h * 1.1 ? "16:9" : "1:1";
+      url = await runSeedance25Recast(pub ? `${pub}/source.mp4` : srcUri, pub ? `${pub}/actor.jpg` : imgUri, srcSecs, aspect, prompt);
     } else if (p === "kling") {
       if (!imgUri) throw new Error("kling needs a portrait (image or image_from)");
       // A 30 s source is too big to inline comfortably: fal fetches it from
