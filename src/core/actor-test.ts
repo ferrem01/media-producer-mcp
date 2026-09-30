@@ -87,7 +87,7 @@ export async function dataUri(file: string, mime: string): Promise<string> {
   return `data:${mime};base64,${(await fs.readFile(file)).toString("base64")}`;
 }
 
-async function okJson(r: Response, what: string): Promise<any> {
+export async function okJson(r: Response, what: string): Promise<any> {
   const text = await r.text();
   let j: any = null;
   try { j = JSON.parse(text); } catch { /* not json */ }
@@ -221,6 +221,32 @@ export const WAN_S2V_DEFAULT_PROMPT = "The man in the picture talks to the camer
  *  expression mapped onto the character image -- face, clothes and setting
  *  from the image -- in ONE call of up to 30 s (character_orientation
  *  "video"). No chunks, so no seams (the Wan recast's problem). */
+/** A fal queue job: submit, poll its status, collect the result's video. */
+async function falVideo(route: string, body: Record<string, unknown>, what: string): Promise<string> {
+  const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
+  const sub = await okJson(await fetch(`https://queue.fal.run/${route}`, { method: "POST", headers, body: JSON.stringify(body) }), `${what} submit`);
+  const statusUrl: string = sub.status_url, responseUrl: string = sub.response_url;
+  if (!statusUrl || !responseUrl) throw new Error(`${what} submit: no status_url in the reply`);
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > DEADLINE_MS) throw new Error(`${what}: timed out`);
+    await sleep(POLL_MS);
+    const st = await okJson(await fetch(statusUrl, { headers }), `${what} status`);
+    if (st.status === "COMPLETED") break;
+    if (st.status && !["IN_QUEUE", "IN_PROGRESS"].includes(st.status)) throw new Error(`${what}: ${st.status}`);
+  }
+  const res = await okJson(await fetch(responseUrl, { headers }), `${what} result`);
+  const url = res?.video?.url;
+  if (!url) throw new Error(`${what} result: no video url`);
+  return url;
+}
+
+/** Kling AI Avatar v2 Pro (on fal): a portrait and a voice (2-60 s, 5 MB)
+ *  -> the portrait talking, lip-synced, its motion Kling's own. */
+export async function runKlingAvatar(img: string, audio: string, prompt?: string): Promise<string> {
+  return falVideo("fal-ai/kling-video/ai-avatar/v2/pro", { image_url: img, audio_url: audio, ...(prompt ? { prompt } : {}) }, "kling avatar");
+}
+
 export async function runKling(src: string, img: string, prompt?: string): Promise<string> {
   const headers = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
   const sub = await okJson(await fetch("https://queue.fal.run/fal-ai/kling-video/v3/pro/motion-control", {

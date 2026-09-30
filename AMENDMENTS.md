@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-09-30 — Cast: Wan out; Kling and Runway perform a script too
+
+Marc: "You can remove Wan from the list. It never worked. Also kling, runway
+can work from a script too as it can use eleven labs to generate the voice."
+- **Wan removed** from the performers (and its whole recast method:
+  reference pass, 16 fps chunks, keep-the-room composite, preview endpoint
+  `POST /api/recast/.../preview`). The actor-test providers stay for
+  experiments. A pre-choice recast entry reads as "wan" and is never reused.
+- A vendor can now offer BOTH modes. The motion-copy modes (Kling Motion
+  Control, Runway Act-Two) have nothing to copy without a recording, so a
+  script needs each vendor's AUDIO-driven mode: **Kling AI Avatar v2 Pro**
+  (fal `fal-ai/kling-video/ai-avatar/v2/pro`: portrait + voice, 2-60 s a
+  call; a longer read is cut at its pauses into <=55 s pieces, each held to
+  its stretch, concatenated) and **Runway Avatars** (`POST /v1/avatars` from
+  the portrait once -- remembered as `cast/<id>.runway.json` -- then
+  `POST /v1/avatar_videos` with the voice). The voice comes from ElevenLabs
+  or HeyGen as before.
+- A recast uses the vendor's motion copy when it has one (that is why Kling
+  or Runway is picked for a recast); audio-driven otherwise.
+- A vendor clip shorter than asked now holds its last frame for the WHOLE gap
+  (was 2 s: a 40 s return for a 49 s piece came back short -- caught by the
+  new test).
+
 ## 2026-09-30 — Cast, steps 2-3: the Cast card in the desktop and phone Studio
 
 The Cast feature's surfaces (step 1 is the vendor layer + the `cast` tool).

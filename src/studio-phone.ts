@@ -702,7 +702,7 @@ ${QUOTIENT_CSS}
     var ok = function (p) { return p && p.available && (C.mode !== 'generate' || p.generate); };
     if (ok(castPerf(C.performer))) return;
     var a = castActor(C.actor);
-    var order = (a && a.heygen_look_id) || C.mode === 'generate' ? ['heygen', 'kling', 'runway', 'wan'] : ['kling', 'heygen', 'runway', 'wan'];
+    var order = (a && a.heygen_look_id) || C.mode === 'generate' ? ['heygen', 'kling', 'runway'] : ['kling', 'heygen', 'runway'];
     C.performer = null;
     for (var i = 0; i < order.length; i++) if (ok(castPerf(order[i]))) { C.performer = order[i]; break; }
   }

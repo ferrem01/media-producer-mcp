@@ -11202,9 +11202,9 @@ ${QUOTIENT_CSS}
   // ── CAST (core/performers, core/recast.ts, core/generated-take.ts) ──
   // Who performs the person in a speaker film: the recording itself; the
   // recording RECAST as an actor through a vendor (HeyGen hears the voice
-  // and draws the person; Kling / Runway / Wan copy the recording's
-  // gestures onto a portrait); or a take GENERATED from the script (no
-  // recording). One card: who plays now, the mode, the actor, the vendor,
+  // and draws the person; Kling / Runway copy the recording's gestures onto
+  // a portrait); or a take GENERATED from the script (no recording; every
+  // vendor can animate the actor from the voice). One card: who plays now, the mode, the actor, the vendor,
   // the voice, then go -- progress polled while the card is open.
   var castUi = { project: null, data: null, mode: 'recast', actor: null, performer: null, voice: '', copy: true, timer: null, add: null, looks: null, pub: null, pubToken: null, pubGender: '', voices: null, lookTimer: null };
   function castT() { return encodeURIComponent(state.tenantId); }
@@ -11261,7 +11261,7 @@ ${QUOTIENT_CSS}
     var ok = function(p) { return p && p.available && (castUi.mode !== 'generate' || p.generate); };
     if (ok(castPerfById(castUi.performer))) return;
     var a = castActorById(castUi.actor);
-    var order = (a && a.heygen_look_id) || castUi.mode === 'generate' ? ['heygen', 'kling', 'runway', 'wan'] : ['kling', 'heygen', 'runway', 'wan'];
+    var order = (a && a.heygen_look_id) || castUi.mode === 'generate' ? ['heygen', 'kling', 'runway'] : ['kling', 'heygen', 'runway'];
     castUi.performer = null;
     for (var i = 0; i < order.length; i++) if (ok(castPerfById(order[i]))) { castUi.performer = order[i]; break; }
   }
@@ -11379,7 +11379,7 @@ ${QUOTIENT_CSS}
         h += '</div>' + (castUi.pubToken ? '<button class="np-btn" data-cast-more="1">More</button>' : '');
       }
     } else if (castUi.add === 'photo') {
-      h += '<div class="np-hint">A clear, front-facing photo. Kling, Runway and Wan copy your gestures onto it; HeyGen animates it from the voice.</div>'
+      h += '<div class="np-hint">A clear, front-facing photo. Kling and Runway copy your gestures onto it (or animate it from the voice); HeyGen animates it from the voice.</div>'
         + '<div class="np-row"><div class="np-what"><input id="cast-photoname" class="np-search" placeholder="Name (e.g. Customer)"></div></div>'
         + '<label class="np-row"><div class="np-what"><input type="checkbox" id="cast-consent"> This is me, or a person who agreed to be cast.</div></label>'
         + '<div class="np-row"><div class="np-what"><input type="file" id="cast-photo" accept="image/*"></div></div>';

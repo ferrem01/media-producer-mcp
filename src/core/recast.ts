@@ -2,24 +2,15 @@
  * RECAST: a speaker take performed by a cast actor (core/cast.ts).
  *
  * The take stays the film's clock and script. Its recast is the SAME
- * timeline redrawn by Wan 2.2 Animate "replace" from the actor's portrait --
- * the person's face, hair and clothes become the actor's; the motion, timing,
- * expressions, room and light stay the recording's (the actor tests on Old
- * Chimp: the most real of every route tried). The voice is converted to the
- * actor's voice when they have one; speech-to-speech keeps every word where
- * it was, so captions, stickers, word anchors and cuts still land.
- *
- * Wan returns at most ~4.3 s (129 frames at 30 fps), so the
- * take is cut into chunks of at most CHUNK_MAX seconds at its pauses, each
- * chunk sent with TAIL seconds of overrun and trimmed back to its own length
- * (a short return holds its last frame for the gap). The chunks run side by
- * side and are stitched back to exactly the take's length at its resolution.
- *
- * That was the first route. The vendor is now a choice (core/performers):
+ * timeline performed by the actor through a vendor (core/performers):
  * HeyGen hears the voice and draws the whole person in one call (the actor
  * tests' winner); Kling and Runway map the recording's motion onto the
- * portrait, a call per stretch of up to maxSeconds cut at the pauses; Wan
- * keeps the whole method above. performTakeFile is the common path.
+ * actor's portrait, a call per stretch of up to maxSeconds cut at the take's
+ * pauses. The voice is converted to the actor's voice when one is asked
+ * for; speech-to-speech keeps every word where it was, so captions,
+ * stickers, word anchors and cuts still land. performTakeFile is the one
+ * path. (Wan 2.2 Animate was the first route: chunked redraws whose seams
+ * never held -- removed.)
  *
  * A recast is a copy of the take like the matte's blur and alpha copies:
  * take.actors[actorId].file, and project.speaker_cast picks who plays
@@ -36,26 +27,10 @@ import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
 import { takeCopies, takeForClip, syncSpeakerClips } from "./speaker-layer.js";
 import { getActor, portraitPath, type CastActor } from "./cast.js";
-import { ffmpeg, dataUri, download, runWan, convertVoice, durationOf } from "./actor-test.js";
+import { ffmpeg, convertVoice, durationOf } from "./actor-test.js";
 import { PERFORMERS, getPerformer, defaultPerformer, type Performer, type PerformContext } from "./performers/index.js";
 
 const execFileAsync = promisify(execFile);
-
-// Wan returns ~129 frames a call (4.31 s of 4.75 s in at 30 fps). Sent at
-// 16 fps -- Wan's own rate -- the same frames cover ~8 s (measured: 8.13 s
-// in, 8.13 s out), so a chunk + its overrun stays under 8 s and a 30 s take
-// is 4 chunks, not 9: half the seams. The picture is interpolated back to
-// the take's 30 fps after the stitch.
-export const CHUNK_MAX = 7.5;
-const CHUNK_MIN = 2.5;
-const TAIL = 0.4;
-export const WAN_FPS = 16;
-// The chunk plan's version: chunks cut under another plan are not reused.
-const PLAN_VERSION = 2;
-// Every chunk at once (a 30 s take is ~9): one round of Wan, not three.
-const PARALLEL = 12;
-// One slow chunk must not hold a film for an hour: give up, submit again.
-const CHUNK_DEADLINE_MS = 18 * 60 * 1000;
 
 export interface RecastStatus {
   project_id: string;
@@ -92,9 +67,10 @@ async function saveStatus(tenant: string, st: RecastStatus): Promise<void> {
   await fs.writeFile(statusFile(tenant, st.project_id), JSON.stringify(st, null, 2)).catch(() => {});
 }
 
-/** Where to cut: at the middle of a pause, as late as fits in CHUNK_MAX, and
- *  never leaving a sliver of a chunk at the end. */
-export function planChunks(duration: number, silences: Array<[number, number]>, max = CHUNK_MAX, min = CHUNK_MIN): Array<[number, number]> {
+/** Where to cut a take into calls of at most `max` seconds: at the middle of
+ *  a pause, as late as fits, never before `min`, and never leaving a sliver
+ *  of a call at the end. */
+export function planChunks(duration: number, silences: Array<[number, number]>, max: number, min: number): Array<[number, number]> {
   const mids = silences.map(([a, b]) => (a + b) / 2).filter((m) => m > 0 && m < duration);
   const out: Array<[number, number]> = [];
   let pos = 0;
@@ -112,7 +88,7 @@ export function planChunks(duration: number, silences: Array<[number, number]>, 
   return out;
 }
 
-async function silencesOf(file: string): Promise<Array<[number, number]>> {
+export async function silencesOf(file: string): Promise<Array<[number, number]>> {
   let err = "";
   try { err = String((await execFileAsync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-af", "silencedetect=noise=-35dB:d=0.2", "-f", "null", "-"], { maxBuffer: 16 * 1024 * 1024 })).stderr || ""); }
   catch (e: any) { err = String(e?.stderr || ""); }
@@ -141,167 +117,6 @@ async function pool<T>(items: T[], n: number, fn: (x: T, i: number) => Promise<v
   }));
 }
 
-/** Recast one take file: chunk, redraw each chunk, stitch, voice. */
-/** A stable seed per actor: every chunk of every take makes the same choices. */
-export function actorSeed(actorId: string): number {
-  let h = 2166136261;
-  for (const ch of actorId) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-  return (h >>> 0) % 2147483647;
-}
-
-/** KEEP THE ROOM: the redrawn person pasted over the recording, the rest of
- *  the frame the recording's own. Every chunk re-imagined the room around
- *  the person a little differently (measured on the Old Chimp pilot: wall
- *  art, shelves, plants changing at each seam); outside the people the real
- *  room now shows through, identical everywhere. The mask is BOTH people
- *  (the recording's person and the actor), grown and softened, so no edge
- *  of the one who recorded peeks out from behind the actor. Alphas are the
- *  matte's VP9 alpha copies (decoded with libvpx to keep the alpha). */
-export function keepRoomGraph(width: number, height: number, grow = 18): string {
-  const dil = Array.from({ length: Math.max(1, Math.round(grow / 3)) }, () => "dilation").join(",");
-  return [
-    `[2:v]scale=${width}:${height},format=rgba,alphaextract[ma]`,
-    `[3:v]scale=${width}:${height},format=rgba,alphaextract[aa]`,
-    `[ma][aa]blend=all_mode=lighten,${dil},gblur=sigma=${Math.max(2, grow / 3)}[m]`,
-    `[1:v]scale=${width}:${height},format=rgba[fgc]`,
-    `[fgc][m]alphamerge[fg]`,
-    `[0:v]scale=${width}:${height},format=rgba[bg]`,
-    `[bg][fg]overlay=shortest=1:format=auto,format=yuv420p[out]`,
-  ].join(";");
-}
-
-export async function keepRoom(orig: string, actor: string, origAlpha: string, actorAlpha: string, out: string): Promise<void> {
-  const [W, H] = await sizeOf(actor);
-  await ffmpeg(["-i", orig, "-i", actor, "-c:v", "libvpx-vp9", "-i", origAlpha, "-c:v", "libvpx-vp9", "-i", actorAlpha,
-    "-filter_complex", keepRoomGraph(W, H), "-map", "[out]", "-an", "-r", "30",
-    "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", out]);
-}
-
-/** Recast one take file: a reference pass, chunks redrawn in parallel with
- *  one seed, stitched, interpolated to 30 fps, the room kept, the voice. */
-export async function recastFile(opts: {
-  rawAbs: string;
-  outAbs: string;
-  workDir: string;
-  portraitAbs: string;
-  voiceId?: string;
-  seed?: number;
-  /** Paste the person over the recording's own room (needs the matte). Default true. */
-  keepRoom?: boolean;
-  /** The matte: (video) -> its alpha copy. Injected so tests need no model. */
-  matte?: (video: string) => Promise<string>;
-  /** "mci" (motion-compensated, the default) or "blend" (fast, for tests). */
-  interpolate?: "mci" | "blend";
-  onChunk?: (done: number, total: number) => void;
-  onStage?: (stage: string) => void;
-}): Promise<void> {
-  const { rawAbs, outAbs, workDir } = opts;
-  await fs.mkdir(workDir, { recursive: true });
-  const w = (n: string) => path.join(workDir, n);
-  const duration = await durationOf(rawAbs);
-  if (!duration) throw new Error("could not read the take's length");
-  // RESUME: a restart (or a stalled chunk) must not throw away chunks
-  // already paid for. The plan is kept beside them; the same take, length
-  // and plan version reuse it, and every chunk already on disk is kept.
-  let chunks = planChunks(duration, await silencesOf(rawAbs));
-  const planKey = { v: PLAN_VERSION, raw: path.basename(rawAbs), duration: Number(duration.toFixed(3)) };
-  try {
-    const prev = JSON.parse(await fs.readFile(w("plan.json"), "utf8"));
-    if (prev.v === planKey.v && prev.raw === planKey.raw && prev.duration === planKey.duration && Array.isArray(prev.chunks)) chunks = prev.chunks;
-    else { await fs.rm(workDir, { recursive: true, force: true }); await fs.mkdir(workDir, { recursive: true }); }
-  } catch { /* first run */ }
-  await fs.writeFile(w("plan.json"), JSON.stringify({ ...planKey, chunks }));
-  const have = async (f: string) => fs.stat(f).then((x) => x.size > 0, () => false);
-  const [W, H] = await sizeOf(rawAbs);
-  const seed = opts.seed;
-  const remembering = (req: string) => async (r: { status_url: string; response_url: string }) => { await fs.writeFile(req, JSON.stringify(r)); };
-  const redraw = async (srcUri: string, img: string, req: string): Promise<string> => {
-    const prior = await fs.readFile(req, "utf8").then((t) => JSON.parse(t), () => null);
-    try {
-      // A request fal already has (submitted before a restart): collect it.
-      return await runWan(srcUri, img, "replace", { resume: prior || undefined, onSubmit: remembering(req), deadlineMs: CHUNK_DEADLINE_MS, seed });
-    } catch {
-      // Stalled or failed: submit fresh, once.
-      await fs.rm(req, { force: true });
-      return await runWan(srcUri, img, "replace", { onSubmit: remembering(req), deadlineMs: CHUNK_DEADLINE_MS, seed });
-    }
-  };
-  const cut = async (a: number, b: number, file: string) => {
-    await ffmpeg(["-ss", String(a), "-to", String(Math.min(duration, b)), "-i", rawAbs,
-      "-vf", "scale=720:-2", "-r", String(WAN_FPS), "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", file]);
-  };
-
-  // THE REFERENCE PASS: every chunk re-imagined the actor from the portrait
-  // and landed on a slightly different man (hair and face shifting at each
-  // seam). One short redraw of the take's opening, and a frame of it -- the
-  // actor as he looks IN this room, this light -- becomes the reference
-  // every chunk is drawn from.
-  opts.onStage?.("reference");
-  if (!(await have(w("reference.jpg")))) {
-    await ffmpeg(["-i", opts.portraitAbs, "-vf", "scale='min(1024,iw)':-2", "-q:v", "3", w("portrait.jpg")]);
-    if (!(await have(w("ref-wan.mp4")))) {
-      await cut(0, Math.min(duration, 2.5), w("ref-src.mp4"));
-      const url = await redraw(await dataUri(w("ref-src.mp4"), "video/mp4"), await dataUri(w("portrait.jpg"), "image/jpeg"), w("ref.json"));
-      await download(url, w("ref-wan.mp4"));
-    }
-    const refLen = (await durationOf(w("ref-wan.mp4"))) || 1;
-    await ffmpeg(["-ss", (refLen / 2).toFixed(2), "-i", w("ref-wan.mp4"), "-frames:v", "1", "-q:v", "2", w("reference.jpg")]);
-  }
-  const img = await dataUri(w("reference.jpg"), "image/jpeg");
-
-  opts.onStage?.("chunks");
-  let done = 0;
-  for (let i = 0; i < chunks.length; i++) if (await have(w(`chunk-${i}.mp4`))) done++;
-  opts.onChunk?.(done, chunks.length);
-  await pool(chunks, PARALLEL, async ([a, b], i) => {
-    const len = b - a;
-    const src = w(`src-${i}.mp4`), raw = w(`wan-${i}.mp4`), fit = w(`chunk-${i}.mp4`);
-    if (await have(fit)) return; // finished before a restart
-    if (!(await have(raw))) {
-      await cut(a, b + TAIL, src);
-      await download(await redraw(await dataUri(src, "video/mp4"), img, w(`wan-${i}.json`)), raw);
-    }
-    // Exactly the chunk's length at Wan's rate: the overrun trimmed off, a
-    // short return holding its last frame.
-    await ffmpeg(["-i", raw, "-an", "-vf", `fps=${WAN_FPS},scale=720:-2,setsar=1,tpad=stop_mode=clone:stop_duration=${TAIL + 1}`,
-      "-t", len.toFixed(3), "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", fit]);
-    opts.onChunk?.(++done, chunks.length);
-  });
-
-  opts.onStage?.("stitch");
-  await fs.writeFile(w("list.txt"), chunks.map((_, i) => `file '${w(`chunk-${i}.mp4`)}'`).join("\n"));
-  await ffmpeg(["-f", "concat", "-safe", "0", "-i", w("list.txt"), "-c", "copy", w("picture16.mp4")]);
-  // Back to the take's 30 fps: motion-compensated in-betweens (a talking
-  // person interpolates well), at Wan's size, then up to the take's.
-  // (obmc + epzs: half the time of aobmc/vsbmc, measured 16.5 s vs 29 s per
-  // 3 s at 720x1280, with the same look on a talking person.)
-  const interp = opts.interpolate === "blend" ? "framerate=fps=30" : "minterpolate=fps=30:mi_mode=mci:mc_mode=obmc:me=epzs";
-  await ffmpeg(["-i", w("picture16.mp4"), "-vf", `${interp},scale=${W}:${H}:flags=lanczos,setsar=1`,
-    "-t", duration.toFixed(3), "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", w("picture.mp4")]);
-  let picture = w("picture.mp4");
-  if (opts.keepRoom !== false && opts.matte) {
-    opts.onStage?.("room");
-    try {
-      const [origAlpha, actorAlpha] = [await opts.matte(rawAbs), await opts.matte(picture)];
-      await keepRoom(rawAbs, picture, origAlpha, actorAlpha, w("picture-room.mp4"));
-      picture = w("picture-room.mp4");
-    } catch (e: any) {
-      console.warn(`  recast: kept the redrawn room (${String(e?.message || e).slice(0, 200)})`);
-    }
-  }
-  opts.onStage?.("voice");
-  // The voice: the actor's when they have one (the delivery kept), else the take's own.
-  let audio = rawAbs;
-  if (opts.voiceId) {
-    await ffmpeg(["-i", rawAbs, "-vn", "-ac", "1", "-ar", "44100", w("take.wav")]);
-    await convertVoice(w("take.wav"), w("voice.mp3"), opts.voiceId);
-    audio = w("voice.mp3");
-  }
-  await ffmpeg(["-i", picture, "-i", audio, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
-    "-af", opts.voiceId ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
-    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", duration.toFixed(3), "-movflags", "+faststart", outAbs]);
-}
-
 /** A public URL for a work file (a vendor fetches a large source by URL
  *  rather than a data URI): copied into the project's output under _cast/,
  *  which is served, when the server has a public https address. */
@@ -318,11 +133,11 @@ function castPublicUrl(tenant: string, projectId: string): (file: string) => Pro
 
 /** A take performed by a cast actor through one vendor (core/performers):
  *  the voice made (the take's own, or the actor's converted -- the delivery
- *  kept), the picture made (audio-driven: one call; video-driven: the take
- *  cut at its pauses into calls of at most maxSeconds, each held to its own
- *  length), then fitted to exactly the take's frame, 30 fps and length with
- *  the voice laid under it. A vendor with its own whole-take method (Wan)
- *  does all of it itself. */
+ *  kept), the picture made (video-driven when the vendor can copy the
+ *  recording's motion: the take cut at its pauses into calls of at most
+ *  maxSeconds, each held to its own length; else audio-driven from the
+ *  voice), then fitted to exactly the take's frame, 30 fps and length with
+ *  the voice laid under it. */
 export async function performTakeFile(opts: {
   rawAbs: string;
   outAbs: string;
@@ -333,10 +148,6 @@ export async function performTakeFile(opts: {
 }): Promise<void> {
   const { rawAbs, outAbs, performer, ctx } = opts;
   await fs.mkdir(ctx.workDir, { recursive: true });
-  if (performer.recastTake) {
-    await performer.recastTake({ rawAbs, outAbs, voiceId: opts.voiceId, ctx, onChunk: opts.onChunk });
-    return;
-  }
   const w = (n: string) => path.join(ctx.workDir, n);
   const duration = await durationOf(rawAbs);
   if (!duration) throw new Error("could not read the take's length");
@@ -356,7 +167,9 @@ export async function performTakeFile(opts: {
 
   ctx.onStage?.(performer.id);
   let picture: string;
-  if (performer.fromAudio) {
+  // A vendor that can copy the recording's motion does (that is why it was
+  // picked for a recast); an audio-driven one draws from the voice.
+  if (!performer.fromVideo && performer.fromAudio) {
     picture = await performer.fromAudio(audio, ctx);
   } else if (performer.fromVideo) {
     const max = performer.maxSeconds || 30;
@@ -371,7 +184,7 @@ export async function performTakeFile(opts: {
           "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", src]);
         const made = await performer.fromVideo!(src, `c${i}`, ctx);
         // Exactly the stretch's length at the take's frame: a short return holds its last frame.
-        await ffmpeg(["-i", made, "-an", "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2`,
+        await ffmpeg(["-i", made, "-an", "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=${Math.ceil(b - a) + 1}`,
           "-t", (b - a).toFixed(3), "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", fit]);
       }
       opts.onChunk?.(++done, chunks.length);
@@ -386,7 +199,7 @@ export async function performTakeFile(opts: {
   ctx.onStage?.("fit");
   // Exactly the take's frame (cover), rate and length: a short return holds its last frame.
   await ffmpeg(["-i", picture, "-i", opts.voiceId ? audio : rawAbs, "-map", "0:v:0", "-map", "1:a:0",
-    "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2`,
+    "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=${Math.ceil(duration) + 1}`,
     "-af", opts.voiceId ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", duration.toFixed(3), "-movflags", "+faststart", outAbs]);
@@ -400,7 +213,7 @@ function recastWorkDir(tenant: string, projectId: string, actorId: string, perfo
 /** Who performed an existing recast: recorded since vendors became a
  *  choice; before that a HeyGen look's recast was HeyGen's, any other Wan's. */
 function madeBy(entry: any): string {
-  return entry?.performer || (entry?.heygen_look_id ? "heygen" : "wan");
+  return entry?.performer || (entry?.heygen_look_id ? "heygen" : "wan"); // "wan": a pre-choice recast, never reused
 }
 
 /** Recast every take the speaker track plays as the actor (or, with null,
@@ -506,42 +319,4 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
   // The pieces were only a means: keep the recast, drop the pieces.
   for (let i = 0; i < st.files.length; i++) await fs.rm(recastWorkDir(tenant, projectId, actor.id, performer.id, i), { recursive: true, force: true }).catch(() => {});
   await fs.rm(path.join(projectOutputDir(tenant, projectId), "_cast"), { recursive: true, force: true }).catch(() => {});
-}
-
-/** A PREVIEW from the chunks that are done: the finished run from the start,
- *  stitched with the matching span of the voice, written to the project's
- *  output as recast-preview-<actor>.mp4. For judging the look while a chunk
- *  is still out (Marc: "skip the last chunk and see if the pilot works").
- *  The film is not touched. */
-export async function previewRecast(tenant: string, projectId: string, actorId: string): Promise<{ file: string; seconds: number; chunks: number; of: number }> {
-  const project = await loadProject(tenant, projectId);
-  if (!project) throw new Error("Project not found");
-  const actor = await getActor(tenant, actorId);
-  if (!actor) throw new Error(`No cast actor "${actorId}"`);
-  const workDir = recastWorkDir(tenant, projectId, actor.id, "wan", 0);
-  const w = (n: string) => path.join(workDir, n);
-  const plan = JSON.parse(await fs.readFile(w("plan.json"), "utf8").catch(() => { throw new Error("No recast of this film has started"); }));
-  const chunks: Array<[number, number]> = plan.chunks || [];
-  let n = 0;
-  while (n < chunks.length && (await fs.stat(w(`chunk-${n}.mp4`)).then((x) => x.size > 0, () => false))) n++;
-  if (!n) throw new Error("No chunk is finished yet");
-  const end = chunks[n - 1][1];
-  const raw = ((project as any).takes || []).map((t: any) => takeCopies(t).raw).find((r: string) => path.basename(resolveVideoPath(r, config.dataDir)) === plan.raw);
-  if (!raw) throw new Error("The take behind the recast is gone");
-  const rawAbs = resolveVideoPath(raw, config.dataDir);
-  const outDir = path.join(config.dataDir, tenant, "projects", projectId, "output");
-  await fs.mkdir(outDir, { recursive: true });
-  const out = path.join(outDir, `recast-preview-${actor.id}.mp4`);
-  await fs.writeFile(w("preview-list.txt"), chunks.slice(0, n).map((_, i) => `file '${w(`chunk-${i}.mp4`)}'`).join("\n"));
-  await ffmpeg(["-f", "concat", "-safe", "0", "-i", w("preview-list.txt"), "-c", "copy", w("preview-picture.mp4")]);
-  let audio = rawAbs;
-  if (actor.voice_id) {
-    await ffmpeg(["-i", rawAbs, "-t", end.toFixed(3), "-vn", "-ac", "1", "-ar", "44100", w("preview.wav")]);
-    await convertVoice(w("preview.wav"), w("preview-voice.mp3"), actor.voice_id);
-    audio = w("preview-voice.mp3");
-  }
-  await ffmpeg(["-i", w("preview-picture.mp4"), "-i", audio, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
-    "-af", actor.voice_id ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
-    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", end.toFixed(3), "-movflags", "+faststart", out]);
-  return { file: `recast-preview-${actor.id}.mp4`, seconds: Number(end.toFixed(2)), chunks: n, of: chunks.length };
 }

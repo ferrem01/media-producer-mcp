@@ -3,17 +3,19 @@
  * (core/recast.ts, core/generated-take.ts). One file per vendor behind this
  * interface, so a new vendor is one new file and a line in index.ts.
  *
- * A performer is driven by one of two things:
- *   audio -- it hears a voice and draws the whole person (HeyGen): the
- *            movement is its own, the voice and timing ours. It can also
- *            perform a GENERATED take (the script voiced, no recording).
- *   video -- it maps the recording's motion onto the actor (Kling, Runway,
- *            Wan): the gestures are the recording's. Each call takes at
- *            most maxSeconds, so a long take is cut at its pauses.
+ * A performer can be driven two ways, and a vendor may offer both:
+ *   audio -- it hears a voice and draws the whole person (HeyGen; Kling's
+ *            AI Avatar; Runway's Avatars): the movement is its own, the
+ *            voice and timing ours. This is what performs a GENERATED take
+ *            (the script voiced, no recording).
+ *   video -- it maps the recording's motion onto the actor (Kling Motion
+ *            Control, Runway Act-Two): the gestures are the recording's.
+ *            Each call takes at most maxSeconds, so a long take is cut at
+ *            its pauses. A recast uses this when the vendor has it.
  */
 import type { CastActor } from "../cast.js";
 
-export type PerformerId = "heygen" | "kling" | "runway" | "wan";
+export type PerformerId = "heygen" | "kling" | "runway";
 
 export interface PerformerInfo {
   id: PerformerId;
@@ -54,7 +56,4 @@ export interface Performer extends PerformerInfo {
    *  so its files and job ids stay apart from the others'. */
   fromVideo?(video: string, tag: string, ctx: PerformContext): Promise<string>;
   maxSeconds?: number;
-  /** A vendor with its own whole-take method (Wan: reference pass, 16 fps,
-   *  the room kept) does the entire recast itself. */
-  recastTake?(opts: { rawAbs: string; outAbs: string; voiceId?: string; ctx: PerformContext; onChunk?: (done: number, total: number) => void }): Promise<void>;
 }
