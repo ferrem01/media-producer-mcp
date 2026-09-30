@@ -334,10 +334,11 @@ export async function heygenRecastFile(opts: {
 
   opts.onStage?.("heygen");
   if (!(await have(w("heygen.mp4")))) {
-    // A digital twin gets Avatar V (the desk twin on it was one of the two
-    // best takes); a photo look or stock presenter gets HeyGen's default.
+    // Avatar V wherever the look offers it -- the twin AND photo looks,
+    // whatever HeyGen's docs say (Marc on the sofa look on V: "insanely
+    // good. Even my hand motions"); HeyGen's default otherwise.
     const look = await getHeygenLook(opts.lookId).catch(() => null);
-    const engine = look?.type === "digital_twin" && look.engines?.includes("avatar_v") ? "avatar_v" : undefined;
+    const engine = look?.engines?.includes("avatar_v") ? "avatar_v" : undefined;
     const aspect = H > W * 1.1 ? "9:16" : W > H * 1.1 ? "16:9" : "1:1";
     const req = w("heygen.json");
     const prior = await fs.readFile(req, "utf8").then((t) => JSON.parse(t)?.video_id as string, () => undefined);

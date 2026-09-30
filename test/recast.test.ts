@@ -252,6 +252,24 @@ describe("recast with a HeyGen look: one call, HeyGen draws the whole performanc
     await heygenRecastFile({ rawAbs: take, outAbs: path.join(DATA, "hg-resumed.mp4"), workDir: work, lookId: "lk_twin" });
     expect(gens).toHaveLength(0);
     expect(Math.abs((await dur(path.join(DATA, "hg-resumed.mp4"))) - 6)).toBeLessThan(0.1);
+
+    // A photo look that offers Avatar V gets it too; one that does not, HeyGen's default.
+    for (const [engines, want] of [[["avatar_v", "avatar_iv"], { type: "avatar_v" }], [["avatar_iv"], undefined]] as const) {
+      vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+        const u = String(url);
+        const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+        if (u === "https://api.heygen.com/v3/avatars/looks/lk_sofa") return json({ data: { id: "lk_sofa", avatar_type: "photo_avatar", supported_api_engines: engines, status: "completed" } });
+        if (u === "https://api.heygen.com/v3/assets") return json({ data: { asset_id: "aud2" } });
+        if (u === "https://api.heygen.com/v3/videos") { gens.push(JSON.parse(init.body)); return json({ data: { video_id: "v2" } }); }
+        if (u === "https://api.heygen.com/v3/videos/v2") return json({ data: { status: "completed", video_url: "https://cdn/hg.mp4" } });
+        if (u === "https://cdn/hg.mp4") return new Response(mp4, { status: 200 });
+        throw new Error("unexpected fetch " + u);
+      }));
+      gens.length = 0;
+      const wd = path.join(DATA, `hg-sofa-${engines.length}`);
+      await heygenRecastFile({ rawAbs: take, outAbs: path.join(wd, "out.mp4"), workDir: wd, lookId: "lk_sofa" });
+      expect(gens[0].engine).toEqual(want);
+    }
     delete process.env.HEYGEN_API_KEY;
   }, 120000);
 });
