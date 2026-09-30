@@ -35,6 +35,9 @@ describe("Preview: watch a built film on the phone", () => {
     expect(html).toContain("watchBufferText('Loading ' + p + '%')");
     expect(html).toContain("v.addEventListener('error', onReady, { once: true });");
     expect(html).toContain("if (WATCH) SPEAKER_STALL_HOLD_MS = 120000;");
+    // "Tap to watch" plays: the players are woken inside the tap, playback starts once loaded.
+    expect(html).toContain("if (WATCH) { state.watchAutoplay = true; watchPrimeMedia(); }");
+    expect(html).toContain("if (!state.playing && !els.playBtn.disabled) els.playBtn.click();");
     expect(html).toContain("if (WATCH) watchBuffering(!!state._spkStallT0 && now - state._spkStallT0 > 300);");
   });
 });

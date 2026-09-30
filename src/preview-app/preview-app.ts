@@ -1587,6 +1587,26 @@ ${QUOTIENT_CSS}
     var ls = ov && ov.querySelector('.loading-state');
     if (ls && ls.firstChild && ls.firstChild.nodeType === 3) ls.firstChild.nodeValue = msg;
   }
+  // Inside the user's tap: give the speaker players the opening take and
+  // play/pause them, so the phone lets them play (with sound) later.
+  function watchPrimeMedia() {
+    try {
+      var first = speakerClipForTime(0);
+      var els2 = [els.speakerBg, els.speakerBg2];
+      els2.forEach(function(v) {
+        if (v && first && first.url && (!v.src || v.src === window.location.href)) { v.preload = 'auto'; v.src = first.url; }
+      });
+      // The music / sfx players too (made on load, before any tap).
+      var all = els2.concat(Array.prototype.slice.call(document.querySelectorAll('audio')));
+      all.forEach(function(v) {
+        if (!v || !v.src || v.src === window.location.href) return;
+        var wasMuted = v.muted; v.muted = true; // silent: this only earns the permission
+        var done = function() { try { v.pause(); } catch (e0) {} v.muted = wasMuted; };
+        var pr = v.play();
+        if (pr && pr.then) pr.then(done, done); else done();
+      });
+    } catch (e) {}
+  }
   // The spinner while a starved take holds the film (watch mode).
   var watchBufOn = false;
   function watchBuffering(on) {
@@ -3008,7 +3028,15 @@ ${QUOTIENT_CSS}
         els.previewPlaceholder.innerHTML = '<button id="mobile-load-preview" style="font:600 15px Inter,sans-serif;padding:14px 26px;border-radius:999px;border:0;background:var(--accent-blue);color:#fff;cursor:pointer;">' + (WATCH ? '\u25b6 Tap to watch' : '\u25b6 Tap to load preview') + '</button>';
         els.previewPlaceholder.style.display = '';
         var mlp = document.getElementById('mobile-load-preview');
-        if (mlp) mlp.addEventListener('click', function() { startCompositePreview(state.currentProject); }, { once: true });
+        if (mlp) mlp.addEventListener('click', function() {
+          // Watch mode: the tap means PLAY. A phone lets media sound only
+          // from a tap, and the film is ready only seconds later -- so wake
+          // the speaker players inside the tap (attach the opening take,
+          // play + pause: the permission sticks to the element), and start
+          // playback the moment the film is loaded.
+          if (WATCH) { state.watchAutoplay = true; watchPrimeMedia(); }
+          startCompositePreview(state.currentProject);
+        }, { once: true });
         return;
       }
       startCompositePreview(project);
@@ -3072,6 +3100,11 @@ ${QUOTIENT_CSS}
               state.forceSync = true;
               syncMedia(t, false);
               state.forceSync = false;
+              // "Tap to watch" was a request to play: honor it now it's loaded.
+              if (WATCH && state.watchAutoplay) {
+                state.watchAutoplay = false;
+                setTimeout(function() { if (!state.playing && !els.playBtn.disabled) els.playBtn.click(); }, 60);
+              }
             });
           });
         } else {

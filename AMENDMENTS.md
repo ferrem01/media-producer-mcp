@@ -37,6 +37,11 @@ preview and render". The phone could only play a RENDERED MP4.
   errors is not waited on -- that also ends the desktop's 8 s wait early),
   and a starved take holds the film with a "Loading" spinner until it has
   data, like any video player.
+- Marc: "Tap to watch does not start the player. It just removes the button
+  and then you have to still hit play." The tap now means play: inside the
+  tap (the only moment a phone lets media sound) the speaker players get the
+  opening take and every player is played-and-paused muted (the permission
+  sticks to the element); when loading finishes, playback starts by itself.
 
 ## 2026-09-30 — Generated take: name the HeyGen speech engine
 
