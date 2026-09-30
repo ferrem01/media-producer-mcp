@@ -2884,6 +2884,7 @@ Rules:
               fps: body.fps != null ? Number(body.fps) : undefined,
               heygen_avatar_id: typeof body.heygen_avatar_id === "string" ? body.heygen_avatar_id : undefined,
               expressiveness: typeof body.expressiveness === "string" ? body.expressiveness : undefined,
+              scene_image: typeof body.scene_image === "string" ? body.scene_image : undefined,
               engine: typeof body.engine === "string" ? body.engine : undefined,
               });
             jsonResponse(res, 202, withUrls(t));

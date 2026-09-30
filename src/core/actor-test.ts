@@ -28,6 +28,7 @@ import { config } from "../config.js";
 import { projectOutputDir } from "../persistence/paths.js";
 import { loadProject } from "../persistence/project.js";
 import { resolveVideoPath } from "./video-path.js";
+import { takeForClip, takeCopies } from "./speaker-layer.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -254,6 +255,9 @@ export async function runKlingAvatar(img: string, audio: string, prompt?: string
  *  by `onSubmit`. */
 export const GENJUTSU_PROMPT = "Replace the person in the video with the person in the reference image: the same face, hair and clothes. " +
   "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions, camera and room of the video exactly. Photorealistic.";
+export const GENJUTSU_SCENE_PROMPT = "Replace the person in the video with the person in the first reference image: the same face, hair and clothes. " +
+  "Place them in the setting of the second reference image (the room, the desk, the lighting). " +
+  "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions and camera framing of the video exactly. Photorealistic.";
 export async function runGenjutsu(video: string, images: string[], opts: { prompt?: string; resolution?: string; resume?: string; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
   const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
   if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");
@@ -635,6 +639,9 @@ export async function startActorTest(opts: {
   /** heygen-avatar: the saved HeyGen avatar to drive (a digital twin).
    *  heygen-v3: a look id (listHeygenLooks); without one it animates the portrait. */
   heygen_avatar_id?: string;
+  /** genjutsu: a SETTING reference (tenant-relative image) -- the actor is
+   *  placed there (a podcast set), the motion kept. */
+  scene_image?: string;
   /** heygen-v3: "low" | "medium" | "high" (Avatar IV). */
   expressiveness?: string;
   /** heygen-v3: "avatar_iv" | "avatar_v" | "avatar_iii" (HeyGen's default when omitted). */
@@ -662,11 +669,15 @@ export async function startActorTest(opts: {
     await fs.access(imgAbs).catch(() => { throw new Error(`image not found: ${opts.image}`); });
     img = { path: imgAbs };
   }
+  // The RECORDING, never a recast of it: a film cast as an actor points its
+  // clips at the actor's file (measured: a Genjutsu trial on Old Chimp,
+  // cast as the HeyGen sofa look, was fed the HeyGen video, not Marc).
+  const rawSource = clip ? (takeCopies(takeForClip(project as any, clip) || null).raw || clip.source) : "";
   const src = opts.video_from
     ? { path: await fromFile(opts.video_from, "video_from"), start: 0, end: null as number | null }
     : opts.source_range && Number(opts.source_range.end) > Number(opts.source_range.start)
-      ? { path: resolveVideoPath(clip.source, config.dataDir), start: Math.max(0, Number(opts.source_range.start)), end: Number(opts.source_range.end) }
-      : { path: resolveVideoPath(clip.source, config.dataDir), start: Number(clip.trim_start) || 0, end: clip.trim_end == null ? null : Number(clip.trim_end) };
+      ? { path: resolveVideoPath(rawSource, config.dataDir), start: Math.max(0, Number(opts.source_range.start)), end: Number(opts.source_range.end) }
+      : { path: resolveVideoPath(rawSource, config.dataDir), start: Number(clip.trim_start) || 0, end: clip.trim_end == null ? null : Number(clip.trim_end) };
   const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
@@ -695,7 +706,13 @@ export async function startActorTest(opts: {
   await save(test);
   // The take is recorded at the film's frame, so the canvas says its shape.
   const frame: [number, number] = [Number((project as any).canvas?.width) || 1080, Number((project as any).canvas?.height) || 1920];
-  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine })
+  let sceneAbs: string | undefined;
+  if (opts.scene_image) {
+    sceneAbs = path.resolve(tenantDir, String(opts.scene_image).replace(/^\/+/, ""));
+    if (!sceneAbs.startsWith(tenantDir + path.sep)) throw new Error("scene_image must be a path inside the tenant");
+    await fs.access(sceneAbs).catch(() => { throw new Error(`scene_image not found: ${opts.scene_image}`); });
+  }
+  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs })
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
   return test;
 }
@@ -716,7 +733,7 @@ async function step<T>(test: ActorTest, name: string, fn: () => Promise<T>): Pro
   }
 }
 
-async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string } = {}): Promise<void> {
+async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string; sceneAbs?: string } = {}): Promise<void> {
   const dir = actorTestDir(test.tenant_id, test.project_id, test.id);
   const f = (name: string) => path.join(dir, name);
 
@@ -783,7 +800,14 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (!img) throw new Error("genjutsu needs a portrait (image or image_from)");
       if (!config.publicUrl.startsWith("https://")) throw new Error("genjutsu needs the server's public https address (it fetches the video by URL)");
       const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
-      url = await runGenjutsu(`${pub}/source.mp4`, [`${pub}/actor.jpg`], { prompt });
+      const images = [`${pub}/actor.jpg`];
+      if (heygenOpts.sceneAbs) {
+        // The setting as a second reference: the actor placed there.
+        await ffmpeg(["-i", heygenOpts.sceneAbs, "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", "-q:v", "3", f("scene.jpg")]);
+        test.files.scene = "scene.jpg";
+        images.push(`${pub}/scene.jpg`);
+      }
+      url = await runGenjutsu(`${pub}/source.mp4`, images, { prompt: prompt || (heygenOpts.sceneAbs ? GENJUTSU_SCENE_PROMPT : undefined) });
     } else if (p === "seedance25") {
       if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");
       const pub = config.publicUrl.startsWith("https://")
