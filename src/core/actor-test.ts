@@ -31,7 +31,7 @@ import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling";
+export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -52,7 +52,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -243,6 +243,48 @@ async function runKling(src: string, img: string, prompt?: string): Promise<stri
   return url;
 }
 
+/** HeyGen Avatar IV: a photo and an audio track -> the photo talks (a
+ *  generated performance: lips to the audio, motion invented). The photo
+ *  and the audio are uploaded as assets, the video generated, its status
+ *  polled. HeyGen's own messages come back on any failure. */
+async function heygenUpload(file: string, contentType: string): Promise<any> {
+  const r = await fetch("https://upload.heygen.com/v1/asset", {
+    method: "POST", headers: { "X-Api-Key": String(process.env.HEYGEN_API_KEY), "Content-Type": contentType },
+    body: await fs.readFile(file),
+  });
+  const j = await okJson(r, "heygen upload");
+  if (!j?.data) throw new Error(`heygen upload: ${JSON.stringify(j).slice(0, 200)}`);
+  return j.data;
+}
+
+async function runHeygen(imgFile: string, audioFile: string, orientation: "portrait" | "landscape" | "square", motion?: string): Promise<string> {
+  const img = await heygenUpload(imgFile, "image/jpeg");
+  const aud = await heygenUpload(audioFile, "audio/mpeg");
+  const headers = { "X-Api-Key": String(process.env.HEYGEN_API_KEY), "Content-Type": "application/json" };
+  const gen = await okJson(await fetch("https://api.heygen.com/v2/video/av4/generate", {
+    method: "POST", headers,
+    body: JSON.stringify({
+      image_key: img.image_key || img.id,
+      video_title: "MegaMedia actor test",
+      audio_asset_id: aud.id,
+      video_orientation: orientation,
+      fit: "cover",
+      ...(motion ? { custom_motion_prompt: motion, enhance_custom_motion_prompt: true } : {}),
+    }),
+  }), "heygen generate");
+  const videoId = gen?.data?.video_id;
+  if (!videoId) throw new Error(`heygen generate: ${JSON.stringify(gen).slice(0, 200)}`);
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > DEADLINE_MS) throw new Error("heygen: timed out");
+    await sleep(Math.max(POLL_MS, 20) * 2);
+    const st = await okJson(await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`, { headers }), "heygen status");
+    const d = st?.data || {};
+    if (d.status === "completed" && d.video_url) return d.video_url;
+    if (d.status === "failed") throw new Error(`heygen: ${JSON.stringify(d.error || d).slice(0, 200)}`);
+  }
+}
+
 /** Runway Act-Two: POST /v1/character_performance, poll /v1/tasks/{id}. */
 async function runRunway(src: string, img: string, ratio: string): Promise<string> {
   const headers = {
@@ -366,7 +408,7 @@ export async function startActorTest(opts: {
   const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling"].includes(p));
+    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen"].includes(p));
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -451,6 +493,12 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       const secs = Math.min(15, Math.max(4, Math.ceil(srcSecs)));
       const aspect = h > w * 1.1 ? (w / h < 0.65 ? "9:16" : "3:4") : w > h * 1.1 ? "16:9" : "1:1";
       url = await runSeedance(null, null, prompt || seedanceTextPrompt(line), secs, aspect);
+    } else if (p === "heygen") {
+      // A generated performance from the portrait and the voice the test settled on.
+      if (!img) throw new Error("heygen needs a portrait (image or image_from)");
+      await voiceJob;
+      if (!test.files.voice) await ffmpeg(["-i", f("source.mp4"), "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", f("take.mp3")]);
+      url = await runHeygen(f("actor.jpg"), test.files.voice ? f("voice.mp3") : f("take.mp3"), h > w * 1.1 ? "portrait" : w > h * 1.1 ? "landscape" : "square", prompt);
     } else if (p === "kling") {
       if (!imgUri) throw new Error("kling needs a portrait (image or image_from)");
       // A 30 s source is too big to inline comfortably: fal fetches it from

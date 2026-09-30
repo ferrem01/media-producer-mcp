@@ -15,6 +15,10 @@ fal, the same key) maps a take's motion, timing and expression onto a
 character image in one call of up to 30 s -- no chunks, no seams, no
 composite. `providers:["kling"]` (character_orientation "video"); a long
 source goes by the test folder's public URL instead of a data URI.
+- `providers:["heygen"]`: HeyGen Avatar IV (`HEYGEN_API_KEY`) -- the portrait
+  and the test's voice uploaded as assets, a talking-photo video generated
+  (lips to the audio, motion invented: a generated performance, not a
+  transfer), status polled; HeyGen's own messages come back on failure.
 
 ## 2026-09-30 — Recast v2: one reference, one seed, 8 s chunks, the room kept
 
