@@ -27,6 +27,16 @@ preview and render". The phone could only play a RENDERED MP4.
   phone) and the editor's blue selection box showed on the film. Watch mode
   now pins the track to 100% (and the bar to the screen) and skips
   studioAttach (no hover/selection boxes).
+- Marc: "a loading issue at the start. It was clearly loading in the
+  background but to the user it looked frozen. Would play a few seconds and
+  then lock up." Two causes: the opening wait was 8 s and the take was not
+  even attached yet (it is attached when playback reaches it), so play began
+  on nothing; and a starved take held the film only 1.5 s before the wall
+  clock ran on past a frozen picture. Watch mode now attaches the opening
+  clip and buffers it before play ("Loading N%", up to a minute; a file that
+  errors is not waited on -- that also ends the desktop's 8 s wait early),
+  and a starved take holds the film with a "Loading" spinner until it has
+  data, like any video player.
 
 ## 2026-09-30 — Generated take: name the HeyGen speech engine
 

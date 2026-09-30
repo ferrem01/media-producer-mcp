@@ -1582,6 +1582,21 @@ ${QUOTIENT_CSS}
   // want to watch"). What plays is exactly what the Studio plays, so it
   // matches the render. Tap the picture to play or pause; the slider scrubs.
   var WATCH = new URLSearchParams(window.location.search).get('view') === 'watch';
+  function watchBufferText(msg) {
+    var ov = document.getElementById('buffer-overlay');
+    var ls = ov && ov.querySelector('.loading-state');
+    if (ls && ls.firstChild && ls.firstChild.nodeType === 3) ls.firstChild.nodeValue = msg;
+  }
+  // The spinner while a starved take holds the film (watch mode).
+  var watchBufOn = false;
+  function watchBuffering(on) {
+    if (on === watchBufOn) return;
+    watchBufOn = on;
+    var ov = document.getElementById('buffer-overlay');
+    if (!ov) return;
+    if (on) watchBufferText('Loading');
+    ov.style.display = on ? 'flex' : 'none';
+  }
   if (WATCH) {
     document.body.classList.add('watch-mode');
     (function wireWatch() {
@@ -1769,6 +1784,10 @@ ${QUOTIENT_CSS}
   // How long a stalled (seeking/buffering) speaker may hold the film before
   // the wall clock takes over -- a dead connection must not freeze Studio.
   var SPEAKER_STALL_HOLD_MS = 1500;
+  // Watch mode is a video player: a starved speaker holds the film (with a
+  // spinner) until it has data -- on a phone 1.5 s ran the clock on past a
+  // frozen picture ("would play a few seconds and then lock up").
+  if (WATCH) SPEAKER_STALL_HOLD_MS = 120000;
   // A sound cue keeps ringing this long past its window before it is cut:
   // play() starts late, and a 50ms tick that starts 150ms late is still due.
   var CUE_RING_S = 0.6;
@@ -2672,7 +2691,27 @@ ${QUOTIENT_CSS}
   function waitForMediaReady() {
     return new Promise(function(resolve) {
       var videos = [];
-      var timeout = 8000;
+      // Watch mode on a phone: the take streams slower than a desk's pipe;
+      // wait for it (with a % on the overlay) rather than start on nothing.
+      var timeout = WATCH ? 60000 : 8000;
+      if (WATCH && els.speakerBg) {
+        // The take is attached only once playback reaches it -- too late to
+        // buffer. Attach the opening clip now and fetch it before play.
+        try {
+          var sp = els.speakerBg;
+          if (!sp.src || sp.src === window.location.href) { var w0 = speakerClipForTime(0); if (w0 && w0.url) sp.src = w0.url; }
+          sp.preload = 'auto';
+          if (sp.src && sp.readyState === 0) sp.load();
+        } catch (eP) {}
+      }
+      if (WATCH && els.speakerBg && els.speakerBg.src) {
+        var pct = setInterval(function() {
+          var v = els.speakerBg, p = 0;
+          try { if (v.duration && v.buffered.length) p = Math.min(99, Math.round(v.buffered.end(v.buffered.length - 1) / v.duration * 100)); } catch (eB) {}
+          if (els.bufferOverlay.style.display === 'none') { clearInterval(pct); return; }
+          watchBufferText('Loading ' + p + '%');
+        }, 400);
+      }
 
       // Speaker bg
       var spk = els.speakerBg;
@@ -2711,6 +2750,9 @@ ${QUOTIENT_CSS}
           onReady();
         } else {
           v.addEventListener('canplaythrough', onReady, { once: true });
+          // A file that fails to load is not worth waiting on (in watch mode
+          // the wait is a minute): count it done, the transport comes up.
+          v.addEventListener('error', onReady, { once: true });
           // Also trigger a load if the video hasn't started loading
           if (v.readyState === 0 && v.src) {
             v.load();
@@ -8959,6 +9001,7 @@ ${QUOTIENT_CSS}
   function stopPlayback() {
     state.playing = false;
     state.playAll = false;
+    if (WATCH) watchBuffering(false);
     updatePlayIcon();
     if (state.animFrameId) {
       cancelAnimationFrame(state.animFrameId);
@@ -8997,6 +9040,7 @@ ${QUOTIENT_CSS}
     } else {
       state.masterTime += elapsed;
     }
+    if (WATCH) watchBuffering(!!state._spkStallT0 && now - state._spkStallT0 > 300);
 
     var globalTime = state.masterTime;
     var totalDur = state.totalDuration;

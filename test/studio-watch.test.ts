@@ -27,5 +27,14 @@ describe("Preview: watch a built film on the phone", () => {
     expect(html).toContain("track.style.width = WATCH ? '100%' : (state.tlZoom * 100) + '%';");
     // Nothing is edited here: no hover or selection boxes drawn on the film.
     expect(html).toContain("if (WATCH) return;\n");
+    // Loading on a phone: the opening take attached and buffered before play (a % on the overlay,
+    // a minute's patience, a failed file not waited on), and a starved take HOLDS the film with a
+    // spinner instead of the clock running on past a frozen picture.
+    expect(html).toContain("var timeout = WATCH ? 60000 : 8000;");
+    expect(html).toContain("var w0 = speakerClipForTime(0); if (w0 && w0.url) sp.src = w0.url;");
+    expect(html).toContain("watchBufferText('Loading ' + p + '%')");
+    expect(html).toContain("v.addEventListener('error', onReady, { once: true });");
+    expect(html).toContain("if (WATCH) SPEAKER_STALL_HOLD_MS = 120000;");
+    expect(html).toContain("if (WATCH) watchBuffering(!!state._spkStallT0 && now - state._spkStallT0 > 300);");
   });
 });
