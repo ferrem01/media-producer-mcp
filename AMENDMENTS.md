@@ -26,6 +26,13 @@ and the actor test read `clip.source`. It now reads the take's RAW file
   and generated-take status writes are now atomic (temp file + rename),
   serialized per film (a progress write fired without waiting can never land
   after the final one), and the job leaves memory only after the final write.
+- The 720p podcast-set run outlived the 25 min actor-test wait (the first
+  1080p run took 20.5 min) and its job was LOST: the test kept no request
+  id, so a video Higgsfield likely finished could not be collected. Genjutsu
+  now waits an hour, the test writes `genjutsu-request.json` the moment
+  Higgsfield takes the job, and `POST /api/actor-test/{t}/{p}/{id}
+  {action:"collect"}` polls that saved job and finishes the test (no second
+  submit, no second charge).
 
 ## 2026-09-30 — Higgsfield Genjutsu: a Cast vendor (and why Seedance refused)
 
