@@ -569,6 +569,10 @@ export interface StoryboardScene {
   label: string;
   /** The cut into this scene, as the board wrote it ("none" = a hard cut). */
   transition_in?: SceneTransition;
+  /** The cast or needs were SET BY HAND (the update tool's storyboard edit):
+   *  the build's recipe passes, creator-cut defaults, slates-over-mocks and
+   *  b-roll fetch leave this scene as it is. */
+  hand_set?: boolean;
   /** What this scene communicates */
   purpose: string;
   /** DEAD legacy slot (once an "O1"/"C1"/"D1" id). storyboardToSaved has

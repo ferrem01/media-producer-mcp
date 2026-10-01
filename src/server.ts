@@ -46,6 +46,7 @@ import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
 import { planMarkdown, removeBoardScenes, reorderBoard } from "./core/film-plan.js";
 import { normalizeSoundCues, normalizeSoundId, ensureSoundFiles } from "./core/scene-sfx.js";
+import { pruneDeadAnchors } from "./core/word-anchors.js";
 import { retimeScene } from "./core/measured-spine.js";
 import { forgetProject } from "./core/library.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
@@ -1476,6 +1477,12 @@ export function createMcpServer(): McpServer {
                 if (sceneUpdate.assets !== undefined) {
                   existing.assets = sceneUpdate.assets.map((a: any) => ({ ...a, status: a.status || "needed", priority: a.priority || (a.type === "camera_video" ? "critical" : "recommended") })) as any;
                 }
+                // SET BY HAND: a cast or needs list written directly is the
+                // plan -- the build's recipe passes, slates and b-roll fetch
+                // leave this scene as it is (measured live, proj_b7fa998e: a
+                // mock swapped for a "screen recording needed" slate, a stock
+                // clip stacked over the chosen b-roll, cleared needs re-added).
+                if (sceneUpdate.components !== undefined || sceneUpdate.assets !== undefined) (existing as any).hand_set = true;
               } else {
                 // Append new scene
                 project.storyboard.scenes.push({
@@ -1489,7 +1496,8 @@ export function createMcpServer(): McpServer {
                   ...(sceneUpdate.transition_in !== undefined ? { transition_in: sceneUpdate.transition_in as any } : {}),
                   ...(sceneUpdate.components !== undefined ? { components: sceneUpdate.components as any } : {}),
                   ...(sceneUpdate.scene_template ? { scene_template: { type: sceneUpdate.scene_template.type, data: sceneUpdate.scene_template.data || {} } } : {}),
-                });
+                  ...(sceneUpdate.components !== undefined || sceneUpdate.assets !== undefined ? { hand_set: true } : {}),
+                } as any);
               }
             }
           }
@@ -1720,6 +1728,9 @@ export function createMcpServer(): McpServer {
             (comp as any).anchors = { ...((comp as any).anchors || {}), ...params.anchors };
             updated = true;
           }
+          // Merged anchors can outlive the data they pointed into (a script
+          // replaced by a shorter one): the dead ones go.
+          if (params.anchors !== undefined || params.data !== undefined || params.enter !== undefined || params.exit !== undefined) pruneDeadAnchors(comp as any);
           if (params.data !== undefined) {
             const stk = await ensureStickerFiles(config.dataDir, [comp as any]).catch(() => null);
             if (stk?.failed.length) pipWarning = [pipWarning, `Sticker not drawn: ${stk.failed.map((f) => `${f.name} (${f.error})`).join("; ")}`].filter(Boolean).join(" ");

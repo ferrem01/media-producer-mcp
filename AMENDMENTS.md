@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — A scene set by hand is left alone; merged anchors drop dead paths
+
+Building the creator-ad test (proj_b7fa998e), the build undid three board
+edits: a cleared screen need came back with a slate over the chosen agent
+mock (holdMadeToRecipe: the recipe beat is "made: recording"), a stock clip
+was stacked over the chosen Veo b-roll (the writer's broll_query folded into a
+stock need), and a pill timed at 0.2 s moved to the emphasis word (the
+creator-cut sticker rule reads <0.5 s as a writer slip). The same recipe rule
+is the likely source of "screen recording needed" on nearly every scene of the
+email film. Marc: "yes on bug and override."
+- A board scene whose components or needs are set directly through the update
+  tool is marked `hand_set` (carried through the board save). The build skips
+  it in every rewriting pass: the recipe passes (motion, needs, shot, made,
+  ground, logo band), the empty-surface clean-up, the creator-cut defaults
+  (mock windows, ends-on-the-person, the sticker rule, the caption cast), the
+  sticker/cut fix, and the writer's broll_query (person films and stock
+  fetch). Its own needs (a screen still asked for, stock it named) still slate
+  and fetch.
+- The update tool merges a component's anchors (one can be re-aimed without
+  restating the rest); anchors whose data path is gone -- a script replaced by
+  a shorter one -- now drop (`pruneDeadAnchors`, core/word-anchors.ts).
+Test: `test/hand-set-scenes.test.ts`.
+
 ## 2026-10-01 — The job sounds are matched to the reel, not picked by eye
 
 Marc: "the FAHH sounds nothing like the one in the sound video." It didn't:
