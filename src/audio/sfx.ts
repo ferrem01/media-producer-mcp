@@ -17,6 +17,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
 import { ensureFoleyLibrary, FOLEY_SET } from "./foley.js";
+import { listGeneratedSfx, GEN_SFX_DIR } from "./sfx-generate.js";
 
 export const SFX_DIR = path.join(config.dataDir, "_system", "sfx");
 const FREESOUND_CACHE = path.join(config.dataDir, "_system", "cache", "freesound");
@@ -26,7 +27,7 @@ export interface SfxOption {
   title: string;
   /** Seconds. */
   duration: number;
-  source: "house" | "freesound";
+  source: "house" | "freesound" | "generated";
   license: string;
   tags: string[];
   /** A URL Studio can play. */
@@ -83,15 +84,30 @@ export async function searchFreesound(query: string, opts: { limit?: number; max
 
 /** Both shelves for a picker. `freesound_configured` tells Studio whether to
  *  offer the search or explain the missing key. */
-export async function listSfxOptions(opts: { query?: string } = {}): Promise<{ house: SfxOption[]; freesound: SfxOption[]; freesound_configured: boolean }> {
+/** The generated shelf (audio/sfx-generate.ts): sounds made from a prompt. */
+export async function listGeneratedOptions(): Promise<SfxOption[]> {
+  return (await listGeneratedSfx()).map((e) => ({
+    id: e.id,
+    title: e.label,
+    duration: e.duration,
+    source: "generated" as const,
+    license: "Generated with ElevenLabs sound effects -- yours to use",
+    tags: e.prompt.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2).slice(0, 12),
+    preview_url: `/assets/_system/sfx/generated/${encodeURIComponent(e.file)}`,
+  }));
+}
+
+export async function listSfxOptions(opts: { query?: string } = {}): Promise<{ house: SfxOption[]; generated: SfxOption[]; freesound: SfxOption[]; freesound_configured: boolean }> {
   const all = await listHouseSfx();
   const q = String(opts.query || "").toLowerCase().trim();
   const words = q.split(/[^a-z0-9]+/).filter(Boolean);
-  const house = !words.length ? all : all.filter((o) =>
-    words.some((w) => o.title.toLowerCase().includes(w) || o.tags.some((t) => t.includes(w))));
+  const matches = (o: SfxOption) => words.some((w) => o.title.toLowerCase().includes(w) || o.tags.some((t) => t.includes(w)));
+  const house = !words.length ? all : all.filter(matches);
+  const gen = await listGeneratedOptions();
+  const generated = !words.length ? gen : gen.filter(matches);
   const freesound_configured = !!process.env.FREESOUND_API_KEY;
   const freesound = q && freesound_configured ? await searchFreesound(q, { limit: 12 }).catch(() => []) : [];
-  return { house: house.length ? house : all, freesound, freesound_configured };
+  return { house: house.length ? house : all, generated, freesound, freesound_configured };
 }
 
 /**
@@ -114,6 +130,14 @@ export async function resolveSfxChoice(id: string, projectAssetsDir: string): Pr
     const dest = path.join(projectAssetsDir, `sfx-${fid}.wav`);
     await fs.copyFile(src, dest);
     return { url: assetUrl(dest), localPath: dest, title: spec.label, license: "House set", duration: spec.duration };
+  }
+  if (id.startsWith("gen-")) {
+    const e = (await listGeneratedSfx()).find((g) => g.id === id);
+    if (!e) throw new Error(`Unknown generated sound: ${id}`);
+    await fs.mkdir(projectAssetsDir, { recursive: true });
+    const dest = path.join(projectAssetsDir, `sfx-${id}.wav`);
+    await fs.copyFile(path.join(GEN_SFX_DIR, e.file), dest);
+    return { url: assetUrl(dest), localPath: dest, title: e.label, license: "Generated (ElevenLabs)", duration: e.duration };
   }
   if (id.startsWith("freesound-")) {
     const key = process.env.FREESOUND_API_KEY;

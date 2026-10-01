@@ -1020,6 +1020,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
+      // The generated shelf (audio/sfx-generate.ts): sounds made from a prompt.
+      const genSfxMatch = urlPath.match(/^\/assets\/_system\/sfx\/generated\/([^/]+)$/);
+      if (genSfxMatch && (method === "GET" || method === "HEAD")) {
+        const f = decodeURIComponent(genSfxMatch[1]);
+        if (f.includes("..") || !/\.wav$/i.test(f)) { res.writeHead(403); res.end("Forbidden"); return; }
+        try { await streamFile(req, res, path.join(config.dataDir, "_system", "sfx", "generated", f)); }
+        catch { res.writeHead(404); res.end("Asset not found"); }
+        return;
+      }
+
       // The house sticker library (core/sticker-library.ts): images only.
       // The committed set is copied in on first request, so a fresh server
       // has it without a deploy step; minted stickers land beside it.

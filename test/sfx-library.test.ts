@@ -117,7 +117,7 @@ describe("the sound-effect library", () => {
 
   it("the tool places one by id and lists the shelves; Studio has a route for the picker and one that serves the house files", async () => {
     const srv = await read("src/server.ts");
-    expect(srv).toMatch(/action: z\.enum\(\["add", "update", "remove", "search", "search_sfx"\]\)/);
+    expect(srv).toMatch(/action: z\.enum\(\["add", "update", "remove", "search", "search_sfx", "generate_sfx"\]\)/);
     expect(srv).toMatch(/sfx: z\.string\(\)\.optional\(\)\.describe\("A sound effect id from action='search_sfx'/);
     expect(srv).toMatch(/if \(params\.action === "search_sfx"\) \{/);
     // A search needs no track -- the schema demanded one, so neither search action could be called at all.

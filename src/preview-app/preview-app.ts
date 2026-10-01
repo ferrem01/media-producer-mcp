@@ -6655,7 +6655,7 @@ ${QUOTIENT_CSS}
     if (sfxOptionsCache) return Promise.resolve(sfxOptionsCache);
     var p = state.currentProject;
     return api('/sfx-options/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id)).then(function(r) {
-      sfxOptionsCache = ((r && r.house) || []).concat((r && r.freesound) || []);
+      sfxOptionsCache = ((r && r.house) || []).concat((r && r.generated) || [], (r && r.freesound) || []);
       return sfxOptionsCache;
     });
   }

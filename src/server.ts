@@ -45,7 +45,7 @@ import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
 import { planMarkdown, removeBoardScenes, reorderBoard } from "./core/film-plan.js";
-import { normalizeSoundCues, ensureSoundFiles } from "./core/scene-sfx.js";
+import { normalizeSoundCues, normalizeSoundId, ensureSoundFiles } from "./core/scene-sfx.js";
 import { retimeScene } from "./core/measured-spine.js";
 import { forgetProject } from "./core/library.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
@@ -79,6 +79,7 @@ import { normalizeSpeakerPipRefs } from "./core/scene-assembler.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
+import { generateSfx } from "./audio/sfx-generate.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
@@ -1330,6 +1331,9 @@ export function createMcpServer(): McpServer {
         volume: z.number().min(0).max(1).optional().describe("The voice's level in the film, 0-1 (default 1, the take as normalised). Pass alone ({volume: 0.7}) to change only the level; the clips are kept."),
       }).nullable().optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time. Pass null (or an empty clips array) to CLEAR the speaker track. {volume} alone sets the voice's level and keeps the clips."),
 
+      sfx_palette: z.record(z.enum(["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"]), z.string()).nullable().optional()
+        .describe("The film's SOUND PALETTE: the one sound each job plays (e.g. {transition: 'camera-flash', payoff: 'gen-impact-1a2b3c'}); every cue with that role plays it. Merged into the current palette; null clears it (house defaults). Re-points the film's role cues at once."),
+
       // Storyboard modifications (direct edits, no LLM)
       storyboard: z.object({
         narrative: z.string().optional(),
@@ -1592,6 +1596,21 @@ export function createMcpServer(): McpServer {
         // audio). It must persist on a project-level update, independent of any
         // scene_id -- gating it behind the scene branch below silently dropped
         // it on `update({canvas, speaker_track})` while still reporting success.
+        if (params.sfx_palette !== undefined) {
+          const pal: Record<string, string> = params.sfx_palette === null ? {} : { ...((project as any).sfx_palette || {}) };
+          for (const [role, id] of Object.entries(params.sfx_palette || {})) {
+            const sid = normalizeSoundId(id);
+            if (!sid) return err(`sfx_palette.${role}: unknown sound "${id}" (a house name, gen-..., or freesound-...)`);
+            pal[role] = sid;
+          }
+          if (Object.keys(pal).length) (project as any).sfx_palette = pal; else delete (project as any).sfx_palette;
+          // The film's role cues follow the palette now (board and built).
+          for (const sc of [...(project.storyboard?.scenes || []), ...(project.scenes || [])] as any[]) {
+            if (Array.isArray(sc?.sfx) && sc.sfx.some((c: any) => c?.role)) sc.sfx = normalizeSoundCues(sc.sfx, (project as any).sfx_palette);
+          }
+          await ensureSoundFiles(project, (id) => resolveSfxChoice(id, projectAssetsDir(params.tenant_id, project.project_id))).catch(() => 0);
+          updated = true;
+        }
         if (params.speaker_track !== undefined) {
           const st = params.speaker_track as any;
           // null, or an empty clips array, clears the speaker track entirely.
@@ -2923,7 +2942,10 @@ export function createMcpServer(): McpServer {
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),
-      action: z.enum(["add", "update", "remove", "search", "search_sfx"]).describe("Action to perform. 'search' searches the Jamendo music library; 'search_sfx' lists SOUND EFFECTS -- the house set (synthesized here: whooshes, ticks, thuds, dings, a whirr, a riser; no licence, always there) and, where a free FREESOUND_API_KEY is set, Creative-Commons-0 matches for `query`. Place one with action='add' and track.sfx."),
+      action: z.enum(["add", "update", "remove", "search", "search_sfx", "generate_sfx"]).describe("Action to perform. 'search' searches the Jamendo music library; 'search_sfx' lists SOUND EFFECTS -- the house set (made here or found free: whooshes, ticks, thuds, dings, a riser, camera flash, right/wrong, boom, bass impact; always there), the GENERATED shelf, and, where a free FREESOUND_API_KEY is set, Creative-Commons-0 matches for `query`. 'generate_sfx' MAKES a sound from `prompt` with ElevenLabs sound effects (optional `seconds`, `name`) and adds it to the generated shelf as gen-<name>-<hash> -- for a sound no library has (a voice, a meme-style hit). Place one with action='add' and track.sfx, or as a scene cue / palette entry."),
+      prompt: z.string().optional().describe("generate_sfx: the sound in words, e.g. 'a man yelling FAHHH, loud and drawn out, comedic meme exclamation, dry, no music'"),
+      seconds: z.number().min(0.5).max(22).optional().describe("generate_sfx: length in seconds (omit to let the model choose)"),
+      name: z.string().optional().describe("generate_sfx: a short name for the shelf (e.g. 'fahhh')"),
       query: z.string().optional().describe("Search query for music (use with action='search')"),
       mood: z.string().optional().describe("Mood filter for music search (e.g. 'happy', 'calm')"),
       genre: z.string().optional().describe("Genre filter for music search"),
@@ -2959,6 +2981,17 @@ export function createMcpServer(): McpServer {
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
+
+      if (params.action === "generate_sfx") {
+        if (!params.prompt) return err("prompt required for generate_sfx: describe the sound");
+        try {
+          const made = await generateSfx({ prompt: params.prompt, seconds: params.seconds, name: params.name });
+          return ok({ generated: made, preview_url: `/assets/_system/sfx/generated/${encodeURIComponent(made.file)}`,
+            note: `Place it with id "${made.id}" -- a scene cue, track.sfx, or the film's sfx_palette.` });
+        } catch (e: any) {
+          return err(`Sound generation failed: ${e.message}`);
+        }
+      }
 
       // Handle search action (no project needed)
       if (params.action === "search_sfx") {

@@ -360,10 +360,15 @@ export async function ensureFoleyLibrary(dir: string): Promise<FoleyManifestEntr
   for (const spec of FOLEY_SET) {
     const file = `${spec.id}.wav`;
     const full = path.join(dir, file);
-    try { await fs.access(full); }
-    catch {
-      if (spec.found) await fs.copyFile(path.join(FOUND_DIR, file), full);
-      else await fs.writeFile(full, wavBytes(renderFoley(spec.id)));
+    if (spec.found) {
+      // A found file is the repo's: re-copied whenever the repo's copy
+      // changes (a better take swapped in), not only when missing.
+      const want = await fs.readFile(path.join(FOUND_DIR, file));
+      const have = await fs.readFile(full).catch(() => null);
+      if (!have || !have.equals(want)) await fs.writeFile(full, want);
+    } else {
+      try { await fs.access(full); }
+      catch { await fs.writeFile(full, wavBytes(renderFoley(spec.id))); }
     }
     entries.push({ ...spec, file, source: "house", license: "house" });
   }
