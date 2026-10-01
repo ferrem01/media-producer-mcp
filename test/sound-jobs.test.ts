@@ -53,8 +53,8 @@ describe("the sound jobs", () => {
   it("a riser LANDS on its moment: it starts its length before `at`", () => {
     const [r] = normalizeSoundCues([{ at: 6, role: "tension" }]);
     expect(r.lands).toBe(true);
-    expect(r.duration).toBeCloseTo(3.98);
-    expect(cueStart(r)).toBeCloseTo(2.02);
+    expect(r.duration).toBeCloseTo(1.5);
+    expect(cueStart(r)).toBeCloseTo(4.5);
     expect(cueStart({ at: 1, lands: true, duration: 3.98 })).toBe(0);
     // An explicit no survives another clean (the build re-normalizes the board).
     const [carry] = normalizeSoundCues(normalizeSoundCues([{ at: 4.5, role: "tension", lands: false }]));
@@ -63,7 +63,7 @@ describe("the sound jobs", () => {
     const [hit] = normalizeSoundCues([{ at: 6, role: "payoff" }]);
     expect(hit.lands).toBeUndefined();
     const tracks = sceneSfxTracks({ scenes: [{ duration_seconds: 8, sfx: [{ ...r, src: "/assets/r.wav" }, { ...hit, src: "/assets/h.wav" }] }] } as any, () => 10, (s) => s);
-    expect(tracks.map((t) => t.startTime)).toEqual([12.02, 16]);
+    expect(tracks.map((t) => t.startTime)).toEqual([14.5, 16]);
   });
 
   it("the writer and the update tool are told the jobs and the two-or-three rule; Studio plays a landing cue early", async () => {

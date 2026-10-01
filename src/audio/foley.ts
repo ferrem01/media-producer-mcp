@@ -296,23 +296,25 @@ export const FOLEY_SET: FoleySpec[] = [
   { id: "camera-shutter", label: "Camera shutter", tags: ["camera", "shutter", "photo", "snap"], duration: 0.16 },
   { id: "monkey", label: "Monkey (ooh-ooh-ah-ah)", tags: ["monkey", "chimp", "ape", "animal", "gag", "funny", "cartoon"], duration: 0.95 },
   // THE SIX JOBS (the viewcci reel, Marc 2026-10-01: "make sure we have
-  // these sound effects"): one sound per job, found free where a CC0
-  // recording exists, generated with ElevenLabs where none does (FAHHH,
-  // the Vine-style boom -- Marc: "What about eleven labs").
-  { id: "attention", label: "FAHHH (attention)", tags: ["attention", "hook", "fahhh", "shout", "yell", "open"], duration: 1.28,
-    found: { credit: "Generated with ElevenLabs sound effects for Quotient (no free copy of the meme exists)", url: "https://elevenlabs.io/sound-effects" } },
-  { id: "camera-flash", label: "Camera flash", tags: ["camera", "flash", "transition", "cut", "snap", "photo"], duration: 0.47,
-    found: { credit: "Rvgerxini, \"iOS Camera flash\" (CC0)", url: "https://freesound.org/s/455511/" } },
-  { id: "riser-metal", label: "Metallic riser", tags: ["riser", "metallic", "tension", "build", "before", "payoff"], duration: 3.98,
-    found: { credit: "HenryRichard, \"Metallic Riser.wav\" (CC0)", url: "https://freesound.org/s/451653/" } },
-  { id: "right", label: "Right (correct chime)", tags: ["right", "correct", "yes", "quiz", "answer", "true", "do"], duration: 0.73,
-    found: { credit: "Beetlemuse, \"Correct Answer / That's Right!\" (CC0)", url: "https://freesound.org/s/528957/" } },
-  { id: "wrong", label: "Wrong (buzzer)", tags: ["wrong", "incorrect", "no", "quiz", "answer", "false", "dont", "buzzer"], duration: 0.49,
-    found: { credit: "KevinVG207, \"Wrong Buzzer\" (CC0)", url: "https://freesound.org/s/331912/" } },
-  { id: "boom", label: "Boom (comedy)", tags: ["boom", "vine", "comedy", "funny", "gag", "meme", "reveal"], duration: 2.0,
-    found: { credit: "Generated with ElevenLabs sound effects for Quotient (a Vine-boom-style hit)", url: "https://elevenlabs.io/sound-effects" } },
-  { id: "bass-impact", label: "Bass impact", tags: ["bass", "impact", "hype", "payoff", "hit", "drop", "land"], duration: 3.0,
-    found: { credit: "Kievinay, \"Bass Impact - Ki_01\" (CC0)", url: "https://freesound.org/s/512389/" } },
+  // these sound effects"; then "the FAHH sounds nothing like the one in the
+  // video"): each one MATCHED to the reel's own sound -- candidates (CC0
+  // recordings, ElevenLabs takes) scored on spectrum, envelope and length
+  // against the reel, the closest EQ-matched toward it. Nothing is lifted
+  // from the reel itself.
+  { id: "attention", label: "FAHHH (attention)", tags: ["attention", "hook", "fahhh", "shout", "yell", "open"], duration: 1.11,
+    found: { credit: "Generated with ElevenLabs sound effects for Quotient, EQ-matched to the reel's FAHHH (no free copy of the meme exists)", url: "https://elevenlabs.io/sound-effects" } },
+  { id: "camera-flash", label: "Camera flash", tags: ["camera", "flash", "transition", "cut", "snap", "photo"], duration: 1.82,
+    found: { credit: "montclairguy, \"Camera shutter and flash combined\" (CC0)", url: "https://freesound.org/s/353044/" } },
+  { id: "riser-metal", label: "Metallic riser", tags: ["riser", "metallic", "tension", "build", "before", "payoff"], duration: 1.5,
+    found: { credit: "Generated with ElevenLabs sound effects for Quotient, EQ-matched to the reel's riser", url: "https://elevenlabs.io/sound-effects" } },
+  { id: "right", label: "Right (correct chime)", tags: ["right", "correct", "yes", "quiz", "answer", "true", "do"], duration: 0.91,
+    found: { credit: "Generated with ElevenLabs sound effects for Quotient, EQ-matched to the reel's chime", url: "https://elevenlabs.io/sound-effects" } },
+  { id: "wrong", label: "Wrong (buzzer)", tags: ["wrong", "incorrect", "no", "quiz", "answer", "false", "dont", "buzzer"], duration: 0.78,
+    found: { credit: "Generated with ElevenLabs sound effects for Quotient, EQ-matched to the reel's buzzer", url: "https://elevenlabs.io/sound-effects" } },
+  { id: "boom", label: "Boom (comedy)", tags: ["boom", "vine", "comedy", "funny", "gag", "meme", "reveal"], duration: 1.26,
+    found: { credit: "Generated with ElevenLabs sound effects for Quotient, EQ-matched to the reel's Vine-style boom", url: "https://elevenlabs.io/sound-effects" } },
+  { id: "bass-impact", label: "Bass impact", tags: ["bass", "impact", "hype", "payoff", "hit", "drop", "land"], duration: 1.22,
+    found: { credit: "Generated with ElevenLabs sound effects for Quotient, EQ-matched to the reel's bass impact", url: "https://elevenlabs.io/sound-effects" } },
 ];
 
 /** Where the found sounds live: src/sounds/sfx (dist/sounds/sfx once

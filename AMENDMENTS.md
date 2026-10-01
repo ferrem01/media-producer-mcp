@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — The job sounds are matched to the reel, not picked by eye
+
+Marc: "the FAHH sounds nothing like the one in the sound video." It didn't:
+the reel's FAHHH is a lo-fi, band-limited, strained ~1.1 s shout; ours was a
+bright, clean 0.9 s one, chosen from a spectrogram by eye. Now every job
+sound is MATCHED to the reel's own sound: five candidates per job (ElevenLabs
+takes with prompts written from the measurements, plus the CC0 options)
+scored on spectral shape, envelope and length against the reel's window for
+that sound (the reel lays a 2.67 kHz tone under every card -- left out), the
+best-shaped EQ-matched toward the reel and time-stretched to its length.
+Distance to the reel (lower is closer), before -> after: FAHHH 9.0 -> 3.6,
+camera flash 24.4 -> 5.7, riser 17.0 -> 5.4, right 18.1 -> 10.5, wrong
+18.5 -> 8.5, boom 17.0 -> 9.9, bass impact 24.6 -> 7.0. Nothing is lifted
+from the reel. The method and sources are in src/sounds/sfx/CREDITS.md.
+
 ## 2026-10-01 — A riser told not to land stays that way
 
 The tension job lands by default (its `at` is where it ends). A cue set
