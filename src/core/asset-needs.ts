@@ -89,12 +89,28 @@ export function normalizeAssetNeeds(raw: unknown): AssetRequirement[] {
 
 export interface OpenAssetNeed { scene_index: number; asset_index: number; type: AssetRequirementType; description: string }
 
+/**
+ * True when a built scene has covered a slated need without the file: the
+ * need is a screen (or a live-action clip) the build stands a slate in, the
+ * scene is built, and its cast no longer carries that slate -- the slot was
+ * filled with something else (a library mock, a hand-built cast) or the
+ * slate was removed. Such a need is no longer waiting on anyone (measured
+ * live, proj_c99e52c3: every scene rebuilt from library pieces, Studio still
+ * listing "Screen recording needed" on six of seven). A scene not built yet
+ * keeps every need.
+ */
+export function needCoveredByCast(builtScene: { components?: unknown[] } | null | undefined, need: AssetRequirement | null | undefined): boolean {
+  if (!builtScene || !need || !isScreenNeed(need)) return false;
+  return !(builtScene.components || []).some((c) => isScreenSlate(c) && (c as any).data.need === need.description);
+}
+
 /** Every proof need still waiting for a file (camera takes have their own
- *  list, `openTakeNeeds`). */
+ *  list, `openTakeNeeds`). A need a built scene covered is not waiting. */
 export function openAssetNeeds(project: Project): OpenAssetNeed[] {
   const out: OpenAssetNeed[] = [];
   (project.storyboard?.scenes || []).forEach((scene, si) => {
     (scene.assets || []).forEach((a, ai) => {
+      if (needCoveredByCast((project.scenes || [])[si] as any, a)) return;
       if (a && a.type !== "camera_video" && a.status === "needed") out.push({ scene_index: si, asset_index: ai, type: a.type, description: a.description });
     });
   });
