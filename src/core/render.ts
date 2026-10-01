@@ -845,7 +845,9 @@ async function renderVideoWithSpeakerTrack(
   const totalProjectDuration = scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
   const clipTracks = clipAudioTracks(project, (i) => sceneStartTimes[i] || 0);
   const spSfx = sceneSfxTracks(project, (i) => sceneStartTimes[i] || 0, resolveVideoPath);
-  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0 || spSfx.length > 0) {
+  // The voice's level (speaker_track.volume): the composite's own sound.
+  const voiceVol = typeof project.speaker_track?.volume === "number" ? Math.max(0, Math.min(1, project.speaker_track.volume)) : 1;
+  if ((project.audio && project.audio.tracks.length > 0) || clipTracks.length > 0 || spSfx.length > 0 || voiceVol !== 1) {
     console.log(`
 [speaker-track] Mixing ${project.audio?.tracks.length || 0} audio track(s)${clipTracks.length ? ` + ${clipTracks.length} clip(s) on scenes` : ""}...`);
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
@@ -870,6 +872,7 @@ async function renderVideoWithSpeakerTrack(
       tracks: audioTracks,
       ducking: duckingOpts,
       totalDuration: totalProjectDuration,
+      baseVolume: voiceVol,
     });
     await fs.rename(audioOutput, outputPath);
   }

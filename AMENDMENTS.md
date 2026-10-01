@@ -6,6 +6,30 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — The voice has a level; Studio's slider reaches it
+
+Marc on the email-signals film: "can you lower the volume on the audio a
+little bit? It's very loud" -- and "the studio volume control does not
+seem to be working ... it works sometimes." Two gaps:
+- Nothing could turn the voice down. A take is normalised to -16 LUFS and
+  the speaker-track render's mix only ran when there were added tracks,
+  passing the composite's own sound (the voice) through untouched. Now
+  `speaker_track.volume` (0-1, default 1) is the voice's level: the mix
+  runs when it is not 1 and scales the base (`mixAudio({baseVolume})`, a
+  `volume=` on `[0:a]`).
+- Studio's transport slider set only the audio tracks (music, voiceover,
+  cues). On a speaker film the voice IS the speaker-bg video element, so
+  the slider "worked sometimes" -- on films with tracks -- and never on the
+  voice. syncMedia now sets the active speaker element to
+  `speaker_track.volume x slider` every tick (the A/B swap at a cut hands
+  over a standby that never heard the slider), and the slider applies it
+  to both elements at once.
+- The MCP `update` tool takes `speaker_track: {volume}` alone and keeps the
+  clips (it used to read "no clips" as clear the track); a full clips
+  update keeps the level unless given; a take attach
+  (`take-needs.ts`) keeps it too.
+Test: `test/voice-volume.test.ts`.
+
 ## 2026-10-01 — A need the built scene covered is not open
 
 The email-signals film, rebuilt from library pieces, still showed "Screen

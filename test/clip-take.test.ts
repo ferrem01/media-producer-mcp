@@ -207,7 +207,7 @@ describe("the clip need", () => {
     const render = await read("src/core/render.ts");
     // Both render paths mix the clips and run the mix when clips alone exist; the ducking triggers include them.
     // (Each also carries the scenes' sound cues -- core/scene-sfx.ts.)
-    expect(render.match(/if \(\(project\.audio && project\.audio\.tracks\.length > 0\) \|\| clipTracks\.length > 0( \|\| \w+\.length > 0)?\) \{/g)?.length).toBe(2);
+    expect(render.match(/if \(\(project\.audio && project\.audio\.tracks\.length > 0\) \|\| clipTracks\.length > 0( \|\| \w+\.length > 0)?( \|\| voiceVol !== 1)?\) \{/g)?.length).toBe(2);
     expect(render.match(/audioTracks\.push\(\.\.\.clipTracks(, \.\.\.\w+)?\);/g)?.length).toBe(2);
     expect(render.match(/duckUnderClips\(resolveDucking\(project\), clipTracks\)/g)?.length).toBe(2);
     expect(render).toMatch(/clipAudioTracks\(project, \(i\) => contentStarts\[i\] \+ insertedBefore\(contentStarts\[i\]\)\)/);

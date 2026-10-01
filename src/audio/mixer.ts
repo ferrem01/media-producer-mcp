@@ -42,6 +42,9 @@ export interface MixOptions {
   tracks: AudioTrackInput[];
   ducking?: DuckingOptions;
   totalDuration: number;   // video duration for looping/trimming
+  /** The level of the video's own sound (a speaker film's voice), 0-1;
+   *  default 1, untouched. */
+  baseVolume?: number;
 }
 
 /**
@@ -49,8 +52,9 @@ export interface MixOptions {
  * Returns the output path.
  */
 export async function mixAudio(opts: MixOptions): Promise<string> {
-  if (opts.tracks.length === 0) {
-    // No audio tracks, just copy video
+  const baseVol = typeof opts.baseVolume === "number" ? Math.max(0, Math.min(1, opts.baseVolume)) : 1;
+  if (opts.tracks.length === 0 && (baseVol === 1 || !(await hasAudioStream(opts.videoPath)))) {
+    // No audio tracks and the video's own sound as it is: just copy video
     await fs.copyFile(opts.videoPath, opts.outputPath);
     return opts.outputPath;
   }
@@ -195,7 +199,7 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
   // REPLACED the voice (measured: a 3s voiced clip + one tick -> the tick
   // and silence). The voice goes in first, untouched.
   if (await hasAudioStream(opts.videoPath)) {
-    filterParts.push(`[0:a]asetpts=PTS-STARTPTS[vbase]`);
+    filterParts.push(`[0:a]asetpts=PTS-STARTPTS${baseVol !== 1 ? `,volume=${baseVol.toFixed(3)}` : ""}[vbase]`);
     trackLabels.unshift(`[vbase]`);
   }
 
