@@ -21,6 +21,32 @@ const info = async (f: string) => { try { await run("ffmpeg", ["-hide_banner", "
 const dur = async (f: string) => { const m = (await info(f)).match(/Duration: (\d+):(\d+):([\d.]+)/)!; return +m[1] * 3600 + +m[2] * 60 + +m[3]; };
 
 describe("generated take: the script performed with no recording", () => {
+  it("voices the whole read in one pass; a voice that refuses pause marks is read line by line", async () => {
+    await fs.mkdir(DATA, { recursive: true });
+    const line = path.join(DATA, "fb.mp3");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=300:duration=1", "-c:a", "libmp3lame", line]);
+    const mp3 = await fs.readFile(line);
+    const bodies: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json" } });
+      if (u.startsWith("https://api.heygen.com/v3/voices?type=private")) return json({ data: [], has_more: false });
+      if (u === "https://api.heygen.com/v3/voices/speech") {
+        const b = JSON.parse(init.body); bodies.push(b);
+        return b.input_type === "ssml" ? json({ error: { message: "ssml not supported for this voice" } }, 400) : json({ data: { audio_url: "https://cdn/fb.mp3" } });
+      }
+      if (u === "https://cdn/fb.mp3") return new Response(mp3, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.HEYGEN_API_KEY = "hk";
+    const { speakScript } = await import("../src/core/generated-take.js");
+    const wd = path.join(DATA, "fb-work"); await fs.mkdir(wd, { recursive: true });
+    const wav = await speakScript(["One.", "Two.\n(pause)\nThree."], { provider: "heygen", id: "v_fb" }, wd);
+    expect(bodies[0].input_type).toBe("ssml");                                     // tried as one read first
+    expect(bodies.slice(1).map((b) => b.text)).toEqual(["One.", "Two.", "Three."]);  // then line by line
+    expect(Math.abs((await dur(wav)) - 4.6)).toBeLessThan(0.15);                     // 3 lines + 0.6 s + 1 s
+  }, 60000);
+
   it("names a speech engine the HeyGen voice allows: its saved default, else the best it offers", async () => {
     const { pickHeygenEngine } = await import("../src/core/generated-take.js");
     expect(pickHeygenEngine({ engines: ["starfish", "elevenlabs_v3"], default_engine: "starfish" })).toBe("starfish");
@@ -82,22 +108,28 @@ describe("generated take: the script performed with no recording", () => {
     expect(st.voice).toEqual({ provider: "heygen", id: "marc_voice" });
     for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getGeneratedTakeStatus(T, P))!; }
     expect(st.status, st.error).toBe("done");
-    expect(speech.map((s) => s.text)).toEqual(["First line.", "Second.", "Third."]);   // one call per spoken part, the empty scene skipped
-    expect(speech.every((s) => s.voice_id === "marc_voice" && s.engine === "elevenlabs")).toBe(true);   // an engine the voice allows, named
+    // ONE call for the whole read, pauses marked: the empty scene skipped, 0.6 s between scenes, 1 s at a pause.
+    expect(speech).toHaveLength(1);
+    expect(speech[0]).toMatchObject({ voice_id: "marc_voice", engine: "elevenlabs", input_type: "ssml" });   // an engine the voice allows, named
+    expect(speech[0].text).toBe('<speak>First line. <break time="0.6s"/> Second. <break time="1.0s"/> Third.</speak>');
     expect(gens).toHaveLength(1);
     expect(gens[0]).toMatchObject({ type: "avatar", avatar_id: "lk_sofa", audio_asset_id: "aud1", aspect_ratio: "9:16", engine: { type: "avatar_v" }, resolution: "1080p" });
+    // Avatar V gets a direction for its invented movement: a grounded presenter by default.
+    const { DEFAULT_MOTION } = await import("../src/core/generated-take.js");
+    expect(gens[0].motion_prompt).toBe(DEFAULT_MOTION);
+    expect(st.motion).toBe(DEFAULT_MOTION);
     expect(attached).toHaveLength(1);
     expect(attached[0]).toMatch(new RegExp(`^/assets/${T}/projects/${P}/assets/take-generated-.*\\.mp4$`));
     const file = path.join(DATA, T, "projects", P, "assets", path.basename(attached[0]));
-    // Our read under HeyGen's picture: three 1 s lines + a 0.6 s scene gap + a 1 s pause.
-    expect(Math.abs((await dur(file)) - 4.6)).toBeLessThan(0.15);
+    // Our read (one pass) under HeyGen's picture.
+    expect(Math.abs((await dur(file)) - 1)).toBeLessThan(0.15);
     expect(st.url).toBe(attached[0]);
 
     // ElevenLabs: a named voice, the same one call to HeyGen.
     st = await startGeneratedTake(T, P, { actor: "sofa", voice: "elevenlabs", voice_id: "roger" }, attach);
     for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 100)); st = (await getGeneratedTakeStatus(T, P))!; }
     expect(st.status, st.error).toBe("done");
-    expect(tts).toEqual(["First line.", "Second.", "Third."]);
+    expect(tts).toEqual(['First line. <break time="0.6s"/> Second. <break time="1.0s"/> Third.']);   // ElevenLabs: one call, break tags, no SSML wrapper
     expect(gens).toHaveLength(2);
 
     // A failed attach is a failed take.
@@ -118,8 +150,10 @@ describe("generated take: the script performed with no recording", () => {
     const portrait = path.join(DATA, T, "cast", "p.jpg");
     await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=gray:s=256x320", "-frames:v", "1", portrait]);
     await fs.writeFile(path.join(DATA, T, "cast", "cast.json"), JSON.stringify([{ id: "cust", name: "Customer", portrait: "cast/p.jpg", consent: { at: "x" }, created_at: "x" }]));
-    const line = path.join(DATA, "line9.mp3");
-    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=300:duration=9", "-c:a", "libmp3lame", line]);
+    // The one-pass read comes back as 69 s of voice with its pauses in it (silence at each break).
+    const line = path.join(DATA, "read69.mp3");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=300:duration=69",
+      "-af", "volume='if(lt(mod(t,10),9),1,0)':eval=frame", "-c:a", "libmp3lame", line]);
     const clip = path.join(DATA, "clip.mp4");
     await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=navy:s=256x320:r=25:d=40", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", clip]);
     const mp3 = await fs.readFile(line), mp4 = await fs.readFile(clip);
@@ -146,7 +180,7 @@ describe("generated take: the script performed with no recording", () => {
 
     let st = await finish(await startGeneratedTake(T, "proj_kr", { actor: "cust", performer: "kling", voice: "elevenlabs", voice_id: "roger" }, attach));
     expect(st.status, st.error).toBe("done");
-    // 7 lines of 9 s + 6 one-second pauses = 69 s: two calls, cut at a pause.
+    // 69 s of read (7 lines with their pauses), voiced in one pass: two Kling calls, cut at a pause.
     expect(kav.length).toBe(2);
     expect(kav[0].image_url).toMatch(/^data:image\/jpeg;base64,/);
     expect(kav[0].audio_url).toMatch(/^data:audio\/mpeg;base64,/);

@@ -231,7 +231,7 @@ function madeBy(entry: any): string {
  *  with a key); `voice_id` an ElevenLabs voice the delivery is converted to
  *  ("mine" keeps the recording's voice; omitted, the actor's own voice).
  *  Returns at once; the work runs on. */
-export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string } = {}): Promise<RecastStatus> {
+export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string; motion?: string } = {}): Promise<RecastStatus> {
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A recast of this film is already running");
   const project = await loadProject(tenant, projectId);
@@ -273,7 +273,7 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   }
   running.set(key, st);
   await saveStatus(tenant, st);
-  void runRecast(tenant, projectId, actor, performer, voiceId, st).catch(async (e) => {
+  void runRecast(tenant, projectId, actor, performer, voiceId, st, opts.motion?.trim() || undefined).catch(async (e) => {
     st.status = "failed"; st.error = e?.message || String(e); st.finished_at = new Date().toISOString();
     await saveStatus(tenant, st);
     running.delete(key);
@@ -281,7 +281,7 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   return st;
 }
 
-async function runRecast(tenant: string, projectId: string, actor: CastActor, performer: Performer, voiceId: string | undefined, st: RecastStatus): Promise<void> {
+async function runRecast(tenant: string, projectId: string, actor: CastActor, performer: Performer, voiceId: string | undefined, st: RecastStatus, motion?: string): Promise<void> {
   const key = `${tenant}/${projectId}`;
   const publicUrl = castPublicUrl(tenant, projectId);
   await Promise.all(st.files.map(async (f, i) => {
@@ -292,7 +292,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
       await performTakeFile({
         rawAbs, outAbs: resolveVideoPath(f.file, config.dataDir), performer, voiceId,
         ctx: {
-          tenant, actor, portraitAbs: portraitPath(tenant, actor), width, height, publicUrl,
+          tenant, actor, portraitAbs: portraitPath(tenant, actor), width, height, publicUrl, motion,
           workDir: recastWorkDir(tenant, projectId, actor.id, performer.id, i),
           onStage: (stage) => { f.stage = stage; void saveStatus(tenant, st); },
         },

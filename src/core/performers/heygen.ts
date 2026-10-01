@@ -38,7 +38,7 @@ export const heygen: Performer = {
       lookId, imgFile: img, audioFile: audio,
       aspect: H > W * 1.1 ? "9:16" : W > H * 1.1 ? "16:9" : "1:1",
       engine: look?.engines?.includes("avatar_v") ? "avatar_v" : undefined,
-      resolution: "1080p", resume,
+      resolution: "1080p", resume, motion: ctx.motion,
       onSubmit: async (id) => { await fs.writeFile(req, JSON.stringify({ video_id: id })); },
     });
     let url: string;

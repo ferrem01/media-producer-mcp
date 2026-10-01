@@ -30,6 +30,8 @@ export interface GeneratedTakeStatus {
   actor: string;
   performer: string;
   voice: { provider: VoiceProvider; id: string };
+  /** The direction given to the performer's movement. */
+  motion?: string;
   status: "running" | "done" | "failed" | "interrupted";
   stage?: string;
   started_at: string;
@@ -39,6 +41,17 @@ export interface GeneratedTakeStatus {
   seconds?: number;
   error?: string;
 }
+
+/** Avatar V invents the movement from the voice alone. Marc on the first
+ *  generated take: "I kept sort of putting my head up high ... in a way I
+ *  would never do." A grounded presenter unless told otherwise. */
+function motionTag(m?: string): string {
+  let h = 0;
+  for (const ch of m || "") h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
+  return m ? h.toString(36) : "free";
+}
+export const DEFAULT_MOTION = "A calm, grounded presenter talking to camera: head level and steady, small natural nods, " +
+  "no chin lifts and no tilting the head back, relaxed shoulders, occasional relaxed hand gestures, warm eye contact with the lens.";
 
 /** Between scenes: a breath, so the split finds each scene's first words. */
 const SCENE_GAP = 0.6;
@@ -109,11 +122,11 @@ async function heygenEngine(voiceId: string): Promise<string | null> {
   return engine;
 }
 
-async function heygenSpeech(text: string, voiceId: string, out: string): Promise<void> {
+async function heygenSpeech(text: string, voiceId: string, out: string, ssml = false): Promise<void> {
   const engine = await heygenEngine(voiceId);
   const r = await fetch("https://api.heygen.com/v3/voices/speech", {
     method: "POST", headers: { "X-Api-Key": String(process.env.HEYGEN_API_KEY), "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice_id: voiceId, ...(engine ? { engine } : {}) }),
+    body: JSON.stringify({ text, voice_id: voiceId, ...(engine ? { engine } : {}), ...(ssml ? { input_type: "ssml" } : {}) }),
   });
   const j: any = await r.json().catch(() => null);
   if (!r.ok || !j?.data?.audio_url) throw new Error(`heygen speech: HTTP ${r.status} ${String(j?.error?.message || j?.message || JSON.stringify(j)).slice(0, 200)}`);
@@ -130,8 +143,42 @@ async function elevenSpeech(text: string, voiceId: string, out: string): Promise
 }
 
 /** The whole read: every scene's parts spoken, joined with silence, one WAV. */
+/** The whole read as ONE text with pause marks: <break> between scenes and
+ *  at "(pause)" lines. Marc on the per-line read: "some choppiness and
+ *  awkwardness in the voice track" -- each line was voiced cold and the
+ *  clips butted with fixed silences, so the delivery reset at every join. */
+export function scriptWithBreaks(scenes: string[], xml = true): string {
+  // SSML (HeyGen) needs XML escapes; ElevenLabs reads plain text with break tags.
+  const esc = (t: string) => xml ? t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : t.replace(/[<>]/g, "");
+  const out: string[] = [];
+  for (const sc of scenes) {
+    const parts = spokenParts(sc);
+    if (!parts.length) continue;
+    if (out.length) out.push(`<break time="${SCENE_GAP}s"/>`);
+    parts.forEach((p, i) => { if (i) out.push(`<break time="${PAUSE.toFixed(1)}s"/>`); out.push(esc(p.join(" "))); });
+  }
+  return out.join(" ");
+}
+
 export async function speakScript(scenes: string[], voice: { provider: VoiceProvider; id: string }, workDir: string): Promise<string> {
   const w = (n: string) => path.join(workDir, n);
+  // ONE PASS first: the whole script voiced in a single call, so the delivery
+  // flows like a real read. If the voice refuses pause marks, line by line.
+  const once = w("voice-once.mp3");
+  if (!(await fs.stat(w("voice.wav")).then((x) => x.size > 0, () => false))) {
+    const marked = scriptWithBreaks(scenes, voice.provider === "heygen");
+    if (!marked) throw new Error("The storyboard has no lines to read");
+    try {
+      if (marked.length > 4800) throw new Error("too long for one call");
+      await (voice.provider === "heygen" ? heygenSpeech(`<speak>${marked}</speak>`, voice.id, once, true) : elevenSpeech(marked, voice.id, once));
+      await ffmpeg(["-i", once, "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("voice.wav")]);
+      return w("voice.wav");
+    } catch (e: any) {
+      console.warn(`  generated take: one-pass voice failed (${String(e?.message || e).slice(0, 160)}); voicing line by line`);
+    }
+  } else {
+    return w("voice.wav");
+  }
   const list: string[] = [];
   const silence = async (secs: number) => {
     const f = w(`gap-${secs}.wav`);
@@ -170,6 +217,9 @@ export async function startGeneratedTake(tenant: string, projectId: string, opts
   performer?: string;
   voice?: VoiceProvider;
   voice_id?: string;
+  /** A direction for the performer's movement; "" for none. Omitted, a
+   *  grounded presenter (DEFAULT_MOTION). */
+  motion?: string;
 }, attach?: (url: string) => Promise<{ status: number; body: Record<string, unknown> }>): Promise<GeneratedTakeStatus> {
   const registered = attacher;
   const doAttach = attach || (registered ? (url: string) => registered(tenant, projectId, url) : null);
@@ -201,7 +251,8 @@ export async function startGeneratedTake(tenant: string, projectId: string, opts
     if (!voiceId && actor.heygen_look_id) voiceId = (await getHeygenLook(actor.heygen_look_id)).default_voice_id || "";
     if (!voiceId) throw new Error("Name a HeyGen voice (voice_id): this actor has no HeyGen voice of its own");
   }
-  const st: GeneratedTakeStatus = { project_id: projectId, actor: actor.id, performer: performer.id, voice: { provider, id: voiceId }, status: "running", started_at: new Date().toISOString() };
+  const motion = opts.motion === undefined ? DEFAULT_MOTION : String(opts.motion).trim().slice(0, 1000);
+  const st: GeneratedTakeStatus = { project_id: projectId, actor: actor.id, performer: performer.id, voice: { provider, id: voiceId }, ...(motion ? { motion } : {}), status: "running", started_at: new Date().toISOString() };
   running.set(key, st);
   await save(tenant, st);
   void run(tenant, projectId, actor, performer, scenes, st, doAttach).catch(async (e) => {
@@ -217,7 +268,7 @@ async function run(tenant: string, projectId: string, actor: CastActor, performe
   const key = `${tenant}/${projectId}`;
   // One work dir per actor, vendor and voice: a restart keeps the lines and
   // the submitted video; another voice starts clean.
-  const workDir = path.join(projectDir(tenant, projectId), "_work", `generated-take-${actor.id}-${performer.id}-${st.voice.provider}-${st.voice.id}`.replace(/[^A-Za-z0-9_.-]/g, "_"));
+  const workDir = path.join(projectDir(tenant, projectId), "_work", `generated-take-${actor.id}-${performer.id}-${st.voice.provider}-${st.voice.id}-${motionTag(st.motion)}`.replace(/[^A-Za-z0-9_.-]/g, "_"));
   await fs.mkdir(workDir, { recursive: true });
   const w = (n: string) => path.join(workDir, n);
   const stage = async (s: string) => { st.stage = s; await save(tenant, st); };
@@ -229,7 +280,7 @@ async function run(tenant: string, projectId: string, actor: CastActor, performe
   await stage(performer.id);
   const project = await loadProject(tenant, projectId);
   const W = Number((project as any)?.canvas?.width) || 1080, H = Number((project as any)?.canvas?.height) || 1920;
-  const picture = await performer.fromAudio!(w("voice.mp3"), { tenant, actor, portraitAbs: portraitPath(tenant, actor), workDir, width: W, height: H });
+  const picture = await performer.fromAudio!(w("voice.mp3"), { tenant, actor, portraitAbs: portraitPath(tenant, actor), workDir, width: W, height: H, motion: st.motion });
 
   await stage("attach");
   // Into the project's assets under a take-* name, the voice laid under the

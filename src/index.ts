@@ -2785,6 +2785,7 @@ Rules:
               fresh: body.fresh === true,
               performer: typeof body.performer === "string" ? body.performer : undefined,
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
+              motion: typeof body.motion === "string" ? body.motion : undefined,
             }));
             return;
           }
@@ -2816,6 +2817,7 @@ Rules:
             performer: typeof body.performer === "string" ? body.performer : undefined,
             voice: body.voice === "elevenlabs" ? "elevenlabs" : "heygen",
             voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
+            motion: typeof body.motion === "string" ? body.motion : undefined,
           });
           jsonResponse(res, 202, st);
         } catch (e: any) { jsonResponse(res, 400, { error: e?.message || String(e) }); }

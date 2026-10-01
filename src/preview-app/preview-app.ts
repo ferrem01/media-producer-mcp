@@ -11458,6 +11458,11 @@ ${QUOTIENT_CSS}
     // The voice.
     h += '<div class="np-block"><div class="np-lead">Voice</div><div class="np-row"><div class="np-what"><select id="cast-voice" class="np-search">' + castVoiceOptions() + '</select></div>'
       + '<div class="np-act"><button class="np-btn" data-cast-hear="1" title="Hear this voice">&#9654;</button></div></div></div>';
+    // Direction for HeyGen's invented movement (Avatar V motion prompt).
+    if (castUi.performer === 'heygen') {
+      h += '<div class="np-block"><div class="np-lead">Direction</div><input id="cast-motion" class="np-search" maxlength="500" value="' + escAttr(castUi.motion || '') + '" placeholder="' + (castUi.mode === 'generate' ? 'Default: calm, head level, small nods, relaxed gestures' : 'Optional: how the performer should move') + '">'
+        + '<div class="np-hint">How the performer moves: steady, energetic, more hand gestures. HeyGen draws the movement from this.</div></div>';
+    }
     if (castUi.mode === 'generate') {
       h += '<div class="np-block"><label class="np-row"><div class="np-what"><input type="checkbox" id="cast-copy"' + (castUi.copy ? ' checked' : '') + '> Make a copy of this film first'
         + '<small>A generated take replaces this film&#8217;s take and re-times its scenes. The copy leaves this one as it is.</small></div></label></div>';
@@ -11582,6 +11587,7 @@ ${QUOTIENT_CSS}
     if (t.name === 'cast-perf') { castUi.performer = t.value; castGoLabel(); return; }
     if (t.id === 'cast-voice') { castUi.voice = t.value; castGoLabel(); return; }
     if (t.id === 'cast-copy') { castUi.copy = !!t.checked; return; }
+    if (t.id === 'cast-motion') { castUi.motion = t.value; return; }
     if (t.id === 'cast-photo') { castUploadPhoto(t); return; }
   }
   var castAudio = null;
@@ -11646,7 +11652,7 @@ ${QUOTIENT_CSS}
     if (castUi.mode === 'recast') {
       var voiceId = castUi.voice.indexOf('eleven:') === 0 ? castUi.voice.slice(7) : 'mine';
       castSay('Starting the recast…');
-      api('POST', '/recast/' + castT() + '/' + castP(), { actor: a.id, performer: p.id, voice_id: voiceId }).then(function(st) {
+      api('POST', '/recast/' + castT() + '/' + castP(), { actor: a.id, performer: p.id, voice_id: voiceId, motion: (castUi.motion || '').trim() || undefined }).then(function(st) {
         castUi.data.recast = st;
         castSay(st.files && st.files.every(function(f) { return f.status === 'reused'; }) ? 'Already made: switching.' : 'Recasting as ' + a.name + ' with ' + p.label + ' (~' + p.minutesPer30s + ' min per 30 s of take).', 'ok');
         castRender(); castPoll();
@@ -11655,6 +11661,7 @@ ${QUOTIENT_CSS}
     }
     var sel = castUi.voice;
     var body = { actor: a.id, performer: p.id, voice: sel.indexOf('eleven:') === 0 ? 'elevenlabs' : 'heygen' };
+    if ((castUi.motion || '').trim()) body.motion = castUi.motion.trim();
     if (sel !== 'look') body.voice_id = sel.slice(sel.indexOf(':') + 1);
     var start = function(pid) {
       return api('POST', '/generated-take/' + encodeURIComponent(t) + '/' + encodeURIComponent(pid), body).then(function(st) {

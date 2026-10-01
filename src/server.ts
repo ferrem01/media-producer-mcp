@@ -1778,6 +1778,7 @@ export function createMcpServer(): McpServer {
       voice: z.enum(["heygen", "elevenlabs"]).optional().describe("generate: who voices the script (default heygen: the look's own voice)."),
       voice_id: z.string().optional().describe("recast: an ElevenLabs voice the delivery is converted to ('mine' keeps the recording's voice; omitted, the actor's own). generate: the HeyGen or ElevenLabs voice to read with."),
       fresh: z.boolean().optional().describe("recast: make it again even if this performance exists."),
+      motion: z.string().optional().describe("recast / generate with HeyGen: a direction for the invented movement (Avatar V motion_prompt), e.g. 'calm, head level, small nods'. generate defaults to a grounded presenter; '' for none."),
       heygen_look_id: z.string().optional().describe("add_actor: a HeyGen look id (from looks). new_look: the look to base the new one on."),
       image: z.string().optional().describe("add_actor: a portrait, tenant-relative path (needs consent)."),
       name: z.string().optional().describe("add_actor / new_look: a name."),
@@ -1823,9 +1824,9 @@ export function createMcpServer(): McpServer {
             return ok({ elevenlabs: eleven.map((v: any) => ({ id: v.voice_id, name: v.name, category: v.category })), heygen: hey });
           }
           case "recast":
-            return ok({ ...(await startRecast(t, needProject(), needActor(), { performer: params.performer, voice_id: params.voice_id, fresh: params.fresh === true })), message: "Running. Poll action='status'." });
+            return ok({ ...(await startRecast(t, needProject(), needActor(), { performer: params.performer, voice_id: params.voice_id, fresh: params.fresh === true, motion: params.motion })), message: "Running. Poll action='status'." });
           case "generate":
-            return ok({ ...(await startGeneratedTake(t, needProject(), { actor: needActor(), performer: params.performer, voice: params.voice, voice_id: params.voice_id })), message: "Running: voice, then the performance, then the attach (the scenes re-time to it). Poll action='status'." });
+            return ok({ ...(await startGeneratedTake(t, needProject(), { actor: needActor(), performer: params.performer, voice: params.voice, voice_id: params.voice_id, motion: params.motion })), message: "Running: voice, then the performance, then the attach (the scenes re-time to it). Poll action='status'." });
           case "status": {
             const pid = needProject();
             const project = await loadProject(t, pid);
