@@ -1327,7 +1327,8 @@ export function createMcpServer(): McpServer {
           trim_end: z.number().optional(),
           fit: z.boolean().optional().describe("Time-fit this clip to the film's total duration (single-clip bases). Use when a raw screen recording runs longer than a separately de-silenced narration so the whole walkthrough plays start-to-finish instead of being truncated."),
         })).optional(),
-      }).nullable().optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time. Pass null (or an empty clips array) to CLEAR the speaker track."),
+        volume: z.number().min(0).max(1).optional().describe("The voice's level in the film, 0-1 (default 1, the take as normalised). Pass alone ({volume: 0.7}) to change only the level; the clips are kept."),
+      }).nullable().optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time. Pass null (or an empty clips array) to CLEAR the speaker track. {volume} alone sets the voice's level and keeps the clips."),
 
       // Storyboard modifications (direct edits, no LLM)
       storyboard: z.object({
@@ -1592,10 +1593,17 @@ export function createMcpServer(): McpServer {
         if (params.speaker_track !== undefined) {
           const st = params.speaker_track as any;
           // null, or an empty clips array, clears the speaker track entirely.
-          if (st === null || !st.clips || st.clips.length === 0) {
+          // {volume} alone is the voice's level: the clips stay (it used to
+          // read as "no clips" and clear the track).
+          const vol = st && typeof st.volume === "number" ? Math.max(0, Math.min(1, st.volume)) : undefined;
+          if (st && !st.clips && vol !== undefined) {
+            if (!project.speaker_track) return err("This film has no speaker track to set a volume on");
+            project.speaker_track.volume = vol;
+          } else if (st === null || !st.clips || st.clips.length === 0) {
             delete project.speaker_track;
           } else {
-            project.speaker_track = st;
+            const keepVol = vol !== undefined ? vol : project.speaker_track?.volume;
+            project.speaker_track = { ...st, ...(keepVol !== undefined ? { volume: keepVol } : {}) };
             await sanitizeSpeakerClips(project);
           }
           updated = true;

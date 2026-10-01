@@ -891,6 +891,9 @@ export interface Take {
 export interface SpeakerTrack {
   /** Ordered list of speaker video clips played end-to-end */
   clips: SpeakerTrackClip[];
+  /** The voice's level in the film, 0-1 (default 1: the take as
+   *  normalised, -16 LUFS). Honored by the render's mix and by Studio. */
+  volume?: number;
 }
 
 // ── Design System (extracted from websites) ──

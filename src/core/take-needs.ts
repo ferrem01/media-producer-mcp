@@ -184,7 +184,7 @@ export function attachTake(project: Project, take: Omit<Take, "id">): Take {
   };
   const others = (project.speaker_track?.clips || []).filter((c) => c.scene_index !== rec.scene_index && c.scene_index !== undefined);
   const clips = [...others, clip].sort((a, b) => (a.scene_index ?? 0) - (b.scene_index ?? 0));
-  project.speaker_track = { clips };
+  project.speaker_track = { ...project.speaker_track, clips };
   ensureSpeakerNeeds(project);
   return rec;
 }

@@ -2078,6 +2078,14 @@ ${QUOTIENT_CSS}
         else if (!playing && !el.paused) el.pause();
         // Unmute when playing (audio should be heard even on non-speaker scenes)
         el.muted = !playing;
+        // THE VOICE HAS A LEVEL: the film's (speaker_track.volume) times the
+        // transport's slider. The slider used to reach only the audio tracks,
+        // so on a speaker film -- where the voice IS this element -- it did
+        // nothing (Marc: "it works sometimes. It's not working right now").
+        // Set every tick on the active element: the A/B swap at a cut hands
+        // over a standby that never heard the slider.
+        var spkVol = speakerVoiceLevel();
+        if (Math.abs((el.volume || 0) - spkVol) > 0.005) { try { el.volume = spkVol; } catch (eV) {} }
         continue;
       }
 
@@ -2536,6 +2544,14 @@ ${QUOTIENT_CSS}
 
   // Effective per-track volume = the track's mixed level scaled by the master
   // volume the user controls in the transport bar.
+  // The voice's level on a speaker film: the film's own setting
+  // (speaker_track.volume, default 1) scaled by the transport's slider.
+  function speakerVoiceLevel() {
+    var p = state.currentProject;
+    var fv = p && p.speaker_track && typeof p.speaker_track.volume === 'number' ? p.speaker_track.volume : 1;
+    var mv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
+    return Math.max(0, Math.min(1, fv)) * mv;
+  }
   function effVolume(audio) {
     var mv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
     return (audio._baseVolume != null ? audio._baseVolume : 1) * mv;
@@ -9274,6 +9290,8 @@ ${QUOTIENT_CSS}
           audio.volume = effVolume(audio);
         }
       });
+      // The voice too, at once (syncMedia keeps it there every tick).
+      [els.speakerBg, els.speakerBg2].forEach(function(v) { if (v) { try { v.volume = speakerVoiceLevel(); } catch (eV) {} } });
       if (els.volIcon) els.volIcon.className = state.masterVolume === 0 ? 'vol-icon muted' : 'vol-icon';
     });
   }
