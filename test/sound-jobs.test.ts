@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { FOLEY_SET, ensureFoleyLibrary, renderFoley } from "../src/audio/foley.js";
+import { FOLEY_SET, ensureFoleyLibrary } from "../src/audio/foley.js";
 import { normalizeSoundCues, cueStart, sceneSfxTracks, soundForRole, DEFAULT_SFX_PALETTE, SOUND_ROLES } from "../src/core/scene-sfx.js";
 
 // THE SIX JOBS (the viewcci reel, Marc 2026-10-01): FAHHH for attention,
@@ -10,26 +10,25 @@ import { normalizeSoundCues, cueStart, sceneSfxTracks, soundForRole, DEFAULT_SFX
 // wrong for engagement, a boom for comedy, a bass impact for the payoff --
 // "pick two or three and use them the same way every time".
 describe("the sound jobs", () => {
-  it("every job has a house sound; the found ones ship as CC0 files, the attention shout is made here", async () => {
+  it("every job has a house sound: CC0 files where free ones exist, ElevenLabs takes for FAHHH and the boom", async () => {
     for (const role of SOUND_ROLES) {
       const id = DEFAULT_SFX_PALETTE[role].replace(/^house-/, "");
       expect(FOLEY_SET.some((f) => f.id === id), role).toBe(true);
     }
     const found = FOLEY_SET.filter((f) => f.found);
-    expect(found.map((f) => f.id).sort()).toEqual(["bass-impact", "boom", "camera-flash", "right", "riser-metal", "wrong"]);
+    expect(found.map((f) => f.id).sort()).toEqual(["attention", "bass-impact", "boom", "camera-flash", "right", "riser-metal", "wrong"]);
     for (const f of found) {
-      expect(f.found!.url).toMatch(/^https:\/\/freesound\.org\/s\/\d+\/$/);
-      expect(f.found!.credit).toMatch(/\(CC0\)$/);
+      // Free first (CC0 from Freesound); ElevenLabs where no free copy exists.
+      if (/elevenlabs/.test(f.found!.url)) expect(f.found!.credit).toMatch(/^Generated with ElevenLabs/);
+      else { expect(f.found!.url).toMatch(/^https:\/\/freesound\.org\/s\/\d+\/$/); expect(f.found!.credit).toMatch(/\(CC0\)$/); }
       const wav = await fs.readFile(`src/sounds/sfx/${f.id}.wav`);
       // 48 kHz mono 16-bit, and as long as the spec says.
       expect(wav.readUInt32LE(24)).toBe(48000);
       expect(wav.readUInt16LE(22)).toBe(1);
       expect(Math.abs(wav.readUInt32LE(40) / 2 / 48000 - f.duration)).toBeLessThan(0.02);
     }
-    // FAHHH: synthesized -- a hiss up front, then a loud voiced vowel.
-    const a = renderFoley("attention");
-    let peak = 0; for (const x of a) peak = Math.max(peak, Math.abs(x));
-    expect(peak).toBeGreaterThan(0.5);
+    expect(FOLEY_SET.find((f) => f.id === "attention")!.found!.url).toMatch(/elevenlabs/);
+    expect(FOLEY_SET.find((f) => f.id === "boom")!.found!.url).toMatch(/elevenlabs/);
   });
 
   it("the library mints the found files beside the synthesized ones", async () => {
