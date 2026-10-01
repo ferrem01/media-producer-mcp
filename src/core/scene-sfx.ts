@@ -105,7 +105,11 @@ export function normalizeSoundCues(raw: unknown, palette?: SoundPalette | null):
     if (!id) continue;
     const cue: SceneSoundCue = { at: 0, id };
     if (role) cue.role = role;
+    // An explicit "no" is kept: the tension job lands by default, and a
+    // `lands: false` dropped here came back true on the next clean (a riser
+    // placed to carry across a cut ended a scene early).
     if (c.lands === true || (role === "tension" && c.lands !== false)) cue.lands = true;
+    else if (role === "tension" && c.lands === false) cue.lands = false;
     if (isAnchorObject(c.anchor)) cue.anchor = { ...c.anchor };
     if (isAnchorObject(c.at)) cue.anchor = { ...c.at };
     else if (typeof c.at === "string") {
