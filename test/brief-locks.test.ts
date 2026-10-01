@@ -45,9 +45,26 @@ describe("what a brief locks", () => {
   });
   it("summarises the previous board scene by scene for the redraft", () => {
     const b = previousBoardBlock({ scenes: [{ label: "The Ask", duration_seconds: 6, voiceover_text: "It starts with one sentence.", components: [{ type: "composer" }], broll_query: "hands typing" }, { label: "Close", scene_template: { type: "st-logo-close" } }] });
-    expect(b).toMatch(/1\. The Ask \[6s\] -- components composer -- broll: hands typing/);
+    expect(b).toMatch(/1\. The Ask \[6s\] -- cast composer -- broll: hands typing/);
     expect(b).toMatch(/2\. Close \[\?s\] -- template st-logo-close/);
     expect(previousBoardBlock(null)).toBe("");
+  });
+  it("hands the redraft each component WHOLE, so the writer never writes back a bare name (proj_c99e52c3)", () => {
+    const flow = { type: "quotient-flow", data: { steps: [{ title: "Pricing page, twice" }, { title: "Wait 2h" }, { title: "Send the note" }] }, enter: { effect: "cut", at: 1.4 } };
+    const pill = { type: "sticker-prop", data: { kind: "pill", text: "5 SIGNALS" } };
+    const lane = { id: "captions", type: "reel-caption-lane", data: { phrases: [{ text: "Signal one", start: 0, end: 1 }] } };
+    const slate = { type: "asset-placeholder", data: { need: "A pricing page visit" } };
+    const b = previousBoardBlock({ scenes: [{ label: "Signal one", duration_seconds: 9, components: [pill, flow, lane, slate] }] });
+    const line = b.split("\n").find((l) => l.trim().startsWith("components: "))!;
+    const shown = JSON.parse(line.trim().slice("components: ".length));
+    // The writer's own pieces, data and timing intact...
+    expect(shown).toEqual([pill, flow]);
+    // ...not the build's casts (the spine's caption lane, the screen slates),
+    // which the build makes again on every pass.
+    expect(line).not.toMatch(/reel-caption-lane|asset-placeholder/);
+    // The summary line names the cast without looking like a components list.
+    expect(b).toMatch(/1\. Signal one \[9s\] -- cast sticker-prop, quotient-flow, reel-caption-lane, asset-placeholder/);
+    expect(b).toMatch(/written as the whole object shown, never as its bare name/);
   });
 });
 

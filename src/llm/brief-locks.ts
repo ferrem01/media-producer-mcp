@@ -70,18 +70,32 @@ export function missingLocks(storyboard: unknown, locks: BriefLocks): string[] {
   return locks.quotes.filter((q) => !hay.includes(norm(q)));
 }
 
-/** A compact record of the board being revised, for the redraft prompt. */
+/** The build's own casts, re-made from the spine and the needs on every
+ *  pass: the caption lane it cast (id "captions") and the screen slates.
+ *  The writer never authors them, so the redraft is not shown them. */
+function castByBuild(c: any): boolean {
+  return !!c && typeof c === "object" && ((c.type === "reel-caption-lane" && c.id === "captions") || c.type === "asset-placeholder");
+}
+
+/** A record of the board being revised, for the redraft prompt. Each
+ *  scene's components go in WHOLE (type, data, timing): handed only their
+ *  names, the writer wrote the names back, and a bare name sends the whole
+ *  scene to codegen (measured live, proj_c99e52c3: a restructuring redraft
+ *  came back with names in all seven scenes, and the build authored seven
+ *  codegen scenes instead of assembling the library). */
 export function previousBoardBlock(storyboard: any): string {
   const scenes: any[] = Array.isArray(storyboard?.scenes) ? storyboard.scenes : [];
   if (!scenes.length) return "";
-  const out = ["## PREVIOUS STORYBOARD (the board being revised -- keep every scene the feedback does not name, cast and copy included)"];
+  const out = ["## PREVIOUS STORYBOARD (the board being revised -- keep every scene the feedback does not name, cast and copy included; a component you keep or rework is written as the whole object shown, never as its bare name)"];
   scenes.forEach((s, i) => {
     const comps = (s.components || []).map((c: any) => (typeof c === "string" ? c : c?.type)).filter(Boolean);
-    const cast = s.scene_template?.type ? `template ${s.scene_template.type}` : comps.length ? `components ${comps.join(", ")}` : "no cast";
+    const cast = s.scene_template?.type ? `template ${s.scene_template.type}` : comps.length ? `cast ${comps.join(", ")}` : "no cast";
     const extras = [s.hero_image ? `hero_image: ${s.hero_image}` : "", s.broll_query ? `broll: ${s.broll_query}` : "", Array.isArray(s.assets) && s.assets.length ? `needs: ${s.assets.map((a: any) => a?.type).filter(Boolean).join(", ")}` : ""].filter(Boolean);
     out.push(`${i + 1}. ${s.label || "Scene " + (i + 1)} [${s.duration_seconds ?? "?"}s] -- ${cast}${extras.length ? " -- " + extras.join("; ") : ""}`);
     if (s.voiceover_text) out.push(`   VO: ${String(s.voiceover_text).replace(/\s+/g, " ").trim()}`);
     if (s.purpose) out.push(`   purpose: ${String(s.purpose).replace(/\s+/g, " ").trim()}`);
+    const authored = (s.components || []).filter((c: any) => c && typeof c === "object" && typeof c.type === "string" && !castByBuild(c));
+    if (authored.length) out.push(`   components: ${JSON.stringify(authored)}`);
   });
   return out.join("\n");
 }
