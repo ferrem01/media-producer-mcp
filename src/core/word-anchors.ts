@@ -178,6 +178,36 @@ export function extractAnchors(component: { data?: Record<string, unknown>; anch
   return Object.keys(anchors).length;
 }
 
+/**
+ * Drop the anchors whose place is gone: a path into data whose parent no
+ * longer exists (`script[6].at` once the script is six steps long), or an
+ * enter./exit. anchor on a component with no entrance/exit. The update tool
+ * MERGES anchors -- so one can be re-aimed without restating the rest --
+ * which left stale ones behind when the data they pointed into was replaced
+ * (measured live, proj_b7fa998e: a re-scripted agent kept anchors for steps
+ * 7 and 8). Returns how many were dropped.
+ */
+export function pruneDeadAnchors(component: { data?: Record<string, unknown>; anchors?: AnchorMap; enter?: unknown; exit?: unknown }): number {
+  const anchors = component.anchors;
+  if (!anchors) return 0;
+  let dropped = 0;
+  for (const key of Object.keys(anchors)) {
+    let alive: boolean;
+    if (key.startsWith("enter.") || key.startsWith("exit.")) {
+      const anim = (component as any)[key.split(".")[0]];
+      alive = !!anim && typeof anim === "object";
+    } else {
+      const parts = key.match(/[^.[\]]+/g) || [];
+      let node: any = component.data || {};
+      for (let i = 0; i < parts.length - 1 && node != null; i++) node = node[parts[i]];
+      alive = node != null && typeof node === "object";
+    }
+    if (!alive) { delete anchors[key]; dropped++; }
+  }
+  if (!Object.keys(anchors).length) delete component.anchors;
+  return dropped;
+}
+
 function setPath(root: any, path: string, value: unknown): boolean {
   const parts = path.match(/[^.[\]]+/g) || [];
   let node = root;

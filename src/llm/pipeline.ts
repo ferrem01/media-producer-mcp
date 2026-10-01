@@ -2275,6 +2275,8 @@ function storyboardToSaved(
       // the take-need rule reads it (measured live, proj_87b44c22: the flag
       // set, saved away, every chapter asked for a take again).
       ...((s as any).transparent_background === false ? { transparent_background: false } : {}),
+      // Set by hand, carried: the next build leaves it alone too.
+      ...((s as any).hand_set ? { hand_set: true } : {}),
       voiceover_text: s.voiceover_text,
       // The writer's emphasis words, carried: the captions tint them.
       ...(Array.isArray((s as any).emphasis) && (s as any).emphasis.length ? { emphasis: (s as any).emphasis } : {}),
@@ -2852,21 +2854,25 @@ async function runUnifiedPipeline(
   // fixed camera marks the scene so no punch-in is invented.
   if (recipeObj) {
     let touched = 0;
-    for (const d of storyboard.scenes as any[]) touched += applyRecipeMotion(d, recipeObj, roleOfLabel(d.label, recipeObj));
+    // A scene SET BY HAND (core/types.ts hand_set) is the plan: no recipe
+    // pass rewrites it (measured live, proj_b7fa998e: a cleared screen need
+    // re-added, the mock under it swapped for a slate).
+    const auto = (storyboard.scenes as any[]).filter((d) => !d.hand_set);
+    for (const d of auto) touched += applyRecipeMotion(d, recipeObj, roleOfLabel(d.label, recipeObj));
     if (touched) console.log(`  Recipe motion: ${touched} enter/exit(s) set from "${recipeObj.id}"`);
     let pruned = 0;
-    for (const d of storyboard.scenes as any[]) pruned += pruneNeedsByRecipe(d, recipeObj);
+    for (const d of auto) pruned += pruneNeedsByRecipe(d, recipeObj);
     if (pruned) console.log(`  Recipe needs: ${pruned} b-roll ask(s) dropped from beats whose footage is the take or the screen`);
-    for (const d of storyboard.scenes as any[]) { const t = holdShotToRecipe(d, recipeObj); if (t) console.log(`  Recipe shot: "${d.label || ""}" is a person beat -- the ${t} template is dropped, the person stays`); }
-    for (const d of storyboard.scenes as any[]) { const notes = holdMadeToRecipe(d, recipeObj); for (const n of notes) console.log(`  Recipe made: "${d.label || ""}" -- ${n}`); }
+    for (const d of auto) { const t = holdShotToRecipe(d, recipeObj); if (t) console.log(`  Recipe shot: "${d.label || ""}" is a person beat -- the ${t} template is dropped, the person stays`); }
+    for (const d of auto) { const notes = holdMadeToRecipe(d, recipeObj); for (const n of notes) console.log(`  Recipe made: "${d.label || ""}" -- ${n}`); }
     { const k = castChapterKickers(storyboard as any, recipeObj); if (k) console.log(`  Recipe: ${k} chapter kicker(s) cast from the chapter scenes' names`); }
-    { let g = 0; for (const d of storyboard.scenes as any[]) if (holdGroundToRecipe(d, recipeObj)) g++; if (g) console.log(`  Recipe ground: ${g} scene(s) with no person are opaque (no take under them)`); }
+    { let g = 0; for (const d of auto) if (holdGroundToRecipe(d, recipeObj)) g++; if (g) console.log(`  Recipe ground: ${g} scene(s) with no person are opaque (no take under them)`); }
     { const w = castWordmarkCards(storyboard as any, recipeObj); if (w) console.log(`  Recipe: ${w} wordmark card(s) cast as st-logo-close`); }
-    for (const d of storyboard.scenes as any[]) { for (const n of holdLogoBandToBrief(d, String(opts.prompt || ""))) console.log(`  Recipe: "${d.label || ""}" -- ${n}`); }
+    for (const d of auto) { for (const n of holdLogoBandToBrief(d, String(opts.prompt || ""))) console.log(`  Recipe: "${d.label || ""}" -- ${n}`); }
   }
   // Every board, recipe or not: a blank window or an empty number row is
   // the writer's sketch of a surface it never filled.
-  for (const d of storyboard.scenes as any[]) { for (const n of holdEmptySurfaces(d)) console.log(`  Board: "${d.label || ""}" -- ${n}`); }
+  for (const d of storyboard.scenes as any[]) { if (d.hand_set) continue; for (const n of holdEmptySurfaces(d)) console.log(`  Board: "${d.label || ""}" -- ${n}`); }
   if (personCarries(filmGrammar)) {
     let spineProject: Project | null = null;
     if (opts.project_id) { try { spineProject = await loadProject(opts.tenant_id, opts.project_id); } catch { /* fresh build */ } }
@@ -2900,7 +2906,7 @@ async function runUnifiedPipeline(
       //  - a mock with no entrance is the claim's cutaway, cut in from 30%
       //    to 80% of the claim;
       //  - a scene with no cast gets its chapter label from its own name.
-      if (filmGrammar === "creator-cut" && d.transparent_background !== false) {
+      if (filmGrammar === "creator-cut" && d.transparent_background !== false && !d.hand_set) {
         const dur = Number(d.duration_seconds) || 0;
         const isLast = i === (storyboard.scenes as any[]).length - 1;
         for (const c of d.components as any[]) {
@@ -3031,7 +3037,7 @@ async function runUnifiedPipeline(
       // proj_f10e79cf: every sticker at 1.15s, gone at 1.15s). With the
       // numbers resolved: it needs a second before the cut, else it rides
       // the cutaway and leaves with it.
-      if (filmGrammar === "creator-cut") {
+      if (filmGrammar === "creator-cut" && !d.hand_set) {
         const proofs = (d.components as any[]).filter((c) => c && typeof c === "object" && isProofSurface(c.type) && c.enter && typeof c.enter === "object" && c.enter.effect === "cut" && typeof c.enter.at === "number");
         const cutOut = proofs.map((c) => (c.exit && typeof c.exit === "object" && typeof c.exit.at === "number") ? Number(c.exit.at) : NaN).find((n) => Number.isFinite(n));
         for (const c of d.components as any[]) {
@@ -3336,7 +3342,10 @@ async function runUnifiedPipeline(
   if (personCarries(filmGrammar)) {
     for (const d of storyboard.scenes as any[]) {
       const q = typeof d.broll_query === "string" ? d.broll_query.trim() : "";
-      if (!q) { delete d.broll_query; continue; }
+      // A hand-set scene's footage is what it was given: the writer's query
+      // is not a need (measured live, proj_b7fa998e: stock stacked over the
+      // chosen clip).
+      if (!q || d.hand_set) { delete d.broll_query; continue; }
       if (!Array.isArray(d.assets)) d.assets = [];
       if (!d.assets.some((n: any) => n && n.type === "stock_footage")) {
         d.assets.push({ type: "stock_footage", description: q, status: "needed", priority: "recommended", use: "cutaway" });
@@ -3501,7 +3510,7 @@ async function runUnifiedPipeline(
       // A scene gets b-roll OR a hero image, never both.
       if (enrichResult.imageUrls.has(si)) continue;
 
-      const query: string | null = draft.broll_query || null;
+      const query: string | null = (draft as any).hand_set ? null : (draft.broll_query || null);
       if (!query) continue;
       if (fetched >= MAX_BROLL) {
         console.log(`  B-roll: cap of ${MAX_BROLL} reached, skipping "${draft.label}"`);

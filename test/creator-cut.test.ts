@@ -299,7 +299,7 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     // THE LINES SET THE FLOOR: a scene's duration is at least its script at speaking pace (measured live: 24 words in 4s).
     expect(pipeline).toMatch(/const floor = Math\.round\(speakingEstimate\(script\) \* 100\) \/ 100;\s*if \(\(Number\(d\.duration_seconds\) \|\| 0\) < floor\) \{[\s\S]*?d\.duration_seconds = floor;/);
     // Only creator-cut, only over the person, and before the spine pass so the proof cast after it can still replace the window.
-    expect(pipeline).toMatch(/if \(filmGrammar === "creator-cut" && d\.transparent_background !== false\) \{\s*const dur = Number\(d\.duration_seconds\)/);
+    expect(pipeline).toMatch(/if \(filmGrammar === "creator-cut" && d\.transparent_background !== false && !d\.hand_set\) \{\s*const dur = Number\(d\.duration_seconds\)/);
     const defaults = pipeline.indexOf("CREATOR-CUT DEFAULTS");
     const cast = pipeline.indexOf("for (const cut of proofComponents(d))");
     expect(defaults).toBeGreaterThan(0);
