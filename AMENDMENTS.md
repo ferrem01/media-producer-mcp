@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — A redraft sees the board's components whole
+
+The email-signals film (proj_c99e52c3, creator-cut, recipe
+presenter-n-things) built SEVEN codegen scenes and assembled nothing from
+the library. Marc: "there was no reason for any of this to be code gen."
+The cause was the redraft, not the grammar, recipe or creativity:
+`previousBoardBlock` (#814) handed the writer the old board with each
+scene's components as NAMES ("components lower-third, sticker-prop,
+quotient-flow"). A restructuring redraft wrote those names back as bare
+strings in every scene, and one bare string sends a scene to codegen
+(`generateScene`), discarding the authored captions, stamps and mocks.
+Every earlier creator-cut board on file had zero bare strings; this one
+had them in all seven scenes. The codegen scenes also baked the first
+HeyGen take's file into their HTML, over the second take the voice came
+from -- the mouth/word mismatch.
+
+Now the redraft carries each authored component WHOLE (type, data,
+timing) as JSON under the scene, and the summary line calls the list
+"cast" so nothing in the prompt is shaped like a list of names. The
+build's own casts (the spine's `captions` lane, the screen slates) are
+left out: the build makes them again. Test: `test/brief-locks.test.ts`.
+
 ## 2026-10-01 — Generated take: one-pass voice, a direction for Avatar V
 
 First end-to-end generated take (the email-signals film, the desk twin on
