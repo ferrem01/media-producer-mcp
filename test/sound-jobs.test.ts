@@ -56,6 +56,10 @@ describe("the sound jobs", () => {
     expect(r.duration).toBeCloseTo(3.98);
     expect(cueStart(r)).toBeCloseTo(2.02);
     expect(cueStart({ at: 1, lands: true, duration: 3.98 })).toBe(0);
+    // An explicit no survives another clean (the build re-normalizes the board).
+    const [carry] = normalizeSoundCues(normalizeSoundCues([{ at: 4.5, role: "tension", lands: false }]));
+    expect(carry.lands).toBe(false);
+    expect(cueStart(carry)).toBe(4.5);
     const [hit] = normalizeSoundCues([{ at: 6, role: "payoff" }]);
     expect(hit.lands).toBeUndefined();
     const tracks = sceneSfxTracks({ scenes: [{ duration_seconds: 8, sfx: [{ ...r, src: "/assets/r.wav" }, { ...hit, src: "/assets/h.wav" }] }] } as any, () => 10, (s) => s);

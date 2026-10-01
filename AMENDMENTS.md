@@ -6,6 +6,14 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — A riser told not to land stays that way
+
+The tension job lands by default (its `at` is where it ends). A cue set
+`lands: false` (a riser placed to carry across a cut) lost the flag on the
+first clean and came back landing on the next -- the build re-normalizes the
+board -- so it ended inside its own scene. normalizeSoundCues now keeps an
+explicit false. Test: `test/sound-jobs.test.ts`.
+
 ## 2026-10-01 — FAHHH and the boom are ElevenLabs takes
 
 The two sounds with no free copy now come from ElevenLabs sound effects
