@@ -1350,9 +1350,11 @@ export function createMcpServer(): McpServer {
           shot: z.string().optional().describe("The plan table's one line for this scene: what fills the frame, in plain words. Empty string hands the cell back to the visual notes."),
           sfx: z.array(z.object({
             at: z.union([z.number(), z.string(), z.object({ word: z.string(), occurrence: z.number().optional(), edge: z.enum(["start", "end"]).optional(), offset: z.number().optional() })]).describe("Scene seconds, or the word it lands on: \"@emails\" / {word, edge, offset}"),
-            id: z.string().describe("A sound: a house name (ding, thud, pop, whoosh-soft, whoosh-fast, click, tick, swell, riser, deflate, camera-shutter, keyboard, paper-drop, monkey) or an id from action='search_sfx'"),
+            id: z.string().optional().describe("A sound: a house name (ding, thud, pop, whoosh-soft, whoosh-fast, click, tick, swell, riser, deflate, camera-shutter, keyboard, paper-drop, monkey, attention, camera-flash, riser-metal, right, wrong, boom, bass-impact) or an id from action='search_sfx'. Omit when role is set."),
+            role: z.enum(["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"]).optional().describe("The sound's JOB; the film's palette (project sfx_palette, else the house default) picks the sound, the same one for every cue with that job"),
+            lands: z.boolean().optional().describe("`at` is where the sound ENDS (a riser building into its moment). Default true for role 'tension'."),
             volume: z.number().optional().describe("0-1, default 0.8"),
-          })).optional().describe("Replace this scene's SOUND CUES: point sounds tied to moments on screen (a ding as a notification lands, a thud as a stamp hits), on the Effects lane beside the camera moves; they re-time with the words. Pass [] to clear. Beds (music, room tone) stay on the audio tracks."),
+          })).optional().describe("Replace this scene's SOUND CUES: point sounds tied to moments on screen, on the Effects lane beside the camera moves; they re-time with the words. Pass [] to clear. Beds (music, room tone) stay on the audio tracks. SOUND JOBS (the house style): give a cue a role instead of a sound and the film's palette picks it, the same sound for the same job every time -- attention (FAHHH: the hook's first beat, once), transition (camera flash: on a hard cut or a card slamming in -- every one the same), tension (metallic riser: builds INTO the payoff; its `at` is where it LANDS), payoff (bass impact: the hype hit on the payoff itself, right where the riser lands), right / wrong (a correct chime / a buzzer: do vs don't, fact vs myth), comedy (boom: the gag beat). Pick TWO OR THREE jobs for the whole film and use each the same way every time -- consistency reads as a style; a different sound on every beat is noise."),
           components: z.array(z.object({
             type: z.string().describe("A library component type (see the catalog), e.g. kinetic-text, card-fan, checklist-toggles"),
             data: z.record(z.unknown()).optional(),
@@ -1442,7 +1444,7 @@ export function createMcpServer(): McpServer {
                 if (sceneUpdate.duration_seconds !== undefined) existing.duration_seconds = sceneUpdate.duration_seconds;
                 if (sceneUpdate.visual_notes !== undefined) existing.visual_notes = sceneUpdate.visual_notes;
                 if (sceneUpdate.sfx !== undefined) {
-                  const cues = normalizeSoundCues(sceneUpdate.sfx);
+                  const cues = normalizeSoundCues(sceneUpdate.sfx, (project as any).sfx_palette);
                   if (cues.length) existing.sfx = cues; else delete existing.sfx;
                   // The built scene plays the same sounds (a board edit on a
                   // built film is heard without a rebuild).

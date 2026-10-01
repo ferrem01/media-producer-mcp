@@ -683,6 +683,11 @@ export interface Project {
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
+  /** The film's sound palette: the one sound each JOB plays (attention,
+   *  transition, tension, payoff, right, wrong, comedy -- core/scene-sfx.ts).
+   *  Unset jobs use the house default. Two or three jobs per film, used the
+   *  same way every time. */
+  sfx_palette?: Partial<Record<"attention" | "transition" | "tension" | "payoff" | "right" | "wrong" | "comedy", string>>;
   /** Who performs the speaker track (a cast actor id, core/cast.ts): every
    *  clip plays that actor's recast of its take when one exists. Absent: the
    *  person who recorded it. */

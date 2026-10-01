@@ -67,7 +67,7 @@ describe("sound cues in Studio", () => {
       expect(await page.$$eval("#audio-lanes .audio-lane-seg.sfx", (s) => s.length)).toBe(0);
       // The preview plays them: initAudio makes an sfx element per cue at the
       // scene's start + at (flagged so the audio lane skips it).
-      expect(html).toMatch(/start_time: sceneOffset\(si\) \+ \(Number\(cue\.at\) \|\| 0\), _cue: true/);
+      expect(html).toMatch(/start_time: sceneOffset\(si\) \+ Math\.max\(0, \(Number\(cue\.at\) \|\| 0\) - \(cue\.lands && Number\(cue\.duration\) > 0 \? Number\(cue\.duration\) : 0\)\), _cue: true/);
       expect(html).toContain("if (audio._cue) return; // a sound cue draws on the Effects lane");
 
       // Click the thud: the editor opens on it; switch it to pop on "third".

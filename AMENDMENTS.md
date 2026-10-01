@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — Sound jobs: six sounds, one palette, the same sound for the same job
+
+Marc sent the viewcci reel ("make sure we have these sound effects and
+that they are being used based on these rules"): FAHHH to get attention,
+camera flash to make transitions smooth, a metallic riser to build
+tension, right and wrong to make it engaging, vine boom for comedy, bass
+impact to build hype before the payoff -- and "pick two or three and use
+them the same way every time." The library had loose stand-ins at best
+and the writer one line of examples; nothing tied a sound to a job or
+asked for consistency.
+- THE SOUNDS (audio/foley.ts): "find free first, synthesize only what you
+  can't find." Six are CC0 recordings from Freesound kept in the repo
+  (src/sounds/sfx, credits in CREDITS.md; `found` on the spec, copied into
+  the library instead of synthesized; build copies src/sounds): camera-flash,
+  riser-metal, right, wrong, boom, bass-impact. FAHHH has no free copy
+  (it is someone's meme recording), so `attention` is synthesized: a
+  breathy "f" into a falling, soft-clipped "aaah".
+- THE JOBS (core/scene-sfx.ts): a cue may carry `role` (attention,
+  transition, tension, payoff, right, wrong, comedy) instead of a sound;
+  the film's palette (`project.sfx_palette` over DEFAULT_SFX_PALETTE)
+  picks the one sound that job plays, film-wide. `lands` makes `at` the
+  END of the sound (a riser builds into its moment; default for
+  tension) -- honoured by the render (`cueStart`) and Studio's playback.
+- THE RULES: the storyboard writer's sfx field and the update tool now
+  carry the jobs and the two-or-three rule; Studio's cue editor keeps a
+  cue's job and landing when it saves.
+Tests: `test/sound-jobs.test.ts`.
+
 ## 2026-10-01 — The voice has a level; Studio's slider reaches it
 
 Marc on the email-signals film: "can you lower the volume on the audio a

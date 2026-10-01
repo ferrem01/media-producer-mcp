@@ -4488,7 +4488,7 @@ Rules:
         const scene: any = project.scenes?.[idx];
         if (!Number.isInteger(idx) || !scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
         if (!Array.isArray(body.sfx)) { jsonResponse(res, 400, { error: "sfx must be an array ([] clears)" }); return; }
-        const cues = normalizeSoundCues(body.sfx);
+        const cues = normalizeSoundCues(body.sfx, (project as any).sfx_palette);
         if (cues.length) scene.sfx = cues; else delete scene.sfx;
         const sb: any = ensureStoryboardScene(project, idx);
         if (cues.length) sb.sfx = JSON.parse(JSON.stringify(cues)); else delete sb.sfx;
