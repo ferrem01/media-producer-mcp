@@ -46,6 +46,9 @@ export interface PerformContext {
    *  sources go by URL instead of a data URI). */
   publicUrl?: (file: string) => Promise<string | null>;
   onStage?: (stage: string) => void;
+  /** A direction for an audio-driven vendor's invented movement (HeyGen's
+   *  motion_prompt, honored on Avatar V twins and photo looks). */
+  motion?: string;
 }
 
 export interface Performer extends PerformerInfo {

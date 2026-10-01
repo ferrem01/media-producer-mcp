@@ -6,6 +6,27 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — Generated take: one-pass voice, a direction for Avatar V
+
+First end-to-end generated take (the email-signals film, the desk twin on
+Avatar V, Marc's HeyGen clone): "it looks like me ... it sounds like me ...
+The mannerisms were a little off. I kept sort of putting my head up high ...
+in a way I would never do. There was some choppiness and awkwardness in the
+voice track." Two causes, both ours:
+- The voice was made LINE BY LINE (each spoken part its own speech call)
+  and the clips butted with fixed silences: the delivery reset at every
+  join. `speakScript` now voices the whole read in ONE call with pause marks
+  (`scriptWithBreaks`: `<break time="0.6s"/>` between scenes, 1.0 s at a
+  "(pause)"; SSML-wrapped and XML-escaped for HeyGen, plain text with break
+  tags for ElevenLabs); a voice that refuses the marks (or a read over
+  4,800 chars) falls back to line by line.
+- Avatar V was given NO direction, so it invented every head move. HeyGen
+  takes a `motion_prompt` on Avatar V twins and photo looks: generated takes
+  now send `DEFAULT_MOTION` (a calm, grounded presenter: head level, small
+  nods, no chin lifts, relaxed gestures) unless told otherwise (`motion`;
+  "" for none). Recasts take an optional `motion` too. The Cast card has a
+  Direction field when HeyGen performs; the MCP `cast` tool takes `motion`.
+
 ## 2026-09-30 — Actor test: the recording, never a recast; a setting for Genjutsu
 
 The first Genjutsu trial came back clean (no face refusal, the mic hand gone,
