@@ -76,7 +76,7 @@ import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transc
 import { resolveVideoPath } from "./core/video-path.js";
 import { startGeneratedTake, getGeneratedTakeStatus, registerTakeAttacher } from "./core/generated-take.js";
 import { performerList } from "./core/performers/index.js";
-import { startActorTest, startVoiceLineup, getActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, listVoices, type ActorTest } from "./core/actor-test.js";
+import { startActorTest, startVoiceLineup, getActorTest, collectActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, listVoices, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor, removeActor, getActor, portraitPath } from "./core/cast.js";
 import { startRecast, getRecastStatus } from "./core/recast.js";
@@ -2859,6 +2859,7 @@ Rules:
       // POST /api/actor-test/{tenant}/{project} {scene_index, image, providers?, voice?, voice_id?}
       //      or {mode:"voices", from: <test id>, voices: [names or ids], picture?}
       // GET  /api/actor-test/{tenant}/{project}/{id}   status, steps, file urls
+      // POST /api/actor-test/{tenant}/{project}/{id} {action:"collect"}   a Higgsfield job the test stopped waiting for
       const actorApi = urlPath.match(/^\/api\/actor-test\/([^/]+)\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
       if (actorApi) {
         const [, atTenant, atProject, atId] = actorApi.map((x) => (x === undefined ? x : decodeURIComponent(x)));
@@ -2889,6 +2890,13 @@ Rules:
               engine: typeof body.engine === "string" ? body.engine : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
+            return;
+          }
+          if (method === "POST" && atId) {
+            // POST .../{id} {action:"collect"}: fetch a Higgsfield job the test stopped waiting for.
+            const body = await parseBody(req).catch(() => ({} as any));
+            if (body.action !== "collect") { jsonResponse(res, 400, { error: "action must be \"collect\"" }); return; }
+            jsonResponse(res, 202, withUrls(await collectActorTest(atTenant, atProject, atId)));
             return;
           }
           if (method === "GET" && atId) {

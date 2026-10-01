@@ -80,6 +80,36 @@ export async function getActorTest(tenant: string, project: string, id: string):
   }
 }
 
+/** COLLECT a Genjutsu job a test stopped waiting for (a timeout, a restart):
+ *  the saved status URL is polled again, and the finished video becomes the
+ *  test's result -- no second job, no second charge. Returns at once. */
+export async function collectActorTest(tenant: string, project: string, id: string): Promise<ActorTest> {
+  const test = await getActorTest(tenant, project, id);
+  if (!test) throw new Error("Actor test not found");
+  if (test.status === "running" && tests.has(id)) throw new Error("This test is still running");
+  const f = (name: string) => path.join(actorTestDir(tenant, project, id), name);
+  const req = await fs.readFile(f("genjutsu-request.json"), "utf8").then((t) => JSON.parse(t)?.status_url as string, () => "");
+  if (!req) throw new Error("This test has no Higgsfield job to collect");
+  test.status = "running"; delete test.error; delete test.finished_at;
+  test.steps.genjutsu = { status: "running" };
+  tests.set(id, test);
+  await save(test);
+  const t0 = Date.now();
+  void (async () => {
+    try {
+      const url = await runGenjutsu("", [], { resume: req });
+      await download(url, f("genjutsu-raw.mp4"));
+      test.steps.genjutsu = { status: "done", seconds: Math.round((Date.now() - t0) / 100) / 10 };
+      await finishTest(test, ["genjutsu"]);
+    } catch (e: any) {
+      test.steps.genjutsu = { status: "failed", error: String(e?.message || e).slice(0, 300) };
+      test.status = "failed"; test.error = test.steps.genjutsu.error; test.finished_at = new Date().toISOString();
+      await save(test);
+    } finally { tests.delete(id); }
+  })();
+  return test;
+}
+
 export async function ffmpeg(args: string[]): Promise<void> {
   await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...args], { maxBuffer: 20 * 1024 * 1024 });
 }
@@ -255,10 +285,13 @@ export async function runKlingAvatar(img: string, audio: string, prompt?: string
  *  by `onSubmit`. */
 export const GENJUTSU_PROMPT = "Replace the person in the video with the person in the reference image: the same face, hair and clothes. " +
   "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions, camera and room of the video exactly. Photorealistic.";
+/** Genjutsu took 20.5 min for 30 s at 1080p, and over 25 min once (measured):
+ *  give it an hour before giving up -- and keep the job, so it can be collected. */
+const GENJUTSU_DEADLINE_MS = 60 * 60 * 1000;
 export const GENJUTSU_SCENE_PROMPT = "Replace the person in the video with the person in the first reference image: the same face, hair and clothes. " +
   "Place them in the setting of the second reference image (the room, the desk, the lighting). " +
   "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions and camera framing of the video exactly. Photorealistic.";
-export async function runGenjutsu(video: string, images: string[], opts: { prompt?: string; resolution?: string; resume?: string; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+export async function runGenjutsu(video: string, images: string[], opts: { prompt?: string; resolution?: string; resume?: string; onSubmit?: (statusUrl: string) => Promise<void> | void; deadlineMs?: number } = {}): Promise<string> {
   const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
   if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");
   const headers = { Authorization: `Key ${id}:${secret}`, "Content-Type": "application/json" };
@@ -274,7 +307,7 @@ export async function runGenjutsu(video: string, images: string[], opts: { promp
   }
   const t0 = Date.now();
   for (;;) {
-    if (Date.now() - t0 > DEADLINE_MS) throw new Error("genjutsu: timed out");
+    if (Date.now() - t0 > (opts.deadlineMs || GENJUTSU_DEADLINE_MS)) throw new Error("genjutsu: timed out (the job is kept: collect it later)");
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), "genjutsu status");
     if (st.status === "completed") {
@@ -810,7 +843,13 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
         images.push(`${pub}/scene.jpg`);
       }
       // A test judges the look: 720p (cheaper) unless asked; films render at 1080p.
-      url = await runGenjutsu(`${pub}/source.mp4`, images, { prompt: prompt || (heygenOpts.sceneAbs ? GENJUTSU_SCENE_PROMPT : undefined), resolution: heygenOpts.resolution || "720p" });
+      url = await runGenjutsu(`${pub}/source.mp4`, images, {
+        prompt: prompt || (heygenOpts.sceneAbs ? GENJUTSU_SCENE_PROMPT : undefined), resolution: heygenOpts.resolution || "720p",
+        // The job, kept the moment Higgsfield takes it: a timeout or a restart
+        // can collect the video instead of paying for another (measured: a
+        // 720p run outlasted the old 25 min wait and was lost).
+        onSubmit: async (statusUrl) => { await fs.writeFile(f("genjutsu-request.json"), JSON.stringify({ status_url: statusUrl })); },
+      });
     } else if (p === "seedance25") {
       if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");
       const pub = config.publicUrl.startsWith("https://")
@@ -851,6 +890,12 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
   await voiceJob;
   const done = (await Promise.all(provJobs)).filter(Boolean) as ActorProvider[];
 
+  await finishTest(test, done);
+}
+
+/** Each provider's raw video with sound, and the side-by-side; the test closes. */
+async function finishTest(test: ActorTest, done: ActorProvider[]): Promise<void> {
+  const f = (name: string) => path.join(actorTestDir(test.tenant_id, test.project_id, test.id), name);
   // Each result with sound: the converted voice when there is one, else
   // the take's own audio. The picture is re-encoded so every file streams.
   const audio = test.files.voice ? f("voice.mp3") : f("source.mp4");

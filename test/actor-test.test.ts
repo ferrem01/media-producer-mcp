@@ -394,6 +394,40 @@ describe("actor test: one scene of the take, performed by a synthetic actor", ()
     expect(st.files.source).toBe("source.mp4");
   }, 60000);
 
+  it("genjutsu: the job is kept the moment Higgsfield takes it, and a test that stopped waiting collects it later", async () => {
+    const mp4 = await fs.readFile(path.join(DATA, "result.mp4"));
+    let polls = 0, submits = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const u = String(url);
+      const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (u === "https://api.higgsfield.ai/higgsfield/genjutsu/motion-transfer/v1.0") { submits++; return json({ status: "queued", request_id: "r9", status_url: "https://api.higgsfield.ai/requests/r9/status" }); }
+      if (u === "https://api.higgsfield.ai/requests/r9/status") return json(++polls < 3 ? { status: "in_progress" } : { status: "completed", video: { url: "https://cdn/gj.mp4" } });
+      if (u.startsWith("https://cdn/")) return new Response(mp4, { status: 200 });
+      throw new Error("unexpected fetch " + u);
+    }));
+    process.env.HF_API_KEY_ID = "kid"; process.env.HF_API_KEY_SECRET = "ks";
+    const { runGenjutsu, collectActorTest, getActorTest, actorTestDir } = await import("../src/core/actor-test.js");
+    // A wait that runs out: the job was saved on submit, the error says so.
+    let saved = "";
+    await expect(runGenjutsu("https://pub/s.mp4", ["https://pub/a.jpg"], { deadlineMs: 1, onSubmit: (u) => { saved = u; } })).rejects.toThrow(/collect it later/);
+    expect(saved).toBe("https://api.higgsfield.ai/requests/r9/status");
+    // A failed test with a saved job: collect fetches the video and finishes the test, no second submit.
+    const id = "collecttest01";
+    const dir = actorTestDir(T, P, id);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.copyFile(path.join(DATA, "result.mp4"), path.join(dir, "source.mp4"));
+    await fs.writeFile(path.join(dir, "genjutsu-request.json"), JSON.stringify({ status_url: saved }));
+    await fs.writeFile(path.join(dir, "status.json"), JSON.stringify({ id, tenant_id: T, project_id: P, scene_index: 0, image: "", providers: ["genjutsu"], voice: false, status: "failed", started_at: "x", steps: { genjutsu: { status: "failed", error: "genjutsu: timed out" } }, files: { source: "source.mp4" } }));
+    let st = await collectActorTest(T, P, id);
+    expect(st.status).toBe("running");
+    for (let i = 0; i < 300 && st.status === "running"; i++) { await new Promise((r) => setTimeout(r, 50)); st = (await getActorTest(T, P, id))!; }
+    expect(st.status, st.error || JSON.stringify(st.steps)).toBe("done");
+    expect(st.files.genjutsu).toBe("genjutsu.mp4");
+    expect(st.files.compare).toBe("compare.mp4");
+    expect(submits).toBe(1);   // only the first call ever submitted
+    delete process.env.HF_API_KEY_ID; delete process.env.HF_API_KEY_SECRET;
+  }, 60000);
+
   it("refuses without a provider key, and an image outside the tenant", async () => {
     const { startActorTest } = await import("../src/core/actor-test.js");
     delete process.env.FAL_KEY; delete process.env.RUNWAYML_API_SECRET;
