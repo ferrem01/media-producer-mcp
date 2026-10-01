@@ -4727,6 +4727,7 @@ ${QUOTIENT_CSS}
     (s.assets || []).forEach(function(a, ai) {
       if (!a || !a.type) return;
       if (a.status !== 'needed' && a.status !== 'provided') return;
+      if (a.status === 'needed' && needCoveredByCast((project.scenes || [])[si], a)) return;
       rows.push({ ai: ai, need: a });
     });
     if (!rows.length) return '';
@@ -10588,12 +10589,22 @@ ${QUOTIENT_CSS}
   // THE OPEN SLOTS of a built film: every need still waiting, with the scene
   // it belongs to. Camera takes go to the speaker lane, the rest to the
   // media lane.
+  // A slated need (a screen, a live-action clip) the built scene covered:
+  // its slate is gone from the cast -- replaced by a mock or removed -- so
+  // nothing is waiting on it (core/asset-needs.ts needCoveredByCast).
+  function needCoveredByCast(scene, need) {
+    if (!scene || !need) return false;
+    var slated = need.type === 'screen_recording' || need.type === 'screenshot' || (need.type === 'camera_video' && need.use === 'clip');
+    if (!slated) return false;
+    return !(scene.components || []).some(function(c) { return c && c.type === 'asset-placeholder' && c.data && c.data.need === need.description; });
+  }
   function openNeedsOf(project) {
     var out = [];
     if (!project || !project.scenes || !project.storyboard) return out;
     (project.storyboard.scenes || []).forEach(function(sb, si) {
       if (!project.scenes[si]) return;
       (sb.assets || []).forEach(function(a, ai) {
+        if (needCoveredByCast(project.scenes[si], a)) return;
         if (a && a.status === 'needed' && !a.path && a.priority !== 'nice_to_have') out.push({ si: si, ai: ai, need: a });
       });
     });

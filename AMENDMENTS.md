@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — A need the built scene covered is not open
+
+The email-signals film, rebuilt from library pieces, still showed "Screen
+recording needed" on six of seven scenes in Studio: every view read the
+needs straight off the board, and nothing closed a need whose slot the
+film had filled another way. Now a SLATED need (a screen recording, a
+screenshot, a live-action clip) counts as open on a built film only while
+its scene still carries its slate (`needCoveredByCast`,
+core/asset-needs.ts; the same rule inline in the desktop Studio's
+`openNeedsOf` / scene needs block and the phone Studio's `proofOf`).
+Replace the slate with a mock, or delete it, and the need is gone. An
+unbuilt scene keeps every need; stock footage and camera takes are not
+slated and stay as they were. Test: `test/needs-covered.test.ts`.
+
 ## 2026-10-01 — A redraft sees the board's components whole
 
 The email-signals film (proj_c99e52c3, creator-cut, recipe

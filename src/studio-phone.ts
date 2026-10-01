@@ -238,9 +238,19 @@ ${QUOTIENT_CSS}
     }
     row.appendChild(panel);
   }
+  // A slated need the built scene covered (its slate replaced by a mock or
+  // removed) is not proof anyone owes (core/asset-needs.ts needCoveredByCast).
+  function needCoveredByCast(built, need) {
+    if (!built || !need) return false;
+    var slated = need.type === 'screen_recording' || need.type === 'screenshot' || (need.type === 'camera_video' && need.use === 'clip');
+    if (!slated || need.status !== 'needed') return false;
+    return !(built.components || []).some(function (c) { return c && c.type === 'asset-placeholder' && c.data && c.data.need === need.description; });
+  }
   function proofOf(scene) {
     var out = [];
-    (scene.assets || []).forEach(function (x, j) { if (x && x.type !== 'camera_video') out.push({ need: x, index: j }); });
+    var si = ((P.storyboard && P.storyboard.scenes) || []).indexOf(scene);
+    var built = si >= 0 && P.scenes ? P.scenes[si] : null;
+    (scene.assets || []).forEach(function (x, j) { if (x && x.type !== 'camera_video' && !needCoveredByCast(built, x)) out.push({ need: x, index: j }); });
     return out;
   }
   function openProof(scenes) {
