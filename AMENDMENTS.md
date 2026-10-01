@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — FAHHH and the boom are ElevenLabs takes
+
+The two sounds with no free copy now come from ElevenLabs sound effects
+(three takes each; the house keeps the one with the cleanest "F" onset and
+the punchiest boom, picked from their spectra -- the other takes stay on the
+generated shelf in Studio's picker). attention.wav and boom.wav replace the
+synthesized shout and the "Drama Boom 02" stand-in; the synth code for the
+shout is gone. Servers already holding the old files pick these up through
+the found-file refresh.
+
 ## 2026-10-01 — Generated sound effects (ElevenLabs); the film's palette is settable
 
 Marc: "What about eleven labs" -- for the sounds with no free copy (the
