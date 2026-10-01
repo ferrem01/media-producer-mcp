@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-01 — Generated sound effects (ElevenLabs); the film's palette is settable
+
+Marc: "What about eleven labs" -- for the sounds with no free copy (the
+FAHHH meme, the Vine boom). ElevenLabs' sound-effects model makes a sound
+from a sentence, and the key is already on the server.
+- `generateSfx` (audio/sfx-generate.ts): POST /v1/sound-generation, kept
+  as a 48 kHz mono WAV peak-matched to the house set in
+  `_system/sfx/generated`, listed on a GENERATED shelf (`gen-<name>-<hash>`)
+  beside house and Freesound; cues, tracks and palettes name it like any
+  sound. MCP: `audio` action `generate_sfx` {prompt, seconds?, name?}.
+  Studio's picker lists the shelf; `/assets/_system/sfx/generated/*.wav`
+  serves its previews.
+- `update` takes `sfx_palette` {job: sound}: merged into the film's palette,
+  every role cue re-pointed at once and its file fetched.
+- A found house file is re-copied whenever the repo's copy changes, so a
+  better take promoted into src/sounds/sfx reaches servers that already
+  minted the old one.
+Test: `test/sfx-generate.test.ts`.
+
 ## 2026-10-01 — Sound jobs: six sounds, one palette, the same sound for the same job
 
 Marc sent the viewcci reel ("make sure we have these sound effects and

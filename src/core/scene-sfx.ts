@@ -82,6 +82,8 @@ export function normalizeSoundId(id: unknown): string | null {
   const s = String(id || "").trim().toLowerCase();
   if (!s) return null;
   if (s.startsWith("freesound-")) return /^freesound-\d+$/.test(s) ? s : null;
+  // A generated sound (audio/sfx-generate.ts): "gen-<name>-<hash>".
+  if (s.startsWith("gen-")) return /^gen-[a-z0-9-]{1,60}$/.test(s) ? s : null;
   const bare = s.startsWith("house-") ? s.slice(6) : s;
   return HOUSE_IDS.has(bare) ? `house-${bare}` : null;
 }
