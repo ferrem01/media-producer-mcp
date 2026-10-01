@@ -2428,7 +2428,8 @@ ${QUOTIENT_CSS}
       (sc.sfx || []).forEach(function(cue) {
         if (!cue || !cue.src) return;
         cueTracks.push({ source: cue.src, type: 'sfx', id: 'cue:' + cue.id, volume: cue.volume != null ? cue.volume : 0.8,
-          start_time: sceneOffset(si) + (Number(cue.at) || 0), _cue: true });
+          // A cue that LANDS on its moment (a riser) starts its length before it.
+          start_time: sceneOffset(si) + Math.max(0, (Number(cue.at) || 0) - (cue.lands && Number(cue.duration) > 0 ? Number(cue.duration) : 0)), _cue: true });
       });
     });
     if (!p || ((!p.audio || !p.audio.tracks || !p.audio.tracks.length) && !cueTracks.length)) {
@@ -6674,6 +6675,15 @@ ${QUOTIENT_CSS}
     for (var i = 0; i < n; i++) if (sceneStartFor(i) <= t + 0.001) hit = i;
     return hit;
   }
+  // A cue as it goes back to the server: its sound, level, time (or word,
+  // with the anchor's occurrence/edge/offset), and its job and landing.
+  function keepCue(c) {
+    var keep = { id: c.id, volume: c.volume, at: c.anchor ? { word: c.anchor.word, occurrence: c.anchor.occurrence, edge: c.anchor.edge, offset: c.anchor.offset } : c.at };
+    if (keep.at && typeof keep.at === 'object') Object.keys(keep.at).forEach(function(k) { if (keep.at[k] == null) delete keep.at[k]; });
+    if (c.role) keep.role = c.role;
+    if (c.lands) keep.lands = true;
+    return keep;
+  }
   function saveSceneSfx(si, next) {
     var p = state.currentProject;
     studioStatus('Saving sound…');
@@ -6752,20 +6762,19 @@ ${QUOTIENT_CSS}
       var atV = parseFloat(document.getElementById('sfx-at').value);
       var next = { id: sel.value, volume: parseInt(document.getElementById('sfx-vol').value, 10) / 100 };
       next.at = w ? '@' + w : Math.max(0, Math.min(sdur, isNaN(atV) ? 0 : atV));
-      var out = list.map(function(c) {
-        var keep = { id: c.id, volume: c.volume, at: c.anchor ? { word: c.anchor.word, occurrence: c.anchor.occurrence, edge: c.anchor.edge, offset: c.anchor.offset } : c.at };
-        if (keep.at && typeof keep.at === 'object') Object.keys(keep.at).forEach(function(k) { if (keep.at[k] == null) delete keep.at[k]; });
-        return keep;
-      });
+      // A cue keeps its JOB and its landing while its sound stays the same
+      // (core/scene-sfx.ts); picking another sound makes it a plain cue.
+      var was = !isNew ? list[ci] : null;
+      if (was && was.lands) next.lands = true;
+      if (was && was.role && sel.value === was.id) next.role = was.role;
+      var out = list.map(keepCue);
       if (isNew) out.push(next); else out[ci] = next;
       camPopClose();
       saveSceneSfx(si, out);
     });
     var delBtn = document.getElementById('sfx-del');
     if (delBtn) delBtn.addEventListener('click', function() {
-      var out = list.filter(function(_, k) { return k !== ci; }).map(function(c) {
-        return { id: c.id, volume: c.volume, at: c.anchor ? { word: c.anchor.word } : c.at };
-      });
+      var out = list.filter(function(_, k) { return k !== ci; }).map(keepCue);
       camPopClose();
       saveSceneSfx(si, out);
     });

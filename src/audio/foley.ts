@@ -14,6 +14,7 @@
  */
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface FoleySpec {
   id: string;
@@ -21,6 +22,11 @@ export interface FoleySpec {
   /** What it is for, in the words a writer or a person would search. */
   tags: string[];
   duration: number;
+  /** A sound FOUND rather than made: a Creative-Commons-0 recording kept in
+   *  the repo (src/sounds/sfx/<id>.wav, trimmed and peak-matched to the
+   *  set) and copied into the library instead of synthesized. CC0 needs no
+   *  credit; it is kept anyway. */
+  found?: { credit: string; url: string };
 }
 
 const SR = 48000;
@@ -71,6 +77,9 @@ export function renderFoley(id: string): Float32Array {
   const st = { lp: 0, bp: 0 };
   const st2 = { lp: 0, bp: 0 };
   const st3 = { lp: 0, bp: 0 };
+  // A running phase for a voice whose pitch glides (attention): the
+  // integral of f0, so the fall is smooth with any vibrato on it.
+  let phase = 0;
 
   for (let i = 0; i < n; i++) {
     const t = i / SR;
@@ -211,6 +220,33 @@ export function renderFoley(id: string): Float32Array {
         }
         break;
       }
+      case "attention": {
+        // "FAHHH": the shouted exclamation that grabs the ear at a hook
+        // (the viewcci reel's attention sound -- no free copy of the meme
+        // exists, so it is made here). A breathy "f" opens into a loud,
+        // gritty "aaah" that starts high and falls, like a man yelling it:
+        // a buzzy glottal voice (harmonics of a falling pitch with a little
+        // vibrato) through open-"ah" formants, soft-clipped for the shout.
+        const fric = t < 0.16 ? Math.pow(Math.min(1, t / 0.03), 0.7) * Math.pow(1 - Math.max(0, t - 0.06) / 0.1, 2) : 0;
+        const hiss = svf(rnd() * 2 - 1, st, 5200, 1.2).bp * fric * 0.9;
+        const u = t - 0.07;
+        let voice = 0;
+        if (u > 0) {
+          const q = Math.min(1, u / (spec.duration - 0.07));
+          const f0 = lerp(235, 150, Math.pow(q, 0.8)) * (1 + 0.018 * Math.sin(2 * Math.PI * 5.5 * u) * Math.min(1, u / 0.25));
+          phase += 2 * Math.PI * f0 / SR;
+          for (let k = 1; k <= 26; k++) {
+            const fk = f0 * k;
+            const res = Math.exp(-Math.pow((fk - 760) / 170, 2)) + 0.8 * Math.exp(-Math.pow((fk - 1220) / 230, 2)) + 0.35 * Math.exp(-Math.pow((fk - 2650) / 380, 2)) + 0.03;
+            voice += Math.sin(phase * k) * res / Math.pow(k, 0.65);
+          }
+          const breath = svf(rnd() * 2 - 1, st2, 1400, 1.4).bp * 0.18;
+          const e = u < 0.05 ? u / 0.05 : u < 0.5 ? 1 : Math.pow(1 - (u - 0.5) / (spec.duration - 0.57), 1.6);
+          voice = Math.tanh((voice * 0.55 + breath) * 2.2) * Math.max(0, e);
+        }
+        v = voice + hiss;
+        break;
+      }
       case "room-tone": {
         // THE FILM IS NEVER DIGITALLY SILENT. A scored film with gaps of
         // absolute silence reads as broken audio (measured on the sketch:
@@ -289,7 +325,27 @@ export const FOLEY_SET: FoleySpec[] = [
   { id: "room-tone", label: "Room tone (loop)", tags: ["room", "tone", "ambience", "bed", "silence", "loop", "air"], duration: 4.0 },
   { id: "camera-shutter", label: "Camera shutter", tags: ["camera", "shutter", "photo", "snap"], duration: 0.16 },
   { id: "monkey", label: "Monkey (ooh-ooh-ah-ah)", tags: ["monkey", "chimp", "ape", "animal", "gag", "funny", "cartoon"], duration: 0.95 },
+  // THE SIX JOBS (the viewcci reel, Marc 2026-10-01: "make sure we have
+  // these sound effects"): one sound per job, found free where a CC0
+  // recording exists, made here where none does.
+  { id: "attention", label: "FAHHH (attention)", tags: ["attention", "hook", "fahhh", "shout", "yell", "open"], duration: 1.15 },
+  { id: "camera-flash", label: "Camera flash", tags: ["camera", "flash", "transition", "cut", "snap", "photo"], duration: 0.47,
+    found: { credit: "Rvgerxini, \"iOS Camera flash\" (CC0)", url: "https://freesound.org/s/455511/" } },
+  { id: "riser-metal", label: "Metallic riser", tags: ["riser", "metallic", "tension", "build", "before", "payoff"], duration: 3.98,
+    found: { credit: "HenryRichard, \"Metallic Riser.wav\" (CC0)", url: "https://freesound.org/s/451653/" } },
+  { id: "right", label: "Right (correct chime)", tags: ["right", "correct", "yes", "quiz", "answer", "true", "do"], duration: 0.73,
+    found: { credit: "Beetlemuse, \"Correct Answer / That's Right!\" (CC0)", url: "https://freesound.org/s/528957/" } },
+  { id: "wrong", label: "Wrong (buzzer)", tags: ["wrong", "incorrect", "no", "quiz", "answer", "false", "dont", "buzzer"], duration: 0.49,
+    found: { credit: "KevinVG207, \"Wrong Buzzer\" (CC0)", url: "https://freesound.org/s/331912/" } },
+  { id: "boom", label: "Boom (comedy)", tags: ["boom", "vine", "comedy", "funny", "gag", "meme", "reveal"], duration: 2.4,
+    found: { credit: "modusmogulus, \"Drama Boom 02\" (CC0)", url: "https://freesound.org/s/802074/" } },
+  { id: "bass-impact", label: "Bass impact", tags: ["bass", "impact", "hype", "payoff", "hit", "drop", "land"], duration: 3.0,
+    found: { credit: "Kievinay, \"Bass Impact - Ki_01\" (CC0)", url: "https://freesound.org/s/512389/" } },
 ];
+
+/** Where the found sounds live: src/sounds/sfx (dist/sounds/sfx once
+ *  built; npm run build copies src/sounds). */
+const FOUND_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "sounds", "sfx");
 
 export interface FoleyManifestEntry extends FoleySpec { file: string; source: "house"; license: "house"; }
 
@@ -305,7 +361,10 @@ export async function ensureFoleyLibrary(dir: string): Promise<FoleyManifestEntr
     const file = `${spec.id}.wav`;
     const full = path.join(dir, file);
     try { await fs.access(full); }
-    catch { await fs.writeFile(full, wavBytes(renderFoley(spec.id))); }
+    catch {
+      if (spec.found) await fs.copyFile(path.join(FOUND_DIR, file), full);
+      else await fs.writeFile(full, wavBytes(renderFoley(spec.id)));
+    }
     entries.push({ ...spec, file, source: "house", license: "house" });
   }
   await fs.writeFile(path.join(dir, "manifest.json"), JSON.stringify({ version: 1, effects: entries }, null, 2));

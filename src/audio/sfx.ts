@@ -41,7 +41,7 @@ export async function listHouseSfx(): Promise<SfxOption[]> {
     title: e.label,
     duration: e.duration,
     source: "house" as const,
-    license: "House set -- made here, yours to use",
+    license: e.found ? `Found free: ${e.found.credit} -- public domain, yours to use` : "House set -- made here, yours to use",
     tags: e.tags,
     preview_url: `/assets/_system/sfx/${encodeURIComponent(e.file)}`,
   }));

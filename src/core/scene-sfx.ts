@@ -23,9 +23,44 @@ import type { Project } from "./types.js";
 import { isAnchorObject, parseShorthand, type WordAnchor } from "./word-anchors.js";
 import { FOLEY_SET } from "../audio/foley.js";
 
+/**
+ * THE JOBS A SOUND DOES (the viewcci reel, Marc 2026-10-01): "use FAHHH to
+ * get attention, camera flash to make your transition smooth, a metallic
+ * riser to build tension, right and wrong to make it engaging, vine boom
+ * to add comedy, bass impact to build hype before your payoff" -- and
+ * "pick two or three and use them the same way every time. That
+ * consistency is what makes it read as a style instead of just noise."
+ * A cue may name its JOB instead of a sound; the film's palette
+ * (project.sfx_palette over DEFAULT_SFX_PALETTE) picks the one sound every
+ * cue with that job plays, so the same job always sounds the same.
+ */
+export type SoundRole = "attention" | "transition" | "tension" | "payoff" | "right" | "wrong" | "comedy";
+export const SOUND_ROLES: readonly SoundRole[] = ["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"];
+export const DEFAULT_SFX_PALETTE: Record<SoundRole, string> = {
+  attention: "house-attention",
+  transition: "house-camera-flash",
+  tension: "house-riser-metal",
+  payoff: "house-bass-impact",
+  right: "house-right",
+  wrong: "house-wrong",
+  comedy: "house-boom",
+};
+export type SoundPalette = Partial<Record<SoundRole, string>>;
+
+/** The sound a job plays in this film: the film's palette, else the house default. */
+export function soundForRole(role: SoundRole, palette?: SoundPalette | null): string {
+  return normalizeSoundId(palette?.[role]) || DEFAULT_SFX_PALETTE[role];
+}
+
 export interface SceneSoundCue {
   /** Scene seconds (the resolved value when `anchor` is set). */
   at: number;
+  /** The job (attention, transition, tension, payoff, right, wrong,
+   *  comedy): when set, the film's palette chose `id`. */
+  role?: SoundRole;
+  /** `at` is where the sound ENDS, not where it starts: a riser builds INTO
+   *  its moment. Default for the tension job. */
+  lands?: boolean;
   /** A library sound: "house-<id>" or "freesound-<n>". */
   id: string;
   /** 0-1 (default 0.8). */
@@ -54,15 +89,21 @@ export function normalizeSoundId(id: unknown): string | null {
 /** Clean a list of cues from any writer (the storyboard LLM, the update tool,
  *  Studio): ids normalized, word times lifted into `anchor`, volumes
  *  clamped, junk dropped. Returns the clean list (possibly empty). */
-export function normalizeSoundCues(raw: unknown): SceneSoundCue[] {
+export function normalizeSoundCues(raw: unknown, palette?: SoundPalette | null): SceneSoundCue[] {
   if (!Array.isArray(raw)) return [];
   const out: SceneSoundCue[] = [];
   for (const r of raw) {
     if (!r || typeof r !== "object") continue;
     const c: any = r;
-    const id = normalizeSoundId(c.id ?? c.sound ?? c.sfx);
+    const role: SoundRole | undefined = SOUND_ROLES.includes(c.role) ? c.role : undefined;
+    const named = normalizeSoundId(c.id ?? c.sound ?? c.sfx);
+    // A job picks its sound from the palette -- the same job, the same
+    // sound, film-wide; a cue with no job keeps the sound it names.
+    const id = role ? soundForRole(role, palette) : named;
     if (!id) continue;
     const cue: SceneSoundCue = { at: 0, id };
+    if (role) cue.role = role;
+    if (c.lands === true || (role === "tension" && c.lands !== false)) cue.lands = true;
     if (isAnchorObject(c.anchor)) cue.anchor = { ...c.anchor };
     if (isAnchorObject(c.at)) cue.anchor = { ...c.at };
     else if (typeof c.at === "string") {
@@ -70,9 +111,15 @@ export function normalizeSoundCues(raw: unknown): SceneSoundCue[] {
       if (a) cue.anchor = a; else if (Number.isFinite(Number(c.at))) cue.at = Math.max(0, Number(c.at));
     } else if (Number.isFinite(Number(c.at))) cue.at = Math.max(0, Number(c.at));
     if (c.volume != null && Number.isFinite(Number(c.volume))) cue.volume = Math.max(0, Math.min(1, Number(c.volume)));
-    if (typeof c.src === "string" && c.src.startsWith("/assets/") && !c.src.includes("..")) cue.src = c.src;
-    if (typeof c.label === "string") cue.label = c.label;
-    if (Number.isFinite(Number(c.duration))) cue.duration = Number(c.duration);
+    // The file and label belong to the sound: a job re-pointed by the
+    // palette to another sound drops them (ensureSoundFiles fetches anew).
+    const sameSound = named === id;
+    if (sameSound && typeof c.src === "string" && c.src.startsWith("/assets/") && !c.src.includes("..")) cue.src = c.src;
+    if (sameSound && typeof c.label === "string") cue.label = c.label;
+    if (sameSound && Number.isFinite(Number(c.duration))) cue.duration = Number(c.duration);
+    // A house sound's length is known here (a landing cue needs it).
+    const house = id.startsWith("house-") ? FOLEY_SET.find((f) => `house-${f.id}` === id) : undefined;
+    if (house) cue.duration = house.duration;
     out.push(cue);
   }
   return out.sort((a, b) => a.at - b.at);
@@ -120,6 +167,13 @@ export interface SfxTrack {
   startTime: number;
 }
 
+/** Where a cue's sound STARTS in its scene: `at`, or -- for a cue that
+ *  lands on its moment (a riser) -- its length before `at`. */
+export function cueStart(cue: Pick<SceneSoundCue, "at" | "lands" | "duration">): number {
+  const at = Number(cue.at) || 0;
+  return Math.max(0, cue.lands && Number(cue.duration) > 0 ? at - Number(cue.duration) : at);
+}
+
 /** Every built scene's cues as audio tracks on the film clock. `startOf(i)`
  *  is scene i's start (the render's own clock, transitions included);
  *  `pathOf` maps an /assets URL to a file. A cue with no file is skipped. */
@@ -128,7 +182,7 @@ export function sceneSfxTracks(project: Pick<Project, "scenes">, startOf: (scene
   (project.scenes || []).forEach((scene: any, i) => {
     for (const cue of (scene.sfx || []) as SceneSoundCue[]) {
       if (!cue || !cue.src) continue;
-      const at = Math.max(0, Math.min(Number(scene.duration_seconds) || 0, Number(cue.at) || 0));
+      const at = Math.max(0, Math.min(Number(scene.duration_seconds) || 0, cueStart(cue)));
       out.push({ path: pathOf(cue.src), type: "sfx", volume: cue.volume ?? DEFAULT_SFX_VOLUME, startTime: Math.round((startOf(i) + at) * 1000) / 1000 });
     }
   });

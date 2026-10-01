@@ -125,15 +125,16 @@ const SCENE_TOOL_SCHEMA = {
     gen_video: { type: "string", description: "AI-generated video clip prompt -- ONLY for moving shots stock footage cannot plausibly contain (mutually exclusive with broll_query/hero_image)" },
     sfx: {
       type: "array",
-      description: "SOUND CUES -- point sounds on moments the viewer SEES land (optional, 0-4 per scene): a ding as a notification drops, a thud as a stamp hits, a pop as a card appears, a whoosh on a fast swap. Tie each to the word it lands on (\"@emails\") or scene seconds. Never a bed or music (those are the film's audio). House sounds: ding, thud, pop, click, tick, whoosh-soft, whoosh-fast, swell, riser, deflate, camera-shutter, keyboard, paper-drop, monkey (a cartoon chimp ooh-ooh-ah-ah, for a chimp or monkey gag).",
+      description: "SOUND CUES -- point sounds on moments the viewer SEES land (optional, 0-4 per scene): a ding as a notification drops, a thud as a stamp hits, a pop as a card appears. Tie each to the word it lands on (\"@emails\") or scene seconds. Never a bed or music (those are the film's audio). SOUND JOBS (the house style): give a cue a role instead of a sound and the film's palette picks it, the same sound for the same job every time -- attention (FAHHH: the hook's first beat, once), transition (camera flash: on a hard cut or a card slamming in -- every one the same), tension (metallic riser: builds INTO the payoff; its `at` is where it LANDS), payoff (bass impact: the hype hit on the payoff itself, right where the riser lands), right / wrong (a correct chime / a buzzer: do vs don't, fact vs myth), comedy (boom: the gag beat). Pick TWO OR THREE jobs for the whole film and use each the same way every time -- consistency reads as a style; a different sound on every beat is noise. House sounds: ding, thud, pop, click, tick, whoosh-soft, whoosh-fast, swell, riser, deflate, camera-shutter, keyboard, paper-drop, monkey (a cartoon chimp ooh-ooh-ah-ah, for a chimp or monkey gag), attention (a shouted FAHHH), camera-flash, riser-metal, right, wrong, boom, bass-impact.",
       items: {
         type: "object",
         properties: {
           at: { type: "string", description: "\"@word\" it lands on, or scene seconds" },
-          id: { type: "string", description: "house sound name, e.g. ding | thud | pop | whoosh-fast" },
+          id: { type: "string", description: "house sound name, e.g. ding | thud | pop | whoosh-fast (omit when role is set)" },
+          role: { type: "string", enum: ["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"], description: "The sound's JOB: the film's palette picks the sound, the same one every time" },
           volume: { type: "number", description: "0-1 (default 0.8)" },
         },
-        required: ["at", "id"],
+        required: ["at"],
       },
     },
     camera_moves: {

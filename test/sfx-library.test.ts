@@ -13,7 +13,7 @@ describe("the house foley set", () => {
   it("renders every effect: the right length, audible, peak-normalized, and the SAME sound on every machine", async () => {
     const { FOLEY_SET, renderFoley, wavBytes } = await import("../src/audio/foley.js");
     expect(FOLEY_SET.length).toBeGreaterThanOrEqual(12);
-    for (const spec of FOLEY_SET) {
+    for (const spec of FOLEY_SET.filter((f) => !f.found)) {
       const buf = renderFoley(spec.id);
       expect(buf.length).toBe(Math.round(spec.duration * 48000));
       let peak = 0, sum = 0;
