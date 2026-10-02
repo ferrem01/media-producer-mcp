@@ -36,6 +36,8 @@ export interface LibraryCard {
   created_at?: string;
   updated_at?: string;
   archived_at?: string;
+  /** The film's tags (normalizeTags), for the filter row and the card chips. */
+  tags?: string[];
   /** Best guess at "when did this last change", always present: the project's
    *  own updated_at/created_at when it has one (111 of 251 did not), else the
    *  file's mtime. Sorting a library by date cannot have holes in it. */
@@ -49,10 +51,29 @@ interface Entry {
    *  claiming a film was never made. */
   renderMtime: number;
   card: LibraryCard;
-  haystack: { name: string; intent: string; screen: string };
+  haystack: { name: string; intent: string; screen: string; tags: string[] };
 }
 
 const index = new Map<string, Entry>();
+
+/**
+ * TAGS: free-form labels a person puts on films to find them again (Marc:
+ * "I have like two hundred videos now ... I'd love to add tags so I could
+ * filter down the list of films by tag"). One spelling per idea: lowercased,
+ * trimmed, inner whitespace collapsed, a leading "#" dropped, at most 40
+ * characters, unique, at most 20 per film.
+ */
+export function normalizeTags(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
+  const out: string[] = [];
+  for (const t of list) {
+    if (typeof t !== "string") continue;
+    const tag = t.replace(/^#+/, "").replace(/\s+/g, " ").trim().toLowerCase().slice(0, 40).trim();
+    if (tag && !out.includes(tag)) out.push(tag);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
 
 /** Strings that are data, not language: asset urls, data URIs, ids, colors. */
 function isProse(s: string): boolean {
@@ -127,6 +148,7 @@ function buildEntry(project: Project, mtime: number, renderMtime: number): Entry
     created_at: p.created_at || undefined,
     updated_at: p.updated_at || undefined,
     archived_at: p.archived_at || undefined,
+    ...(normalizeTags(p.tags).length ? { tags: normalizeTags(p.tags) } : {}),
     touched_at: p.updated_at || p.created_at || new Date(mtime).toISOString(),
   };
 
@@ -138,6 +160,7 @@ function buildEntry(project: Project, mtime: number, renderMtime: number): Entry
       name: project.name.toLowerCase(),
       intent: intent.join(" \n ").toLowerCase().slice(0, 24000),
       screen: screen.join(" \n ").toLowerCase().slice(0, 24000),
+      tags: normalizeTags(p.tags),
     },
   };
 }
@@ -202,10 +225,12 @@ function score(entry: Entry, tokens: string[]): number {
   let total = 0;
   for (const t of tokens) {
     const inName = entry.haystack.name.includes(t);
+    // A tag is a word the person chose for this film: it ranks like the title.
+    const inTags = entry.haystack.tags.some((g) => g.includes(t));
     const inIntent = entry.haystack.intent.includes(t);
     const inScreen = entry.haystack.screen.includes(t);
-    if (!inName && !inIntent && !inScreen) return -1;
-    total += inName ? 6 : inIntent ? 3 : 1;
+    if (!inName && !inTags && !inIntent && !inScreen) return -1;
+    total += inName || inTags ? 6 : inIntent ? 3 : 1;
   }
   if (entry.haystack.name.includes(tokens.join(" "))) total += 8;  // the whole phrase, in the title
   return total;
@@ -216,6 +241,8 @@ export interface LibraryQuery {
   filter?: LibraryFilter;
   sort?: LibrarySort;
   archived?: boolean;
+  /** Films carrying EVERY one of these tags (a narrowing, like the search). */
+  tags?: string[];
   limit?: number;
   offset?: number;
 }
@@ -224,6 +251,9 @@ export interface LibraryResult {
   cards: Array<LibraryCard & { copies?: LibraryCard[] }>;
   total: number;
   counts: { all: number; rendered: number; built: number; board: number; archived: number };
+  /** Every tag in this view (archived or not) with how many films carry it,
+   *  most used first: the filter row and the autocomplete. */
+  tag_counts: Array<{ tag: string; count: number }>;
 }
 
 /** Films that share a name are the norm here (ten copies of one idea). Group
@@ -259,8 +289,13 @@ export async function searchLibrary(tenantId: string, query: LibraryQuery): Prom
     archived: entries.filter((e) => !!e.card.archived_at).length,
   };
 
+  const tagTally = new Map<string, number>();
+  for (const e of visible) for (const t of e.haystack.tags) tagTally.set(t, (tagTally.get(t) || 0) + 1);
+  const tag_counts = [...tagTally].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+
   const filter = query.filter || "all";
-  let pool = visible.filter((e) => matchesFilter(e.card, filter));
+  const wantTags = normalizeTags(query.tags || []);
+  let pool = visible.filter((e) => matchesFilter(e.card, filter) && wantTags.every((t) => e.haystack.tags.includes(t)));
 
   const q = (query.q || "").trim().toLowerCase();
   let ranked: LibraryCard[];
@@ -282,5 +317,5 @@ export async function searchLibrary(tenantId: string, query: LibraryQuery): Prom
   const grouped = q ? ranked : groupCopies(ranked);
   const offset = Math.max(0, query.offset || 0);
   const limit = Math.min(200, Math.max(1, query.limit || 60));
-  return { cards: grouped.slice(offset, offset + limit), total: grouped.length, counts };
+  return { cards: grouped.slice(offset, offset + limit), total: grouped.length, counts, tag_counts };
 }

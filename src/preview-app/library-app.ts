@@ -129,6 +129,31 @@ ${RAIL_CSS}
     box-shadow: var(--shadow); transition: transform .2s cubic-bezier(.4,0,.2,1); z-index: 30;
   }
   .actionbar.up { transform: translateX(-50%) translateY(0); }
+  /* ── Tags: chips on the card, a filter row, a box to add one ── */
+  .tagrow { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tagrow .lbl { font-size: 12px; color: var(--text-3); margin-right: 2px; }
+  .tchip { font-size: 12px; padding: 3px 9px; }
+  .ctags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 7px; align-items: center; }
+  .ctag {
+    display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; line-height: 1;
+    color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 7px; cursor: pointer; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ctag:hover { border-color: var(--accent); color: var(--text); }
+  .ctag.on { border-color: var(--accent); color: var(--accent); }
+  .ctag .x { display: none; opacity: .6; padding-left: 2px; }
+  .card:hover .ctag .x { display: inline; }
+  .ctag .x:hover { opacity: 1; }
+  .addtag {
+    font-size: 11px; color: var(--text-3); background: none; border: 1px dashed var(--border-2);
+    border-radius: 999px; padding: 3px 7px; cursor: pointer; line-height: 1; opacity: 0; transition: opacity .12s;
+  }
+  .card:hover .addtag, .addtag.always { opacity: 1; }
+  .taginput {
+    font: inherit; font-size: 11px; width: 110px; padding: 3px 7px; border-radius: 999px;
+    border: 1px solid var(--accent); background: var(--surface); color: var(--text); outline: none;
+  }
+  .actionbar .taginput { font-size: 13px; width: 150px; padding: 6px 10px; }
   .actionbar .n { font-size: 13px; font-weight: 600; padding-left: 6px; }
   .toast {
     position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
@@ -184,15 +209,17 @@ ${railHtml("films")}
       <span class="lib-count" id="count"></span>
       <div class="search-wrap">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
-        <input id="q" type="text" autocomplete="off" placeholder="Search a title, a prompt, or words on screen…">
+        <input id="q" type="text" autocomplete="off" placeholder="Search a title, a tag, a prompt, or words on screen…">
         <button class="q-clear" id="qclear" title="Clear">&times;</button>
       </div>
       <span class="grow"></span>
       <button class="chip" id="pickbtn">Select</button>
     </div>
     <div class="toolbar" id="filters"></div>
+    <div class="tagrow" id="tagfilters"></div>
   </div>
 </header>
+<datalist id="alltags"></datalist>
 <main>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none"></div>
@@ -216,6 +243,9 @@ ${RAIL_JS}
     filter: params.get('filter') || 'all',
     sort: params.get('sort') || 'recent',
     archived: params.get('archived') === '1',
+    // Films carrying every one of these tags (?tag=a,b).
+    tags: (params.get('tag') || '').split(',').map(function (t) { return t.trim().toLowerCase(); }).filter(Boolean),
+    tagCounts: [], showAllTags: false,
     cards: [], counts: null, total: 0,
     picking: false, selected: Object.create(null), expanded: Object.create(null)
   };
@@ -298,6 +328,13 @@ ${RAIL_JS}
           (c.frame && c.frame !== '16x9' ? '<span class="dot"></span><span>' + esc(c.frame) + '</span>' : '') +
           (fmtDate(c.touched_at) ? '<span class="dot"></span><span>' + esc(fmtDate(c.touched_at)) + '</span>' : '') +
         '</div>' +
+        '<div class="ctags" data-tags-for="' + esc(c.project_id) + '">' +
+          (c.tags || []).map(function (t) {
+            return '<span class="ctag' + (state.tags.indexOf(t) >= 0 ? ' on' : '') + '" data-tag="' + esc(t) + '" title="Show films tagged ' + esc(t) + '">' +
+              esc(t) + '<span class="x" data-untag="' + esc(t) + '" title="Remove tag">&times;</span></span>';
+          }).join('') +
+          (state.archived ? '' : '<button class="addtag' + ((c.tags || []).length ? '' : '') + '" data-addtag="' + esc(c.project_id) + '">+ tag</button>') +
+        '</div>' +
       '</div>' +
     '</div>';
   }
@@ -315,7 +352,9 @@ ${RAIL_JS}
 
     empty.style.display = state.cards.length ? 'none' : '';
     if (!state.cards.length) {
-      empty.innerHTML = state.q
+      empty.innerHTML = state.tags.length && !state.q
+        ? '<h2>No films tagged ' + state.tags.map(function (t) { return '“' + esc(t) + '”'; }).join(' + ') + '</h2><p>Clear a tag above to widen the list.</p>'
+        : state.q
         ? '<h2>Nothing matches “' + esc(state.q) + '”</h2><p>Search covers the title, the prompt, and the words on screen.</p>'
         : state.archived ? '<h2>The archive is empty</h2><p>Films you put down land here.</p>'
         : '<h2>No films yet</h2>';
@@ -324,7 +363,32 @@ ${RAIL_JS}
     document.getElementById('count').textContent =
       state.total + (state.q ? ' match' + (state.total === 1 ? '' : 'es') : ' film' + (state.total === 1 ? '' : 's'));
     renderFilters(c);
+    renderTagFilters();
     renderActionbar();
+  }
+
+  // The tag row: every tag in this view, most used first, with its count.
+  // Several can be on at once (films carrying all of them).
+  function renderTagFilters() {
+    var el = document.getElementById('tagfilters');
+    var list = state.tagCounts.slice();
+    state.tags.forEach(function (t) { if (!list.some(function (x) { return x.tag === t; })) list.unshift({ tag: t, count: 0 }); });
+    document.getElementById('alltags').innerHTML = state.tagCounts.map(function (x) { return '<option value="' + esc(x.tag) + '">'; }).join('');
+    if (!list.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+    el.style.display = '';
+    var cap = 14;
+    var shown = state.showAllTags ? list : list.filter(function (x, i) { return i < cap || state.tags.indexOf(x.tag) >= 0; });
+    el.innerHTML = '<span class="lbl">Tags</span>' + shown.map(function (x) {
+      return '<button class="chip tchip' + (state.tags.indexOf(x.tag) >= 0 ? ' on' : '') + '" data-tagfilter="' + esc(x.tag) + '">' +
+        esc(x.tag) + ' <span class="n">' + x.count + '</span></button>';
+    }).join('') +
+      (list.length > cap ? '<button class="chip tchip" id="moretags">' + (state.showAllTags ? 'Fewer' : '+' + (list.length - shown.length) + ' more') + '</button>' : '') +
+      (state.tags.length ? '<button class="chip tchip" id="cleartags">Clear tags</button>' : '');
+  }
+  function toggleTagFilter(t) {
+    var i = state.tags.indexOf(t);
+    if (i >= 0) state.tags.splice(i, 1); else state.tags.push(t);
+    load();
   }
 
   function renderFilters(counts) {
@@ -358,7 +422,7 @@ ${RAIL_JS}
     document.getElementById('selcount').textContent = ids.length + ' selected';
     document.getElementById('actions').innerHTML = state.archived
       ? '<button class="btn" data-act="restore">Restore</button> <button class="btn danger" data-act="delete">Delete permanently</button>'
-      : '<button class="btn primary" data-act="archive">Archive</button>';
+      : '<button class="btn" data-act="tag">Tag…</button> <button class="btn" data-act="untag">Untag…</button> <button class="btn primary" data-act="archive">Archive</button>';
   }
 
   var loadSeq = 0;
@@ -369,10 +433,11 @@ ${RAIL_JS}
       grid.innerHTML = new Array(8).fill('<div class="skeleton"></div>').join('');
     }
     var qs = '?filter=' + encodeURIComponent(state.filter) + '&sort=' + encodeURIComponent(state.sort) +
-      (state.q ? '&q=' + encodeURIComponent(state.q) : '') + (state.archived ? '&archived=1' : '') + '&limit=200';
+      (state.q ? '&q=' + encodeURIComponent(state.q) : '') + (state.archived ? '&archived=1' : '') +
+      (state.tags.length ? '&tag=' + encodeURIComponent(state.tags.join(',')) : '') + '&limit=200';
     railApi('/api/library/' + encodeURIComponent(state.tenant) + qs).then(function (r) {
       if (seq !== loadSeq) return;              // a later keystroke already won
-      state.cards = r.cards; state.total = r.total; state.counts = r.counts;
+      state.cards = r.cards; state.total = r.total; state.counts = r.counts; state.tagCounts = r.tag_counts || [];
       render();
       syncUrl();
     }).catch(function (e) {
@@ -390,6 +455,7 @@ ${RAIL_JS}
     if (state.filter !== 'all') p.set('filter', state.filter);
     if (state.sort !== 'recent') p.set('sort', state.sort);
     if (state.archived) p.set('archived', '1');
+    if (state.tags.length) p.set('tag', state.tags.join(','));
     if (TOKEN) p.set('token', TOKEN);
     history.replaceState(null, '', location.pathname + '?' + p.toString());
     // Studio's back arrow returns to exactly this view.
@@ -418,6 +484,12 @@ ${RAIL_JS}
       state.selected = Object.create(null); state.cards = [];
       load(); return;
     }
+  });
+  document.getElementById('tagfilters').addEventListener('click', function (e) {
+    var t = e.target.closest('[data-tagfilter]');
+    if (t) { toggleTagFilter(t.getAttribute('data-tagfilter')); return; }
+    if (e.target.closest('#moretags')) { state.showAllTags = !state.showAllTags; renderTagFilters(); return; }
+    if (e.target.closest('#cleartags')) { state.tags = []; load(); }
   });
   document.getElementById('filters').addEventListener('change', function (e) {
     if (e.target.id === 'sort') { state.sort = e.target.value; load(); }
@@ -470,7 +542,68 @@ ${RAIL_JS}
     img.src = src;
   }
 
+  // ── Tags on a card: click one to filter, × to take it off, "+ tag" to add ──
+  function cardById(id) {
+    var hit = null;
+    state.cards.forEach(function (c) { if (c.project_id === id) hit = c; (c.copies || []).forEach(function (k) { if (k.project_id === id) hit = k; }); });
+    return hit;
+  }
+  function saveTags(id, tags) {
+    return railApi('/api/projects/' + encodeURIComponent(state.tenant) + '/' + encodeURIComponent(id), {
+      method: 'PATCH', body: JSON.stringify({ tags: tags })
+    }).then(function (r) {
+      var c = cardById(id); if (c) c.tags = r.tags || [];
+      return r;
+    });
+  }
+  function openTagInput(holder, onTags) {
+    var box = document.createElement('input');
+    box.className = 'taginput'; box.setAttribute('list', 'alltags'); box.placeholder = 'tag, another';
+    holder.appendChild(box); box.focus();
+    var done = false;
+    function finish(commit) {
+      if (done) return; done = true;
+      var tags = commit ? box.value.split(',').map(function (t) { return t.trim(); }).filter(Boolean) : [];
+      box.remove();
+      if (tags.length) onTags(tags);
+    }
+    box.addEventListener('keydown', function (ev) {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') finish(true);
+      if (ev.key === 'Escape') finish(false);
+    });
+    box.addEventListener('blur', function () { finish(true); });
+    box.addEventListener('click', function (ev) { ev.stopPropagation(); });
+  }
+
   document.getElementById('grid').addEventListener('click', function (e) {
+    var untag = e.target.closest('[data-untag]');
+    if (untag) {
+      e.stopPropagation();
+      var uid = untag.closest('[data-tags-for]').getAttribute('data-tags-for');
+      var gone = untag.getAttribute('data-untag');
+      var uc = cardById(uid);
+      saveTags(uid, ((uc && uc.tags) || []).filter(function (t) { return t !== gone; }))
+        .then(function () { load(); toast('Removed “' + gone + '”'); })
+        .catch(function (err) { toast(err.message); });
+      return;
+    }
+    var tagEl = e.target.closest('[data-tag]');
+    if (tagEl) { e.stopPropagation(); toggleTagFilter(tagEl.getAttribute('data-tag')); return; }
+    var add = e.target.closest('[data-addtag]');
+    if (add) {
+      e.stopPropagation();
+      var aid = add.getAttribute('data-addtag');
+      add.style.display = 'none';
+      openTagInput(add.parentNode, function (tags) {
+        var ac = cardById(aid);
+        saveTags(aid, ((ac && ac.tags) || []).concat(tags))
+          .then(function () { load(); })
+          .catch(function (err) { toast(err.message); });
+      });
+      setTimeout(function () { if (!add.parentNode.querySelector('.taginput')) add.style.display = ''; }, 0);
+      return;
+    }
     var arrow = e.target.closest('.nav-arrow');
     if (arrow) {
       e.stopPropagation();
@@ -502,6 +635,19 @@ ${RAIL_JS}
     var act = b.getAttribute('data-act');
     var ids = selectedIds();
     if (!ids.length) { toast('Nothing selected'); return; }
+    if (act === 'tag' || act === 'untag') {
+      b.style.display = 'none';
+      openTagInput(b.parentNode, function (tags) {
+        railApi('/api/library/' + encodeURIComponent(state.tenant) + '/bulk', {
+          method: 'POST', body: JSON.stringify({ action: act, project_ids: ids, tags: tags })
+        }).then(function (r) {
+          toast((act === 'tag' ? 'Tagged ' : 'Untagged ') + r.done + ' film' + (r.done === 1 ? '' : 's') + ' “' + tags.join('”, “') + '”');
+          load();
+        }).catch(function (err) { toast(err.message); });
+      });
+      setTimeout(function () { b.style.display = ''; }, 0);
+      return;
+    }
     if (act === 'delete' && !confirm('Delete ' + ids.length + ' film' + (ids.length === 1 ? '' : 's') + ' permanently? This cannot be undone.')) return;
     railApi('/api/library/' + encodeURIComponent(state.tenant) + '/bulk', {
       method: 'POST', body: JSON.stringify({ action: act, project_ids: ids })

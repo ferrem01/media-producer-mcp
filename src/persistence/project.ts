@@ -270,11 +270,11 @@ export async function loadProjects(tenantId: string): Promise<Project[]> {
   }
 }
 
-export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number; updated_at?: string }>> {
+export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number; updated_at?: string; tags?: string[] }>> {
   const dir = projectsDir(tenantId);
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
-    const results: Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number; updated_at?: string }> = [];
+    const results: Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number; updated_at?: string; tags?: string[] }> = [];
 
     for (const entry of entries) {
       if (!entry.isDirectory() || !entry.name.startsWith("proj_")) continue;
@@ -287,6 +287,7 @@ export async function listProjects(tenantId: string): Promise<Array<{ project_id
           status: project.status,
           scene_count: project.scenes?.length ?? 0,
           updated_at: project.updated_at,
+          ...(project.tags && project.tags.length ? { tags: project.tags } : {}),
         });
       }
     }
@@ -313,7 +314,7 @@ export async function saveProject(project: Project): Promise<void> {
 export async function updateProject(
   tenantId: string,
   projectId: string,
-  updates: Partial<Pick<Project, "name" | "canvas" | "brand_kit" | "status" | "audio">>,
+  updates: Partial<Pick<Project, "name" | "canvas" | "brand_kit" | "status" | "audio" | "tags">>,
 ): Promise<Project | null> {
   const project = await loadProject(tenantId, projectId);
   if (!project) return null;
@@ -323,6 +324,7 @@ export async function updateProject(
   if (updates.brand_kit) project.brand_kit = { ...project.brand_kit, ...updates.brand_kit };
   if (updates.status !== undefined) project.status = updates.status;
   if (updates.audio !== undefined) project.audio = updates.audio;
+  if (updates.tags !== undefined) { if (updates.tags.length) project.tags = updates.tags; else delete project.tags; }
 
   await saveProject(project);
   return project;
