@@ -884,7 +884,7 @@ export interface Take {
    *  same timeline redrawn by Wan from the actor's portrait, the voice
    *  converted when the actor has one. Keyed by actor id. `source` stays
    *  the raw take; the project's speaker_cast picks which one plays. */
-  actors?: Record<string, { file: string; voice_id?: string; made_at: string }>;
+  actors?: Record<string, { file: string; performer?: string; voice_id?: string; heygen_look_id?: string; motion?: string; made_at: string }>;
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };

@@ -23,7 +23,7 @@ describe("Studio: the Cast card", () => {
     expect(html).toContain("api('POST', '/recast/' + castT() + '/' + castP(), { actor: a.id, performer: p.id, voice_id: voiceId, motion: (castUi.motion || '').trim() || undefined })");
     // A direction for HeyGen's invented movement.
     expect(html).toContain('id="cast-motion"');
-    expect(html).toContain("if ((castUi.motion || '').trim()) body.motion = castUi.motion.trim();");
+    expect(html).toContain("body.motion = (castUi.motion || '').trim();");
     expect(html).toContain("api('POST', '/recast/' + castT() + '/' + castP(), { actor: null })");
     expect(html).toContain("'/generated-take/' + encodeURIComponent(t) + '/' + encodeURIComponent(pid)");
     // A generated take replaces the film's take: a copy first, by default.

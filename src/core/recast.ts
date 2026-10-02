@@ -267,6 +267,8 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
     // and look, and the file is still there. fresh: made again regardless.
     const reusable = !opts.fresh && existing && madeBy(existing) === performer.id && existing.voice_id === voiceId
       && existing.heygen_look_id === actor.heygen_look_id
+      // A new direction is a new performance (HeyGen draws the movement from it).
+      && (existing.motion || undefined) === (opts.motion?.trim() || undefined)
       && (await fs.access(resolveVideoPath(existing.file, config.dataDir)).then(() => true, () => false));
     const file = reusable ? existing.file : raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`);
     st.files.push({ raw, file, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0 });
@@ -312,7 +314,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     const now = new Date().toISOString();
     for (const t of (project as any).takes || []) {
       const hit = ok.find((f) => f.raw === takeCopies(t).raw);
-      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), made_at: now } };
+      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
     // face and half in another is worse than none.

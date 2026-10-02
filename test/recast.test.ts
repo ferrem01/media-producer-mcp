@@ -131,6 +131,12 @@ describe("recast: a take performed by a cast actor", () => {
     expect((await startRecast(T, P, "roger-guy", { performer: "kling", voice_id: "mine", fresh: true })).files[0].status).toBe("running");
     await wait();
     expect(klingCalls).toBe(3);
+    // Another direction is another performance too; the same one again is reused.
+    expect((await startRecast(T, P, "roger-guy", { performer: "kling", voice_id: "mine", motion: "more energy" })).files[0].status).toBe("running");
+    await wait();
+    expect(klingCalls).toBe(4);
+    expect((await startRecast(T, P, "roger-guy", { performer: "kling", voice_id: "mine", motion: "more energy " })).files[0].status).toBe("reused");
+    await wait();
     // null puts the recording back.
     await startRecast(T, P, null);
     const back2 = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
