@@ -23,6 +23,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { config } from "../config.js";
 import { loadProject, saveProject } from "../persistence/project.js";
+import { recutProjectTakes } from "./take-edits.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
 import { takeCopies, takeForClip, syncSpeakerClips } from "./speaker-layer.js";
@@ -321,6 +322,8 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     if (ok.length === st.files.length) (project as any).speaker_cast = actor.id;
     syncSpeakerClips(project as any);
     await saveProject(project);
+    // A take cut by hand plays cut copies: the new performance gets its own.
+    await recutProjectTakes(tenant, projectId).catch((e) => console.warn(`  recast: cutting the new performance failed: ${e?.message || e}`));
   }
   st.status = ok.length === st.files.length ? "done" : "failed";
   if (st.status === "failed") st.error = st.files.find((f) => f.error)?.error || "a take could not be recast";

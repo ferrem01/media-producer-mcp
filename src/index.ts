@@ -43,7 +43,9 @@ import { queueTakeMatte, blurPreviewFrame } from "./core/take-matte.js";
 import { takeJobsFor } from "./core/take-jobs.js";
 import { queueTakeGrade } from "./core/take-grade.js";
 import { DEFAULT_SOFT_STRENGTH } from "./core/take-sanitize.js";
-import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies } from "./core/speaker-layer.js";
+import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies, takeForClip } from "./core/speaker-layer.js";
+import { wordsThroughCuts } from "./core/take-clock.js";
+import { editSceneTake } from "./core/take-edits.js";
 import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
@@ -1314,7 +1316,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|generated-take|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|generated-take|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -4006,6 +4008,28 @@ Rules:
         return;
       }
 
+      // ── API: Trim / cut / restore a scene's camera take (core/take-edits.ts) ──
+      // POST /api/take-edit/{tenant}/{project}
+      //   {scene_index, op: "trim", head?, tail?}      seconds off the start/end (negative gives back)
+      //   {scene_index, op: "cut", from, to}           scene seconds of what plays
+      //   {scene_index, op: "restore", src_start, src_end}
+      const takeEditMatch = urlPath.match(/^\/api\/take-edit\/([^/]+)\/([^/]+)$/);
+      if (takeEditMatch && method === "POST") {
+        const [, teTenant, teProject] = takeEditMatch.map(decodeURIComponent);
+        try {
+          const body = await parseBody(req) as Record<string, any>;
+          const si = Number(body.scene_index);
+          if (!Number.isInteger(si) || si < 0) { jsonResponse(res, 400, { error: "scene_index is required" }); return; }
+          const r = await editSceneTake(teTenant, teProject, si, body as any, config.dataDir);
+          console.log(`  take-edit: ${teProject} scene ${si + 1} ${body.op} -> ${r.seconds}s (${r.cuts.length} cut(s))`);
+          jsonResponse(res, 200, { ok: true, ...r });
+        } catch (e: any) {
+          console.error(`  take-edit: FAILED (${e?.message || e})`);
+          jsonResponse(res, /not found/i.test(e?.message || "") ? 404 : 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Speaker cut (symmetric-EDL stages 2+4, ROADMAP #8) ──
       // POST /api/speaker-cut/{tenant}/{project}  { from, to }  (film seconds)
       // The referee: removes a span of FILM TIME from the speaker and writes
@@ -4662,6 +4686,14 @@ Rules:
             const bySrc2: Record<string, Array<{ text: string; start: number; end: number }> | null> = {};
             for (const c of lane2) {
               if (bySrc2[c.source] !== undefined) continue;
+              // A cut take plays its cut copy: the raw take's words, through the
+              // cuts (one transcript per take, not one per copy).
+              const cutTk = takeForClip(project as any, c as any) as any;
+              if (cutTk?.cuts?.length) {
+                try { const w = await wordsForTake(project, { ...cutTk, source: takeCopies(cutTk).raw } as any, config.dataDir); bySrc2[c.source] = w ? wordsThroughCuts(w, cutTk.cuts) : null; }
+                catch { bySrc2[c.source] = null; }
+                continue;
+              }
               try { bySrc2[c.source] = await wordsForTake(project, { id: "lane", scene_index: c.scene_index, source: c.source, recorded_at: "", trim_start: c.trim_start, trim_end: c.trim_end ?? undefined } as any, config.dataDir); }
               catch { bySrc2[c.source] = null; }
             }

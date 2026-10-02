@@ -899,6 +899,16 @@ export interface Take {
   lines?: string;
   /** A still from the take (at its trim), served for the speaker lane. */
   poster?: string;
+  /** Trimmed or cut by hand (core/take-edits.ts): the scene's clip window
+   *  follows the take's (trim_start/trim_end mapped through the cuts). */
+  edited?: boolean;
+  /** Spans cut out of the take, in ORIGINAL-recording seconds (the speaker
+   *  lane's EDL cut shape). The scene plays the window minus these. */
+  cuts?: Array<{ src_start: number; src_end: number }>;
+  /** Cache: each of the take's files with the cuts taken out, by the
+   *  original file: the copy, the cut list it was made for, and the
+   *  original's mtime:size when it was made. */
+  cut_files?: Record<string, { file: string; cuts: string; stamp: string }>;
 }
 
 export interface SpeakerTrack {
