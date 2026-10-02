@@ -71,3 +71,15 @@ describe("tag wiring", () => {
     expect(ui).toMatch(/datalist id="alltags"/);
   });
 });
+
+describe("tags in Studio", () => {
+  it("the film's header carries its tags: chips, + tag with autocomplete, x to remove", () => {
+    const studio = read("src/preview-app/preview-app.ts");
+    expect(studio).toMatch(/id="hdr-tags"/);
+    expect(studio).toMatch(/datalist id="hdr-alltags"/);
+    expect(studio).toMatch(/showProjectTags\(project\)/);
+    expect(studio).toMatch(/\{ tags: next \}/);
+    expect(studio).toMatch(/'\/library\/' \+ encodeURIComponent\(state\.tenantId\) \+ '\?limit=1'/);
+    expect(studio).toMatch(/body\.watch-mode #hdr-tags \{ display: none; \}/);
+  });
+});

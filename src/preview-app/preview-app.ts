@@ -49,6 +49,7 @@ ${QUOTIENT_CSS}
   body.watch-mode header { background: #000; }
   body.watch-mode header h1, body.watch-mode .hdr-sep, body.watch-mode .header-controls { display: none !important; }
   body.watch-mode #project-name { color: #fff; pointer-events: none; }
+  body.watch-mode #hdr-tags { display: none; }
   body.watch-mode #sidebar, body.watch-mode #inspector, body.watch-mode #draft-footer, body.watch-mode #tl-resizer,
   body.watch-mode .tl-zoom-seg, body.watch-mode #lane-gutter, body.watch-mode #rate-badge, body.watch-mode #vol-control,
   body.watch-mode #timeline-track > :not(#timeline-slider), body.watch-mode #job-pill, body.watch-mode #rendering-banner,
@@ -111,6 +112,20 @@ ${QUOTIENT_CSS}
   .hdr-name:empty::before { content: attr(data-ph); color: var(--content-tertiary); }
   .hdr-name.saving { opacity: .6; }
   .hdr-name.failed { box-shadow: 0 0 0 1.5px #dc2626; }
+  /* The film's tags, after its name: the same free-form tags as the Films
+     cards. A chip opens the Films page filtered to it; x removes it. */
+  .hdr-tags { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
+  .htag { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; line-height: 18px; padding: 0 7px;
+    border: 1px solid var(--border-secondary); border-radius: 999px; color: var(--content-secondary); cursor: pointer; white-space: nowrap; }
+  .htag:hover { border-color: var(--accent-blue); color: var(--content-primary); }
+  .htag .x { display: none; opacity: .6; padding-left: 2px; }
+  .htag:hover .x { display: inline; }
+  .htag .x:hover { opacity: 1; }
+  .hdr-addtag { font: inherit; font-size: 11px; line-height: 18px; padding: 0 7px; border: 1px dashed var(--border-secondary);
+    border-radius: 999px; background: none; color: var(--content-tertiary); cursor: pointer; white-space: nowrap; }
+  .hdr-addtag:hover { color: var(--content-primary); border-color: var(--accent-blue); }
+  .hdr-taginput { font: inherit; font-size: 12px; width: 150px; padding: 1px 8px; border: 1px solid var(--accent-blue);
+    border-radius: 999px; outline: none; background: var(--surface-primary); }
   .header-controls label { font-size: 12px; font-weight: 500; color: var(--content-secondary); }
   .header-controls input, .header-controls select {
     height: 32px; background: var(--surface-primary); border: 1px solid var(--input); color: var(--content-primary);
@@ -1319,6 +1334,8 @@ ${QUOTIENT_CSS}
     <h1>Studio</h1>
     <span class="hdr-sep">/</span>
     <div id="project-name" class="hdr-name" contenteditable="plaintext-only" spellcheck="false" title="Click to rename this film" data-ph="Loading&#8230;"></div>
+    <div id="hdr-tags" class="hdr-tags"></div>
+    <datalist id="hdr-alltags"></datalist>
     <div class="header-controls">
       <button class="btn btn-secondary" id="project-delete-btn" style="display:none;" title="Delete this project &#8212; scenes, assets and rendered MP4. Asks first; cannot be undone.">&#128465;</button>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
@@ -2697,6 +2714,93 @@ ${QUOTIENT_CSS}
     });
   }
 
+  // ── The film's tags (the Films cards' tags, here too) ──
+  var hdrTags = { loaded: false };
+  function tagLibraryHref(tag) {
+    var ltok = new URLSearchParams(window.location.search).get('token');
+    var q = [];
+    if (state.tenantId) q.push('tenant=' + encodeURIComponent(state.tenantId));
+    if (ltok) q.push('token=' + encodeURIComponent(ltok));
+    q.push('tag=' + encodeURIComponent(tag));
+    return '/library?' + q.join('&');
+  }
+  function showProjectTags(project) {
+    var box = document.getElementById('hdr-tags');
+    if (!box || !project || box.querySelector('input')) return;
+    var tags = project.tags || [];
+    box.innerHTML = tags.map(function(t) {
+      return '<span class="htag" data-htag="' + escAttr(t) + '" title="All films tagged ' + escAttr(t) + '">' + escHtml(t)
+        + '<span class="x" data-hun="' + escAttr(t) + '" title="Remove this tag">\u00d7</span></span>';
+    }).join('') + '<button class="hdr-addtag" data-hadd="1" title="Tag this film (comma for several)">+ tag</button>';
+  }
+  function saveProjectTags(next) {
+    var p = state.currentProject;
+    if (!p) return;
+    var was = p.tags || [];
+    p.tags = next;
+    showProjectTags(p);
+    api('PATCH', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { tags: next }).then(function(res) {
+      p.tags = (res && res.tags) || next;
+      showProjectTags(p);
+    }).catch(function(err) {
+      p.tags = was;
+      showProjectTags(p);
+      studioStatus('Could not save tags: ' + (err.message || err), 'err');
+    });
+  }
+  function fillTagChoices() {
+    if (hdrTags.loaded || !state.tenantId) return;
+    hdrTags.loaded = true;
+    api('/library/' + encodeURIComponent(state.tenantId) + '?limit=1').then(function(r) {
+      var dl = document.getElementById('hdr-alltags');
+      if (dl && r && r.tag_counts) dl.innerHTML = r.tag_counts.map(function(t) { return '<option value="' + escAttr(t.tag) + '">'; }).join('');
+    }).catch(function() { hdrTags.loaded = false; });
+  }
+  function openProjectTagInput(btn) {
+    var p = state.currentProject;
+    if (!p) return;
+    fillTagChoices();
+    var input = document.createElement('input');
+    input.className = 'hdr-taginput';
+    input.setAttribute('list', 'hdr-alltags');
+    input.placeholder = 'tag, another';
+    btn.replaceWith(input);
+    input.focus();
+    var done = false;
+    function commit(save) {
+      if (done) return;
+      done = true;
+      var add = save ? String(input.value || '').split(',').map(function(t) { return t.replace(/^#+/, '').trim().toLowerCase(); }).filter(Boolean) : [];
+      var cur = (p.tags || []).slice();
+      add.forEach(function(t) { if (cur.indexOf(t) < 0) cur.push(t); });
+      input.remove();
+      if (add.length) saveProjectTags(cur); else showProjectTags(p);
+    }
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+      if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+    });
+    input.addEventListener('blur', function() { commit(true); });
+  }
+  function wireProjectTags() {
+    var box = document.getElementById('hdr-tags');
+    if (!box) return;
+    box.addEventListener('click', function(e) {
+      var t = e.target;
+      var un = t.closest && t.closest('[data-hun]');
+      if (un) {
+        e.stopPropagation();
+        var gone = un.getAttribute('data-hun');
+        saveProjectTags((state.currentProject.tags || []).filter(function(x) { return x !== gone; }));
+        return;
+      }
+      var add = t.closest && t.closest('[data-hadd]');
+      if (add) { openProjectTagInput(add); return; }
+      var chip = t.closest && t.closest('[data-htag]');
+      if (chip) window.location.href = tagLibraryHref(chip.getAttribute('data-htag'));
+    });
+  }
+
   function loadProjects() {
     // tenantId comes from the session (/auth/me) or a share-link param --
     // there is no tenant field to read.
@@ -2980,6 +3084,7 @@ ${QUOTIENT_CSS}
     api('/projects/' + state.tenantId + '/' + projectId).then(function(project) {
       state.currentProject = project;
       showProjectName(project);
+      showProjectTags(project);
       // Work already running on this film's takes (another tab, the booth,
       // the agent) shows in the job pill from the start.
       jobPillHide(); takeStatus.wasBusy = false;
@@ -9285,6 +9390,7 @@ ${QUOTIENT_CSS}
 
   // Events
   wireProjectName();
+  wireProjectTags();
   els.playBtn.addEventListener('click', togglePlay);
   els.slider.addEventListener('input', function() { scrub(parseFloat(els.slider.value)); });
   if (els.volSlider) {
