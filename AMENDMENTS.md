@@ -21,6 +21,9 @@ asked for tags to narrow the Films list: free-form, his words.
   (project level), `list` takes `tag`.
 - Films page: chips on each card (click to filter, x to remove), "+ tag" with
   autocomplete, a tag filter row with counts, Tag…/Untag… in the bulk bar.
+- Studio: the same chips after the film's name in the header ("+ tag" with
+  autocomplete, x removes, a chip opens Films filtered to it). Marc expected
+  tags on the film itself, not only on its card.
 Test: `test/library-tags.test.ts`.
 
 ## 2026-10-01 — A scene set by hand is left alone; merged anchors drop dead paths
