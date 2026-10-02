@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-02 — Free-form tags on films
+
+About 200 films in one tenant, and the search only knew what a film says. Marc
+asked for tags to narrow the Films list: free-form, his words.
+- `project.tags` (lowercase, `#` stripped, deduped, 40 chars, 20 per film:
+  `normalizeTags` in core/library.ts). Tagging does not bump `updated_at`, so
+  a film does not jump to the top of "recent".
+- Library: `?tag=` (repeatable, all-of) narrows the shelf; a search matches a
+  tag like a title; `tag_counts` (most used first) feeds the filter row and
+  the autocomplete.
+- API: `PATCH /api/projects/{t}/{p}` takes `{tags}`; the bulk route takes
+  `tag` / `untag`. MCP: `update` takes `tags` / `add_tags` / `remove_tags`
+  (project level), `list` takes `tag`.
+- Films page: chips on each card (click to filter, x to remove), "+ tag" with
+  autocomplete, a tag filter row with counts, Tag…/Untag… in the bulk bar.
+Test: `test/library-tags.test.ts`.
+
 ## 2026-10-01 — A scene set by hand is left alone; merged anchors drop dead paths
 
 Building the creator-ad test (proj_b7fa998e), the build undid three board

@@ -60,7 +60,7 @@ import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
 import { listProjects, loadProjects, loadProject, saveProject, updateProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent, duplicateProject } from "./persistence/project.js";
-import { searchLibrary, forgetProject } from "./core/library.js";
+import { searchLibrary, forgetProject, normalizeTags } from "./core/library.js";
 import { planRows, reorderBoard } from "./core/film-plan.js";
 import { normalizeSoundCues, ensureSoundFiles, hasCueWithoutFile } from "./core/scene-sfx.js";
 import { getLibraryHtml } from "./preview-app/library-app.js";
@@ -1640,6 +1640,8 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           filter: (qp.get("filter") as any) || undefined,
           sort: (qp.get("sort") as any) || undefined,
           archived: qp.get("archived") === "1",
+          // ?tag=a&tag=b or ?tag=a,b -- films carrying every one.
+          tags: qp.getAll("tag").flatMap((t) => t.split(",")),
           limit: qp.get("limit") ? Number(qp.get("limit")) : undefined,
           offset: qp.get("offset") ? Number(qp.get("offset")) : undefined,
         });
@@ -1693,13 +1695,24 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const ids: string[] = Array.isArray(bBody?.project_ids) ? bBody.project_ids.slice(0, 500) : [];
         const action = String(bBody?.action || "archive");
         if (!ids.length) { jsonResponse(res, 400, { error: "project_ids required" }); return; }
-        if (!["archive", "restore", "delete"].includes(action)) {
-          jsonResponse(res, 400, { error: "action must be archive, restore or delete" }); return;
+        if (!["archive", "restore", "delete", "tag", "untag"].includes(action)) {
+          jsonResponse(res, 400, { error: "action must be archive, restore, delete, tag or untag" }); return;
         }
+        // tag / untag: the tags to put on (or take off) every selected film.
+        const bTags = normalizeTags(bBody?.tags ?? bBody?.tag);
+        if ((action === "tag" || action === "untag") && !bTags.length) { jsonResponse(res, 400, { error: "tags required" }); return; }
         let done = 0;
         for (const id of ids) {
           try {
-            if (action === "delete") {
+            if (action === "tag" || action === "untag") {
+              const p = await loadProject(bTenant, id);
+              if (!p) continue;
+              const have = normalizeTags(p.tags);
+              const next = action === "tag" ? normalizeTags([...have, ...bTags]) : have.filter((t) => !bTags.includes(t));
+              // Tags are not an edit to the film: updated_at stays.
+              await updateProject(bTenant, id, { tags: next });
+              done++;
+            } else if (action === "delete") {
               // Only ever from the archive: a film has to be put down before
               // it can be thrown away.
               const p = await loadProject(bTenant, id);
@@ -1762,10 +1775,13 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const [, tenantId, projectId] = getMatch.map(decodeURIComponent);
         const body = await parseBody(req);
         const name = typeof body.name === "string" ? body.name.replace(/\s+/g, " ").trim().slice(0, 200) : "";
-        if (!name) { jsonResponse(res, 400, { error: "name is required" }); return; }
-        const updated = await updateProject(tenantId, projectId, { name });
+        // {tags}: the film's whole tag list (the library's chips). Like a
+        // name, not an edit to the film.
+        const hasTags = body.tags !== undefined;
+        if (!name && !hasTags) { jsonResponse(res, 400, { error: "name or tags is required" }); return; }
+        const updated = await updateProject(tenantId, projectId, { ...(name ? { name } : {}), ...(hasTags ? { tags: normalizeTags(body.tags) } : {}) });
         if (!updated) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        jsonResponse(res, 200, { ok: true, project_id: projectId, name: updated.name });
+        jsonResponse(res, 200, { ok: true, project_id: projectId, name: updated.name, tags: updated.tags || [] });
         return;
       }
 

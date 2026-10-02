@@ -48,7 +48,7 @@ import { planMarkdown, removeBoardScenes, reorderBoard } from "./core/film-plan.
 import { normalizeSoundCues, normalizeSoundId, ensureSoundFiles } from "./core/scene-sfx.js";
 import { pruneDeadAnchors } from "./core/word-anchors.js";
 import { retimeScene } from "./core/measured-spine.js";
-import { forgetProject } from "./core/library.js";
+import { forgetProject, normalizeTags } from "./core/library.js";
 import { openAssetNeeds } from "./core/asset-needs.js";
 import { castBoardStandIns } from "./core/board-standins.js";
 import { sanitizeTake } from "./core/take-sanitize.js";
@@ -1114,10 +1114,11 @@ export function createMcpServer(): McpServer {
 
   tool(
     "list",
-    "List projects for a tenant, or available component types. Pass target='components' to see the component catalog.",
+    "List projects for a tenant (each with its tags), or available component types. Pass tag to list only the films carrying it. Pass target='components' to see the component catalog.",
     {
       tenant_id: z.string().optional(),
       target: z.enum(["projects", "components"]).optional().describe("What to list (default: projects)"),
+      tag: z.union([z.string(), z.array(z.string())]).optional().describe("Projects: only films carrying this tag (or every one of these tags)"),
     },
     async (params) => {
       const target = params.target || "projects";
@@ -1127,7 +1128,8 @@ export function createMcpServer(): McpServer {
         return ok(catalog);
       }
 
-      const projects = await listProjects(params.tenant_id);
+      const want = normalizeTags(params.tag ?? []);
+      const projects = (await listProjects(params.tenant_id)).filter((p) => want.every((t) => normalizeTags(p.tags).includes(t)));
       // Per-project latest-render facts, so "which of these can I download?"
       // needs no follow-up call per project.
       const enriched = await Promise.all(projects.map(async (p) => ({
@@ -1332,6 +1334,9 @@ export function createMcpServer(): McpServer {
         volume: z.number().min(0).max(1).optional().describe("The voice's level in the film, 0-1 (default 1, the take as normalised). Pass alone ({volume: 0.7}) to change only the level; the clips are kept."),
       }).nullable().optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time. Pass null (or an empty clips array) to CLEAR the speaker track. {volume} alone sets the voice's level and keeps the clips."),
 
+      tags: z.array(z.string()).optional().describe("Project: the film's whole TAG list for the library (free-form, e.g. ['analytics', 'creator ad']); [] clears. Not an edit to the film."),
+      add_tags: z.array(z.string()).optional().describe("Project: tags to add to the film (kept with the ones it has)."),
+      remove_tags: z.array(z.string()).optional().describe("Project: tags to take off the film."),
       sfx_palette: z.record(z.enum(["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"]), z.string()).nullable().optional()
         .describe("The film's SOUND PALETTE: the one sound each job plays (e.g. {transition: 'camera-flash', payoff: 'gen-impact-1a2b3c'}); every cue with that role plays it. Merged into the current palette; null clears it (house defaults). Re-points the film's role cues at once."),
 
@@ -1396,6 +1401,20 @@ export function createMcpServer(): McpServer {
       }).optional().describe("Provide an asset for a storyboard scene. Updates status from 'needed' to 'provided'."),
     },
     async (params) => {
+      // ── Tags alone: a library label, not an edit to the film ──
+      // (updated_at stays, so tagging never marks a render stale).
+      const tagKeys = ["tags", "add_tags", "remove_tags"];
+      const given = Object.keys(params).filter((k) => (params as any)[k] !== undefined && k !== "tenant_id" && k !== "project_id");
+      if (given.length && given.every((k) => tagKeys.includes(k))) {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err("Project not found");
+        let next = params.tags !== undefined ? normalizeTags(params.tags) : normalizeTags(project.tags);
+        if (params.add_tags) next = normalizeTags([...next, ...params.add_tags]);
+        if (params.remove_tags) { const drop = normalizeTags(params.remove_tags); next = next.filter((t) => !drop.includes(t)); }
+        await updateProject(params.tenant_id!, params.project_id, { tags: next });
+        forgetProject(params.tenant_id!, params.project_id);
+        return ok({ status: "updated", project_id: params.project_id, tags: next });
+      }
       // ── Storyboard modifications ──
       if (params.storyboard || params.provide_asset) {
         const project = await loadProject(params.tenant_id, params.project_id);
@@ -1604,6 +1623,13 @@ export function createMcpServer(): McpServer {
         // audio). It must persist on a project-level update, independent of any
         // scene_id -- gating it behind the scene branch below silently dropped
         // it on `update({canvas, speaker_track})` while still reporting success.
+        if (params.tags !== undefined || params.add_tags !== undefined || params.remove_tags !== undefined) {
+          let next = params.tags !== undefined ? normalizeTags(params.tags) : normalizeTags((project as any).tags);
+          if (params.add_tags) next = normalizeTags([...next, ...params.add_tags]);
+          if (params.remove_tags) { const drop = normalizeTags(params.remove_tags); next = next.filter((t) => !drop.includes(t)); }
+          if (next.length) (project as any).tags = next; else delete (project as any).tags;
+          updated = true;
+        }
         if (params.sfx_palette !== undefined) {
           const pal: Record<string, string> = params.sfx_palette === null ? {} : { ...((project as any).sfx_palette || {}) };
           for (const [role, id] of Object.entries(params.sfx_palette || {})) {

@@ -678,6 +678,10 @@ export interface Project {
    *  off the shelf, cleared to bring it back, and only an explicit delete in
    *  the archive view actually removes anything. */
   archived_at?: string;
+  /** Free-form tags for finding a film in the library ("analytics", "creator
+   *  ad"): lowercased, trimmed, unique (core/library.ts normalizeTags). Not an
+   *  edit to the film -- setting them never marks a render stale. */
+  tags?: string[];
   canvas: Canvas;
   brand_kit: BrandKit;
   scenes: Scene[];
