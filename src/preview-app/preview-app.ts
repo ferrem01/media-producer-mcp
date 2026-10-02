@@ -6,6 +6,7 @@
  */
 
 import { QUOTIENT_CSS } from "../quotient-theme.js";
+import { DEFAULT_MOTION } from "../core/generated-take.js";
 
 export function getPreviewHtml(): string {
   return `<!DOCTYPE html>
@@ -11490,7 +11491,7 @@ ${QUOTIENT_CSS}
   // a portrait); or a take GENERATED from the script (no recording; every
   // vendor can animate the actor from the voice). One card: who plays now, the mode, the actor, the vendor,
   // the voice, then go -- progress polled while the card is open.
-  var castUi = { project: null, data: null, mode: 'recast', actor: null, performer: null, voice: '', copy: true, timer: null, add: null, looks: null, pub: null, pubToken: null, pubGender: '', voices: null, lookTimer: null };
+  var castUi = { project: null, data: null, mode: 'recast', actor: null, performer: null, voice: '', copy: true, timer: null, add: null, looks: null, pub: null, pubToken: null, pubGender: '', voices: null, lookTimer: null, motion: ${JSON.stringify(DEFAULT_MOTION)} };
   function castT() { return encodeURIComponent(state.tenantId); }
   function castP() { return encodeURIComponent(castUi.project.project_id); }
   function castIsPersonFilm(project) {
@@ -11604,8 +11605,11 @@ ${QUOTIENT_CSS}
       + '<div class="np-act"><button class="np-btn" data-cast-hear="1" title="Hear this voice">&#9654;</button></div></div></div>';
     // Direction for HeyGen's invented movement (Avatar V motion prompt).
     if (castUi.performer === 'heygen') {
-      h += '<div class="np-block"><div class="np-lead">Direction</div><input id="cast-motion" class="np-search" maxlength="500" value="' + escAttr(castUi.motion || '') + '" placeholder="' + (castUi.mode === 'generate' ? 'Default: calm, head level, small nods, relaxed gestures' : 'Optional: how the performer should move') + '">'
-        + '<div class="np-hint">How the performer moves: steady, energetic, more hand gestures. HeyGen draws the movement from this.</div></div>';
+      // A full box holding the house direction, ready to change (Marc): the
+      // same calm presenter a generated take uses, for a recast too. Cleared,
+      // HeyGen chooses the movement itself.
+      h += '<div class="np-block"><div class="np-lead">Direction</div><textarea id="cast-motion" rows="4" maxlength="1000" placeholder="Empty: HeyGen chooses how the performer moves">' + escHtml(castUi.motion || '') + '</textarea>'
+        + '<div class="np-hint">How the performer moves: steady, energetic, more hand gestures. HeyGen draws the movement from this. Clear it to let HeyGen choose.</div></div>';
     }
     if (castUi.mode === 'generate') {
       h += '<div class="np-block"><label class="np-row"><div class="np-what"><input type="checkbox" id="cast-copy"' + (castUi.copy ? ' checked' : '') + '> Make a copy of this film first'
@@ -11805,7 +11809,9 @@ ${QUOTIENT_CSS}
     }
     var sel = castUi.voice;
     var body = { actor: a.id, performer: p.id, voice: sel.indexOf('eleven:') === 0 ? 'elevenlabs' : 'heygen' };
-    if ((castUi.motion || '').trim()) body.motion = castUi.motion.trim();
+    // Sent as written: an empty box means no direction (the server's default
+    // fills only a body with no motion at all).
+    body.motion = (castUi.motion || '').trim();
     if (sel !== 'look') body.voice_id = sel.slice(sel.indexOf(':') + 1);
     var start = function(pid) {
       return api('POST', '/generated-take/' + encodeURIComponent(t) + '/' + encodeURIComponent(pid), body).then(function(st) {

@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-02 — The recast's Direction is a real box, with the default in it
+
+The Direction field was a one-line input with grey example text that was never
+sent: an empty recast got HeyGen's own movement, not the calm presenter the
+generated take used, and a pasted direction was hard to see or edit. Marc: make
+it a text box with the default already in it.
+- Studio's Cast card: Direction is a textarea holding `DEFAULT_MOTION`
+  (core/generated-take.ts), sent as written for a recast and a generated take;
+  cleared, HeyGen chooses.
+- A recast with a different direction is a new performance: the take's
+  `actors[id].motion` is kept and compared, so it is made again instead of
+  reused.
+Tests: `test/cast-direction.test.ts`, `test/recast.test.ts`.
+
 ## 2026-10-02 — Free-form tags on films
 
 About 200 films in one tenant, and the search only knew what a film says. Marc
