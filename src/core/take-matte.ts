@@ -27,6 +27,7 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { recutProjectTakes } from "./take-edits.js";
 import os from "node:os";
 import crypto from "node:crypto";
 import { spawn, execFile } from "node:child_process";
@@ -462,6 +463,8 @@ export function queueTakeMatte(opts: {
       markTakeJobError(project, opts.rawUrl, "matte", null, (t) => takeCopies(t).raw);
       project.updated_at = new Date().toISOString();
       await opts.saveProject(project);
+      // A take cut by hand: the new copies get cut copies too.
+      await recutProjectTakes(opts.tenantId, opts.projectId, opts.dataDir).catch((e) => console.warn(`  take matte: cutting the copies failed: ${e?.message || e}`));
       console.log(`  take matte: ${[m.output, m.alpha].filter(Boolean).map((f) => path.basename(f!)).join(" + ")} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${owned} take(s) updated, ${synced} clip field(s) re-pointed`);
       if (opts.afterSave) opts.afterSave(opts.tenantId, opts.projectId);
     } catch (e: any) {

@@ -6,6 +6,39 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-02 — Trim and cut a camera take (speaker_track), the screencast way
+
+Marc reshot seven per-scene takes and wanted 0.3 s off the start of one:
+Studio could cut a screencast's narration (`project.speaker`, its EDL) but a
+camera take had only its window. Two speaker structures, each with half of
+what the other lacks; this is step 1 of converging on `speaker_track` (step 2:
+move the screencast narrator onto it and delete `speaker` -- its own PR, the
+three timelapse mapper twins of SPEC-timelapse are the risk).
+- A take carries the speaker lane's cut list: `take.cuts` ({src_start,
+  src_end}, original-recording seconds) beside its window
+  (trim_start/trim_end). `core/take-clock.ts` is the pure clock (cut clock <->
+  recording, kept seconds, words through cuts); `core/take-edits.ts` the edits
+  (trim / cut / restore, `editSceneTake`) and the bake.
+- The cut is BAKED, like the narrator's derived audio: every file of the take
+  (raw, blur, alpha webm, each recast) gets a copy without the cut spans
+  (`take.cut_files`, `<name>.cut-<key>.<ext>`, 10 ms audio fades at seams).
+  One clock for all of them, so a cut holds for whoever performs.
+  syncSpeakerClips points the clip at the copy and maps the window onto the
+  cut clock; render, Studio playback, the alpha layer and the lane read a
+  clip exactly as before. A trim alone makes no copy.
+- The scene re-times to what is left: `takeDuration`/`windowWords` read the
+  raw take's words through the cuts, so word anchors, captions and sound
+  cues re-resolve. (Unanchored absolute times stay where they were.)
+- A re-grade, a new matte copy or a recast re-cuts (`recutProjectTakes`,
+  baked on a snapshot, landed on a fresh load).
+- Studio: drag a take's edge on the speaker lane to trim it; click a take for
+  its card (±0.1 s nudges, mark-in/mark-out cut at the playhead, each cut with
+  Restore); cuts show as red seams; shift-click two words of one scene to cut
+  them. API `POST /api/take-edit/{t}/{p}`; MCP `edit_speaker` with
+  scene_index (trim / cut / restore / list).
+- Not yet: a punch-in to hide a jump cut; split markers on a take.
+Tests: `test/take-edits.test.ts` (real files: raw, blur and alpha copies).
+
 ## 2026-10-02 — The recast's Direction is a real box, with the default in it
 
 The Direction field was a one-line input with grey example text that was never

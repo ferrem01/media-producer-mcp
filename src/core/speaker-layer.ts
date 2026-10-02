@@ -39,6 +39,8 @@
  * their own paths (scene-assembler.ts) untouched.
  */
 
+import { cutClock, cutFileFor, takeWindow } from "./take-clock.js";
+
 export const SPEAKER_SRC = "speaker";
 /** The older token of the alpha layer; read as background "alpha". */
 export const SPEAKER_ALPHA_SRC = "speaker-alpha";
@@ -52,8 +54,9 @@ export const SPEAKER_SHAPES: readonly SpeakerShape[] = ["rectangle", "rounded", 
 
 type Comp = { id?: string; type?: string; z_index?: number; position?: any; data?: Record<string, any>; enter?: any; exit?: any };
 type SceneLike = { components?: Array<Comp | null> | null; duration_seconds?: number; transparent_background?: boolean };
-type TakeLike = { source: string; blur?: string; alpha?: string; actors?: Record<string, { file: string }> | null; background?: { mode?: string; source_raw?: string } | null; scene_index?: number; silhouette?: { rows: Array<[number, number] | null> } };
-type ClipLike = { source: string; alpha?: string; scene_index?: number };
+type TakeLike = { source: string; blur?: string; alpha?: string; actors?: Record<string, { file: string }> | null; background?: { mode?: string; source_raw?: string } | null; scene_index?: number; silhouette?: { rows: Array<[number, number] | null> };
+  edited?: boolean; trim_start?: number; trim_end?: number; duration?: number; cuts?: Array<{ src_start: number; src_end: number }>; cut_files?: Record<string, { file: string; cuts: string; stamp: string }> };
+type ClipLike = { source: string; alpha?: string; scene_index?: number; trim_start?: number; trim_end?: number };
 type ProjectLike = { scenes?: SceneLike[] | null; takes?: TakeLike[] | null; speaker_track?: { clips: ClipLike[] } | null; speaker_cast?: string | null };
 
 export function asSpeakerBackground(v: unknown): SpeakerBackground | null {
@@ -247,7 +250,9 @@ export function takeOwns(take: TakeLike | null | undefined, url: string | undefi
   if (!take || !url) return false;
   const c = takeCopies(take);
   return url === c.raw || url === c.blur || url === c.alpha || (!!c.raw && copyNamesOf(c.raw).includes(url))
-    || Object.values(take.actors || {}).some((a) => a && a.file === url);
+    || Object.values(take.actors || {}).some((a) => a && a.file === url)
+    // The take's cut copies (core/take-edits.ts).
+    || Object.values(take.cut_files || {}).some((v) => v && v.file === url);
 }
 
 /** The newest take behind a clip. */
@@ -274,9 +279,28 @@ export function syncSpeakerClips(project: ProjectLike): number {
     // (core/recast.ts). The matte's blur and alpha copies are of the person
     // who recorded, so a recast clip carries neither.
     const cast = project.speaker_cast ? take.actors?.[project.speaker_cast]?.file : undefined;
-    const wantSource = cast || (mode === "blur" && copies.blur ? copies.blur : copies.raw);
+    let wantSource = cast || (mode === "blur" && copies.blur ? copies.blur : copies.raw);
+    let wantAlpha = cast ? undefined : copies.alpha;
+    // A take with cuts plays its cut copies (core/take-edits.ts): the copy
+    // of the wanted file, else the raw take's (a recast or matte copy made
+    // since the cut waits for ensureTakeCutFiles), and an alpha copy only
+    // once it is cut too -- every file the clip names shares one clock.
+    const cut = take.cuts && take.cuts.length ? take : null;
+    if (cut) {
+      wantSource = cutFileFor(cut, wantSource) || cutFileFor(cut, copies.raw) || wantSource;
+      wantAlpha = cutFileFor(cut, wantAlpha);
+    }
     if (clip.source !== wantSource) { clip.source = wantSource; changed++; }
-    const wantAlpha = cast ? undefined : copies.alpha;
+    // An edited take owns its clip's window: the take's, on the clock of the
+    // file the clip plays.
+    if (take.edited) {
+      const onCut = !!cut && Object.values(take.cut_files || {}).some((v) => v.file === wantSource);
+      const w = takeWindow(take);
+      const ts = onCut ? cutClock(take.cuts, w.start) : w.start;
+      const te = onCut ? cutClock(take.cuts, w.end) : w.end;
+      if (clip.trim_start !== ts) { clip.trim_start = ts; changed++; }
+      if (clip.trim_end !== te) { clip.trim_end = te; changed++; }
+    }
     if (wantAlpha && clip.alpha !== wantAlpha) { clip.alpha = wantAlpha; changed++; }
     if (!wantAlpha && clip.alpha) { delete clip.alpha; changed++; }
     // speaker-3d tucks its side words behind the person: it carries the

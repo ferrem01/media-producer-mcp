@@ -558,6 +558,20 @@ ${QUOTIENT_CSS}
   /* Hover highlights WITHOUT raising the piece: the words (and their pin
      targets) always stay on top of the block. */
   .spk-clip:hover { box-shadow: 0 0 0 1.5px var(--accent-blue), inset 0 0 0 1px rgb(45 99 225 / 0.28); }
+  /* A camera take's edges drag to trim it; its cuts show as red seams
+     (core/take-edits.ts). */
+  /* Above the scrubber (z 4): a take's click, edges and seams must be reachable. */
+  .spk-clip.spk-take { z-index: 5; }
+  .spk-clip .spk-h { position: absolute; top: -1px; bottom: -1px; width: 8px; cursor: ew-resize; z-index: 2; }
+  .spk-clip .spk-h.l { left: -1px; border-radius: 4px 0 0 4px; }
+  .spk-clip .spk-h.r { right: -1px; border-radius: 0 4px 4px 0; }
+  .spk-clip:hover .spk-h, .spk-clip .spk-h.on { background: rgb(45 99 225 / 0.55); }
+  .spk-clip .spk-seam { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--red-500); border-radius: 2px; cursor: pointer; z-index: 2; }
+  .spk-clip .spk-drag { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); font: 600 10px/14px Inter, sans-serif; color: #fff;
+    background: var(--accent-blue); border-radius: 3px; padding: 0 5px; white-space: nowrap; pointer-events: none; }
+  .tk-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; color: var(--content-secondary); }
+  .tk-row .tk-lab { flex: 1; }
+  .tk-row button { min-width: 44px; }
   .spk-cut { position: absolute; margin-left: -8px; width: 16px; height: 18px; line-height: 17px; text-align: center;
     font-size: 11px; z-index: 5; color: var(--accent-blue); background: #fff; border: 1px solid var(--blue-300); border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: auto; cursor: pointer; }
@@ -7798,13 +7812,32 @@ ${QUOTIENT_CSS}
         blk.title = 'Take for scene ' + (si + 1) + ' \u2014 ' + d0.toFixed(1) + 's' + (c.trim_start ? ' (from ' + Number(c.trim_start).toFixed(1) + 's of the recording)' : '') + '. Click to jump here. Re-record it from the board.';
         // The take's own picture, tiled along the piece: the speaker lane IS
         // the camera on a speaker film.
-        var tk = (p.takes || []).filter(function(t) { return t.scene_index === si && t.source === c.source; }).pop();
+        // The take behind the clip (the clip may play a blur, recast or cut copy of it).
+        var tk = sceneTakeFor(si);
         if (tk) {
           blk.style.backgroundImage = 'url(' + '/api' + withToken('/take-poster/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '/' + encodeURIComponent(tk.id)) + ')';
           blk.style.backgroundSize = 'auto 100%';
           blk.style.backgroundRepeat = 'repeat-x';
+          blk.title = 'Take for scene ' + (si + 1) + ' \u2014 ' + d0.toFixed(1) + 's. Click: trim or cut it. Drag an edge to trim. Shift-click words to cut them.';
+          blk.classList.add('spk-take');
+          takeLaneEdges(blk, si, total);
+          (tk.cuts || []).forEach(function(cut) {
+            var at = takeCutClock(tk.cuts, cut.src_start) - takeCutClock(tk.cuts, tk.trim_start || 0);
+            if (!(at > 0 && at < d0)) return;
+            var seam = document.createElement('div');
+            seam.className = 'spk-seam';
+            seam.style.left = ((at / d0) * 100).toFixed(2) + '%';
+            seam.title = 'Cut ' + (cut.src_end - cut.src_start).toFixed(1) + 's here. Click to restore it.';
+            seam.addEventListener('click', function(ev) { ev.stopPropagation(); takePopOpen(si, blk); });
+            blk.appendChild(seam);
+          });
         }
-        blk.addEventListener('click', function(ev) { ev.stopPropagation(); scrub(Math.round((f / total) * 1000)); els.slider.value = Math.round((f / total) * 1000); });
+        blk.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          if (blk._dragged) { blk._dragged = false; return; }
+          scrub(Math.round((f / total) * 1000)); els.slider.value = Math.round((f / total) * 1000);
+          if (tk) takePopOpen(si, blk);
+        });
         track.insertBefore(blk, document.getElementById('wave-strip'));
       });
     }
@@ -8051,6 +8084,153 @@ ${QUOTIENT_CSS}
     });
   }
 
+  // ── Camera takes: trim and cut a scene's take (core/take-edits.ts) ──
+  // The take's cut list is on the recording's clock; the clip plays the cut
+  // copy. These mirror core/take-clock.ts.
+  function takeCutClock(cuts, src) {
+    var removed = 0;
+    (cuts || []).forEach(function(c) {
+      if (c.src_end <= src) removed += c.src_end - c.src_start;
+      else if (c.src_start < src) removed += src - c.src_start;
+    });
+    return src - removed;
+  }
+  function takeEditRequest(si, body, verb) {
+    var p = state.currentProject;
+    if (!p) return Promise.resolve();
+    body.scene_index = si;
+    studioStatus(verb + '…', '');
+    return api('POST', '/take-edit/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body).then(function(r) {
+      var d = r.shortened || 0;
+      studioStatus('Scene ' + (si + 1) + ' take: ' + r.seconds.toFixed(2) + 's' + (Math.abs(d) >= 0.01 ? ' (' + (d > 0 ? d.toFixed(2) + 's shorter' : (-d).toFixed(2) + 's longer') + ')' : '') + '.', 'ok');
+      afterSpeakerEdit(r, Math.max(0, sceneStartFor(si) - 0.5));
+      loadTranscript();
+      return r;
+    }).catch(function(e) { studioStatus('Take edit failed: ' + (e.message || e), 'err'); throw e; });
+  }
+  // Drag a take's edge to trim it: the left edge takes time off the start,
+  // the right edge off the end (dragging outward gives it back).
+  function takeLaneEdges(blk, si, total) {
+    ['l', 'r'].forEach(function(side) {
+      var h = document.createElement('div');
+      h.className = 'spk-h ' + side;
+      h.title = side === 'l' ? 'Drag to trim the start of the take' : 'Drag to trim the end of the take';
+      h.addEventListener('click', function(ev) { ev.stopPropagation(); });
+      h.addEventListener('mousedown', function(ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        var trackEl = blk.parentElement;
+        var pxPerSec = (trackEl ? trackEl.getBoundingClientRect().width : 1) / (total || 1);
+        var x0 = ev.clientX, left0 = blk.offsetLeft, width0 = blk.offsetWidth, secs = 0;
+        var tip = document.createElement('div');
+        tip.className = 'spk-drag';
+        blk.appendChild(tip);
+        h.classList.add('on');
+        function move(e2) {
+          var dx = e2.clientX - x0;
+          // Seconds taken off (negative: given back), in what plays.
+          secs = Math.round((side === 'l' ? dx : -dx) / pxPerSec * 100) / 100;
+          secs = Math.min(secs, Math.max(0, width0 / pxPerSec - 0.5));
+          var px = secs * pxPerSec;
+          if (side === 'l') { blk.style.left = (left0 + px) + 'px'; blk.style.width = Math.max(4, width0 - px) + 'px'; }
+          else blk.style.width = Math.max(4, width0 - px) + 'px';
+          tip.textContent = secs >= 0 ? '−' + secs.toFixed(2) + 's' : '+' + (-secs).toFixed(2) + 's';
+        }
+        function up() {
+          document.removeEventListener('mousemove', move);
+          document.removeEventListener('mouseup', up);
+          h.classList.remove('on');
+          tip.remove();
+          blk._dragged = true;
+          setTimeout(function() { blk._dragged = false; }, 0);
+          if (Math.abs(secs) < 0.02) { renderLaneLabels(); return; }
+          var body = { op: 'trim' };
+          body[side === 'l' ? 'head' : 'tail'] = secs;
+          takeEditRequest(si, body, secs > 0 ? 'Trimming the take' : 'Giving the take back').catch(function() { renderLaneLabels(); });
+        }
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+      });
+      blk.appendChild(h);
+    });
+  }
+  // The take's card: nudge its edges, cut between two marks, restore a cut.
+  function takePopOpen(si, anchorEl) {
+    var p = state.currentProject;
+    var tk = sceneTakeFor(si);
+    var pop = document.getElementById('cam-pop');
+    if (!p || !tk || !pop) return;
+    camPopClose(); rvPopClose(); wordCutClear();
+    var sc = p.scenes[si] || {};
+    var mark = state._takeMark && state._takeMark.si === si ? state._takeMark.t : null;
+    var cuts = tk.cuts || [];
+    var h = '<div class="sp-head"><span class="sp-title"><b>Scene ' + (si + 1) + ' take</b> — ' + Number(sc.duration_seconds || 0).toFixed(2) + 's</span><button class="sp-x" id="tk-x">✕</button></div>'
+      + '<div class="sp-region" style="margin-bottom:8px;">Trim or cut what plays. The scene gets shorter; a cut inside is a jump cut. The blur, alpha and recast versions follow.</div>'
+      + '<div class="tk-row"><span class="tk-lab">Start</span><button class="rv-go secondary" data-tk="head" data-v="-0.1" title="Give 0.1s back">+0.1s</button><button class="rv-go secondary" data-tk="head" data-v="0.1" title="Trim 0.1s off the start">−0.1s</button></div>'
+      + '<div class="tk-row"><span class="tk-lab">End</span><button class="rv-go secondary" data-tk="tail" data-v="-0.1" title="Give 0.1s back">+0.1s</button><button class="rv-go secondary" data-tk="tail" data-v="0.1" title="Trim 0.1s off the end">−0.1s</button></div>'
+      + '<div class="sp-row"><button class="rv-go secondary" id="tk-mark" style="flex:1;">' + (mark == null ? 'Mark cut start at playhead' : 'Cut from ' + fmtTime(mark) + ' to playhead') + '</button></div>'
+      + (mark != null ? '<div class="sp-row"><button class="rv-go secondary" id="tk-unmark" style="flex:1;color:var(--content-secondary);">Clear the mark</button></div>' : '')
+      + cuts.map(function(c, i) {
+          return '<div class="tk-row"><span class="tk-lab">Cut ' + (c.src_end - c.src_start).toFixed(2) + 's at ' + (takeCutClock(cuts, c.src_start) - takeCutClock(cuts, tk.trim_start || 0)).toFixed(2) + 's</span><button class="rv-go secondary" data-tk-restore="' + i + '">↩ Restore</button></div>';
+        }).join('')
+      + '<div class="sp-region" style="margin-top:4px;">Or shift-click the first and last word on the word lane to cut them.</div>';
+    pop.innerHTML = h;
+    spkPopPlace(pop, anchorEl);
+    document.getElementById('tk-x').addEventListener('click', camPopClose);
+    pop.querySelectorAll('[data-tk]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var body = { op: 'trim' }; body[b.getAttribute('data-tk')] = Number(b.getAttribute('data-v'));
+        b.disabled = true;
+        takeEditRequest(si, body, 'Trimming the take').then(function() { takePopOpen(si, anchorEl.isConnected ? anchorEl : document.querySelector('.spk-clip')); }, function() { b.disabled = false; });
+      });
+    });
+    pop.querySelectorAll('[data-tk-restore]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var c = cuts[Number(b.getAttribute('data-tk-restore'))];
+        b.disabled = true;
+        takeEditRequest(si, { op: 'restore', src_start: c.src_start, src_end: c.src_end }, 'Restoring the cut').then(function() { camPopClose(); }, function() { b.disabled = false; });
+      });
+    });
+    var um = document.getElementById('tk-unmark');
+    if (um) um.addEventListener('click', function() { state._takeMark = null; takePopOpen(si, anchorEl); });
+    document.getElementById('tk-mark').addEventListener('click', function() {
+      var t = (state.masterTime || 0) - sceneStartFor(si);
+      if (!(t >= 0 && t <= (sc.duration_seconds || 0))) { studioStatus('Park the playhead inside scene ' + (si + 1) + ' first', 'err'); return; }
+      if (mark == null) { state._takeMark = { si: si, t: state.masterTime || 0 }; takePopOpen(si, anchorEl); return; }
+      var a = Math.min(mark, state.masterTime || 0) - sceneStartFor(si), z = Math.max(mark, state.masterTime || 0) - sceneStartFor(si);
+      state._takeMark = null;
+      camPopClose();
+      takeEditRequest(si, { op: 'cut', from: Math.max(0, a), to: z }, 'Cutting the take');
+    });
+  }
+  // Shift-click two words of a camera take: cut them (one scene at a time).
+  function takeWordCutSelect(seg, el) {
+    if (!wcut.a) {
+      wcut.a = { seg: seg, el: el };
+      el.classList.add('wl-sel');
+      studioStatus('First word marked — shift-click the LAST word of the span to cut', '');
+      return;
+    }
+    wcut.b = { seg: seg, el: el };
+    el.classList.add('wl-sel');
+    var from = Math.min(wcut.a.seg.start, wcut.b.seg.start) - 0.04;
+    var to = Math.max(wcut.a.seg.end, wcut.b.seg.end) + 0.04;
+    var ia = compositeSceneForTime(Math.max(0, from + 0.05)), ib = compositeSceneForTime(Math.max(0, to - 0.05));
+    if (!ia || !ib || ia.index !== ib.index) { wordCutClear(); studioStatus('A cut stays inside one scene’s take — pick two words of the same scene', 'err'); return; }
+    var si = ia.index, s0 = sceneStartFor(si);
+    var btn = document.createElement('button');
+    btn.id = 'word-cut-btn';
+    btn.textContent = '✂ Cut ' + (to - from).toFixed(1) + 's';
+    btn.title = 'Cut these words out of scene ' + (si + 1) + '’s take (a jump cut; the scene gets shorter)';
+    var total = state.totalDuration || 1;
+    btn.style.left = Math.min(97, ((to / total) * 100)).toFixed(2) + '%';
+    btn.style.top = (laneLayout().speaker + 40) + 'px';
+    btn.addEventListener('click', function() {
+      btn.disabled = true; btn.textContent = 'Cutting…';
+      takeEditRequest(si, { op: 'cut', from: Math.max(0, from - s0), to: to - s0 }, 'Cutting the take');
+    });
+    document.getElementById('timeline-track').appendChild(btn);
+  }
+
   // ── Word-cut selection (ROADMAP #8 stage 4): shift-click the first and
   // last word of a span, confirm, and the referee removes that film time
   // from speaker + screen + captions + audio in one pass. ──
@@ -8064,6 +8244,7 @@ ${QUOTIENT_CSS}
 
   function wordCutSelect(seg, el) {
     var p = state.currentProject;
+    if (p && !(p.speaker && p.speaker.clips && p.speaker.clips.length) && speakerTrackIsPerScene()) { takeWordCutSelect(seg, el); return; }
     if (!p || !p.speaker || !p.speaker.clips || p.speaker.clips.length !== 1) {
       studioStatus('This film has no speaker lane to cut (older project?)', 'err');
       return;

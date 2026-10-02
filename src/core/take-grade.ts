@@ -29,6 +29,7 @@
  */
 
 import path from "node:path";
+import { recutProjectTakes } from "./take-edits.js";
 import { gradeTake, type TakeLook } from "./take-sanitize.js";
 import { queueTakeMatte } from "./take-matte.js";
 import { takeCopies, syncSpeakerClips, missingSpeakerCopies } from "./speaker-layer.js";
@@ -130,6 +131,8 @@ export function queueTakeGrade(job: TakeGradeJob): void {
       }
       project.updated_at = stamp;
       await job.saveProject(project);
+      // A take cut by hand plays cut copies of the old grade: cut the new one.
+      await recutProjectTakes(job.tenantId, job.projectId, job.dataDir).catch((e) => console.warn(`  take grade: re-cutting failed: ${e?.message || e}`));
       const studioNote = g.studio ? `, studio ${g.studio.applied.filter === "null" ? "clean (nothing to correct)" : `wb ${g.studio.applied.wb.join("/")} skin ${g.studio.applied.skin} ev ${g.studio.applied.ev} curve ${g.studio.applied.contrast}`}` : g.correct ? ", studio skipped" : ", studio off";
       console.log(`  take grade: ${path.basename(job.rawUrl)} -> ${g.look}${g.look === "soft" ? ` ${g.strength}` : ""}${g.baseSoft ? " (over the old base)" : ""}${studioNote} in ${Math.round(g.ms / 1000)}s; ${owned} take(s)`);
       if (rematte.blur || rematte.alpha) {

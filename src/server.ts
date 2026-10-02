@@ -2054,13 +2054,15 @@ export function createMcpServer(): McpServer {
 
   tool(
     "edit_speaker",
-    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'. action='look' sets the soft look on the booth take behind scene_index -- look 'soft' with strength 0-1 (skin smoothing; 0.5 the house pick) or 'natural'; correct:false turns off the studio colour/exposure correction every take gets (true back on); fill 0-1 sets the fill light on the face's shadows (default 0.5, 0 off) -- re-graded from the kept original in the background (every scene cut from the same recording follows; Studio refreshes when it lands).",
+    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'. A CAMERA-TAKE film (one take per scene) edits each scene's take instead: pass scene_index -- action='trim' takes head/tail seconds off the take's start/end (negative gives them back), action='cut' removes from/to in SCENE seconds (a jump cut; the take's blur, alpha and recast copies follow), action='restore' gives a cut back, action='list' shows every scene's take window and cuts; the scene re-times to what is left. action='look' sets the soft look on the booth take behind scene_index -- look 'soft' with strength 0-1 (skin smoothing; 0.5 the house pick) or 'natural'; correct:false turns off the studio colour/exposure correction every take gets (true back on); fill 0-1 sets the fill light on the face's shadows (default 0.5, 0 off) -- re-graded from the kept original in the background (every scene cut from the same recording follows; Studio refreshes when it lands).",
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),
-      action: z.enum(["list", "cut", "restore", "look"]),
+      action: z.enum(["list", "cut", "restore", "look", "trim"]),
       // coerce: a client holding the tool's older schema sends these as strings.
-      scene_index: z.coerce.number().optional().describe("look: 0-based scene whose take to grade"),
+      scene_index: z.coerce.number().optional().describe("look/trim/cut/restore on a camera-take film: 0-based scene whose take"),
+      head: z.coerce.number().optional().describe("trim: seconds off the take's start (negative gives back)"),
+      tail: z.coerce.number().optional().describe("trim: seconds off the take's end (negative gives back)"),
       look: z.enum(["soft", "natural"]).optional().describe("look: the grade"),
       strength: z.coerce.number().min(0).max(1).optional().describe("look: skin smoothing 0-1 (default 0.5)"),
       correct: z.boolean().optional().describe("look: studio correction on/off (omit to keep)"),
@@ -2090,6 +2092,27 @@ export function createMcpServer(): McpServer {
         });
         const scenes = (project.takes || []).filter((t) => takeCopies(t).raw === raw).map((t) => t.scene_index + 1);
         return ok({ status: "grading", look: lk, strength, correct: params.correct ?? take.correct !== false, fill: params.fill ?? take.fill ?? 0.5, scenes, note: "Re-grading in the background from the kept original (about a minute); the project saves when it lands." });
+      }
+      // A camera-take film: each scene's take (core/take-edits.ts).
+      const perSceneTakes = !(project as any).speaker?.clips?.length && (project.speaker_track?.clips || []).some((c) => c.scene_index !== undefined);
+      if (params.action === "trim" || (perSceneTakes && params.action !== "list" && params.scene_index !== undefined) || (perSceneTakes && params.action === "list")) {
+        const te = await import("./core/take-edits.js");
+        const { activeTake } = await import("./core/take-needs.js");
+        if (params.action === "list") {
+          const takes = (project.speaker_track?.clips || []).filter((c) => c.scene_index !== undefined).map((c) => {
+            const t = activeTake(project, c.scene_index!);
+            return t ? { scene_index: c.scene_index, window: te.takeWindow(t), plays_seconds: te.keptSeconds(t), cuts: t.cuts || [] } : { scene_index: c.scene_index, take: null };
+          });
+          return ok({ project_id: project.project_id, takes, note: "window and cuts are in seconds of the recording; trim/cut take seconds of what the scene plays" });
+        }
+        if (params.scene_index === undefined) return err("scene_index is required: which scene's take");
+        const edit = params.action === "trim" ? { op: "trim" as const, head: params.head, tail: params.tail }
+          : params.action === "cut" ? { op: "cut" as const, from: Number(params.from), to: Number(params.to) }
+          : { op: "restore" as const, src_start: Number(params.src_start), src_end: Number(params.src_end) };
+        try {
+          const r = await te.editSceneTake(project.tenant_id, project.project_id, Number(params.scene_index), edit, config.dataDir);
+          return ok({ status: "edited", scene_index: r.scene_index, plays_seconds: r.seconds, shortened: r.shortened, window: r.window, cuts: r.cuts, studio_url: previewUrl(project.tenant_id, project.project_id) });
+        } catch (e: any) { return err(e?.message || String(e)); }
       }
       const { applySpeakerCut, applySpeakerRestore, maintainTranscriptCacheAfterCut, dropTranscriptCache } =
         await import("./core/speaker-edl.js");
