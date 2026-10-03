@@ -19,6 +19,7 @@
  * them). Files land in the project's output dir under actor-tests/<id>/,
  * reachable by URL like a render; status.json records every step.
  */
+import { reportVendor, falJob } from "./vendor-status.js";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -172,6 +173,7 @@ export async function runWan(src: string, img: string, mode: "replace" | "move",
     if (Date.now() - t0 > (opts.deadlineMs || DEADLINE_MS)) throw new Error("fal: timed out");
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), "fal status");
+    reportVendor({ vendor: "fal", job: falJob(statusUrl), status: st.status, queue: st.queue_position });
     if (st.status === "COMPLETED") break;
     if (st.status && !["IN_QUEUE", "IN_PROGRESS"].includes(st.status)) throw new Error(`fal: ${st.status}`);
   }
@@ -202,6 +204,7 @@ async function runSeedance(img: string | null, audio: string | null, prompt: str
     if (Date.now() - t0 > DEADLINE_MS) throw new Error("seedance: timed out");
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), "seedance status");
+    reportVendor({ vendor: "seedance", job: falJob(statusUrl), status: st.status, queue: st.queue_position });
     if (st.status === "COMPLETED") break;
     if (st.status && !["IN_QUEUE", "IN_PROGRESS"].includes(st.status)) throw new Error(`seedance: ${st.status}`);
   }
@@ -237,6 +240,7 @@ async function runWanS2V(img: string, audio: string, secs: number, prompt: strin
     if (Date.now() - t0 > DEADLINE_MS) throw new Error("wan s2v: timed out");
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), "wan s2v status");
+    reportVendor({ vendor: "wan", job: falJob(statusUrl), status: st.status, queue: st.queue_position });
     if (st.status === "COMPLETED") break;
     if (st.status && !["IN_QUEUE", "IN_PROGRESS"].includes(st.status)) throw new Error(`wan s2v: ${st.status}`);
   }
@@ -263,6 +267,7 @@ async function falVideo(route: string, body: Record<string, unknown>, what: stri
     if (Date.now() - t0 > DEADLINE_MS) throw new Error(`${what}: timed out`);
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), `${what} status`);
+    reportVendor({ vendor: what, job: falJob(statusUrl), status: st.status, queue: st.queue_position });
     if (st.status === "COMPLETED") break;
     if (st.status && !["IN_QUEUE", "IN_PROGRESS"].includes(st.status)) throw new Error(`${what}: ${st.status}`);
   }
@@ -310,6 +315,7 @@ export async function runGenjutsu(video: string, images: string[], opts: { promp
     if (Date.now() - t0 > (opts.deadlineMs || GENJUTSU_DEADLINE_MS)) throw new Error("genjutsu: timed out (the job is kept: collect it later)");
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), "genjutsu status");
+    reportVendor({ vendor: "higgsfield", job: st?.id || st?.request_id, status: st.status, progress: typeof st?.progress === "number" ? st.progress : undefined });
     if (st.status === "completed") {
       const url = st?.video?.url || st?.videos?.[0]?.url;
       if (!url) throw new Error("genjutsu: completed without a video url");
@@ -346,6 +352,7 @@ export async function runKling(src: string, img: string, prompt?: string): Promi
     if (Date.now() - t0 > DEADLINE_MS) throw new Error("kling: timed out");
     await sleep(POLL_MS);
     const st = await okJson(await fetch(statusUrl, { headers }), "kling status");
+    reportVendor({ vendor: "kling", job: falJob(statusUrl), status: st.status, queue: st.queue_position });
     if (st.status === "COMPLETED") break;
     if (st.status && !["IN_QUEUE", "IN_PROGRESS"].includes(st.status)) throw new Error(`kling: ${st.status}`);
   }
@@ -392,6 +399,7 @@ async function runHeygen(imgFile: string, audioFile: string, orientation: "portr
     await sleep(Math.max(POLL_MS, 20) * 2);
     const st = await okJson(await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`, { headers }), "heygen status");
     const d = st?.data || {};
+    reportVendor({ vendor: "heygen", job: videoId, status: d.status });
     if (d.status === "completed" && d.video_url) return d.video_url;
     if (d.status === "failed") throw new Error(`heygen: ${JSON.stringify(d.error || d).slice(0, 200)}`);
   }
@@ -430,6 +438,7 @@ async function runHeygenAvatar(avatarId: string, audioFile: string, width: numbe
     await sleep(Math.max(POLL_MS, 20) * 2);
     const st = await okJson(await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`, { headers }), "heygen status");
     const d = st?.data || {};
+    reportVendor({ vendor: "heygen", job: videoId, status: d.status });
     if (d.status === "completed" && d.video_url) return d.video_url;
     if (d.status === "failed") throw new Error(`heygen avatar: ${JSON.stringify(d.error || d).slice(0, 200)}`);
   }
@@ -543,6 +552,7 @@ export async function runHeygenV3(opts: {
     if (Date.now() - t0 > DEADLINE_MS) throw new Error("heygen v3: timed out");
     await sleep(Math.max(POLL_MS, 20) * 2);
     const d = (await okJson(await fetch(`${HEYGEN_V3}/videos/${encodeURIComponent(videoId)}`, { headers: heygenHeaders(false) }), "heygen v3 status"))?.data || {};
+    reportVendor({ vendor: "heygen", job: videoId, status: d.status, progress: typeof d.progress === "number" ? d.progress : undefined, message: d.failure_message });
     if (d.status === "completed" && d.video_url) return d.video_url;
     if (d.status === "failed") throw new Error(`heygen v3: ${d.failure_message || d.failure_code || "failed"}`);
   }
@@ -599,6 +609,7 @@ export async function runRunway(src: string, img: string, ratio: string): Promis
     if (Date.now() - t0 > DEADLINE_MS) throw new Error("runway: timed out");
     await sleep(POLL_MS);
     const task = await okJson(await fetch(`https://api.dev.runwayml.com/v1/tasks/${sub.id}`, { headers }), "runway task");
+    reportVendor({ vendor: "runway", job: sub.id, status: task.status, progress: typeof task.progress === "number" ? task.progress : undefined, message: task.failure });
     if (task.status === "SUCCEEDED") {
       const url = Array.isArray(task.output) ? task.output[0] : null;
       if (!url) throw new Error("runway: no output url");

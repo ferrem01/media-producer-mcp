@@ -30,6 +30,7 @@ import { takeCopies, takeForClip, syncSpeakerClips } from "./speaker-layer.js";
 import { getActor, portraitPath, type CastActor } from "./cast.js";
 import { ffmpeg, convertVoice, durationOf } from "./actor-test.js";
 import { detectFace } from "./face-band.js";
+import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import { PERFORMERS, getPerformer, defaultPerformer, type Performer, type PerformContext } from "./performers/index.js";
 
 const execFileAsync = promisify(execFile);
@@ -42,7 +43,20 @@ export interface RecastStatus {
   status: "running" | "done" | "failed" | "interrupted";
   started_at: string;
   finished_at?: string;
-  files: Array<{ raw: string; file: string; status: "running" | "done" | "failed" | "reused"; chunks_done: number; chunks_total: number; stage?: string; error?: string }>;
+  files: Array<{
+    raw: string; file: string; status: "running" | "done" | "failed" | "reused"; chunks_done: number; chunks_total: number; stage?: string; error?: string;
+    /** The take's length (s): with the vendor's pace, the time-left estimate. */
+    seconds?: number;
+    started_at?: string;
+    /** When the current stage began. */
+    stage_at?: string;
+    finished_at?: string;
+    /** The vendor's last reply (core/vendor-status.ts): its status word,
+     *  queue place, progress, job id -- what Studio shows while it waits. */
+    vendor?: VendorStatus;
+  }>;
+  /** The vendor's rough pace (minutes of work per 30 s of take). */
+  minutes_per_30s?: number;
   error?: string;
 }
 
@@ -50,6 +64,25 @@ const running = new Map<string, RecastStatus>();
 
 function statusFile(tenant: string, project: string): string {
   return path.join(projectDir(tenant, project), "recast.json");
+}
+
+/** Where a recast is: takes finished of all, and a rough time left -- the
+ *  slowest unfinished take's expected time (its length at the vendor's pace,
+ *  plus the fit) less what it has run. Null time left when nothing says. */
+export function recastProgress(st: RecastStatus | null, now = Date.now()): { done: number; total: number; failed: number; eta_seconds: number | null } | null {
+  if (!st) return null;
+  const files = st.files || [];
+  const done = files.filter((f) => f.status === "done" || f.status === "reused").length;
+  const failed = files.filter((f) => f.status === "failed").length;
+  let eta: number | null = null;
+  const pace = st.minutes_per_30s || 0;
+  for (const f of files) {
+    if (f.status !== "running" || !pace || !f.seconds) continue;
+    const expected = (f.seconds / 30) * pace * 60 + 15;
+    const ran = f.started_at ? (now - Date.parse(f.started_at)) / 1000 : 0;
+    eta = Math.max(eta ?? 0, Math.max(0, Math.round(expected - ran)));
+  }
+  return { done, total: files.length, failed, eta_seconds: st.status === "running" ? eta : 0 };
 }
 
 export async function getRecastStatus(tenant: string, project: string): Promise<RecastStatus | null> {
@@ -285,6 +318,7 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   const voiceId = opts.voice_id === undefined ? actor.voice_id : opts.voice_id === "mine" ? undefined : opts.voice_id || undefined;
   if (voiceId && !process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
   st.performer = performer.id;
+  st.minutes_per_30s = performer.minutesPer30s;
   if (voiceId) st.voice_id = voiceId;
   // The raw files behind the track's clips (a one-take film is one file).
   const raws = new Set<string>();
@@ -326,19 +360,23 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     try {
       const rawAbs = resolveVideoPath(f.raw, config.dataDir);
       const [width, height] = await sizeOf(rawAbs);
-      await performTakeFile({
+      f.seconds = Math.round(((await durationOf(rawAbs)) || 0) * 10) / 10 || undefined;
+      f.started_at = f.stage_at = new Date().toISOString();
+      // Every vendor reply for this take lands on it (Studio's status list).
+      await withVendorStatus((v) => { f.vendor = v; void saveStatus(tenant, st); }, () => performTakeFile({
         rawAbs, outAbs: resolveVideoPath(f.file, config.dataDir), performer, voiceId,
         ctx: {
           tenant, actor, portraitAbs: portraitPath(tenant, actor), width, height, publicUrl, motion,
           workDir: recastWorkDir(tenant, projectId, actor.id, performer.id, i),
-          onStage: (stage) => { f.stage = stage; void saveStatus(tenant, st); },
+          onStage: (stage) => { f.stage = stage; f.stage_at = new Date().toISOString(); void saveStatus(tenant, st); },
         },
         onChunk: (done, total) => { f.chunks_done = done; f.chunks_total = total; void saveStatus(tenant, st); },
-      });
+      }));
       f.status = "done";
     } catch (e: any) {
       f.status = "failed"; f.error = String(e?.message || e).slice(0, 300);
     }
+    f.finished_at = new Date().toISOString();
     await saveStatus(tenant, st);
   }));
   const ok = st.files.filter((f) => f.status === "done" || f.status === "reused");

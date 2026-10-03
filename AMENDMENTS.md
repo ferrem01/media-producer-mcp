@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-03 — A recast's status: every take, what the vendor says, time left
+
+"Recasting is such a big job... it's hard to tell where it is and when it's
+going to be done." Studio showed one line built from the first take only.
+- `core/vendor-status.ts`: every polling loop (fal's queue -- Kling, Wan,
+  Seedance --, HeyGen v1/v3, Runway, Higgsfield) reports each reply
+  (`reportVendor`: status word, queue place, progress, job id, message);
+  whoever started the work listens for one take (`withVendorStatus`,
+  AsyncLocalStorage) -- no callback threaded through every vendor call.
+- The recast keeps, per take: its length, started/stage/finished times and
+  the vendor's last reply; the status carries the vendor's pace.
+  `recastProgress`: done / total / failed and a time left (the slowest
+  unfinished take's expected time less what it ran). GET /api/recast and
+  /api/take-status hand it to Studio.
+- Studio's Cast panel lists every take (scene, length, stage or the vendor's
+  word -- queued #n, working 42%, finished --, job id, error, time run) under
+  "N of M done, m:ss, ~n min left"; the header pill keeps the count with the
+  panel closed. The Direction box spans the panel (it was a third wide).
+Tests: `test/recast-status.test.ts`.
+
 ## 2026-10-03 — A recast crops around the face
 
 "I am not exactly centered in the frame" (proj_c99e52c3, recast as "Marc at

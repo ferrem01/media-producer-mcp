@@ -81,7 +81,7 @@ import { performerList } from "./core/performers/index.js";
 import { startActorTest, startVoiceLineup, getActorTest, collectActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, listVoices, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor, removeActor, getActor, portraitPath } from "./core/cast.js";
-import { startRecast, getRecastStatus } from "./core/recast.js";
+import { startRecast, getRecastStatus, recastProgress } from "./core/recast.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -2819,7 +2819,8 @@ Rules:
           }
           if (method === "GET") {
             const proj = await loadProject(rcTenant, rcProject);
-            jsonResponse(res, 200, { speaker_cast: (proj as any)?.speaker_cast || null, recast: await getRecastStatus(rcTenant, rcProject) });
+            const rcNow = await getRecastStatus(rcTenant, rcProject);
+            jsonResponse(res, 200, { speaker_cast: (proj as any)?.speaker_cast || null, recast: rcNow, progress: recastProgress(rcNow) });
             return;
           }
           jsonResponse(res, 405, { error: "Method not allowed" });
@@ -3601,7 +3602,13 @@ Rules:
           seen.add(raw);
           errors.push({ raw, scenes: scenesOf(raw), ...t.job_error });
         }
-        jsonResponse(res, 200, { jobs, errors });
+        // A recast running on the film rides along: the header pill counts
+        // its takes and the time left even with the Cast panel closed.
+        const rcSt = await getRecastStatus(tsTenant, tsProject);
+        const recast = rcSt && rcSt.status === "running"
+          ? { actor: rcSt.actor, performer: rcSt.performer, started_at: rcSt.started_at, ...recastProgress(rcSt) }
+          : null;
+        jsonResponse(res, 200, { jobs, errors, recast });
         return;
       }
 

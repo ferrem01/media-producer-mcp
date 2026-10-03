@@ -1127,6 +1127,21 @@ ${QUOTIENT_CSS}
   .np-btn.active { background: var(--content-primary); color: var(--surface-primary); border-color: var(--content-primary); }
   .np-btn.armed { background: var(--content-primary); color: var(--surface-primary); border-color: var(--content-primary); animation: np-armed-pulse 900ms ease-out 1; }
   @keyframes np-armed-pulse { 0% { box-shadow: 0 0 0 0 rgb(45 99 225 / 0.55); } 100% { box-shadow: 0 0 0 14px rgb(45 99 225 / 0); } }
+  /* The recast's status, take by take (core/recast.ts files[] + the vendor's
+     last reply): where it is and when it will be done. */
+  .rc-status { margin-top: 10px; border: 1px solid var(--border-secondary); border-radius: var(--radius); overflow: hidden; }
+  .rc-head { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; background: rgb(45 99 225 / 0.06); font-size: 12px; color: var(--content-primary); }
+  .rc-head b { color: var(--accent-blue); }
+  .rc-bar { height: 3px; background: rgb(45 99 225 / 0.12); }
+  .rc-bar span { display: block; height: 100%; background: var(--accent-blue); transition: width .4s ease; }
+  .rc-row { display: grid; grid-template-columns: 74px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 10px; border-top: 1px solid var(--border-secondary); font-size: 12px; }
+  .rc-take { color: var(--content-secondary); font-variant-numeric: tabular-nums; }
+  .rc-what { color: var(--content-primary); }
+  .rc-what small { display: block; color: var(--content-tertiary); font-size: 11px; margin-top: 1px; word-break: break-all; }
+  .rc-time { color: var(--content-tertiary); font-variant-numeric: tabular-nums; }
+  .rc-row.done .rc-what { color: #15803d; }
+  .rc-row.failed .rc-what { color: var(--destructive, #dc2626); }
+  .rc-row.reused .rc-what { color: var(--content-tertiary); }
   .np-armed { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; padding: 2px 8px; border-radius: 999px; background: rgb(45 99 225 / 0.10); color: var(--accent-blue); font-weight: 600; font-size: 12px; }
   .np-armed i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-blue); animation: np-wait-blink 1.2s ease-in-out infinite; }
   @keyframes np-wait-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
@@ -6447,6 +6462,8 @@ ${QUOTIENT_CSS}
     if (!p || !state.tenantId) return;
     api('/take-status/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id)).then(function(r) {
       var jobs = (r && r.jobs) || [], errors = (r && r.errors) || [];
+      // A running recast is work on this film too (the pill keeps its count).
+      if (r && r.recast) jobs = jobs.concat([{ kind: 'recast', raw: 'recast', recast: r.recast, started_at: r.recast.started_at }]);
       if (jobs.length) takeStatus.idle = 0; else takeStatus.idle++;
       if (takeStatus.timer && takeStatus.idle >= 3) { clearInterval(takeStatus.timer); takeStatus.timer = null; }
       renderTakeStatus(jobs, errors);
@@ -6473,14 +6490,20 @@ ${QUOTIENT_CSS}
       takeStatus.wasBusy = true;
       var parts = jobs.map(function(j) {
         takeStatus.seen[j.raw + j.kind] = true;
+        if (j.kind === 'recast') {
+          var rr = j.recast, who = (castActorById(rr.actor) || {}).name || String(rr.actor || '').replace(/-/g, ' ');
+          return 'Recasting as ' + escHtml(who) + ' \u2014 <b>' + rr.done + ' of ' + rr.total + '</b> takes \u00b7 ' + fmtAgo(rr.started_at) + (rr.eta_seconds != null ? ' \u00b7 ' + rcLeft(rr.eta_seconds) : '');
+        }
         var what = j.kind === 'grade' ? 'Applying the look' + (j.what && j.what.length ? ' (' + j.what.join(' \u00b7 ') + ')' : '')
           : ((j.what || []).indexOf('alpha') >= 0 && (j.what || []).indexOf('blur') < 0 ? 'Cutting you out' : 'Blurring the background');
         return escHtml(what) + (j.scenes && j.scenes.length ? ' \u2014 ' + sceneRange(j.scenes) : '') + (typeof j.pct === 'number' ? ' \u00b7 <b>' + j.pct + '%</b>' : '') + ' \u00b7 ' + fmtAgo(j.started_at);
       });
       var pct = jobs.filter(function(j) { return typeof j.pct === 'number'; }).map(function(j) { return j.pct; })[0];
+      var rcJob = jobs.filter(function(j) { return j.kind === 'recast'; })[0];
+      if (pct === undefined && rcJob && rcJob.recast.total) pct = Math.round((rcJob.recast.done / rcJob.recast.total) * 100);
       pill.className = 'show';
       pill.innerHTML = '<span class="jp-dot"></span>' + parts.join(' &nbsp;\u00b7&nbsp; ') +
-        '<span class="jp-note">edits to this take wait their turn</span>' +
+        (jobs.some(function(j) { return j.kind !== 'recast'; }) ? '<span class="jp-note">edits to this take wait their turn</span>' : '') +
         (typeof pct === 'number' ? '<span class="jp-bar" style="width:' + pct + '%"></span>' : '');
       document.body.classList.add('has-job-pill');
       return;
@@ -11811,7 +11834,7 @@ ${QUOTIENT_CSS}
       castUi.voices ? Promise.resolve(castUi.voices) : api('/cast/' + castT() + '/voices').catch(function() { return { elevenlabs: [], heygen: [] }; }),
     ]).then(function(r) {
       if (!document.getElementById('cast-body') || castUi.project !== p) return;
-      castUi.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, gen: r[2].generated_take || null };
+      castUi.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, rcProgress: r[1].progress || null, gen: r[2].generated_take || null };
       castUi.voices = r[3];
       if (castUi.actor && !castUi.data.cast.some(function(a) { return a.id === castUi.actor; })) castUi.actor = null;
       if (!castUi.actor && castUi.data.cast.length) castUi.actor = (castUi.data.speaker_cast && castUi.data.cast.some(function(a) { return a.id === castUi.data.speaker_cast; })) ? castUi.data.speaker_cast : castUi.data.cast[0].id;
@@ -11840,6 +11863,58 @@ ${QUOTIENT_CSS}
     castUi.performer = null;
     for (var i = 0; i < order.length; i++) if (ok(castPerfById(order[i]))) { castUi.performer = order[i]; break; }
   }
+  // ── The recast's status: every take, where it is, what the vendor says ──
+  function rcClock(sec) { sec = Math.max(0, Math.round(sec)); return Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60); }
+  function rcLeft(sec) { if (sec == null) return ''; if (sec < 20) return 'any moment'; return '~' + (sec < 90 ? Math.round(sec / 10) * 10 + ' s' : Math.round(sec / 60) + ' min') + ' left'; }
+  // The vendor's status word, said plainly.
+  function rcVendorWord(v) {
+    var st = String(v.status || '').toLowerCase();
+    var word = /queue|pending|waiting|submitted/.test(st) ? 'queued' : /progress|processing|running|rendering|generating/.test(st) ? 'working'
+      : /complete|succeed|success|ready/.test(st) ? 'finished' : /fail|error|cancel/.test(st) ? 'failed' : (v.status || 'waiting');
+    var extra = [];
+    if (typeof v.queue === 'number') extra.push('#' + (v.queue + 1) + ' in line');
+    if (typeof v.progress === 'number') extra.push(Math.round(v.progress * 100) + '%');
+    return word + (extra.length ? ' (' + extra.join(', ') + ')' : '');
+  }
+  function castRecastStatus(rc, prog) {
+    var perf = castPerfById(rc.performer) || {};
+    var vendor = perf.label || rc.performer || 'the vendor';
+    var files = rc.files || [];
+    var now = Date.now();
+    var done = prog ? prog.done : files.filter(function(f) { return f.status === 'done' || f.status === 'reused'; }).length;
+    var total = prog ? prog.total : files.length;
+    var elapsed = (now - Date.parse(rc.started_at)) / 1000;
+    var pct = total ? Math.round((done / total) * 100) : 0;
+    var h = '<div class="rc-status"><div class="rc-head"><span>Recasting as ' + escHtml((castActorById(rc.actor) || {}).name || rc.actor) + ' with ' + escHtml(vendor) + ' &#8212; <b>' + done + ' of ' + total + '</b> done</span>'
+      + '<span>' + rcClock(elapsed) + (prog && prog.eta_seconds != null ? ' &#183; ' + rcLeft(prog.eta_seconds) : '') + '</span></div>'
+      + '<div class="rc-bar"><span style="width:' + pct + '%"></span></div>';
+    var proj = state.currentProject || {};
+    files.forEach(function(f, i) {
+      var tk = (proj.takes || []).filter(function(t) { return t.source === f.raw || (t.background && t.background.source_raw === f.raw); }).pop();
+      var label = tk ? 'Scene ' + (tk.scene_index + 1) : 'Take ' + (i + 1);
+      var what, sub = '', cls = f.status;
+      if (f.status === 'reused') what = 'Already made &#8212; reused';
+      else if (f.status === 'done') what = '&#10003; Done';
+      else if (f.status === 'failed') { what = 'Failed'; sub = f.error || ''; }
+      else {
+        var stg = f.stage || 'starting';
+        if (stg === 'voice') what = 'Preparing the voice';
+        else if (stg === 'fit') what = 'Fitting to the frame (face-centred crop)';
+        else if (stg === 'starting') what = 'Starting';
+        else {
+          what = escHtml(vendor) + ': ' + escHtml(f.vendor ? rcVendorWord(f.vendor) : 'sending');
+          if (f.chunks_total) what += ' &#183; piece ' + Math.min(f.chunks_done + 1, f.chunks_total) + ' of ' + f.chunks_total;
+        }
+        if (f.vendor && (f.vendor.job || f.vendor.message)) sub = (f.vendor.message ? f.vendor.message + ' ' : '') + (f.vendor.job ? 'job ' + f.vendor.job : '');
+      }
+      var t0 = f.started_at ? Date.parse(f.started_at) : null;
+      var t1 = f.finished_at ? Date.parse(f.finished_at) : now;
+      var time = t0 ? rcClock((t1 - t0) / 1000) : '';
+      h += '<div class="rc-row ' + escAttr(cls) + '"><span class="rc-take">' + escHtml(label) + (f.seconds ? ' &#183; ' + Number(f.seconds).toFixed(0) + 's' : '') + '</span>'
+        + '<span class="rc-what">' + what + (sub ? '<small>' + escHtml(sub) + '</small>' : '') + '</span><span class="rc-time">' + time + '</span></div>';
+    });
+    return h + '</div>';
+  }
   function castRender() {
     var body = document.getElementById('cast-body'); var d = castUi.data;
     if (!body || !d) return;
@@ -11850,12 +11925,14 @@ ${QUOTIENT_CSS}
     h += '<div class="np-block"><div class="np-lead">Now performing</div><div class="np-row"><div class="np-what">'
       + (now ? escHtml(now.name) + '<small>' + escHtml(nowRc && nowRc.performer ? (castPerfById(nowRc.performer) || {}).label || nowRc.performer : 'recast') + '</small>' : (castHasTake() ? 'You &#8212; your recording' : 'Nobody yet &#8212; no take'))
       + '</div><div class="np-act">' + (d.speaker_cast ? '<button class="np-btn" data-cast-me="1">Back to me</button>' : '') + '</div></div>';
-    if (castRunning()) {
-      var job = d.recast && d.recast.status === 'running' ? d.recast : d.gen;
+    if (castRunning() && d.recast && d.recast.status === 'running') {
+      h += castRecastStatus(d.recast, d.rcProgress);
+    } else if (castRunning()) {
+      var job = d.gen;
       var f = job.files && job.files[0];
       var stage = (f && f.stage) || job.stage || 'starting';
       var chunks = f && f.chunks_total ? ' · ' + f.chunks_done + ' of ' + f.chunks_total : '';
-      h += '<div class="np-armed"><span></span>' + (job === d.gen ? 'Generating the take' : 'Recasting') + ' as ' + escHtml((castActorById(job.actor) || {}).name || job.actor) + ' &#8212; ' + escHtml(stage) + chunks + '</div>';
+      h += '<div class="np-armed"><span></span>Generating the take as ' + escHtml((castActorById(job.actor) || {}).name || job.actor) + ' &#8212; ' + escHtml(stage) + chunks + '</div>';
     } else if (d.recast && d.recast.status === 'failed') {
       h += '<div class="np-note">Last recast failed: ' + escHtml(d.recast.error || '') + '</div>';
     } else if (d.gen && d.gen.status === 'failed') {
@@ -11898,7 +11975,7 @@ ${QUOTIENT_CSS}
       // A full box holding the house direction, ready to change (Marc): the
       // same calm presenter a generated take uses, for a recast too. Cleared,
       // HeyGen chooses the movement itself.
-      h += '<div class="np-block"><div class="np-lead">Direction</div><textarea id="cast-motion" rows="4" maxlength="1000" placeholder="Empty: HeyGen chooses how the performer moves">' + escHtml(castUi.motion || '') + '</textarea>'
+      h += '<div class="np-block"><div class="np-lead">Direction</div><textarea id="cast-motion" rows="4" maxlength="1000" style="width:100%;box-sizing:border-box;min-height:88px;resize:vertical;font:inherit;font-size:13px;line-height:1.45;padding:8px 10px;" placeholder="Empty: HeyGen chooses how the performer moves">' + escHtml(castUi.motion || '') + '</textarea>'
         + '<div class="np-hint">How the performer moves: steady, energetic, more hand gestures. HeyGen draws the movement from this. Clear it to let HeyGen choose.</div></div>';
     }
     if (castUi.mode === 'generate') {
@@ -12092,6 +12169,7 @@ ${QUOTIENT_CSS}
       castSay('Starting the recast…');
       api('POST', '/recast/' + castT() + '/' + castP(), { actor: a.id, performer: p.id, voice_id: voiceId, motion: (castUi.motion || '').trim() || undefined }).then(function(st) {
         castUi.data.recast = st;
+        watchTakeStatus();
         castSay(st.files && st.files.every(function(f) { return f.status === 'reused'; }) ? 'Already made: switching.' : 'Recasting as ' + a.name + ' with ' + p.label + ' (~' + p.minutesPer30s + ' min per 30 s of take).', 'ok');
         castRender(); castPoll();
       }).catch(function(e) { castSay(e.message || String(e), 'err'); castGoLabel(); });
@@ -12132,7 +12210,7 @@ ${QUOTIENT_CSS}
         api('/generated-take/' + castT() + '/' + castP()).catch(function() { return {}; }),
       ]).then(function(r) {
         if (!castUi.data || castUi.project !== p) return;
-        castUi.data.speaker_cast = r[0].speaker_cast || null; castUi.data.recast = r[0].recast || null; castUi.data.gen = r[1].generated_take || null;
+        castUi.data.speaker_cast = r[0].speaker_cast || null; castUi.data.recast = r[0].recast || null; castUi.data.rcProgress = r[0].progress || null; castUi.data.gen = r[1].generated_take || null;
         if (castRunning()) { castRender(); castPoll(); return; }
         castUi.timer = null;
         if (wasRunning) {

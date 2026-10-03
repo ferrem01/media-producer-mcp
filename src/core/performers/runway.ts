@@ -7,6 +7,7 @@
  *               actor's portrait (kept beside it in the cast), then driven by
  *               a voice (a script voiced by ElevenLabs or HeyGen).
  */
+import { reportVendor } from "../vendor-status.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { runRunway, download, dataUri, ffmpeg, okJson } from "../actor-test.js";
@@ -60,6 +61,7 @@ async function ready(id: string): Promise<string> {
     if (Date.now() - t0 > DEADLINE_MS) throw new Error("runway avatar: timed out");
     await sleep(POLL_MS);
     const a = await okJson(await fetch(`${API}/avatars/${encodeURIComponent(id)}`, { headers: headers() }), "runway avatar status");
+    reportVendor({ vendor: "runway", job: id, status: `avatar ${a.status}`, message: a.failure });
     if (a.status === "READY") return id;
     if (a.status === "FAILED") throw new Error(`runway avatar: ${a.failure || a.failureCode || "failed"}`);
   }
@@ -100,6 +102,7 @@ export const runway: Performer = {
       if (Date.now() - t0 > DEADLINE_MS) throw new Error("runway avatar video: timed out");
       await sleep(POLL_MS);
       const t = await okJson(await fetch(`${API}/tasks/${task.id}`, { headers: headers() }), "runway task");
+      reportVendor({ vendor: "runway", job: task.id, status: t.status, progress: typeof t.progress === "number" ? t.progress : undefined, message: t.failure });
       if (t.status === "SUCCEEDED") {
         const url = Array.isArray(t.output) ? t.output[0] : null;
         if (!url) throw new Error("runway avatar video: no output url");
