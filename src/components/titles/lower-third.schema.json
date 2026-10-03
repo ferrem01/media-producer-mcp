@@ -66,6 +66,11 @@
       "label": "Size multiplier: sets the card's size (1 = default, 1.5 = 50% larger). The lower third places itself in the frame, so its size is this, not its box.",
       "optional": true,
       "default": 1
+    },
+    "margin": {
+      "type": "number",
+      "label": "Margin from its box's edges, % (default 6 from the side, 8 from the bottom; 0 = flush to the edge). The margin keeps the card clear of rounded phone corners and platform buttons.",
+      "optional": true
     }
   }
 }

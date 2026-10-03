@@ -38,6 +38,9 @@ describe("the lower third's size", () => {
     const html = fs.readFileSync(path.join(dir, "lower-third.component.html"), "utf8");
     expect(html).toMatch(/gsap\.set\(anchor, \{ scale: scale, transformOrigin:/);
     expect(html).toMatch(/Math\.min\(3, Math\.max\(0\.5, Number\(data\.scale\)\)\)/);
+    // Its margin from the box's edges is data too (0 = flush).
+    expect(schema.data.margin).toMatchObject({ type: "number", optional: true });
+    expect(html).toMatch(/Math\.max\(0, Math\.min\(40, Number\(data\.margin\)\)\)/);
   });
 });
 
