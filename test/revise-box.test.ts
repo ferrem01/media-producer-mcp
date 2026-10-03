@@ -39,7 +39,7 @@ describe("the lower third's size", () => {
     expect(html).toMatch(/gsap\.set\(anchor, \{ scale: scale, transformOrigin:/);
     expect(html).toMatch(/Math\.min\(3, Math\.max\(0\.5, Number\(data\.scale\)\)\)/);
     // Its margin from the box's edges is data too (0 = flush).
-    expect(schema.data.margin).toMatchObject({ type: "number", optional: true });
+    expect(schema.data.margin).toMatchObject({ type: "number", optional: true, placeholder: "default: 6 side / 8 bottom" });
     expect(html).toMatch(/Math\.max\(0, Math\.min\(40, Number\(data\.margin\)\)\)/);
   });
 });
