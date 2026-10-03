@@ -3242,6 +3242,14 @@ ${QUOTIENT_CSS}
             renderLayers();
             clearProps();
             updateSceneIndicator();
+            // An edit that reloads the preview keeps the component it was
+            // made on selected (Marc: a box change dropped back to "Select a
+            // component").
+            if (resume && resume.componentIndex >= 0 && project.scenes[idx].components && project.scenes[idx].components[resume.componentIndex]) {
+              state.currentComponentIndex = resume.componentIndex;
+              renderLayers();
+              renderProps();
+            }
             renderCamPills();
             renderMediaLane();
             renderWordLane();
@@ -4276,7 +4284,9 @@ ${QUOTIENT_CSS}
           comp.position = next;
           input.disabled = false;
           studioStatus('Box: ' + k + ' ' + next[k] + ' \u2713', 'ok');
-          startCompositePreview(state.currentProject, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+          // The light refresh a data edit uses: the preview redraws in place,
+          // the component stays selected and the playhead stays put.
+          refreshCompositeInPlace();
         }).catch(function(e) { input.disabled = false; studioStatus('Box change failed: ' + e.message, 'err'); });
       }
       input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
@@ -6322,20 +6332,26 @@ ${QUOTIENT_CSS}
     var savedMasterTime = state.masterTime || 0;
     var patchPath = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
     api('PATCH', patchPath, { data: comp.data }).then(function(result) {
-      if (state.compositeLoaded) {
-        // Composite mode: re-fetch the entire composite document
-        var compositePath = '/preview-composite/' + state.tenantId + '/' + project.project_id;
-        fetchHtml(compositePath).then(function(freshHtml) {
-          state._compositeHtml = freshHtml;
-          writeSceneToIframe(freshHtml);
-          waitForCompositeReady(function(masterTl) {
-            masterTl.time(savedMasterTime);
-            masterTl.pause();
-          });
-        });
-      }
+      refreshCompositeInPlace(savedMasterTime);
     }).catch(function(e) {
       console.error('Save failed:', e);
+    });
+  }
+
+  // Redraw the composite in place after a component edit: same playhead, the
+  // selection and the panels untouched (no timeline rebuild).
+  function refreshCompositeInPlace(atTime) {
+    var project = state.currentProject;
+    if (!project || !state.compositeLoaded) return;
+    var t = atTime != null ? atTime : (state.masterTime || 0);
+    var compositePath = '/preview-composite/' + state.tenantId + '/' + project.project_id;
+    fetchHtml(compositePath).then(function(freshHtml) {
+      state._compositeHtml = freshHtml;
+      writeSceneToIframe(freshHtml);
+      waitForCompositeReady(function(masterTl) {
+        masterTl.time(t);
+        masterTl.pause();
+      });
     });
   }
 

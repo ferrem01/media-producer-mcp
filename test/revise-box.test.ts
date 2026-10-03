@@ -48,5 +48,10 @@ describe("the box in Studio's Inspect", () => {
     expect(s).toMatch(/box \(% of frame\)/);
     expect(s).toMatch(/class="prop-input prop-box-in" data-box="/);
     expect(s).toMatch(/api\('PATCH', patchPath, \{ position: next \}\)/);
+    // Saved in place: the component stays selected (Marc: it dropped to "Select a component").
+    expect(s).toMatch(/function refreshCompositeInPlace\(atTime\)/);
+    const commit = s.slice(s.indexOf("// The box: any of x/y/w/h"), s.indexOf("// Toggle switches (boolean)"));
+    expect(commit).toMatch(/refreshCompositeInPlace\(\);/);
+    expect(commit).not.toMatch(/startCompositePreview/);
   });
 });
