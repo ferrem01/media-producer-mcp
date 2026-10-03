@@ -22,6 +22,9 @@ y, h and w."
   SELF_PLACING_TYPES), so its size is `data.scale` (0.5-3, default 1), grown
   from its anchored corner with the wrap width matched. The reviser prefers a
   data field that says it sets the size over the box.
+- The lower third keeps a margin inside its box (6% from the side, 8% from
+  the bottom: clear of phone corners and platform buttons), so x: 0 did not
+  put it on the edge. `data.margin` (%, 0 = flush) sets it.
 - Open: ~30 library components size in frame units; those that follow a box
   should size from it, self-placing ones need a size field like this one.
 - Studio's Inspect shows every component's box as x / y / w / h in % of

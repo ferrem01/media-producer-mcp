@@ -90,6 +90,14 @@
     if (data && data.accent) root.style.setProperty('--lt3-accent', data.accent);
     if (side === 'right') root.classList.add('lt3-right');
     if ((data && data.vertical) === 'top') root.classList.add('lt3-top');
+    // MARGIN: its distance from the box's edges (the side and the bottom, or
+    // the top), % -- the default 6/8 keeps it clear of phone corners and
+    // platform buttons; 0 is flush (Marc: "x: 0 isn't on the left edge").
+    if (data && data.margin != null && data.margin !== '' && isFinite(Number(data.margin))) {
+      var m = Math.max(0, Math.min(40, Number(data.margin))) + '%';
+      if (side === 'right') anchor.style.right = m; else anchor.style.left = m;
+      if ((data && data.vertical) === 'top') anchor.style.top = m; else anchor.style.bottom = m;
+    }
     // SIZE: the card places itself in the whole frame (its box is the stage),
     // so its size is data.scale -- grown from the anchored corner, the
     // wrap width shrunk to match so a big card still fits the frame.
