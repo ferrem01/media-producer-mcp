@@ -4693,11 +4693,13 @@ Rules:
             const bySrc2: Record<string, Array<{ text: string; start: number; end: number }> | null> = {};
             for (const c of lane2) {
               if (bySrc2[c.source] !== undefined) continue;
-              // A cut take plays its cut copy: the raw take's words, through the
-              // cuts (one transcript per take, not one per copy).
-              const cutTk = takeForClip(project as any, c as any) as any;
-              if (cutTk?.cuts?.length) {
-                try { const w = await wordsForTake(project, { ...cutTk, source: takeCopies(cutTk).raw } as any, config.dataDir); bySrc2[c.source] = w ? wordsThroughCuts(w, cutTk.cuts) : null; }
+              // Every copy of a take -- blur, recast, cut -- plays on the raw
+              // take's clock: its words are the raw take's (through any cuts).
+              // One transcript per take; a recast no longer re-transcribes
+              // seven new files before the lane shows a word (Marc).
+              const tk = takeForClip(project as any, c as any) as any;
+              if (tk) {
+                try { const w = await wordsForTake(project, { ...tk, source: takeCopies(tk).raw } as any, config.dataDir); bySrc2[c.source] = w ? wordsThroughCuts(w, tk.cuts) : null; }
                 catch { bySrc2[c.source] = null; }
                 continue;
               }
