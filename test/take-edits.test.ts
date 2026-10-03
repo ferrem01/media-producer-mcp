@@ -151,3 +151,15 @@ describe("the speaker lane in Studio (Marc's first pass)", () => {
     expect(studio()).toMatch(/sby\._mpTrim !== nx\.trimStart/);
   });
 });
+
+describe("a scene click in Studio shows that scene's take", () => {
+  const studio = () => (require("node:fs") as typeof import("node:fs")).readFileSync(path.join(__dirname, "..", "src/preview-app/preview-app.ts"), "utf8");
+  it("selectScene syncs the media like a scrub, and a paused speaker shows the exact frame", () => {
+    const s = studio();
+    const sel = s.slice(s.indexOf("function selectScene(index) {"), s.indexOf("function preloadSceneVideos("));
+    expect(sel).toMatch(/state\.forceSync = true;\s*syncMedia\(sceneStart, false\);/);
+    expect(s).toMatch(/if \(!playing && el\.paused\) \{/);
+    // The load-time seek holds its own element (the loop's `el` moves on).
+    expect(s).toMatch(/var spkEl = el;\s*spkEl\._mpSeekOnMeta = spkEl\.src;/);
+  });
+});
