@@ -476,12 +476,31 @@ export async function listHeygenLooks(): Promise<HeygenLook[]> {
  *  presenters ("public"), optionally by gender, for browsing. */
 export async function heygenLookPage(opts: { ownership: "private" | "public"; token?: string; limit?: number; gender?: string }): Promise<{ looks: HeygenLook[]; next_token: string | null }> {
   if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
-  const q = new URLSearchParams({ ownership: opts.ownership, limit: String(Math.max(1, Math.min(50, opts.limit || 50))) });
-  if (opts.token) q.set("token", opts.token);
-  const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks?${q}`, { headers: heygenHeaders(false) }), "heygen looks");
-  let looks: HeygenLook[] = (j?.data || []).map((l: any) => ({ ...toLook(l), ...(l.gender ? { gender: l.gender } : {}) }));
-  if (opts.gender) looks = looks.filter((l: any) => !l.gender || String(l.gender).toLowerCase() === opts.gender!.toLowerCase());
-  return { looks, next_token: j?.has_more && j?.next_token ? j.next_token : null };
+  const fetchPage = async (token?: string) => {
+    const q = new URLSearchParams({ ownership: opts.ownership, limit: String(Math.max(1, Math.min(50, opts.limit || 50))) });
+    if (token) q.set("token", token);
+    const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks?${q}`, { headers: heygenHeaders(false) }), "heygen looks");
+    const looks: HeygenLook[] = (j?.data || []).map((l: any) => ({ ...toLook(l), ...(l.gender ? { gender: l.gender } : {}) }));
+    return { looks, next: j?.has_more && j?.next_token ? String(j.next_token) : null };
+  };
+  if (!opts.gender) {
+    const one = await fetchPage(opts.token);
+    return { looks: one.looks, next_token: one.next };
+  }
+  // HeyGen cannot filter by gender and lists one person's ~20 looks together:
+  // the first three pages of stock presenters are all men, so a one-page
+  // filter showed no women at all (Marc). Page on until there are some.
+  const want = opts.gender.toLowerCase();
+  const out: HeygenLook[] = [];
+  let token = opts.token, next: string | null = null;
+  for (let i = 0; i < 12; i++) {
+    const pg = await fetchPage(token);
+    out.push(...pg.looks.filter((l: any) => !l.gender || String(l.gender).toLowerCase() === want));
+    next = pg.next;
+    if (out.length >= 24 || !next) break;
+    token = next;
+  }
+  return { looks: out, next_token: next };
 }
 
 export async function getHeygenLook(id: string): Promise<HeygenLook> {

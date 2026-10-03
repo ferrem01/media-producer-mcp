@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-03 — Cast: HeyGen presenters by gender actually finds women
+
+"There is no women that come up" (Cast -> + Add actor -> HeyGen presenters
+-> Women). HeyGen lists a person's ~20 looks together and has no gender
+filter; the filter ran on one page of 50, and the first three pages of
+stock presenters are all men (measured: 25 people, ~600 looks, 402 male,
+198 female; the first woman is on page 4). `heygenLookPage` with a gender
+now pages on (up to 12 pages) until it has 24 matches or runs out, and
+returns the token where it stopped, so "More" continues from there.
+Test: `test/heygen-looks-gender.test.ts`.
+
 ## 2026-10-03 — The film list sorts by date created
 
 "Can you add a sorted by created date to the film list." Films store
