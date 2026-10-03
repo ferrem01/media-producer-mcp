@@ -28,6 +28,9 @@ y, h and w."
   the frame (stored px converted), saved through the component PATCH on
   Enter/blur. Before, only the speaker had placement controls in Studio;
   the box was editable only through the agent's tools.
+  A box change redraws the preview in place (`refreshCompositeInPlace`, the
+  path a data edit uses) so the component stays selected -- the first cut
+  restarted the preview and dropped to "Select a component".
 - The recast suite's flake was real: a recast said done BEFORE deleting its
   work dirs, so a recast started the moment it read done could lose its
   pieces to the first one's cleanup. The cleanup now runs first.
