@@ -29,6 +29,7 @@ import { resolveVideoPath } from "./video-path.js";
 import { takeCopies, takeForClip, syncSpeakerClips } from "./speaker-layer.js";
 import { getActor, portraitPath, type CastActor } from "./cast.js";
 import { ffmpeg, convertVoice, durationOf } from "./actor-test.js";
+import { detectFace } from "./face-band.js";
 import { PERFORMERS, getPerformer, defaultPerformer, type Performer, type PerformContext } from "./performers/index.js";
 
 const execFileAsync = promisify(execFile);
@@ -207,13 +208,43 @@ export async function performTakeFile(opts: {
   }
 
   ctx.onStage?.("fit");
-  // Exactly the take's frame (cover), rate and length: a short return holds its last frame.
+  // Exactly the take's frame (cover), rate and length: a short return holds
+  // its last frame. A picture of another shape (a landscape look performing
+  // a portrait take) is cropped around the FACE, not the middle (Marc: "I am
+  // not exactly centered in the frame").
+  const crop = await faceCrop(picture, W, H, duration);
   await ffmpeg(["-i", picture, "-i", opts.voiceId ? audio : rawAbs, "-map", "0:v:0", "-map", "1:a:0",
-    "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=${Math.ceil(duration) + 1}`,
+    "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H}${crop ? `:${crop.x}:${crop.y}` : ""},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=${Math.ceil(duration) + 1}`,
     "-af", opts.voiceId ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", duration.toFixed(3), "-movflags", "+faststart", outAbs]);
 }
+
+/** Where to cut a W x H frame out of a picture of another shape, covering
+ *  it: centred on the face across the frame, the face's eyes about two
+ *  fifths down in a taller frame. Null when the shapes match (the plain
+ *  centre crop is right) or no face is found (the centre is the fallback). */
+export async function faceCrop(picture: string, W: number, H: number, duration: number): Promise<{ x: number; y: number } | null> {
+  let sw: number, sh: number;
+  try { [sw, sh] = await sizeOf(picture); } catch { return null; }
+  if (!(sw > 0 && sh > 0) || Math.abs(sw / sh - W / H) < 0.05) return null;
+  const s = Math.max(W / sw, H / sh);
+  const cw = Math.round(sw * s), ch = Math.round(sh * s);
+  const face = await detectFace(picture, duration, 6, sw >= sh ? [480, Math.round((480 * sh) / sw)] : [270, Math.round((270 * sh) / sw)]).catch(() => null);
+  if (!face) return null;
+  return placeCrop(face, cw, ch, W, H);
+}
+
+/** The crop's corner for a face at (cx, cy) fractions of a cw x ch picture. */
+export function placeCrop(face: { cx: number; cy: number }, cw: number, ch: number, W: number, H: number): { x: number; y: number } {
+  const even = (n: number) => Math.max(0, Math.round(n / 2) * 2);
+  const x = even(Math.min(Math.max(0, face.cx * cw - W / 2), cw - W));
+  const y = even(Math.min(Math.max(0, face.cy * ch - H * 0.4), ch - H));
+  return { x, y };
+}
+
+/** Bumped when the recast's framing changes (2: the face-centred crop). */
+const FRAMING = 2;
 
 /** The work dir of one take's recast by one actor through one vendor. */
 function recastWorkDir(tenant: string, projectId: string, actorId: string, performer: string, i: number): string {
@@ -270,6 +301,9 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
       && existing.heygen_look_id === actor.heygen_look_id
       // A new direction is a new performance (HeyGen draws the movement from it).
       && (existing.motion || undefined) === (opts.motion?.trim() || undefined)
+      // Made before the face-centred crop: a landscape look in a portrait
+      // film sat off centre, so an older HeyGen recast is made again.
+      && (performer.id !== "heygen" || existing.framing === FRAMING)
       && (await fs.access(resolveVideoPath(existing.file, config.dataDir)).then(() => true, () => false));
     const file = reusable ? existing.file : raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`);
     st.files.push({ raw, file, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0 });
@@ -315,7 +349,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     const now = new Date().toISOString();
     for (const t of (project as any).takes || []) {
       const hit = ok.find((f) => f.raw === takeCopies(t).raw);
-      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), made_at: now } };
+      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), framing: FRAMING, made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
     // face and half in another is worse than none.

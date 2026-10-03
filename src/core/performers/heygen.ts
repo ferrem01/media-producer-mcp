@@ -11,6 +11,15 @@ import path from "node:path";
 import { runHeygenV3, getHeygenLook, download, ffmpeg } from "../actor-test.js";
 import type { Performer, PerformContext } from "./types.js";
 
+/** The aspect to ask HeyGen for: the take's, unless the look is the other
+ *  orientation -- then the look's, and the recast crops around the face. */
+export function lookAspect(orientation: string | undefined, W: number, H: number): string {
+  const take = H > W * 1.1 ? "9:16" : W > H * 1.1 ? "16:9" : "1:1";
+  if (orientation === "landscape" && take !== "16:9") return "16:9";
+  if (orientation === "portrait" && take !== "9:16") return "9:16";
+  return take;
+}
+
 export const heygen: Performer = {
   id: "heygen",
   label: "HeyGen",
@@ -36,7 +45,10 @@ export const heygen: Performer = {
     }
     const call = (resume?: string) => runHeygenV3({
       lookId, imgFile: img, audioFile: audio,
-      aspect: H > W * 1.1 ? "9:16" : W > H * 1.1 ? "16:9" : "1:1",
+      // The LOOK's own shape when it differs from the take's: HeyGen covers a
+      // portrait frame with a landscape look by cropping its middle, wherever
+      // the person sits; the fit (recast.ts faceCrop) crops around the face.
+      aspect: lookAspect(look?.orientation, W, H),
       engine: look?.engines?.includes("avatar_v") ? "avatar_v" : undefined,
       resolution: "1080p", resume, motion: ctx.motion,
       onSubmit: async (id) => { await fs.writeFile(req, JSON.stringify({ video_id: id })); },

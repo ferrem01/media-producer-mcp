@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-03 — A recast crops around the face
+
+"I am not exactly centered in the frame" (proj_c99e52c3, recast as "Marc at
+his desk"). The takes are 1080x1920; the look is a LANDSCAPE digital twin.
+The recast asked HeyGen for 9:16 with fit cover, and HeyGen filled the
+portrait frame by cropping the look's middle, wherever the person sat.
+- HeyGen is asked for the look's own shape when its orientation differs from
+  the take's (`lookAspect`, performers/heygen.ts).
+- The recast's fit crops a picture of another shape around the detected
+  face (`faceCrop`/`placeCrop`, recast.ts): centred across, eyes ~two fifths
+  down; no face found or same shape -> the centre crop as before.
+  `detectFace` takes the picture's own shape (a landscape face squashed into
+  270x480 was no face to the cascade).
+- `actors[id].framing` (2): an older HeyGen recast is made again, not reused.
+Tests: `test/recast-face-crop.test.ts`.
+
 ## 2026-10-03 — Revise edits a component's box; the lower third has a size
 
 Marc clicked the lower third in Studio and asked Revise to make it 50%
