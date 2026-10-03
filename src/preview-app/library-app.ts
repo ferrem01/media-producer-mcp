@@ -326,7 +326,11 @@ ${RAIL_JS}
           '<b>' + fmtDur(c.duration_seconds) + '</b><span class="dot"></span>' +
           '<span>' + c.scene_count + ' scene' + (c.scene_count === 1 ? '' : 's') + '</span>' +
           (c.frame && c.frame !== '16x9' ? '<span class="dot"></span><span>' + esc(c.frame) + '</span>' : '') +
-          (fmtDate(c.touched_at) ? '<span class="dot"></span><span>' + esc(fmtDate(c.touched_at)) + '</span>' : '') +
+          // Sorted by date created, the card says when it was made (~ when
+          // that date is inferred: older films never stored one).
+          (state.sort === 'created' && fmtDate(c.created)
+            ? '<span class="dot"></span><span title="' + (c.created_guess ? 'Created (estimated: this film predates the stored date)' : 'Created') + '">' + (c.created_guess ? '~' : '') + 'made ' + esc(fmtDate(c.created)) + '</span>'
+            : (fmtDate(c.touched_at) ? '<span class="dot"></span><span>' + esc(fmtDate(c.touched_at)) + '</span>' : '')) +
         '</div>' +
         '<div class="ctags" data-tags-for="' + esc(c.project_id) + '">' +
           (c.tags || []).map(function (t) {
@@ -403,7 +407,7 @@ ${RAIL_JS}
     html += '<span class="grow"></span>';
     if (!state.q) {
       html += '<select class="chip" id="sort">' +
-        ['recent:Newest', 'name:Name', 'longest:Longest'].map(function (o) {
+        ['recent:Last edited', 'created:Date created', 'name:Name', 'longest:Longest'].map(function (o) {
           var v = o.split(':');
           return '<option value="' + v[0] + '"' + (state.sort === v[0] ? ' selected' : '') + '>' + v[1] + '</option>';
         }).join('') + '</select>';

@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-03 — The film list sorts by date created
+
+"Can you add a sorted by created date to the film list." Films store
+created_at, but about half the tenant (older films) never wrote one.
+- Library cards carry `created` (always present): the stored created_at,
+  else the project folder's birth time, else its first take, else its last
+  change -- the earliest of those -- flagged `created_guess`.
+- Sort "Date created" (`sort=created`); "Newest" is renamed "Last edited"
+  (it always sorted by last change). Sorted by created, each card says
+  "made <date>" (with ~ when estimated).
+Test: `test/library-created.test.ts`.
+
 ## 2026-10-03 — A recast's status: every take, what the vendor says, time left
 
 "Recasting is such a big job... it's hard to tell where it is and when it's
