@@ -45,6 +45,12 @@ three timelapse mapper twins of SPEC-timelapse are the risk).
   to happen (the play-through guard skips seeks under 0.12 s and a rolling
   speaker is never corrected under 2 s, and the next take's standby stayed
   parked at its old start -- an edit now re-seeks exactly and re-parks it).
+- Then: "clicking a scene in the left list doesn't work anymore". It moved
+  the playhead but never synced the media (a scrub does), so on a speaker
+  film scene 1's take stayed on screen. selectScene now syncs like a scrub,
+  and a PAUSED speaker always shows the exact frame (the drift tiers only
+  hard-sync past 0.5 s); a file still loading seeks on loadedmetadata --
+  holding its own element (the loop's `var el` had moved on by then).
 Tests: `test/take-edits.test.ts` (real files: raw, blur and alpha copies).
 
 ## 2026-10-02 — The recast's Direction is a real box, with the default in it

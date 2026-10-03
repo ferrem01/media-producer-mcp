@@ -2108,7 +2108,28 @@ ${QUOTIENT_CSS}
         var target = speakerSourceTime(time);
         if (target > state.speakerTrimEnd) target = state.speakerTrimEnd;
         var spkDrift = Math.abs(el.currentTime - target);
-        if (playing && !el.paused && el.readyState >= 3 && !state.forceSync && spkDrift < 2) {
+        if (!playing && el.paused) {
+          // PAUSED IS A FRAME: show exactly the frame under the playhead. The
+          // drift tiers below (hard sync only past 0.5 s) are for a rolling
+          // clock; parked, they left a scene click or a 0.3 s trim showing
+          // the wrong frame. A file still loading gets the seek when it can.
+          if (el.readyState >= 1) {
+            if (spkDrift > 0.04) { try { el.currentTime = target; } catch (eF) {} }
+          } else if (el.src && el._mpSeekOnMeta !== el.src) {
+            // Once per file being loaded (an element with no file yet never
+            // fires, so the guard is the file, not a flag).
+            // (\`el\` is this loop's var: the next clip reassigns it before
+            // the event fires -- hold this element.)
+            var spkEl = el;
+            spkEl._mpSeekOnMeta = spkEl.src;
+            spkEl.addEventListener('loadedmetadata', function() {
+              if (!spkEl.paused) return;
+              var tt = speakerSourceTime(state.masterTime || 0);
+              if (tt > state.speakerTrimEnd) tt = state.speakerTrimEnd;
+              try { spkEl.currentTime = tt; } catch (eM) {}
+            }, { once: true });
+          }
+        } else if (playing && !el.paused && el.readyState >= 3 && !state.forceSync && spkDrift < 2) {
           // The speaker IS the clock while rolling: never corrective-seek it
           // (that snaps the picture AND blips the voice). The clock follows
           // it instead (see animLoop).
@@ -3423,7 +3444,12 @@ ${QUOTIENT_CSS}
       els.slider.value = state.totalDuration > 0 ? Math.round((sceneStart / state.totalDuration) * 1000) : 0;
       updateTimeDisplay(sceneStart);
       updateSceneIndicator();
-      // Speaker track
+      // The media follow, as a scrub does: on a speaker film the camera IS
+      // the picture, and a click that moved only the playhead left scene 1's
+      // take on screen (Marc: "it doesn't work anymore").
+      state.forceSync = true;
+      syncMedia(sceneStart, false);
+      state.forceSync = false;
       renderLayers();
       clearProps();
     }
