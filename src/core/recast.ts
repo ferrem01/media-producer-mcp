@@ -325,12 +325,15 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     // A take cut by hand plays cut copies: the new performance gets its own.
     await recutProjectTakes(tenant, projectId).catch((e) => console.warn(`  recast: cutting the new performance failed: ${e?.message || e}`));
   }
+  // The pieces were only a means: keep the recast, drop the pieces -- BEFORE
+  // saying done. A recast started the moment this one reads done uses the
+  // same work dirs; cleaning up after let this one delete that one's pieces
+  // (the recast suite's flake: a vendor call counted twice, or once).
+  for (let i = 0; i < st.files.length; i++) await fs.rm(recastWorkDir(tenant, projectId, actor.id, performer.id, i), { recursive: true, force: true }).catch(() => {});
+  await fs.rm(path.join(projectOutputDir(tenant, projectId), "_cast"), { recursive: true, force: true }).catch(() => {});
   st.status = ok.length === st.files.length ? "done" : "failed";
   if (st.status === "failed") st.error = st.files.find((f) => f.error)?.error || "a take could not be recast";
   st.finished_at = new Date().toISOString();
   await saveStatus(tenant, st);
   running.delete(key);
-  // The pieces were only a means: keep the recast, drop the pieces.
-  for (let i = 0; i < st.files.length; i++) await fs.rm(recastWorkDir(tenant, projectId, actor.id, performer.id, i), { recursive: true, force: true }).catch(() => {});
-  await fs.rm(path.join(projectOutputDir(tenant, projectId), "_cast"), { recursive: true, force: true }).catch(() => {});
 }

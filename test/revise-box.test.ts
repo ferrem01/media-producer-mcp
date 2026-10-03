@@ -40,3 +40,13 @@ describe("the lower third's size", () => {
     expect(html).toMatch(/Math\.min\(3, Math\.max\(0\.5, Number\(data\.scale\)\)\)/);
   });
 });
+
+describe("the box in Studio's Inspect", () => {
+  it("every component shows x/y/w/h in % of the frame and saves a change through the component PATCH", () => {
+    const s = fs.readFileSync(path.join(__dirname, "..", "src/preview-app/preview-app.ts"), "utf8");
+    expect(s).toMatch(/function boxPercents\(pos, canvas\)/);
+    expect(s).toMatch(/box \(% of frame\)/);
+    expect(s).toMatch(/class="prop-input prop-box-in" data-box="/);
+    expect(s).toMatch(/api\('PATCH', patchPath, \{ position: next \}\)/);
+  });
+});

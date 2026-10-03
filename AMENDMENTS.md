@@ -24,7 +24,14 @@ y, h and w."
   data field that says it sets the size over the box.
 - Open: ~30 library components size in frame units; those that follow a box
   should size from it, self-placing ones need a size field like this one.
-Tests: `test/revise-box.test.ts`.
+- Studio's Inspect shows every component's box as x / y / w / h in % of
+  the frame (stored px converted), saved through the component PATCH on
+  Enter/blur. Before, only the speaker had placement controls in Studio;
+  the box was editable only through the agent's tools.
+- The recast suite's flake was real: a recast said done BEFORE deleting its
+  work dirs, so a recast started the moment it read done could lose its
+  pieces to the first one's cleanup. The cleanup now runs first.
+Tests: `test/revise-box.test.ts`, `test/recast.test.ts`.
 
 ## 2026-10-02 — Trim and cut a camera take (speaker_track), the screencast way
 
