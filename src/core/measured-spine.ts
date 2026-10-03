@@ -7,6 +7,7 @@
 
 import { recaptionIfStale } from "./captions.js";
 import path from "node:path";
+import fs from "node:fs/promises";
 import type { Project, Take } from "./types.js";
 import { getTranscript, whisperAvailable, snapLeadingWords, snapWordsOutOfSilences } from "./transcribe.js";
 import { getWaveformPeaks } from "./waveform.js";
@@ -34,10 +35,27 @@ export async function wordsForTake(project: Project, take: Take, dataDir?: strin
     if (onsetIdx > 0) segs = snapLeadingWords(segs, onsetIdx / wf.bucketsPerSecond);
   } catch { /* waveform optional */ }
   try {
-    const silences = await detectSilence(file);
+    // The silences are measured once per file (an ffmpeg pass per take on
+    // every lane load made Studio wait ~1 s a take).
+    const silences = await cachedSilences(file, cacheDir);
     if (silences.length) segs = snapWordsOutOfSilences(segs, silences);
   } catch { /* ffmpeg optional */ }
   return segs.map((s) => ({ text: s.text, start: s.start, end: s.end }));
+}
+
+/** detectSilence, kept beside the transcript and keyed to the file's size
+ *  and mtime. */
+async function cachedSilences(file: string, cacheDir: string): Promise<Array<{ from: number; to: number }>> {
+  const st = await fs.stat(file);
+  const key = `${st.size}:${Math.round(st.mtimeMs)}`;
+  const memo = path.join(cacheDir, "silences.json");
+  try {
+    const m = JSON.parse(await fs.readFile(memo, "utf8"));
+    if (m && m.key === key && Array.isArray(m.silences)) return m.silences;
+  } catch { /* none yet */ }
+  const silences = await detectSilence(file);
+  try { await fs.mkdir(cacheDir, { recursive: true }); await fs.writeFile(memo, JSON.stringify({ key, silences })); } catch { /* best effort */ }
+  return silences as any;
 }
 
 /** The de-aired window of a whole recording (single-scene attach): the

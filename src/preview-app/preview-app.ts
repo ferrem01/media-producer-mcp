@@ -8585,7 +8585,17 @@ ${QUOTIENT_CSS}
     cv.height = 15;
     var ctx = cv.getContext('2d');
     ctx.clearRect(0, 0, cv.width, cv.height);
-    ctx.fillStyle = 'var(--blue-300)';
+    // A canvas cannot read a CSS variable: 'var(--blue-300)' fell back to
+    // black, invisible on a camera take's thumbnails (Marc: "the wave did
+    // not load"). Resolve it.
+    var waveCol = '';
+    try { waveCol = getComputedStyle(document.documentElement).getPropertyValue('--blue-300').trim(); } catch (eW) {}
+    ctx.fillStyle = waveCol || '#93b4f5';
+    // Over a camera take's thumbnails the faint blue underlay vanishes: light
+    // bars, nearly opaque, read on any picture.
+    var onTakes = !!document.querySelector('.spk-take');
+    cv.style.opacity = onTakes ? '0.8' : '';
+    if (onTakes) ctx.fillStyle = 'rgba(255,255,255,0.92)';
     var bps = r.buckets_per_second || 6;
     var wvOff = speakerFilmOffset() - (state.speakerTrimStart || 0);
     var visible = Math.min(r.peaks.length, Math.ceil((total - wvOff) * bps));

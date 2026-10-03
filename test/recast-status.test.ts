@@ -68,3 +68,15 @@ describe("where a recast is", () => {
     expect(s).toMatch(/<textarea id="cast-motion" rows="4" maxlength="1000" style="width:100%/);
   });
 });
+
+describe("the speaker lane after a recast", () => {
+  it("reads the raw take's words for every copy, caches the silences, and draws the wave in a real colour", () => {
+    const idx = fs.readFileSync(path.join(__dirname, "..", "src/index.ts"), "utf8");
+    expect(idx).toMatch(/const tk = takeForClip\(project as any, c as any\) as any;\s*if \(tk\) \{/);
+    const ms = fs.readFileSync(path.join(__dirname, "..", "src/core/measured-spine.ts"), "utf8");
+    expect(ms).toMatch(/const silences = await cachedSilences\(file, cacheDir\);/);
+    const s = fs.readFileSync(path.join(__dirname, "..", "src/preview-app/preview-app.ts"), "utf8");
+    expect(s).not.toMatch(/ctx\.fillStyle = 'var\(--blue-300\)';/);
+    expect(s).toMatch(/getPropertyValue\('--blue-300'\)/);
+  });
+});

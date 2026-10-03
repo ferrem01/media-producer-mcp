@@ -24,6 +24,15 @@ going to be done." Studio showed one line built from the first take only.
   word -- queued #n, working 42%, finished --, job id, error, time run) under
   "N of M done, m:ss, ~n min left"; the header pill keeps the count with the
   panel closed. The Direction box spans the panel (it was a third wide).
+- After Marc's first real recast the speaker lane showed no words and no
+  wave. Words: the lane transcribed each clip's OWN file, so a recast's seven
+  new files were transcribed from scratch (13 s+, much longer cold) -- every
+  copy of a take (blur, recast, cut) now reads the raw take's words through
+  its cuts; and wordsForTake's silence pass (an ffmpeg run per take on every
+  load, ~7 s a film) is cached beside the transcript. Wave: the canvas was
+  given 'var(--blue-300)', which a canvas cannot read -> black, at 28% over
+  dark take thumbnails; the colour is resolved, and over camera takes the
+  bars are light and nearly opaque.
 Tests: `test/recast-status.test.ts`.
 
 ## 2026-10-03 — A recast crops around the face
