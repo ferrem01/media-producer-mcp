@@ -61,9 +61,11 @@ export function detectInFrame(pixels: Uint8Array, width: number, height: number,
  * seconds) and return the median face, or null when fewer than half the
  * frames show one.
  */
-export async function detectFace(filePath: string, duration: number, frames = 6): Promise<FaceBox | null> {
+export async function detectFace(filePath: string, duration: number, frames = 6, dims?: [number, number]): Promise<FaceBox | null> {
   const classify = await classifier();
-  const W = 270, H = 480;
+  // A portrait take by default; a landscape file passes its own shape (a
+  // face squashed into 270x480 is not a face to the cascade).
+  const [W, H] = dims || [270, 480];
   const boxes: FaceBox[] = [];
   const span = Math.max(1, duration - 2);
   for (let i = 0; i < frames; i++) {
