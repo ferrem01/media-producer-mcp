@@ -158,7 +158,7 @@ describe("the desktop Studio's camera follows the scene too", () => {
     // a cut too -- the underlay seeks to its trim (measured live: the voice
     // ran ~1.2s behind the mouth from scene 2 on).
     expect(app).toMatch(/var winKey = wantBase \+ '\|' \+ want\.trimStart \+ '\|' \+ want\.sceneStart;/);
-    expect(app).toMatch(/if \(clip\._window !== undefined && clip\._window !== winKey && !swapped\) \{\s*var cutT = speakerSourceTime\(time\);/);
+    expect(app).toMatch(/if \(clip\._window !== undefined && \(clip\._window !== winKey \|\| edited\) && !swapped\) \{\s*var cutT = speakerSourceTime\(time\);/);
     expect(app).toMatch(/clip\._window = winKey;/);
   });
 });
@@ -250,7 +250,8 @@ describe("a continuous speaker track keeps no scene markers", () => {
   it("contiguous windows of one recording play through the cut: the preview seeks only when the jump is real", async () => {
     const fs = await import("node:fs/promises");
     const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
-    expect(studio).toMatch(/if \(Math\.abs\(curT - cutT\) > 0\.12\) \{\s*try \{ el\.currentTime = cutT; \}/);
+    // (A take just trimmed or cut seeks on any jump: take-edits.test.ts.)
+    expect(studio).toMatch(/if \(Math\.abs\(curT - cutT\) > \(edited \? 0\.02 : 0\.12\)\) \{\s*try \{ el\.currentTime = cutT; \}/);
   });
 
   it("an opaque scene (no person under it) takes no take need, and a needed one it carried is withdrawn", async () => {

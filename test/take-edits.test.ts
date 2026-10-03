@@ -134,3 +134,20 @@ describe("take edits wiring", () => {
     expect(studio).toMatch(/'\/take-edit\/'/);
   });
 });
+
+describe("the speaker lane in Studio (Marc's first pass)", () => {
+  const studio = () => (require("node:fs") as typeof import("node:fs")).readFileSync(path.join(__dirname, "..", "src/preview-app/preview-app.ts"), "utf8");
+  it("reserves the lane for camera takes from the first paint (no jump when the transcript lands)", () => {
+    expect(studio()).toMatch(/\(p\.speaker_track && p\.speaker_track\.clips && p\.speaker_track\.clips\.length\) \|\|/);
+    expect(studio()).toMatch(/speakerTrackIsPerScene\(\) && total > 0 && y\.speaker >= 0/);
+  });
+  it("keeps the take under the words and the waveform; only its edges and seams rise", () => {
+    expect(studio()).not.toMatch(/\.spk-clip\.spk-take \{ z-index/);
+    expect(studio()).toMatch(/\.spk-clip \.spk-h \{[^}]*z-index: 6/);
+  });
+  it("re-seeks the speaker exactly after an edit, and re-parks the next take at its new start", () => {
+    expect(studio()).toMatch(/state\._takeEditN = \(state\._takeEditN \|\| 0\) \+ 1/);
+    expect(studio()).toMatch(/Math\.abs\(curT - cutT\) > \(edited \? 0\.02 : 0\.12\)/);
+    expect(studio()).toMatch(/sby\._mpTrim !== nx\.trimStart/);
+  });
+});

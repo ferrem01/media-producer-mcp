@@ -560,13 +560,13 @@ ${QUOTIENT_CSS}
   .spk-clip:hover { box-shadow: 0 0 0 1.5px var(--accent-blue), inset 0 0 0 1px rgb(45 99 225 / 0.28); }
   /* A camera take's edges drag to trim it; its cuts show as red seams
      (core/take-edits.ts). */
-  /* Above the scrubber (z 4): a take's click, edges and seams must be reachable. */
-  .spk-clip.spk-take { z-index: 5; }
-  .spk-clip .spk-h { position: absolute; top: -1px; bottom: -1px; width: 8px; cursor: ew-resize; z-index: 2; }
+  /* The take itself stays UNDER the words and the waveform; only its edges
+     and seams rise above them, so they can be grabbed. */
+  .spk-clip .spk-h { position: absolute; top: -1px; bottom: -1px; width: 8px; cursor: ew-resize; z-index: 6; }
   .spk-clip .spk-h.l { left: -1px; border-radius: 4px 0 0 4px; }
   .spk-clip .spk-h.r { right: -1px; border-radius: 0 4px 4px 0; }
   .spk-clip:hover .spk-h, .spk-clip .spk-h.on { background: rgb(45 99 225 / 0.55); }
-  .spk-clip .spk-seam { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--red-500); border-radius: 2px; cursor: pointer; z-index: 2; }
+  .spk-clip .spk-seam { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--red-500); border-radius: 2px; cursor: pointer; z-index: 6; }
   .spk-clip .spk-drag { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); font: 600 10px/14px Inter, sans-serif; color: #fff;
     background: var(--accent-blue); border-radius: 3px; padding: 0 5px; white-space: nowrap; pointer-events: none; }
   .tk-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; color: var(--content-secondary); }
@@ -2061,7 +2061,16 @@ ${QUOTIENT_CSS}
         // < 2s as "the speaker is the clock"). A new window on the same
         // file IS a cut: seek to its trim, once.
         var winKey = wantBase + '|' + want.trimStart + '|' + want.sceneStart;
-        if (clip._window !== undefined && clip._window !== winKey && !swapped) {
+        // A take just trimmed or cut: land on the new frame exactly -- the
+        // play-through guard below swallowed a 0.1 s trim (Marc).
+        var edited = clip._edit !== (state._takeEditN || 0);
+        clip._edit = state._takeEditN || 0;
+        if (edited && swapped) {
+          var eT = speakerSourceTime(time);
+          if (eT > want.trimEnd) eT = want.trimEnd;
+          try { if (Math.abs((Number(el.currentTime) || 0) - eT) > 0.02) el.currentTime = eT; } catch (eE) {}
+        }
+        if (clip._window !== undefined && (clip._window !== winKey || edited) && !swapped) {
           var cutT = speakerSourceTime(time);
           if (cutT > want.trimEnd) cutT = want.trimEnd;
           // CONTIGUOUS WINDOWS PLAY THROUGH: "record all" cuts one file into
@@ -2073,7 +2082,7 @@ ${QUOTIENT_CSS}
           // scrub); drift correction below keeps the rest honest.
           var curT = 0;
           try { curT = Number(el.currentTime) || 0; } catch (eCur) {}
-          if (Math.abs(curT - cutT) > 0.12) {
+          if (Math.abs(curT - cutT) > (edited ? 0.02 : 0.12)) {
             try { el.currentTime = cutT; } catch (eCut) {}
             clip._lastSeekTs = (window.performance && performance.now) ? performance.now() : Date.now();
           }
@@ -6475,9 +6484,14 @@ ${QUOTIENT_CSS}
     var nx = speakerClipForTime(nextStart + 0.01);
     if (!nx) return;
     var base = nx.url.split('/').pop();
-    if (sby.src && sby.src.indexOf(base) >= 0) return;
+    if (sby.src && sby.src.indexOf(base) >= 0) {
+      // Same file, new start (the take was trimmed): park it again.
+      if (sby._mpTrim !== nx.trimStart && sby.paused && sby.readyState >= 1) { try { sby.currentTime = nx.trimStart; sby._mpTrim = nx.trimStart; } catch (eR) {} }
+      return;
+    }
     sby.muted = true;
     sby.src = nx.url;
+    sby._mpTrim = nx.trimStart;
     sby.addEventListener('loadedmetadata', function() { try { sby.currentTime = nx.trimStart; } catch (eS) {} }, { once: true });
     sby.load();
   }
@@ -7454,7 +7468,11 @@ ${QUOTIENT_CSS}
   function laneLayout() {
     var p = state.currentProject || {};
     var tracks = ((p.audio || {}).tracks) || [];
+    // Camera takes (speaker_track) count from the first paint: waiting for
+    // the transcript drew the takes at the top for a second, then dropped
+    // them into their lane (Marc).
     var hasSpk = !!((p.speaker && p.speaker.clips && p.speaker.clips.length) ||
+      (p.speaker_track && p.speaker_track.clips && p.speaker_track.clips.length) ||
       (state._transcript && state._transcript.length) ||
       tracks.some(function(t) { return t.type === 'voiceover'; }));
     var hasMusic = tracks.some(function(t) { return t.type === 'music'; });
@@ -7797,7 +7815,7 @@ ${QUOTIENT_CSS}
     applyLaneLayout(y);
     renderCompLane();
     var hasSpeaker = !!(p.speaker && p.speaker.clips && p.speaker.clips.length);
-    if (!hasSpeaker && speakerTrackIsPerScene() && total > 0) {
+    if (!hasSpeaker && speakerTrackIsPerScene() && total > 0 && y.speaker >= 0) {
       // Per-scene takes: one piece per take at its scene, the way the
       // film plays them. Click a piece to jump to its scene.
       p.speaker_track.clips.forEach(function(c) {
@@ -8101,6 +8119,7 @@ ${QUOTIENT_CSS}
     body.scene_index = si;
     studioStatus(verb + '…', '');
     return api('POST', '/take-edit/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body).then(function(r) {
+      state._takeEditN = (state._takeEditN || 0) + 1;
       var d = r.shortened || 0;
       studioStatus('Scene ' + (si + 1) + ' take: ' + r.seconds.toFixed(2) + 's' + (Math.abs(d) >= 0.01 ? ' (' + (d > 0 ? d.toFixed(2) + 's shorter' : (-d).toFixed(2) + 's longer') + ')' : '') + '.', 'ok');
       afterSpeakerEdit(r, Math.max(0, sceneStartFor(si) - 0.5));
