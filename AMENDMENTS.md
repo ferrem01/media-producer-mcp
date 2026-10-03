@@ -37,6 +37,14 @@ three timelapse mapper twins of SPEC-timelapse are the risk).
   them. API `POST /api/take-edit/{t}/{p}`; MCP `edit_speaker` with
   scene_index (trim / cut / restore / list).
 - Not yet: a punch-in to hide a jump cut; split markers on a take.
+- Marc's first pass in Studio (fixed the same day): the speaker lane drew
+  at the top until the transcript landed (the layout only counted
+  `project.speaker` or a transcript -- camera takes now count from the first
+  paint); the takes covered the words and waveform (raised above the
+  scrubber -- now only the edges and seams rise); a 0.1-0.2 s trim seemed not
+  to happen (the play-through guard skips seeks under 0.12 s and a rolling
+  speaker is never corrected under 2 s, and the next take's standby stayed
+  parked at its old start -- an edit now re-seeks exactly and re-parks it).
 Tests: `test/take-edits.test.ts` (real files: raw, blur and alpha copies).
 
 ## 2026-10-02 — The recast's Direction is a real box, with the default in it
