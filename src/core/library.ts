@@ -42,6 +42,12 @@ export interface LibraryCard {
    *  own updated_at/created_at when it has one (111 of 251 did not), else the
    *  file's mtime. Sorting a library by date cannot have holes in it. */
   touched_at: string;
+  /** When the film was made, always present: its own created_at, else (older
+   *  films never wrote one -- about half the tenant) when its folder was
+   *  created, else its earliest take or last change. `created_guess` marks
+   *  the fallback. Marc: "add a sorted by created date to the film list". */
+  created: string;
+  created_guess?: boolean;
 }
 
 interface Entry {
@@ -100,7 +106,7 @@ function collectStrings(value: unknown, out: string[], budget = { left: 24000 },
   }
 }
 
-function buildEntry(project: Project, mtime: number, renderMtime: number): Entry {
+function buildEntry(project: Project, mtime: number, renderMtime: number, bornMs = 0): Entry {
   const scenes = project.scenes || [];
   const duration = scenes.reduce((sum, s) => sum + (Number(s.duration_seconds) || 0), 0);
   const p = project as unknown as Record<string, any>;
@@ -150,6 +156,7 @@ function buildEntry(project: Project, mtime: number, renderMtime: number): Entry
     archived_at: p.archived_at || undefined,
     ...(normalizeTags(p.tags).length ? { tags: normalizeTags(p.tags) } : {}),
     touched_at: p.updated_at || p.created_at || new Date(mtime).toISOString(),
+    ...createdOf(p, bornMs, mtime),
   };
 
   return {
@@ -163,6 +170,15 @@ function buildEntry(project: Project, mtime: number, renderMtime: number): Entry
       tags: normalizeTags(p.tags),
     },
   };
+}
+
+/** When a film was made: its created_at, else the folder's birth, else its
+ *  first take, else its last change (flagged as a guess). */
+function createdOf(p: Record<string, any>, bornMs: number, mtime: number): { created: string; created_guess?: boolean } {
+  if (p.created_at) return { created: String(p.created_at) };
+  const takes = ((p.takes || []) as Array<{ recorded_at?: string }>).map((t) => t.recorded_at).filter((x): x is string => !!x).sort();
+  const candidates = [bornMs > 0 ? new Date(bornMs).toISOString() : "", takes[0] || "", p.updated_at || "", mtime > 0 ? new Date(mtime).toISOString() : ""].filter(Boolean).sort();
+  return { created: candidates[0] || new Date(0).toISOString(), created_guess: true };
 }
 
 /** Read every project in the tenant, reusing index entries whose file has not moved. */
@@ -190,7 +206,9 @@ export async function libraryEntries(tenantId: string): Promise<Entry[]> {
     if (cached && cached.mtime === mtime && cached.renderMtime === renderMtime) { out.push(cached); continue; }
     const project = await loadProject(tenantId, id);
     if (!project) continue;
-    const entry = buildEntry(project, mtime, renderMtime);
+    let bornMs = 0;
+    try { bornMs = (await fs.stat(path.join(dir, id))).birthtimeMs || 0; } catch { /* no birth time on this filesystem */ }
+    const entry = buildEntry(project, mtime, renderMtime, bornMs);
     index.set(key, entry);
     out.push(entry);
   }
@@ -205,7 +223,7 @@ export function forgetProject(tenantId: string, projectId: string): void {
   index.delete(`${tenantId}/${projectId}`);
 }
 
-export type LibrarySort = "recent" | "name" | "longest";
+export type LibrarySort = "recent" | "created" | "name" | "longest";
 export type LibraryFilter = "all" | "rendered" | "built" | "board";
 
 function matchesFilter(card: LibraryCard, filter: LibraryFilter): boolean {
@@ -311,6 +329,7 @@ export async function searchLibrary(tenantId: string, query: LibraryQuery): Prom
     ranked = pool.map((e) => e.card).sort((a, b) =>
       sort === "name" ? a.name.localeCompare(b.name)
       : sort === "longest" ? b.duration_seconds - a.duration_seconds
+      : sort === "created" ? b.created.localeCompare(a.created)
       : b.touched_at.localeCompare(a.touched_at));
   }
 
