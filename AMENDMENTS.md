@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-03 — Revise edits a component's box; the lower third has a size
+
+Marc clicked the lower third in Studio and asked Revise to make it 50%
+larger; it answered that it could not. A library component's Revise edited
+its DATA only, and the lower third has no size field -- its type is sized in
+frame units (2.2vw: ~24 px on a 1080-wide 9:16 frame), so even its box would
+not have grown it. Marc: "I would expect the revise to be able to change x,
+y, h and w."
+- Revise of a library component now edits its BOX as well: the reviser sees
+  the frame size and the current box, and returns `_box` ({x, y, width,
+  height}, the box's own units) beside the data (`sanitizeBox`); "bigger",
+  "move it up", "full width" land on `component.position`.
+- The lower third places itself in the whole frame (its box is the stage --
+  SELF_PLACING_TYPES), so its size is `data.scale` (0.5-3, default 1), grown
+  from its anchored corner with the wrap width matched. The reviser prefers a
+  data field that says it sets the size over the box.
+- Open: ~30 library components size in frame units; those that follow a box
+  should size from it, self-placing ones need a size field like this one.
+Tests: `test/revise-box.test.ts`.
+
 ## 2026-10-02 — Trim and cut a camera take (speaker_track), the screencast way
 
 Marc reshot seven per-scene takes and wanted 0.3 s off the start of one:
