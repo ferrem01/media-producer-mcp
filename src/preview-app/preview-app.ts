@@ -858,6 +858,9 @@ ${QUOTIENT_CSS}
   .prop-label {
     font-size: 11px; font-weight: 500; color: var(--content-secondary);
   }
+  .prop-box { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .prop-box-f { display: flex; align-items: center; gap: 3px; font-size: 10px; color: var(--content-tertiary); }
+  .prop-box-f .prop-input { padding: 5px 4px; min-width: 0; }
   .prop-input {
     width: 100%; padding: 6px 10px;
     font-size: 12px; font-family: inherit;
@@ -4007,6 +4010,21 @@ ${QUOTIENT_CSS}
     return { min: -absVal * 2, max: absVal * 2, step: absVal > 100 ? 1 : 0.1 };
   }
 
+  // A component's box as % of the frame (it may be stored as "N%" or px).
+  function boxPercents(pos, canvas) {
+    pos = pos || {};
+    var W = (canvas && canvas.width) || 1920, H = (canvas && canvas.height) || 1080;
+    var out = {};
+    [['x', W], ['y', H], ['width', W], ['height', H]].forEach(function(f) {
+      var v = pos[f[0]];
+      if (v == null || v === '') return;
+      var n = parseFloat(v);
+      if (!isFinite(n)) return;
+      out[f[0]] = Math.round((/%$/.test(String(v)) ? n : (n / f[1]) * 100) * 10) / 10;
+    });
+    return out;
+  }
+
   function renderProps() {
     if (!els.propEditor) return; // obsolete prop editor removed; Revise panel handles edits
     loadSchemaEnums();
@@ -4017,6 +4035,13 @@ ${QUOTIENT_CSS}
 
     var html = '<div class="props-content">';
     html += '<div class="prop-component-type">' + escHtml(comp.type) + '</div>';
+    // THE BOX: where the component sits and how big it is, in % of the frame
+    // (Marc: x/y/w/h were editable only through the agent).
+    var bx = boxPercents(comp.position, project.canvas);
+    html += '<div class="prop-row"><label class="prop-label" title="Where it sits and how big it is, in % of the frame">box (% of frame)</label><div class="prop-box">'
+      + [['x', 'x'], ['y', 'y'], ['width', 'w'], ['height', 'h']].map(function(f) {
+          return '<label class="prop-box-f"><span>' + f[1] + '</span><input type="number" step="0.5" class="prop-input prop-box-in" data-box="' + f[0] + '" value="' + (bx[f[0]] != null ? bx[f[0]] : '') + '"></label>';
+        }).join('') + '</div></div>';
 
     var data = comp.data || {};
     var keys = Object.keys(data);
@@ -4234,6 +4259,29 @@ ${QUOTIENT_CSS}
     els.propEditor.innerHTML = html;
 
     // ── Wire up event handlers ──
+
+    // The box: any of x/y/w/h, saved on Enter or leaving the field.
+    els.propEditor.querySelectorAll('.prop-box-in').forEach(function(input) {
+      function commit() {
+        var v = parseFloat(input.value);
+        var k = input.getAttribute('data-box');
+        var cur = boxPercents(comp.position, project.canvas);
+        if (!isFinite(v) || cur[k] === Math.round(v * 10) / 10) return;
+        var next = {};
+        ['x', 'y', 'width', 'height'].forEach(function(f) { if (cur[f] != null) next[f] = cur[f] + '%'; });
+        next[k] = (Math.round(v * 10) / 10) + '%';
+        var patchPath = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+        input.disabled = true;
+        api('PATCH', patchPath, { position: next }).then(function() {
+          comp.position = next;
+          input.disabled = false;
+          studioStatus('Box: ' + k + ' ' + next[k] + ' \u2713', 'ok');
+          startCompositePreview(state.currentProject, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+        }).catch(function(e) { input.disabled = false; studioStatus('Box change failed: ' + e.message, 'err'); });
+      }
+      input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+      input.addEventListener('change', commit);
+    });
 
     // Toggle switches (boolean)
     els.propEditor.querySelectorAll('.prop-toggle-input').forEach(function(input) {
