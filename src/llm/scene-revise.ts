@@ -83,7 +83,7 @@ export function resolveReviseTarget(scene: any, element?: ReviseElement): Revise
 export function sanitizeDataRevise(
   raw: string,
   prevData: Record<string, unknown>,
-): { ok: true; data: Record<string, unknown>; note?: string } | { ok: false; error: string } {
+): { ok: true; data: Record<string, unknown>; note?: string; box?: ComponentBox } | { ok: false; error: string } {
   let data: Record<string, unknown>;
   try {
     data = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim());
@@ -101,6 +101,12 @@ export function sanitizeDataRevise(
   }
   const note = typeof (data as any)._note === "string" ? (data as any)._note : note0;
   delete (data as any)._note;
+  // The component's BOX (x/y/width/height) rides along as _box: a library
+  // component's size and place are its box, not its data (Marc: "I would
+  // expect the revise to be able to change x, y, h and w").
+  const box = sanitizeBox((data as any)._box);
+  delete (data as any)._box;
+  if (box && !Object.keys(data).length) return { ok: true, data: {}, note, box };
   // Drop slot-DEFINITION echoes ({type, label} objects) -- keep the current
   // value for those keys instead of storing schema metadata as content.
   for (const [k, v] of Object.entries(data)) {
@@ -114,7 +120,21 @@ export function sanitizeDataRevise(
   if (prevKeys.length > 0 && !Object.keys(data).some((k) => prevKeys.includes(k))) {
     return { ok: false, error: "Data revise dropped every existing key -- scene unchanged." };
   }
-  return { ok: true, data, note };
+  return { ok: true, data, note, ...(box ? { box } : {}) };
+}
+
+export type ComponentBox = Partial<Record<"x" | "y" | "width" | "height", number | string>>;
+
+/** A revise's box: only x/y/width/height, each a number (px) or "N%"/"Npx". */
+export function sanitizeBox(raw: unknown): ComponentBox | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const out: ComponentBox = {};
+  for (const k of ["x", "y", "width", "height"] as const) {
+    const v = (raw as any)[k];
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = Math.round(v * 100) / 100;
+    else if (typeof v === "string" && /^-?\d+(\.\d+)?(%|px)?$/.test(v.trim())) out[k] = v.trim();
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 export interface ReviseSceneOpts {
@@ -515,8 +535,9 @@ async function reviseLibraryComponentData(
     }
   } catch { /* schema is optional context */ }
 
-  const sys = `You edit the data of a "${comp.type}" component inside a video scene. The component's rendering is fixed code; you can ONLY change its data fields (sizes, positions, text, styling options the fields express). Return ONLY the updated data object as pure JSON -- the same shape as "Current data", no markdown fences, no commentary, no schema. Keep every existing key, and keep values the instruction does not affect unchanged (NEVER change file/URL fields like video_url unless explicitly asked). If the instruction asks for something the data fields cannot express, leave the data unchanged and add a "_note" string key explaining what this component's data cannot do.`;
-  const user = `Component: ${comp.type} (id: ${comp.id})\n${fieldLines ? `Data fields:\n${fieldLines}\n` : ""}\nCurrent data:\n${JSON.stringify(comp.data || {}, null, 2)}\n\nInstruction: ${opts.instruction.trim()}\n\nReturn ONLY the updated data JSON object (same shape as Current data).`;
+  const sys = `You edit a "${comp.type}" component inside a video scene. The component's rendering is fixed code; you change its DATA fields (text, styling options, sizes the fields express) and its BOX -- where it sits in the frame and how big it is (x, y, width, height). Return ONLY the updated data object as pure JSON -- the same shape as "Current data", no markdown fences, no commentary, no schema. Keep every existing key, and keep values the instruction does not affect unchanged (NEVER change file/URL fields like video_url unless explicitly asked). To MOVE or RESIZE the component ("bigger", "50% larger", "move it up", "full width"), add a "_box" key with the box fields that change, in the SAME units as "Current box" ("N%" of the frame, or px numbers). Resize around where it sits: a component anchored bottom-left keeps its left edge and its bottom edge (y + height) and grows up and right; a centred one keeps its centre. Prefer the box over a data field for size and place unless a data field says it sets that size. If the instruction asks for something neither the data nor the box can express, leave both unchanged and add a "_note" string key explaining why.`;
+  const W = project.canvas?.width || 1920, H = project.canvas?.height || 1080;
+  const user = `Component: ${comp.type} (id: ${comp.id})\nFrame: ${W}x${H}\nCurrent box: ${JSON.stringify(comp.position || {})}\n${fieldLines ? `Data fields:\n${fieldLines}\n` : ""}\nCurrent data:\n${JSON.stringify(comp.data || {}, null, 2)}\n\nInstruction: ${opts.instruction.trim()}\n\nReturn ONLY the updated data JSON object (same shape as Current data, plus "_box" if the box changes).`;
 
   let raw: string;
   try {
@@ -535,6 +556,7 @@ async function reviseLibraryComponentData(
   // here can be load-bearing (video_url IS the film) -- absence must never
   // mean deletion for a library component.
   comp.data = { ...(comp.data || {}), ...sanitized.data };
+  if (sanitized.box) comp.position = { ...(comp.position || {}), ...sanitized.box };
   await saveProject(project);
 
   // Re-assemble for the Studio preview (best-effort; the data is already saved).

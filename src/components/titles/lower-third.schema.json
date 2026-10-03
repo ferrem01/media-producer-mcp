@@ -60,6 +60,12 @@
         "top"
       ],
       "description": "bottom (the lower third proper) or top (a top third, for a scene whose bottom band is busy)"
+    },
+    "scale": {
+      "type": "number",
+      "label": "Size multiplier: sets the card's size (1 = default, 1.5 = 50% larger). The lower third places itself in the frame, so its size is this, not its box.",
+      "optional": true,
+      "default": 1
     }
   }
 }

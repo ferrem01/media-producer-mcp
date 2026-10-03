@@ -90,6 +90,14 @@
     if (data && data.accent) root.style.setProperty('--lt3-accent', data.accent);
     if (side === 'right') root.classList.add('lt3-right');
     if ((data && data.vertical) === 'top') root.classList.add('lt3-top');
+    // SIZE: the card places itself in the whole frame (its box is the stage),
+    // so its size is data.scale -- grown from the anchored corner, the
+    // wrap width shrunk to match so a big card still fits the frame.
+    var scale = (data && Number(data.scale) > 0) ? Math.min(3, Math.max(0.5, Number(data.scale))) : 1;
+    if (scale !== 1) {
+      gsap.set(anchor, { scale: scale, transformOrigin: (side === 'right' ? 'right ' : 'left ') + ((data && data.vertical) === 'top' ? 'top' : 'bottom') });
+      anchor.style.maxWidth = (64 / scale).toFixed(2) + '%';
+    }
 
     // Entrance travel direction: enter from the anchored side.
     var dir = side === 'right' ? 1 : -1;
