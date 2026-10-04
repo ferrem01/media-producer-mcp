@@ -33,7 +33,7 @@ import { takeForClip, takeCopies } from "./speaker-layer.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3" | "seedance25" | "genjutsu";
+export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3" | "seedance25" | "genjutsu" | "hf-seedance25";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -54,7 +54,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY", seedance25: "FAL_KEY", genjutsu: "HF_API_KEY_ID" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY", seedance25: "FAL_KEY", genjutsu: "HF_API_KEY_ID", "hf-seedance25": "HF_API_KEY_ID" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -337,6 +337,51 @@ export async function runSeedance25Recast(video: string, img: string, seconds: n
     prompt: prompt || SEEDANCE25_RECAST_PROMPT, video_urls: [video], image_urls: [img],
     duration: String(Math.max(4, Math.min(30, Math.round(seconds)))), aspect_ratio: aspect, resolution: "720p", generate_audio: false,
   }, "seedance 2.5");
+}
+
+/** Seedance 2.5 reference-to-video through HIGGSFIELD's API (not fal): the
+ *  same recast idea as runSeedance25Recast -- the motion from @Video1, the
+ *  person from @Image1. Our fal call was refused on a photoreal face; this
+ *  measures whether Higgsfield's route is. Public URLs only (asset:// is
+ *  rejected there). */
+/** The performance-transfer prompt that worked through Higgsfield on Oct 3
+ *  (Marc's brief): the face from the sheet, the body language from the take,
+ *  the words and voice from the audio. */
+export const HF_PERFORMANCE_PROMPT = "The person from the first reference image (the start frame) and the character sheet (the same face, hair, clothes and accessories) talks directly to the camera " +
+  "in a vertical selfie-style medium close-up in a bright modern office. They perform exactly like the person in the reference video: " +
+  "copy the head movements, hand gestures, timing and energy. Do not copy that person's face, hair or clothes. " +
+  "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
+  "Dry close-mic'd voice, no room echo, no music. Soft natural window light, realistic skin texture, no text on screen.";
+export async function runHiggsfieldSeedance25(video: string, img: string | string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+  const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
+  if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");
+  const headers = { Authorization: `Key ${id}:${secret}`, "Content-Type": "application/json" };
+  const sub = await okJson(await fetch("https://api.higgsfield.ai/bytedance/seedance-2.5/reference-to-video", {
+    method: "POST", headers: { ...headers, "Idempotency-Key": crypto.randomBytes(12).toString("hex") },
+    body: JSON.stringify({
+      prompt: opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), video_urls: [video], image_urls: Array.isArray(img) ? img : [img],
+      ...(opts.audio ? { audio_urls: [opts.audio] } : {}),
+      duration: Math.max(4, Math.min(30, Math.round(seconds))), aspect_ratio: aspect, resolution: opts.resolution || "480p",
+      // With a voice track the video carries it (lip-synced); without one, silent.
+      generate_audio: !!opts.audio,
+    }),
+  }), "higgsfield seedance 2.5 submit");
+  const statusUrl = sub?.status_url || (sub?.request_id ? `https://api.higgsfield.ai/requests/${sub.request_id}/status` : "");
+  if (!statusUrl) throw new Error(`higgsfield seedance 2.5 submit: ${JSON.stringify(sub).slice(0, 300)}`);
+  await opts.onSubmit?.(statusUrl);
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > GENJUTSU_DEADLINE_MS) throw new Error("higgsfield seedance 2.5: timed out");
+    await sleep(POLL_MS);
+    const st = await okJson(await fetch(statusUrl, { headers }), "higgsfield seedance 2.5 status");
+    reportVendor({ vendor: "higgsfield seedance", job: st?.request_id, status: st.status });
+    if (st.status === "completed") {
+      const url = st?.video?.url || st?.videos?.[0]?.url;
+      if (!url) throw new Error("higgsfield seedance 2.5: completed without a video url");
+      return url;
+    }
+    if (["failed", "canceled", "cancelled", "nsfw", "error"].includes(String(st.status))) throw new Error(`higgsfield seedance 2.5: ${st.status}${st.error || st.message ? " -- " + (st.error || st.message) : ""} ${JSON.stringify(st).slice(0, 300)}`);
+  }
 }
 
 export async function runKling(src: string, img: string, prompt?: string): Promise<string> {
@@ -703,10 +748,16 @@ export async function startActorTest(opts: {
    *  heygen-v3: a look id (listHeygenLooks); without one it animates the portrait. */
   heygen_avatar_id?: string;
   /** genjutsu: a SETTING reference (tenant-relative image) -- the actor is
-   *  placed there (a podcast set), the motion kept. */
+   *  placed there (a podcast set), the motion kept. hf-seedance25: a second
+   *  reference image (the model sheet behind the start frame). */
   scene_image?: string;
-  /** genjutsu: "480p" | "720p" | "1080p" (a test defaults to 720p). */
+  /** genjutsu / hf-seedance25: "480p" | "720p" | "1080p" (720p / 480p by default). */
   resolution?: string;
+  /** The performance from a file of the tenant (e.g. a b-roll clip,
+   *  "projects/<id>/assets/cb-walk-phone.mp4") instead of a speaker take. */
+  video_asset?: string;
+  /** Cap the source at this many seconds (a cheap test). */
+  max_seconds?: number;
   /** heygen-v3: "low" | "medium" | "high" (Avatar IV). */
   expressiveness?: string;
   /** heygen-v3: "avatar_iv" | "avatar_v" | "avatar_iii" (HeyGen's default when omitted). */
@@ -715,7 +766,7 @@ export async function startActorTest(opts: {
   const project = await loadProject(opts.tenant, opts.project);
   if (!project) throw new Error("Project not found");
   const clip = ((project as any).speaker_track?.clips || []).find((c: any) => c.scene_index === opts.scene_index);
-  if (!clip && !opts.video_from) throw new Error(`Scene ${opts.scene_index + 1} has no speaker clip`);
+  if (!clip && !opts.video_from && !opts.video_asset) throw new Error(`Scene ${opts.scene_index + 1} has no speaker clip`);
   const tenantDir = path.resolve(config.dataDir, opts.tenant);
   const fromFile = async (ref: { test: string; file: string }, what: string): Promise<string> => {
     if (!isActorTestId(String(ref?.test || "")) || !/^[A-Za-z0-9_.-]+$/.test(String(ref?.file || ""))) throw new Error(`${what}: bad reference`);
@@ -738,15 +789,25 @@ export async function startActorTest(opts: {
   // clips at the actor's file (measured: a Genjutsu trial on Old Chimp,
   // cast as the HeyGen sofa look, was fed the HeyGen video, not Marc).
   const rawSource = clip ? (takeCopies(takeForClip(project as any, clip) || null).raw || clip.source) : "";
-  const src = opts.video_from
+  let assetAbs = "";
+  if (opts.video_asset) {
+    assetAbs = path.resolve(tenantDir, String(opts.video_asset).replace(/^\/+/, ""));
+    if (!assetAbs.startsWith(tenantDir + path.sep)) throw new Error("video_asset must be a path inside the tenant");
+    await fs.access(assetAbs).catch(() => { throw new Error(`video_asset not found: ${opts.video_asset}`); });
+  }
+  const src0 = assetAbs
+    ? { path: assetAbs, start: 0, end: null as number | null }
+    : opts.video_from
     ? { path: await fromFile(opts.video_from, "video_from"), start: 0, end: null as number | null }
     : opts.source_range && Number(opts.source_range.end) > Number(opts.source_range.start)
       ? { path: resolveVideoPath(rawSource, config.dataDir), start: Math.max(0, Number(opts.source_range.start)), end: Number(opts.source_range.end) }
       : { path: resolveVideoPath(rawSource, config.dataDir), start: Number(clip.trim_start) || 0, end: clip.trim_end == null ? null : Number(clip.trim_end) };
+  const cap = Number(opts.max_seconds) > 0 ? Number(opts.max_seconds) : 0;
+  const src = cap ? { ...src0, end: src0.end == null ? src0.start + cap : Math.min(src0.end, src0.start + cap) } : src0;
   const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3", "seedance25", "genjutsu"].includes(p));
+    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3", "seedance25", "genjutsu", "hf-seedance25"].includes(p));
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -879,6 +940,35 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
         // can collect the video instead of paying for another (measured: a
         // 720p run outlasted the old 25 min wait and was lost).
         onSubmit: async (statusUrl) => { await fs.writeFile(f("genjutsu-request.json"), JSON.stringify({ status_url: statusUrl })); },
+      });
+    } else if (p === "hf-seedance25") {
+      if (!img) throw new Error("hf-seedance25 needs a portrait (image or image_from)");
+      if (!config.publicUrl.startsWith("https://")) throw new Error("hf-seedance25 needs the server's public https address (Higgsfield fetches by URL)");
+      const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
+      const aspect = h > w * 1.1 ? "9:16" : w > h * 1.1 ? "16:9" : "1:1";
+      // The reference at full detail (a model sheet's face close-up is a
+      // third of a wide image; actor.jpg is capped at 1024 wide).
+      await ffmpeg(["-i", img.path, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet.jpg")]);
+      test.files.sheet = "sheet.jpg";
+      // A second reference (scene_image): in the Oct 3 runs the GPT Image
+      // start frame went first and the model sheet second.
+      const refs = [`${pub}/sheet.jpg`];
+      if (heygenOpts.sceneAbs) {
+        await ffmpeg(["-i", heygenOpts.sceneAbs, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet2.jpg")]);
+        test.files.sheet2 = "sheet2.jpg";
+        refs.push(`${pub}/sheet2.jpg`);
+      }
+      // The voice track as the brief asks: the converted voice, -14 LUFS, WAV.
+      await voiceJob;
+      let audio: string | undefined;
+      if (test.files.voice) {
+        await ffmpeg(["-i", f("voice.mp3"), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", f("voice.wav")]);
+        test.files.voice_wav = "voice.wav";
+        audio = `${pub}/voice.wav`;
+      }
+      url = await runHiggsfieldSeedance25(`${pub}/source.mp4`, refs, srcSecs, aspect, {
+        prompt, resolution: heygenOpts.resolution || "480p", audio,
+        onSubmit: async (statusUrl) => { await fs.writeFile(f("hf-seedance25-request.json"), JSON.stringify({ status_url: statusUrl })); },
       });
     } else if (p === "seedance25") {
       if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");

@@ -2919,6 +2919,8 @@ Rules:
               scene_image: typeof body.scene_image === "string" ? body.scene_image : undefined,
               resolution: typeof body.resolution === "string" && ["480p", "720p", "1080p"].includes(body.resolution) ? body.resolution : undefined,
               engine: typeof body.engine === "string" ? body.engine : undefined,
+              video_asset: typeof body.video_asset === "string" ? body.video_asset : undefined,
+              max_seconds: body.max_seconds != null ? Number(body.max_seconds) : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;
