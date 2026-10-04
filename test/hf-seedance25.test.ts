@@ -29,8 +29,9 @@ describe("Seedance 2.5 on Higgsfield", () => {
 
     // The brief's performance transfer: sheet + take + voice track, the video carrying the voice.
     sent.length = 0; polls = 0;
-    await runHiggsfieldSeedance25("https://x/source.mp4", "https://x/sheet.jpg", 8.7, "9:16", { audio: "https://x/voice.wav" });
-    expect(sent[0].body).toMatchObject({ audio_urls: ["https://x/voice.wav"], image_urls: ["https://x/sheet.jpg"], duration: 9, generate_audio: true });
+    await runHiggsfieldSeedance25("https://x/source.mp4", "https://x/sheet.jpg", 8.7, "9:16", { audio: "https://x/voice-ref.mp3" });
+    // A second of headroom past the voice, as Marc's app run had it.
+    expect(sent[0].body).toMatchObject({ audio_urls: ["https://x/voice-ref.mp3"], image_urls: ["https://x/sheet.jpg"], duration: 10, bitrate_mode: "standard", generate_audio: true });
     expect(sent[0].body.prompt).toMatch(/Do not copy that person's face/);
 
     polls = 0;
