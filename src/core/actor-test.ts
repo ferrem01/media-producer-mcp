@@ -352,7 +352,7 @@ export const HF_PERFORMANCE_PROMPT = "The person from the first reference image 
   "copy the head movements, hand gestures, timing and energy. Do not copy that person's face, hair or clothes. " +
   "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
   "Dry close-mic'd voice, no room echo, no music. Soft natural window light, realistic skin texture, no text on screen.";
-export async function runHiggsfieldSeedance25(video: string, img: string | string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+export async function runHiggsfieldSeedance25(video: string, img: string | string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; duration?: number; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
   const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
   if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");
   const headers = { Authorization: `Key ${id}:${secret}`, "Content-Type": "application/json" };
@@ -363,7 +363,7 @@ export async function runHiggsfieldSeedance25(video: string, img: string | strin
       ...(opts.audio ? { audio_urls: [opts.audio] } : {}),
       // With a voice track, a second of headroom past it (Marc's app run
       // gave 8.7 s of voice 10 s); the model squeezing the words lost sync.
-      duration: Math.max(4, Math.min(30, opts.audio ? Math.ceil(seconds) + 1 : Math.round(seconds))), aspect_ratio: aspect, resolution: opts.resolution || "480p",
+      duration: Math.max(4, Math.min(30, opts.duration ? Math.round(opts.duration) : opts.audio ? Math.ceil(seconds) + 1 : Math.round(seconds))), aspect_ratio: aspect, resolution: opts.resolution || "480p",
       bitrate_mode: "standard",
       // With a voice track the video carries it (lip-synced); without one, silent.
       generate_audio: !!opts.audio,
@@ -724,6 +724,8 @@ export async function convertVoice(wav: string, out: string, voiceId: string): P
   await fs.writeFile(out, Buffer.from(await r.arrayBuffer()));
 }
 
+type HfUrls = { video_url: string; audio_url?: string; image_urls: string[]; duration?: number };
+
 export async function startActorTest(opts: {
   tenant: string;
   project: string;
@@ -761,6 +763,9 @@ export async function startActorTest(opts: {
   video_asset?: string;
   /** Cap the source at this many seconds (a cheap test). */
   max_seconds?: number;
+  /** hf-seedance25: send these public URLs exactly as given, nothing made
+   *  on our side (an A/B against a Higgsfield app run's own inputs). */
+  hf_urls?: { video_url: string; audio_url?: string; image_urls: string[]; duration?: number };
   /** heygen-v3: "low" | "medium" | "high" (Avatar IV). */
   expressiveness?: string;
   /** heygen-v3: "avatar_iv" | "avatar_v" | "avatar_iii" (HeyGen's default when omitted). */
@@ -841,7 +846,13 @@ export async function startActorTest(opts: {
     if (!sceneAbs.startsWith(tenantDir + path.sep)) throw new Error("scene_image must be a path inside the tenant");
     await fs.access(sceneAbs).catch(() => { throw new Error(`scene_image not found: ${opts.scene_image}`); });
   }
-  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs, resolution: opts.resolution })
+  let hfUrls: HfUrls | undefined;
+  if (opts.hf_urls) {
+    const u = opts.hf_urls, isUrl = (x: unknown) => typeof x === "string" && /^https:\/\/[^\s]+$/.test(x);
+    if (!isUrl(u.video_url) || (u.audio_url != null && !isUrl(u.audio_url)) || !Array.isArray(u.image_urls) || !u.image_urls.length || u.image_urls.length > 30 || !u.image_urls.every(isUrl)) throw new Error("hf_urls: video_url, image_urls (1-30) and audio_url must be https URLs");
+    hfUrls = { video_url: u.video_url, audio_url: u.audio_url, image_urls: u.image_urls, duration: Number(u.duration) > 0 ? Math.max(4, Math.min(30, Math.round(Number(u.duration)))) : undefined };
+  }
+  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs, resolution: opts.resolution, hfUrls })
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
   return test;
 }
@@ -862,7 +873,7 @@ async function step<T>(test: ActorTest, name: string, fn: () => Promise<T>): Pro
   }
 }
 
-async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string; sceneAbs?: string; resolution?: string } = {}): Promise<void> {
+async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string; sceneAbs?: string; resolution?: string; hfUrls?: HfUrls } = {}): Promise<void> {
   const dir = actorTestDir(test.tenant_id, test.project_id, test.id);
   const f = (name: string) => path.join(dir, name);
 
@@ -949,35 +960,41 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (!config.publicUrl.startsWith("https://")) throw new Error("hf-seedance25 needs the server's public https address (Higgsfield fetches by URL)");
       const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
       const aspect = h > w * 1.1 ? "9:16" : w > h * 1.1 ? "16:9" : "1:1";
-      // The reference at full detail (a model sheet's face close-up is a
-      // third of a wide image; actor.jpg is capped at 1024 wide).
-      await ffmpeg(["-i", img.path, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet.jpg")]);
-      test.files.sheet = "sheet.jpg";
-      // A second reference (scene_image): in the Oct 3 runs the GPT Image
-      // start frame went first and the model sheet second.
-      const refs = [`${pub}/sheet.jpg`];
-      if (heygenOpts.sceneAbs) {
-        await ffmpeg(["-i", heygenOpts.sceneAbs, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet2.jpg")]);
-        test.files.sheet2 = "sheet2.jpg";
-        refs.push(`${pub}/sheet2.jpg`);
+      const onSubmit = async (statusUrl: string) => { await fs.writeFile(f("hf-seedance25-request.json"), JSON.stringify({ status_url: statusUrl })); };
+      if (heygenOpts.hfUrls) {
+        // Exactly the given inputs (Marc's app run): the A/B is the route.
+        const u = heygenOpts.hfUrls;
+        url = await runHiggsfieldSeedance25(u.video_url, u.image_urls, srcSecs, aspect, { prompt, resolution: heygenOpts.resolution || "480p", audio: u.audio_url, duration: u.duration, onSubmit });
+      } else {
+        // The reference at full detail (a model sheet's face close-up is a
+        // third of a wide image; actor.jpg is capped at 1024 wide).
+        await ffmpeg(["-i", img.path, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet.jpg")]);
+        test.files.sheet = "sheet.jpg";
+        // A second reference (scene_image): in the Oct 3 runs the GPT Image
+        // start frame went first and the model sheet second.
+        const refs = [`${pub}/sheet.jpg`];
+        if (heygenOpts.sceneAbs) {
+          await ffmpeg(["-i", heygenOpts.sceneAbs, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet2.jpg")]);
+          test.files.sheet2 = "sheet2.jpg";
+          refs.push(`${pub}/sheet2.jpg`);
+        }
+        // The voice track: the converted voice at -14 LUFS, as MP3 (what
+        // Marc's app run sent).
+        await voiceJob;
+        let audio: string | undefined;
+        if (test.files.voice) {
+          await ffmpeg(["-i", f("voice.mp3"), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", f("voice-ref.mp3")]);
+          test.files.voice_ref = "voice-ref.mp3";
+          audio = `${pub}/voice-ref.mp3`;
+        }
+        // The take as the motion reference only: its own voice stripped, so
+        // the voice track is the one voice the model hears (two voices drifted).
+        await ffmpeg(["-i", f("source.mp4"), "-an", "-c:v", "copy", "-movflags", "+faststart", f("motion.mp4")]);
+        test.files.motion = "motion.mp4";
+        url = await runHiggsfieldSeedance25(`${pub}/motion.mp4`, refs, srcSecs, aspect, {
+          prompt, resolution: heygenOpts.resolution || "480p", audio, onSubmit,
+        });
       }
-      // The voice track: the converted voice at -14 LUFS, as MP3 (what
-      // Marc's app run sent).
-      await voiceJob;
-      let audio: string | undefined;
-      if (test.files.voice) {
-        await ffmpeg(["-i", f("voice.mp3"), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", f("voice-ref.mp3")]);
-        test.files.voice_ref = "voice-ref.mp3";
-        audio = `${pub}/voice-ref.mp3`;
-      }
-      // The take as the motion reference only: its own voice stripped, so
-      // the voice track is the one voice the model hears (two voices drifted).
-      await ffmpeg(["-i", f("source.mp4"), "-an", "-c:v", "copy", "-movflags", "+faststart", f("motion.mp4")]);
-      test.files.motion = "motion.mp4";
-      url = await runHiggsfieldSeedance25(`${pub}/motion.mp4`, refs, srcSecs, aspect, {
-        prompt, resolution: heygenOpts.resolution || "480p", audio,
-        onSubmit: async (statusUrl) => { await fs.writeFile(f("hf-seedance25-request.json"), JSON.stringify({ status_url: statusUrl })); },
-      });
     } else if (p === "seedance25") {
       if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");
       const pub = config.publicUrl.startsWith("https://")

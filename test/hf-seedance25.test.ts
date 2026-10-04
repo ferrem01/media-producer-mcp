@@ -34,6 +34,11 @@ describe("Seedance 2.5 on Higgsfield", () => {
     expect(sent[0].body).toMatchObject({ audio_urls: ["https://x/voice-ref.mp3"], image_urls: ["https://x/sheet.jpg"], duration: 10, bitrate_mode: "standard", generate_audio: true });
     expect(sent[0].body.prompt).toMatch(/Do not copy that person's face/);
 
+    // An exact duration (hf_urls: an app run's own inputs) is sent as given.
+    sent.length = 0; polls = 0;
+    await runHiggsfieldSeedance25("https://x/v.mp4", ["https://x/a.png", "https://x/b.png"], 8.7, "9:16", { audio: "https://x/a.mp3", duration: 10 });
+    expect(sent[0].body).toMatchObject({ video_urls: ["https://x/v.mp4"], image_urls: ["https://x/a.png", "https://x/b.png"], audio_urls: ["https://x/a.mp3"], duration: 10 });
+
     polls = 0;
     vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: any) => init?.method === "POST"
       ? new Response(JSON.stringify({ request_id: "r2", status_url: "https://api.higgsfield.ai/requests/r2/status" }), { status: 200 })
