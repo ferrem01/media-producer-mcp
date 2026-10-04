@@ -994,7 +994,7 @@ export interface Take {
   /** The take IS a cast actor's performance (core/scene-performance.ts):
    *  made by a vendor from the scene's line, no recording behind it. A
    *  recast never redraws it. */
-  performed_by?: { actor: string; engine: "seedance"; quality: "draft" | "final" };
+  performed_by?: { actor: string; engine: "seedance" | "heygen"; quality: "draft" | "final" };
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };

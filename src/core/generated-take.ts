@@ -122,7 +122,7 @@ async function heygenEngine(voiceId: string): Promise<string | null> {
   return engine;
 }
 
-async function heygenSpeech(text: string, voiceId: string, out: string, ssml = false): Promise<void> {
+export async function heygenSpeech(text: string, voiceId: string, out: string, ssml = false): Promise<void> {
   const engine = await heygenEngine(voiceId);
   const r = await fetch("https://api.heygen.com/v3/voices/speech", {
     method: "POST", headers: { "X-Api-Key": String(process.env.HEYGEN_API_KEY), "Content-Type": "application/json" },

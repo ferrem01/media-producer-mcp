@@ -8,7 +8,8 @@
  *   recast               one recast job per actor and engine, those scenes only
  *   record               the recording back (free); a scene with no recording
  *                        waits for the booth
- *   generate + HeyGen    not per scene yet (phase D): reported, skipped
+ *   generate + HeyGen    the look speaks the line (its look is the setting;
+ *                        HeyGen API credits, no draft)
  *
  * FINALS ALL: every ready scene with a draft and no final, finished at 1080p
  * from its draft (Atlas draft-complete: the same shot, nothing sent again).
@@ -71,6 +72,11 @@ export async function planPerformance(tenant: string, projectId: string, opts: {
       row.action = "perform";
       row.seconds = billed(sceneSeconds(project, i));
       row.usd = Math.round(row.seconds * SEEDANCE_DRAFT_USD_PER_S * 100) / 100;
+    } else if (plan.engine === "heygen") {
+      // HeyGen bills its own API credits; its one render is the take (no draft).
+      row.action = "perform";
+      row.seconds = Math.ceil(sceneSeconds(project, i));
+      row.note = "HeyGen API credits";
     } else row.note = `${ENGINE_LABEL[plan.engine || ""] || plan.engine} per scene is not built yet`;
     out.push(row);
   });

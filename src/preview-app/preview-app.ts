@@ -12037,7 +12037,7 @@ ${QUOTIENT_CSS}
   }
   // ── Scene by scene (core/scene-performance.ts) ──
   function castNameOf(id) { var a = castActorById(id); return a ? a.name : id; }
-  var SP_STAGE = { frame: 'drawing the start frame', voice: 'voicing the line', draft: 'Seedance is making the draft', final: 'Seedance is making the 1080p final', attach: 'attaching it to the scene' };
+  var SP_STAGE = { frame: 'drawing the start frame', voice: 'voicing the line', draft: 'Seedance is making the draft', final: 'Seedance is making the 1080p final', attach: 'attaching it to the scene', heygen: 'HeyGen is performing it' };
   function castScenesHtml() {
     var d = castUi.data, list = d.scenes || [], a = castActorById(castUi.actor), p = castPerfById(castUi.performer);
     castUi.spOpen = castUi.spOpen || {}; castUi.spShot = castUi.spShot || {}; castUi.spVoice = castUi.spVoice || {}; castUi.spClip = castUi.spClip || {}; castUi.spClipSec = castUi.spClipSec || {};

@@ -771,3 +771,43 @@ describe("perform the plan: every scene that does not answer it, with the cost f
     expect((await pp.planFinals(T, P3)).scenes).toEqual([]);
   }, 120000);
 });
+
+describe("HeyGen generates a scene: the look is the setting", () => {
+  it("voices the line, HeyGen draws the person from the portrait, our voice laid under it, attached as the scene's take with no draft", async () => {
+    process.env.HEYGEN_API_KEY = "hk"; process.env.ELEVENLABS_API_KEY = "ek"; process.env.ATLASCLOUD_API_KEY = "ak";
+    const m = await media(path.join(DATA, "_media_hg"));
+    const P3 = "proj_pp";
+    const hey: any[] = [];
+    let atlas = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.includes("api.atlascloud.ai")) { atlas++; throw new Error("no Seedance here"); }
+      if (u.endsWith("/v3/assets")) { hey.push({ asset: true }); return new Response(JSON.stringify({ data: { asset_id: `a${hey.length}` } })); }
+      if (u.endsWith("/v3/videos") && init?.method === "POST") { hey.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { video_id: "hv1" } })); }
+      if (u.includes("/v3/videos/hv1")) return new Response(JSON.stringify({ data: { status: "completed", video_url: "https://cdn/hg.mp4" } }));
+      if (u === "https://cdn/hg.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const pp = await import("../src/core/perform-plan.js");
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: { actor: "dana", how: "generate", engine: "heygen" } }] });
+    const est = await pp.planPerformance(T, P3, { scenes: [1] });
+    expect(est.scenes[0]).toMatchObject({ action: "perform", note: "HeyGen API credits" });
+    expect(est.scenes[0].usd).toBeUndefined();
+    // No engine named: the plan's (HeyGen).
+    await sp.startScenePerformance(T, P3, 1, { voice_source: "script" });
+    await until(async () => (await sp.getScenePerformances(T, P3))[1].performance?.status !== "running", 40000);
+    const s1 = (await sp.getScenePerformances(T, P3))[1];
+    expect(s1.performance.error).toBeUndefined();
+    expect(atlas).toBe(0);
+    const gen = hey.find((h) => h.audio_asset_id);
+    expect(gen).toMatchObject({ type: "image", aspect_ratio: "9:16", resolution: "1080p" });
+    expect(gen.motion_prompt).toMatch(/calm, grounded presenter/);
+    expect(s1.performance.final.url).toMatch(/take-performed-dana-s2-final-heygen-.*\.mp4$/);
+    expect(s1.performance.draft).toBeUndefined();
+    expect(s1.performance.made_with).toEqual({ actor: "dana", engine: "heygen" });
+    expect(s1).toMatchObject({ state: "ready", plan_line: "Dana · Generate · HeyGen" });
+    expect((await pp.planFinals(T, P3, { scenes: [1] })).scenes).toEqual([]);   // nothing to finish: HeyGen's render is the take
+  }, 90000);
+});

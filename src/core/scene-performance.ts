@@ -27,9 +27,11 @@ import { loadProject, saveProject } from "../persistence/project.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
 import { getActor, listCast, portraitPath, type CastActor } from "./cast.js";
-import { resolvePlan, planState, planLine, planField, writePlan, applyPlanEdit, type ResolvedPlan } from "./cast-plan.js";
+import { resolvePlan, planState, planLine, planField, writePlan, applyPlanEdit, defaultEngine, type ResolvedPlan } from "./cast-plan.js";
+import { getPerformer } from "./performers/index.js";
+import { getHeygenLook } from "./actor-test.js";
 import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
-import { elevenSpeech, spokenParts } from "./generated-take.js";
+import { elevenSpeech, heygenSpeech, spokenParts, DEFAULT_MOTION } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, cutClock, cutFileFor } from "./take-clock.js";
 import { editImage } from "../media/image-gen.js";
@@ -503,6 +505,11 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   room_url?: string;
   /** The location (a tenant location id; "" for none). */
   location?: string;
+  /** Who makes it: "seedance" or "heygen" (a HeyGen look's own setting).
+   *  Omitted: the plan's engine for this actor, else the best for them. */
+  engine?: "seedance" | "heygen";
+  /** HeyGen: a direction for the movement ("" for none). */
+  motion?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -512,6 +519,9 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   const prev: ScenePerformance | undefined = scene.performance;
   const plan = await planOf(tenant, project, si);
   const actor = await needActor(tenant, opts.actor || plan.actor || prev?.actor);
+  const engine = opts.engine || (plan.how === "generate" && plan.actor === actor.id && plan.engine ? plan.engine : defaultEngine("generate", actor));
+  if (engine === "heygen") return startSceneHeygen(tenant, projectId, si, actor, plan, opts);
+  if (engine !== "seedance") throw new Error(`${engine} cannot perform a scene from its line (seedance or heygen)`);
   if (!process.env.ATLASCLOUD_API_KEY) throw new Error("Seedance is not set up on this server (ATLASCLOUD_API_KEY)");
   if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice first`);
   const quality = opts.quality === "final" ? "final" : "draft";
@@ -550,6 +560,92 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     release();
     await patch(tenant, projectId, si, (p) => { p.status = "failed"; p.error = String(e?.message || e).slice(0, 300); delete p.stage; p.finished_at = new Date().toISOString(); }).catch(() => {});
   }).finally(() => { running.delete(key); vendorNow.delete(key); });
+  return perf;
+}
+
+/** HEYGEN GENERATES THE SCENE: the actor's look (or portrait) speaks the
+ *  scene's line -- the look is the setting, so there is no frame and no
+ *  location. The voice: the actor's ElevenLabs voice (the v4 delivery, or the
+ *  recording converted), else the look's own HeyGen voice. Our voice is laid
+ *  under HeyGen's picture (its own copy is re-encoded). No draft: HeyGen's
+ *  one render is the take. Returns at once. */
+async function startSceneHeygen(tenant: string, projectId: string, si: number, actor: CastActor, plan: ResolvedPlan, opts: {
+  voice_source?: "script" | "take"; delivery?: string; motion?: string;
+}): Promise<ScenePerformance> {
+  const doAttach = attacher;
+  if (!doAttach) throw new Error("Takes cannot be attached here");
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HeyGen is not set up on this server (HEYGEN_API_KEY)");
+  const { project, scene } = await loadScene(tenant, projectId, si);
+  const prev: ScenePerformance | undefined = scene.performance;
+  const source = opts.voice_source || prev?.voice_source || "script";
+  let lookVoice = "";
+  if (!actor.voice_id) {
+    if (!actor.heygen_look_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice first`);
+    if (source === "take") throw new Error(`${actor.name} has no ElevenLabs voice to convert your recording to: give the actor one, or read the script`);
+    lookVoice = (await getHeygenLook(actor.heygen_look_id)).default_voice_id || "";
+    if (!lookVoice) throw new Error(`${actor.name}'s look has no HeyGen voice of its own: give the actor an ElevenLabs voice`);
+  }
+  const key = `${tenant}/${projectId}/${si}`;
+  if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
+  const motion = opts.motion === undefined ? DEFAULT_MOTION : String(opts.motion).trim().slice(0, 1000);
+  const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
+  running.add(key);
+  const perf = await patch(tenant, projectId, si, (p, sc) => {
+    if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
+    p.actor = actor.id; p.voice_source = source;
+    if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
+    p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
+    followPlan(sc, project, { actor: actor.id, how: "generate", engine: "heygen" }, plan);
+  });
+  const release = () => { running.delete(key); vendorNow.delete(key); };
+  const stage = (st: string) => patch(tenant, projectId, si, (p) => { p.stage = st; });
+  void (async () => {
+    const voiceDir = path.join(projectDir(tenant, projectId), "_work", `heygen-s${si + 1}`);
+    await fs.mkdir(voiceDir, { recursive: true });
+    let voice: { file: string; seconds: number };
+    if (actor.voice_id) voice = await sceneVoice(tenant, projectId, si, actor, source, voiceDir);
+    else {
+      const line = spokenParts(String((await loadScene(tenant, projectId, si)).scene.voiceover_text || "")).map((x) => x.join(" ")).join(" ... ");
+      if (!line) throw new Error(`Scene ${si + 1} has no lines to read`);
+      const said = path.join(voiceDir, "said.mp3"), file = path.join(voiceDir, "voice.mp3");
+      await heygenSpeech(line, lookVoice, said);
+      await ffmpeg(["-i", said, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);
+      voice = { file, seconds: (await durationOf(file)) || 0 };
+    }
+    const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
+    await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
+    await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
+    const voiceUrl = assetUrl(tenant, projectId, voiceName);
+    // One work dir per voice and direction: a restart collects the HeyGen job
+    // it submitted; a new line or direction is a new job.
+    const hash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).update(`|${actor.id}|${motion}`).digest("hex").slice(0, 12);
+    const workDir = path.join(projectDir(tenant, projectId), "_work", `heygen-s${si + 1}-${hash}`);
+    await fs.mkdir(workDir, { recursive: true });
+    await fs.copyFile(voice.file, path.join(workDir, "voice.mp3"));
+    await stage("heygen");
+    const picture = await getPerformer("heygen")!.fromAudio!(path.join(workDir, "voice.mp3"), {
+      tenant, actor, portraitAbs: portraitPath(tenant, actor), workDir, width: W, height: H, ...(motion ? { motion } : {}),
+    });
+    await stage("attach");
+    const name = `take-performed-${actor.id}-s${si + 1}-final-heygen-${stamp()}.mp4`;
+    await ffmpeg(["-i", picture, "-i", voice.file, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+      "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", "-movflags", "+faststart", path.join(assetsDir(tenant, projectId), name)]);
+    const url = assetUrl(tenant, projectId, name);
+    const out = await doAttach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "heygen", quality: "final" } });
+    if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
+    release();
+    await patch(tenant, projectId, si, (p) => {
+      const now = new Date().toISOString();
+      p.final = { url, made_at: now };
+      p.voice_url = voiceUrl;
+      p.made_with = { actor: actor.id, engine: "heygen" };
+      p.status = "done"; delete p.stage; p.finished_at = now;
+    });
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  })().catch(async (e) => {
+    release();
+    await patch(tenant, projectId, si, (p) => { p.status = "failed"; p.error = String(e?.message || e).slice(0, 300); delete p.stage; p.finished_at = new Date().toISOString(); }).catch(() => {});
+  }).finally(release);
   return perf;
 }
 

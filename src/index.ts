@@ -3054,6 +3054,8 @@ Rules:
                 delivery: typeof body.delivery === "string" ? body.delivery : undefined,
                 room_url: typeof body.room_url === "string" ? body.room_url : undefined,
                 location: str(body.location),
+                engine: body.engine === "heygen" ? "heygen" : body.engine === "seedance" ? "seedance" : undefined,
+                motion: str(body.motion),
               }));
               return;
             }

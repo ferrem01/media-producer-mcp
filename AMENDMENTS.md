@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — HeyGen generates a scene (SPEC-cast-scenes.md, phase D)
+
+`startScenePerformance` now dispatches on the engine: `engine: "heygen"` (or a
+scene whose plan says HeyGen; a HeyGen look defaults to it) has the look --
+or, for an actor with no look, the portrait -- speak the scene's line. The
+look is the setting: no frame, no location, no draft (HeyGen's one render is
+the take). The voice is the actor's ElevenLabs voice (v4 delivery, or the
+recording converted), else the look's own HeyGen voice; ours is laid under
+HeyGen's picture. The job's work dir is keyed by the voice and direction, so a
+restart collects the HeyGen job instead of paying twice. Attached as
+`take-performed-<actor>-s<n>-final-heygen-*.mp4` with `performed_by.engine:
+"heygen"`; `made_with` records it, so the plan's state reads ready. perform_all
+includes HeyGen scenes (cost: HeyGen API credits). MCP perform_scene takes
+`engine` and `motion`.
+
 ## 2026-10-04 — Perform the plan / finals all (SPEC-cast-scenes.md, phase C)
 
 `core/perform-plan.ts`. `perform_all`: every scene whose take does not answer
