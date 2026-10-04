@@ -40,6 +40,13 @@ export interface CastActor {
   /** A portrait actor's consent: the person who added it said this is
    *  them, or someone who agreed to be cast. HeyGen looks carry HeyGen's. */
   consent?: { at: string };
+  /** A generated person (a model sheet and a start frame made by an image
+   *  model): nobody's likeness, so no consent -- the adder said so. */
+  fictional?: { at: string };
+  /** Tenant-relative path of the model sheet (cast/<id>-sheet.jpg): the same
+   *  person from several angles. The portrait is the start frame drawn from
+   *  it. Genjutsu gets both (a second reference image). */
+  sheet?: string;
   created_at: string;
 }
 
@@ -79,10 +86,15 @@ export async function addActor(tenant: string, opts: {
   heygen_look_id?: string;
   /** Required for a portrait: this is me, or a person who agreed to be cast. */
   consent?: boolean;
+  /** Instead of consent: a generated person, nobody real. */
+  fictional?: boolean;
+  /** The model sheet, a tenant file (see CastActor.sheet). */
+  sheet?: string;
 }): Promise<CastActor> {
   // A portrait can be anyone's face: whoever adds it vouches for it. A
   // HeyGen look already passed HeyGen's own consent (or is a stock presenter).
-  if (!opts.heygen_look_id && opts.consent !== true) throw new Error("Confirm this is you, or a person who agreed to be cast (consent: true)");
+  // A fictional actor is a generated face: the adder vouches it is nobody's.
+  if (!opts.heygen_look_id && opts.consent !== true && opts.fictional !== true) throw new Error("Confirm this is you, or a person who agreed to be cast (consent: true), or a generated person (fictional: true)");
   const look = opts.heygen_look_id ? await getHeygenLook(String(opts.heygen_look_id)) : null;
   if (look && look.status && look.status !== "completed") throw new Error(`That HeyGen look is ${look.status}, not ready yet`);
   const name = String(opts.name || look?.name || "").trim().slice(0, 60);
@@ -120,13 +132,48 @@ export async function addActor(tenant: string, opts: {
   } finally {
     if (fetched) await fs.rm(fetched, { force: true }).catch(() => {});
   }
+  const sheet = opts.sheet ? await saveSheet(tenant, id, opts.sheet) : undefined;
   const actor: CastActor = {
     id, name, portrait: rel,
     ...(opts.voice_id ? { voice_id: String(opts.voice_id), voice_name: String(opts.voice_name || opts.voice_id) } : {}),
-    ...(look ? { heygen_look_id: look.id } : { consent: { at: new Date().toISOString() } }),
+    ...(look ? { heygen_look_id: look.id } : opts.fictional === true && opts.consent !== true ? { fictional: { at: new Date().toISOString() } } : { consent: { at: new Date().toISOString() } }),
+    ...(sheet ? { sheet } : {}),
     created_at: new Date().toISOString(),
   };
   cast.push(actor);
+  await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast, null, 2));
+  return actor;
+}
+
+/** A model sheet (a tenant file) as cast/<id>-sheet.jpg, at full detail:
+ *  a wide sheet's face is a third of its width. */
+async function saveSheet(tenant: string, id: string, file: string): Promise<string> {
+  const tenantDir = path.resolve(config.dataDir, tenant);
+  const src = path.resolve(tenantDir, String(file || "").replace(/^\/+/, ""));
+  if (!src.startsWith(tenantDir + path.sep)) throw new Error("sheet must be a path inside the tenant");
+  await fs.access(src).catch(() => { throw new Error("sheet not found"); });
+  await fs.mkdir(castDir(tenant), { recursive: true });
+  const rel = path.join("cast", `${id}-sheet.jpg`);
+  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+  return rel;
+}
+
+/** Change an actor: its name, its voice (an ElevenLabs voice the recast
+ *  converts the delivery to; "" clears it) or its model sheet. */
+export async function updateActor(tenant: string, id: string, opts: { name?: string; voice_id?: string; voice_name?: string; sheet?: string }): Promise<CastActor> {
+  const cast = await listCast(tenant);
+  const actor = cast.find((a) => a.id === id);
+  if (!actor) throw new Error("No such actor");
+  if (opts.name != null) {
+    const name = String(opts.name).trim().slice(0, 60);
+    if (!name) throw new Error("name can't be empty");
+    actor.name = name;
+  }
+  if (opts.voice_id != null) {
+    if (opts.voice_id) { actor.voice_id = String(opts.voice_id); actor.voice_name = String(opts.voice_name || opts.voice_id); }
+    else { delete actor.voice_id; delete actor.voice_name; }
+  }
+  if (opts.sheet) actor.sheet = await saveSheet(tenant, id, opts.sheet);
   await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast, null, 2));
   return actor;
 }
@@ -139,5 +186,6 @@ export async function removeActor(tenant: string, id: string): Promise<boolean> 
   if (!actor) return false;
   await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast.filter((a) => a.id !== id), null, 2));
   await fs.rm(portraitPath(tenant, actor), { force: true }).catch(() => {});
+  if (actor.sheet) await fs.rm(path.join(config.dataDir, tenant, actor.sheet), { force: true }).catch(() => {});
   return true;
 }

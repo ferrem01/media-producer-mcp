@@ -38,6 +38,9 @@ export interface PerformContext {
   actor: CastActor;
   /** The actor's portrait (absolute), for vendors that draw from a picture. */
   portraitAbs: string;
+  /** The actor's model sheet (absolute), when it has one: a second
+   *  reference for vendors that take several images (Genjutsu). */
+  sheetAbs?: string;
   workDir: string;
   /** The take's frame, for the aspect asked for. */
   width: number;

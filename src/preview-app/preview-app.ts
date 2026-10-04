@@ -11961,7 +11961,7 @@ ${QUOTIENT_CSS}
     d.cast.forEach(function(a) {
       h += '<div class="np-cand tall cast-actor' + (a.id === castUi.actor ? ' sel' : '') + '" data-actor="' + escAttr(a.id) + '">'
         + '<img src="' + escAttr(withToken('/api/cast/' + castT() + '/' + encodeURIComponent(a.id) + '/portrait')) + '" alt="">'
-        + '<small>' + escHtml(a.name) + (a.heygen_look_id ? ' · HeyGen' : '') + '</small>'
+        + '<small>' + escHtml(a.name) + (a.heygen_look_id ? ' · HeyGen' : a.fictional ? ' · generated' : '') + '</small>'
         + '<button class="cast-x" data-cast-x="' + escAttr(a.id) + '" title="Remove from the cast">×</button></div>';
     });
     h += '<div class="np-cand tall cast-add' + (castUi.add ? ' sel' : '') + '" data-cast-add="1"><span>+ Add actor</span></div></div>';
@@ -12051,8 +12051,10 @@ ${QUOTIENT_CSS}
     } else if (castUi.add === 'photo') {
       h += '<div class="np-hint">A clear, front-facing photo. Kling and Runway copy your gestures onto it (or animate it from the voice); HeyGen animates it from the voice.</div>'
         + '<div class="np-row"><div class="np-what"><input id="cast-photoname" class="np-search" placeholder="Name (e.g. Customer)"></div></div>'
-        + '<label class="np-row"><div class="np-what"><input type="checkbox" id="cast-consent"> This is me, or a person who agreed to be cast.</div></label>'
-        + '<div class="np-row"><div class="np-what"><input type="file" id="cast-photo" accept="image/*"></div></div>';
+        + '<label class="np-row"><div class="np-what"><input type="radio" name="cast-who" id="cast-consent" value="real"> This is me, or a person who agreed to be cast.</div></label>'
+        + '<label class="np-row"><div class="np-what"><input type="radio" name="cast-who" id="cast-fictional" value="fictional"> A generated person (nobody real): the photo is its start frame.</div></label>'
+        + '<div class="np-row"><div class="np-what"><small>Character sheet (optional, for a generated person: the same person from several angles; Higgsfield uses it)</small><input type="file" id="cast-sheet" accept="image/*"></div></div>'
+        + '<div class="np-row"><div class="np-what"><small>Photo (adds the actor)</small><input type="file" id="cast-photo" accept="image/*"></div></div>';
     }
     return h + '</div>';
   }
@@ -12145,29 +12147,42 @@ ${QUOTIENT_CSS}
       castUi.lookTimer = setTimeout(check, 5000);
     }).catch(function(e) { castSay(e.message || String(e), 'err'); });
   }
+  // A file into this film's assets; resolves to its tenant-relative path.
+  function castUploadFile(file, prefix) {
+    return new Promise(function(resolve, reject) {
+      var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      var fname = prefix + '-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', withToken('/api/upload-asset/' + castT() + '/' + encodeURIComponent(castUi.project.project_id) + '?name=' + encodeURIComponent(fname)));
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      if (_token) xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+      xhr.onerror = function() { reject(new Error('Upload failed (network).')); };
+      xhr.onload = function() {
+        var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
+        if (xhr.status < 200 || xhr.status >= 300 || !up.url) { reject(new Error('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)))); return; }
+        resolve(up.url.replace('/assets/' + state.tenantId + '/', ''));
+      };
+      xhr.send(file);
+    });
+  }
   function castUploadPhoto(input) {
     var file = input.files && input.files[0]; if (!file) return;
-    var consent = document.getElementById('cast-consent');
-    var nameEl = document.getElementById('cast-photoname');
-    if (!consent || !consent.checked) { castSay('Confirm this is you, or a person who agreed to be cast.', 'err'); input.value = ''; return; }
+    var consent = document.getElementById('cast-consent'), fictional = document.getElementById('cast-fictional');
+    var nameEl = document.getElementById('cast-photoname'), sheetEl = document.getElementById('cast-sheet');
+    var isFictional = !!(fictional && fictional.checked);
+    if (!isFictional && !(consent && consent.checked)) { castSay('Say who this is: you (or a person who agreed to be cast), or a generated person.', 'err'); input.value = ''; return; }
     var name = (nameEl && nameEl.value.trim()) || file.name.replace(/[.][^.]+$/, '');
-    var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    var fname = 'cast-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
-    var pid = castUi.project.project_id;
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', withToken('/api/upload-asset/' + castT() + '/' + encodeURIComponent(pid) + '?name=' + encodeURIComponent(fname)));
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-    if (_token) xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
-    xhr.onerror = function() { castSay('Upload failed (network).', 'err'); };
-    xhr.onload = function() {
-      var up; try { up = JSON.parse(xhr.responseText); } catch (e) { up = {}; }
-      if (xhr.status < 200 || xhr.status >= 300 || !up.url) { castSay('Upload failed: ' + (up.error || ('HTTP ' + xhr.status)), 'err'); return; }
-      // The cast keeps its own copy: the actor outlives this film.
-      var rel = up.url.replace('/assets/' + state.tenantId + '/', '');
-      castAddActor({ name: name, image: rel, consent: true }, name);
-    };
+    var sheetFile = sheetEl && sheetEl.files && sheetEl.files[0];
     castSay('Uploading…');
-    xhr.send(file);
+    // The cast keeps its own copies: the actor outlives this film.
+    (sheetFile ? castUploadFile(sheetFile, 'cast-sheet') : Promise.resolve(null)).then(function(sheetRel) {
+      return castUploadFile(file, 'cast').then(function(rel) {
+        var body = { name: name, image: rel };
+        if (isFictional) body.fictional = true; else body.consent = true;
+        if (sheetRel) body.sheet = sheetRel;
+        return castAddActor(body, name);
+      });
+    }).catch(function(e) { castSay(e.message || String(e), 'err'); });
   }
   function castGo() {
     var a = castActorById(castUi.actor), p = castPerfById(castUi.performer);

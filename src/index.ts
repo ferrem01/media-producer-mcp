@@ -2787,7 +2787,20 @@ Rules:
             jsonResponse(res, 200, await addActor(caTenant, {
               name: body.name, image: body.image, from: body.from, voice_id: body.voice_id, voice_name: body.voice_name,
               heygen_look_id: typeof body.heygen_look_id === "string" ? body.heygen_look_id : undefined,
-              consent: body.consent === true,
+              consent: body.consent === true, fictional: body.fictional === true,
+              sheet: typeof body.sheet === "string" ? body.sheet : undefined,
+            }));
+            return;
+          }
+          if (caSub && method === "PATCH") {
+            // PATCH /api/cast/{tenant}/{actor} {name?, voice_id?, voice_name?, sheet?}
+            const body = await parseBody(req).catch(() => ({} as any));
+            const { updateActor } = await import("./core/cast.js");
+            jsonResponse(res, 200, await updateActor(caTenant, caSub, {
+              name: typeof body.name === "string" ? body.name : undefined,
+              voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
+              voice_name: typeof body.voice_name === "string" ? body.voice_name : undefined,
+              sheet: typeof body.sheet === "string" ? body.sheet : undefined,
             }));
             return;
           }
@@ -2924,6 +2937,7 @@ Rules:
               hf_urls: body.hf_urls && typeof body.hf_urls === "object" ? body.hf_urls : undefined,
               compare_with: Array.isArray(body.compare_with) ? body.compare_with : undefined,
               audio_asset: typeof body.audio_asset === "string" ? body.audio_asset : undefined,
+              sheet: typeof body.sheet === "string" ? body.sheet : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;

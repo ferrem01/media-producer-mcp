@@ -9,7 +9,7 @@
  */
 import fs from "node:fs/promises";
 import path from "node:path";
-import { runGenjutsu, download, ffmpeg } from "../actor-test.js";
+import { runGenjutsu, download, ffmpeg, GENJUTSU_SHEET_PROMPT } from "../actor-test.js";
 import type { Performer, PerformContext } from "./types.js";
 
 export const higgsfield: Performer = {
@@ -32,10 +32,21 @@ export const higgsfield: Performer = {
     }
     const src = await ctx.publicUrl?.(video), pic = await ctx.publicUrl?.(img);
     if (!src || !pic) throw new Error("Higgsfield fetches the take by URL: the server needs its public https address");
+    // A cast member made from a model sheet: the start frame first, the
+    // sheet second (the same person from other angles).
+    const images = [pic];
+    if (ctx.sheetAbs) {
+      const sheet = w("sheet.jpg");
+      if (!(await fs.stat(sheet).then(() => true, () => false))) {
+        await ffmpeg(["-i", ctx.sheetAbs, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", sheet]);
+      }
+      const sheetUrl = await ctx.publicUrl?.(sheet);
+      if (sheetUrl) images.push(sheetUrl);
+    }
     const req = w(`higgsfield-${tag}.json`);
     const prior = await fs.readFile(req, "utf8").then((t) => JSON.parse(t)?.status_url as string, () => undefined);
-    const call = (resume?: string) => runGenjutsu(src, [pic], {
-      resume, onSubmit: async (statusUrl) => { await fs.writeFile(req, JSON.stringify({ status_url: statusUrl })); },
+    const call = (resume?: string) => runGenjutsu(src, images, {
+      resume, ...(images.length > 1 ? { prompt: GENJUTSU_SHEET_PROMPT } : {}), onSubmit: async (statusUrl) => { await fs.writeFile(req, JSON.stringify({ status_url: statusUrl })); },
     });
     let url: string;
     try { url = await call(prior); }

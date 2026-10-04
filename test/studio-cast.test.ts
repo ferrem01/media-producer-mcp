@@ -40,7 +40,12 @@ describe("Studio: the Cast card", () => {
     expect(html).toContain("'/heygen-avatars/' + castT() + '?looks=1'");
     expect(html).toContain("'?public=1'");
     expect(html).toContain("This is me, or a person who agreed to be cast.");
-    expect(html).toContain("castAddActor({ name: name, image: rel, consent: true }, name)");
+    // A photo is vouched for: you / a person who agreed, or a generated person
+    // (fictional) whose model sheet can ride along (Marc's AI cast brief).
+    expect(html).toContain("if (isFictional) body.fictional = true; else body.consent = true;");
+    expect(html).toContain("A generated person (nobody real): the photo is its start frame.");
+    expect(html).toContain("if (sheetRel) body.sheet = sheetRel;");
+    expect(html).toContain("a.fictional ? ' · generated' : ''");
     expect(html).toContain("api('POST', '/heygen-avatars/' + castT(), { avatar_id: castUi.newBase, prompt: prompt");
   });
 });

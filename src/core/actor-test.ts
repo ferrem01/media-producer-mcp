@@ -295,6 +295,9 @@ export const GENJUTSU_PROMPT = "Replace the person in the video with the person 
 /** Genjutsu took 20.5 min for 30 s at 1080p, and over 25 min once (measured):
  *  give it an hour before giving up -- and keep the job, so it can be collected. */
 const GENJUTSU_DEADLINE_MS = 60 * 60 * 1000;
+export const GENJUTSU_SHEET_PROMPT = "Replace the person in the video with the person in the first reference image: the same face, hair and clothes. " +
+  "The second reference image is that same person's character sheet, from other angles. " +
+  "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions, camera and room of the video exactly. Photorealistic.";
 export const GENJUTSU_SCENE_PROMPT = "Replace the person in the video with the person in the first reference image: the same face, hair and clothes. " +
   "Place them in the setting of the second reference image (the room, the desk, the lighting). " +
   "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions and camera framing of the video exactly. Photorealistic.";
@@ -812,6 +815,9 @@ export async function startActorTest(opts: {
   video_asset?: string;
   /** Cap the source at this many seconds (a cheap test). */
   max_seconds?: number;
+  /** genjutsu: a cast member's model sheet (tenant-relative) as the second
+   *  reference image, the way a recast sends it. */
+  sheet?: string;
   /** The voice laid on a result that does not voice itself (Kling,
    *  Genjutsu, Wan...): a tenant audio file, e.g. a converted voice made on
    *  the same cut as video_asset. Without it: the converted voice, else the
@@ -912,13 +918,19 @@ export async function startActorTest(opts: {
     if (!sceneAbs.startsWith(tenantDir + path.sep)) throw new Error("scene_image must be a path inside the tenant");
     await fs.access(sceneAbs).catch(() => { throw new Error(`scene_image not found: ${opts.scene_image}`); });
   }
+  let sheetAbs: string | undefined;
+  if (opts.sheet) {
+    sheetAbs = path.resolve(tenantDir, String(opts.sheet).replace(/^\/+/, ""));
+    if (!sheetAbs.startsWith(tenantDir + path.sep)) throw new Error("sheet must be a path inside the tenant");
+    await fs.access(sheetAbs).catch(() => { throw new Error(`sheet not found: ${opts.sheet}`); });
+  }
   let hfUrls: HfUrls | undefined;
   if (opts.hf_urls) {
     const u = opts.hf_urls, isUrl = (x: unknown) => typeof x === "string" && /^https:\/\/[^\s]+$/.test(x);
     if (!isUrl(u.video_url) || (u.audio_url != null && !isUrl(u.audio_url)) || !Array.isArray(u.image_urls) || !u.image_urls.length || u.image_urls.length > 30 || !u.image_urls.every(isUrl)) throw new Error("hf_urls: video_url, image_urls (1-30) and audio_url must be https URLs");
     hfUrls = { video_url: u.video_url, audio_url: u.audio_url, image_urls: u.image_urls, duration: Number(u.duration) > 0 ? Math.max(4, Math.min(30, Math.round(Number(u.duration)))) : undefined, mute_video: u.mute_video === true, no_video: u.no_video === true };
   }
-  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs, resolution: opts.resolution, hfUrls })
+  void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs, sheetAbs, resolution: opts.resolution, hfUrls })
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
   return test;
 }
@@ -939,7 +951,7 @@ async function step<T>(test: ActorTest, name: string, fn: () => Promise<T>): Pro
   }
 }
 
-async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string; sceneAbs?: string; resolution?: string; hfUrls?: HfUrls } = {}): Promise<void> {
+async function run(test: ActorTest, src: { path: string; start: number; end: number | null }, img: { path: string; at?: number } | null, frame: [number, number], voiceId?: string, prompt?: string, line = "", fps = 30, heygenAvatarId?: string, heygenOpts: { expressiveness?: string; engine?: string; sceneAbs?: string; sheetAbs?: string; resolution?: string; hfUrls?: HfUrls } = {}): Promise<void> {
   const dir = actorTestDir(test.tenant_id, test.project_id, test.id);
   const f = (name: string) => path.join(dir, name);
 
@@ -1007,7 +1019,12 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (!config.publicUrl.startsWith("https://")) throw new Error("genjutsu needs the server's public https address (it fetches the video by URL)");
       const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
       const images = [`${pub}/actor.jpg`];
-      if (heygenOpts.sceneAbs) {
+      if (heygenOpts.sheetAbs) {
+        // A cast member's model sheet as the second reference (the recast's way).
+        await ffmpeg(["-i", heygenOpts.sheetAbs, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet.jpg")]);
+        test.files.sheet = "sheet.jpg";
+        images.push(`${pub}/sheet.jpg`);
+      } else if (heygenOpts.sceneAbs) {
         // The setting as a second reference: the actor placed there.
         await ffmpeg(["-i", heygenOpts.sceneAbs, "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", "-q:v", "3", f("scene.jpg")]);
         test.files.scene = "scene.jpg";
@@ -1015,7 +1032,7 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       }
       // A test judges the look: 720p (cheaper) unless asked; films render at 1080p.
       url = await runGenjutsu(`${pub}/source.mp4`, images, {
-        prompt: prompt || (heygenOpts.sceneAbs ? GENJUTSU_SCENE_PROMPT : undefined), resolution: heygenOpts.resolution || "720p",
+        prompt: prompt || (heygenOpts.sheetAbs ? GENJUTSU_SHEET_PROMPT : heygenOpts.sceneAbs ? GENJUTSU_SCENE_PROMPT : undefined), resolution: heygenOpts.resolution || "720p",
         // The job, kept the moment Higgsfield takes it: a timeout or a restart
         // can collect the video instead of paying for another (measured: a
         // 720p run outlasted the old 25 min wait and was lost).

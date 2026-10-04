@@ -296,6 +296,12 @@ function madeBy(entry: any): string {
  *  with a key); `voice_id` an ElevenLabs voice the delivery is converted to
  *  ("mine" keeps the recording's voice; omitted, the actor's own voice).
  *  Returns at once; the work runs on. */
+/** The actor's model sheet, for the vendors that take more than one image
+ *  (Genjutsu); the others draw from the portrait alone. */
+function sheetFor(tenant: string, actor: CastActor, pid: string): string | undefined {
+  return pid === "higgsfield" && actor.sheet ? path.join(config.dataDir, tenant, actor.sheet) : undefined;
+}
+
 export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string; motion?: string } = {}): Promise<RecastStatus> {
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A recast of this film is already running");
@@ -338,6 +344,8 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
       // Made before the face-centred crop: a landscape look in a portrait
       // film sat off centre, so an older HeyGen recast is made again.
       && (performer.id !== "heygen" || existing.framing === FRAMING)
+      // A sheet added or changed is a new performance for a vendor that reads it.
+      && (existing.sheet || undefined) === (sheetFor(tenant, actor, performer.id) ? actor.sheet : undefined)
       && (await fs.access(resolveVideoPath(existing.file, config.dataDir)).then(() => true, () => false));
     const file = reusable ? existing.file : raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`);
     st.files.push({ raw, file, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0 });
@@ -366,7 +374,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
       await withVendorStatus((v) => { f.vendor = v; void saveStatus(tenant, st); }, () => performTakeFile({
         rawAbs, outAbs: resolveVideoPath(f.file, config.dataDir), performer, voiceId,
         ctx: {
-          tenant, actor, portraitAbs: portraitPath(tenant, actor), width, height, publicUrl, motion,
+          tenant, actor, portraitAbs: portraitPath(tenant, actor), sheetAbs: sheetFor(tenant, actor, performer.id), width, height, publicUrl, motion,
           workDir: recastWorkDir(tenant, projectId, actor.id, performer.id, i),
           onStage: (stage) => { f.stage = stage; f.stage_at = new Date().toISOString(); void saveStatus(tenant, st); },
         },
@@ -387,7 +395,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     const now = new Date().toISOString();
     for (const t of (project as any).takes || []) {
       const hit = ok.find((f) => f.raw === takeCopies(t).raw);
-      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), framing: FRAMING, made_at: now } };
+      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: actor.sheet } : {}), framing: FRAMING, made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
     // face and half in another is worse than none.
