@@ -12106,6 +12106,21 @@ ${QUOTIENT_CSS}
       });
       h += '</div>';
     }
+    // The room reference: a drawn frame of this film sent with the take so
+    // the room stays the same from scene to scene.
+    castUi.spRoom = castUi.spRoom || {};
+    var roomOpts = [];
+    ((castUi.data && castUi.data.scenes) || []).forEach(function(sc) {
+      ((sc.performance && sc.performance.frames) || []).forEach(function(f) {
+        if (f.from_scene == null && roomOpts.indexOf(f.url) < 0) roomOpts.push({ url: f.url, label: 'Scene ' + (sc.scene_index + 1) + '’s frame' });
+      });
+    });
+    var room = castUi.spRoom[i] != null ? castUi.spRoom[i] : (mine && perf.room_url) || '';
+    if (roomOpts.length) {
+      h += '<div class="np-row"><div class="np-what">Room reference: <select id="sp-room-' + i + '"><option value="">None</option>'
+        + roomOpts.map(function(o) { return '<option value="' + escAttr(o.url) + '"' + (o.url === room ? ' selected' : '') + '>' + escHtml(o.label) + '</option>'; }).join('')
+        + '</select><small>keeps the room, couch and windows the same in every scene</small></div></div>';
+    }
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'
       + '<button class="np-btn" data-sp-frame="' + i + '"' + (run || !a ? ' disabled' : '') + '>' + (frames.length ? 'Redraw frame' : 'Draw frame') + '</button> '
       + (i > 0 && (castUi.data.scenes[i - 1] || {}).take ? '<button class="np-btn" data-sp-cont="' + i + '"' + (run || !a ? ' disabled' : '') + ' title="Pick up exactly where scene ' + i + ' ends">Start from scene ' + i + '&#8217;s last frame</button> ' : '')
@@ -12275,7 +12290,8 @@ ${QUOTIENT_CSS}
     if ((v = el('data-sp-draft')) !== null || (v = el('data-sp-final')) !== null) {
       var fin = el('data-sp-final') !== null;
       var dBox = document.getElementById('sp-del-' + v);
-      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v), delivery: dBox ? dBox.value : undefined },
+      var rBox = document.getElementById('sp-room-' + v);
+      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v), delivery: dBox ? dBox.value : undefined, room_url: rBox ? rBox.value : undefined },
         fin ? 'Making the 1080p final…' : 'Making the draft (a few minutes)…');
       return;
     }
@@ -12324,6 +12340,7 @@ ${QUOTIENT_CSS}
     var t = ev.target, m;
     if ((m = /^sp-vtrack-(\\d+)$/.exec(t.id || ''))) { spPost(m[1], { action: 'revoice', voice_track: t.value }, 'Changing the sound…').then(function() { loadProject(castUi.project.project_id); }); return; }
     if ((m = /^sp-voice-(\\d+)$/.exec(t.name || ''))) { castUi.spVoice = castUi.spVoice || {}; castUi.spVoice[m[1]] = t.value; return; }
+    if ((m = /^sp-room-(\\d+)$/.exec(t.id || ''))) { castUi.spRoom = castUi.spRoom || {}; castUi.spRoom[m[1]] = t.value; return; }
     if ((m = /^sp-clipsec-(\\d+)$/.exec(t.id || ''))) { castUi.spClipSec = castUi.spClipSec || {}; castUi.spClipSec[m[1]] = Number(t.value); return; }
     if (/^sp-(shot|clip)-\\d+$/.test(t.id || '')) { castInput(ev); return; }
     if (t.name === 'cast-perf') { castUi.performer = t.value; castGoLabel(); return; }

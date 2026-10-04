@@ -76,6 +76,8 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(src).toContain("force: true }, 'Making the draft anyway…')");
     // Delivery, and the voice heard alone before Seedance.
     expect(src).toContain("{ action: 'voice', actor: spActor, voice_source: (castUi.spVoice || {})[hv] || undefined, delivery: delBox ? delBox.value : undefined }");
+    // The room reference rides with the perform call.
+    expect(src).toContain("room_url: rBox ? rBox.value : undefined }");
     // Regexes inside the page template are written with doubled backslashes.
     expect(src).toContain("/^sp-shot-(\\\\d+)$/");
   });

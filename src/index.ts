@@ -2975,6 +2975,7 @@ Rules:
                 voice_track: body.voice_track === "seedance" ? "seedance" : body.voice_track === "converted" ? "converted" : undefined,
                 force: body.force === true,
                 delivery: typeof body.delivery === "string" ? body.delivery : undefined,
+                room_url: typeof body.room_url === "string" ? body.room_url : undefined,
               }));
               return;
             }
