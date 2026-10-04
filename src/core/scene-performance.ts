@@ -105,7 +105,9 @@ export function framePrompt(shot: string, vertical: boolean, sheet: boolean): st
   return `The exact same person as in the reference image${sheet ? "s (the first is their portrait, the second their character sheet)" : ""}: ` +
     "the same face, hair, skin, clothes and accessories. " +
     `${shot.trim().replace(/\.?$/, ".")} ` +
-    `A ${vertical ? "vertical" : "horizontal"} photograph from a real camera, the person's head and shoulders clearly in frame, ` +
+    // Framed as the shot says: a wide couch shot must not be pulled into a
+    // close-up (Marc, Oct 4: "further back from camera ... sitting in a couch").
+    `A ${vertical ? "vertical" : "horizontal"} photograph from a real camera, framed exactly as described, the face clearly visible, ` +
     "realistic skin texture, natural light, no text, no logos.";
 }
 

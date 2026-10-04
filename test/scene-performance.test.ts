@@ -114,6 +114,9 @@ describe("a scene performed by a cast actor", () => {
     await until(async () => (await sp.getScenePerformances(T, P))[0].performance?.status === "done");
     let s0 = (await sp.getScenePerformances(T, P))[0];
     expect(calls.edit_images).toBe(2);                         // the portrait and the sheet
+    const { framePrompt } = await import("../src/core/scene-performance.js");
+    expect(framePrompt("Sitting on a couch, wide shot", true, true)).toMatch(/Sitting on a couch, wide shot\. A vertical photograph from a real camera, framed exactly as described/);
+    expect(framePrompt("x", true, true)).not.toMatch(/head and shoulders/);
     expect(s0.performance.frames).toHaveLength(1);
     expect(s0.performance.frame).toMatch(/^\/assets\/t\/projects\/proj_perf\/assets\/frame-dana-.*\.jpg$/);
     const probe = await run("ffmpeg", ["-hide_banner", "-i", path.join(DATA, s0.performance.frame.replace(/^\/assets\//, ""))]).then(() => "", (e: any) => String(e.stderr));
