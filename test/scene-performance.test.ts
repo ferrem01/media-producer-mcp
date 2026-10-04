@@ -693,3 +693,81 @@ describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
     await sp.editCastPlan(T, P, { cast_plan: null });
   }, 120000);
 });
+
+describe("perform the plan: every scene that does not answer it, with the cost first", () => {
+  it("lists what each scene needs and what it costs, starts it only when asked, and finishes ready drafts at 1080p", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    delete process.env.KLING_API_KEY; delete process.env.KLING_ACCESS_KEY;
+    const m = await media(path.join(DATA, "_media_pp"));
+    const P3 = "proj_pp";
+    const pdir = path.join(DATA, T, "projects", P3);
+    await fs.mkdir(path.join(pdir, "assets"), { recursive: true });
+    await fs.writeFile(path.join(pdir, "assets", "rec.mp4"), m.mp4);
+    const rec = (si: number) => ({ id: `tk${si}`, scene_index: si, source: `/assets/${T}/projects/${P3}/assets/rec.mp4`, created_at: "2026-10-04T00:00:00.000Z" });
+    await fs.writeFile(path.join(pdir, "project.json"), JSON.stringify({
+      project_id: P3, tenant_id: T, name: "PP", format: "video", status: "generated", canvas: { width: 1080, height: 1920, fps: 30 },
+      created_at: "2026-10-04T00:00:00.000Z", updated_at: "2026-10-04T00:00:00.000Z", treatment: { filmGrammar: "speaker" },
+      storyboard: { cast_plan: { actor: "dana", how: "generate" }, scenes: [
+        { label: "Hook", voiceover_text: "One.", duration_seconds: 6, components: [] },
+        { label: "Me", voiceover_text: "Two.", duration_seconds: 5, components: [], performer: { how: "record" } },
+        { label: "Recast", voiceover_text: "Three.", duration_seconds: 5, components: [], performer: { how: "recast", engine: "kling" } },
+      ] },
+      scenes: [{ id: "a", duration_seconds: 9.2, components: [] }, { id: "b", duration_seconds: 5, components: [] }, { id: "c", duration_seconds: 5, components: [] }],
+      takes: [rec(1), rec(2)],
+      speaker_track: { clips: [{ scene_index: 1, source: rec(1).source }, { scene_index: 2, source: rec(2).source }] },
+    }));
+    const atlas: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: `pp${atlas.length}` } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/pp.mp4"], draft_id: "ppd" } }));
+      if (u === "https://cdn/pp.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const { loadProject: lp, saveProject: svp } = await import("../src/persistence/project.js");
+    // An attacher that does what index.ts does, enough for the state: the take and its clip.
+    sp.registerSceneAttacher(async (tenant, project, url, si, extra) => {
+      const pr: any = await lp(tenant, project);
+      pr.takes = [...(pr.takes || []), { id: `perf${si}${pr.takes.length}`, scene_index: si, source: url, created_at: new Date().toISOString(), ...(extra.performed_by ? { performed_by: extra.performed_by } : {}) }];
+      pr.speaker_track.clips = [...pr.speaker_track.clips.filter((c: any) => c.scene_index !== si), { scene_index: si, source: url }];
+      await svp(pr);
+      return { status: 200, body: {} };
+    });
+    const pp = await import("../src/core/perform-plan.js");
+    const est = await pp.planPerformance(T, P3);
+    expect(est.scenes.map((r) => [r.index, r.state, r.action])).toEqual([[0, "todo", "perform"], [1, "ready", "skip"], [2, "todo", "recast"]]);
+    expect(est.scenes[0]).toMatchObject({ seconds: 10, usd: 1.34 });       // the built scene's 9.2 s, billed whole
+    expect(est.usd).toBe(1.34);
+    expect(atlas).toHaveLength(0);                                         // an estimate makes nothing
+
+    const go = await pp.performPlan(T, P3);
+    expect(go.started).toEqual([0]);
+    expect(go.waiting).toEqual([{ index: 2, note: expect.stringMatching(/Kling/) }]);   // not set up here: said, not hidden
+    await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done", 40000);
+    let s = await sp.getScenePerformances(T, P3);
+    expect(s[0]).toMatchObject({ state: "ready", plan_line: "Dana · Generate · Seedance" });
+    expect(s[0].performer).toBeNull();                                     // it followed the film's plan
+
+    // The plan for scene 1 becomes Dana generated: stale until performed.
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: null }] });
+    s = await sp.getScenePerformances(T, P3);
+    expect(s[1]).toMatchObject({ state: "stale", why: expect.stringMatching(/your recording plays/) });
+    // ...and back to me: the recording is put back for free when it is not playing.
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 0, performer: { how: "record" } }] });
+    const back = await pp.planPerformance(T, P3, { scenes: [0] });
+    expect(back.scenes[0]).toMatchObject({ action: "skip", note: expect.stringMatching(/waits for your recording/) });
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 0, performer: null }] });
+
+    // Finals: the ready draft, at 1080p.
+    const fin = await pp.planFinals(T, P3);
+    expect(fin.scenes).toEqual([{ index: 0, seconds: 10, usd: 3 }]);
+    const fgo = await pp.finalsAll(T, P3);
+    expect(fgo.started).toEqual([0]);
+    await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done" && !!(await sp.getScenePerformances(T, P3))[0].performance?.final, 40000);
+    expect(atlas.at(-1)).toEqual({ model: "bytedance/seedance-2.5/draft-complete", draft_id: "ppd", watermark: false });
+    expect((await pp.planFinals(T, P3)).scenes).toEqual([]);
+  }, 120000);
+});

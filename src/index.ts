@@ -2969,6 +2969,7 @@ Rules:
       // ── API: Scenes performed by cast actors (core/scene-performance.ts) ──
       // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, its plan and state, any performance; the film's cast_plan
       // POST /api/scene-performance/{tenant}/{project}            {action:"plan", cast_plan?, scenes?: [{index, performer}]}  (core/cast-plan.ts; nothing is made)
+      //                                                           {action:"perform_all" | "finals_all", scenes?, confirm?}  (core/perform-plan.ts: the plan and cost; confirm starts it)
       // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?, location?}  (location: a location id, "" none)
       //                                                           {action:"pick", url}
       //                                                           {action:"location", location}  (a location id, "" none: frames drawn there, its plate the room)
@@ -2993,7 +2994,15 @@ Rules:
           if (method === "POST" && spApi[3] === undefined) {
             // The cast plan: {action:"plan", cast_plan?: {...} | null, scenes?: [{index, performer: {...} | null}]}
             const body = await parseBody(req).catch(() => ({} as any));
-            if (body.action !== "plan") { jsonResponse(res, 400, { error: 'action must be "plan"' }); return; }
+            const spScenes = Array.isArray(body.scenes) && body.scenes.every((x: unknown) => Number.isInteger(x)) ? body.scenes as number[] : undefined;
+            if (body.action === "perform_all" || body.action === "finals_all") {
+              // The plan and the cost; confirm: true starts it (paid).
+              const pp = await import("./core/perform-plan.js");
+              if (body.action === "perform_all") jsonResponse(res, body.confirm === true ? 202 : 200, body.confirm === true ? await pp.performPlan(spTenant, spProject, { scenes: spScenes }) : await pp.planPerformance(spTenant, spProject, { scenes: spScenes }));
+              else jsonResponse(res, body.confirm === true ? 202 : 200, body.confirm === true ? await pp.finalsAll(spTenant, spProject, { scenes: spScenes }) : await pp.planFinals(spTenant, spProject, { scenes: spScenes }));
+              return;
+            }
+            if (body.action !== "plan") { jsonResponse(res, 400, { error: 'action must be "plan", "perform_all" or "finals_all"' }); return; }
             const { editCastPlan } = await import("./core/scene-performance.js");
             await editCastPlan(spTenant, spProject, {
               ...(body.cast_plan !== undefined ? { cast_plan: body.cast_plan && typeof body.cast_plan === "object" ? body.cast_plan : null } : {}),

@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Perform the plan / finals all (SPEC-cast-scenes.md, phase C)
+
+`core/perform-plan.ts`. `perform_all`: every scene whose take does not answer
+its plan (todo / stale), made as the plan says -- Seedance drafts side by side,
+a recast per actor+engine (one recast job per film at a time; the rest are
+reported to run next), the recording put back where the plan is me (free).
+HeyGen-generate per scene is reported as not built (phase D); scenes waiting
+for a recording say so. `finals_all`: every ready draft with no newer final,
+finished at 1080p from its draft id.
+
+Both return the scene list and the COST first (Seedance 480p $0.134/s, 1080p
+final ~$0.30/s, billed whole seconds, 4 s minimum, on the built scene's
+length); `confirm: true` starts them. MCP `cast` perform_all / finals_all;
+POST `/api/scene-performance/{t}/{p}` `{action:"perform_all"|"finals_all",
+confirm?}`.
+
 ## 2026-10-04 — The cast plan on the storyboard (SPEC-cast-scenes.md, phase B)
 
 `core/cast-plan.ts`. The film's default on `storyboard.cast_plan`, each scene's
