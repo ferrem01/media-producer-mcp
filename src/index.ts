@@ -1333,7 +1333,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2828,6 +2828,50 @@ Rules:
         return;
       }
 
+      // ── API: Locations (core/locations.ts): the sets generated scenes are performed in ──
+      // GET    /api/locations/{tenant}                 the tenant's locations
+      // POST   /api/locations/{tenant} {name, prompt?, image?, clean?, shape?}
+      //        prompt alone: drawn; image (a workspace file or asset url): cleaned of people,
+      //        or kept as it is with clean: false. A drawn one lists as "drawing" until it lands.
+      // PATCH  /api/locations/{tenant}/{id} {name}
+      // DELETE /api/locations/{tenant}/{id}
+      // GET    /api/locations/{tenant}/{id}/image     the clean plate
+      const locApi = urlPath.match(/^\/api\/locations\/([^/]+)(?:\/([A-Za-z0-9_-]+)(\/image)?)?$/);
+      if (locApi) {
+        const lcTenant = decodeURIComponent(locApi[1]);
+        const lcId = locApi[2];
+        try {
+          const { listLocations, addLocation, renameLocation, removeLocation, locationImage } = await import("./core/locations.js");
+          if (locApi[3] && lcId && method === "GET") {
+            const img = await locationImage(lcTenant, lcId).then((f) => fs.readFile(f)).catch(() => null);
+            if (!img) { jsonResponse(res, 404, { error: "No image" }); return; }
+            res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=300" });
+            res.end(img);
+            return;
+          }
+          if (!lcId && method === "GET") { jsonResponse(res, 200, { locations: await listLocations(lcTenant) }); return; }
+          if (!lcId && method === "POST") {
+            const body = await parseBody(req).catch(() => ({} as any));
+            const shape = body.shape === "tall" || body.shape === "square" || body.shape === "wide" ? body.shape : undefined;
+            jsonResponse(res, 202, await addLocation(lcTenant, {
+              name: String(body.name || ""), prompt: typeof body.prompt === "string" ? body.prompt : undefined,
+              image: typeof body.image === "string" ? body.image : undefined, clean: body.clean === false ? false : undefined, shape,
+            }));
+            return;
+          }
+          if (lcId && method === "PATCH") {
+            const body = await parseBody(req).catch(() => ({} as any));
+            jsonResponse(res, 200, await renameLocation(lcTenant, lcId, String(body.name || "")));
+            return;
+          }
+          if (lcId && method === "DELETE") { jsonResponse(res, 200, { removed: await removeLocation(lcTenant, lcId) }); return; }
+          jsonResponse(res, 405, { error: "Method not allowed" });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
       // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based]}
       //      null puts the recording's person back; performer picks the vendor; voice_id an
@@ -2924,8 +2968,9 @@ Rules:
       // POST /api/actor-test/{tenant}/{project}/{id} {action:"collect"}   a Higgsfield job the test stopped waiting for
       // ── API: Scenes performed by cast actors (core/scene-performance.ts) ──
       // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, any performance
-      // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?}
+      // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?, location?}  (location: a location id, "" none)
       //                                                           {action:"pick", url}
+      //                                                           {action:"location", location}  (a location id, "" none: frames drawn there, its plate the room)
       //                                                           {action:"continue", from_scene?}
       //                                                           {action:"revoice", voice_track?: "converted" | "seedance"}  (the sound, without making it again)
       //                                                           {action:"restore", url, draft_id?}  (an earlier performance of the scene back as its take)
@@ -2944,7 +2989,7 @@ Rules:
             const si = Number(spApi[3]);
             const body = await parseBody(req).catch(() => ({} as any));
             const str = (v: unknown) => typeof v === "string" ? v : undefined;
-            if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt) })); return; }
+            if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), location: str(body.location) })); return; }
             if (body.action === "voice") {
               const { previewSceneVoice } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined,
@@ -2967,6 +3012,11 @@ Rules:
               return;
             }
             if (body.action === "pick") { jsonResponse(res, 200, await pickSceneFrame(spTenant, spProject, si, String(body.url || ""))); return; }
+            if (body.action === "location") {
+              const { setSceneLocation } = await import("./core/scene-performance.js");
+              jsonResponse(res, 200, await setSceneLocation(spTenant, spProject, si, String(body.location || "")));
+              return;
+            }
             if (body.action === "perform") {
               jsonResponse(res, 202, await startScenePerformance(spTenant, spProject, si, {
                 actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), video_prompt: str(body.video_prompt),
@@ -2976,6 +3026,7 @@ Rules:
                 force: body.force === true,
                 delivery: typeof body.delivery === "string" ? body.delivery : undefined,
                 room_url: typeof body.room_url === "string" ? body.room_url : undefined,
+                location: str(body.location),
               }));
               return;
             }
@@ -2995,7 +3046,7 @@ Rules:
               jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined }));
               return;
             }
-            jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "voice", "perform", "revoice", "restore", "clip", "cast" or "recording"' });
+            jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "location", "voice", "perform", "revoice", "restore", "clip", "cast" or "recording"' });
             return;
           }
           jsonResponse(res, 405, { error: "Method not allowed" });

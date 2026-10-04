@@ -588,6 +588,10 @@ export interface ScenePerformance {
    *  last reference image, so the room stops drifting from scene to scene
    *  (Marc, Oct 4: "the apartment and the couch is changing slightly"). */
   room_url?: string;
+  /** The LOCATION the scene is set in (a tenant location id, core/locations.ts):
+   *  the start frame is drawn in it and its clean plate goes to Seedance as
+   *  the room reference (room_url, when set, overrides the plate). */
+  location?: string;
   /** The prompts, written out in full when the defaults built from the shot
    *  are not what is wanted (Marc: "define any prompt for any scene"):
    *  `frame_prompt` what GPT Image draws, `video_prompt` what Seedance gets.
@@ -598,7 +602,9 @@ export interface ScenePerformance {
   frames?: Array<{ url: string; shot: string; prompt?: string; made_at: string;
     /** Not drawn: the last frame of this scene's take (0-based), so the
      *  scene picks up exactly where that one ended. */
-    from_scene?: number }>;
+    from_scene?: number;
+    /** The location it was drawn in. */
+    location?: string }>;
   frame?: string;
   /** The sound: "seedance" (default) keeps the model's own read -- the only
    *  track the lips were made to; "converted" lays the exact voice file over

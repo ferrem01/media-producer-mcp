@@ -32,6 +32,7 @@ import { elevenSpeech, spokenParts } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, cutClock, cutFileFor } from "./take-clock.js";
 import { editImage } from "../media/image-gen.js";
+import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import type { ScenePerformance } from "./types.js";
@@ -101,9 +102,13 @@ async function needActor(tenant: string, id: string | undefined): Promise<CastAc
 }
 
 /** The start frame prompt: the same person, in this shot, at this shape. */
-export function framePrompt(shot: string, vertical: boolean, sheet: boolean): string {
-  return `The exact same person as in the reference image${sheet ? "s (the first is their portrait, the second their character sheet)" : ""}: ` +
+export function framePrompt(shot: string, vertical: boolean, sheet: boolean, location = false): string {
+  const refs = location
+    ? (sheet ? "the first two reference images (their portrait and their character sheet)" : "the first reference image")
+    : `the reference image${sheet ? "s (the first is their portrait, the second their character sheet)" : ""}`;
+  return `The exact same person as in ${refs}: ` +
     "the same face, hair, skin, clothes and accessories. " +
+    (location ? "The last reference image is the room they are in: keep that exact room -- the same walls, furniture, plants, windows, art and light -- seen from where this shot needs. " : "") +
     `${shot.trim().replace(/\.?$/, ".")} ` +
     // Framed as the shot says: a wide couch shot must not be pulled into a
     // close-up (Marc, Oct 4: "further back from camera ... sitting in a couch").
@@ -121,18 +126,32 @@ function setPrompt(p: ScenePerformance, key: "frame_prompt" | "video_prompt", v:
   return before !== p[key];
 }
 
-/** The prompts a scene uses unless it says otherwise: built from the shot. */
-export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, room = false): { frame_prompt: string; video_prompt: string } {
-  return { frame_prompt: framePrompt(shot, vertical, sheet), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot)}` };
+/** A scene's location: undefined keeps it, "" clears it, an id sets it.
+ *  A new location drops the picked frame unless it was drawn there (a frame
+ *  in another room would fight the plate), and the draft with it. */
+function setLocation(p: ScenePerformance, v: string | undefined): boolean {
+  if (v === undefined) return false;
+  const next = String(v).trim();
+  if ((p.location || "") === next) return false;
+  if (next) p.location = next; else delete p.location;
+  const picked = (p.frames || []).find((f) => f.url === p.frame);
+  if (p.frame && (picked?.location || "") !== next) delete p.frame;
+  delete p.draft;
+  return true;
 }
 
-async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string): Promise<string> {
+/** The prompts a scene uses unless it says otherwise: built from the shot. */
+export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, room = false, location = false): { frame_prompt: string; video_prompt: string } {
+  return { frame_prompt: framePrompt(shot, vertical, sheet, location), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot)}` };
+}
+
+async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string, locationAbs?: string): Promise<string> {
   const vertical = height > width;
   const sheetAbs = actor.sheet ? path.join(config.dataDir, tenant, actor.sheet) : undefined;
   const work = path.join(projectDir(tenant, projectId), "_work");
   await fs.mkdir(work, { recursive: true });
   const drawn = path.join(work, `frame-${stamp()}.png`);
-  await editImage({ prompt: prompt || framePrompt(shot, vertical, !!sheetAbs), images: [portraitPath(tenant, actor), ...(sheetAbs ? [sheetAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
+  await editImage({ prompt: prompt || framePrompt(shot, vertical, !!sheetAbs, !!locationAbs), images: [portraitPath(tenant, actor), ...(sheetAbs ? [sheetAbs] : []), ...(locationAbs ? [locationAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
   // Cut to the film's exact shape (2:3 drawn, 9:16 wanted), centred.
   const name = `frame-${actor.id}-${stamp()}.jpg`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
@@ -144,7 +163,7 @@ async function drawFrame(tenant: string, projectId: string, actor: CastActor, sh
 
 /** Draw (or redraw) a scene's start frame. Returns at once; the frame lands
  *  on the scene's performance (frames, frame). */
-export async function startSceneFrame(tenant: string, projectId: string, si: number, opts: { actor?: string; shot?: string; frame_prompt?: string }): Promise<ScenePerformance> {
+export async function startSceneFrame(tenant: string, projectId: string, si: number, opts: { actor?: string; shot?: string; frame_prompt?: string; location?: string }): Promise<ScenePerformance> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
   const actor = await needActor(tenant, opts.actor || prev?.actor);
@@ -153,21 +172,25 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
   const shot = String(opts.shot ?? prev?.shot ?? DEFAULT_SHOT).trim().slice(0, 1000) || DEFAULT_SHOT;
   const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
+  if (opts.location) await locationImage(tenant, opts.location);
   running.add(key);
   const perf = await patch(tenant, projectId, si, (p) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     p.actor = actor.id; p.shot = shot; setPrompt(p, "frame_prompt", opts.frame_prompt);
+    // A location chosen now is the room: an older raw room reference yields.
+    if (setLocation(p, opts.location)) delete p.room_url;
     p.status = "running"; p.stage = "frame"; delete p.error;
     p.started_at = new Date().toISOString(); delete p.finished_at;
   });
   const prompt = perf.frame_prompt;
+  const location = perf.location;
   void (async () => {
     try {
-      const url = await drawFrame(tenant, projectId, actor, shot, W, H, prompt);
+      const url = await drawFrame(tenant, projectId, actor, shot, W, H, prompt, location ? await locationImage(tenant, location) : undefined);
       // Free before "done": a poll that reads done may start the next job at once.
       running.delete(key);
       await patch(tenant, projectId, si, (p) => {
-        p.frames = [...(p.frames || []), { url, shot, ...(prompt ? { prompt } : {}), made_at: new Date().toISOString() }].slice(-6);
+        p.frames = [...(p.frames || []), { url, shot, ...(prompt ? { prompt } : {}), ...(location ? { location } : {}), made_at: new Date().toISOString() }].slice(-6);
         p.frame = url; p.status = "done"; delete p.stage; p.finished_at = new Date().toISOString();
       });
     } catch (e: any) {
@@ -216,6 +239,14 @@ export async function continueSceneFrom(tenant: string, projectId: string, si: n
     p.frames = [...(p.frames || []), { url, shot: p.shot, from_scene: from, made_at: new Date().toISOString() }].slice(-6);
     p.frame = url;
   });
+}
+
+/** Set a scene's location without drawing or performing (Studio's picker):
+ *  "" clears it. A new location drops a frame drawn elsewhere and the draft. */
+export async function setSceneLocation(tenant: string, projectId: string, si: number, location: string): Promise<ScenePerformance> {
+  await loadScene(tenant, projectId, si);
+  if (location) await locationImage(tenant, location);
+  return patch(tenant, projectId, si, (p) => { if (setLocation(p, location)) delete p.room_url; });
 }
 
 /** Pick which drawn frame the scene uses. */
@@ -423,6 +454,8 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   delivery?: string;
   /** The room reference: a project image asset ("" for none). */
   room_url?: string;
+  /** The location (a tenant location id; "" for none). */
+  location?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -443,6 +476,9 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     if (!opts.room_url.startsWith(prefix) || opts.room_url.includes("..") || !/\.(jpe?g|png|webp)$/i.test(opts.room_url)) throw new Error("room_url must be an image asset of this film");
     if (!(await fs.stat(resolveVideoPath(opts.room_url, config.dataDir)).then(() => true, () => false))) throw new Error("room_url not found");
   }
+  // The location the take is made in, checked before anything is spent.
+  const where = opts.location ?? prev?.location;
+  if (where && !(quality === "final" && prev?.draft?.draft_id && opts.location === undefined)) await locationImage(tenant, where);
   running.add(key);
   const perf = await patch(tenant, projectId, si, (p) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
@@ -453,6 +489,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
     if (opts.voice_track) p.voice_track = opts.voice_track;
     if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
+    if (setLocation(p, opts.location) && opts.room_url === undefined) delete p.room_url;
     if (opts.room_url !== undefined) { if (opts.room_url) p.room_url = opts.room_url; else delete p.room_url; }
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
@@ -479,13 +516,16 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   let voice: { file: string; seconds: number } | null = null;
   let voiceUrl = perf.voice_url;
   let inputs = `final:${perf.draft?.draft_id || ""}`;
+  // The location's plate: the room the frame is drawn in and Seedance keeps.
+  const locationAbs = !finishing && perf.location ? await locationImage(tenant, perf.location) : undefined;
+  const roomAbs = perf.room_url ? resolveVideoPath(perf.room_url, config.dataDir) : locationAbs;
   if (!finishing) {
     // The frame: the one picked, else one drawn now.
     if (!frame) {
       await stage("frame");
-      frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt);
+      frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt, locationAbs);
       const made = frame;
-      await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
+      await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), ...(perf.location ? { location: perf.location } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
     }
     await stage("voice");
     voice = await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
@@ -509,7 +549,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
     voiceUrl = assetUrl(tenant, projectId, voiceName);
     const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
-    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.room_url || ""].join("|");
+    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.room_url || "", perf.location || ""].join("|");
   }
   const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot);
 
@@ -524,9 +564,9 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     const frameAbs = resolveVideoPath(frame!, config.dataDir);
     const images = [await publicUrl(tenant, projectId, frameAbs)];
     if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));
-    if (perf.room_url) images.push(await publicUrl(tenant, projectId, resolveVideoPath(perf.room_url, config.dataDir)));
+    if (roomAbs) images.push(await publicUrl(tenant, projectId, roomAbs));
     return seedanceShot({
-      images, audio: await publicUrl(tenant, projectId, voice!.file), prompt: videoPrompt, room: !!perf.room_url,
+      images, audio: await publicUrl(tenant, projectId, voice!.file), prompt: videoPrompt, room: !!roomAbs,
       // A breath of room past the voice (the proven run gave 10.03 s of voice
       // 10 s and held sync: headroom is not what keeps the lips on).
       seconds: voice!.seconds + 0.3, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
@@ -675,7 +715,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
-    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true, !!s.performance?.room_url);
+    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true, !!(s.performance?.room_url || s.performance?.location), !!s.performance?.location);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;
@@ -730,10 +770,13 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
   const started = await setClip((c) => { for (const k of Object.keys(c)) delete c[k]; Object.assign(c, { actor: actor.id, shot, seconds, at, status: "running", started_at: new Date().toISOString() }); });
   void (async () => {
     try {
-      const frame = await drawFrame(tenant, projectId, actor, shot, W, H);
+      // In the scene's location when it has one: the cutaway is the same room.
+      const loc = scene.performance?.location ? await locationImage(tenant, scene.performance.location) : undefined;
+      const frame = await drawFrame(tenant, projectId, actor, shot, W, H, undefined, loc);
       const images = [await publicUrl(tenant, projectId, resolveVideoPath(frame, config.dataDir))];
       if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));
-      const r = await seedanceShot({ images, prompt: silentPrompt(shot), seconds, ratio: seedanceRatio(W, H), draft: false, resolution: "720p" });
+      if (loc) images.push(await publicUrl(tenant, projectId, loc));
+      const r = await seedanceShot({ images, prompt: silentPrompt(shot), room: !!loc, seconds, ratio: seedanceRatio(W, H), draft: false, resolution: "720p" });
       const work = path.join(projectDir(tenant, projectId), "_work");
       await fs.mkdir(work, { recursive: true });
       const raw = path.join(work, `clip-${stamp()}.mp4`);

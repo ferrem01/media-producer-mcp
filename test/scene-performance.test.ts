@@ -421,6 +421,89 @@ describe("the room reference: the same room in every scene", () => {
   }, 90000);
 });
 
+describe("locations: a clean plate per set, the room of every take made there", () => {
+  it("draws a plate from a prompt, cleans one from a frame (or keeps it), and a scene set there draws its frame in it and sends the plate as the room", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_loc"));
+    const pdir = path.join(DATA, T, "projects", P);
+    await fs.writeFile(path.join(pdir, "assets", "frame-s1.png"), m.png);
+    const calls = { gens: [] as any[], edits: [] as Array<{ prompt: string; images: number }>, atlas: [] as any[] };
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.endsWith("/images/generations")) { calls.gens.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] })); }
+      if (u.endsWith("/images/edits")) {
+        const f = init.body as FormData;
+        calls.edits.push({ prompt: String(f.get("prompt")), images: f.getAll("image[]").length });
+        return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      }
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.endsWith("/generateVideo")) { calls.atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: `lc${calls.atlas.length}` } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/lc.mp4"], draft_id: "lcd" } }));
+      if (u === "https://cdn/lc.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const loc = await import("../src/core/locations.js");
+    await expect(loc.addLocation(T, { name: "Nowhere" })).rejects.toThrow(/prompt .* or an image/);
+    await expect(loc.addLocation(T, { name: "Out", image: "../other/x.png" })).rejects.toThrow(/file of this workspace/);
+
+    // From a prompt: listed at once as drawing, the plate lands.
+    const lounge = await loc.addLocation(T, { name: "Loft lounge", prompt: "A bright loft lounge, a grey linen couch, plants by tall windows" });
+    expect(lounge).toMatchObject({ id: "loft-lounge", made_from: "prompt", status: "drawing" });
+    await until(async () => !!(await loc.getLocation(T, "loft-lounge"))?.image);
+    expect(calls.gens[0].prompt).toMatch(/^A bright loft lounge.*windows\. An empty set with nobody in it/);
+    expect(calls.gens[0].size).toBe("1536x1024");
+    expect((await loc.getLocation(T, "loft-lounge"))!.status).toBeUndefined();
+
+    // From a frame (an asset url): the person removed, in the frame's shape.
+    const frameUrl = `/assets/${T}/projects/${P}/assets/frame-s1.png`;
+    await loc.addLocation(T, { name: "Office", image: frameUrl });
+    await until(async () => !!(await loc.getLocation(T, "office"))?.image);
+    expect(calls.edits[0]).toEqual({ prompt: loc.CLEAN_PROMPT, images: 1 });
+    // Kept as it is: nothing drawn.
+    const kept = await loc.addLocation(T, { name: "Office", image: frameUrl, clean: false });
+    expect(kept.id).toMatch(/^office-[0-9a-f]{4}$/);
+    expect(kept).toMatchObject({ made_from: "upload" });
+    expect(kept.image).toBe(path.join("locations", `${kept.id}.jpg`));
+    expect(calls.edits).toHaveLength(1);
+    expect((await loc.listLocations(T)).map((l) => l.id)).toEqual(["loft-lounge", "office", kept.id]);
+
+    // A scene set there: the old raw room yields, the frame is drawn in the plate.
+    const sp = await import("../src/core/scene-performance.js");
+    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
+    await expect(sp.setSceneLocation(T, P, 1, "attic")).rejects.toThrow(/No location "attic"/);
+    const set = await sp.setSceneLocation(T, P, 1, "loft-lounge");
+    expect(set.location).toBe("loft-lounge");
+    expect(set.room_url).toBeUndefined();
+    expect(set.frame).toBeUndefined();
+    expect(set.draft).toBeUndefined();
+    const s1 = (await sp.getScenePerformances(T, P))[1];
+    expect(s1.defaults.frame_prompt).toMatch(/The last reference image is the room they are in/);
+    expect(s1.defaults.video_prompt).toMatch(/@Image3 is the room/);
+    await sp.startScenePerformance(T, P, 1, { actor: "dana", voice_source: "script", video_prompt: "", frame_prompt: "", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P))[1].performance?.status !== "running", 40000);
+    const done = (await sp.getScenePerformances(T, P))[1].performance;
+    expect(done.error).toBeUndefined();
+    expect(calls.edits[1].images).toBe(3);                  // portrait, sheet, plate
+    expect(calls.edits[1].prompt).toMatch(/first two reference images .* The last reference image is the room/);
+    expect(done.frames.at(-1)).toMatchObject({ url: done.frame, location: "loft-lounge" });
+    expect(calls.atlas[0].reference_images).toHaveLength(3);
+    expect(calls.atlas[0].reference_images[2]).toMatch(/_perform\/.*loft-lounge\.jpg$/);
+    expect(calls.atlas[0].prompt).toMatch(/@Image3 is the room/);
+    expect(done.draft.inputs).toMatch(/\|loft-lounge$/);
+
+    // The same location again keeps the frame; another drops it.
+    expect((await sp.setSceneLocation(T, P, 1, "loft-lounge")).frame).toBe(done.frame);
+    expect((await sp.setSceneLocation(T, P, 1, "office")).frame).toBeUndefined();
+
+    // Removed: the plate goes, and a scene still set there says so.
+    expect(await loc.removeLocation(T, "office")).toBe(true);
+    expect(await loc.removeLocation(T, "office")).toBe(false);
+    await expect(fs.access(path.join(DATA, T, "locations", "office.jpg"))).rejects.toThrow();
+    await expect(sp.startScenePerformance(T, P, 1, { actor: "dana" })).rejects.toThrow(/No location "office"/);
+    expect((await sp.setSceneLocation(T, P, 1, "")).location).toBeUndefined();
+  }, 90000);
+});
+
 describe("an earlier performance back as the scene's take", () => {
   it("re-attaches a take-performed file of this scene, Seedance's sound, its draft id kept for the final", async () => {
     const m = await media(path.join(DATA, "_media7"));
