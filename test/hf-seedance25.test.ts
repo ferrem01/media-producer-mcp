@@ -74,3 +74,10 @@ describe("Seedance 2.5 on Atlas Cloud", () => {
     delete process.env.ATLASCLOUD_API_KEY;
   });
 });
+
+describe("the actor test keeps a Seedance 2.5 result's own voice", () => {
+  it("finishTest does not lay the take's audio over hf-seedance25 / atlas-seedance25", () => {
+    const src = (require("node:fs") as typeof import("node:fs")).readFileSync(require("node:path").join(__dirname, "..", "src/core/actor-test.ts"), "utf8");
+    expect(src).toMatch(/p === "seedance" \|\| p === "seedance-t2v" \|\| p === "hf-seedance25" \|\| p === "atlas-seedance25"\) && \(await hasAudio/);
+  });
+});
