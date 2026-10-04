@@ -46,3 +46,31 @@ describe("Seedance 2.5 on Higgsfield", () => {
     await expect(runHiggsfieldSeedance25("https://x/s.mp4", "https://x/a.jpg", 5, "9:16")).rejects.toThrow(/failed -- likeness of a real person/);
   });
 });
+
+describe("Seedance 2.5 on Atlas Cloud", () => {
+  it("sends the omni references with draft on, names the start frame in the prompt, polls the prediction", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.MP_ACTOR_POLL_MS = "1";
+    const sent: any[] = [];
+    let polls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      if (init?.method === "POST") {
+        sent.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+        return new Response(JSON.stringify({ code: 200, data: { id: "pred_1", status: "processing" } }), { status: 200 });
+      }
+      polls++;
+      expect(url).toBe("https://api.atlascloud.ai/api/v1/model/prediction/pred_1");
+      return new Response(JSON.stringify({ code: 200, data: polls < 2 ? { id: "pred_1", status: "processing" } : { id: "pred_1", status: "completed", outputs: ["https://cdn/atlas.mp4"] } }), { status: 200 });
+    }));
+    const { runAtlasSeedance25 } = await import("../src/core/actor-test.js");
+    const url = await runAtlasSeedance25("https://x/v.mp4", ["https://x/head.png", "https://x/sheet.png"], 8.7, "9:16", { audio: "https://x/a.mp3", prompt: "She talks." });
+    expect(url).toBe("https://cdn/atlas.mp4");
+    expect(sent[0].url).toBe("https://api.atlascloud.ai/api/v1/model/generateVideo");
+    expect(sent[0].headers.Authorization).toBe("Bearer ak");
+    expect(sent[0].body).toMatchObject({
+      model: "bytedance/seedance-2.5/reference-to-video", reference_images: ["https://x/head.png", "https://x/sheet.png"],
+      reference_videos: ["https://x/v.mp4"], reference_audios: ["https://x/a.mp3"], duration: 10, ratio: "9:16", draft: true, generate_audio: true,
+    });
+    expect(sent[0].body.prompt).toBe("@Image1 is the first frame of the video. @Image2 is the character sheet (the same person). @Video1 is the reference video. @Audio1 is the reference audio. She talks.");
+    delete process.env.ATLASCLOUD_API_KEY;
+  });
+});

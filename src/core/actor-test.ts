@@ -33,7 +33,7 @@ import { takeForClip, takeCopies } from "./speaker-layer.js";
 
 const execFileAsync = promisify(execFile);
 
-export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3" | "seedance25" | "genjutsu" | "hf-seedance25";
+export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedance-t2v" | "wan-s2v" | "kling" | "heygen" | "heygen-avatar" | "heygen-v3" | "seedance25" | "genjutsu" | "hf-seedance25" | "atlas-seedance25";
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
@@ -54,7 +54,7 @@ export interface ActorTest {
   error?: string;
 }
 
-const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY", seedance25: "FAL_KEY", genjutsu: "HF_API_KEY_ID", "hf-seedance25": "HF_API_KEY_ID" };
+const KEYS: Record<ActorProvider, string> = { wan: "FAL_KEY", "wan-move": "FAL_KEY", runway: "RUNWAYML_API_SECRET", seedance: "FAL_KEY", "seedance-t2v": "FAL_KEY", "wan-s2v": "FAL_KEY", kling: "FAL_KEY", heygen: "HEYGEN_API_KEY", "heygen-avatar": "HEYGEN_API_KEY", "heygen-v3": "HEYGEN_API_KEY", seedance25: "FAL_KEY", genjutsu: "HF_API_KEY_ID", "hf-seedance25": "HF_API_KEY_ID", "atlas-seedance25": "ATLASCLOUD_API_KEY" };
 const tests = new Map<string, ActorTest>();
 
 export function isActorTestId(id: string): boolean {
@@ -337,6 +337,53 @@ export async function runSeedance25Recast(video: string, img: string, seconds: n
     prompt: prompt || SEEDANCE25_RECAST_PROMPT, video_urls: [video], image_urls: [img],
     duration: String(Math.max(4, Math.min(30, Math.round(seconds)))), aspect_ratio: aspect, resolution: "720p", generate_audio: false,
   }, "seedance 2.5");
+}
+
+/** Seedance 2.5 reference-to-video through ATLAS CLOUD: the same omni
+ *  reference call as Higgsfield's, plus `draft` (a 480p preview, as Marc's
+ *  app runs had it), which Higgsfield's public API lacks. ByteDance forbids a
+ *  start frame alongside references, so the start frame is named in the
+ *  prompt (@Image1), its documented workaround. URL inputs of real people
+ *  are registered as assets by Atlas. */
+export function atlasRefPrompt(prompt: string, images: number, audio: boolean): string {
+  const names = ["@Image1 is the first frame of the video."];
+  if (images > 1) names.push(`${Array.from({ length: images - 1 }, (_, i) => `@Image${i + 2}`).join(", ")} ${images > 2 ? "are" : "is"} the character sheet (the same person).`);
+  names.push("@Video1 is the reference video.");
+  if (audio) names.push("@Audio1 is the reference audio.");
+  return `${names.join(" ")} ${prompt}`;
+}
+export async function runAtlasSeedance25(video: string, img: string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; duration?: number; draft?: boolean; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+  const key = process.env.ATLASCLOUD_API_KEY;
+  if (!key) throw new Error("ATLASCLOUD_API_KEY is not set");
+  const headers = { Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+  const sub = await okJson(await fetch("https://api.atlascloud.ai/api/v1/model/generateVideo", {
+    method: "POST", headers,
+    body: JSON.stringify({
+      model: "bytedance/seedance-2.5/reference-to-video",
+      prompt: atlasRefPrompt(opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), img.length, !!opts.audio),
+      reference_images: img, reference_videos: [video], ...(opts.audio ? { reference_audios: [opts.audio] } : {}),
+      duration: Math.max(4, Math.min(30, opts.duration ? Math.round(opts.duration) : opts.audio ? Math.ceil(seconds) + 1 : Math.round(seconds))),
+      ratio: aspect, resolution: opts.resolution || "480p", generate_audio: !!opts.audio, watermark: false,
+      draft: opts.draft !== false,
+    }),
+  }), "atlas seedance 2.5 submit");
+  const id = sub?.data?.id;
+  if (!id) throw new Error(`atlas seedance 2.5 submit: ${JSON.stringify(sub).slice(0, 300)}`);
+  const statusUrl = `https://api.atlascloud.ai/api/v1/model/prediction/${id}`;
+  await opts.onSubmit?.(statusUrl);
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > GENJUTSU_DEADLINE_MS) throw new Error("atlas seedance 2.5: timed out");
+    await sleep(POLL_MS);
+    const st = (await okJson(await fetch(statusUrl, { headers }), "atlas seedance 2.5 status"))?.data || {};
+    reportVendor({ vendor: "atlas seedance", job: id, status: st.status });
+    if (st.status === "completed" || st.status === "succeeded") {
+      const url = st?.outputs?.[0];
+      if (!url) throw new Error("atlas seedance 2.5: completed without an output");
+      return typeof url === "string" ? url : url.url;
+    }
+    if (["failed", "canceled", "cancelled", "error"].includes(String(st.status))) throw new Error(`atlas seedance 2.5: ${st.status}${st.error ? " -- " + st.error : ""} ${JSON.stringify(st).slice(0, 300)}`);
+  }
 }
 
 /** Seedance 2.5 reference-to-video through HIGGSFIELD's API (not fal): the
@@ -815,7 +862,7 @@ export async function startActorTest(opts: {
   const fps = Math.max(8, Math.min(60, Math.round(Number(opts.fps) || 30)));
   const line = String((project as any).storyboard?.scenes?.[opts.scene_index]?.voiceover_text || "").trim();
   const wanted = (opts.providers && opts.providers.length ? opts.providers : (["wan", "runway"] as ActorProvider[]))
-    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3", "seedance25", "genjutsu", "hf-seedance25"].includes(p));
+    .filter((p): p is ActorProvider => ["wan", "wan-move", "runway", "seedance", "seedance-t2v", "wan-s2v", "kling", "heygen", "heygen-avatar", "heygen-v3", "seedance25", "genjutsu", "hf-seedance25", "atlas-seedance25"].includes(p));
   const providers = wanted.filter((p) => !!process.env[KEYS[p]]);
   if (!providers.length) throw new Error(`No provider key on the server (${wanted.map((p) => KEYS[p]).join(", ")})`);
   const voice = opts.voice !== false && !!process.env.ELEVENLABS_API_KEY;
@@ -955,16 +1002,20 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
         // 720p run outlasted the old 25 min wait and was lost).
         onSubmit: async (statusUrl) => { await fs.writeFile(f("genjutsu-request.json"), JSON.stringify({ status_url: statusUrl })); },
       });
-    } else if (p === "hf-seedance25") {
-      if (!img) throw new Error("hf-seedance25 needs a portrait (image or image_from)");
-      if (!config.publicUrl.startsWith("https://")) throw new Error("hf-seedance25 needs the server's public https address (Higgsfield fetches by URL)");
+    } else if (p === "hf-seedance25" || p === "atlas-seedance25") {
+      if (!img) throw new Error(`${p} needs a portrait (image or image_from)`);
+      if (!config.publicUrl.startsWith("https://")) throw new Error(`${p} needs the server's public https address (the vendor fetches by URL)`);
+      // One reference call, two routes: Higgsfield's API, or Atlas Cloud's (with draft).
+      const seedance = (v: string, imgs: string[], o: { audio?: string; duration?: number; onSubmit: (u: string) => Promise<void> }) => p === "atlas-seedance25"
+        ? runAtlasSeedance25(v, imgs, srcSecs, aspect, { prompt, resolution: heygenOpts.resolution || "480p", ...o })
+        : runHiggsfieldSeedance25(v, imgs, srcSecs, aspect, { prompt, resolution: heygenOpts.resolution || "480p", ...o });
       const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
       const aspect = h > w * 1.1 ? "9:16" : w > h * 1.1 ? "16:9" : "1:1";
-      const onSubmit = async (statusUrl: string) => { await fs.writeFile(f("hf-seedance25-request.json"), JSON.stringify({ status_url: statusUrl })); };
+      const onSubmit = async (statusUrl: string) => { await fs.writeFile(f(`${p}-request.json`), JSON.stringify({ status_url: statusUrl })); };
       if (heygenOpts.hfUrls) {
         // Exactly the given inputs (Marc's app run): the A/B is the route.
         const u = heygenOpts.hfUrls;
-        url = await runHiggsfieldSeedance25(u.video_url, u.image_urls, srcSecs, aspect, { prompt, resolution: heygenOpts.resolution || "480p", audio: u.audio_url, duration: u.duration, onSubmit });
+        url = await seedance(u.video_url, u.image_urls, { audio: u.audio_url, duration: u.duration, onSubmit });
       } else {
         // The reference at full detail (a model sheet's face close-up is a
         // third of a wide image; actor.jpg is capped at 1024 wide).
@@ -991,9 +1042,7 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
         // the voice track is the one voice the model hears (two voices drifted).
         await ffmpeg(["-i", f("source.mp4"), "-an", "-c:v", "copy", "-movflags", "+faststart", f("motion.mp4")]);
         test.files.motion = "motion.mp4";
-        url = await runHiggsfieldSeedance25(`${pub}/motion.mp4`, refs, srcSecs, aspect, {
-          prompt, resolution: heygenOpts.resolution || "480p", audio, onSubmit,
-        });
+        url = await seedance(`${pub}/motion.mp4`, refs, { audio, onSubmit });
       }
     } else if (p === "seedance25") {
       if (!imgUri) throw new Error("seedance25 needs a portrait (image or image_from)");
