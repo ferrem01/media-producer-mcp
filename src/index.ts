@@ -2967,7 +2967,8 @@ Rules:
       // GET  /api/actor-test/{tenant}/{project}/{id}   status, steps, file urls
       // POST /api/actor-test/{tenant}/{project}/{id} {action:"collect"}   a Higgsfield job the test stopped waiting for
       // ── API: Scenes performed by cast actors (core/scene-performance.ts) ──
-      // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, any performance
+      // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, its plan and state, any performance; the film's cast_plan
+      // POST /api/scene-performance/{tenant}/{project}            {action:"plan", cast_plan?, scenes?: [{index, performer}]}  (core/cast-plan.ts; nothing is made)
       // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?, location?}  (location: a location id, "" none)
       //                                                           {action:"pick", url}
       //                                                           {action:"location", location}  (a location id, "" none: frames drawn there, its plate the room)
@@ -2984,7 +2985,24 @@ Rules:
       if (spApi) {
         const spTenant = decodeURIComponent(spApi[1]), spProject = decodeURIComponent(spApi[2]);
         try {
-          if (method === "GET" && spApi[3] === undefined) { jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject) }); return; }
+          if (method === "GET" && spApi[3] === undefined) {
+            const spProj = await loadProject(spTenant, spProject);
+            jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject), cast_plan: (spProj as any)?.storyboard?.cast_plan || null });
+            return;
+          }
+          if (method === "POST" && spApi[3] === undefined) {
+            // The cast plan: {action:"plan", cast_plan?: {...} | null, scenes?: [{index, performer: {...} | null}]}
+            const body = await parseBody(req).catch(() => ({} as any));
+            if (body.action !== "plan") { jsonResponse(res, 400, { error: 'action must be "plan"' }); return; }
+            const { editCastPlan } = await import("./core/scene-performance.js");
+            await editCastPlan(spTenant, spProject, {
+              ...(body.cast_plan !== undefined ? { cast_plan: body.cast_plan && typeof body.cast_plan === "object" ? body.cast_plan : null } : {}),
+              scenes: Array.isArray(body.scenes) ? body.scenes.filter((x: any) => x && Number.isInteger(x.index)).map((x: any) => ({ index: x.index, performer: x.performer && typeof x.performer === "object" ? x.performer : null })) : [],
+            });
+            const spProj = await loadProject(spTenant, spProject);
+            jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject), cast_plan: (spProj as any)?.storyboard?.cast_plan || null });
+            return;
+          }
           if (method === "POST" && spApi[3] !== undefined) {
             const si = Number(spApi[3]);
             const body = await parseBody(req).catch(() => ({} as any));

@@ -115,6 +115,14 @@ export const animationSchema = z.object({
   from: z.string().optional().describe("enter effect 'morph' only: the component it is born from -- its id, or 'id.anchor' for a [data-anchor] part inside it. Same scene; a missing source fades in instead."),
 }).optional();
 
+/** A cast plan (core/cast-plan.ts): who performs, how, with what, where. */
+const planSchema = z.object({
+  actor: z.string().nullable().optional(),
+  how: z.enum(["record", "recast", "generate", ""]).optional(),
+  engine: z.string().optional(),
+  location: z.string().nullable().optional(),
+});
+
 const transitionSchema = z.object({
   // Keep in sync with SceneTransition (core/types.ts) -- the render engine's
   // full vocabulary. The hand-edit API rejecting engine-supported transitions
@@ -1377,6 +1385,7 @@ export function createMcpServer(): McpServer {
           })).optional().describe("Replace this scene's CAST on the board, deterministically: the full list of components in stack order (type + data; a position is honored by the build, an unplaced component is laid out by it). Omit to keep the cast; pass [] to clear it. Works before any build -- a built film is rebuilt from the board with generate mode='full'. A scene template on the scene is dropped unless scene_template is passed too."),
           scene_template: z.object({ type: z.string(), data: z.record(z.unknown()).optional() }).nullable().optional().describe("Set the scene's template (a full-frame card such as st-logo-close) or pass null to drop it."),
           transparent_background: z.union([z.boolean(), z.enum(["true", "false"])]).transform((v) => v === true || v === "true").optional().describe("Person films: false makes this a full graphic beat -- the person's VOICE carries on over it but the picture is the cast (a split of two phones, a full-screen flow); true (the default on a person film) puts the cast over the person."),
+          performer: planSchema.nullable().optional().describe("This scene's CAST PLAN over the film's cast_plan (same fields; actor null = me, location null = none even when the film has one, '' = the film's). null: follow the film again. Nothing is made."),
           transition_in: transitionSchema.describe("The cut INTO this scene, kept on the board so a rebuild keeps it: a named transition with duration_seconds, or type 'none' for a hard cut (the render's default is a half-second crossfade)."),
           assets: z.array(z.object({
             type: z.enum(["screenshot", "screen_recording", "stock_footage", "mockup", "illustration", "camera_video"]),
@@ -1389,6 +1398,7 @@ export function createMcpServer(): McpServer {
             until: z.number().optional(),
           })).optional().describe("Replace this scene's NEEDS on the board, deterministically: the full list of assets the scene asks for. Pass [] when the cast IS the plan (a library stand-in for a screen nobody will record) -- an open screen need would otherwise cast a slate over it. Omit to keep the needs."),
         })).optional(),
+        cast_plan: planSchema.nullable().optional().describe("WHO performs the person in every scene that does not say otherwise, HOW and WHERE (speaker / creator-cut films): {actor (a cast actor id; null = me), how: record | recast | generate, engine (recast: higgsfield = Genjutsu, kling, heygen, runway; generate: seedance, heygen; omitted = the best for the actor), location (generate with Seedance: a location id)}. Only the fields you pass change ('' puts one back to its default); null clears the plan. NOTHING IS MADE: scenes whose take no longer matches show state 'stale' (cast action='scenes') until performed again."),
         remove_scenes: z.array(z.number()).optional().describe("Indices of storyboard scenes to remove"),
         reorder_scenes: z.array(z.number()).optional().describe("Current indices in desired order"),
       }).optional().describe("Direct storyboard edits. Partial updates -- only fields you pass get changed. Works in the storyboard state. scenes[].components sets a scene's cast deterministically (no writer)."),
@@ -1519,6 +1529,14 @@ export function createMcpServer(): McpServer {
                 } as any);
               }
             }
+          }
+
+          // The cast plan: the film's and each scene's (core/cast-plan.ts).
+          const planScenes = (params.storyboard.scenes || []).filter((u: any) => u.performer !== undefined && u.index !== undefined).map((u: any) => ({ index: u.index as number, performer: u.performer }));
+          if (params.storyboard.cast_plan !== undefined || planScenes.length) {
+            const { applyPlanEdit } = await import("./core/cast-plan.js");
+            try { await applyPlanEdit(params.tenant_id, project, { cast_plan: params.storyboard.cast_plan as any, scenes: planScenes }); }
+            catch (e: any) { return err(e?.message || String(e)); }
           }
 
           // Recalculate estimated duration
@@ -1834,7 +1852,7 @@ export function createMcpServer(): McpServer {
 
   tool(
     "cast",
-    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). SCENE BY SCENE (one film can mix them): perform_scene -- a cast actor performs ONE scene with no recording: a start frame drawn for the shot (start_frame first to see and redraw it -- cheap), the scene's line voiced in the actor's ElevenLabs voice (voice_source script) or the scene's recording converted to it (take: the delivery kept), Seedance 2.5 performs it, attached as that scene's take (quality draft = 480p preview ~2 min; then final = the same shot at 1080p); recast with scenes:[...] -- only those scenes' recordings, performed one-to-one (Higgsfield) and those scenes cast as the actor; hear_voice -- the scene's voice alone, before any video (a delivery with v4 tags, pauses, CAPS, /IPA/); continue_from -- the scene starts from another scene's LAST frame (default the one before), so they link without a jump; scene_cast -- who plays a scene (an actor, 'recording', or 'film' to follow the film); actor_clip -- b-roll of the actor, no speech, over a scene (shot, seconds, at); scenes -- every scene's performer and any job. LOCATIONS (Seedance only; a HeyGen look is its own setting): a tenant library of sets, each a clean plate (the room with nobody in it) -- add_location from a prompt (drawn), or an image (a frame of a take: the person is removed; clean:false keeps it as is), async: it lists as 'drawing' until it lands; locations lists them; scene_location sets a scene's (or pass location on start_frame / perform_scene). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the ElevenLabs voice a recast converts to, '' clears -- or sheet), remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
+    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). SCENE BY SCENE (one film can mix them): perform_scene -- a cast actor performs ONE scene with no recording: a start frame drawn for the shot (start_frame first to see and redraw it -- cheap), the scene's line voiced in the actor's ElevenLabs voice (voice_source script) or the scene's recording converted to it (take: the delivery kept), Seedance 2.5 performs it, attached as that scene's take (quality draft = 480p preview ~2 min; then final = the same shot at 1080p); recast with scenes:[...] -- only those scenes' recordings, performed one-to-one (Higgsfield) and those scenes cast as the actor; hear_voice -- the scene's voice alone, before any video (a delivery with v4 tags, pauses, CAPS, /IPA/); continue_from -- the scene starts from another scene's LAST frame (default the one before), so they link without a jump; scene_cast -- who plays a scene (an actor, 'recording', or 'film' to follow the film); actor_clip -- b-roll of the actor, no speech, over a scene (shot, seconds, at); scenes -- every scene's performer, its PLAN (set with the update tool's storyboard cast_plan / scenes[].performer: who, how, engine, where) and state (ready / todo / stale: made for another plan), and any job. A perform_scene or start_frame with no actor or location uses the plan's; choosing one there writes it into the scene's plan. LOCATIONS (Seedance only; a HeyGen look is its own setting): a tenant library of sets, each a clean plate (the room with nobody in it) -- add_location from a prompt (drawn), or an image (a frame of a take: the person is removed; clean:false keeps it as is), async: it lists as 'drawing' until it lands; locations lists them; scene_location sets a scene's (or pass location on start_frame / perform_scene). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the ElevenLabs voice a recast converts to, '' clears -- or sheet), remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
     {
       tenant_id: z.string(),
       action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "voices", "recast", "generate", "status", "clear", "scenes", "start_frame", "continue_from", "pick_frame", "hear_voice", "perform_scene", "revoice", "scene_cast", "actor_clip", "locations", "add_location", "remove_location", "scene_location"]),
@@ -1918,7 +1936,8 @@ export function createMcpServer(): McpServer {
             return ok({ ...(await startRecast(t, needProject(), needActor(), { performer: params.performer, voice_id: params.voice_id, fresh: params.fresh === true, motion: params.motion, scenes: params.scenes })), message: "Running. Poll action='status'." });
           case "scenes": {
             const sp = await import("./core/scene-performance.js");
-            return ok({ scenes: await sp.getScenePerformances(t, needProject()), studio_url: previewUrl(t, needProject()) });
+            const proj = await loadProject(t, needProject());
+            return ok({ cast_plan: (proj as any)?.storyboard?.cast_plan || null, scenes: await sp.getScenePerformances(t, needProject()), studio_url: previewUrl(t, needProject()) });
           }
           case "start_frame":
           case "continue_from":

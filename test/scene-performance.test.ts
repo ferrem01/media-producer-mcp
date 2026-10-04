@@ -582,3 +582,114 @@ describe("cast scene by scene", () => {
     expect(after.storyboard.scenes[1].cast).toBeUndefined();
   });
 });
+
+describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
+  it("resolves a scene's plan over the film's, picks engines, writes a line, and says ready / todo / stale", async () => {
+    const cp = await import("../src/core/cast-plan.js");
+    const actors: any[] = [{ id: "dana", name: "Dana" }, { id: "marc-look", name: "Marc look", heygen_look_id: "hl1" }];
+    const locs = [{ id: "loft", name: "Loft lounge" }];
+    const proj: any = { storyboard: { cast_plan: { actor: "dana", how: "generate", location: "loft" }, scenes: [
+      {}, { performer: { location: null } }, { performer: { actor: null } }, { performer: { how: "recast" } }, { performer: { actor: "marc-look" } },
+    ] } };
+    const r0 = cp.resolvePlan(proj, 0, actors);
+    expect(r0).toMatchObject({ actor: "dana", how: "generate", engine: "seedance", location: "loft" });
+    expect(r0.from_film.sort()).toEqual(["actor", "how", "location"]);
+    expect(cp.planLine(r0, actors, locs)).toBe("Dana · Generate · Seedance · Loft lounge");
+    expect(cp.resolvePlan(proj, 1, actors).location).toBeUndefined();          // none, over the film's
+    expect(cp.resolvePlan(proj, 2, actors)).toMatchObject({ actor: null });
+    expect(cp.planLine(cp.resolvePlan(proj, 3, actors), actors)).toBe("Dana · Recast · Genjutsu");   // a location means nothing to a recast
+    expect(cp.resolvePlan(proj, 4, actors)).toMatchObject({ actor: "marc-look", engine: "heygen" });  // a look is its own setting
+    expect(cp.resolvePlan(proj, 4, actors).location).toBeUndefined();
+    // No how anywhere: a cast member recasts a recording, else generates; nobody is me recording.
+    const bare: any = { storyboard: { scenes: [{ performer: { actor: "dana" } }, {}] } };
+    expect(cp.resolvePlan(bare, 0, actors, true).how).toBe("recast");
+    expect(cp.resolvePlan(bare, 0, actors, false).how).toBe("generate");
+    expect(cp.planLine(cp.resolvePlan(bare, 1, actors, true))).toBe("Me · Record");
+
+    // State.
+    const gen = cp.resolvePlan(proj, 0, actors);
+    const sc = proj.storyboard.scenes[0];
+    expect(cp.planState(proj, 0, gen, null, false).state).toBe("todo");
+    expect(cp.planState(proj, 0, gen, { recast_by: [] }, true)).toMatchObject({ state: "stale" });
+    sc.performance = { made_with: { actor: "dana", engine: "seedance", location: "loft" } };
+    expect(cp.planState(proj, 0, gen, { performed_by: { actor: "dana", engine: "seedance" } }, true).state).toBe("ready");
+    sc.performance.made_with.location = "office";
+    expect(cp.planState(proj, 0, gen, { performed_by: { actor: "dana", engine: "seedance" } }, true)).toMatchObject({ state: "stale", why: expect.stringMatching(/another location/) });
+    const rec = cp.resolvePlan(proj, 3, actors);
+    expect(cp.planState(proj, 3, rec, { recast_by: [] }, false).state).toBe("todo");
+    proj.storyboard.scenes[3].cast = "dana";
+    expect(cp.planState(proj, 3, rec, { recast_by: ["dana"] }, true).state).toBe("ready");
+
+    // Edits: checked, '' back to the film's, null kept.
+    expect(() => cp.cleanPlan({ actor: "nobody" }, actors, locs)).toThrow(/No cast actor "nobody"/);
+    expect(() => cp.cleanPlan({ location: "attic" }, actors, locs)).toThrow(/No location "attic"/);
+    expect(() => cp.cleanPlan({ how: "dance" }, actors, locs)).toThrow(/how must be/);
+    expect(() => cp.writePlan({ how: "recast" }, cp.cleanPlan({ engine: "seedance" }, actors, locs))).toThrow(/Seedance cannot recast/);
+    expect(cp.writePlan({ actor: "dana", location: "loft" }, cp.cleanPlan({ location: "" }, actors, locs))).toEqual({ actor: "dana" });
+    expect(cp.writePlan(undefined, cp.cleanPlan({ location: "none" }, actors, locs))).toEqual({ location: null });
+    expect(cp.writePlan({ actor: "dana" }, cp.cleanPlan({ how: "record" }, actors, locs))).toEqual({ actor: null, how: "record" });
+    expect(cp.writePlan({ engine: "kling" }, cp.cleanPlan({ engine: "" }, actors, locs))).toBeUndefined();
+  });
+
+  it("a plan edit makes nothing; a perform with no actor or location uses the plan; choosing in a perform writes the plan; a changed plan reads stale", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_plan"));
+    const loc = await import("../src/core/locations.js");
+    await fs.writeFile(path.join(DATA, T, "projects", P, "assets", "plate.png"), m.png);
+    const plate = await loc.addLocation(T, { name: "Den", image: `/assets/${T}/projects/${P}/assets/plate.png`, clean: false });
+    const atlas: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: `pl${atlas.length}` } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/pl.mp4"], draft_id: "pld" } }));
+      if (u === "https://cdn/pl.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const takes: any[] = [];
+    sp.registerSceneAttacher(async (_t, _p, url, si, extra) => { takes.push({ url, si, extra }); return { status: 200, body: {} }; });
+    const { loadProject: lp, saveProject: svp } = await import("../src/persistence/project.js");
+    // A fresh scene with nothing performed: clear scene 0's earlier state.
+    const pr: any = await lp(T, P); delete pr.storyboard.scenes[0].performance; delete pr.storyboard.scenes[0].performer; await svp(pr);
+
+    await expect(sp.editCastPlan(T, P, { cast_plan: { actor: "ghost" } })).rejects.toThrow(/No cast actor "ghost"/);
+    await sp.editCastPlan(T, P, { cast_plan: { actor: "dana", how: "generate", location: plate.id } });
+    expect(atlas).toHaveLength(0);                                   // nothing made
+    let s0 = (await sp.getScenePerformances(T, P))[0];
+    expect(s0.plan_line).toBe("Dana · Generate · Seedance · Den");
+    expect(s0.plan).toMatchObject({ actor: "dana", how: "generate", engine: "seedance", location: plate.id });
+
+    // Perform with nothing named: the plan's actor and location.
+    await sp.startScenePerformance(T, P, 0, { voice_source: "script", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P))[0].performance?.status !== "running", 40000);
+    s0 = (await sp.getScenePerformances(T, P))[0];
+    expect(s0.performance.error).toBeUndefined();
+    expect(s0.performance.location).toBe(plate.id);
+    expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance", location: plate.id });
+    expect(atlas[0].reference_images[2]).toMatch(new RegExp(`${plate.id}\\.jpg$`));
+    expect(s0.performer).toBeNull();                                  // it followed the film: nothing written
+    // (the attacher here is a stub, so the take is read from the scene's own record)
+
+    // The film's location changes: the scene no longer matches -- stale, never remade by itself.
+    const den2 = await loc.addLocation(T, { name: "Den two", image: `/assets/${T}/projects/${P}/assets/plate.png`, clean: false });
+    await sp.editCastPlan(T, P, { cast_plan: { location: den2.id } });
+    expect(atlas).toHaveLength(1);
+    const pr2: any = await lp(T, P);
+    const cp = await import("../src/core/cast-plan.js");
+    const plan = cp.resolvePlan(pr2, 0, [{ id: "dana", name: "Dana" } as any]);
+    expect(cp.planState(pr2, 0, plan, { performed_by: { actor: "dana", engine: "seedance" } }, false)).toMatchObject({ state: "stale" });
+
+    // A scene's own plan: choosing a location in the perform writes it there.
+    await sp.startScenePerformance(T, P, 0, { voice_source: "script", force: true, location: plate.id });
+    await until(async () => (await sp.getScenePerformances(T, P))[0].performance?.status !== "running", 40000);
+    s0 = (await sp.getScenePerformances(T, P))[0];
+    expect(s0.performer).toEqual({ location: plate.id });
+    expect(s0.plan_line).toBe("Dana · Generate · Seedance · Den");
+    // null follows the film again.
+    await sp.editCastPlan(T, P, { scenes: [{ index: 0, performer: null }] });
+    expect((await sp.getScenePerformances(T, P))[0].performer).toBeNull();
+    await sp.editCastPlan(T, P, { cast_plan: null });
+  }, 120000);
+});
