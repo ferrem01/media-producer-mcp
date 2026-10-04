@@ -360,6 +360,32 @@ describe("the pitch check, before Seedance is paid", () => {
   }, 120000);
 });
 
+describe("delivery: how the line is said (ElevenLabs v4)", () => {
+  it("the script voice reads the delivery with v4 (tags, pauses, CAPS kept), the line when none; hear_voice makes the voice alone", async () => {
+    const sp = await import("../src/core/scene-performance.js");
+    expect(sp.SCRIPT_VOICE_MODEL).toBe("eleven_v4");
+    expect(sp.deliveryText("Then what?\n(pause)\nFor most *teams*... nothing.")).toBe("Then what? ... For most teams... nothing.");
+    expect(sp.deliveryText("ignored", "[curious] Then what? [excited] SEND more of that.")).toBe("[curious] Then what? [excited] SEND more of that.");
+    process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media8"));
+    const tts: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      if (String(url).includes("/text-to-speech/")) { tts.push(JSON.parse(init.body)); return new Response(m.mp3); }
+      throw new Error("unexpected fetch " + url);
+    }));
+    const D = "[curious] Your best email isn't on your calendar... [excited] It's waiting for a SIGNAL.";
+    const r = await sp.previewSceneVoice(T, P, 1, { actor: "dana", voice_source: "script", delivery: D });
+    expect(tts[0]).toEqual({ text: D, model_id: "eleven_v4" });
+    expect(r.url).toMatch(/voice-preview-dana-s2-.*\.mp3$/);
+    expect(r.hz).toBeGreaterThan(200); expect(r.delivery).toBe(D);
+    expect((await sp.getScenePerformances(T, P))[1].performance.delivery).toBe(D);   // kept for the draft
+    // "" goes back to the plain line.
+    await sp.previewSceneVoice(T, P, 1, { voice_source: "script", delivery: "" });
+    expect((await sp.getScenePerformances(T, P))[1].performance.delivery).toBeUndefined();
+    expect(tts[1].text).not.toMatch(/\[/);
+  }, 60000);
+});
+
 describe("an earlier performance back as the scene's take", () => {
   it("re-attaches a take-performed file of this scene, Seedance's sound, its draft id kept for the final", async () => {
     const m = await media(path.join(DATA, "_media7"));

@@ -128,6 +128,18 @@ take, kept as `voice_hz`). More than 10% off stops the scene with the
 numbers (`performance.pitch_check`, "Nothing was sent to Seedance"); Studio
 offers "Make it anyway", the MCP `force`.
 
+Delivery (Marc: can we "control the pauses ... the inflection ... the
+emphasis ... the pronunciation" in ElevenLabs text?). ElevenLabs' newest
+model is v4 (`eleven_v4`, recommended over v3): tags in brackets
+([excited], [whispers], [sighs], [laughs], [sarcastic]), no SSML <break>
+(ellipses and dashes instead), CAPITALS for emphasis, /IPA/ for
+pronunciation. A scene's script voice now reads with v4 (`SCRIPT_VOICE_MODEL`,
+MP_TTS_MODEL overrides) from `performance.delivery` -- the line with those
+marks, kept apart from the script so they never reach captions or another
+voice; "(pause)" lines become "..." when there is none. `previewSceneVoice`
+(MCP `hear_voice`, API `{action:"voice"}`, Studio "Hear the voice") makes
+the voice alone for cents before any Seedance.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

@@ -577,6 +577,12 @@ export interface ScenePerformance {
    *  voice ("script"), or the scene's recorded take converted to it
    *  ("take": the delivery kept). */
   voice_source: "script" | "take";
+  /** How the line is SAID when the voice reads the script: the line with
+   *  delivery marks for ElevenLabs v4 -- tags in brackets ([excited],
+   *  [whispers], [sighs], [laughs]), "..." and dashes for pauses, CAPITALS
+   *  for emphasis, /IPA/ for a pronunciation. Kept apart from the script, so
+   *  the marks never reach captions or any other voice. Absent: the line. */
+  delivery?: string;
   /** The prompts, written out in full when the defaults built from the shot
    *  are not what is wanted (Marc: "define any prompt for any scene"):
    *  `frame_prompt` what GPT Image draws, `video_prompt` what Seedance gets.
