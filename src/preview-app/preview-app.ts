@@ -12042,7 +12042,7 @@ ${QUOTIENT_CSS}
     var d = castUi.data, list = d.scenes || [], a = castActorById(castUi.actor), p = castPerfById(castUi.performer);
     castUi.spOpen = castUi.spOpen || {}; castUi.spShot = castUi.spShot || {}; castUi.spVoice = castUi.spVoice || {}; castUi.spClip = castUi.spClip || {}; castUi.spClipSec = castUi.spClipSec || {};
     if (!list.length) return '<div class="np-empty">This film has no scenes yet.</div>';
-    var h = '<div class="np-block"><div class="np-lead">Scenes</div><div class="np-hint"><b>Recast</b> uses the vendor picked above on your recording of the scene (one-to-one). <b>' + escHtml(a ? a.name : 'The actor') + ' performs it</b> needs no recording: a start frame for the shot, the line voiced in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice, a 480p draft, then the 1080p final.</div></div>';
+    var h = castLocationsHtml(a) + '<div class="np-block"><div class="np-lead">Scenes</div><div class="np-hint"><b>Recast</b> uses the vendor picked above on your recording of the scene (one-to-one). <b>' + escHtml(a ? a.name : 'The actor') + ' performs it</b> needs no recording: a start frame for the shot, the line voiced in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice, a 480p draft, then the 1080p final.</div></div>';
     list.forEach(function(s) {
       var i = s.scene_index, tk = s.take, perf = s.performance || {};
       var run = s.running || perf.status === 'running';
@@ -12060,6 +12060,47 @@ ${QUOTIENT_CSS}
       h += '</div>';
     });
     return h;
+  }
+  // ── Locations (core/locations.ts): clean plates of the sets ──
+  function castLocationsHtml(a) {
+    var locs = castUi.locations;
+    var h = '<div class="np-block"><div class="np-lead">Locations</div>';
+    if (!locs) { castLoadLocations(); return h + '<div class="np-empty">Loading…</div></div>'; }
+    h += '<div class="np-hint">The rooms ' + escHtml(a ? a.name : 'the actor') + ' performs in, each a clean plate (nobody in it). A scene set in one has its frame drawn there and sends the plate with every take, so the room holds from scene to scene.</div><div class="np-grid">';
+    locs.forEach(function(l) {
+      h += '<div class="np-cand cast-actor" title="' + escAttr(l.prompt || l.name) + '">'
+        + (l.image ? '<img src="' + escAttr(withToken('/api/locations/' + castT() + '/' + encodeURIComponent(l.id) + '/image')) + '" alt="">'
+          : '<div class="np-empty" style="padding:24px 6px">' + (l.status === 'failed' ? 'Failed: ' + escHtml(l.error || '') : 'Drawing…') + '</div>')
+        + '<small>' + escHtml(l.name) + '</small>'
+        + '<button class="cast-x" data-loc-x="' + escAttr(l.id) + '" title="Remove this location">×</button></div>';
+    });
+    h += '<div class="np-cand cast-add' + (castUi.locAdd ? ' sel' : '') + '" data-loc-add="1"><span>+ Add location</span></div></div>';
+    if (castUi.locAdd) {
+      var frames = [];
+      ((castUi.data && castUi.data.scenes) || []).forEach(function(sc) {
+        ((sc.performance && sc.performance.frames) || []).forEach(function(f) { if (f.from_scene == null) frames.push({ url: f.url, label: 'Scene ' + (sc.scene_index + 1) + '’s frame' }); });
+      });
+      h += '<div class="np-panel">'
+        + '<div class="np-row"><div class="np-what"><input id="loc-name" class="np-search" maxlength="60" placeholder="Name (e.g. Loft lounge)" value="' + escAttr(castUi.locName || '') + '"></div></div>'
+        + '<div class="np-hint">Describe the room, or clean a frame you already like (the person is removed).</div>'
+        + '<textarea id="loc-prompt" rows="3" maxlength="2000" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;font-size:13px;line-height:1.45;padding:8px 10px;" placeholder="A bright loft lounge, a grey linen couch, plants by tall windows, warm afternoon light">' + escHtml(castUi.locPrompt || '') + '</textarea>'
+        + (frames.length ? '<div class="np-row"><div class="np-what">From a frame: <select id="loc-frame"><option value="">No: draw it from the description</option>'
+          + frames.map(function(f) { return '<option value="' + escAttr(f.url) + '">' + escHtml(f.label) + '</option>'; }).join('') + '</select>'
+          + ' <label><input type="checkbox" id="loc-keep"> keep it as it is</label></div></div>' : '')
+        + '<div style="margin:6px 0"><button class="np-btn" data-loc-make="1">Make the location</button></div></div>';
+    }
+    return h + '</div>';
+  }
+  function castLoadLocations() {
+    if (castUi.locLoading) return;
+    castUi.locLoading = true;
+    api('/locations/' + castT()).then(function(r) {
+      castUi.locLoading = false;
+      castUi.locations = r.locations || [];
+      if (!castTyping()) castRender();
+      // A plate being drawn: look again shortly.
+      if (castUi.locations.some(function(l) { return l.status === 'drawing'; })) setTimeout(castLoadLocations, 3000);
+    }).catch(function(e) { castUi.locLoading = false; castUi.locations = []; castRender(); castSay(e.message || String(e), 'err'); });
   }
   function castScenePanel(s, a, hasRec, run) {
     var i = s.scene_index, perf = s.performance || {};
@@ -12116,7 +12157,11 @@ ${QUOTIENT_CSS}
       });
     });
     var room = castUi.spRoom[i] != null ? castUi.spRoom[i] : (mine && perf.room_url) || '';
-    if (roomOpts.length) {
+    var locs = (castUi.locations || []).filter(function(l) { return l.image || l.id === perf.location; });
+    h += '<div class="np-row"><div class="np-what">Location: <select id="sp-loc-' + i + '"' + (run ? ' disabled' : '') + '><option value="">None</option>'
+      + locs.map(function(l) { return '<option value="' + escAttr(l.id) + '"' + (l.id === perf.location ? ' selected' : '') + '>' + escHtml(l.name) + '</option>'; }).join('')
+      + '</select><small>' + (locs.length ? 'the frame is drawn in this room and every take keeps it' : 'add one under Locations above') + '</small></div></div>';
+    if (roomOpts.length && !perf.location) {
       h += '<div class="np-row"><div class="np-what">Room reference: <select id="sp-room-' + i + '"><option value="">None</option>'
         + roomOpts.map(function(o) { return '<option value="' + escAttr(o.url) + '"' + (o.url === room ? ' selected' : '') + '>' + escHtml(o.label) + '</option>'; }).join('')
         + '</select><small>keeps the room, couch and windows the same in every scene</small></div></div>';
@@ -12301,6 +12346,26 @@ ${QUOTIENT_CSS}
       spPost(v, { action: 'clip', actor: spActor, shot: cs.value.trim(), seconds: sec ? Number(sec.value) : 5 }, 'Making the b-roll…');
       return;
     }
+    if (el('data-loc-add')) { castUi.locAdd = !castUi.locAdd; castRender(); return; }
+    if ((v = el('data-loc-x'))) {
+      ev.stopPropagation();
+      var lx = (castUi.locations || []).filter(function(l) { return l.id === v; })[0];
+      if (!confirm('Remove the location ' + (lx ? lx.name : v) + '? Takes made there stay as they are.')) return;
+      api('DELETE', '/locations/' + castT() + '/' + encodeURIComponent(v)).then(function() { castUi.locations = null; castRender(); }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
+    if (el('data-loc-make')) {
+      var ln = document.getElementById('loc-name'), lp = document.getElementById('loc-prompt'), lf = document.getElementById('loc-frame'), lk = document.getElementById('loc-keep');
+      var body = { name: ln ? ln.value.trim() : '', prompt: lp ? lp.value.trim() : '' };
+      if (lf && lf.value) { body.image = lf.value; if (lk && lk.checked) body.clean = false; }
+      if (!body.name) { castSay('Name the location.', 'err'); return; }
+      if (!body.image && !body.prompt) { castSay('Describe the room, or pick a frame to clean.', 'err'); return; }
+      castSay(body.image && body.clean === false ? 'Adding the location…' : 'Drawing the location (under a minute)…');
+      api('POST', '/locations/' + castT(), body).then(function(l) {
+        castUi.locAdd = false; castUi.locName = ''; castUi.locPrompt = ''; castUi.locations = null; castSay(l.name + (l.status === 'drawing' ? ' is being drawn.' : ' is added.'), 'ok'); castRender();
+      }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
     if ((v = el('data-cast-x'))) {
       ev.stopPropagation();
       var ax = castActorById(v);
@@ -12332,6 +12397,8 @@ ${QUOTIENT_CSS}
     castUi.spShot = castUi.spShot || {}; castUi.spClip = castUi.spClip || {};
     if ((m = /^sp-shot-(\\d+)$/.exec(t.id || ''))) castUi.spShot[m[1]] = t.value;
     if ((m = /^sp-clip-(\\d+)$/.exec(t.id || ''))) castUi.spClip[m[1]] = t.value;
+    if (t.id === 'loc-name') castUi.locName = t.value;
+    if (t.id === 'loc-prompt') castUi.locPrompt = t.value;
     if ((m = /^sp-del-(\\d+)$/.exec(t.id || ''))) { castUi.spDel = castUi.spDel || {}; castUi.spDel[m[1]] = t.value; }
     if ((m = /^sp-fprompt-(\\d+)$/.exec(t.id || ''))) { castUi.spFP = castUi.spFP || {}; castUi.spFP[m[1]] = t.value; }
     if ((m = /^sp-vprompt-(\\d+)$/.exec(t.id || ''))) { castUi.spVP = castUi.spVP || {}; castUi.spVP[m[1]] = t.value; }
@@ -12340,6 +12407,7 @@ ${QUOTIENT_CSS}
     var t = ev.target, m;
     if ((m = /^sp-vtrack-(\\d+)$/.exec(t.id || ''))) { spPost(m[1], { action: 'revoice', voice_track: t.value }, 'Changing the sound…').then(function() { loadProject(castUi.project.project_id); }); return; }
     if ((m = /^sp-voice-(\\d+)$/.exec(t.name || ''))) { castUi.spVoice = castUi.spVoice || {}; castUi.spVoice[m[1]] = t.value; return; }
+    if ((m = /^sp-loc-(\\d+)$/.exec(t.id || ''))) { spPost(m[1], { action: 'location', location: t.value }, t.value ? 'Setting the location…' : 'No location.'); return; }
     if ((m = /^sp-room-(\\d+)$/.exec(t.id || ''))) { castUi.spRoom = castUi.spRoom || {}; castUi.spRoom[m[1]] = t.value; return; }
     if ((m = /^sp-clipsec-(\\d+)$/.exec(t.id || ''))) { castUi.spClipSec = castUi.spClipSec || {}; castUi.spClipSec[m[1]] = Number(t.value); return; }
     if (/^sp-(shot|clip)-\\d+$/.test(t.id || '')) { castInput(ev); return; }

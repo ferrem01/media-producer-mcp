@@ -6,6 +6,31 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Locations: a clean plate per set (SPEC-cast-scenes.md, phase A)
+
+Marc asked what happens when Dana moves room or each scene is somewhere else,
+then how it all reaches the storyboard and Studio. Agreed: two functions
+(Recast, Generate), three choices (me / recast / generate), the plan on the
+storyboard -- written up in `SPEC-cast-scenes.md`. Phase A ships the place.
+
+- `core/locations.ts`: a tenant library (`<tenant>/locations/`, one jpg per
+  location + `locations.json`). The image is a CLEAN PLATE, nobody in it, so it
+  pins the room and not a pose. Made from a prompt (GPT Image), cleaned from a
+  frame (GPT Image edit, the person removed), or an image kept as it is
+  (`clean: false`). Drawing is async: listed as `drawing` until it lands.
+- A scene's `performance.location`: its start frame is drawn with the plate as
+  the last reference image ("the last reference image is the room they are
+  in"), and every take sends the plate to Seedance as the room reference (the
+  mechanism that held the room on scenes 6-7). A raw `room_url` still overrides;
+  choosing a location clears it. A new location drops the picked frame unless
+  it was drawn there, and the draft. B-roll on the scene uses it too. A removed
+  location stops a perform before anything is spent.
+- Surfaces: `/api/locations/{tenant}[/{id}[/image]]`; scene-performance
+  `{action:"location"}` plus `location` on frame/perform; MCP `cast` actions
+  `locations`, `add_location`, `remove_location`, `scene_location`; Studio
+  Scene by scene gets a Locations block (add from a description or a frame of
+  the film, remove) and a Location picker per scene.
+
 ## 2026-10-04 — Sign out, then sign in as someone else
 
 Marc signed in on his phone (Claude's in-app browser) with the wrong Gmail;

@@ -81,4 +81,16 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     // Regexes inside the page template are written with doubled backslashes.
     expect(src).toContain("/^sp-shot-(\\\\d+)$/");
   });
+
+  it("locations: a library of clean plates in Scene by scene, and each scene's location picked from it", () => {
+    const html = getPreviewHtml();
+    expect(html).toContain("api('/locations/' + castT())");
+    expect(html).toContain("api('POST', '/locations/' + castT(), body)");
+    expect(html).toContain("api('DELETE', '/locations/' + castT() + '/' + encodeURIComponent(v))");
+    expect(html).toContain("'/api/locations/' + castT() + '/' + encodeURIComponent(l.id) + '/image'");
+    expect(html).toContain("if (lf && lf.value) { body.image = lf.value; if (lk && lk.checked) body.clean = false; }");
+    expect(html).toContain("spPost(m[1], { action: 'location', location: t.value }");
+    // The raw room reference only shows when the scene has no location.
+    expect(html).toContain("if (roomOpts.length && !perf.location) {");
+  });
 });
