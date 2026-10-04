@@ -2915,9 +2915,10 @@ Rules:
       // POST /api/actor-test/{tenant}/{project}/{id} {action:"collect"}   a Higgsfield job the test stopped waiting for
       // ── API: Scenes performed by cast actors (core/scene-performance.ts) ──
       // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, any performance
-      // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot}
+      // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?}
       //                                                           {action:"pick", url}
-      //                                                           {action:"perform", actor?, shot?, voice_source?, quality?}
+      //                                                           {action:"perform", actor?, shot?, voice_source?, quality?, frame_prompt?, video_prompt?}
+      //                                                           (a prompt replaces the default built from the shot; "" goes back to it)
       //                                                           {action:"clip", actor?, shot, seconds?}  (b-roll, no speech)
       //                                                           {action:"cast", cast: actor id | null | "film"}
       //                                                           {action:"recording"}  (the recording back, re-attached if a performance replaced it)
@@ -2930,11 +2931,11 @@ Rules:
             const si = Number(spApi[3]);
             const body = await parseBody(req).catch(() => ({} as any));
             const str = (v: unknown) => typeof v === "string" ? v : undefined;
-            if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot) })); return; }
+            if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt) })); return; }
             if (body.action === "pick") { jsonResponse(res, 200, await pickSceneFrame(spTenant, spProject, si, String(body.url || ""))); return; }
             if (body.action === "perform") {
               jsonResponse(res, 202, await startScenePerformance(spTenant, spProject, si, {
-                actor: str(body.actor), shot: str(body.shot),
+                actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), video_prompt: str(body.video_prompt),
                 voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined,
                 quality: body.quality === "final" ? "final" : "draft",
               }));

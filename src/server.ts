@@ -1844,6 +1844,8 @@ export function createMcpServer(): McpServer {
       voice_source: z.enum(["script", "take"]).optional().describe("perform_scene: the scene's line read in the actor's voice (script, default), or the scene's recording converted to it (take)."),
       quality: z.enum(["draft", "final"]).optional().describe("perform_scene: draft (480p preview, default) or final (the draft's shot at 1080p)."),
       frame_url: z.string().optional().describe("pick_frame: which drawn frame the scene uses (from action='scenes')."),
+      frame_prompt: z.string().optional().describe("start_frame / perform_scene: the WHOLE prompt GPT Image draws the start frame from, in place of the default built from the shot (action='scenes' shows the default). '' goes back to the default."),
+      video_prompt: z.string().optional().describe("perform_scene: the WHOLE prompt Seedance gets, in place of the default built from the shot (action='scenes' shows it). Name the references @Image1 (the first frame), @Image2 (the sheet), @Audio1 (the voice), or they are named for you. '' goes back to the default."),
       cast: z.string().optional().describe("scene_cast: an actor id, 'recording' (the recorded person), or 'film' (follow the film)."),
       seconds: z.number().optional().describe("actor_clip: length, 4-15 s (default 5)."),
       at: z.number().optional().describe("actor_clip: when it starts in the scene, seconds (default 0)."),
@@ -1918,9 +1920,9 @@ export function createMcpServer(): McpServer {
             if (params.scene_index === undefined) return err("scene_index is required (0-based)");
             const sp = await import("./core/scene-performance.js");
             const pid = needProject(), si = params.scene_index;
-            if (params.action === "start_frame") return ok({ ...(await sp.startSceneFrame(t, pid, si, { actor: params.actor, shot: params.shot })), message: "Drawing (~20-60 s). Poll action='scenes'; redraw with another start_frame, or pick_frame an earlier one." });
+            if (params.action === "start_frame") return ok({ ...(await sp.startSceneFrame(t, pid, si, { actor: params.actor, shot: params.shot, frame_prompt: params.frame_prompt })), message: "Drawing (~20-60 s). Poll action='scenes'; redraw with another start_frame, or pick_frame an earlier one." });
             if (params.action === "pick_frame") { if (!params.frame_url) return err("frame_url is required"); return ok(await sp.pickSceneFrame(t, pid, si, params.frame_url)); }
-            if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, quality: params.quality })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
+            if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, quality: params.quality, frame_prompt: params.frame_prompt, video_prompt: params.video_prompt })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
             if (params.action === "actor_clip") return ok({ ...(await sp.startActorClip(t, pid, si, { actor: params.actor, shot: String(params.shot || ""), seconds: params.seconds, at: params.at })), message: "Making the clip (~3-5 min). Poll action='scenes'." });
             const { setSceneCast } = await import("./core/recast.js");
             const c = params.cast;
