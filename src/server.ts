@@ -1834,12 +1834,12 @@ export function createMcpServer(): McpServer {
 
   tool(
     "cast",
-    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters) or portraits (need consent). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
+    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the ElevenLabs voice a recast converts to, '' clears -- or sheet), remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
     {
       tenant_id: z.string(),
-      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "remove_actor", "voices", "recast", "generate", "status", "clear"]),
+      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "voices", "recast", "generate", "status", "clear"]),
       project_id: z.string().optional().describe("recast / generate / status / clear: the film."),
-      actor: z.string().optional().describe("recast / generate / remove_actor: a cast actor id (from list)."),
+      actor: z.string().optional().describe("recast / generate / update_actor / remove_actor: a cast actor id (from list)."),
       performer: z.enum(["heygen", "kling", "higgsfield", "runway"]).optional().describe("recast / generate: the vendor. Default: HeyGen for a HeyGen look, else the best configured vendor (Kling first)."),
       voice: z.enum(["heygen", "elevenlabs"]).optional().describe("generate: who voices the script (default heygen: the look's own voice)."),
       voice_id: z.string().optional().describe("recast: an ElevenLabs voice the delivery is converted to ('mine' keeps the recording's voice; omitted, the actor's own). generate: the HeyGen or ElevenLabs voice to read with."),
@@ -1849,6 +1849,8 @@ export function createMcpServer(): McpServer {
       image: z.string().optional().describe("add_actor: a portrait, tenant-relative path (needs consent)."),
       name: z.string().optional().describe("add_actor / new_look: a name."),
       consent: z.boolean().optional().describe("add_actor with image: the user confirmed this is them, or a person who agreed to be cast."),
+      fictional: z.boolean().optional().describe("add_actor with image: instead of consent, a generated person (nobody real), e.g. an image model's start frame."),
+      sheet: z.string().optional().describe("add_actor / update_actor: the model sheet the portrait was drawn from (tenant-relative image); Higgsfield gets it as a second reference."),
       prompt: z.string().optional().describe("new_look: the setting and clothes ('on a couch in a grey sweater')."),
       look_id: z.string().optional().describe("look_status: the new look's id."),
       public: z.boolean().optional().describe("looks: HeyGen's stock presenters instead of the user's own."),
@@ -1879,7 +1881,11 @@ export function createMcpServer(): McpServer {
             if (!params.look_id) return err("look_id is required");
             return ok(await at.getHeygenLook(params.look_id));
           case "add_actor":
-            return ok(await addActor(t, { name: params.name, image: params.image, heygen_look_id: params.heygen_look_id, voice_id: params.voice_id, consent: params.consent === true }));
+            return ok(await addActor(t, { name: params.name, image: params.image, heygen_look_id: params.heygen_look_id, voice_id: params.voice_id, consent: params.consent === true, fictional: params.fictional === true, sheet: params.sheet }));
+          case "update_actor": {
+            const { updateActor } = await import("./core/cast.js");
+            return ok(await updateActor(t, needActor(), { name: params.name, voice_id: params.voice_id, sheet: params.sheet }));
+          }
           case "remove_actor":
             return ok({ removed: await removeActor(t, needActor()) });
           case "voices": {

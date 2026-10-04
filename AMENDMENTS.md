@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Cast members from a model sheet; Genjutsu reads the sheet
+
+Marc's verdict on the one-to-one test: Kling tracks his expressions "pretty
+accurately" and Genjutsu was "probably the better one of the two". Items 1-3
+of the cast pipeline:
+1. **A cast member is a generated person.** `CastActor.fictional` (instead
+   of `consent`: nobody's likeness, the adder says so; no on-screen label,
+   Marc: not required) and `CastActor.sheet` (the model sheet, saved at full
+   detail as `cast/<id>-sheet.jpg`; the portrait is the start frame drawn
+   from it). `add_actor` takes `fictional` and `sheet`; Studio's photo tab
+   offers "A generated person" and an optional character sheet; the card
+   says "generated".
+2. **Genjutsu gets both images**: the start frame, then the sheet, with
+   `GENJUTSU_SHEET_PROMPT` naming the second as the same person's sheet. A
+   Genjutsu recast made before the actor had a sheet is made again. Only the
+   start frame was in the run Marc liked; the actor test's `sheet` option
+   runs the two-image version on the same clip to check it before a film.
+3. **The voice is set later**: `updateActor` / `cast update_actor` /
+   `PATCH /api/cast/{t}/{id}` (name, voice_id, sheet). Talia is a
+   Higgsfield preset and Higgsfield's API has no voice tools, so Dana's
+   voice is an ElevenLabs library voice Marc adds to his account (his pick).
+
 ## 2026-10-04 — Actor test: Seedance 2.5 through Atlas Cloud (`atlas-seedance25`)
 
 The API run with Marc's exact inputs still drifted. That points at the route,
