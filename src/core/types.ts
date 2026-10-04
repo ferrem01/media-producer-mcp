@@ -564,11 +564,47 @@ export interface StoryboardComponent {
   pose?: ComponentPose;
 }
 
+/** A scene performed by a cast actor with no recording of it
+ *  (core/scene-performance.ts): the actor's start frame drawn for the shot,
+ *  the scene's line voiced, Seedance 2.5 performing it; the result is the
+ *  scene's take. */
+export interface ScenePerformance {
+  actor: string;
+  /** The shot: where the actor is and what they do ("walks toward the
+   *  camera down a bright office hallway, medium-wide"). */
+  shot: string;
+  /** Where the voice comes from: the scene's line read in the actor's
+   *  voice ("script"), or the scene's recorded take converted to it
+   *  ("take": the delivery kept). */
+  voice_source: "script" | "take";
+  /** Start frames drawn for the shot, newest last; `frame` the one used. */
+  frames?: Array<{ url: string; shot: string; made_at: string }>;
+  frame?: string;
+  /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */
+  draft?: { url: string; draft_id?: string; inputs: string; made_at: string };
+  final?: { url: string; made_at: string };
+  /** The job on this scene: drawing a frame, voicing, performing, attaching. */
+  status?: "running" | "done" | "failed";
+  stage?: string;
+  error?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
 export interface StoryboardScene {
   /** Scene label */
   label: string;
   /** The cut into this scene, as the board wrote it ("none" = a hard cut). */
   transition_in?: SceneTransition;
+  /** Who performs this scene's take (core/speaker-layer.ts syncSpeakerClips):
+   *  a cast actor id plays that actor's recast of the take; null plays the
+   *  recording itself; absent follows the film (project.speaker_cast). */
+  cast?: string | null;
+  /** A cast actor performing the scene without a recording (Seedance). */
+  performance?: ScenePerformance;
+  /** The last cast-actor b-roll made for this scene (no speech, Seedance),
+   *  laid over the scene as a video component. */
+  actor_clip?: { actor: string; shot: string; seconds: number; at: number; status: "running" | "done" | "failed"; url?: string; error?: string; started_at: string; finished_at?: string };
   /** The cast or needs were SET BY HAND (the update tool's storyboard edit):
    *  the build's recipe passes, creator-cut defaults, slates-over-mocks and
    *  b-roll fetch leave this scene as it is. */
@@ -884,7 +920,11 @@ export interface Take {
    *  same timeline redrawn by Wan from the actor's portrait, the voice
    *  converted when the actor has one. Keyed by actor id. `source` stays
    *  the raw take; the project's speaker_cast picks which one plays. */
-  actors?: Record<string, { file: string; performer?: string; voice_id?: string; heygen_look_id?: string; motion?: string; framing?: number; made_at: string }>;
+  actors?: Record<string, { file: string; performer?: string; voice_id?: string; heygen_look_id?: string; motion?: string; framing?: number; sheet?: string; made_at: string }>;
+  /** The take IS a cast actor's performance (core/scene-performance.ts):
+   *  made by a vendor from the scene's line, no recording behind it. A
+   *  recast never redraws it. */
+  performed_by?: { actor: string; engine: "seedance"; quality: "draft" | "final" };
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };

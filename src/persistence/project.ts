@@ -305,10 +305,18 @@ export async function saveProject(project: Project): Promise<void> {
   await fs.mkdir(dir, { recursive: true });
   // Normalize all URLs to relative paths (never persist localhost URLs)
   const normalized = normalizeAllUrls(project) as Project;
-  await fs.writeFile(
-    projectJsonPath(project.tenant_id, project.project_id),
-    JSON.stringify(normalized, null, 2),
-  );
+  // Atomic: written beside, then renamed over. A reader landing mid-write
+  // read a half file and saw "Project not found" (measured: a Studio-style
+  // poll during a scene performance's saves, Oct 4).
+  const file = projectJsonPath(project.tenant_id, project.project_id);
+  const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  try {
+    await fs.writeFile(tmp, JSON.stringify(normalized, null, 2));
+    await fs.rename(tmp, file);
+  } catch (e) {
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    throw e;
+  }
 }
 
 export async function updateProject(

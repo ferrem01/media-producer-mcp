@@ -1834,10 +1834,19 @@ export function createMcpServer(): McpServer {
 
   tool(
     "cast",
-    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the ElevenLabs voice a recast converts to, '' clears -- or sheet), remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
+    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). SCENE BY SCENE (one film can mix them): perform_scene -- a cast actor performs ONE scene with no recording: a start frame drawn for the shot (start_frame first to see and redraw it -- cheap), the scene's line voiced in the actor's ElevenLabs voice (voice_source script) or the scene's recording converted to it (take: the delivery kept), Seedance 2.5 performs it, attached as that scene's take (quality draft = 480p preview ~2 min; then final = the same shot at 1080p); recast with scenes:[...] -- only those scenes' recordings, performed one-to-one (Higgsfield) and those scenes cast as the actor; scene_cast -- who plays a scene (an actor, 'recording', or 'film' to follow the film); actor_clip -- b-roll of the actor, no speech, over a scene (shot, seconds, at); scenes -- every scene's performer and any job. Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the ElevenLabs voice a recast converts to, '' clears -- or sheet), remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
     {
       tenant_id: z.string(),
-      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "voices", "recast", "generate", "status", "clear"]),
+      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "voices", "recast", "generate", "status", "clear", "scenes", "start_frame", "pick_frame", "perform_scene", "scene_cast", "actor_clip"]),
+      scene_index: z.number().int().min(0).optional().describe("start_frame / pick_frame / perform_scene / scene_cast / actor_clip: the scene (0-based)."),
+      scenes: z.array(z.number().int().min(0)).optional().describe("recast / clear: only these scenes (0-based); the rest of the film stays as it is."),
+      shot: z.string().optional().describe("start_frame / perform_scene / actor_clip: where the actor is and what they do ('walks toward the camera down a bright office hallway, medium-wide')."),
+      voice_source: z.enum(["script", "take"]).optional().describe("perform_scene: the scene's line read in the actor's voice (script, default), or the scene's recording converted to it (take)."),
+      quality: z.enum(["draft", "final"]).optional().describe("perform_scene: draft (480p preview, default) or final (the draft's shot at 1080p)."),
+      frame_url: z.string().optional().describe("pick_frame: which drawn frame the scene uses (from action='scenes')."),
+      cast: z.string().optional().describe("scene_cast: an actor id, 'recording' (the recorded person), or 'film' (follow the film)."),
+      seconds: z.number().optional().describe("actor_clip: length, 4-15 s (default 5)."),
+      at: z.number().optional().describe("actor_clip: when it starts in the scene, seconds (default 0)."),
       project_id: z.string().optional().describe("recast / generate / status / clear: the film."),
       actor: z.string().optional().describe("recast / generate / update_actor / remove_actor: a cast actor id (from list)."),
       performer: z.enum(["heygen", "kling", "higgsfield", "runway"]).optional().describe("recast / generate: the vendor. Default: HeyGen for a HeyGen look, else the best configured vendor (Kling first)."),
@@ -1896,7 +1905,30 @@ export function createMcpServer(): McpServer {
             return ok({ elevenlabs: eleven.map((v: any) => ({ id: v.voice_id, name: v.name, category: v.category })), heygen: hey });
           }
           case "recast":
-            return ok({ ...(await startRecast(t, needProject(), needActor(), { performer: params.performer, voice_id: params.voice_id, fresh: params.fresh === true, motion: params.motion })), message: "Running. Poll action='status'." });
+            return ok({ ...(await startRecast(t, needProject(), needActor(), { performer: params.performer, voice_id: params.voice_id, fresh: params.fresh === true, motion: params.motion, scenes: params.scenes })), message: "Running. Poll action='status'." });
+          case "scenes": {
+            const sp = await import("./core/scene-performance.js");
+            return ok({ scenes: await sp.getScenePerformances(t, needProject()), studio_url: previewUrl(t, needProject()) });
+          }
+          case "start_frame":
+          case "pick_frame":
+          case "perform_scene":
+          case "actor_clip":
+          case "scene_cast": {
+            if (params.scene_index === undefined) return err("scene_index is required (0-based)");
+            const sp = await import("./core/scene-performance.js");
+            const pid = needProject(), si = params.scene_index;
+            if (params.action === "start_frame") return ok({ ...(await sp.startSceneFrame(t, pid, si, { actor: params.actor, shot: params.shot })), message: "Drawing (~20-60 s). Poll action='scenes'; redraw with another start_frame, or pick_frame an earlier one." });
+            if (params.action === "pick_frame") { if (!params.frame_url) return err("frame_url is required"); return ok(await sp.pickSceneFrame(t, pid, si, params.frame_url)); }
+            if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, quality: params.quality })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
+            if (params.action === "actor_clip") return ok({ ...(await sp.startActorClip(t, pid, si, { actor: params.actor, shot: String(params.shot || ""), seconds: params.seconds, at: params.at })), message: "Making the clip (~3-5 min). Poll action='scenes'." });
+            const { setSceneCast } = await import("./core/recast.js");
+            const c = params.cast;
+            if (!c) return err("cast is required: an actor id, 'recording' or 'film'");
+            // The recording back -- re-attached if a performance replaced it.
+            if (c === "recording") return ok({ ...(await sp.useSceneRecording(t, pid, si)), scenes: await sp.getScenePerformances(t, pid) });
+            return ok({ scenes: await setSceneCast(t, pid, [si], c === "film" ? undefined : c === "recording" ? null : c) });
+          }
           case "generate":
             return ok({ ...(await startGeneratedTake(t, needProject(), { actor: needActor(), performer: params.performer, voice: params.voice, voice_id: params.voice_id, motion: params.motion })), message: "Running: voice, then the performance, then the attach (the scenes re-time to it). Poll action='status'." });
           case "status": {
@@ -1906,7 +1938,7 @@ export function createMcpServer(): McpServer {
             return ok({ speaker_cast: (project as any).speaker_cast || null, recast: await getRecastStatus(t, pid), generated_take: await getGeneratedTakeStatus(t, pid), studio_url: previewUrl(t, pid) });
           }
           case "clear":
-            return ok({ ...(await startRecast(t, needProject(), null)), message: "The recording's own person is back." });
+            return ok({ ...(await startRecast(t, needProject(), null, { scenes: params.scenes })), message: params.scenes?.length ? "The recording's own person is back on those scenes." : "The recording's own person is back." });
         }
       } catch (e: any) {
         return err(e?.message || String(e));

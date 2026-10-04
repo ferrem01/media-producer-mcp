@@ -77,6 +77,7 @@ import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiti
 import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import { startGeneratedTake, getGeneratedTakeStatus, registerTakeAttacher } from "./core/generated-take.js";
+import { registerSceneAttacher, startSceneFrame, pickSceneFrame, startScenePerformance, getScenePerformances } from "./core/scene-performance.js";
 import { performerList } from "./core/performers/index.js";
 import { startActorTest, startVoiceLineup, getActorTest, collectActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, listVoices, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
@@ -516,6 +517,11 @@ registerTakeAttacher(async (tenant, project, url) => {
   return out;
 });
 
+// A scene performed by a cast actor (core/scene-performance.ts) is attached
+// as that scene's take, marked as a performance (a recast never redraws it).
+registerSceneAttacher((tenant, project, url, sceneIndex, extra) =>
+  attachTakeToScene(tenant, project, { url, scene_index: sceneIndex, capture: "generated", look: "natural", correct: false, ...extra }));
+
 async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
     const tkUrl = String(tkBody.url || "");
     const expectedPrefix = `/assets/${tkTenant}/projects/${tkProject}/assets/`;
@@ -595,6 +601,8 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
       look: "natural" as const,
       face: tkFace,
       loudness: sanitized?.loudness,
+      // A cast actor's performance, not a recording (core/scene-performance.ts).
+      ...(tkBody.performed_by && typeof tkBody.performed_by === "object" ? { performed_by: tkBody.performed_by as Take["performed_by"] } : {}),
     };
     // "Record all": one recording, cut where each scene's script begins.
     let takes: Take[];
@@ -1316,7 +1324,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|generated-take|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -2812,7 +2820,7 @@ Rules:
       }
 
       // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
-      // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?}
+      // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based]}
       //      null puts the recording's person back; performer picks the vendor; voice_id an
       //      ElevenLabs voice ("mine" keeps the recording's); fresh makes it again
       // GET  /api/recast/{tenant}/{project}                       progress and who plays
@@ -2827,6 +2835,7 @@ Rules:
               performer: typeof body.performer === "string" ? body.performer : undefined,
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
               motion: typeof body.motion === "string" ? body.motion : undefined,
+              scenes: Array.isArray(body.scenes) ? body.scenes.map(Number).filter((n: number) => Number.isInteger(n) && n >= 0) : undefined,
             }));
             return;
           }
@@ -2904,6 +2913,59 @@ Rules:
       //      or {mode:"voices", from: <test id>, voices: [names or ids], picture?}
       // GET  /api/actor-test/{tenant}/{project}/{id}   status, steps, file urls
       // POST /api/actor-test/{tenant}/{project}/{id} {action:"collect"}   a Higgsfield job the test stopped waiting for
+      // ── API: Scenes performed by cast actors (core/scene-performance.ts) ──
+      // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, any performance
+      // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot}
+      //                                                           {action:"pick", url}
+      //                                                           {action:"perform", actor?, shot?, voice_source?, quality?}
+      //                                                           {action:"clip", actor?, shot, seconds?}  (b-roll, no speech)
+      //                                                           {action:"cast", cast: actor id | null | "film"}
+      //                                                           {action:"recording"}  (the recording back, re-attached if a performance replaced it)
+      const spApi = urlPath.match(/^\/api\/scene-performance\/([^/]+)\/([^/]+)(?:\/(\d+))?$/);
+      if (spApi) {
+        const spTenant = decodeURIComponent(spApi[1]), spProject = decodeURIComponent(spApi[2]);
+        try {
+          if (method === "GET" && spApi[3] === undefined) { jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject) }); return; }
+          if (method === "POST" && spApi[3] !== undefined) {
+            const si = Number(spApi[3]);
+            const body = await parseBody(req).catch(() => ({} as any));
+            const str = (v: unknown) => typeof v === "string" ? v : undefined;
+            if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot) })); return; }
+            if (body.action === "pick") { jsonResponse(res, 200, await pickSceneFrame(spTenant, spProject, si, String(body.url || ""))); return; }
+            if (body.action === "perform") {
+              jsonResponse(res, 202, await startScenePerformance(spTenant, spProject, si, {
+                actor: str(body.actor), shot: str(body.shot),
+                voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined,
+                quality: body.quality === "final" ? "final" : "draft",
+              }));
+              return;
+            }
+            if (body.action === "recording") {
+              const { useSceneRecording } = await import("./core/scene-performance.js");
+              jsonResponse(res, 200, await useSceneRecording(spTenant, spProject, si));
+              return;
+            }
+            if (body.action === "cast") {
+              const { setSceneCast } = await import("./core/recast.js");
+              const cast = body.cast === "film" || body.cast === undefined ? undefined : body.cast === null ? null : String(body.cast);
+              jsonResponse(res, 200, { scenes: await setSceneCast(spTenant, spProject, [si], cast) });
+              return;
+            }
+            if (body.action === "clip") {
+              const { startActorClip } = await import("./core/scene-performance.js");
+              jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined }));
+              return;
+            }
+            jsonResponse(res, 400, { error: 'action must be "frame", "pick", "perform", "clip", "cast" or "recording"' });
+            return;
+          }
+          jsonResponse(res, 405, { error: "Method not allowed" });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       const actorApi = urlPath.match(/^\/api\/actor-test\/([^/]+)\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
       if (actorApi) {
         const [, atTenant, atProject, atId] = actorApi.map((x) => (x === undefined ? x : decodeURIComponent(x)));

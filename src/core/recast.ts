@@ -57,6 +57,8 @@ export interface RecastStatus {
   }>;
   /** The vendor's rough pace (minutes of work per 30 s of take). */
   minutes_per_30s?: number;
+  /** A recast of some scenes only (0-based). */
+  scenes?: number[];
   error?: string;
 }
 
@@ -302,14 +304,46 @@ function sheetFor(tenant: string, actor: CastActor, pid: string): string | undef
   return pid === "higgsfield" && actor.sheet ? path.join(config.dataDir, tenant, actor.sheet) : undefined;
 }
 
-export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string; motion?: string } = {}): Promise<RecastStatus> {
+/** Who performs some scenes: an actor id (their recast plays where it
+ *  exists), null (the recording itself), undefined (follow the film). */
+export async function setSceneCast(tenant: string, projectId: string, scenes: number[], cast: string | null | undefined) {
+  const project = await loadProject(tenant, projectId);
+  if (!project) throw new Error("Project not found");
+  const board: any[] = (project as any).storyboard?.scenes || [];
+  for (const si of scenes) {
+    if (!board[si]) throw new Error(`No scene ${si + 1}`);
+    if (cast === undefined) delete board[si].cast; else board[si].cast = cast;
+  }
+  syncSpeakerClips(project as any);
+  project.updated_at = new Date().toISOString();
+  await saveProject(project);
+  return board.map((s, i) => ({ scene_index: i, cast: s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null, follows_film: s.cast === undefined }));
+}
+
+export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string; motion?: string;
+  /** Only these scenes (0-based): their takes are recast and the scenes cast
+   *  as the actor; the rest of the film is left as it is. */
+  scenes?: number[] } = {}): Promise<RecastStatus> {
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A recast of this film is already running");
   const project = await loadProject(tenant, projectId);
   if (!project) throw new Error("Project not found");
   const st: RecastStatus = { project_id: projectId, actor: actorId, status: "running", started_at: new Date().toISOString(), files: [] };
+  const only = Array.isArray(opts.scenes) && opts.scenes.length ? new Set(opts.scenes.map(Number)) : null;
+  st.scenes = only ? [...only].sort((a, b) => a - b) : undefined;
   if (!actorId) {
+    if (only) {
+      // Back to the recording on these scenes only.
+      for (const si of only) { const sc = (project as any).storyboard?.scenes?.[si]; if (sc) sc.cast = null; }
+      syncSpeakerClips(project as any);
+      await saveProject(project);
+      st.status = "done"; st.finished_at = new Date().toISOString();
+      await saveStatus(tenant, st);
+      return st;
+    }
     delete (project as any).speaker_cast;
+    // Back to the recording everywhere: the scenes cast one by one too.
+    for (const sc of (project as any).storyboard?.scenes || []) if (sc && sc.cast !== undefined) delete sc.cast;
     syncSpeakerClips(project as any);
     await saveProject(project);
     st.status = "done"; st.finished_at = new Date().toISOString();
@@ -329,10 +363,13 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   // The raw files behind the track's clips (a one-take film is one file).
   const raws = new Set<string>();
   for (const clip of (project as any).speaker_track?.clips || []) {
+    if (only && !only.has(clip.scene_index)) continue;
     const take = takeForClip(project as any, clip);
-    if (take) raws.add(takeCopies(take).raw);
+    // A scene a cast actor already performs (core/scene-performance.ts) is
+    // not a recording: there is nobody to recast.
+    if (take && !(take as any).performed_by) raws.add(takeCopies(take).raw);
   }
-  if (!raws.size) throw new Error("This film has no speaker take to recast");
+  if (!raws.size) throw new Error(only ? "Those scenes have no recording to recast" : "This film has no speaker take to recast");
   for (const raw of raws) {
     const existing = ((project as any).takes || []).find((t: any) => takeCopies(t).raw === raw && t.actors?.[actor.id]?.file)?.actors?.[actor.id];
     // Reused only when it is the same performance: the same vendor, voice
@@ -398,8 +435,12 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
       if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: actor.sheet } : {}), framing: FRAMING, made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
-    // face and half in another is worse than none.
-    if (ok.length === st.files.length) (project as any).speaker_cast = actor.id;
+    // face and half in another is worse than none. A recast of some scenes
+    // casts those scenes; the rest of the film stays as it was.
+    if (ok.length === st.files.length) {
+      if (st.scenes) for (const si of st.scenes) { const sc = (project as any).storyboard?.scenes?.[si]; if (sc) sc.cast = actor.id; }
+      else (project as any).speaker_cast = actor.id;
+    }
     syncSpeakerClips(project as any);
     await saveProject(project);
     // A take cut by hand plays cut copies: the new performance gets its own.
