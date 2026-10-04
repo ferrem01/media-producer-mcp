@@ -359,7 +359,7 @@ export async function matchVoicePitch(input: string, target: number, out: string
 }
 
 /** The scene's voice as an MP3 at -14 LUFS (what the proven run sent). */
-async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number; pitch?: { measured: number; target: number; shifted: boolean } }> {
+async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number; pitch?: { measured: number; target: number; shifted: boolean; result?: number } }> {
   if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
   if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice (cast update_actor voice_id)`);
   const w = (n: string) => path.join(workDir, n);
@@ -387,12 +387,27 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
   // A converted delivery keeps the speaker's pitch: a line spoken low comes
   // out low (Oct 4: scene 3 at 160 Hz against 186-200), and Seedance copies
   // it faithfully. Shift it to the actor's own pitch, timing untouched.
-  let pitch: { measured: number; target: number; shifted: boolean } | undefined;
+  let pitch: { measured: number; target: number; shifted: boolean; result?: number } | undefined;
   let src = said;
   if (source === "take") {
+    // The pitch is raised in the RECORDING, then converted again: ElevenLabs
+    // rebuilds the voice in the actor's own timbre at the new pitch. Shifting
+    // the converted file instead moved its formants too -- Marc: "it sounds
+    // like a chipmunk now" (Oct 4).
     const target = await actorPitch(tenant, actor, workDir).catch(() => 0);
-    const m = await matchVoicePitch(said, target, w("said-pitched.wav"), workDir);
-    if (m) { src = m.file; pitch = { measured: m.measured, target: Math.round(target), shifted: m.shifted }; }
+    const measured = await voicePitch(said, workDir);
+    if (measured > 0 && target > 0) {
+      const ratio = target / measured;
+      const shifted = Math.abs(ratio - 1) > 0.03 && ratio > 0.6 && ratio < 1.7;
+      let result: number | undefined;
+      if (shifted) {
+        await shiftPitch(w("take.wav"), w("take-pitched.wav"), ratio);
+        await convertVoice(w("take-pitched.wav"), w("said-pitched.mp3"), actor.voice_id);
+        src = w("said-pitched.mp3");
+        result = Math.round(await voicePitch(src, workDir)) || undefined;
+      }
+      pitch = { measured: Math.round(measured), target: Math.round(target), shifted, ...(result ? { result } : {}) };
+    }
   }
   const file = w("voice.mp3");
   await ffmpeg(["-i", src, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);

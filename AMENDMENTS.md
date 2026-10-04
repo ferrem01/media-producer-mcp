@@ -97,6 +97,14 @@ natural pitch measured once from a sample read in its voice
 (asetrate + atempo: pitch moved, timing kept), `performance.voice_pitch`
 recording measured, target and whether it moved.
 
+**Correction, again.** Shifting the converted file (asetrate) moved its
+formants with the pitch -- Marc: "it sounds like a chimpmunk now. does not
+sound like her at all" -- and Seedance copied that too. The pitch is now
+raised in the RECORDING and converted again: convert, measure, raise the
+take by target/measured, convert once more; ElevenLabs rebuilds the voice in
+the actor's own timbre at the new pitch. One extra conversion per scene.
+`voice_pitch.result` is where the second pass landed.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.
