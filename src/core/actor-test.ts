@@ -344,15 +344,26 @@ export async function runSeedance25Recast(video: string, img: string, seconds: n
  *  person from @Image1. Our fal call was refused on a photoreal face; this
  *  measures whether Higgsfield's route is. Public URLs only (asset:// is
  *  rejected there). */
-export async function runHiggsfieldSeedance25(video: string, img: string, seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+/** The performance-transfer prompt that worked through Higgsfield on Oct 3
+ *  (Marc's brief): the face from the sheet, the body language from the take,
+ *  the words and voice from the audio. */
+export const HF_PERFORMANCE_PROMPT = "The person from the reference character sheet (the same face, hair, clothes and accessories) talks directly to the camera " +
+  "in a vertical selfie-style medium close-up in a bright modern office. They perform exactly like the person in the reference video: " +
+  "copy the head movements, hand gestures, timing and energy. Do not copy that person's face, hair or clothes. " +
+  "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
+  "Dry close-mic'd voice, no room echo, no music. Soft natural window light, realistic skin texture, no text on screen.";
+export async function runHiggsfieldSeedance25(video: string, img: string | string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
   const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
   if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");
   const headers = { Authorization: `Key ${id}:${secret}`, "Content-Type": "application/json" };
   const sub = await okJson(await fetch("https://api.higgsfield.ai/bytedance/seedance-2.5/reference-to-video", {
     method: "POST", headers: { ...headers, "Idempotency-Key": crypto.randomBytes(12).toString("hex") },
     body: JSON.stringify({
-      prompt: opts.prompt || SEEDANCE25_RECAST_PROMPT, video_urls: [video], image_urls: [img],
-      duration: Math.max(4, Math.min(30, Math.round(seconds))), aspect_ratio: aspect, resolution: opts.resolution || "480p", generate_audio: false,
+      prompt: opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), video_urls: [video], image_urls: Array.isArray(img) ? img : [img],
+      ...(opts.audio ? { audio_urls: [opts.audio] } : {}),
+      duration: Math.max(4, Math.min(30, Math.round(seconds))), aspect_ratio: aspect, resolution: opts.resolution || "480p",
+      // With a voice track the video carries it (lip-synced); without one, silent.
+      generate_audio: !!opts.audio,
     }),
   }), "higgsfield seedance 2.5 submit");
   const statusUrl = sub?.status_url || (sub?.request_id ? `https://api.higgsfield.ai/requests/${sub.request_id}/status` : "");
@@ -934,8 +945,20 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (!config.publicUrl.startsWith("https://")) throw new Error("hf-seedance25 needs the server's public https address (Higgsfield fetches by URL)");
       const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
       const aspect = h > w * 1.1 ? "9:16" : w > h * 1.1 ? "16:9" : "1:1";
-      url = await runHiggsfieldSeedance25(`${pub}/source.mp4`, `${pub}/actor.jpg`, srcSecs, aspect, {
-        prompt, resolution: heygenOpts.resolution || "480p",
+      // The reference at full detail (a model sheet's face close-up is a
+      // third of a wide image; actor.jpg is capped at 1024 wide).
+      await ffmpeg(["-i", img.path, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet.jpg")]);
+      test.files.sheet = "sheet.jpg";
+      // The voice track as the brief asks: the converted voice, -14 LUFS, WAV.
+      await voiceJob;
+      let audio: string | undefined;
+      if (test.files.voice) {
+        await ffmpeg(["-i", f("voice.mp3"), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", f("voice.wav")]);
+        test.files.voice_wav = "voice.wav";
+        audio = `${pub}/voice.wav`;
+      }
+      url = await runHiggsfieldSeedance25(`${pub}/source.mp4`, `${pub}/sheet.jpg`, srcSecs, aspect, {
+        prompt, resolution: heygenOpts.resolution || "480p", audio,
         onSubmit: async (statusUrl) => { await fs.writeFile(f("hf-seedance25-request.json"), JSON.stringify({ status_url: statusUrl })); },
       });
     } else if (p === "seedance25") {

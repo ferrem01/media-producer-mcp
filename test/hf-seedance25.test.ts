@@ -27,6 +27,12 @@ describe("Seedance 2.5 on Higgsfield", () => {
     expect(sent[0].headers.Authorization).toBe("Key id:sec");
     expect(sent[0].body).toMatchObject({ video_urls: ["https://x/source.mp4"], image_urls: ["https://x/actor.jpg"], duration: 4, aspect_ratio: "9:16", resolution: "480p", generate_audio: false });
 
+    // The brief's performance transfer: sheet + take + voice track, the video carrying the voice.
+    sent.length = 0; polls = 0;
+    await runHiggsfieldSeedance25("https://x/source.mp4", "https://x/sheet.jpg", 8.7, "9:16", { audio: "https://x/voice.wav" });
+    expect(sent[0].body).toMatchObject({ audio_urls: ["https://x/voice.wav"], image_urls: ["https://x/sheet.jpg"], duration: 9, generate_audio: true });
+    expect(sent[0].body.prompt).toMatch(/Do not copy that person's face/);
+
     polls = 0;
     vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: any) => init?.method === "POST"
       ? new Response(JSON.stringify({ request_id: "r2", status_url: "https://api.higgsfield.ai/requests/r2/status" }), { status: 200 })

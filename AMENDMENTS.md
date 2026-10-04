@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Actor test: Seedance 2.5 through Higgsfield's API (the AI cast pipeline gate)
+
+Marc's AI cast pipeline brief (a fictional cast member from a model sheet,
+voiced by ElevenLabs, performing his studio take through Seedance 2.5) was
+proven through the Higgsfield MCP on Oct 3. Higgsfield's API serves
+`bytedance/seedance-2.5/reference-to-video` (image_urls <=30, video_urls
+<=10, audio_urls <=10; public URLs; asset:// rejected); Soul ID trains via
+`POST /v1/custom-references` for Soul image endpoints only; no draft/
+finalize field in the API schema. The open question is whether the API
+passes a real person's take as the motion reference (fal refused faces).
+- Actor-test provider `hf-seedance25` (`runHiggsfieldSeedance25`): the
+  reference image at full detail (`sheet.jpg`, up to 2048 wide), the take as
+  the video reference, and -- when the test converts the voice -- the voice
+  as a -14 LUFS WAV audio reference with `generate_audio` on and the brief's
+  performance-transfer prompt (`HF_PERFORMANCE_PROMPT`); 480p by default;
+  the request saved the moment Higgsfield takes it; a refusal reported word
+  for word.
+- Actor test `video_asset` (a tenant file as the performance instead of a
+  speaker take) and `max_seconds` (cap the source).
+- Not built: the automatic "AI-generated presenter" label (Marc: not
+  required).
+Test: `test/hf-seedance25.test.ts`.
+
 ## 2026-10-03 — Cast: HeyGen presenters by gender actually finds women
 
 "There is no women that come up" (Cast -> + Add actor -> HeyGen presenters
