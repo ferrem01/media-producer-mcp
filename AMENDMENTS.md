@@ -17,6 +17,11 @@ duration had no headroom (9 s for 8.7 s); a voice track now gets ceil + 1
 cannot express: the `start_image` role (the headshot as frame one, not a
 reference) and `draft`.
 
+The second run looked the same as the first, so `hf_urls` on the actor
+test sends given public URLs exactly as they are (video, audio, images,
+duration) with nothing made on our side: Marc's app run's own inputs
+through the public API, so the only difference left is the route.
+
 ## 2026-10-04 — Actor test: Seedance 2.5 through Higgsfield's API (the AI cast pipeline gate)
 
 Marc's AI cast pipeline brief (a fictional cast member from a model sheet,
