@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — hf-seedance25: one voice, headroom, the app run's fields
+
+The first API run lost lip sync partway. Marc's app run (job 040426e3)
+differed in four ways. The take we sent still carried his own voice next to
+the converted one; it now goes as `motion.mp4` with the audio stripped. The
+duration had no headroom (9 s for 8.7 s); a voice track now gets ceil + 1
+(10 s, as his). The voice goes as MP3 (`voice-ref.mp3`) and
+`bitrate_mode: "standard"`, as his. Two of his fields the public endpoint
+cannot express: the `start_image` role (the headshot as frame one, not a
+reference) and `draft`.
+
 ## 2026-10-04 — Actor test: Seedance 2.5 through Higgsfield's API (the AI cast pipeline gate)
 
 Marc's AI cast pipeline brief (a fictional cast member from a model sheet,
