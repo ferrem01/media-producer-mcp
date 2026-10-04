@@ -12109,9 +12109,15 @@ ${QUOTIENT_CSS}
         + '<option value="converted"' + (vt === 'converted' ? ' selected' : '') + '>The exact voice file (may drift off the lips)</option></select>'
         + (perf.voice_url ? ' <a href="' + escAttr(withToken(perf.voice_url)) + '" target="_blank">hear the voice file</a>' : '')
         + (perf.voice_offset ? '<small>lined up ' + Math.round(perf.voice_offset * 1000) + ' ms</small>' : '')
+        + (perf.voice_hz ? '<small>voice ' + perf.voice_hz + ' Hz' + (perf.recording_hz ? ' (from your recording at ' + perf.recording_hz + ' Hz)' : '') + '</small>' : '')
         + '</div></div>';
     }
     if (run && mine) h += '<div class="np-armed"><span></span>' + escHtml(SP_STAGE[perf.stage] || 'starting') + (s.vendor ? ' &#183; Seedance ' + escHtml(rcVendorWord(s.vendor)) : '') + '</div>';
+    else if (mine && perf.status === 'failed' && perf.pitch_check) {
+      // The pitch check stopped it before Seedance: say so, offer to go anyway.
+      h += '<div class="np-note">' + escHtml(perf.error || '') + '</div>'
+        + '<div style="margin:6px 0"><button class="np-btn" data-sp-force="' + i + '">Make it anyway</button></div>';
+    }
     else if (mine && perf.status === 'failed') h += '<div class="np-note">It failed: ' + escHtml(perf.error || '') + '</div>';
     else if (mine && perf.final) h += '<div class="np-hint">&#10003; The 1080p final is this scene&#8217;s take.</div>';
     else if (mine && perf.draft) h += '<div class="np-hint">&#10003; The draft is this scene&#8217;s take: play the film to watch it. Happy? Make the final.</div>';
@@ -12242,6 +12248,10 @@ ${QUOTIENT_CSS}
     if ((v = el('data-sp-frame')) !== null) { spPost(v, { action: 'frame', actor: spActor, shot: spShot(v) || undefined, frame_prompt: spPrompt('f', v) }, 'Drawing the start frame…'); return; }
     if ((v = el('data-sp-cont')) !== null) { spPost(v, { action: 'continue', actor: spActor, from_scene: Number(v) - 1, shot: spShot(v) || undefined }, 'Taking scene ' + v + '’s last frame…'); return; }
     if ((v = el('data-sp-pick')) !== null) { var pk = v.split('|'); spPost(pk[0], { action: 'pick', url: pk.slice(1).join('|') }, 'Using that frame.'); return; }
+    if ((v = el('data-sp-force')) !== null) {
+      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v), force: true }, 'Making the draft anyway…');
+      return;
+    }
     if ((v = el('data-sp-draft')) !== null || (v = el('data-sp-final')) !== null) {
       var fin = el('data-sp-final') !== null;
       spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v) },

@@ -2957,6 +2957,7 @@ Rules:
                 voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined,
                 quality: body.quality === "final" ? "final" : "draft",
                 voice_track: body.voice_track === "seedance" ? "seedance" : body.voice_track === "converted" ? "converted" : undefined,
+                force: body.force === true,
               }));
               return;
             }
