@@ -105,6 +105,19 @@ take by target/measured, convert once more; ElevenLabs rebuilds the voice in
 the actor's own timbre at the new pitch. One extra conversion per scene.
 `voice_pitch.result` is where the second pass landed.
 
+**Rolled back.** The two-pass conversion garbled the words (scene 1's
+transcript: "isn't on your counter. It's reading for a signal" for
+"calendar" / "waiting") -- Marc: "this is going very bad". Both pitch
+experiments failed (the shifted file: a chipmunk; the raised recording:
+mangled speech), so the pitch step is gone entirely (no measuring, no
+actor.voice_pitch): the plain conversion, Seedance's own sound. Scene 3 was
+low because the line was spoken low: re-record it. Scenes 1-3 were put back
+to their earlier takes with `restoreSceneTake` (API `{action:"restore",
+url, draft_id?}`: an earlier take-performed file of the scene re-attached,
+no generation). A final with a draft id now always finishes the draft
+(draft-complete inherits frame, prompt, voice and seed): no voice is made
+for it.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

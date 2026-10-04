@@ -594,11 +594,6 @@ export interface ScenePerformance {
    *  the video, which Marc measured "totally off from the lips" (Oct 4:
    *  Seedance re-performs the line, it does not keep the file's timing). */
   voice_track?: "converted" | "seedance";
-  /** The converted voice's pitch as first made, the actor's, whether the
-   *  recording was raised and converted again, and where that landed (Hz):
-   *  a line spoken low no longer comes out low (Oct 4: scene 3 at 160 Hz
-   *  against 186-200). */
-  voice_pitch?: { measured: number; target: number; shifted: boolean; result?: number };
   /** The voice file the scene was performed to (a project asset), and how
    *  far it was shifted to line up with the video (s). */
   voice_url?: string;

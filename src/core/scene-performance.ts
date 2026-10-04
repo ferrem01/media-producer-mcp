@@ -26,7 +26,7 @@ import { config } from "../config.js";
 import { loadProject, saveProject } from "../persistence/project.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
-import { getActor, portraitPath, setActorVoicePitch, type CastActor } from "./cast.js";
+import { getActor, portraitPath, type CastActor } from "./cast.js";
 import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
 import { elevenSpeech, scriptWithBreaks, spokenParts } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
@@ -304,62 +304,8 @@ export async function layVoice(videoAbs: string, voiceAbs: string, outAbs: strin
   return lag;
 }
 
-/** The median pitch of a voice (Hz): 40 ms frames, autocorrelation within
- *  70-400 Hz, voiced frames only. 0 when nothing voiced was found. */
-export async function voicePitch(file: string, work: string): Promise<number> {
-  const pcm = path.join(work, `pitch-${crypto.randomBytes(3).toString("hex")}.raw`);
-  await ffmpeg(["-i", file, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", pcm]);
-  const buf = await fs.readFile(pcm);
-  await fs.rm(pcm, { force: true }).catch(() => {});
-  const n = Math.floor(buf.length / 2), x = new Float32Array(n);
-  for (let i = 0; i < n; i++) x[i] = buf.readInt16LE(i * 2) / 32768;
-  const sr = 16000, w = 640, hop = 160, lo = Math.floor(sr / 400), hi = Math.floor(sr / 70);
-  const win = Float32Array.from({ length: w }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (w - 1)));
-  const f0: number[] = [];
-  const fr = new Float32Array(w);
-  for (let s = 0; s + w <= n; s += hop) {
-    let e = 0;
-    for (let i = 0; i < w; i++) { fr[i] = x[s + i] * win[i]; e += fr[i] * fr[i]; }
-    if (Math.sqrt(e / w) < 0.02) continue;
-    let best = 0, bk = 0;
-    for (let k = lo; k < hi; k++) { let c = 0; for (let i = 0; i + k < w; i++) c += fr[i] * fr[i + k]; if (c > best) { best = c; bk = k; } }
-    if (bk && best / e > 0.45) f0.push(sr / bk);
-  }
-  if (!f0.length) return 0;
-  f0.sort((a, b) => a - b);
-  return f0[Math.floor(f0.length / 2)];
-}
-
-/** The actor's voice's natural pitch: measured once from a sample read in
- *  it, kept on the actor. */
-async function actorPitch(tenant: string, actor: CastActor, work: string): Promise<number> {
-  if (actor.voice_pitch && actor.voice_pitch.voice_id === actor.voice_id && actor.voice_pitch.hz > 0) return actor.voice_pitch.hz;
-  const sample = path.join(work, "actor-sample.mp3");
-  await elevenSpeech("Hi, I'm glad you're here. Let me walk you through how it works, step by step, and why it matters for your team.", actor.voice_id!, sample);
-  const hz = await voicePitch(sample, work);
-  if (hz > 0) await setActorVoicePitch(tenant, actor.id, { voice_id: actor.voice_id!, hz: Math.round(hz) });
-  return hz;
-}
-
-/** Shift a voice's pitch by a ratio without changing its timing. */
-async function shiftPitch(input: string, out: string, ratio: number): Promise<void> {
-  const sr = 44100;
-  await ffmpeg(["-i", input, "-af", `aresample=${sr},asetrate=${Math.round(sr * ratio)},aresample=${sr},atempo=${(1 / ratio).toFixed(5)}`, "-ac", "1", "-c:a", "pcm_s16le", out]);
-}
-
-/** A voice shifted to a target pitch (more than 3% off, within reason),
- *  timing untouched. null when either pitch is unknown. */
-export async function matchVoicePitch(input: string, target: number, out: string, work: string): Promise<{ file: string; measured: number; shifted: boolean } | null> {
-  const measured = await voicePitch(input, work);
-  if (!(measured > 0) || !(target > 0)) return null;
-  const ratio = target / measured;
-  const shifted = Math.abs(ratio - 1) > 0.03 && ratio > 0.6 && ratio < 1.7;
-  if (shifted) await shiftPitch(input, out, ratio);
-  return { file: shifted ? out : input, measured: Math.round(measured), shifted };
-}
-
 /** The scene's voice as an MP3 at -14 LUFS (what the proven run sent). */
-async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number; pitch?: { measured: number; target: number; shifted: boolean; result?: number } }> {
+async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number }> {
   if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
   if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice (cast update_actor voice_id)`);
   const w = (n: string) => path.join(workDir, n);
@@ -384,36 +330,12 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
       "-vn", "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("take.wav")]);
     await convertVoice(w("take.wav"), said, actor.voice_id);
   }
-  // A converted delivery keeps the speaker's pitch: a line spoken low comes
-  // out low (Oct 4: scene 3 at 160 Hz against 186-200), and Seedance copies
-  // it faithfully. Shift it to the actor's own pitch, timing untouched.
-  let pitch: { measured: number; target: number; shifted: boolean; result?: number } | undefined;
-  let src = said;
-  if (source === "take") {
-    // The pitch is raised in the RECORDING, then converted again: ElevenLabs
-    // rebuilds the voice in the actor's own timbre at the new pitch. Shifting
-    // the converted file instead moved its formants too -- Marc: "it sounds
-    // like a chipmunk now" (Oct 4).
-    const target = await actorPitch(tenant, actor, workDir).catch(() => 0);
-    const measured = await voicePitch(said, workDir);
-    if (measured > 0 && target > 0) {
-      const ratio = target / measured;
-      const shifted = Math.abs(ratio - 1) > 0.03 && ratio > 0.6 && ratio < 1.7;
-      let result: number | undefined;
-      if (shifted) {
-        await shiftPitch(w("take.wav"), w("take-pitched.wav"), ratio);
-        await convertVoice(w("take-pitched.wav"), w("said-pitched.mp3"), actor.voice_id);
-        src = w("said-pitched.mp3");
-        result = Math.round(await voicePitch(src, workDir)) || undefined;
-      }
-      pitch = { measured: Math.round(measured), target: Math.round(target), shifted, ...(result ? { result } : {}) };
-    }
-  }
+  const src = said;
   const file = w("voice.mp3");
   await ffmpeg(["-i", src, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);
   const seconds = (await durationOf(file)) || 0;
   if (seconds > MAX_VOICE_SECONDS) throw new Error(`Scene ${si + 1}'s line runs ${seconds.toFixed(1)} s; one Seedance shot holds ${MAX_VOICE_SECONDS} s -- split the scene`);
-  return { file, seconds, pitch };
+  return { file, seconds };
 }
 
 /** Perform a scene: frame (drawn if none), voice, Seedance, attach. A draft
@@ -466,33 +388,32 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   const workDir = path.join(projectDir(tenant, projectId), "_work", `perform-s${si + 1}`);
   await fs.mkdir(workDir, { recursive: true });
 
-  // The frame: the one picked, else one drawn now.
+  // A final finishing a draft: Atlas's draft-complete inherits the draft's
+  // frame, prompt, voice and seed -- nothing is made or sent again.
+  const finishing = quality === "final" && !!perf.draft?.draft_id;
   let frame = perf.frame;
-  if (!frame) {
-    await stage("frame");
-    frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt);
-    const made = frame;
-    await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
+  let voice: { file: string; seconds: number } | null = null;
+  let voiceUrl = perf.voice_url;
+  let inputs = `final:${perf.draft?.draft_id || ""}`;
+  if (!finishing) {
+    // The frame: the one picked, else one drawn now.
+    if (!frame) {
+      await stage("frame");
+      frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt);
+      const made = frame;
+      await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
+    }
+    await stage("voice");
+    voice = await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
+    // The voice kept beside the take: heard, checked.
+    const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
+    await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
+    await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
+    voiceUrl = assetUrl(tenant, projectId, voiceName);
+    const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
+    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || ""].join("|");
   }
-  await stage("voice");
-  // A final finishing a draft uses the voice the draft was made to: a new
-  // conversion differs by a hair (and in timing), so the draft would never
-  // match and the laid file would drift off the lips.
-  const keptVoice = quality === "final" && perf.draft?.draft_id && perf.voice_url ? resolveVideoPath(perf.voice_url, config.dataDir) : null;
-  const voice = keptVoice && await fs.stat(keptVoice).then(() => true, () => false)
-    ? { file: keptVoice, seconds: (await durationOf(keptVoice)) || 0 }
-    : await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
-  // The voice kept beside the take: heard, checked, reused for the final.
-  const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
-  await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
-  if (voice.file !== keptVoice) await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
-  const voiceUrl = voice.file === keptVoice ? perf.voice_url! : assetUrl(tenant, projectId, voiceName);
-  const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
-  // What makes the shot: a final can finish the draft only if none changed.
-  // (The script voice is made fresh each time and differs by a hair, so a
-  // draft from the script is finished whatever the new read sounds like.)
   const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot);
-  const inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, perf.voice_source === "take" ? voiceHash : "", perf.video_prompt || ""].join("|");
 
   await stage(quality === "final" ? "final" : "draft");
   const kept = path.join(workDir, `seedance-${quality}.json`);
@@ -501,15 +422,15 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   const onSubmit = async (id: string) => { await fs.writeFile(kept, JSON.stringify({ inputs, prediction_id: id })); };
   const vkey = `${tenant}/${projectId}/${si}`;
   const result = await withVendorStatus((v) => { vendorNow.set(vkey, v); }, async () => {
-    if (quality === "final" && perf.draft?.draft_id && perf.draft.inputs === inputs) return seedanceFinal(perf.draft.draft_id, { resume, onSubmit });
+    if (finishing) return seedanceFinal(perf.draft!.draft_id!, { resume, onSubmit });
     const frameAbs = resolveVideoPath(frame!, config.dataDir);
     const images = [await publicUrl(tenant, projectId, frameAbs)];
     if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));
     return seedanceShot({
-      images, audio: await publicUrl(tenant, projectId, voice.file), prompt: videoPrompt,
+      images, audio: await publicUrl(tenant, projectId, voice!.file), prompt: videoPrompt,
       // A breath of room past the voice (the proven run gave 10.03 s of voice
       // 10 s and held sync: headroom is not what keeps the lips on).
-      seconds: voice.seconds + 0.3, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
+      seconds: voice!.seconds + 0.3, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
     });
   });
 
@@ -522,9 +443,9 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   // The sound: the exact voice file lined up to the video (default), or
   // the model's own read.
   let url = seedanceUrl, offset: number | undefined;
-  if (perf.voice_track === "converted") {
+  if (perf.voice_track === "converted" && voiceUrl) {
     const name = `take-performed-${actor.id}-s${si + 1}-${quality}-voiced-${stamp()}.mp4`;
-    offset = await layVoice(path.join(assetsDir(tenant, projectId), raw), resolveVideoPath(voiceUrl, config.dataDir), path.join(assetsDir(tenant, projectId), name), workDir);
+    offset = await layVoice(path.join(assetsDir(tenant, projectId), raw), resolveVideoPath(voiceUrl!, config.dataDir), path.join(assetsDir(tenant, projectId), name), workDir);
     url = assetUrl(tenant, projectId, name);
   }
   const out = await attach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "seedance", quality } });
@@ -536,8 +457,8 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     const now = new Date().toISOString();
     if (quality === "draft") p.draft = { url, ...(result.draftId ? { draft_id: result.draftId } : {}), inputs, made_at: now };
     else p.final = { url, made_at: now };
-    p.voice_url = voiceUrl; p.seedance_url = seedanceUrl;
-    if ("pitch" in voice && voice.pitch) p.voice_pitch = voice.pitch;
+    if (voiceUrl) p.voice_url = voiceUrl; else delete p.voice_url;
+    p.seedance_url = seedanceUrl;
     if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
@@ -585,6 +506,36 @@ export async function revoiceScene(tenant: string, projectId: string, si: number
       if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
       if (take.performed_by.quality === "final" && p.final) p.final.url = url;
       else if (p.draft) p.draft.url = url;
+    });
+  } finally { running.delete(key); }
+}
+
+/** Put an EARLIER performance of this scene back as its take: a
+ * take-performed-* asset made for this scene, re-attached (no new
+ * generation). `draft_id`, when known, lets its final be finished. */
+export async function restoreSceneTake(tenant: string, projectId: string, si: number, opts: { url: string; draft_id?: string }): Promise<ScenePerformance> {
+  const doAttach = attacher;
+  if (!doAttach) throw new Error("Takes cannot be attached here");
+  const key = `${tenant}/${projectId}/${si}`;
+  if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
+  const { scene } = await loadScene(tenant, projectId, si);
+  const perf: ScenePerformance | undefined = scene.performance;
+  if (!perf?.actor) throw new Error(`Scene ${si + 1} has no performance`);
+  const prefix = `/assets/${tenant}/projects/${projectId}/assets/`;
+  const name = String(opts.url || "").startsWith(prefix) ? String(opts.url).slice(prefix.length) : "";
+  const m = /^take-performed-([A-Za-z0-9_-]+?)-s(\d+)-(draft|final)-[^/]+\.mp4$/.exec(name);
+  if (!m || Number(m[2]) !== si + 1) throw new Error(`That is not a performance of scene ${si + 1}`);
+  if (!(await fs.stat(path.join(assetsDir(tenant, projectId), name)).then(() => true, () => false))) throw new Error("That file is gone");
+  const quality = m[3] as "draft" | "final";
+  running.add(key);
+  try {
+    const out = await doAttach(tenant, projectId, opts.url, si, { performed_by: { actor: m[1], engine: "seedance", quality } });
+    if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
+    return await patch(tenant, projectId, si, (p) => {
+      const now = new Date().toISOString();
+      if (quality === "final") p.final = { url: opts.url, made_at: now };
+      else { p.draft = { url: opts.url, ...(opts.draft_id ? { draft_id: String(opts.draft_id) } : {}), inputs: "restored", made_at: now }; delete p.final; }
+      p.seedance_url = opts.url; delete p.voice_url; delete p.voice_offset; p.voice_track = "seedance";
     });
   } finally { running.delete(key); }
 }
