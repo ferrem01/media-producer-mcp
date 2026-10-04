@@ -2923,6 +2923,7 @@ Rules:
               max_seconds: body.max_seconds != null ? Number(body.max_seconds) : undefined,
               hf_urls: body.hf_urls && typeof body.hf_urls === "object" ? body.hf_urls : undefined,
               compare_with: Array.isArray(body.compare_with) ? body.compare_with : undefined,
+              audio_asset: typeof body.audio_asset === "string" ? body.audio_asset : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;

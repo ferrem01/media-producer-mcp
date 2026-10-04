@@ -41,6 +41,14 @@ hf_urls video, kept as `ref.mp4`; before, it was the scene's take, a
 different recording), then `compare_with` panels from earlier tests, then
 this test's results, with her own voice as the sound.
 
+Verdict on Seedance's reference video (Marc): "similar-ish", not tracking
+-- the body turn and the mic come through, no moment-to-moment match of
+expression; with and without the video both look good. It is guidance, not
+motion transfer. For one-to-one, the motion-transfer models (Kling 3.0
+Motion Control, Genjutsu) on the same 10 s clip, with `audio_asset` laying
+the converted voice made on that same cut (same words and timing, so it fits
+lips that came from Marc).
+
 ## 2026-10-04 — hf-seedance25: one voice, headroom, the app run's fields
 
 The first API run lost lip sync partway. Marc's app run (job 040426e3)

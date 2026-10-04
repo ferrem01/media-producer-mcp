@@ -812,6 +812,11 @@ export async function startActorTest(opts: {
   video_asset?: string;
   /** Cap the source at this many seconds (a cheap test). */
   max_seconds?: number;
+  /** The voice laid on a result that does not voice itself (Kling,
+   *  Genjutsu, Wan...): a tenant audio file, e.g. a converted voice made on
+   *  the same cut as video_asset. Without it: the converted voice, else the
+   *  take's own audio. */
+  audio_asset?: string;
   /** Extra panels for compare.mp4 from earlier tests' files (e.g. the same
    *  call with the reference video, beside this one without it). */
   compare_with?: { test: string; file: string }[];
@@ -889,6 +894,14 @@ export async function startActorTest(opts: {
   for (const p of wanted) if (!providers.includes(p)) test.steps[p] = { status: "skipped", error: `${KEYS[p]} is not set` };
   if (!voice) test.steps.voice = { status: "skipped", error: opts.voice === false ? "not asked for" : "ELEVENLABS_API_KEY is not set" };
   await fs.mkdir(actorTestDir(opts.tenant, opts.project, test.id), { recursive: true });
+  if (opts.audio_asset) {
+    const audAbs = path.resolve(tenantDir, String(opts.audio_asset).replace(/^\/+/, ""));
+    if (!audAbs.startsWith(tenantDir + path.sep)) throw new Error("audio_asset must be a path inside the tenant");
+    await fs.access(audAbs).catch(() => { throw new Error(`audio_asset not found: ${opts.audio_asset}`); });
+    const name = `voice-track${path.extname(audAbs).toLowerCase() || ".mp3"}`;
+    await fs.copyFile(audAbs, path.join(actorTestDir(opts.tenant, opts.project, test.id), name));
+    test.files.voice_track = name;
+  }
   tests.set(test.id, test);
   await save(test);
   // The take is recorded at the film's frame, so the canvas says its shape.
@@ -1120,7 +1133,7 @@ async function finishTest(test: ActorTest, done: ActorProvider[]): Promise<void>
   const f = (name: string) => path.join(actorTestDir(test.tenant_id, test.project_id, test.id), name);
   // Each result with sound: the converted voice when there is one, else
   // the take's own audio. The picture is re-encoded so every file streams.
-  const audio = test.files.voice ? f("voice.mp3") : f("source.mp4");
+  const audio = test.files.voice_track ? f(test.files.voice_track) : test.files.voice ? f("voice.mp3") : f("source.mp4");
   for (const p of done) {
     if (SELF_VOICED.has(p) && (await hasAudio(f(`${p}-raw.mp4`)))) {
       // Seedance renders the voice itself, placed where it lip-synced it.

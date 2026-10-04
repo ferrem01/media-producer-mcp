@@ -88,5 +88,7 @@ describe("the actor test keeps a Seedance 2.5 result's own voice", () => {
     expect(src).toMatch(/if \(SELF_VOICED\.has\(p\) && \(await hasAudio/);
     // The side-by-side shows the clip she copied and plays her own voice.
     expect(src).toMatch(/test\.files\.ref \? f\(test\.files\.ref\) : f\("source\.mp4"\)/);
+    // A supplied voice track (audio_asset) is what Kling / Genjutsu results carry.
+    expect(src).toMatch(/const audio = test\.files\.voice_track \? f\(test\.files\.voice_track\) :/);
   });
 });
