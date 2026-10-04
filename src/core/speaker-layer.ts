@@ -57,7 +57,15 @@ type SceneLike = { components?: Array<Comp | null> | null; duration_seconds?: nu
 type TakeLike = { source: string; blur?: string; alpha?: string; actors?: Record<string, { file: string }> | null; background?: { mode?: string; source_raw?: string } | null; scene_index?: number; silhouette?: { rows: Array<[number, number] | null> };
   edited?: boolean; trim_start?: number; trim_end?: number; duration?: number; cuts?: Array<{ src_start: number; src_end: number }>; cut_files?: Record<string, { file: string; cuts: string; stamp: string }> };
 type ClipLike = { source: string; alpha?: string; scene_index?: number; trim_start?: number; trim_end?: number };
-type ProjectLike = { scenes?: SceneLike[] | null; takes?: TakeLike[] | null; speaker_track?: { clips: ClipLike[] } | null; speaker_cast?: string | null };
+type ProjectLike = { scenes?: SceneLike[] | null; takes?: TakeLike[] | null; speaker_track?: { clips: ClipLike[] } | null; speaker_cast?: string | null; storyboard?: { scenes?: Array<{ cast?: string | null } | null> } | null };
+
+/** Who performs a scene's take: the scene's own cast (an actor id, or null
+ *  for the recording itself) when it has one, else the film's. */
+export function sceneCastOf(project: ProjectLike, sceneIndex: number): string | null {
+  const sc = project.storyboard?.scenes?.[sceneIndex];
+  if (sc && sc.cast !== undefined) return sc.cast;
+  return project.speaker_cast || null;
+}
 
 export function asSpeakerBackground(v: unknown): SpeakerBackground | null {
   if (v === "none") return "room";
@@ -275,10 +283,11 @@ export function syncSpeakerClips(project: ProjectLike): number {
     if (!take) continue;
     const copies = takeCopies(take);
     const mode = sceneSpeakerBackground((project.scenes || [])[clip.scene_index]);
-    // A cast actor performs the whole track when the take has their recast
-    // (core/recast.ts). The matte's blur and alpha copies are of the person
-    // who recorded, so a recast clip carries neither.
-    const cast = project.speaker_cast ? take.actors?.[project.speaker_cast]?.file : undefined;
+    // A cast actor performs the take when it has their recast (core/recast.ts)
+    // -- the scene's cast, else the film's. The matte's blur and alpha copies
+    // are of the person who recorded, so a recast clip carries neither.
+    const castId = sceneCastOf(project, clip.scene_index);
+    const cast = castId ? take.actors?.[castId]?.file : undefined;
     let wantSource = cast || (mode === "blur" && copies.blur ? copies.blur : copies.raw);
     let wantAlpha = cast ? undefined : copies.alpha;
     // A take with cuts plays its cut copies (core/take-edits.ts): the copy

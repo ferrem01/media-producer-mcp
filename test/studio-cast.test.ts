@@ -49,3 +49,22 @@ describe("Studio: the Cast card", () => {
     expect(html).toContain("api('POST', '/heygen-avatars/' + castT(), { avatar_id: castUi.newBase, prompt: prompt");
   });
 });
+
+describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
+  it("each scene can be the recording, a recast of it, or the actor performing it with no recording -- frame, draft, final, b-roll", () => {
+    const fs = require("node:fs") as typeof import("node:fs");
+    const path = require("node:path") as typeof import("node:path");
+    const src = fs.readFileSync(path.join(__dirname, "..", "src/preview-app/preview-app.ts"), "utf8");
+    expect(src).toContain(`data-cast-mode="scenes">Scene by scene</button>`);
+    expect(src).toContain("api('/scene-performance/' + castT() + '/' + castP())");
+    expect(src).toContain("{ actor: rcA.id, performer: rcP.id, scenes: [Number(v)] }");
+    expect(src).toContain("{ action: 'recording' }");
+    expect(src).toContain("{ action: 'frame', actor: spActor, shot: spShot(v) || undefined }");
+    expect(src).toContain("quality: fin ? 'final' : 'draft'");
+    expect(src).toContain("{ action: 'clip', actor: spActor, shot: cs.value.trim(), seconds: sec ? Number(sec.value) : 5 }");
+    // The poll keeps going while a scene works, and never redraws the box being typed in.
+    expect(src).toContain("if (castRunning()) { if (!castTyping()) castRender(); castPoll(); return; }");
+    // Regexes inside the page template are written with doubled backslashes.
+    expect(src).toContain("/^sp-shot-(\\\\d+)$/");
+  });
+});

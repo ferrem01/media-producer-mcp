@@ -11833,6 +11833,7 @@ ${QUOTIENT_CSS}
     document.getElementById('cast-go').addEventListener('click', castGo);
     document.getElementById('cast-body').addEventListener('click', castClick);
     document.getElementById('cast-body').addEventListener('change', castChange);
+    document.getElementById('cast-body').addEventListener('input', castInput);
     castLoad();
   }
   function castLoad() {
@@ -11842,9 +11843,10 @@ ${QUOTIENT_CSS}
       api('/recast/' + castT() + '/' + castP()),
       api('/generated-take/' + castT() + '/' + castP()).catch(function() { return {}; }),
       castUi.voices ? Promise.resolve(castUi.voices) : api('/cast/' + castT() + '/voices').catch(function() { return { elevenlabs: [], heygen: [] }; }),
+      api('/scene-performance/' + castT() + '/' + castP()).catch(function() { return { scenes: [] }; }),
     ]).then(function(r) {
       if (!document.getElementById('cast-body') || castUi.project !== p) return;
-      castUi.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, rcProgress: r[1].progress || null, gen: r[2].generated_take || null };
+      castUi.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, rcProgress: r[1].progress || null, gen: r[2].generated_take || null, scenes: r[4].scenes || [] };
       castUi.voices = r[3];
       if (castUi.actor && !castUi.data.cast.some(function(a) { return a.id === castUi.actor; })) castUi.actor = null;
       if (!castUi.actor && castUi.data.cast.length) castUi.actor = (castUi.data.speaker_cast && castUi.data.cast.some(function(a) { return a.id === castUi.data.speaker_cast; })) ? castUi.data.speaker_cast : castUi.data.cast[0].id;
@@ -11858,7 +11860,14 @@ ${QUOTIENT_CSS}
     });
   }
   function castHasTake() { var p = castUi.project; return !!(p && p.takes && p.takes.length); }
-  function castRunning() { var d = castUi.data; return !!(d && ((d.recast && d.recast.status === 'running') || (d.gen && d.gen.status === 'running'))); }
+  function castRunning() { var d = castUi.data; return !!(d && ((d.recast && d.recast.status === 'running') || (d.gen && d.gen.status === 'running') || castScenesRunning())); }
+  // A scene being performed, or a b-roll clip being made (core/scene-performance.ts).
+  function castScenesRunning() {
+    var d = castUi.data;
+    return !!(d && (d.scenes || []).some(function(s) { return s.running || (s.performance && s.performance.status === 'running') || (s.actor_clip && s.actor_clip.status === 'running'); }));
+  }
+  // Typing in a scene's shot: the poll must not redraw the box under the caret.
+  function castTyping() { var a = document.activeElement; var b = document.getElementById('cast-body'); return !!(a && b && b.contains(a) && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')); }
   function castActorById(id) { var d = castUi.data; return d ? d.cast.filter(function(a) { return a.id === id; })[0] : null; }
   function castPerfById(id) { var d = castUi.data; return d ? d.performers.filter(function(p) { return p.id === id; })[0] : null; }
   // The vendor when the user has not chosen: HeyGen for a HeyGen look (the
@@ -11869,7 +11878,8 @@ ${QUOTIENT_CSS}
     var ok = function(p) { return p && p.available && (castUi.mode !== 'generate' || p.generate); };
     if (ok(castPerfById(castUi.performer))) return;
     var a = castActorById(castUi.actor);
-    var order = (a && a.heygen_look_id) || castUi.mode === 'generate' ? ['heygen', 'kling', 'runway', 'higgsfield'] : ['kling', 'higgsfield', 'heygen', 'runway'];
+    // Scene by scene recasts one-to-one: Higgsfield first (Marc's pick, Oct 4).
+    var order = (a && a.heygen_look_id) || castUi.mode === 'generate' ? ['heygen', 'kling', 'runway', 'higgsfield'] : castUi.mode === 'scenes' ? ['higgsfield', 'kling', 'runway', 'heygen'] : ['kling', 'higgsfield', 'heygen', 'runway'];
     castUi.performer = null;
     for (var i = 0; i < order.length; i++) if (ok(castPerfById(order[i]))) { castUi.performer = order[i]; break; }
   }
@@ -11937,7 +11947,7 @@ ${QUOTIENT_CSS}
       + '</div><div class="np-act">' + (d.speaker_cast ? '<button class="np-btn" data-cast-me="1">Back to me</button>' : '') + '</div></div>';
     if (castRunning() && d.recast && d.recast.status === 'running') {
       h += castRecastStatus(d.recast, d.rcProgress);
-    } else if (castRunning()) {
+    } else if (d.gen && d.gen.status === 'running') {
       var job = d.gen;
       var f = job.files && job.files[0];
       var stage = (f && f.stage) || job.stage || 'starting';
@@ -11952,9 +11962,11 @@ ${QUOTIENT_CSS}
     // The mode.
     h += '<div class="np-block"><div class="np-tabs">'
       + '<button class="np-btn' + (castUi.mode === 'recast' ? ' active' : '') + '" data-cast-mode="recast"' + (castHasTake() ? '' : ' disabled title="Record a take first"') + '>Recast my recording</button>'
-      + '<button class="np-btn' + (castUi.mode === 'generate' ? ' active' : '') + '" data-cast-mode="generate">Generate from the script</button></div>'
+      + '<button class="np-btn' + (castUi.mode === 'generate' ? ' active' : '') + '" data-cast-mode="generate">Generate from the script</button>'
+      + '<button class="np-btn' + (castUi.mode === 'scenes' ? ' active' : '') + '" data-cast-mode="scenes">Scene by scene</button></div>'
       + '<div class="np-hint">' + (castUi.mode === 'recast'
         ? 'Your take stays the clock: the same words, timing and cuts, performed by the actor.'
+        : castUi.mode === 'scenes' ? 'Mix them in one film: each scene is your recording, your recording recast as the actor, or the actor performing it with no recording (Seedance).'
         : 'No recording: the script is voiced and performed, then attached as this film&#8217;s take.') + '</div></div>';
     // The actor.
     h += '<div class="np-block"><div class="np-lead">Actor</div><div class="np-grid">';
@@ -11977,6 +11989,11 @@ ${QUOTIENT_CSS}
         + '<small>' + escHtml(p.keeps) + ' · ' + escHtml(p.limits) + ' · ~' + p.minutesPer30s + ' min per 30 s' + (why ? ' · ' + why : '') + '</small></div></label>';
     });
     h += '</div>';
+    if (castUi.mode === 'scenes') {
+      body.innerHTML = h + castScenesHtml();
+      castGoLabel();
+      return;
+    }
     // The voice.
     h += '<div class="np-block"><div class="np-lead">Voice</div><div class="np-row"><div class="np-what"><select id="cast-voice" class="np-search">' + castVoiceOptions() + '</select></div>'
       + '<div class="np-act"><button class="np-btn" data-cast-hear="1" title="Hear this voice">&#9654;</button></div></div></div>';
@@ -12014,8 +12031,91 @@ ${QUOTIENT_CSS}
   function castGoLabel() {
     var b = document.getElementById('cast-go'); if (!b) return;
     var a = castActorById(castUi.actor), p = castPerfById(castUi.performer);
+    if (castUi.mode === 'scenes') { b.disabled = true; b.textContent = 'Use each scene’s buttons'; return; }
     b.disabled = !a || !p || castRunning() || (castUi.mode === 'recast' && !castHasTake()) || (castUi.mode === 'generate' && !castUi.voice);
     b.textContent = castUi.mode === 'recast' ? 'Recast as ' + (a ? a.name : '…') + (p ? ' with ' + p.label : '') : 'Generate the take' + (p ? ' with ' + p.label : '');
+  }
+  // ── Scene by scene (core/scene-performance.ts) ──
+  function castNameOf(id) { var a = castActorById(id); return a ? a.name : id; }
+  var SP_STAGE = { frame: 'drawing the start frame', voice: 'voicing the line', draft: 'Seedance is making the draft', final: 'Seedance is making the 1080p final', attach: 'attaching it to the scene' };
+  function castScenesHtml() {
+    var d = castUi.data, list = d.scenes || [], a = castActorById(castUi.actor), p = castPerfById(castUi.performer);
+    castUi.spOpen = castUi.spOpen || {}; castUi.spShot = castUi.spShot || {}; castUi.spVoice = castUi.spVoice || {}; castUi.spClip = castUi.spClip || {}; castUi.spClipSec = castUi.spClipSec || {};
+    if (!list.length) return '<div class="np-empty">This film has no scenes yet.</div>';
+    var h = '<div class="np-block"><div class="np-lead">Scenes</div><div class="np-hint"><b>Recast</b> uses the vendor picked above on your recording of the scene (one-to-one). <b>' + escHtml(a ? a.name : 'The actor') + ' performs it</b> needs no recording: a start frame for the shot, the line voiced in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice, a 480p draft, then the 1080p final.</div></div>';
+    list.forEach(function(s) {
+      var i = s.scene_index, tk = s.take, perf = s.performance || {};
+      var run = s.running || perf.status === 'running';
+      var who = tk && tk.performed_by ? castNameOf(tk.performed_by.actor) + ' · performed (' + (tk.performed_by.quality === 'final' ? '1080p' : 'draft') + ')'
+        : s.cast && tk && (tk.recast_by || []).indexOf(s.cast) >= 0 ? castNameOf(s.cast) + ' · recast' : tk ? 'You · your recording' : 'No take yet';
+      var hasRec = !!(tk && !tk.performed_by);
+      h += '<div class="np-block sp-scene"><div class="np-lead">Scene ' + (i + 1) + (s.label ? ' · ' + escHtml(s.label) : '') + ' <small>' + escHtml(who) + '</small></div>';
+      if (s.lines) h += '<div class="np-hint">&#8220;' + escHtml(s.lines.replace(/\\s+/g, ' ').slice(0, 180)) + '&#8221;</div>';
+      h += '<div class="np-tabs">'
+        + '<button class="np-btn" data-sp-rec="' + i + '"' + (s.has_recording && !run && (s.cast || (tk && tk.performed_by)) ? '' : ' disabled') + ' title="Play your own recording in this scene">My recording</button>'
+        + '<button class="np-btn" data-sp-recast="' + i + '"' + (a && p && hasRec && !run && !(d.recast && d.recast.status === 'running') ? '' : ' disabled') + ' title="' + (hasRec ? 'Your recording of this scene, performed by the actor' : 'Record this scene first') + '">Recast as ' + escHtml(a ? a.name : '…') + (p ? ' (' + escHtml(p.label) + ')' : '') + '</button>'
+        + '<button class="np-btn' + (castUi.spOpen[i] ? ' active' : '') + '" data-sp-open="' + i + '">' + escHtml(a ? a.name : 'The actor') + ' performs it</button>'
+        + '</div>';
+      if (castUi.spOpen[i]) h += castScenePanel(s, a, hasRec, run);
+      h += '</div>';
+    });
+    return h;
+  }
+  function castScenePanel(s, a, hasRec, run) {
+    var i = s.scene_index, perf = s.performance || {};
+    var mine = !!(a && perf.actor === a.id);
+    var shot = castUi.spShot[i] != null ? castUi.spShot[i] : (mine && perf.shot) || '';
+    var voice = castUi.spVoice[i] || (mine && perf.voice_source) || 'script';
+    var ta = 'width:100%;box-sizing:border-box;resize:vertical;font:inherit;font-size:13px;line-height:1.45;padding:8px 10px;';
+    var h = '<div class="np-panel sp-panel">';
+    h += '<div class="np-hint">The shot: where ' + escHtml(a ? a.name : 'the actor') + ' is and what they do.</div>'
+      + '<textarea id="sp-shot-' + i + '" rows="2" maxlength="1000" style="' + ta + '" placeholder="A selfie-style medium close-up in a bright modern office, talking straight to the camera">' + escHtml(shot) + '</textarea>';
+    h += '<label class="np-row"><div class="np-what"><input type="radio" name="sp-voice-' + i + '" value="script"' + (voice === 'script' ? ' checked' : '') + '> Read the script in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice</div></label>'
+      + '<label class="np-row' + (s.has_recording ? '' : ' dis') + '"><div class="np-what"><input type="radio" name="sp-voice-' + i + '" value="take"' + (voice === 'take' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> Convert my recording of this scene<small>Your delivery and timing, in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice' + (s.has_recording ? '' : ' &#8212; record the scene first') + '</small></div></label>';
+    var frames = mine ? (perf.frames || []) : [];
+    if (frames.length) {
+      h += '<div class="np-grid">';
+      frames.forEach(function(f) {
+        h += '<div class="np-cand tall' + (f.url === perf.frame ? ' sel' : '') + '" data-sp-pick="' + i + '|' + escAttr(f.url) + '" title="' + escAttr(f.shot || '') + '"><img src="' + escAttr(withToken(f.url)) + '" alt=""></div>';
+      });
+      h += '</div>';
+    }
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'
+      + '<button class="np-btn" data-sp-frame="' + i + '"' + (run || !a ? ' disabled' : '') + '>' + (frames.length ? 'Redraw frame' : 'Draw frame') + '</button> '
+      + '<button class="np-btn" data-sp-draft="' + i + '"' + (run || !a ? ' disabled' : '') + '>Make draft (480p)</button> '
+      + (mine && perf.draft ? '<button class="np-btn" data-sp-final="' + i + '"' + (run ? ' disabled' : '') + '>Make final (1080p)</button>' : '')
+      + '</div>';
+    if (run && mine) h += '<div class="np-armed"><span></span>' + escHtml(SP_STAGE[perf.stage] || 'starting') + (s.vendor ? ' &#183; Seedance ' + escHtml(rcVendorWord(s.vendor)) : '') + '</div>';
+    else if (mine && perf.status === 'failed') h += '<div class="np-note">It failed: ' + escHtml(perf.error || '') + '</div>';
+    else if (mine && perf.final) h += '<div class="np-hint">&#10003; The 1080p final is this scene&#8217;s take.</div>';
+    else if (mine && perf.draft) h += '<div class="np-hint">&#10003; The draft is this scene&#8217;s take: play the film to watch it. Happy? Make the final.</div>';
+    else if (!frames.length) h += '<div class="np-hint">Draw the frame first to see ' + escHtml(a ? a.name : 'the actor') + ' in the shot (cheap), or go straight to the draft.</div>';
+    // B-roll of the actor: no speech, over this scene.
+    var clip = s.actor_clip || null;
+    var clipRun = !!(clip && clip.status === 'running');
+    var clipShot = castUi.spClip[i] != null ? castUi.spClip[i] : '';
+    var sec = castUi.spClipSec[i] || 5;
+    h += '<div class="np-hint" style="margin-top:10px">B-roll of ' + escHtml(a ? a.name : 'the actor') + ' over this scene (no speech):</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><input id="sp-clip-' + i + '" class="np-search" style="flex:1;min-width:0" maxlength="1000" placeholder="Sips a coffee at her desk, looking out the window" value="' + escAttr(clipShot) + '">'
+      + '<select id="sp-clipsec-' + i + '">' + [4, 5, 6, 8, 10].map(function(n) { return '<option value="' + n + '"' + (n === sec ? ' selected' : '') + '>' + n + ' s</option>'; }).join('') + '</select>'
+      + '<button class="np-btn" data-sp-clip="' + i + '"' + (clipRun || !a ? ' disabled' : '') + '>Add b-roll</button></div>';
+    if (clipRun) h += '<div class="np-armed"><span></span>Making the b-roll (a frame, then Seedance)</div>';
+    else if (clip && clip.status === 'failed') h += '<div class="np-note">The b-roll failed: ' + escHtml(clip.error || '') + '</div>';
+    else if (clip && clip.status === 'done') h += '<div class="np-hint">&#10003; B-roll on the scene: ' + escHtml(clip.shot || '') + ' (' + clip.seconds + ' s from ' + clip.at + ' s)</div>';
+    return h + '</div>';
+  }
+  function spPost(i, body, said) {
+    castSay(said || 'Working…');
+    return api('POST', '/scene-performance/' + castT() + '/' + castP() + '/' + i, body).then(function() { castSay(''); return castScenesRefresh(); })
+      .catch(function(e) { castSay(e.message || String(e), 'err'); });
+  }
+  function castScenesRefresh() {
+    return api('/scene-performance/' + castT() + '/' + castP()).then(function(r) {
+      if (!castUi.data) return;
+      castUi.data.scenes = r.scenes || [];
+      castRender();
+      if (castRunning()) castPoll();
+    });
   }
   function castAddHtml() {
     var h = '<div class="np-panel cast-addp"><div class="np-tabs">';
@@ -12084,6 +12184,39 @@ ${QUOTIENT_CSS}
     var t = ev.target;
     var el = function(attr) { var n = t.closest ? t.closest('[' + attr + ']') : null; return n ? n.getAttribute(attr) : null; };
     var v;
+    // Scene by scene.
+    var spActor = castUi.actor;
+    var spShot = function(i) { var x = document.getElementById('sp-shot-' + i); return x ? x.value.trim() : (castUi.spShot || {})[i] || ''; };
+    if ((v = el('data-sp-open')) !== null) { castUi.spOpen = castUi.spOpen || {}; castUi.spOpen[v] = !castUi.spOpen[v]; castRender(); return; }
+    if ((v = el('data-sp-rec')) !== null) {
+      spPost(v, { action: 'recording' }, 'Back to your recording on scene ' + (Number(v) + 1) + '…').then(function() { loadProject(castUi.project.project_id); });
+      return;
+    }
+    if ((v = el('data-sp-recast')) !== null) {
+      var rcA = castActorById(spActor), rcP = castPerfById(castUi.performer);
+      if (!rcA || !rcP) return;
+      castSay('Starting the recast of scene ' + (Number(v) + 1) + '…');
+      api('POST', '/recast/' + castT() + '/' + castP(), { actor: rcA.id, performer: rcP.id, scenes: [Number(v)] }).then(function(st) {
+        castUi.data.recast = st; watchTakeStatus();
+        castSay(st.files && st.files.every(function(f) { return f.status === 'reused'; }) ? 'Already made: switching.' : 'Recasting scene ' + (Number(v) + 1) + ' as ' + rcA.name + ' with ' + rcP.label + '.', 'ok');
+        castRender(); castPoll();
+      }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
+    if ((v = el('data-sp-frame')) !== null) { spPost(v, { action: 'frame', actor: spActor, shot: spShot(v) || undefined }, 'Drawing the start frame…'); return; }
+    if ((v = el('data-sp-pick')) !== null) { var pk = v.split('|'); spPost(pk[0], { action: 'pick', url: pk.slice(1).join('|') }, 'Using that frame.'); return; }
+    if ((v = el('data-sp-draft')) !== null || (v = el('data-sp-final')) !== null) {
+      var fin = el('data-sp-final') !== null;
+      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft' },
+        fin ? 'Making the 1080p final…' : 'Making the draft (a few minutes)…');
+      return;
+    }
+    if ((v = el('data-sp-clip')) !== null) {
+      var cs = document.getElementById('sp-clip-' + v), sec = document.getElementById('sp-clipsec-' + v);
+      if (!cs || !cs.value.trim()) { castSay('Say what the actor does in the b-roll.', 'err'); return; }
+      spPost(v, { action: 'clip', actor: spActor, shot: cs.value.trim(), seconds: sec ? Number(sec.value) : 5 }, 'Making the b-roll…');
+      return;
+    }
     if ((v = el('data-cast-x'))) {
       ev.stopPropagation();
       var ax = castActorById(v);
@@ -12094,7 +12227,7 @@ ${QUOTIENT_CSS}
     if ((v = el('data-actor'))) { castUi.actor = v; castUi.add = null; castUi.voice = ''; castUi.performer = null; castPickPerformer(); castRender(); return; }
     if (el('data-cast-add')) { castUi.add = castUi.add ? null : 'looks'; castRender(); return; }
     if ((v = el('data-cast-addtab'))) { castUi.add = v; castRender(); return; }
-    if ((v = el('data-cast-mode'))) { castUi.mode = v; castUi.voice = ''; castPickPerformer(); castRender(); return; }
+    if ((v = el('data-cast-mode'))) { castUi.mode = v; castUi.voice = ''; if (v === 'scenes') castUi.performer = null; castPickPerformer(); castRender(); return; }
     if ((v = el('data-cast-look'))) { castAddActor({ heygen_look_id: v }, 'the look'); return; }
     if ((v = el('data-cast-base'))) { castUi.newBase = v; castRender(); return; }
     if (el('data-cast-gender') !== null && t.closest && t.closest('[data-cast-gender]')) { castUi.pubGender = el('data-cast-gender'); castUi.pub = null; castUi.pubToken = null; castRender(); return; }
@@ -12109,8 +12242,18 @@ ${QUOTIENT_CSS}
     }
     if (el('data-cast-hear')) { castHear(); return; }
   }
+  // A scene's shot, voice and b-roll inputs, kept across redraws.
+  function castInput(ev) {
+    var t = ev.target, m;
+    castUi.spShot = castUi.spShot || {}; castUi.spClip = castUi.spClip || {};
+    if ((m = /^sp-shot-(\\d+)$/.exec(t.id || ''))) castUi.spShot[m[1]] = t.value;
+    if ((m = /^sp-clip-(\\d+)$/.exec(t.id || ''))) castUi.spClip[m[1]] = t.value;
+  }
   function castChange(ev) {
-    var t = ev.target;
+    var t = ev.target, m;
+    if ((m = /^sp-voice-(\\d+)$/.exec(t.name || ''))) { castUi.spVoice = castUi.spVoice || {}; castUi.spVoice[m[1]] = t.value; return; }
+    if ((m = /^sp-clipsec-(\\d+)$/.exec(t.id || ''))) { castUi.spClipSec = castUi.spClipSec || {}; castUi.spClipSec[m[1]] = Number(t.value); return; }
+    if (/^sp-(shot|clip)-\\d+$/.test(t.id || '')) { castInput(ev); return; }
     if (t.name === 'cast-perf') { castUi.performer = t.value; castGoLabel(); return; }
     if (t.id === 'cast-voice') { castUi.voice = t.value; castGoLabel(); return; }
     if (t.id === 'cast-copy') { castUi.copy = !!t.checked; return; }
@@ -12233,14 +12376,18 @@ ${QUOTIENT_CSS}
       Promise.all([
         api('/recast/' + castT() + '/' + castP()),
         api('/generated-take/' + castT() + '/' + castP()).catch(function() { return {}; }),
+        api('/scene-performance/' + castT() + '/' + castP()).catch(function() { return null; }),
       ]).then(function(r) {
         if (!castUi.data || castUi.project !== p) return;
         castUi.data.speaker_cast = r[0].speaker_cast || null; castUi.data.recast = r[0].recast || null; castUi.data.rcProgress = r[0].progress || null; castUi.data.gen = r[1].generated_take || null;
-        if (castRunning()) { castRender(); castPoll(); return; }
+        if (r[2]) castUi.data.scenes = r[2].scenes || [];
+        if (castRunning()) { if (!castTyping()) castRender(); castPoll(); return; }
         castUi.timer = null;
         if (wasRunning) {
+          var spFail = (castUi.data.scenes || []).filter(function(s) { return (s.performance && s.performance.status === 'failed') || (s.actor_clip && s.actor_clip.status === 'failed'); })[0];
           var failed = (castUi.data.recast && castUi.data.recast.status === 'failed') || (castUi.data.gen && castUi.data.gen.status === 'failed');
           if (failed) castSay('It failed: ' + ((castUi.data.gen && castUi.data.gen.error) || (castUi.data.recast && castUi.data.recast.error) || ''), 'err');
+          else if (spFail && castUi.mode === 'scenes') castSay('Scene ' + (spFail.scene_index + 1) + ' failed: ' + ((spFail.performance && spFail.performance.error) || (spFail.actor_clip && spFail.actor_clip.error) || ''), 'err');
           else { castSay('Done. Play the film to see it; render when you are ready.', 'ok'); studioStatus('Cast: done.', 'ok'); }
           loadProject(p.project_id);
         }

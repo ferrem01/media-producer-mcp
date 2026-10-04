@@ -6,6 +6,55 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Scenes performed by cast actors; cast scene by scene; actor b-roll
+
+Marc: "I want to make sure we are building the seedance pipeline ... take an
+actor defined with a model sheet, generate a first frame, pass in a script
+and generate a voice file, pass all that into seedance and generate a speaker
+video ... Would also like the recast ... a scene where the actor walks and
+talks to the camera ... and in the next a close up where it is a genjutsu of
+me talking recast as the actor." Then: "Do them all."
+
+**1. A scene performed with no recording** (`core/scene-performance.ts`,
+`core/seedance.ts`). Per scene, on the storyboard scene's `performance`:
+- *Frame*: GPT Image (`editImage`, OpenAI's edits endpoint, the house model
+  with gpt-image-1 as fallback) draws the actor from the portrait and sheet
+  in the shot, cut to the film's shape. Cheap; redrawn and picked.
+- *Voice*: the scene's line in the actor's ElevenLabs voice (`script`), or
+  the scene's recording converted to it (`take`: the delivery kept). MP3 at
+  -14 LUFS, at most 29 s (one Seedance call).
+- *Perform*: Seedance 2.5 on Atlas, reference images (frame, sheet) and
+  reference audio, the shot in the prompt, the frame named as the first
+  frame. `draft` (480p, Atlas's draft id kept) then `final`: the draft's
+  shot at 1080p via draft-complete, or a 1080p render if the shot changed.
+  The prediction id is kept so a restart collects instead of paying again.
+- *Attach*: as that scene's take (`attachTakeToScene`, capture "generated",
+  no studio grade), marked `take.performed_by`, Seedance's own sound kept.
+
+**2. Cast scene by scene.** `storyboard.scenes[i].cast`: an actor id (their
+recast plays), null (the recording), absent (the film's `speaker_cast`).
+`sceneCastOf` / `syncSpeakerClips` read it. `startRecast(..., {scenes})`
+recasts only those scenes' recordings and casts those scenes; a recast
+never redraws a `performed_by` take. `setSceneCast`; clearing the whole
+film clears scene casts too.
+
+**3. Studio**: the Cast panel's third tab, *Scene by scene*: per scene, My
+recording / Recast as <actor> (the vendor picked above; Higgsfield first) /
+<actor> performs it (shot box, voice source, Draw frame, frame picker, Make
+draft, Make final, Seedance status) and b-roll of the actor.
+
+**4. Actor b-roll** (`startActorClip`): a frame for the shot, a silent 720p
+Seedance shot, laid over the scene as a video component from `at` for its
+length (one per scene, a new one replaces it).
+
+MCP: `cast` actions `scenes`, `start_frame`, `pick_frame`, `perform_scene`,
+`scene_cast`, `actor_clip`; `recast`/`clear` take `scenes`. HTTP:
+`/api/scene-performance/{t}/{p}[/{scene}]`; `/api/recast` takes `scenes`.
+
+Also: `saveProject` is now atomic (temp file, then rename). The new suite's
+polls read a half-written project.json as "Project not found"; Studio's
+polls during any long job could too.
+
 ## 2026-10-04 — Cast members from a model sheet; Genjutsu reads the sheet
 
 Marc's verdict on the one-to-one test: Kling tracks his expressions "pretty
