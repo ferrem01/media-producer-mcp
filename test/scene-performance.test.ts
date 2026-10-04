@@ -606,6 +606,16 @@ describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
     expect(cp.resolvePlan(bare, 0, actors, false).how).toBe("generate");
     expect(cp.planLine(cp.resolvePlan(bare, 1, actors, true))).toBe("Me · Record");
 
+    // No plan anywhere (a film made before plans): read off what each scene plays.
+    const legacy: any = { speaker_cast: null, storyboard: { scenes: [
+      { performance: { actor: "dana", draft: { url: "x" }, room_url: "/r.jpg" } }, { cast: "dana" }, {},
+    ] } };
+    expect(cp.resolvePlan(legacy, 0, actors)).toMatchObject({ actor: "dana", how: "generate", engine: "seedance", inferred: true });
+    expect(cp.planState(legacy, 0, cp.resolvePlan(legacy, 0, actors), { performed_by: { actor: "dana", engine: "seedance" } }, true).state).toBe("ready");
+    expect(cp.resolvePlan(legacy, 1, actors, true)).toMatchObject({ actor: "dana", how: "recast", inferred: true });
+    expect(cp.resolvePlan(legacy, 2, actors, true)).toMatchObject({ actor: null, how: "record" });
+    expect(cp.resolvePlan(legacy, 2, actors, true).inferred).toBeUndefined();
+
     // State.
     const gen = cp.resolvePlan(proj, 0, actors);
     const sc = proj.storyboard.scenes[0];
