@@ -1838,7 +1838,7 @@ export function createMcpServer(): McpServer {
     {
       tenant_id: z.string(),
       action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "voices", "recast", "generate", "status", "clear", "scenes", "start_frame", "continue_from", "pick_frame", "perform_scene", "revoice", "scene_cast", "actor_clip"]),
-      voice_track: z.enum(["converted", "seedance"]).optional().describe("perform_scene / revoice: the sound -- 'converted' (default) lays the exact voice file over the video, lined up, so every scene is the same voice; 'seedance' keeps the model's own read (it drifts between scenes)."),
+      voice_track: z.enum(["converted", "seedance"]).optional().describe("perform_scene / revoice: the sound -- 'seedance' (default) keeps the model's own read, the only track the lips were made to; 'converted' lays the exact voice file over the video (it does not hold lip sync: Seedance re-performs the line)."),
       from_scene: z.number().int().min(0).optional().describe("continue_from: the scene whose LAST frame starts this one (0-based; default the scene before) -- the two scenes link without a jump."),
       scene_index: z.number().int().min(0).optional().describe("start_frame / pick_frame / perform_scene / scene_cast / actor_clip: the scene (0-based)."),
       scenes: z.array(z.number().int().min(0)).optional().describe("recast / clear: only these scenes (0-based); the rest of the film stays as it is."),

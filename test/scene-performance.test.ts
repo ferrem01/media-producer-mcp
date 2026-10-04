@@ -293,7 +293,7 @@ describe("one voice in every scene: the exact file laid over the video", () => {
     const sp = await import("../src/core/scene-performance.js");
     const attached: any[] = [];
     sp.registerSceneAttacher(async (tenant, proj, url, si, extra) => { attached.push({ url, si, extra }); return { status: 200, body: {} }; });
-    let perf = await sp.revoiceScene(T, P, 2);
+    let perf = await sp.revoiceScene(T, P, 2, { voice_track: "converted" });
     expect(attached[0]).toMatchObject({ si: 2, extra: { performed_by: { actor: "dana", quality: "draft" } } });
     expect(attached[0].url).toMatch(/take-performed-dana-s3-draft-voiced-.*\.mp4$/);
     expect(perf.voice_url).toMatch(/voice-dana-s3-.*\.mp3$/);
@@ -304,6 +304,25 @@ describe("one voice in every scene: the exact file laid over the video", () => {
     expect(attached[1].url).toBe(src);
     expect(perf.voice_track).toBe("seedance");
     await expect(sp.revoiceScene(T, P, 1)).rejects.toThrow(/not performed/);
+  }, 60000);
+});
+
+describe("the actor's pitch, however the line was spoken", () => {
+  it("measures a voice's pitch and shifts a low read up to the actor's, keeping its length", async () => {
+    const d = path.join(DATA, "_pitch"); await fs.mkdir(d, { recursive: true });
+    const low = path.join(d, "low.wav");
+    // A low read: a 160 Hz voice-like tone with harmonics.
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc='0.5*sin(2*PI*160*t)+0.25*sin(2*PI*320*t)+0.12*sin(2*PI*480*t)':s=44100:d=3", low]);
+    const sp = await import("../src/core/scene-performance.js");
+    expect(Math.abs((await sp.voicePitch(low, d)) - 160)).toBeLessThan(6);
+    const m = await sp.matchVoicePitch(low, 198, path.join(d, "fixed.wav"), d);
+    expect(m!.shifted).toBe(true);
+    expect(Math.abs((await sp.voicePitch(m!.file, d)) - 198)).toBeLessThan(8);
+    const info = await run("ffmpeg", ["-hide_banner", "-i", m!.file]).then(() => "", (e: any) => String(e.stderr));
+    expect(info).toMatch(/Duration: 00:00:0(2\.9|3\.0)/);    // the timing is the delivery's: unchanged
+    // Already the actor's pitch: left alone.
+    const same = await sp.matchVoicePitch(low, 163, path.join(d, "same.wav"), d);
+    expect(same).toMatchObject({ shifted: false, file: low });
   }, 60000);
 });
 

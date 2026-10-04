@@ -83,6 +83,20 @@ conversion differs, so a "take" draft could never be finished, and the laid
 file would drift off the lips). `revoiceScene` (MCP `revoice`, Studio's
 Sound select) changes the sound of a made scene without making it again.
 
+**Correction, same day.** Laid over the videos, the exact files were
+"totally off from the lips" (Marc): Seedance re-performs the line, it does
+not keep the reference's timing word for word, so no single shift lines a
+file up. And the revoice showed the drift was never Seedance's: scene 3's
+converted file itself sat at 160 Hz (Marc spoke the line lower;
+speech-to-speech keeps the speaker's pitch), and Seedance copied it
+faithfully. So: Seedance's own read is the default sound again
+(`voice_track: "seedance"`; "converted" stays, labelled as drifting), and the
+converted delivery is PITCH-MATCHED before Seedance hears it: the actor's
+natural pitch measured once from a sample read in its voice
+(`actor.voice_pitch`), the conversion shifted to it when more than 3% off
+(asetrate + atempo: pitch moved, timing kept), `performance.voice_pitch`
+recording measured, target and whether it moved.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

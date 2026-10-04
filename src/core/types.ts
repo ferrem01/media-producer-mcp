@@ -589,11 +589,15 @@ export interface ScenePerformance {
      *  scene picks up exactly where that one ended. */
     from_scene?: number }>;
   frame?: string;
-  /** The sound: "converted" (default) lays the exact voice file over the
-   *  video, lined up to Seedance's own read -- every scene the same voice;
-   *  "seedance" keeps the model's re-rendered voice, which drifts from scene
-   *  to scene (Oct 4: 200, 186, then 160 Hz on three couch scenes). */
+  /** The sound: "seedance" (default) keeps the model's own read -- the only
+   *  track the lips were made to; "converted" lays the exact voice file over
+   *  the video, which Marc measured "totally off from the lips" (Oct 4:
+   *  Seedance re-performs the line, it does not keep the file's timing). */
   voice_track?: "converted" | "seedance";
+  /** The converted voice's pitch as made and the actor's it was shifted to
+   *  (Hz): a line spoken low no longer comes out low (Oct 4: scene 3 at 160
+   *  Hz against 186-200). */
+  voice_pitch?: { measured: number; target: number; shifted: boolean };
   /** The voice file the scene was performed to (a project asset), and how
    *  far it was shifted to line up with the video (s). */
   voice_url?: string;

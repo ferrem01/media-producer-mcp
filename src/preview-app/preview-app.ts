@@ -12103,12 +12103,13 @@ ${QUOTIENT_CSS}
       + '</div>';
     // The sound of a performed scene: the exact voice file, or the model's read.
     if (mine && (perf.draft || perf.final) && !run) {
-      var vt = perf.voice_track || 'converted';
+      var vt = perf.voice_track || 'seedance';
       h += '<div class="np-row"><div class="np-what">Sound: <select id="sp-vtrack-' + i + '">'
-        + '<option value="converted"' + (vt === 'converted' ? ' selected' : '') + '>The exact voice file (same voice every scene)</option>'
-        + '<option value="seedance"' + (vt === 'seedance' ? ' selected' : '') + '>Seedance&#8217;s own read</option></select>'
+        + '<option value="seedance"' + (vt === 'seedance' ? ' selected' : '') + '>Seedance&#8217;s own read (in sync with the lips)</option>'
+        + '<option value="converted"' + (vt === 'converted' ? ' selected' : '') + '>The exact voice file (may drift off the lips)</option></select>'
         + (perf.voice_url ? ' <a href="' + escAttr(withToken(perf.voice_url)) + '" target="_blank">hear the voice file</a>' : '')
-        + (perf.voice_offset ? '<small>lined up ' + Math.round(perf.voice_offset * 1000) + ' ms</small>' : '') + '</div></div>';
+        + (perf.voice_offset ? '<small>lined up ' + Math.round(perf.voice_offset * 1000) + ' ms</small>' : '')
+        + (perf.voice_pitch ? '<small>voice pitch ' + perf.voice_pitch.measured + ' Hz' + (perf.voice_pitch.shifted ? ', matched to ' + escHtml(a ? a.name : 'the actor') + '&#8217;s ' + perf.voice_pitch.target + ' Hz' : ' (already ' + escHtml(a ? a.name : 'the actor') + '&#8217;s)') + '</small>' : '') + '</div></div>';
     }
     if (run && mine) h += '<div class="np-armed"><span></span>' + escHtml(SP_STAGE[perf.stage] || 'starting') + (s.vendor ? ' &#183; Seedance ' + escHtml(rcVendorWord(s.vendor)) : '') + '</div>';
     else if (mine && perf.status === 'failed') h += '<div class="np-note">It failed: ' + escHtml(perf.error || '') + '</div>';

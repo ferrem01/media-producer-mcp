@@ -47,6 +47,10 @@ export interface CastActor {
    *  person from several angles. The portrait is the start frame drawn from
    *  it. Genjutsu gets both (a second reference image). */
   sheet?: string;
+  /** The actor's voice's natural pitch (median, Hz), measured once from a
+   *  sample read in it: a converted delivery is shifted to it, so a line
+   *  spoken low still comes out as the actor (core/scene-performance.ts). */
+  voice_pitch?: { voice_id: string; hz: number };
   created_at: string;
 }
 
@@ -172,10 +176,20 @@ export async function updateActor(tenant: string, id: string, opts: { name?: str
   if (opts.voice_id != null) {
     if (opts.voice_id) { actor.voice_id = String(opts.voice_id); actor.voice_name = String(opts.voice_name || opts.voice_id); }
     else { delete actor.voice_id; delete actor.voice_name; }
+    if (actor.voice_pitch && actor.voice_pitch.voice_id !== actor.voice_id) delete actor.voice_pitch;
   }
   if (opts.sheet) actor.sheet = await saveSheet(tenant, id, opts.sheet);
   await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast, null, 2));
   return actor;
+}
+
+/** Remember an actor's measured voice pitch. */
+export async function setActorVoicePitch(tenant: string, id: string, pitch: { voice_id: string; hz: number }): Promise<void> {
+  const cast = await listCast(tenant);
+  const actor = cast.find((a) => a.id === id);
+  if (!actor) return;
+  actor.voice_pitch = pitch;
+  await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast, null, 2));
 }
 
 /** Remove an actor from the cast (and its portrait). Recasts already made

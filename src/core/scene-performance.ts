@@ -26,7 +26,7 @@ import { config } from "../config.js";
 import { loadProject, saveProject } from "../persistence/project.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
-import { getActor, portraitPath, type CastActor } from "./cast.js";
+import { getActor, portraitPath, setActorVoicePitch, type CastActor } from "./cast.js";
 import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
 import { elevenSpeech, scriptWithBreaks, spokenParts } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
@@ -304,8 +304,62 @@ export async function layVoice(videoAbs: string, voiceAbs: string, outAbs: strin
   return lag;
 }
 
+/** The median pitch of a voice (Hz): 40 ms frames, autocorrelation within
+ *  70-400 Hz, voiced frames only. 0 when nothing voiced was found. */
+export async function voicePitch(file: string, work: string): Promise<number> {
+  const pcm = path.join(work, `pitch-${crypto.randomBytes(3).toString("hex")}.raw`);
+  await ffmpeg(["-i", file, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", pcm]);
+  const buf = await fs.readFile(pcm);
+  await fs.rm(pcm, { force: true }).catch(() => {});
+  const n = Math.floor(buf.length / 2), x = new Float32Array(n);
+  for (let i = 0; i < n; i++) x[i] = buf.readInt16LE(i * 2) / 32768;
+  const sr = 16000, w = 640, hop = 160, lo = Math.floor(sr / 400), hi = Math.floor(sr / 70);
+  const win = Float32Array.from({ length: w }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (w - 1)));
+  const f0: number[] = [];
+  const fr = new Float32Array(w);
+  for (let s = 0; s + w <= n; s += hop) {
+    let e = 0;
+    for (let i = 0; i < w; i++) { fr[i] = x[s + i] * win[i]; e += fr[i] * fr[i]; }
+    if (Math.sqrt(e / w) < 0.02) continue;
+    let best = 0, bk = 0;
+    for (let k = lo; k < hi; k++) { let c = 0; for (let i = 0; i + k < w; i++) c += fr[i] * fr[i + k]; if (c > best) { best = c; bk = k; } }
+    if (bk && best / e > 0.45) f0.push(sr / bk);
+  }
+  if (!f0.length) return 0;
+  f0.sort((a, b) => a - b);
+  return f0[Math.floor(f0.length / 2)];
+}
+
+/** The actor's voice's natural pitch: measured once from a sample read in
+ *  it, kept on the actor. */
+async function actorPitch(tenant: string, actor: CastActor, work: string): Promise<number> {
+  if (actor.voice_pitch && actor.voice_pitch.voice_id === actor.voice_id && actor.voice_pitch.hz > 0) return actor.voice_pitch.hz;
+  const sample = path.join(work, "actor-sample.mp3");
+  await elevenSpeech("Hi, I'm glad you're here. Let me walk you through how it works, step by step, and why it matters for your team.", actor.voice_id!, sample);
+  const hz = await voicePitch(sample, work);
+  if (hz > 0) await setActorVoicePitch(tenant, actor.id, { voice_id: actor.voice_id!, hz: Math.round(hz) });
+  return hz;
+}
+
+/** Shift a voice's pitch by a ratio without changing its timing. */
+async function shiftPitch(input: string, out: string, ratio: number): Promise<void> {
+  const sr = 44100;
+  await ffmpeg(["-i", input, "-af", `aresample=${sr},asetrate=${Math.round(sr * ratio)},aresample=${sr},atempo=${(1 / ratio).toFixed(5)}`, "-ac", "1", "-c:a", "pcm_s16le", out]);
+}
+
+/** A voice shifted to a target pitch (more than 3% off, within reason),
+ *  timing untouched. null when either pitch is unknown. */
+export async function matchVoicePitch(input: string, target: number, out: string, work: string): Promise<{ file: string; measured: number; shifted: boolean } | null> {
+  const measured = await voicePitch(input, work);
+  if (!(measured > 0) || !(target > 0)) return null;
+  const ratio = target / measured;
+  const shifted = Math.abs(ratio - 1) > 0.03 && ratio > 0.6 && ratio < 1.7;
+  if (shifted) await shiftPitch(input, out, ratio);
+  return { file: shifted ? out : input, measured: Math.round(measured), shifted };
+}
+
 /** The scene's voice as an MP3 at -14 LUFS (what the proven run sent). */
-async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number }> {
+async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number; pitch?: { measured: number; target: number; shifted: boolean } }> {
   if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
   if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice (cast update_actor voice_id)`);
   const w = (n: string) => path.join(workDir, n);
@@ -330,11 +384,21 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
       "-vn", "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("take.wav")]);
     await convertVoice(w("take.wav"), said, actor.voice_id);
   }
+  // A converted delivery keeps the speaker's pitch: a line spoken low comes
+  // out low (Oct 4: scene 3 at 160 Hz against 186-200), and Seedance copies
+  // it faithfully. Shift it to the actor's own pitch, timing untouched.
+  let pitch: { measured: number; target: number; shifted: boolean } | undefined;
+  let src = said;
+  if (source === "take") {
+    const target = await actorPitch(tenant, actor, workDir).catch(() => 0);
+    const m = await matchVoicePitch(said, target, w("said-pitched.wav"), workDir);
+    if (m) { src = m.file; pitch = { measured: m.measured, target: Math.round(target), shifted: m.shifted }; }
+  }
   const file = w("voice.mp3");
-  await ffmpeg(["-i", said, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);
+  await ffmpeg(["-i", src, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);
   const seconds = (await durationOf(file)) || 0;
   if (seconds > MAX_VOICE_SECONDS) throw new Error(`Scene ${si + 1}'s line runs ${seconds.toFixed(1)} s; one Seedance shot holds ${MAX_VOICE_SECONDS} s -- split the scene`);
-  return { file, seconds };
+  return { file, seconds, pitch };
 }
 
 /** Perform a scene: frame (drawn if none), voice, Seedance, attach. A draft
@@ -436,15 +500,15 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
 
   vendorNow.delete(vkey);
   await stage("attach");
-  const raw = `seedance-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
+  const raw = `take-performed-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
   await download(result.url, path.join(assetsDir(tenant, projectId), raw));
   const seedanceUrl = assetUrl(tenant, projectId, raw);
   // The sound: the exact voice file lined up to the video (default), or
   // the model's own read.
   let url = seedanceUrl, offset: number | undefined;
-  if ((perf.voice_track || "converted") === "converted") {
-    const name = `take-performed-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
+  if (perf.voice_track === "converted") {
+    const name = `take-performed-${actor.id}-s${si + 1}-${quality}-voiced-${stamp()}.mp4`;
     offset = await layVoice(path.join(assetsDir(tenant, projectId), raw), resolveVideoPath(voiceUrl, config.dataDir), path.join(assetsDir(tenant, projectId), name), workDir);
     url = assetUrl(tenant, projectId, name);
   }
@@ -458,6 +522,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     if (quality === "draft") p.draft = { url, ...(result.draftId ? { draft_id: result.draftId } : {}), inputs, made_at: now };
     else p.final = { url, made_at: now };
     p.voice_url = voiceUrl; p.seedance_url = seedanceUrl;
+    if ("pitch" in voice && voice.pitch) p.voice_pitch = voice.pitch;
     if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
@@ -478,7 +543,7 @@ export async function revoiceScene(tenant: string, projectId: string, si: number
   const clip = ((project as any).speaker_track?.clips || []).find((c: any) => c.scene_index === si);
   const take: any = clip ? takeForClip(project as any, clip) : null;
   if (!perf || !take?.performed_by) throw new Error(`Scene ${si + 1} is not performed by a cast actor`);
-  const track = opts.voice_track || "converted";
+  const track = opts.voice_track || "seedance";
   const seedanceUrl = perf.seedance_url || take.source;
   const workDir = path.join(projectDir(tenant, projectId), "_work", `perform-s${si + 1}`);
   running.add(key);
