@@ -20,6 +20,12 @@ preview), ratio, generate_audio. The prompt is prefixed with "@Image1 is the
 first frame ... @Video1 ... @Audio1". Key: `ATLASCLOUD_API_KEY` in
 `/etc/media-producer/env`. `hf_urls` works for both providers.
 
+The Atlas run with those exact inputs played Marc's own voice under hers:
+the reference video still carried his audio, and Atlas passes a video's
+soundtrack to the model (Higgsfield's app evidently mutes it; its output
+pitch was 188 Hz against his 113). `hf_urls.mute_video` makes a silent copy
+of the URL'd video on the server and sends that.
+
 ## 2026-10-04 — hf-seedance25: one voice, headroom, the app run's fields
 
 The first API run lost lip sync partway. Marc's app run (job 040426e3)

@@ -771,7 +771,7 @@ export async function convertVoice(wav: string, out: string, voiceId: string): P
   await fs.writeFile(out, Buffer.from(await r.arrayBuffer()));
 }
 
-type HfUrls = { video_url: string; audio_url?: string; image_urls: string[]; duration?: number };
+type HfUrls = { video_url: string; audio_url?: string; image_urls: string[]; duration?: number; mute_video?: boolean };
 
 export async function startActorTest(opts: {
   tenant: string;
@@ -812,7 +812,7 @@ export async function startActorTest(opts: {
   max_seconds?: number;
   /** hf-seedance25: send these public URLs exactly as given, nothing made
    *  on our side (an A/B against a Higgsfield app run's own inputs). */
-  hf_urls?: { video_url: string; audio_url?: string; image_urls: string[]; duration?: number };
+  hf_urls?: { video_url: string; audio_url?: string; image_urls: string[]; duration?: number; mute_video?: boolean };
   /** heygen-v3: "low" | "medium" | "high" (Avatar IV). */
   expressiveness?: string;
   /** heygen-v3: "avatar_iv" | "avatar_v" | "avatar_iii" (HeyGen's default when omitted). */
@@ -897,7 +897,7 @@ export async function startActorTest(opts: {
   if (opts.hf_urls) {
     const u = opts.hf_urls, isUrl = (x: unknown) => typeof x === "string" && /^https:\/\/[^\s]+$/.test(x);
     if (!isUrl(u.video_url) || (u.audio_url != null && !isUrl(u.audio_url)) || !Array.isArray(u.image_urls) || !u.image_urls.length || u.image_urls.length > 30 || !u.image_urls.every(isUrl)) throw new Error("hf_urls: video_url, image_urls (1-30) and audio_url must be https URLs");
-    hfUrls = { video_url: u.video_url, audio_url: u.audio_url, image_urls: u.image_urls, duration: Number(u.duration) > 0 ? Math.max(4, Math.min(30, Math.round(Number(u.duration)))) : undefined };
+    hfUrls = { video_url: u.video_url, audio_url: u.audio_url, image_urls: u.image_urls, duration: Number(u.duration) > 0 ? Math.max(4, Math.min(30, Math.round(Number(u.duration)))) : undefined, mute_video: u.mute_video === true };
   }
   void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs, resolution: opts.resolution, hfUrls })
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
@@ -1015,7 +1015,20 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (heygenOpts.hfUrls) {
         // Exactly the given inputs (Marc's app run): the A/B is the route.
         const u = heygenOpts.hfUrls;
-        url = await seedance(u.video_url, u.image_urls, { audio: u.audio_url, duration: u.duration, onSubmit });
+        let video = u.video_url;
+        if (u.mute_video) {
+          // A silent copy: Atlas hands a reference video's soundtrack to the
+          // model, so the take's own voice played under hers (measured Oct 4;
+          // Higgsfield's app mutes it).
+          const r = await fetch(u.video_url);
+          if (!r.ok) throw new Error(`mute_video: fetch ${r.status}`);
+          await fs.writeFile(f("ref-in.mp4"), Buffer.from(await r.arrayBuffer()));
+          await ffmpeg(["-i", f("ref-in.mp4"), "-an", "-c:v", "copy", "-movflags", "+faststart", f("motion.mp4")]);
+          await fs.rm(f("ref-in.mp4"), { force: true });
+          test.files.motion = "motion.mp4";
+          video = `${pub}/motion.mp4`;
+        }
+        url = await seedance(video, u.image_urls, { audio: u.audio_url, duration: u.duration, onSubmit });
       } else {
         // The reference at full detail (a model sheet's face close-up is a
         // third of a wide image; actor.jpg is capped at 1024 wide).
