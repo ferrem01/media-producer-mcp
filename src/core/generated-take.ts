@@ -133,10 +133,10 @@ async function heygenSpeech(text: string, voiceId: string, out: string, ssml = f
   await download(j.data.audio_url, out);
 }
 
-export async function elevenSpeech(text: string, voiceId: string, out: string): Promise<void> {
+export async function elevenSpeech(text: string, voiceId: string, out: string, model = "eleven_multilingual_v2"): Promise<void> {
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
     method: "POST", headers: { "xi-api-key": String(process.env.ELEVENLABS_API_KEY), "Content-Type": "application/json" },
-    body: JSON.stringify({ text, model_id: "eleven_multilingual_v2" }),
+    body: JSON.stringify({ text, model_id: model }),
   });
   if (!r.ok) throw new Error(`elevenlabs speech: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   await fs.writeFile(out, Buffer.from(await r.arrayBuffer()));

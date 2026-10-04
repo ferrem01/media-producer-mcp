@@ -12072,6 +12072,17 @@ ${QUOTIENT_CSS}
       + '<textarea id="sp-shot-' + i + '" rows="2" maxlength="1000" style="' + ta + '" placeholder="A selfie-style medium close-up in a bright modern office, talking straight to the camera">' + escHtml(shot) + '</textarea>';
     h += '<label class="np-row"><div class="np-what"><input type="radio" name="sp-voice-' + i + '" value="script"' + (voice === 'script' ? ' checked' : '') + '> Read the script in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice</div></label>'
       + '<label class="np-row' + (s.has_recording ? '' : ' dis') + '"><div class="np-what"><input type="radio" name="sp-voice-' + i + '" value="take"' + (voice === 'take' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> Convert my recording of this scene<small>Your delivery and timing, in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice' + (s.has_recording ? '' : ' &#8212; record the scene first') + '</small></div></label>';
+    // How the line is said (script voice: ElevenLabs v4 reads tags, '...'
+    // pauses, CAPITALS, /IPA/), and the voice heard alone before Seedance.
+    castUi.spDel = castUi.spDel || {}; castUi.spHear = castUi.spHear || {};
+    if (voice === 'script') {
+      var del = castUi.spDel[i] != null ? castUi.spDel[i] : (mine && perf.delivery) || String(s.lines || '').replace(/\\(pause\\)/gi, '...').replace(/\\*/g, '');
+      h += '<div class="np-hint">Delivery: how ' + escHtml(a ? a.name : 'the actor') + ' says it. Tags like [excited] [whispers] [sighs] [laughs], ... or a dash for a pause, CAPITALS for emphasis, /IPA/ for a pronunciation.</div>'
+        + '<textarea id="sp-del-' + i + '" rows="3" maxlength="4000" style="' + ta + '">' + escHtml(del) + '</textarea>';
+    }
+    var heard = castUi.spHear[i];
+    h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><button class="np-btn" data-sp-hear="' + i + '"' + (run || !a ? ' disabled' : '') + '>Hear the voice</button>'
+      + (heard ? '<audio controls src="' + escAttr(withToken(heard.url)) + '" style="height:32px"></audio><small>' + heard.seconds + ' s' + (heard.hz ? ' &#183; ' + heard.hz + ' Hz' : '') + '</small>' : '<small>just the voice, no video: cents, a few seconds</small>') + '</div>';
     // The prompts in full, prefilled with what the scene uses (its own, else
     // the default built from the shot). Cleared: back to the default.
     castUi.spFP = castUi.spFP || {}; castUi.spVP = castUi.spVP || {}; castUi.spPrompts = castUi.spPrompts || {};
@@ -12248,13 +12259,23 @@ ${QUOTIENT_CSS}
     if ((v = el('data-sp-frame')) !== null) { spPost(v, { action: 'frame', actor: spActor, shot: spShot(v) || undefined, frame_prompt: spPrompt('f', v) }, 'Drawing the start frame…'); return; }
     if ((v = el('data-sp-cont')) !== null) { spPost(v, { action: 'continue', actor: spActor, from_scene: Number(v) - 1, shot: spShot(v) || undefined }, 'Taking scene ' + v + '’s last frame…'); return; }
     if ((v = el('data-sp-pick')) !== null) { var pk = v.split('|'); spPost(pk[0], { action: 'pick', url: pk.slice(1).join('|') }, 'Using that frame.'); return; }
+    if ((v = el('data-sp-hear')) !== null) {
+      var delBox = document.getElementById('sp-del-' + v);
+      castSay('Making the voice…');
+      var hv = v;
+      api('POST', '/scene-performance/' + castT() + '/' + castP() + '/' + hv, { action: 'voice', actor: spActor, voice_source: (castUi.spVoice || {})[hv] || undefined, delivery: delBox ? delBox.value : undefined })
+        .then(function(r) { castUi.spHear = castUi.spHear || {}; castUi.spHear[hv] = r; castSay(''); return castScenesRefresh(); })
+        .catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
     if ((v = el('data-sp-force')) !== null) {
       spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v), force: true }, 'Making the draft anyway…');
       return;
     }
     if ((v = el('data-sp-draft')) !== null || (v = el('data-sp-final')) !== null) {
       var fin = el('data-sp-final') !== null;
-      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v) },
+      var dBox = document.getElementById('sp-del-' + v);
+      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v), delivery: dBox ? dBox.value : undefined },
         fin ? 'Making the 1080p final…' : 'Making the draft (a few minutes)…');
       return;
     }
@@ -12295,6 +12316,7 @@ ${QUOTIENT_CSS}
     castUi.spShot = castUi.spShot || {}; castUi.spClip = castUi.spClip || {};
     if ((m = /^sp-shot-(\\d+)$/.exec(t.id || ''))) castUi.spShot[m[1]] = t.value;
     if ((m = /^sp-clip-(\\d+)$/.exec(t.id || ''))) castUi.spClip[m[1]] = t.value;
+    if ((m = /^sp-del-(\\d+)$/.exec(t.id || ''))) { castUi.spDel = castUi.spDel || {}; castUi.spDel[m[1]] = t.value; }
     if ((m = /^sp-fprompt-(\\d+)$/.exec(t.id || ''))) { castUi.spFP = castUi.spFP || {}; castUi.spFP[m[1]] = t.value; }
     if ((m = /^sp-vprompt-(\\d+)$/.exec(t.id || ''))) { castUi.spVP = castUi.spVP || {}; castUi.spVP[m[1]] = t.value; }
   }

@@ -28,7 +28,7 @@ import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
 import { getActor, portraitPath, type CastActor } from "./cast.js";
 import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
-import { elevenSpeech, scriptWithBreaks, spokenParts } from "./generated-take.js";
+import { elevenSpeech, spokenParts } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, cutClock, cutFileFor } from "./take-clock.js";
 import { editImage } from "../media/image-gen.js";
@@ -360,6 +360,21 @@ async function filmVoicePitch(tenant: string, projectId: string, actorId: string
  *  stops for a look (scene 3 at 160 Hz against 186-200 was 17% off). */
 const PITCH_TOLERANCE = 0.1;
 
+/** The voice that reads a scene's script: ElevenLabs v4, which follows
+ *  delivery tags ([excited], [whispers]...), "..." pauses, CAPITALS and
+ *  /IPA/ (Marc, Oct 4: control "the pauses ... the inflection ... the
+ *  emphasis ... the pronunciation"). MP_TTS_MODEL overrides it. */
+export const SCRIPT_VOICE_MODEL = process.env.MP_TTS_MODEL || "eleven_v4";
+
+/** What the script voice reads: the scene's delivery when written, else
+ *  its line -- "(pause)" lines become a pause v4 reads ("..."), emphasis
+ *  asterisks go. v4 takes no <break> tags. */
+export function deliveryText(line: string, delivery?: string): string {
+  const d = String(delivery || "").trim();
+  if (d) return d;
+  return spokenParts(line).map((p) => p.join(" ")).join(" ... ");
+}
+
 /** The scene's voice as an MP3 at -14 LUFS (what the proven run sent). */
 async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number }> {
   if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
@@ -368,9 +383,9 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
   const said = w("said.mp3");
   if (source === "script") {
     const { scene } = await loadScene(tenant, projectId, si);
-    const text = String(scene.voiceover_text || "");
-    if (!spokenParts(text).length) throw new Error(`Scene ${si + 1} has no lines to read`);
-    await elevenSpeech(scriptWithBreaks([text], false), actor.voice_id, said);
+    const text = deliveryText(String(scene.voiceover_text || ""), scene.performance?.delivery);
+    if (!text) throw new Error(`Scene ${si + 1} has no lines to read`);
+    await elevenSpeech(text, actor.voice_id, said, SCRIPT_VOICE_MODEL);
   } else {
     const project = await loadProject(tenant, projectId);
     const take = sceneRecording(project, si);
@@ -404,6 +419,8 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   voice_track?: "converted" | "seedance";
   /** Make it even when the pitch check would stop it. */
   force?: boolean;
+  /** The delivery the script voice reads ("" back to the plain line). */
+  delivery?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -428,6 +445,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
     if (opts.voice_track) p.voice_track = opts.voice_track;
+    if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
   const release = () => { running.delete(key); vendorNow.delete(key); };
@@ -610,6 +628,32 @@ export async function restoreSceneTake(tenant: string, projectId: string, si: nu
       p.seedance_url = opts.url; delete p.voice_url; delete p.voice_offset; p.voice_track = "seedance";
     });
   } finally { running.delete(key); }
+}
+
+/** HEAR THE VOICE before Seedance: the scene's voice made on its own
+ *  (cents, seconds) -- the delivery read by the script voice, or the
+ *  recording converted -- kept as an asset, with its pitch. `delivery`
+ *  given is kept on the scene. */
+export async function previewSceneVoice(tenant: string, projectId: string, si: number, opts: { actor?: string; voice_source?: "script" | "take"; delivery?: string }): Promise<{ url: string; seconds: number; hz: number; delivery?: string }> {
+  const { scene } = await loadScene(tenant, projectId, si);
+  const prev: ScenePerformance | undefined = scene.performance;
+  const actor = await needActor(tenant, opts.actor || prev?.actor);
+  const source = opts.voice_source || prev?.voice_source || "script";
+  if (opts.delivery !== undefined || !prev?.actor) {
+    await patch(tenant, projectId, si, (p) => {
+      if (!p.actor) p.actor = actor.id;
+      if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
+    });
+  }
+  const workDir = path.join(projectDir(tenant, projectId), "_work", `voice-preview-s${si + 1}`);
+  await fs.mkdir(workDir, { recursive: true });
+  const voice = await sceneVoice(tenant, projectId, si, actor, source, workDir);
+  const name = `voice-preview-${actor.id}-s${si + 1}-${stamp()}.mp3`;
+  await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
+  await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), name));
+  const hz = await voicePitch(voice.file, workDir).catch(() => 0);
+  const after = (await loadScene(tenant, projectId, si)).scene.performance;
+  return { url: assetUrl(tenant, projectId, name), seconds: Math.round(voice.seconds * 100) / 100, hz, ...(after?.delivery ? { delivery: after.delivery } : {}) };
 }
 
 /** Every scene's performer at a glance: who plays it, and any performance. */

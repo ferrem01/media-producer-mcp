@@ -74,6 +74,8 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     // The pitch check stopped a scene: say why, and offer to make it anyway.
     expect(src).toContain("data-sp-force=");
     expect(src).toContain("force: true }, 'Making the draft anyway…')");
+    // Delivery, and the voice heard alone before Seedance.
+    expect(src).toContain("{ action: 'voice', actor: spActor, voice_source: (castUi.spVoice || {})[hv] || undefined, delivery: delBox ? delBox.value : undefined }");
     // Regexes inside the page template are written with doubled backslashes.
     expect(src).toContain("/^sp-shot-(\\\\d+)$/");
   });
