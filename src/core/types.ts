@@ -584,7 +584,10 @@ export interface ScenePerformance {
   frame_prompt?: string;
   video_prompt?: string;
   /** Start frames drawn for the shot, newest last; `frame` the one used. */
-  frames?: Array<{ url: string; shot: string; prompt?: string; made_at: string }>;
+  frames?: Array<{ url: string; shot: string; prompt?: string; made_at: string;
+    /** Not drawn: the last frame of this scene's take (0-based), so the
+     *  scene picks up exactly where that one ended. */
+    from_scene?: number }>;
   frame?: string;
   /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */
   draft?: { url: string; draft_id?: string; inputs: string; made_at: string };

@@ -61,6 +61,15 @@ Prompts boxes prefilled with the defaults from the shot; "" back to the
 default). A video prompt that names @Image1 itself is sent as written; a new
 one means the draft is not finished from the old.
 
+Linking scenes (Marc: "review the linking of scenes visually ... first and
+last frame"): Seedance's first+last-frame mode cannot take reference audio,
+so a speaking scene cannot pin its last frame. Instead a scene can START from
+another scene's last frame (`continueSceneFrom`, MCP `continue_from`, Studio
+"Start from scene N's last frame"): the frame it ends on as it plays (its
+clip's file at its trim), cut by ffmpeg in the film's shape -- free and
+instant, whatever plays there. Bridge clips (first+last frame, silent) for a
+change of place were left for when a film needs one: a hard cut works.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

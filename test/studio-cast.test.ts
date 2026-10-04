@@ -67,6 +67,8 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     // Any prompt for any scene: both boxes prefilled, a cleared box goes back to the default.
     expect(src).toContain("frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v)");
     expect(src).toContain("return !t || t === dv.trim() ? '' : t;");
+    // Linking scenes: start from the scene before's last frame.
+    expect(src).toContain("{ action: 'continue', actor: spActor, from_scene: Number(v) - 1, shot: spShot(v) || undefined }");
     // Regexes inside the page template are written with doubled backslashes.
     expect(src).toContain("/^sp-shot-(\\\\d+)$/");
   });

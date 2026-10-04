@@ -178,6 +178,46 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   return perf;
 }
 
+/** The frame a scene ENDS on, as it plays (its clip's file, at its trim):
+ *  the next scene's start frame, so the two link without a jump (Marc,
+ *  Oct 4: "linking of scenes visually"). */
+export async function lastFrameOf(tenant: string, projectId: string, si: number, actorId: string, width: number, height: number): Promise<string> {
+  const project = await loadProject(tenant, projectId);
+  const clip = ((project as any)?.speaker_track?.clips || []).find((c: any) => c.scene_index === si);
+  if (!clip?.source) throw new Error(`Scene ${si + 1} has no take to continue from`);
+  const file = resolveVideoPath(clip.source, config.dataDir);
+  const end = clip.trim_end != null ? Number(clip.trim_end) : await durationOf(file);
+  if (!end) throw new Error(`Scene ${si + 1}'s take has no length`);
+  const name = `frame-${actorId}-from-s${si + 1}-${stamp()}.jpg`;
+  await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
+  const ar = `${width}/${height}`;
+  const vertical = height > width;
+  await ffmpeg(["-ss", String(Math.max(0, end - 0.08)), "-i", file, "-frames:v", "1",
+    "-vf", `crop='min(iw,ih*${ar})':'min(ih,iw/(${ar}))',scale=${vertical ? "720:-2" : "-2:720"}:flags=lanczos`, "-q:v", "2", path.join(assetsDir(tenant, projectId), name)]);
+  return assetUrl(tenant, projectId, name);
+}
+
+/** Start a scene from the previous one's last frame (or any scene's):
+ *  the frame is cut from that take, not drawn -- quick and free. */
+export async function continueSceneFrom(tenant: string, projectId: string, si: number, opts: { actor?: string; from_scene: number; shot?: string }): Promise<ScenePerformance> {
+  const { project, scene } = await loadScene(tenant, projectId, si);
+  const prev: ScenePerformance | undefined = scene.performance;
+  const actor = await needActor(tenant, opts.actor || prev?.actor);
+  const from = Number(opts.from_scene);
+  if (!Number.isInteger(from) || from < 0 || from === si) throw new Error("from_scene must be another scene (0-based)");
+  const key = `${tenant}/${projectId}/${si}`;
+  if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
+  const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
+  const url = await lastFrameOf(tenant, projectId, from, actor.id, W, H);
+  return patch(tenant, projectId, si, (p) => {
+    if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
+    p.actor = actor.id;
+    if (opts.shot !== undefined) p.shot = String(opts.shot).trim().slice(0, 1000) || DEFAULT_SHOT;
+    p.frames = [...(p.frames || []), { url, shot: p.shot, from_scene: from, made_at: new Date().toISOString() }].slice(-6);
+    p.frame = url;
+  });
+}
+
 /** Pick which drawn frame the scene uses. */
 export async function pickSceneFrame(tenant: string, projectId: string, si: number, url: string): Promise<ScenePerformance> {
   return patch(tenant, projectId, si, (p) => {

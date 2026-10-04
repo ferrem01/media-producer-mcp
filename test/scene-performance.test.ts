@@ -223,6 +223,28 @@ describe("any prompt for any scene", () => {
   }, 60000);
 });
 
+describe("linking scenes: start from the last frame", () => {
+  it("cuts the frame the previous scene ends on (at its trim, in the film's shape) and makes it this scene's start frame", async () => {
+    const m = await media(path.join(DATA, "_media4"));
+    const pdir = path.join(DATA, T, "projects", P);
+    await fs.writeFile(path.join(pdir, "assets", "s1take.mp4"), m.mp4);
+    const pf = path.join(pdir, "project.json");
+    const disk = JSON.parse(await fs.readFile(pf, "utf8"));
+    const src = `/assets/${T}/projects/${P}/assets/s1take.mp4`;
+    disk.takes = [{ id: "take_0", scene_index: 0, source: src, recorded_at: "", performed_by: { actor: "dana", engine: "seedance", quality: "draft" } }];
+    disk.speaker_track = { clips: [{ source: src, scene_index: 0, start: 0, trim_start: 0, trim_end: 3 }] };
+    await fs.writeFile(pf, JSON.stringify(disk));
+    const sp = await import("../src/core/scene-performance.js");
+    const perf = await sp.continueSceneFrom(T, P, 1, { actor: "dana", from_scene: 0 });
+    expect(perf.frame).toMatch(/frame-dana-from-s1-.*\.jpg$/);
+    expect(perf.frames!.at(-1)).toMatchObject({ from_scene: 0, url: perf.frame });
+    const info = await run("ffmpeg", ["-hide_banner", "-i", path.join(DATA, perf.frame!.replace(/^\/assets\//, ""))]).then(() => "", (e: any) => String(e.stderr));
+    expect(info).toMatch(/720x1280/);                          // 270x480 take, cut and scaled to the 9:16 frame
+    await expect(sp.continueSceneFrom(T, P, 1, { actor: "dana", from_scene: 1 })).rejects.toThrow(/another scene/);
+    await expect(sp.continueSceneFrom(T, P, 0, { actor: "dana", from_scene: 1 })).rejects.toThrow(/no take to continue from/);
+  }, 60000);
+});
+
 describe("the recording back after a performance", () => {
   it("finds the recording under a performance, converts it when asked, and re-attaches it for 'My recording'", async () => {
     const sp = await import("../src/core/scene-performance.js");
