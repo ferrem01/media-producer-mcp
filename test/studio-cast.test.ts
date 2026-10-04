@@ -93,4 +93,19 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     // The raw room reference only shows when the scene has no location.
     expect(html).toContain("if (roomOpts.length && !perf.location) {");
   });
+
+  it("the cast plan: Who -> How -> Engine -> Where for the film and each scene, state badges, perform the plan with the cost first", () => {
+    const html = getPreviewHtml();
+    expect(html).toContain("castFilmPlanHtml() + castPerformAllHtml() + castLocationsHtml(a)");
+    expect(html).toContain("castPlanRow(String(i), s.performer || {}, s.plan || {}, true)");
+    expect(html).toContain("castPlanPost({ action: 'plan', cast_plan: f })");
+    expect(html).toContain("castPlanPost({ action: 'plan', scenes: [{ index: Number(scope), performer: f }] })");
+    expect(html).toContain("if (val === 'me') { f.actor = null; f.how = 'record'; }");
+    // The estimate first; confirm starts it.
+    expect(html).toContain("api('POST', '/scene-performance/' + castT() + '/' + castP(), { action: kind })");
+    expect(html).toContain("api('POST', '/scene-performance/' + castT() + '/' + castP(), { action: gk, confirm: true })");
+    expect(html).toContain("/^pl-(actor|how|engine|location)-(film|\\d+)$/");
+    // The board's plan table: who performs each beat.
+    expect(html).toContain("'<div class=\"pv-who st-' + escAttr(r.performer_state || '')");
+  });
 });

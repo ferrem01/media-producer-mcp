@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Studio: the cast plan as a decision tree (SPEC-cast-scenes.md, phase E)
+
+Cast card, Scene by scene:
+- **The film's plan**: Who (Me / an actor) -> How (Record / Recast my recording
+  / Generate) -> Engine (only the ones that can do that) -> Where (a location,
+  only for Seedance). A change makes nothing; scenes it no longer matches show
+  stale.
+- **Each scene**: the same row, each select leading with "Film's" (follow the
+  film), the plan's one line beside it, and a state badge (ready / to make /
+  stale, the reason on hover).
+- **Perform the plan / Finals at 1080p**: the scene list and the cost first,
+  then "Perform them" / "Make the finals" starts it; what waits (no recording,
+  one recast at a time, a vendor not set up) is said.
+- **The board's plan table** shows who performs each beat under its shot, with
+  the state (GET /api/storyboard/{t}/{p}/plan adds `performer`,
+  `performer_state` on person films with a plan or performances).
+
 ## 2026-10-04 — HeyGen generates a scene (SPEC-cast-scenes.md, phase D)
 
 `startScenePerformance` now dispatches on the engine: `engine: "heygen"` (or a

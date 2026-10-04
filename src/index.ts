@@ -4643,7 +4643,19 @@ Rules:
         const [, tenantId, projectId] = sbPlanMatch.map(decodeURIComponent);
         const project = await loadProject(tenantId, projectId);
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        jsonResponse(res, 200, { rows: planRows(project) });
+        const rows: any[] = planRows(project);
+        // A person film with a cast plan: who performs each beat, and whether
+        // its take answers that (core/cast-plan.ts) -- the board's one line.
+        const pg = (project as any).treatment?.filmGrammar;
+        const sbScenes: any[] = (project as any).storyboard?.scenes || [];
+        if ((pg === "speaker" || pg === "creator-cut") && ((project as any).storyboard?.cast_plan || sbScenes.some((s) => s?.performer || s?.performance))) {
+          const perfRows = await getScenePerformances(tenantId, projectId).catch(() => []);
+          for (const r of rows) {
+            const p: any = perfRows.find((x: any) => x.scene_index === r.index);
+            if (p) Object.assign(r, { performer: p.plan_line, performer_state: p.state, ...(p.why ? { performer_why: p.why } : {}) });
+          }
+        }
+        jsonResponse(res, 200, { rows });
         return;
       }
 
