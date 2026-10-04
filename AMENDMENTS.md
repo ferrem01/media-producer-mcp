@@ -26,6 +26,13 @@ soundtrack to the model (Higgsfield's app evidently mutes it; its output
 pitch was 188 Hz against his 113). `hf_urls.mute_video` makes a silent copy
 of the URL'd video on the server and sends that.
 
+**Correction, same day.** The "your voice under hers" Marc heard was ours.
+`finishTest` laid the converted voice, or with none the source clip's
+audio (a different take: scene 1 of proj_c99e52c3), over every provider's
+result except fal's Seedance, so both 2.5 routes lost the voice they
+lip-synced. They now keep their own audio, like fal's Seedance. The raw
+outputs (`<provider>-raw.mp4`) had the real audio all along.
+
 ## 2026-10-04 — hf-seedance25: one voice, headroom, the app run's fields
 
 The first API run lost lip sync partway. Marc's app run (job 040426e3)

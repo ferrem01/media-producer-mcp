@@ -1107,8 +1107,10 @@ async function finishTest(test: ActorTest, done: ActorProvider[]): Promise<void>
   // the take's own audio. The picture is re-encoded so every file streams.
   const audio = test.files.voice ? f("voice.mp3") : f("source.mp4");
   for (const p of done) {
-    if ((p === "seedance" || p === "seedance-t2v") && (await hasAudio(f(`${p}-raw.mp4`)))) {
+    if ((p === "seedance" || p === "seedance-t2v" || p === "hf-seedance25" || p === "atlas-seedance25") && (await hasAudio(f(`${p}-raw.mp4`)))) {
       // Seedance renders the voice itself, placed where it lip-synced it.
+      // (The 2.5 routes once had theirs replaced by the take's own audio:
+      // Marc heard a different take under her moving lips, Oct 4.)
       await ffmpeg(["-i", f(`${p}-raw.mp4`), "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", f(`${p}.mp4`)]);
       test.files[p] = `${p}.mp4`;
