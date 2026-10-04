@@ -70,6 +70,19 @@ clip's file at its trim), cut by ffmpeg in the film's shape -- free and
 instant, whatever plays there. Bridge clips (first+last frame, silent) for a
 change of place were left for when a film needs one: a hard cut works.
 
+One voice in every scene. Three couch scenes, all from Marc's recording
+converted to Bella, came back at 200, 186 and then 160 Hz -- Marc: "almost
+like a man's voice". Seedance re-renders the voice it is given; it drifts.
+Now the exact voice file is laid over the video (`voice_track:
+"converted"`, the default): the two reads' envelopes cross-correlated within
++-0.6 s, the file shifted to Seedance's timing (the lips), padded to the
+video's length (an explicit length: apad with -shortest hung under a copied
+video). The voice file and the raw Seedance video are kept as assets
+(`voice_url`, `seedance_url`); a final reuses the draft's voice file (a new
+conversion differs, so a "take" draft could never be finished, and the laid
+file would drift off the lips). `revoiceScene` (MCP `revoice`, Studio's
+Sound select) changes the sound of a made scene without making it again.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

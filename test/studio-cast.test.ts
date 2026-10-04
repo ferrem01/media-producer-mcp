@@ -69,6 +69,8 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(src).toContain("return !t || t === dv.trim() ? '' : t;");
     // Linking scenes: start from the scene before's last frame.
     expect(src).toContain("{ action: 'continue', actor: spActor, from_scene: Number(v) - 1, shot: spShot(v) || undefined }");
+    // The sound of a performed scene: the exact voice file, or the model's read.
+    expect(src).toContain("spPost(m[1], { action: 'revoice', voice_track: t.value }");
     // Regexes inside the page template are written with doubled backslashes.
     expect(src).toContain("/^sp-shot-(\\\\d+)$/");
   });

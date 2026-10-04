@@ -140,6 +140,7 @@ describe("a scene performed by a cast actor", () => {
     await sp.startScenePerformance(T, P, 0, { quality: "final" });
     await until(async () => attached.length === 2 && (await sp.getScenePerformances(T, P))[0].performance?.status === "done");
     expect(calls.atlas[1]).toEqual({ model: "bytedance/seedance-2.5/draft-complete", draft_id: "draft-9", watermark: false });
+    expect(calls.tts).toHaveLength(1);                         // the final reuses the voice the draft was made to
     expect(attached[1].extra.performed_by.quality).toBe("final");
     expect((await sp.getScenePerformances(T, P))[0].performance.final.url).toMatch(/-final-/);
 
@@ -242,6 +243,67 @@ describe("linking scenes: start from the last frame", () => {
     expect(info).toMatch(/720x1280/);                          // 270x480 take, cut and scaled to the 9:16 frame
     await expect(sp.continueSceneFrom(T, P, 1, { actor: "dana", from_scene: 1 })).rejects.toThrow(/another scene/);
     await expect(sp.continueSceneFrom(T, P, 0, { actor: "dana", from_scene: 1 })).rejects.toThrow(/no take to continue from/);
+  }, 60000);
+});
+
+describe("one voice in every scene: the exact file laid over the video", () => {
+  it("finds the offset between the video's read and the voice file", async () => {
+    const { bestLag } = await import("../src/core/scene-performance.js");
+    const voice = new Float32Array(300); for (let i = 40; i < 60; i++) voice[i] = 1; for (let i = 150; i < 190; i++) voice[i] = 0.7;
+    const video = new Float32Array(320); for (let i = 40; i < 60; i++) video[i + 12] = 1; for (let i = 150; i < 190; i++) video[i + 12] = 0.7;
+    expect(bestLag(video, voice).lag).toBeCloseTo(0.12, 5);
+    expect(bestLag(new Float32Array(300).fill(0.5), voice).lag).toBe(0);   // nothing to line up to: left as is
+  });
+
+  it("lays the voice file over the video, shifted to the video's read, as long as the video", async () => {
+    const d = path.join(DATA, "_lay"); await fs.mkdir(d, { recursive: true });
+    const vid = path.join(d, "v.mp4"), voice = path.join(d, "voice.mp3"), out = path.join(d, "out.mp4");
+    // The video's own read: a tone from 1.0 s; the voice file: the same from 0.8 s.
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=160x284:rate=24:duration=4", "-f", "lavfi", "-i", "aevalsrc='if(between(t,1,1.6),sin(2*PI*330*t),0)':s=48000:d=4",
+      "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", vid]);
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc='if(between(t,0.8,1.4),sin(2*PI*220*t),0)':s=48000:d=3", "-c:a", "libmp3lame", voice]);
+    const { layVoice } = await import("../src/core/scene-performance.js");
+    const lag = await layVoice(vid, voice, out, d);
+    expect(lag).toBeGreaterThan(0.15); expect(lag).toBeLessThan(0.25);
+    const info = await run("ffmpeg", ["-hide_banner", "-i", out]).then(() => "", (e: any) => String(e.stderr));
+    expect(info).toMatch(/Duration: 00:00:0(3\.9|4\.0)/);
+    // The tone now starts at ~1.0 s, under the video's read.
+    const pcm = path.join(d, "o.raw");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-i", out, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", pcm]);
+    const b = await fs.readFile(pcm);
+    let first = -1;
+    for (let i = 0; i < b.length / 2; i++) if (Math.abs(b.readInt16LE(i * 2)) > 3000) { first = i / 16000; break; }
+    expect(first).toBeGreaterThan(0.9); expect(first).toBeLessThan(1.1);
+  }, 60000);
+
+  it("revoice: an existing scene gets the voice file from its work folder, laid and re-attached; 'seedance' puts the model's read back", async () => {
+    const m = await media(path.join(DATA, "_media5"));
+    const pdir = path.join(DATA, T, "projects", P);
+    await fs.writeFile(path.join(pdir, "assets", "perf2.mp4"), m.mp4);
+    await fs.mkdir(path.join(pdir, "_work", "perform-s3"), { recursive: true });
+    await fs.writeFile(path.join(pdir, "_work", "perform-s3", "voice.mp3"), m.mp3);
+    const pf = path.join(pdir, "project.json");
+    const disk = JSON.parse(await fs.readFile(pf, "utf8"));
+    disk.storyboard.scenes[2] = { label: "Three", purpose: "", template: "", voiceover_text: "x", components: [],
+      performance: { actor: "dana", shot: "couch", voice_source: "take", draft: { url: `/assets/${T}/projects/${P}/assets/perf2.mp4`, inputs: "", made_at: "" }, status: "done" } };
+    const src = `/assets/${T}/projects/${P}/assets/perf2.mp4`;
+    disk.takes = [...(disk.takes || []), { id: "take_9", scene_index: 2, source: src, recorded_at: "", performed_by: { actor: "dana", engine: "seedance", quality: "draft" } }];
+    disk.speaker_track = { clips: [...(disk.speaker_track?.clips || []).filter((c: any) => c.scene_index !== 2), { source: src, scene_index: 2, start: 0 }] };
+    await fs.writeFile(pf, JSON.stringify(disk));
+    const sp = await import("../src/core/scene-performance.js");
+    const attached: any[] = [];
+    sp.registerSceneAttacher(async (tenant, proj, url, si, extra) => { attached.push({ url, si, extra }); return { status: 200, body: {} }; });
+    let perf = await sp.revoiceScene(T, P, 2);
+    expect(attached[0]).toMatchObject({ si: 2, extra: { performed_by: { actor: "dana", quality: "draft" } } });
+    expect(attached[0].url).toMatch(/take-performed-dana-s3-draft-voiced-.*\.mp4$/);
+    expect(perf.voice_url).toMatch(/voice-dana-s3-.*\.mp3$/);
+    expect(perf.seedance_url).toBe(src);
+    expect(perf.voice_track).toBe("converted");
+    expect(perf.draft!.url).toBe(attached[0].url);
+    perf = await sp.revoiceScene(T, P, 2, { voice_track: "seedance" });
+    expect(attached[1].url).toBe(src);
+    expect(perf.voice_track).toBe("seedance");
+    await expect(sp.revoiceScene(T, P, 1)).rejects.toThrow(/not performed/);
   }, 60000);
 });
 

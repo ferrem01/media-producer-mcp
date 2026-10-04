@@ -589,6 +589,17 @@ export interface ScenePerformance {
      *  scene picks up exactly where that one ended. */
     from_scene?: number }>;
   frame?: string;
+  /** The sound: "converted" (default) lays the exact voice file over the
+   *  video, lined up to Seedance's own read -- every scene the same voice;
+   *  "seedance" keeps the model's re-rendered voice, which drifts from scene
+   *  to scene (Oct 4: 200, 186, then 160 Hz on three couch scenes). */
+  voice_track?: "converted" | "seedance";
+  /** The voice file the scene was performed to (a project asset), and how
+   *  far it was shifted to line up with the video (s). */
+  voice_url?: string;
+  voice_offset?: number;
+  /** The video as Seedance made it, before the voice was laid over it. */
+  seedance_url?: string;
   /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */
   draft?: { url: string; draft_id?: string; inputs: string; made_at: string };
   final?: { url: string; made_at: string };

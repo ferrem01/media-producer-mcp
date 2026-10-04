@@ -12101,6 +12101,15 @@ ${QUOTIENT_CSS}
       + '<button class="np-btn" data-sp-draft="' + i + '"' + (run || !a ? ' disabled' : '') + '>Make draft (480p)</button> '
       + (mine && perf.draft ? '<button class="np-btn" data-sp-final="' + i + '"' + (run ? ' disabled' : '') + '>Make final (1080p)</button>' : '')
       + '</div>';
+    // The sound of a performed scene: the exact voice file, or the model's read.
+    if (mine && (perf.draft || perf.final) && !run) {
+      var vt = perf.voice_track || 'converted';
+      h += '<div class="np-row"><div class="np-what">Sound: <select id="sp-vtrack-' + i + '">'
+        + '<option value="converted"' + (vt === 'converted' ? ' selected' : '') + '>The exact voice file (same voice every scene)</option>'
+        + '<option value="seedance"' + (vt === 'seedance' ? ' selected' : '') + '>Seedance&#8217;s own read</option></select>'
+        + (perf.voice_url ? ' <a href="' + escAttr(withToken(perf.voice_url)) + '" target="_blank">hear the voice file</a>' : '')
+        + (perf.voice_offset ? '<small>lined up ' + Math.round(perf.voice_offset * 1000) + ' ms</small>' : '') + '</div></div>';
+    }
     if (run && mine) h += '<div class="np-armed"><span></span>' + escHtml(SP_STAGE[perf.stage] || 'starting') + (s.vendor ? ' &#183; Seedance ' + escHtml(rcVendorWord(s.vendor)) : '') + '</div>';
     else if (mine && perf.status === 'failed') h += '<div class="np-note">It failed: ' + escHtml(perf.error || '') + '</div>';
     else if (mine && perf.final) h += '<div class="np-hint">&#10003; The 1080p final is this scene&#8217;s take.</div>';
@@ -12280,6 +12289,7 @@ ${QUOTIENT_CSS}
   }
   function castChange(ev) {
     var t = ev.target, m;
+    if ((m = /^sp-vtrack-(\\d+)$/.exec(t.id || ''))) { spPost(m[1], { action: 'revoice', voice_track: t.value }, 'Changing the sound…').then(function() { loadProject(castUi.project.project_id); }); return; }
     if ((m = /^sp-voice-(\\d+)$/.exec(t.name || ''))) { castUi.spVoice = castUi.spVoice || {}; castUi.spVoice[m[1]] = t.value; return; }
     if ((m = /^sp-clipsec-(\\d+)$/.exec(t.id || ''))) { castUi.spClipSec = castUi.spClipSec || {}; castUi.spClipSec[m[1]] = Number(t.value); return; }
     if (/^sp-(shot|clip)-\\d+$/.test(t.id || '')) { castInput(ev); return; }

@@ -259,6 +259,51 @@ export async function useSceneRecording(tenant: string, projectId: string, si: n
   return { reattached };
 }
 
+/** 10 ms loudness envelope of a file's sound (16 kHz mono). */
+async function envelope(file: string, work: string): Promise<Float32Array> {
+  const pcm = path.join(work, `env-${crypto.randomBytes(3).toString("hex")}.raw`);
+  await ffmpeg(["-i", file, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", pcm]);
+  const buf = await fs.readFile(pcm);
+  await fs.rm(pcm, { force: true }).catch(() => {});
+  const n = Math.floor(buf.length / 2), hop = 160, out = new Float32Array(Math.floor(n / hop));
+  for (let f = 0; f < out.length; f++) {
+    let s = 0;
+    for (let i = 0; i < hop; i++) { const v = buf.readInt16LE((f * hop + i) * 2) / 32768; s += v * v; }
+    out[f] = Math.sqrt(s / hop);
+  }
+  return out;
+}
+
+/** How far the voice file must move to line up with the video's own read
+ *  (s; positive = later), by cross-correlating their envelopes within
+ *  +-0.6 s. 0 when the match is too weak to trust. */
+export function bestLag(video: Float32Array, voice: Float32Array, maxFrames = 60): { lag: number; score: number } {
+  const norm = (a: Float32Array) => { let m = 0; for (const v of a) m += v; m /= a.length || 1; let sd = 0; for (const v of a) sd += (v - m) ** 2; sd = Math.sqrt(sd / (a.length || 1)) || 1; return Float32Array.from(a, (v) => (v - m) / sd); };
+  const a = norm(video), b = norm(voice);
+  let best = 0, bestScore = -Infinity;
+  for (let lag = -maxFrames; lag <= maxFrames; lag++) {
+    let s = 0, n = 0;
+    for (let i = 0; i < b.length; i++) { const j = i + lag; if (j < 0 || j >= a.length) continue; s += a[j] * b[i]; n++; }
+    const score = n ? s / n : -Infinity;
+    if (score > bestScore) { bestScore = score; best = lag; }
+  }
+  return bestScore >= 0.3 ? { lag: best / 100, score: bestScore } : { lag: 0, score: bestScore };
+}
+
+/** The exact voice file laid over the video in place of the model's read,
+ *  shifted to line up with it, padded to the video's length. */
+export async function layVoice(videoAbs: string, voiceAbs: string, outAbs: string, work: string): Promise<number> {
+  const { lag } = bestLag(await envelope(videoAbs, work), await envelope(voiceAbs, work));
+  const shift = lag > 0 ? `adelay=${Math.round(lag * 1000)}:all=1,` : lag < 0 ? `atrim=start=${(-lag).toFixed(3)},asetpts=PTS-STARTPTS,` : "";
+  // An explicit length: an endless apad with -shortest never ended under a
+  // copied video stream (measured: the encode hung).
+  const dur = (await durationOf(videoAbs)) || 0;
+  if (!dur) throw new Error("the video has no length");
+  await ffmpeg(["-i", videoAbs, "-i", voiceAbs, "-filter_complex", `[1:a]${shift}apad=whole_dur=${dur.toFixed(3)},atrim=0:${dur.toFixed(3)}[a]`, "-map", "0:v:0", "-map", "[a]",
+    "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", dur.toFixed(3), "-movflags", "+faststart", outAbs]);
+  return lag;
+}
+
 /** The scene's voice as an MP3 at -14 LUFS (what the proven run sent). */
 async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number }> {
   if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
@@ -299,6 +344,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   actor?: string; shot?: string; voice_source?: "script" | "take"; quality?: "draft" | "final";
   /** Full prompts in place of the defaults ("" back to the default). */
   frame_prompt?: string; video_prompt?: string;
+  voice_track?: "converted" | "seedance";
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -322,6 +368,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     // A new video prompt is a new shot: the draft no longer stands.
     if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
+    if (opts.voice_track) p.voice_track = opts.voice_track;
     p.status = "running"; p.stage = "voice"; delete p.error; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
   const release = () => { running.delete(key); vendorNow.delete(key); };
@@ -349,7 +396,18 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
   }
   await stage("voice");
-  const voice = await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
+  // A final finishing a draft uses the voice the draft was made to: a new
+  // conversion differs by a hair (and in timing), so the draft would never
+  // match and the laid file would drift off the lips.
+  const keptVoice = quality === "final" && perf.draft?.draft_id && perf.voice_url ? resolveVideoPath(perf.voice_url, config.dataDir) : null;
+  const voice = keptVoice && await fs.stat(keptVoice).then(() => true, () => false)
+    ? { file: keptVoice, seconds: (await durationOf(keptVoice)) || 0 }
+    : await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
+  // The voice kept beside the take: heard, checked, reused for the final.
+  const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
+  await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
+  if (voice.file !== keptVoice) await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
+  const voiceUrl = voice.file === keptVoice ? perf.voice_url! : assetUrl(tenant, projectId, voiceName);
   const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
   // What makes the shot: a final can finish the draft only if none changed.
   // (The script voice is made fresh each time and differs by a hair, so a
@@ -378,10 +436,18 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
 
   vendorNow.delete(vkey);
   await stage("attach");
-  const name = `take-performed-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
+  const raw = `seedance-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
-  await download(result.url, path.join(assetsDir(tenant, projectId), name));
-  const url = assetUrl(tenant, projectId, name);
+  await download(result.url, path.join(assetsDir(tenant, projectId), raw));
+  const seedanceUrl = assetUrl(tenant, projectId, raw);
+  // The sound: the exact voice file lined up to the video (default), or
+  // the model's own read.
+  let url = seedanceUrl, offset: number | undefined;
+  if ((perf.voice_track || "converted") === "converted") {
+    const name = `take-performed-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
+    offset = await layVoice(path.join(assetsDir(tenant, projectId), raw), resolveVideoPath(voiceUrl, config.dataDir), path.join(assetsDir(tenant, projectId), name), workDir);
+    url = assetUrl(tenant, projectId, name);
+  }
   const out = await attach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "seedance", quality } });
   if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
   await fs.rm(kept, { force: true }).catch(() => {});
@@ -391,8 +457,56 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     const now = new Date().toISOString();
     if (quality === "draft") p.draft = { url, ...(result.draftId ? { draft_id: result.draftId } : {}), inputs, made_at: now };
     else p.final = { url, made_at: now };
+    p.voice_url = voiceUrl; p.seedance_url = seedanceUrl;
+    if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
+}
+
+/** Change a performed scene's sound without making it again: "converted"
+ *  lays the exact voice file over the video Seedance made (lined up), or
+ *  "seedance" puts the model's own read back. Re-attached as the scene's
+ *  take. For a scene made before the voice was kept, the voice from its
+ *  work folder (the last one made for the scene) is used and kept. */
+export async function revoiceScene(tenant: string, projectId: string, si: number, opts: { voice_track?: "converted" | "seedance" } = {}): Promise<ScenePerformance> {
+  const doAttach = attacher;
+  if (!doAttach) throw new Error("Takes cannot be attached here");
+  const key = `${tenant}/${projectId}/${si}`;
+  if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
+  const { project, scene } = await loadScene(tenant, projectId, si);
+  const perf: ScenePerformance | undefined = scene.performance;
+  const clip = ((project as any).speaker_track?.clips || []).find((c: any) => c.scene_index === si);
+  const take: any = clip ? takeForClip(project as any, clip) : null;
+  if (!perf || !take?.performed_by) throw new Error(`Scene ${si + 1} is not performed by a cast actor`);
+  const track = opts.voice_track || "converted";
+  const seedanceUrl = perf.seedance_url || take.source;
+  const workDir = path.join(projectDir(tenant, projectId), "_work", `perform-s${si + 1}`);
+  running.add(key);
+  try {
+    let voiceUrl = perf.voice_url;
+    if (!voiceUrl) {
+      const old = path.join(workDir, "voice.mp3");
+      if (!(await fs.stat(old).then(() => true, () => false))) throw new Error(`Scene ${si + 1}'s voice file is gone: perform it again`);
+      const name = `voice-${perf.actor}-s${si + 1}-${stamp()}.mp3`;
+      await fs.copyFile(old, path.join(assetsDir(tenant, projectId), name));
+      voiceUrl = assetUrl(tenant, projectId, name);
+    }
+    let url = seedanceUrl, offset: number | undefined;
+    if (track === "converted") {
+      const name = `take-performed-${perf.actor}-s${si + 1}-${take.performed_by.quality}-voiced-${stamp()}.mp4`;
+      await fs.mkdir(workDir, { recursive: true });
+      offset = await layVoice(resolveVideoPath(seedanceUrl, config.dataDir), resolveVideoPath(voiceUrl, config.dataDir), path.join(assetsDir(tenant, projectId), name), workDir);
+      url = assetUrl(tenant, projectId, name);
+    }
+    const out = await doAttach(tenant, projectId, url, si, { performed_by: take.performed_by });
+    if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
+    return await patch(tenant, projectId, si, (p) => {
+      p.voice_track = track; p.voice_url = voiceUrl; p.seedance_url = seedanceUrl;
+      if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
+      if (take.performed_by.quality === "final" && p.final) p.final.url = url;
+      else if (p.draft) p.draft.url = url;
+    });
+  } finally { running.delete(key); }
 }
 
 /** Every scene's performer at a glance: who plays it, and any performance. */
