@@ -2917,6 +2917,7 @@ Rules:
       // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, any performance
       // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?}
       //                                                           {action:"pick", url}
+      //                                                           {action:"continue", from_scene?}  (the start frame = that scene's last frame; default the scene before)
       //                                                           {action:"perform", actor?, shot?, voice_source?, quality?, frame_prompt?, video_prompt?}
       //                                                           (a prompt replaces the default built from the shot; "" goes back to it)
       //                                                           {action:"clip", actor?, shot, seconds?}  (b-roll, no speech)
@@ -2932,6 +2933,11 @@ Rules:
             const body = await parseBody(req).catch(() => ({} as any));
             const str = (v: unknown) => typeof v === "string" ? v : undefined;
             if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt) })); return; }
+            if (body.action === "continue") {
+              const { continueSceneFrom } = await import("./core/scene-performance.js");
+              jsonResponse(res, 200, await continueSceneFrom(spTenant, spProject, si, { actor: str(body.actor), from_scene: Number(body.from_scene ?? si - 1), shot: str(body.shot) }));
+              return;
+            }
             if (body.action === "pick") { jsonResponse(res, 200, await pickSceneFrame(spTenant, spProject, si, String(body.url || ""))); return; }
             if (body.action === "perform") {
               jsonResponse(res, 202, await startScenePerformance(spTenant, spProject, si, {
@@ -2957,7 +2963,7 @@ Rules:
               jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined }));
               return;
             }
-            jsonResponse(res, 400, { error: 'action must be "frame", "pick", "perform", "clip", "cast" or "recording"' });
+            jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "perform", "clip", "cast" or "recording"' });
             return;
           }
           jsonResponse(res, 405, { error: "Method not allowed" });

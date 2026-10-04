@@ -12091,12 +12091,13 @@ ${QUOTIENT_CSS}
     if (frames.length) {
       h += '<div class="np-grid">';
       frames.forEach(function(f) {
-        h += '<div class="np-cand tall' + (f.url === perf.frame ? ' sel' : '') + '" data-sp-pick="' + i + '|' + escAttr(f.url) + '" title="' + escAttr(f.shot || '') + '"><img src="' + escAttr(withToken(f.url)) + '" alt=""></div>';
+        h += '<div class="np-cand tall' + (f.url === perf.frame ? ' sel' : '') + '" data-sp-pick="' + i + '|' + escAttr(f.url) + '" title="' + escAttr(f.from_scene != null ? 'Scene ' + (f.from_scene + 1) + '’s last frame' : (f.shot || '')) + '"><img src="' + escAttr(withToken(f.url)) + '" alt="">' + (f.from_scene != null ? '<small>from scene ' + (f.from_scene + 1) + '</small>' : '') + '</div>';
       });
       h += '</div>';
     }
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'
       + '<button class="np-btn" data-sp-frame="' + i + '"' + (run || !a ? ' disabled' : '') + '>' + (frames.length ? 'Redraw frame' : 'Draw frame') + '</button> '
+      + (i > 0 && (castUi.data.scenes[i - 1] || {}).take ? '<button class="np-btn" data-sp-cont="' + i + '"' + (run || !a ? ' disabled' : '') + ' title="Pick up exactly where scene ' + i + ' ends">Start from scene ' + i + '&#8217;s last frame</button> ' : '')
       + '<button class="np-btn" data-sp-draft="' + i + '"' + (run || !a ? ' disabled' : '') + '>Make draft (480p)</button> '
       + (mine && perf.draft ? '<button class="np-btn" data-sp-final="' + i + '"' + (run ? ' disabled' : '') + '>Make final (1080p)</button>' : '')
       + '</div>';
@@ -12229,6 +12230,7 @@ ${QUOTIENT_CSS}
       return;
     }
     if ((v = el('data-sp-frame')) !== null) { spPost(v, { action: 'frame', actor: spActor, shot: spShot(v) || undefined, frame_prompt: spPrompt('f', v) }, 'Drawing the start frame…'); return; }
+    if ((v = el('data-sp-cont')) !== null) { spPost(v, { action: 'continue', actor: spActor, from_scene: Number(v) - 1, shot: spShot(v) || undefined }, 'Taking scene ' + v + '’s last frame…'); return; }
     if ((v = el('data-sp-pick')) !== null) { var pk = v.split('|'); spPost(pk[0], { action: 'pick', url: pk.slice(1).join('|') }, 'Using that frame.'); return; }
     if ((v = el('data-sp-draft')) !== null || (v = el('data-sp-final')) !== null) {
       var fin = el('data-sp-final') !== null;
