@@ -56,6 +56,12 @@ confirm?}`.
 
 ## 2026-10-04 — The cast plan on the storyboard (SPEC-cast-scenes.md, phase B)
 
+**Follow-up (live check, proj_566ccd05):** a film with no plan read every
+Dana scene as "Me · Record · stale". A scene with no plan anywhere (no
+`cast_plan`, no `performer`) now infers it from what it plays -- its
+performance (actor, engine, location: generated) or its recast -- marked
+`inferred`, so films made before plans read as what they are.
+
 `core/cast-plan.ts`. The film's default on `storyboard.cast_plan`, each scene's
 own on `storyboard.scenes[i].performer`: `{actor (null = me), how: record |
 recast | generate, engine, location}`, any field absent = the film's (a scene's

@@ -42,6 +42,9 @@ export interface ResolvedPlan {
   location?: string;
   /** The fields this scene takes from the film's plan. */
   from_film: Array<keyof CastPlan>;
+  /** No plan anywhere: read off what the scene already plays (a film made
+   *  before plans existed reads as what it is, not as stale). */
+  inferred?: boolean;
 }
 
 /** A scene's plan: its own fields over the film's. No how anywhere: a cast
@@ -58,6 +61,23 @@ export function resolvePlan(project: Project, si: number, actors: CastActor[] = 
   };
   let actor = pick("actor") ?? null;
   let how = pick("how") as PlanHow | undefined;
+  // Nothing planned at all: what the scene already is -- its performance
+  // (generated), else the recast it plays.
+  const sc: any = (project as any).storyboard?.scenes?.[si] || {};
+  const planned = Object.keys(own).length || Object.keys(film).length;
+  let inferred = false;
+  if (!planned) {
+    const perf = sc.performance;
+    const cast = sc.cast !== undefined ? sc.cast : (project as any).speaker_cast ?? null;
+    if (perf?.actor && (perf.draft || perf.final)) {
+      inferred = true; actor = perf.actor; how = "generate";
+      const made = perf.made_with?.engine || "seedance";
+      const loc = perf.made_with?.location || perf.location;
+      const out = { actor, how, engine: made, ...(made === "seedance" && loc ? { location: loc } : {}), from_film, inferred };
+      return out as ResolvedPlan;
+    }
+    if (cast) { inferred = true; actor = cast; how = "recast"; }
+  }
   if (!how) how = actor ? (hasRecording ? "recast" : "generate") : "record";
   if (how === "record") actor = null;
   const actorObj = actor ? actors.find((a) => a.id === actor) || null : null;
@@ -65,7 +85,7 @@ export function resolvePlan(project: Project, si: number, actors: CastActor[] = 
   const engine = how === "record" ? undefined : (named && ENGINES[how].includes(named) ? named : defaultEngine(how, actorObj));
   const loc = pick("location");
   const location = how === "generate" && engine === "seedance" && loc ? loc : undefined;
-  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), from_film };
+  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), from_film, ...(inferred ? { inferred } : {}) };
 }
 
 /** One field of a scene's plan as written: its own, else the film's (no
