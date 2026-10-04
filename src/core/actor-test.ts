@@ -361,7 +361,10 @@ export async function runHiggsfieldSeedance25(video: string, img: string | strin
     body: JSON.stringify({
       prompt: opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), video_urls: [video], image_urls: Array.isArray(img) ? img : [img],
       ...(opts.audio ? { audio_urls: [opts.audio] } : {}),
-      duration: Math.max(4, Math.min(30, Math.round(seconds))), aspect_ratio: aspect, resolution: opts.resolution || "480p",
+      // With a voice track, a second of headroom past it (Marc's app run
+      // gave 8.7 s of voice 10 s); the model squeezing the words lost sync.
+      duration: Math.max(4, Math.min(30, opts.audio ? Math.ceil(seconds) + 1 : Math.round(seconds))), aspect_ratio: aspect, resolution: opts.resolution || "480p",
+      bitrate_mode: "standard",
       // With a voice track the video carries it (lip-synced); without one, silent.
       generate_audio: !!opts.audio,
     }),
@@ -958,15 +961,20 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
         test.files.sheet2 = "sheet2.jpg";
         refs.push(`${pub}/sheet2.jpg`);
       }
-      // The voice track as the brief asks: the converted voice, -14 LUFS, WAV.
+      // The voice track: the converted voice at -14 LUFS, as MP3 (what
+      // Marc's app run sent).
       await voiceJob;
       let audio: string | undefined;
       if (test.files.voice) {
-        await ffmpeg(["-i", f("voice.mp3"), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", f("voice.wav")]);
-        test.files.voice_wav = "voice.wav";
-        audio = `${pub}/voice.wav`;
+        await ffmpeg(["-i", f("voice.mp3"), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", f("voice-ref.mp3")]);
+        test.files.voice_ref = "voice-ref.mp3";
+        audio = `${pub}/voice-ref.mp3`;
       }
-      url = await runHiggsfieldSeedance25(`${pub}/source.mp4`, refs, srcSecs, aspect, {
+      // The take as the motion reference only: its own voice stripped, so
+      // the voice track is the one voice the model hears (two voices drifted).
+      await ffmpeg(["-i", f("source.mp4"), "-an", "-c:v", "copy", "-movflags", "+faststart", f("motion.mp4")]);
+      test.files.motion = "motion.mp4";
+      url = await runHiggsfieldSeedance25(`${pub}/motion.mp4`, refs, srcSecs, aspect, {
         prompt, resolution: heygenOpts.resolution || "480p", audio,
         onSubmit: async (statusUrl) => { await fs.writeFile(f("hf-seedance25-request.json"), JSON.stringify({ status_url: statusUrl })); },
       });
