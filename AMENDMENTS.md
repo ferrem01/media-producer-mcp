@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Actor test: Seedance 2.5 through Atlas Cloud (`atlas-seedance25`)
+
+The API run with Marc's exact inputs still drifted. That points at the route,
+not our prep. ByteDance's own API forbids a start frame alongside omni
+references ("mutually exclusive scenarios"), so no reseller offers both. The
+documented workaround is to name the first frame in the prompt. What Marc's
+app run had that Higgsfield's public API lacks is `draft`. BytePlus (the
+first-party API) takes no online payment from US accounts, so the test goes
+through Atlas Cloud: `bytedance/seedance-2.5/reference-to-video` with
+reference_images / reference_videos / reference_audios, `draft: true` (480p
+preview), ratio, generate_audio. The prompt is prefixed with "@Image1 is the
+first frame ... @Video1 ... @Audio1". Key: `ATLASCLOUD_API_KEY` in
+`/etc/media-producer/env`. `hf_urls` works for both providers.
+
 ## 2026-10-04 — hf-seedance25: one voice, headroom, the app run's fields
 
 The first API run lost lip sync partway. Marc's app run (job 040426e3)
