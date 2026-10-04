@@ -1234,7 +1234,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
       if (urlPath === "/auth/logout") {
-        res.writeHead(302, { "Set-Cookie": "mp_session=; HttpOnly; Path=/; Max-Age=0", Location: "/" });
+        // Cleared with the attributes it was set with (Secure on https), and
+        // the browser told to drop this site's cookies outright; the next
+        // sign-in shows Google's account chooser (google-oauth.ts).
+        const lgHttps = (String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() || (config.publicUrl.startsWith("https://") ? "https" : "http")) === "https";
+        res.writeHead(302, {
+          "Set-Cookie": `mp_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${lgHttps ? "; Secure" : ""}`,
+          ...(lgHttps ? { "Clear-Site-Data": '"cookies"' } : {}),
+          "Cache-Control": "no-store",
+          Location: "/",
+        });
         res.end();
         return;
       }
