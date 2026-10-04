@@ -1288,6 +1288,13 @@ ${QUOTIENT_CSS}
   .pv-time { font-variant-numeric: tabular-nums; color: var(--content-secondary); white-space: nowrap; }
   .pv-fit { color: #b45309; font-size: 11.5px; font-weight: 600; margin-top: 3px; white-space: normal; }
   .pv-kind { font-weight: 700; color: var(--content-primary); }
+  .pv-who { margin-top: 4px; font-size: 11px; color: var(--content-secondary); }
+  .pv-who.st-stale b { color: #d97706; }
+  .sp-state { font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; background: var(--surface-secondary, #eee); }
+  .sp-state.stale { background: #fde68a; color: #78350f; }
+  .sp-state.ready { background: #bbf7d0; color: #14532d; }
+  .sp-plan { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; font-size: 12px; }
+  .sp-plan select { max-width: 160px; }
   .pv-cell {
     outline: none; border-radius: 5px; padding: 1px 4px; margin: -1px -4px; min-height: 20px;
     white-space: pre-wrap; word-break: break-word; cursor: text;
@@ -5506,7 +5513,10 @@ ${QUOTIENT_CSS}
         '<td class="pv-time" data-i="' + i + '">' + planSpan(r.start, r.end) + planFitHtml(r) + '</td>' +
         '<td><span class="pv-kind k-' + escAttr(r.shot_kind) + '">' + escHtml(r.shot_label) + ':</span> ' +
           '<div class="pv-cell pv-shot' + (r.shot_written ? '' : ' derived') + '" contenteditable="plaintext-only" spellcheck="true" data-k="shot" data-i="' + i + '" ' +
-          'data-ph="What fills the frame, in a few words">' + escHtml(r.shot) + '</div></td>' +
+          'data-ph="What fills the frame, in a few words">' + escHtml(r.shot) + '</div>' +
+          // Who performs the beat (the cast plan) and whether its take is that.
+          (r.performer ? '<div class="pv-who st-' + escAttr(r.performer_state || '') + '" title="' + escAttr(r.performer_why || '') + '">' + escHtml(r.performer) +
+            (r.performer_state === 'stale' ? ' · <b>stale</b>' : r.performer_state === 'todo' ? ' · to make' : ' · &#10003;') + '</div>' : '') + '</td>' +
         '<td><div class="pv-cell pv-line" contenteditable="plaintext-only" spellcheck="true" data-k="line" data-i="' + i + '" ' +
           'data-ph="' + (voiced ? 'What is said' : 'Silent') + '">' + escHtml(r.line) + '</div></td>' +
         '</tr>';
@@ -11846,7 +11856,7 @@ ${QUOTIENT_CSS}
       api('/scene-performance/' + castT() + '/' + castP()).catch(function() { return { scenes: [] }; }),
     ]).then(function(r) {
       if (!document.getElementById('cast-body') || castUi.project !== p) return;
-      castUi.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, rcProgress: r[1].progress || null, gen: r[2].generated_take || null, scenes: r[4].scenes || [] };
+      castUi.data = { cast: r[0].cast || [], performers: r[0].performers || [], speaker_cast: r[1].speaker_cast || null, recast: r[1].recast || null, rcProgress: r[1].progress || null, gen: r[2].generated_take || null, scenes: r[4].scenes || [], cast_plan: r[4].cast_plan || null };
       castUi.voices = r[3];
       if (castUi.actor && !castUi.data.cast.some(function(a) { return a.id === castUi.actor; })) castUi.actor = null;
       if (!castUi.actor && castUi.data.cast.length) castUi.actor = (castUi.data.speaker_cast && castUi.data.cast.some(function(a) { return a.id === castUi.data.speaker_cast; })) ? castUi.data.speaker_cast : castUi.data.cast[0].id;
@@ -12037,19 +12047,21 @@ ${QUOTIENT_CSS}
   }
   // ── Scene by scene (core/scene-performance.ts) ──
   function castNameOf(id) { var a = castActorById(id); return a ? a.name : id; }
-  var SP_STAGE = { frame: 'drawing the start frame', voice: 'voicing the line', draft: 'Seedance is making the draft', final: 'Seedance is making the 1080p final', attach: 'attaching it to the scene' };
+  var SP_STAGE = { frame: 'drawing the start frame', voice: 'voicing the line', draft: 'Seedance is making the draft', final: 'Seedance is making the 1080p final', attach: 'attaching it to the scene', heygen: 'HeyGen is performing it' };
   function castScenesHtml() {
     var d = castUi.data, list = d.scenes || [], a = castActorById(castUi.actor), p = castPerfById(castUi.performer);
     castUi.spOpen = castUi.spOpen || {}; castUi.spShot = castUi.spShot || {}; castUi.spVoice = castUi.spVoice || {}; castUi.spClip = castUi.spClip || {}; castUi.spClipSec = castUi.spClipSec || {};
     if (!list.length) return '<div class="np-empty">This film has no scenes yet.</div>';
-    var h = castLocationsHtml(a) + '<div class="np-block"><div class="np-lead">Scenes</div><div class="np-hint"><b>Recast</b> uses the vendor picked above on your recording of the scene (one-to-one). <b>' + escHtml(a ? a.name : 'The actor') + ' performs it</b> needs no recording: a start frame for the shot, the line voiced in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice, a 480p draft, then the 1080p final.</div></div>';
+    var h = castFilmPlanHtml() + castPerformAllHtml() + castLocationsHtml(a) + '<div class="np-block"><div class="np-lead">Scenes</div><div class="np-hint"><b>Recast</b> uses the vendor picked above on your recording of the scene (one-to-one). <b>' + escHtml(a ? a.name : 'The actor') + ' performs it</b> needs no recording: a start frame for the shot, the line voiced in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice, a 480p draft, then the 1080p final.</div></div>';
     list.forEach(function(s) {
       var i = s.scene_index, tk = s.take, perf = s.performance || {};
       var run = s.running || perf.status === 'running';
       var who = tk && tk.performed_by ? castNameOf(tk.performed_by.actor) + ' · performed (' + (tk.performed_by.quality === 'final' ? '1080p' : 'draft') + ')'
         : s.cast && tk && (tk.recast_by || []).indexOf(s.cast) >= 0 ? castNameOf(s.cast) + ' · recast' : tk ? 'You · your recording' : 'No take yet';
       var hasRec = !!(tk && !tk.performed_by);
-      h += '<div class="np-block sp-scene"><div class="np-lead">Scene ' + (i + 1) + (s.label ? ' · ' + escHtml(s.label) : '') + ' <small>' + escHtml(who) + '</small></div>';
+      h += '<div class="np-block sp-scene"><div class="np-lead">Scene ' + (i + 1) + (s.label ? ' · ' + escHtml(s.label) : '') + ' <small>' + escHtml(who) + '</small>'
+        + (s.state ? '<span class="sp-state ' + escAttr(s.state) + '" title="' + escAttr(s.why || '') + '">' + (s.state === 'ready' ? '&#10003; ready' : s.state === 'stale' ? 'stale' : 'to make') + '</span>' : '') + '</div>';
+      h += castPlanRow(String(i), s.performer || {}, s.plan || {}, true);
       if (s.lines) h += '<div class="np-hint">&#8220;' + escHtml(s.lines.replace(/\\s+/g, ' ').slice(0, 180)) + '&#8221;</div>';
       h += '<div class="np-tabs">'
         + '<button class="np-btn" data-sp-rec="' + i + '"' + (s.has_recording && !run && (s.cast || (tk && tk.performed_by)) ? '' : ' disabled') + ' title="Play your own recording in this scene">My recording</button>'
@@ -12060,6 +12072,82 @@ ${QUOTIENT_CSS}
       h += '</div>';
     });
     return h;
+  }
+  // ── The cast plan (core/cast-plan.ts): Who -> How -> Engine -> Where ──
+  var PLAN_ENGINES = { recast: [['higgsfield', 'Genjutsu'], ['kling', 'Kling'], ['heygen', 'HeyGen'], ['runway', 'Runway']], generate: [['seedance', 'Seedance'], ['heygen', 'HeyGen']] };
+  var PLAN_HOW = [['record', 'Record'], ['recast', 'Recast my recording'], ['generate', 'Generate (no recording)']];
+  // One row of selects. 'own' is what this scope writes (the film's plan, or
+  // the scene's own fields); 'res' what it resolves to (shapes the choices).
+  // A scene's selects lead with "Film's", which follows the film's plan.
+  function castPlanRow(scope, own, res, scene) {
+    var d = castUi.data || {}, actors = d.cast || [];
+    var opt = function(v, label, cur) { return '<option value="' + escAttr(v) + '"' + (v === cur ? ' selected' : '') + '>' + escHtml(label) + '</option>'; };
+    var film = scene ? '<option value="">Film&#8217;s</option>' : '';
+    var who = own.actor === null ? 'me' : (own.actor || '');
+    if (!scene && !who) who = 'me';
+    var h = '<div class="sp-plan">'
+      + '<select id="pl-actor-' + scope + '" title="Who performs it">' + film + opt('me', 'Me', who)
+      + actors.map(function(x) { return opt(x.id, x.name, who); }).join('') + '</select>';
+    if (res.how !== 'record' || own.how) {
+      h += '<select id="pl-how-' + scope + '" title="How">' + film + PLAN_HOW.filter(function(x) { return x[0] !== 'record' || res.how === 'record' || !res.actor; }).map(function(x) { return opt(x[0], x[1], own.how || ''); }).join('') + '</select>';
+    }
+    var engines = PLAN_ENGINES[res.how] || [];
+    if (engines.length) {
+      h += '<select id="pl-engine-' + scope + '" title="Engine">' + (scene ? film : '<option value="">Best for them</option>')
+        + engines.map(function(x) { return opt(x[0], x[1], own.engine || ''); }).join('') + '</select>';
+    }
+    if (res.how === 'generate' && res.engine === 'seedance') {
+      var locs = (castUi.locations || []).filter(function(l) { return l.image; });
+      var where = own.location === null ? 'none' : (own.location || '');
+      h += '<select id="pl-location-' + scope + '" title="Where (a location)">' + film + (scene ? opt('none', 'No location', where) : opt('', 'No location', where))
+        + locs.map(function(l) { return opt(l.id, l.name, where); }).join('') + '</select>';
+    }
+    if (scene && castUi.data && castUi.data.scenes) {
+      var sc = castUi.data.scenes[Number(scope)] || {};
+      if (sc.plan_line) h += '<small>' + escHtml(sc.plan_line) + '</small>';
+    }
+    return h + '</div>';
+  }
+  function castFilmPlanHtml() {
+    var fp = (castUi.data && castUi.data.cast_plan) || {};
+    // What the film's plan resolves to, for a scene with no recording.
+    var a = fp.actor ? castActorById(fp.actor) : null;
+    var how = fp.how || (a ? 'generate' : 'record');
+    var engine = how === 'record' ? '' : (fp.engine || (a && a.heygen_look_id ? 'heygen' : how === 'recast' ? 'higgsfield' : 'seedance'));
+    return '<div class="np-block"><div class="np-lead">The film&#8217;s plan</div>'
+      + '<div class="np-hint">Who performs every scene that does not say otherwise, how, and where. Changing it makes nothing: scenes it no longer matches show <b>stale</b> until you perform them.</div>'
+      + castPlanRow('film', fp, { actor: fp.actor || null, how: how, engine: engine }, false) + '</div>';
+  }
+  function castPerformAllHtml() {
+    var est = castUi.plEst;
+    var h = '<div class="np-block"><div class="np-lead">Perform the plan</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="np-btn" data-pl-est="perform_all">Perform the plan&#8230;</button>'
+      + '<button class="np-btn" data-pl-est="finals_all">Finals at 1080p&#8230;</button></div>';
+    if (est) {
+      var rows = (est.r.scenes || []);
+      var todo = est.kind === 'finals_all' ? rows : rows.filter(function(x) { return x.action !== 'skip'; });
+      var skip = est.kind === 'finals_all' ? [] : rows.filter(function(x) { return x.action === 'skip' && x.note && x.note !== 'ready'; });
+      h += '<div class="np-panel">';
+      if (!todo.length) h += '<div class="np-hint">' + (est.kind === 'finals_all' ? 'No ready drafts to finish.' : 'Every scene already answers the plan.') + '</div>';
+      todo.forEach(function(x) {
+        h += '<div class="np-row"><div class="np-what">Scene ' + (x.index + 1) + (x.label ? ' · ' + escHtml(x.label) : '')
+          + '<small>' + (est.kind === 'finals_all' ? '1080p final' : escHtml(x.action === 'perform' ? 'perform' : x.action === 'recast' ? 'recast' : 'your recording back')) + (x.usd ? ' · $' + x.usd.toFixed(2) : x.note ? ' · ' + escHtml(x.note) : '') + '</small></div></div>';
+      });
+      skip.forEach(function(x) { h += '<div class="np-hint">Scene ' + (x.index + 1) + ': ' + escHtml(x.note) + '</div>'; });
+      if (todo.length) h += '<div class="np-hint">About <b>$' + (est.r.usd || 0).toFixed(2) + '</b>' + (est.r.minutes ? ' · ~' + est.r.minutes + ' min' : '') + '.</div>'
+        + '<div style="display:flex;gap:8px;margin:6px 0"><button class="np-btn" data-pl-go="' + est.kind + '">' + (est.kind === 'finals_all' ? 'Make the finals' : 'Perform them') + '</button><button class="np-btn" data-pl-cancel="1">Cancel</button></div>';
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+  function castPlanPost(body, said) {
+    castSay(said || 'Saving the plan…');
+    return api('POST', '/scene-performance/' + castT() + '/' + castP(), body).then(function(r) {
+      castSay('');
+      if (castUi.data) { castUi.data.scenes = r.scenes || castUi.data.scenes; if (r.cast_plan !== undefined) castUi.data.cast_plan = r.cast_plan || null; }
+      castRender();
+      return r;
+    }).catch(function(e) { castSay(e.message || String(e), 'err'); });
   }
   // ── Locations (core/locations.ts): clean plates of the sets ──
   function castLocationsHtml(a) {
@@ -12216,6 +12304,7 @@ ${QUOTIENT_CSS}
     return api('/scene-performance/' + castT() + '/' + castP()).then(function(r) {
       if (!castUi.data) return;
       castUi.data.scenes = r.scenes || [];
+      castUi.data.cast_plan = r.cast_plan || null;
       castRender();
       if (castRunning()) castPoll();
     });
@@ -12346,6 +12435,26 @@ ${QUOTIENT_CSS}
       spPost(v, { action: 'clip', actor: spActor, shot: cs.value.trim(), seconds: sec ? Number(sec.value) : 5 }, 'Making the b-roll…');
       return;
     }
+    if ((v = el('data-pl-est'))) {
+      var kind = v;
+      castSay('Working out what it takes…');
+      api('POST', '/scene-performance/' + castT() + '/' + castP(), { action: kind }).then(function(r) { castSay(''); castUi.plEst = { kind: kind, r: r }; castRender(); })
+        .catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
+    if (el('data-pl-cancel')) { castUi.plEst = null; castRender(); return; }
+    if ((v = el('data-pl-go'))) {
+      var gk = v;
+      castSay(gk === 'finals_all' ? 'Starting the finals…' : 'Starting the scenes…');
+      api('POST', '/scene-performance/' + castT() + '/' + castP(), { action: gk, confirm: true }).then(function(r) {
+        castUi.plEst = null;
+        var n = (r.started || []).length + (r.recast ? r.recast.scenes.length : 0);
+        var waits = (r.waiting || []).map(function(w) { return 'scene ' + (w.index + 1) + ': ' + w.note; });
+        castSay(n + ' scene' + (n === 1 ? '' : 's') + ' started' + (waits.length ? ' · ' + waits.join(' · ') : '') + '.', waits.length ? '' : 'ok');
+        castScenesRefresh(); loadProject(castUi.project.project_id);
+      }).catch(function(e) { castSay(e.message || String(e), 'err'); });
+      return;
+    }
     if (el('data-loc-add')) { castUi.locAdd = !castUi.locAdd; castRender(); return; }
     if ((v = el('data-loc-x'))) {
       ev.stopPropagation();
@@ -12407,6 +12516,17 @@ ${QUOTIENT_CSS}
     var t = ev.target, m;
     if ((m = /^sp-vtrack-(\\d+)$/.exec(t.id || ''))) { spPost(m[1], { action: 'revoice', voice_track: t.value }, 'Changing the sound…').then(function() { loadProject(castUi.project.project_id); }); return; }
     if ((m = /^sp-voice-(\\d+)$/.exec(t.name || ''))) { castUi.spVoice = castUi.spVoice || {}; castUi.spVoice[m[1]] = t.value; return; }
+    if ((m = /^pl-(actor|how|engine|location)-(film|\\d+)$/.exec(t.id || ''))) {
+      var fld = m[1], scope = m[2], val = t.value, f = {};
+      if (fld === 'actor') {
+        if (val === 'me') { f.actor = null; f.how = 'record'; }
+        else if (val === '') f.actor = '';
+        else { f.actor = val; f.how = ''; f.engine = ''; }
+      } else f[fld] = val;
+      if (scope === 'film') { if (fld === 'location' && val === '') f.location = ''; castPlanPost({ action: 'plan', cast_plan: f }); }
+      else castPlanPost({ action: 'plan', scenes: [{ index: Number(scope), performer: f }] });
+      return;
+    }
     if ((m = /^sp-loc-(\\d+)$/.exec(t.id || ''))) { spPost(m[1], { action: 'location', location: t.value }, t.value ? 'Setting the location…' : 'No location.'); return; }
     if ((m = /^sp-room-(\\d+)$/.exec(t.id || ''))) { castUi.spRoom = castUi.spRoom || {}; castUi.spRoom[m[1]] = t.value; return; }
     if ((m = /^sp-clipsec-(\\d+)$/.exec(t.id || ''))) { castUi.spClipSec = castUi.spClipSec || {}; castUi.spClipSec[m[1]] = Number(t.value); return; }

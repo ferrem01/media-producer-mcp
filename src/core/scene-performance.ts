@@ -26,16 +26,19 @@ import { config } from "../config.js";
 import { loadProject, saveProject } from "../persistence/project.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
-import { getActor, portraitPath, type CastActor } from "./cast.js";
+import { getActor, listCast, portraitPath, type CastActor } from "./cast.js";
+import { resolvePlan, planState, planLine, planField, writePlan, applyPlanEdit, defaultEngine, type ResolvedPlan } from "./cast-plan.js";
+import { getPerformer } from "./performers/index.js";
+import { getHeygenLook } from "./actor-test.js";
 import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
-import { elevenSpeech, spokenParts } from "./generated-take.js";
+import { elevenSpeech, heygenSpeech, spokenParts, DEFAULT_MOTION } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, cutClock, cutFileFor } from "./take-clock.js";
 import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
-import type { ScenePerformance } from "./types.js";
+import type { ScenePerformance, CastPlan } from "./types.js";
 
 /** Where an actor stands when no shot is given. */
 export const DEFAULT_SHOT = "A selfie-style medium close-up in a bright modern office, the person talking straight to the camera";
@@ -53,7 +56,7 @@ const vendorNow = new Map<string, VendorStatus>();
 const chains = new Map<string, Promise<unknown>>();
 
 /** Change a scene's performance: load, mutate, save, one writer per film. */
-async function patch(tenant: string, projectId: string, si: number, fn: (perf: ScenePerformance) => void): Promise<ScenePerformance> {
+async function patch(tenant: string, projectId: string, si: number, fn: (perf: ScenePerformance, scene: any) => void): Promise<ScenePerformance> {
   const k = `${tenant}/${projectId}`;
   const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
     const project = await loadProject(tenant, projectId);
@@ -61,7 +64,7 @@ async function patch(tenant: string, projectId: string, si: number, fn: (perf: S
     const scene: any = (project as any).storyboard?.scenes?.[si];
     if (!scene) throw new Error(`No scene ${si + 1}`);
     const perf: ScenePerformance = scene.performance || { actor: "", shot: DEFAULT_SHOT, voice_source: "script" };
-    fn(perf);
+    fn(perf, scene);
     scene.performance = perf;
     project.updated_at = new Date().toISOString();
     await saveProject(project);
@@ -99,6 +102,28 @@ async function needActor(tenant: string, id: string | undefined): Promise<CastAc
   const actor = await getActor(tenant, id);
   if (!actor) throw new Error(`No cast actor "${id}"`);
   return actor;
+}
+
+/** The scene's plan (core/cast-plan.ts): its own fields over the film's. */
+async function planOf(tenant: string, project: any, si: number): Promise<ResolvedPlan> {
+  return resolvePlan(project, si, await listCast(tenant), !!sceneRecording(project, si));
+}
+
+/** A direct action (Studio's buttons, the cast tool) is a choice: the scene's
+ *  plan follows it, so the board says what the scene now is. Only fields that
+ *  differ from what the scene already resolves to are written. */
+function followPlan(scene: any, project: any, want: Partial<CastPlan>, before: ResolvedPlan): void {
+  const fields: Record<string, unknown> = {};
+  if (want.actor !== undefined && want.actor !== before.actor) fields.actor = want.actor;
+  if (want.how !== undefined && want.how !== before.how) fields.how = want.how;
+  if (want.engine !== undefined && want.engine !== before.engine) fields.engine = want.engine;
+  if (want.location !== undefined && (want.location || "") !== (before.location || "")) fields.location = want.location || "";
+  if (!Object.keys(fields).length) return;
+  // Clearing a location the film supplies would only inherit it back: say none.
+  const film: CastPlan = project?.storyboard?.cast_plan || {};
+  if (fields.location === "" && film.location) fields.location = null;
+  const next = writePlan(scene.performer, fields);
+  if (next) scene.performer = next; else delete scene.performer;
 }
 
 /** The start frame prompt: the same person, in this shot, at this shape. */
@@ -166,19 +191,23 @@ async function drawFrame(tenant: string, projectId: string, actor: CastActor, sh
 export async function startSceneFrame(tenant: string, projectId: string, si: number, opts: { actor?: string; shot?: string; frame_prompt?: string; location?: string }): Promise<ScenePerformance> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
-  const actor = await needActor(tenant, opts.actor || prev?.actor);
+  const plan = await planOf(tenant, project, si);
+  const actor = await needActor(tenant, opts.actor || plan.actor || prev?.actor);
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the start frame is drawn by GPT Image)");
   const key = `${tenant}/${projectId}/${si}`;
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
   const shot = String(opts.shot ?? prev?.shot ?? DEFAULT_SHOT).trim().slice(0, 1000) || DEFAULT_SHOT;
   const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
-  if (opts.location) await locationImage(tenant, opts.location);
+  // The room: the one asked for, else the plan's.
+  const where = opts.location !== undefined ? opts.location : (planField(project, si, "location") || "");
+  if (where) await locationImage(tenant, where);
   running.add(key);
-  const perf = await patch(tenant, projectId, si, (p) => {
+  const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     p.actor = actor.id; p.shot = shot; setPrompt(p, "frame_prompt", opts.frame_prompt);
     // A location chosen now is the room: an older raw room reference yields.
-    if (setLocation(p, opts.location)) delete p.room_url;
+    if (setLocation(p, where)) delete p.room_url;
+    followPlan(sc, project, { ...(opts.actor && plan.how !== "record" ? { actor: actor.id } : {}), ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
     p.status = "running"; p.stage = "frame"; delete p.error;
     p.started_at = new Date().toISOString(); delete p.finished_at;
   });
@@ -225,7 +254,7 @@ export async function lastFrameOf(tenant: string, projectId: string, si: number,
 export async function continueSceneFrom(tenant: string, projectId: string, si: number, opts: { actor?: string; from_scene: number; shot?: string }): Promise<ScenePerformance> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
-  const actor = await needActor(tenant, opts.actor || prev?.actor);
+  const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || prev?.actor);
   const from = Number(opts.from_scene);
   if (!Number.isInteger(from) || from < 0 || from === si) throw new Error("from_scene must be another scene (0-based)");
   const key = `${tenant}/${projectId}/${si}`;
@@ -244,9 +273,29 @@ export async function continueSceneFrom(tenant: string, projectId: string, si: n
 /** Set a scene's location without drawing or performing (Studio's picker):
  *  "" clears it. A new location drops a frame drawn elsewhere and the draft. */
 export async function setSceneLocation(tenant: string, projectId: string, si: number, location: string): Promise<ScenePerformance> {
-  await loadScene(tenant, projectId, si);
+  const { project } = await loadScene(tenant, projectId, si);
   if (location) await locationImage(tenant, location);
-  return patch(tenant, projectId, si, (p) => { if (setLocation(p, location)) delete p.room_url; });
+  const plan = await planOf(tenant, project, si);
+  return patch(tenant, projectId, si, (p, sc) => {
+    if (setLocation(p, location)) delete p.room_url;
+    // The scene's plan says where it is set (none: over the film's, too).
+    followPlan(sc, project, { location }, { ...plan, location: planField(project, si, "location") || undefined });
+  });
+}
+
+/** Change the cast plan (the film's and/or scenes'), on the film's writer
+ *  chain so it never loses a perform's write. Nothing is made. */
+export async function editCastPlan(tenant: string, projectId: string, edit: Parameters<typeof applyPlanEdit>[2]): Promise<void> {
+  const k = `${tenant}/${projectId}`;
+  const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+    const project = await loadProject(tenant, projectId);
+    if (!project) throw new Error("Project not found");
+    await applyPlanEdit(tenant, project, edit);
+    project.updated_at = new Date().toISOString();
+    await saveProject(project);
+  });
+  chains.set(k, next);
+  await next;
 }
 
 /** Pick which drawn frame the scene uses. */
@@ -456,6 +505,11 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   room_url?: string;
   /** The location (a tenant location id; "" for none). */
   location?: string;
+  /** Who makes it: "seedance" or "heygen" (a HeyGen look's own setting).
+   *  Omitted: the plan's engine for this actor, else the best for them. */
+  engine?: "seedance" | "heygen";
+  /** HeyGen: a direction for the movement ("" for none). */
+  motion?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -463,7 +517,11 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   const grammar = (project as any).treatment?.filmGrammar;
   if (grammar !== "speaker" && grammar !== "creator-cut") throw new Error("A performed scene needs a film a person carries (speaker or creator-cut)");
   const prev: ScenePerformance | undefined = scene.performance;
-  const actor = await needActor(tenant, opts.actor || prev?.actor);
+  const plan = await planOf(tenant, project, si);
+  const actor = await needActor(tenant, opts.actor || plan.actor || prev?.actor);
+  const engine = opts.engine || (plan.how === "generate" && plan.actor === actor.id && plan.engine ? plan.engine : defaultEngine("generate", actor));
+  if (engine === "heygen") return startSceneHeygen(tenant, projectId, si, actor, plan, opts);
+  if (engine !== "seedance") throw new Error(`${engine} cannot perform a scene from its line (seedance or heygen)`);
   if (!process.env.ATLASCLOUD_API_KEY) throw new Error("Seedance is not set up on this server (ATLASCLOUD_API_KEY)");
   if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice first`);
   const quality = opts.quality === "final" ? "final" : "draft";
@@ -476,11 +534,13 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     if (!opts.room_url.startsWith(prefix) || opts.room_url.includes("..") || !/\.(jpe?g|png|webp)$/i.test(opts.room_url)) throw new Error("room_url must be an image asset of this film");
     if (!(await fs.stat(resolveVideoPath(opts.room_url, config.dataDir)).then(() => true, () => false))) throw new Error("room_url not found");
   }
-  // The location the take is made in, checked before anything is spent.
-  const where = opts.location ?? prev?.location;
-  if (where && !(quality === "final" && prev?.draft?.draft_id && opts.location === undefined)) await locationImage(tenant, where);
+  // The location the take is made in (asked for, else the plan's), checked
+  // before anything is spent. A final finishing its draft keeps the draft's.
+  const finishingDraft = quality === "final" && !!prev?.draft?.draft_id && opts.location === undefined;
+  const where = opts.location !== undefined ? opts.location : (planField(project, si, "location") || "");
+  if (!finishingDraft && where) await locationImage(tenant, where);
   running.add(key);
-  const perf = await patch(tenant, projectId, si, (p) => {
+  const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     if (p.shot !== shot || p.voice_source !== source) delete p.draft;
     setPrompt(p, "frame_prompt", opts.frame_prompt);
@@ -489,7 +549,9 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
     if (opts.voice_track) p.voice_track = opts.voice_track;
     if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
-    if (setLocation(p, opts.location) && opts.room_url === undefined) delete p.room_url;
+    if (!finishingDraft && setLocation(p, where) && opts.room_url === undefined) delete p.room_url;
+    // Performing it IS the choice: the scene's plan is this actor, generated with Seedance.
+    followPlan(sc, project, { actor: actor.id, how: "generate", engine: "seedance", ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
     if (opts.room_url !== undefined) { if (opts.room_url) p.room_url = opts.room_url; else delete p.room_url; }
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
@@ -498,6 +560,92 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     release();
     await patch(tenant, projectId, si, (p) => { p.status = "failed"; p.error = String(e?.message || e).slice(0, 300); delete p.stage; p.finished_at = new Date().toISOString(); }).catch(() => {});
   }).finally(() => { running.delete(key); vendorNow.delete(key); });
+  return perf;
+}
+
+/** HEYGEN GENERATES THE SCENE: the actor's look (or portrait) speaks the
+ *  scene's line -- the look is the setting, so there is no frame and no
+ *  location. The voice: the actor's ElevenLabs voice (the v4 delivery, or the
+ *  recording converted), else the look's own HeyGen voice. Our voice is laid
+ *  under HeyGen's picture (its own copy is re-encoded). No draft: HeyGen's
+ *  one render is the take. Returns at once. */
+async function startSceneHeygen(tenant: string, projectId: string, si: number, actor: CastActor, plan: ResolvedPlan, opts: {
+  voice_source?: "script" | "take"; delivery?: string; motion?: string;
+}): Promise<ScenePerformance> {
+  const doAttach = attacher;
+  if (!doAttach) throw new Error("Takes cannot be attached here");
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HeyGen is not set up on this server (HEYGEN_API_KEY)");
+  const { project, scene } = await loadScene(tenant, projectId, si);
+  const prev: ScenePerformance | undefined = scene.performance;
+  const source = opts.voice_source || prev?.voice_source || "script";
+  let lookVoice = "";
+  if (!actor.voice_id) {
+    if (!actor.heygen_look_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice first`);
+    if (source === "take") throw new Error(`${actor.name} has no ElevenLabs voice to convert your recording to: give the actor one, or read the script`);
+    lookVoice = (await getHeygenLook(actor.heygen_look_id)).default_voice_id || "";
+    if (!lookVoice) throw new Error(`${actor.name}'s look has no HeyGen voice of its own: give the actor an ElevenLabs voice`);
+  }
+  const key = `${tenant}/${projectId}/${si}`;
+  if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
+  const motion = opts.motion === undefined ? DEFAULT_MOTION : String(opts.motion).trim().slice(0, 1000);
+  const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
+  running.add(key);
+  const perf = await patch(tenant, projectId, si, (p, sc) => {
+    if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
+    p.actor = actor.id; p.voice_source = source;
+    if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
+    p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
+    followPlan(sc, project, { actor: actor.id, how: "generate", engine: "heygen" }, plan);
+  });
+  const release = () => { running.delete(key); vendorNow.delete(key); };
+  const stage = (st: string) => patch(tenant, projectId, si, (p) => { p.stage = st; });
+  void (async () => {
+    const voiceDir = path.join(projectDir(tenant, projectId), "_work", `heygen-s${si + 1}`);
+    await fs.mkdir(voiceDir, { recursive: true });
+    let voice: { file: string; seconds: number };
+    if (actor.voice_id) voice = await sceneVoice(tenant, projectId, si, actor, source, voiceDir);
+    else {
+      const line = spokenParts(String((await loadScene(tenant, projectId, si)).scene.voiceover_text || "")).map((x) => x.join(" ")).join(" ... ");
+      if (!line) throw new Error(`Scene ${si + 1} has no lines to read`);
+      const said = path.join(voiceDir, "said.mp3"), file = path.join(voiceDir, "voice.mp3");
+      await heygenSpeech(line, lookVoice, said);
+      await ffmpeg(["-i", said, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);
+      voice = { file, seconds: (await durationOf(file)) || 0 };
+    }
+    const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
+    await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
+    await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
+    const voiceUrl = assetUrl(tenant, projectId, voiceName);
+    // One work dir per voice and direction: a restart collects the HeyGen job
+    // it submitted; a new line or direction is a new job.
+    const hash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).update(`|${actor.id}|${motion}`).digest("hex").slice(0, 12);
+    const workDir = path.join(projectDir(tenant, projectId), "_work", `heygen-s${si + 1}-${hash}`);
+    await fs.mkdir(workDir, { recursive: true });
+    await fs.copyFile(voice.file, path.join(workDir, "voice.mp3"));
+    await stage("heygen");
+    const picture = await getPerformer("heygen")!.fromAudio!(path.join(workDir, "voice.mp3"), {
+      tenant, actor, portraitAbs: portraitPath(tenant, actor), workDir, width: W, height: H, ...(motion ? { motion } : {}),
+    });
+    await stage("attach");
+    const name = `take-performed-${actor.id}-s${si + 1}-final-heygen-${stamp()}.mp4`;
+    await ffmpeg(["-i", picture, "-i", voice.file, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+      "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", "-movflags", "+faststart", path.join(assetsDir(tenant, projectId), name)]);
+    const url = assetUrl(tenant, projectId, name);
+    const out = await doAttach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "heygen", quality: "final" } });
+    if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
+    release();
+    await patch(tenant, projectId, si, (p) => {
+      const now = new Date().toISOString();
+      p.final = { url, made_at: now };
+      p.voice_url = voiceUrl;
+      p.made_with = { actor: actor.id, engine: "heygen" };
+      p.status = "done"; delete p.stage; p.finished_at = now;
+    });
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  })().catch(async (e) => {
+    release();
+    await patch(tenant, projectId, si, (p) => { p.status = "failed"; p.error = String(e?.message || e).slice(0, 300); delete p.stage; p.finished_at = new Date().toISOString(); }).catch(() => {});
+  }).finally(release);
   return perf;
 }
 
@@ -598,6 +746,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     else p.final = { url, made_at: now };
     if (voiceUrl) p.voice_url = voiceUrl; else delete p.voice_url;
     p.seedance_url = seedanceUrl;
+    p.made_with = { actor: actor.id, engine: "seedance", ...(p.location ? { location: p.location } : {}) };
     if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
@@ -684,9 +833,9 @@ export async function restoreSceneTake(tenant: string, projectId: string, si: nu
  *  recording converted -- kept as an asset, with its pitch. `delivery`
  *  given is kept on the scene. */
 export async function previewSceneVoice(tenant: string, projectId: string, si: number, opts: { actor?: string; voice_source?: "script" | "take"; delivery?: string }): Promise<{ url: string; seconds: number; hz: number; delivery?: string }> {
-  const { scene } = await loadScene(tenant, projectId, si);
+  const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
-  const actor = await needActor(tenant, opts.actor || prev?.actor);
+  const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || prev?.actor);
   const source = opts.voice_source || prev?.voice_source || "script";
   if (opts.delivery !== undefined || !prev?.actor) {
     await patch(tenant, projectId, si, (p) => {
@@ -710,8 +859,9 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const project = await loadProject(tenant, projectId);
   if (!project) throw new Error("Project not found");
   const clips = (project as any).speaker_track?.clips || [];
-  const { listCast } = await import("./cast.js");
   const actors = await listCast(tenant);
+  const { listLocations } = await import("./locations.js");
+  const locations = await listLocations(tenant);
   const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
@@ -719,10 +869,16 @@ export async function getScenePerformances(tenant: string, projectId: string) {
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;
+    const hasRec = !!sceneRecording(project, i);
+    const plan = resolvePlan(project as any, i, actors, hasRec);
+    const st = planState(project as any, i, plan, take ? { performed_by: take.performed_by || null, recast_by: Object.keys(take.actors || {}) } : null, hasRec);
     return {
       scene_index: i, label: s.label, lines: String(s.voiceover_text || ""),
       take: take ? { performed_by: take.performed_by || null, recast_by: Object.keys(take.actors || {}) } : null,
-      has_recording: !!sceneRecording(project, i),
+      has_recording: hasRec,
+      // The plan (core/cast-plan.ts): what the scene should be, and whether its take is it.
+      plan, plan_line: planLine(plan, actors, locations), state: st.state, ...(st.why ? { why: st.why } : {}),
+      performer: s.performer || null,
       cast, cast_follows_film: s.cast === undefined,
       performance: s.performance || null,
       // What the scene uses when it writes no prompt of its own.
@@ -741,10 +897,13 @@ export async function getScenePerformances(tenant: string, projectId: string) {
  *  clip lands on the scene (`actor_clip`). */
 export async function startActorClip(tenant: string, projectId: string, si: number, opts: { actor?: string; shot: string; seconds?: number; at?: number }): Promise<Record<string, unknown>> {
   const { project, scene } = await loadScene(tenant, projectId, si);
-  const actor = await needActor(tenant, opts.actor || scene.performance?.actor);
+  const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || scene.performance?.actor);
   if (!process.env.ATLASCLOUD_API_KEY) throw new Error("Seedance is not set up on this server (ATLASCLOUD_API_KEY)");
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the frame is drawn by GPT Image)");
   const shot = String(opts.shot || "").trim().slice(0, 1000);
+  // The b-roll is set where the scene is: the plan's location, else the last one used.
+  const clipWhere = planField(project, si, "location") ?? scene.performance?.location;
+  if (clipWhere) await locationImage(tenant, clipWhere);
   if (!shot) throw new Error("shot is required: what the actor does (\"sips a coffee at her desk, looking out the window\")");
   const seconds = Math.max(4, Math.min(15, Math.round(Number(opts.seconds) || 5)));
   const at = Math.max(0, Number(opts.at) || 0);
@@ -771,7 +930,7 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
   void (async () => {
     try {
       // In the scene's location when it has one: the cutaway is the same room.
-      const loc = scene.performance?.location ? await locationImage(tenant, scene.performance.location) : undefined;
+      const loc = clipWhere ? await locationImage(tenant, clipWhere) : undefined;
       const frame = await drawFrame(tenant, projectId, actor, shot, W, H, undefined, loc);
       const images = [await publicUrl(tenant, projectId, resolveVideoPath(frame, config.dataDir))];
       if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));

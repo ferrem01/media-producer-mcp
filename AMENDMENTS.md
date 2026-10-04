@@ -6,6 +6,79 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Studio: the cast plan as a decision tree (SPEC-cast-scenes.md, phase E)
+
+Cast card, Scene by scene:
+- **The film's plan**: Who (Me / an actor) -> How (Record / Recast my recording
+  / Generate) -> Engine (only the ones that can do that) -> Where (a location,
+  only for Seedance). A change makes nothing; scenes it no longer matches show
+  stale.
+- **Each scene**: the same row, each select leading with "Film's" (follow the
+  film), the plan's one line beside it, and a state badge (ready / to make /
+  stale, the reason on hover).
+- **Perform the plan / Finals at 1080p**: the scene list and the cost first,
+  then "Perform them" / "Make the finals" starts it; what waits (no recording,
+  one recast at a time, a vendor not set up) is said.
+- **The board's plan table** shows who performs each beat under its shot, with
+  the state (GET /api/storyboard/{t}/{p}/plan adds `performer`,
+  `performer_state` on person films with a plan or performances).
+
+## 2026-10-04 — HeyGen generates a scene (SPEC-cast-scenes.md, phase D)
+
+`startScenePerformance` now dispatches on the engine: `engine: "heygen"` (or a
+scene whose plan says HeyGen; a HeyGen look defaults to it) has the look --
+or, for an actor with no look, the portrait -- speak the scene's line. The
+look is the setting: no frame, no location, no draft (HeyGen's one render is
+the take). The voice is the actor's ElevenLabs voice (v4 delivery, or the
+recording converted), else the look's own HeyGen voice; ours is laid under
+HeyGen's picture. The job's work dir is keyed by the voice and direction, so a
+restart collects the HeyGen job instead of paying twice. Attached as
+`take-performed-<actor>-s<n>-final-heygen-*.mp4` with `performed_by.engine:
+"heygen"`; `made_with` records it, so the plan's state reads ready. perform_all
+includes HeyGen scenes (cost: HeyGen API credits). MCP perform_scene takes
+`engine` and `motion`.
+
+## 2026-10-04 — Perform the plan / finals all (SPEC-cast-scenes.md, phase C)
+
+`core/perform-plan.ts`. `perform_all`: every scene whose take does not answer
+its plan (todo / stale), made as the plan says -- Seedance drafts side by side,
+a recast per actor+engine (one recast job per film at a time; the rest are
+reported to run next), the recording put back where the plan is me (free).
+HeyGen-generate per scene is reported as not built (phase D); scenes waiting
+for a recording say so. `finals_all`: every ready draft with no newer final,
+finished at 1080p from its draft id.
+
+Both return the scene list and the COST first (Seedance 480p $0.134/s, 1080p
+final ~$0.30/s, billed whole seconds, 4 s minimum, on the built scene's
+length); `confirm: true` starts them. MCP `cast` perform_all / finals_all;
+POST `/api/scene-performance/{t}/{p}` `{action:"perform_all"|"finals_all",
+confirm?}`.
+
+## 2026-10-04 — The cast plan on the storyboard (SPEC-cast-scenes.md, phase B)
+
+`core/cast-plan.ts`. The film's default on `storyboard.cast_plan`, each scene's
+own on `storyboard.scenes[i].performer`: `{actor (null = me), how: record |
+recast | generate, engine, location}`, any field absent = the film's (a scene's
+`location: null` = none even when the film has one). No `how` anywhere: a cast
+member recasts the scene's recording when there is one, else generates.
+Engines: recast higgsfield (Genjutsu, the default), kling, heygen, runway;
+generate seedance (default), heygen; a HeyGen look defaults to HeyGen (its
+look is its setting, so a location only resolves for Seedance).
+
+- A plan edit makes NOTHING. Each scene's state is derived (cast
+  action='scenes', the scene-performance GET): ready (its take answers the
+  plan), todo (nothing made), stale (made for another plan: another actor,
+  engine, or location -- `performance.made_with` records what a take was made
+  with). Re-performing is always asked.
+- Execution reads the plan: perform / start_frame / hear_voice / b-roll with
+  no actor or location use the plan's; choosing one there writes it into the
+  scene's plan (performing a scene = this actor, generated, Seedance), so the
+  board says what the scene now is. A final finishing its draft keeps the
+  draft's location.
+- Edit: the `update` tool's storyboard `cast_plan` and `scenes[].performer`
+  (checked against the cast and the locations), or POST
+  `/api/scene-performance/{t}/{p}` `{action:"plan"}`.
+
 ## 2026-10-04 — Locations: a clean plate per set (SPEC-cast-scenes.md, phase A)
 
 Marc asked what happens when Dana moves room or each scene is somewhere else,

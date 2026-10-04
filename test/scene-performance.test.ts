@@ -582,3 +582,232 @@ describe("cast scene by scene", () => {
     expect(after.storyboard.scenes[1].cast).toBeUndefined();
   });
 });
+
+describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
+  it("resolves a scene's plan over the film's, picks engines, writes a line, and says ready / todo / stale", async () => {
+    const cp = await import("../src/core/cast-plan.js");
+    const actors: any[] = [{ id: "dana", name: "Dana" }, { id: "marc-look", name: "Marc look", heygen_look_id: "hl1" }];
+    const locs = [{ id: "loft", name: "Loft lounge" }];
+    const proj: any = { storyboard: { cast_plan: { actor: "dana", how: "generate", location: "loft" }, scenes: [
+      {}, { performer: { location: null } }, { performer: { actor: null } }, { performer: { how: "recast" } }, { performer: { actor: "marc-look" } },
+    ] } };
+    const r0 = cp.resolvePlan(proj, 0, actors);
+    expect(r0).toMatchObject({ actor: "dana", how: "generate", engine: "seedance", location: "loft" });
+    expect(r0.from_film.sort()).toEqual(["actor", "how", "location"]);
+    expect(cp.planLine(r0, actors, locs)).toBe("Dana · Generate · Seedance · Loft lounge");
+    expect(cp.resolvePlan(proj, 1, actors).location).toBeUndefined();          // none, over the film's
+    expect(cp.resolvePlan(proj, 2, actors)).toMatchObject({ actor: null });
+    expect(cp.planLine(cp.resolvePlan(proj, 3, actors), actors)).toBe("Dana · Recast · Genjutsu");   // a location means nothing to a recast
+    expect(cp.resolvePlan(proj, 4, actors)).toMatchObject({ actor: "marc-look", engine: "heygen" });  // a look is its own setting
+    expect(cp.resolvePlan(proj, 4, actors).location).toBeUndefined();
+    // No how anywhere: a cast member recasts a recording, else generates; nobody is me recording.
+    const bare: any = { storyboard: { scenes: [{ performer: { actor: "dana" } }, {}] } };
+    expect(cp.resolvePlan(bare, 0, actors, true).how).toBe("recast");
+    expect(cp.resolvePlan(bare, 0, actors, false).how).toBe("generate");
+    expect(cp.planLine(cp.resolvePlan(bare, 1, actors, true))).toBe("Me · Record");
+
+    // State.
+    const gen = cp.resolvePlan(proj, 0, actors);
+    const sc = proj.storyboard.scenes[0];
+    expect(cp.planState(proj, 0, gen, null, false).state).toBe("todo");
+    expect(cp.planState(proj, 0, gen, { recast_by: [] }, true)).toMatchObject({ state: "stale" });
+    sc.performance = { made_with: { actor: "dana", engine: "seedance", location: "loft" } };
+    expect(cp.planState(proj, 0, gen, { performed_by: { actor: "dana", engine: "seedance" } }, true).state).toBe("ready");
+    sc.performance.made_with.location = "office";
+    expect(cp.planState(proj, 0, gen, { performed_by: { actor: "dana", engine: "seedance" } }, true)).toMatchObject({ state: "stale", why: expect.stringMatching(/another location/) });
+    const rec = cp.resolvePlan(proj, 3, actors);
+    expect(cp.planState(proj, 3, rec, { recast_by: [] }, false).state).toBe("todo");
+    proj.storyboard.scenes[3].cast = "dana";
+    expect(cp.planState(proj, 3, rec, { recast_by: ["dana"] }, true).state).toBe("ready");
+
+    // Edits: checked, '' back to the film's, null kept.
+    expect(() => cp.cleanPlan({ actor: "nobody" }, actors, locs)).toThrow(/No cast actor "nobody"/);
+    expect(() => cp.cleanPlan({ location: "attic" }, actors, locs)).toThrow(/No location "attic"/);
+    expect(() => cp.cleanPlan({ how: "dance" }, actors, locs)).toThrow(/how must be/);
+    expect(() => cp.writePlan({ how: "recast" }, cp.cleanPlan({ engine: "seedance" }, actors, locs))).toThrow(/Seedance cannot recast/);
+    expect(cp.writePlan({ actor: "dana", location: "loft" }, cp.cleanPlan({ location: "" }, actors, locs))).toEqual({ actor: "dana" });
+    expect(cp.writePlan(undefined, cp.cleanPlan({ location: "none" }, actors, locs))).toEqual({ location: null });
+    expect(cp.writePlan({ actor: "dana" }, cp.cleanPlan({ how: "record" }, actors, locs))).toEqual({ actor: null, how: "record" });
+    expect(cp.writePlan({ engine: "kling" }, cp.cleanPlan({ engine: "" }, actors, locs))).toBeUndefined();
+  });
+
+  it("a plan edit makes nothing; a perform with no actor or location uses the plan; choosing in a perform writes the plan; a changed plan reads stale", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_plan"));
+    const loc = await import("../src/core/locations.js");
+    await fs.writeFile(path.join(DATA, T, "projects", P, "assets", "plate.png"), m.png);
+    const plate = await loc.addLocation(T, { name: "Den", image: `/assets/${T}/projects/${P}/assets/plate.png`, clean: false });
+    const atlas: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: `pl${atlas.length}` } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/pl.mp4"], draft_id: "pld" } }));
+      if (u === "https://cdn/pl.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const takes: any[] = [];
+    sp.registerSceneAttacher(async (_t, _p, url, si, extra) => { takes.push({ url, si, extra }); return { status: 200, body: {} }; });
+    const { loadProject: lp, saveProject: svp } = await import("../src/persistence/project.js");
+    // A fresh scene with nothing performed: clear scene 0's earlier state.
+    const pr: any = await lp(T, P); delete pr.storyboard.scenes[0].performance; delete pr.storyboard.scenes[0].performer; await svp(pr);
+
+    await expect(sp.editCastPlan(T, P, { cast_plan: { actor: "ghost" } })).rejects.toThrow(/No cast actor "ghost"/);
+    await sp.editCastPlan(T, P, { cast_plan: { actor: "dana", how: "generate", location: plate.id } });
+    expect(atlas).toHaveLength(0);                                   // nothing made
+    let s0 = (await sp.getScenePerformances(T, P))[0];
+    expect(s0.plan_line).toBe("Dana · Generate · Seedance · Den");
+    expect(s0.plan).toMatchObject({ actor: "dana", how: "generate", engine: "seedance", location: plate.id });
+
+    // Perform with nothing named: the plan's actor and location.
+    await sp.startScenePerformance(T, P, 0, { voice_source: "script", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P))[0].performance?.status !== "running", 40000);
+    s0 = (await sp.getScenePerformances(T, P))[0];
+    expect(s0.performance.error).toBeUndefined();
+    expect(s0.performance.location).toBe(plate.id);
+    expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance", location: plate.id });
+    expect(atlas[0].reference_images[2]).toMatch(new RegExp(`${plate.id}\\.jpg$`));
+    expect(s0.performer).toBeNull();                                  // it followed the film: nothing written
+    // (the attacher here is a stub, so the take is read from the scene's own record)
+
+    // The film's location changes: the scene no longer matches -- stale, never remade by itself.
+    const den2 = await loc.addLocation(T, { name: "Den two", image: `/assets/${T}/projects/${P}/assets/plate.png`, clean: false });
+    await sp.editCastPlan(T, P, { cast_plan: { location: den2.id } });
+    expect(atlas).toHaveLength(1);
+    const pr2: any = await lp(T, P);
+    const cp = await import("../src/core/cast-plan.js");
+    const plan = cp.resolvePlan(pr2, 0, [{ id: "dana", name: "Dana" } as any]);
+    expect(cp.planState(pr2, 0, plan, { performed_by: { actor: "dana", engine: "seedance" } }, false)).toMatchObject({ state: "stale" });
+
+    // A scene's own plan: choosing a location in the perform writes it there.
+    await sp.startScenePerformance(T, P, 0, { voice_source: "script", force: true, location: plate.id });
+    await until(async () => (await sp.getScenePerformances(T, P))[0].performance?.status !== "running", 40000);
+    s0 = (await sp.getScenePerformances(T, P))[0];
+    expect(s0.performer).toEqual({ location: plate.id });
+    expect(s0.plan_line).toBe("Dana · Generate · Seedance · Den");
+    // null follows the film again.
+    await sp.editCastPlan(T, P, { scenes: [{ index: 0, performer: null }] });
+    expect((await sp.getScenePerformances(T, P))[0].performer).toBeNull();
+    await sp.editCastPlan(T, P, { cast_plan: null });
+  }, 120000);
+});
+
+describe("perform the plan: every scene that does not answer it, with the cost first", () => {
+  it("lists what each scene needs and what it costs, starts it only when asked, and finishes ready drafts at 1080p", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    delete process.env.KLING_API_KEY; delete process.env.KLING_ACCESS_KEY;
+    const m = await media(path.join(DATA, "_media_pp"));
+    const P3 = "proj_pp";
+    const pdir = path.join(DATA, T, "projects", P3);
+    await fs.mkdir(path.join(pdir, "assets"), { recursive: true });
+    await fs.writeFile(path.join(pdir, "assets", "rec.mp4"), m.mp4);
+    const rec = (si: number) => ({ id: `tk${si}`, scene_index: si, source: `/assets/${T}/projects/${P3}/assets/rec.mp4`, created_at: "2026-10-04T00:00:00.000Z" });
+    await fs.writeFile(path.join(pdir, "project.json"), JSON.stringify({
+      project_id: P3, tenant_id: T, name: "PP", format: "video", status: "generated", canvas: { width: 1080, height: 1920, fps: 30 },
+      created_at: "2026-10-04T00:00:00.000Z", updated_at: "2026-10-04T00:00:00.000Z", treatment: { filmGrammar: "speaker" },
+      storyboard: { cast_plan: { actor: "dana", how: "generate" }, scenes: [
+        { label: "Hook", voiceover_text: "One.", duration_seconds: 6, components: [] },
+        { label: "Me", voiceover_text: "Two.", duration_seconds: 5, components: [], performer: { how: "record" } },
+        { label: "Recast", voiceover_text: "Three.", duration_seconds: 5, components: [], performer: { how: "recast", engine: "kling" } },
+      ] },
+      scenes: [{ id: "a", duration_seconds: 9.2, components: [] }, { id: "b", duration_seconds: 5, components: [] }, { id: "c", duration_seconds: 5, components: [] }],
+      takes: [rec(1), rec(2)],
+      speaker_track: { clips: [{ scene_index: 1, source: rec(1).source }, { scene_index: 2, source: rec(2).source }] },
+    }));
+    const atlas: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: `pp${atlas.length}` } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/pp.mp4"], draft_id: "ppd" } }));
+      if (u === "https://cdn/pp.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const { loadProject: lp, saveProject: svp } = await import("../src/persistence/project.js");
+    // An attacher that does what index.ts does, enough for the state: the take and its clip.
+    sp.registerSceneAttacher(async (tenant, project, url, si, extra) => {
+      const pr: any = await lp(tenant, project);
+      pr.takes = [...(pr.takes || []), { id: `perf${si}${pr.takes.length}`, scene_index: si, source: url, created_at: new Date().toISOString(), ...(extra.performed_by ? { performed_by: extra.performed_by } : {}) }];
+      pr.speaker_track.clips = [...pr.speaker_track.clips.filter((c: any) => c.scene_index !== si), { scene_index: si, source: url }];
+      await svp(pr);
+      return { status: 200, body: {} };
+    });
+    const pp = await import("../src/core/perform-plan.js");
+    const est = await pp.planPerformance(T, P3);
+    expect(est.scenes.map((r) => [r.index, r.state, r.action])).toEqual([[0, "todo", "perform"], [1, "ready", "skip"], [2, "todo", "recast"]]);
+    expect(est.scenes[0]).toMatchObject({ seconds: 10, usd: 1.34 });       // the built scene's 9.2 s, billed whole
+    expect(est.usd).toBe(1.34);
+    expect(atlas).toHaveLength(0);                                         // an estimate makes nothing
+
+    const go = await pp.performPlan(T, P3);
+    expect(go.started).toEqual([0]);
+    expect(go.waiting).toEqual([{ index: 2, note: expect.stringMatching(/Kling/) }]);   // not set up here: said, not hidden
+    await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done", 40000);
+    let s = await sp.getScenePerformances(T, P3);
+    expect(s[0]).toMatchObject({ state: "ready", plan_line: "Dana · Generate · Seedance" });
+    expect(s[0].performer).toBeNull();                                     // it followed the film's plan
+
+    // The plan for scene 1 becomes Dana generated: stale until performed.
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: null }] });
+    s = await sp.getScenePerformances(T, P3);
+    expect(s[1]).toMatchObject({ state: "stale", why: expect.stringMatching(/your recording plays/) });
+    // ...and back to me: the recording is put back for free when it is not playing.
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 0, performer: { how: "record" } }] });
+    const back = await pp.planPerformance(T, P3, { scenes: [0] });
+    expect(back.scenes[0]).toMatchObject({ action: "skip", note: expect.stringMatching(/waits for your recording/) });
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 0, performer: null }] });
+
+    // Finals: the ready draft, at 1080p.
+    const fin = await pp.planFinals(T, P3);
+    expect(fin.scenes).toEqual([{ index: 0, seconds: 10, usd: 3 }]);
+    const fgo = await pp.finalsAll(T, P3);
+    expect(fgo.started).toEqual([0]);
+    await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done" && !!(await sp.getScenePerformances(T, P3))[0].performance?.final, 40000);
+    expect(atlas.at(-1)).toEqual({ model: "bytedance/seedance-2.5/draft-complete", draft_id: "ppd", watermark: false });
+    expect((await pp.planFinals(T, P3)).scenes).toEqual([]);
+  }, 120000);
+});
+
+describe("HeyGen generates a scene: the look is the setting", () => {
+  it("voices the line, HeyGen draws the person from the portrait, our voice laid under it, attached as the scene's take with no draft", async () => {
+    process.env.HEYGEN_API_KEY = "hk"; process.env.ELEVENLABS_API_KEY = "ek"; process.env.ATLASCLOUD_API_KEY = "ak";
+    const m = await media(path.join(DATA, "_media_hg"));
+    const P3 = "proj_pp";
+    const hey: any[] = [];
+    let atlas = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.includes("api.atlascloud.ai")) { atlas++; throw new Error("no Seedance here"); }
+      if (u.endsWith("/v3/assets")) { hey.push({ asset: true }); return new Response(JSON.stringify({ data: { asset_id: `a${hey.length}` } })); }
+      if (u.endsWith("/v3/videos") && init?.method === "POST") { hey.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { video_id: "hv1" } })); }
+      if (u.includes("/v3/videos/hv1")) return new Response(JSON.stringify({ data: { status: "completed", video_url: "https://cdn/hg.mp4" } }));
+      if (u === "https://cdn/hg.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const pp = await import("../src/core/perform-plan.js");
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: { actor: "dana", how: "generate", engine: "heygen" } }] });
+    const est = await pp.planPerformance(T, P3, { scenes: [1] });
+    expect(est.scenes[0]).toMatchObject({ action: "perform", note: "HeyGen API credits" });
+    expect(est.scenes[0].usd).toBeUndefined();
+    // No engine named: the plan's (HeyGen).
+    await sp.startScenePerformance(T, P3, 1, { voice_source: "script" });
+    await until(async () => (await sp.getScenePerformances(T, P3))[1].performance?.status !== "running", 40000);
+    const s1 = (await sp.getScenePerformances(T, P3))[1];
+    expect(s1.performance.error).toBeUndefined();
+    expect(atlas).toBe(0);
+    const gen = hey.find((h) => h.audio_asset_id);
+    expect(gen).toMatchObject({ type: "image", aspect_ratio: "9:16", resolution: "1080p" });
+    expect(gen.motion_prompt).toMatch(/calm, grounded presenter/);
+    expect(s1.performance.final.url).toMatch(/take-performed-dana-s2-final-heygen-.*\.mp4$/);
+    expect(s1.performance.draft).toBeUndefined();
+    expect(s1.performance.made_with).toEqual({ actor: "dana", engine: "heygen" });
+    expect(s1).toMatchObject({ state: "ready", plan_line: "Dana · Generate · HeyGen" });
+    expect((await pp.planFinals(T, P3, { scenes: [1] })).scenes).toEqual([]);   // nothing to finish: HeyGen's render is the take
+  }, 90000);
+});

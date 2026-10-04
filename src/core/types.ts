@@ -541,6 +541,26 @@ export interface Storyboard {
   estimated_duration: number;
   /** Feedback that shaped this storyboard */
   revision_notes?: string[];
+  /** Who performs the person, how and where, for every scene that does not
+   *  say otherwise (core/cast-plan.ts, SPEC-cast-scenes.md). */
+  cast_plan?: CastPlan;
+}
+
+/** WHO performs a person-carried scene, HOW, with which ENGINE, and WHERE.
+ *  The film's default on `storyboard.cast_plan`; a scene's own on
+ *  `storyboard.scenes[i].performer` (each field absent: the film's). The plan
+ *  only says what is wanted -- a change never makes anything by itself; the
+ *  scene shows as stale until it is performed again. */
+export interface CastPlan {
+  /** A cast actor id; null = me (the recording's person). */
+  actor?: string | null;
+  how?: "record" | "recast" | "generate";
+  /** recast: higgsfield (Genjutsu) | kling | heygen | runway.
+   *  generate: seedance | heygen. Absent: the best for the actor. */
+  engine?: string;
+  /** generate with Seedance: a location id (core/locations.ts); null on a
+   *  scene = no location, over the film's. */
+  location?: string | null;
 }
 
 export interface StoryboardAudioDirection {
@@ -626,6 +646,8 @@ export interface ScenePerformance {
   voice_offset?: number;
   /** The video as Seedance made it, before the voice was laid over it. */
   seedance_url?: string;
+  /** What the scene's current take was made with (the plan it answers). */
+  made_with?: { actor: string; engine: string; location?: string };
   /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */
   draft?: { url: string; draft_id?: string; inputs: string; made_at: string };
   final?: { url: string; made_at: string };
@@ -646,6 +668,8 @@ export interface StoryboardScene {
    *  a cast actor id plays that actor's recast of the take; null plays the
    *  recording itself; absent follows the film (project.speaker_cast). */
   cast?: string | null;
+  /** This scene's plan, over the film's `storyboard.cast_plan`. */
+  performer?: CastPlan;
   /** A cast actor performing the scene without a recording (Seedance). */
   performance?: ScenePerformance;
   /** The last cast-actor b-roll made for this scene (no speech, Seedance),
@@ -970,7 +994,7 @@ export interface Take {
   /** The take IS a cast actor's performance (core/scene-performance.ts):
    *  made by a vendor from the scene's line, no recording behind it. A
    *  recast never redraws it. */
-  performed_by?: { actor: string; engine: "seedance"; quality: "draft" | "final" };
+  performed_by?: { actor: string; engine: "seedance" | "heygen"; quality: "draft" | "final" };
   /** Where the face is, measured at ingest (fractions of the frame; the
    *  layout builds its bands around it). Absent when none was found. */
   face?: { cx: number; cy: number; size: number; confidence: number };
