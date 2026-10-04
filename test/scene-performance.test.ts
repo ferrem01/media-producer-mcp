@@ -386,6 +386,41 @@ describe("delivery: how the line is said (ElevenLabs v4)", () => {
   }, 60000);
 });
 
+describe("the room reference: the same room in every scene", () => {
+  it("labels the room as the last reference image and sends it with the take", async () => {
+    const sd = await import("../src/core/seedance.js");
+    expect(sd.seedanceRefs(3, true, false, true)).toBe("@Image1 is the first frame of the video. @Image2 is the character sheet (the same person). @Image3 is the room: keep this exact room, furniture, plants, windows and light throughout. @Audio1 is the reference audio.");
+    expect(sd.seedanceRefs(2, true, false, true)).toBe("@Image1 is the first frame of the video. @Image2 is the room: keep this exact room, furniture, plants, windows and light throughout. @Audio1 is the reference audio.");
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media9"));
+    const pdir = path.join(DATA, T, "projects", P);
+    await fs.writeFile(path.join(pdir, "assets", "room.png"), m.png);
+    const room = `/assets/${T}/projects/${P}/assets/room.png`;
+    const atlas: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: "rm1" } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/rm.mp4"], draft_id: "rmd" } }));
+      if (u === "https://cdn/rm.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
+    await expect(sp.startScenePerformance(T, P, 1, { actor: "dana", voice_source: "script", room_url: "/assets/elsewhere/x.png" })).rejects.toThrow(/image asset of this film/);
+    await sp.startScenePerformance(T, P, 1, { actor: "dana", voice_source: "script", room_url: room, video_prompt: "", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P))[1].performance?.status !== "running", 40000);
+    const s2 = (await sp.getScenePerformances(T, P))[1];
+    expect(s2.performance.error).toBeUndefined();
+    expect(s2.performance.room_url).toBe(room);
+    expect(atlas[0].reference_images).toHaveLength(3);
+    expect(atlas[0].reference_images[2]).toMatch(/_perform\/.*room\.png$/);
+    expect(atlas[0].prompt).toMatch(/@Image3 is the room: keep this exact room/);
+    expect(s2.defaults.video_prompt).toMatch(/@Image3 is the room/);
+  }, 90000);
+});
+
 describe("an earlier performance back as the scene's take", () => {
   it("re-attaches a take-performed file of this scene, Seedance's sound, its draft id kept for the final", async () => {
     const m = await media(path.join(DATA, "_media7"));

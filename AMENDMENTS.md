@@ -151,6 +151,15 @@ voice; "(pause)" lines become "..." when there is none. `previewSceneVoice`
 (MCP `hear_voice`, API `{action:"voice"}`, Studio "Hear the voice") makes
 the voice alone for cents before any Seedance.
 
+The room reference. All seven scenes as v4-voiced Dana drafts, each from the
+one before's last frame: Marc -- the voice and inflection "sound great", but
+"the apartment and the couch is changing slightly", worst in the back
+scenes. Chained start frames carry each scene's small redraw into the next.
+`performance.room_url` (MCP/API `room_url`, Studio "Room reference"): an
+image of the set -- usually the first scene's drawn frame -- sent as the LAST
+reference image and named in the prompt ("@ImageN is the room: keep this
+exact room, furniture, plants, windows and light throughout").
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

@@ -122,8 +122,8 @@ function setPrompt(p: ScenePerformance, key: "frame_prompt" | "video_prompt", v:
 }
 
 /** The prompts a scene uses unless it says otherwise: built from the shot. */
-export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean): { frame_prompt: string; video_prompt: string } {
-  return { frame_prompt: framePrompt(shot, vertical, sheet), video_prompt: `${seedanceRefs(sheet ? 2 : 1, true)} ${speakingPrompt(shot)}` };
+export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, room = false): { frame_prompt: string; video_prompt: string } {
+  return { frame_prompt: framePrompt(shot, vertical, sheet), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot)}` };
 }
 
 async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string): Promise<string> {
@@ -421,6 +421,8 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   force?: boolean;
   /** The delivery the script voice reads ("" back to the plain line). */
   delivery?: string;
+  /** The room reference: a project image asset ("" for none). */
+  room_url?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -436,6 +438,11 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
   const shot = String(opts.shot ?? prev?.shot ?? DEFAULT_SHOT).trim().slice(0, 1000) || DEFAULT_SHOT;
   const source = opts.voice_source || prev?.voice_source || "script";
+  if (opts.room_url) {
+    const prefix = `/assets/${tenant}/projects/${projectId}/assets/`;
+    if (!opts.room_url.startsWith(prefix) || opts.room_url.includes("..") || !/\.(jpe?g|png|webp)$/i.test(opts.room_url)) throw new Error("room_url must be an image asset of this film");
+    if (!(await fs.stat(resolveVideoPath(opts.room_url, config.dataDir)).then(() => true, () => false))) throw new Error("room_url not found");
+  }
   running.add(key);
   const perf = await patch(tenant, projectId, si, (p) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
@@ -446,6 +453,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
     if (opts.voice_track) p.voice_track = opts.voice_track;
     if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
+    if (opts.room_url !== undefined) { if (opts.room_url) p.room_url = opts.room_url; else delete p.room_url; }
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
   const release = () => { running.delete(key); vendorNow.delete(key); };
@@ -501,7 +509,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
     voiceUrl = assetUrl(tenant, projectId, voiceName);
     const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
-    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || ""].join("|");
+    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.room_url || ""].join("|");
   }
   const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot);
 
@@ -516,8 +524,9 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     const frameAbs = resolveVideoPath(frame!, config.dataDir);
     const images = [await publicUrl(tenant, projectId, frameAbs)];
     if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));
+    if (perf.room_url) images.push(await publicUrl(tenant, projectId, resolveVideoPath(perf.room_url, config.dataDir)));
     return seedanceShot({
-      images, audio: await publicUrl(tenant, projectId, voice!.file), prompt: videoPrompt,
+      images, audio: await publicUrl(tenant, projectId, voice!.file), prompt: videoPrompt, room: !!perf.room_url,
       // A breath of room past the voice (the proven run gave 10.03 s of voice
       // 10 s and held sync: headroom is not what keeps the lips on).
       seconds: voice!.seconds + 0.3, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
@@ -666,7 +675,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
-    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true);
+    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true, !!s.performance?.room_url);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;

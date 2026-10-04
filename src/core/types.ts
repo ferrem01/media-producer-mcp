@@ -583,6 +583,11 @@ export interface ScenePerformance {
    *  for emphasis, /IPA/ for a pronunciation. Kept apart from the script, so
    *  the marks never reach captions or any other voice. Absent: the line. */
   delivery?: string;
+  /** The ROOM reference: an image of the set (a project asset -- usually
+   *  the first scene's drawn frame) sent to Seedance with every take as the
+   *  last reference image, so the room stops drifting from scene to scene
+   *  (Marc, Oct 4: "the apartment and the couch is changing slightly"). */
+  room_url?: string;
   /** The prompts, written out in full when the defaults built from the shot
    *  are not what is wanted (Marc: "define any prompt for any scene"):
    *  `frame_prompt` what GPT Image draws, `video_prompt` what Seedance gets.

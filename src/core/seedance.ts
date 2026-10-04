@@ -25,9 +25,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export interface SeedanceResult { url: string; draftId?: string; predictionId: string }
 
 /** The references named in the prompt, as Seedance cites them. */
-export function seedanceRefs(images: number, audio: boolean, video = false): string {
+export function seedanceRefs(images: number, audio: boolean, video = false, room = false): string {
   const names = ["@Image1 is the first frame of the video."];
-  if (images > 1) names.push(`${Array.from({ length: images - 1 }, (_, i) => `@Image${i + 2}`).join(", ")} ${images > 2 ? "are" : "is"} the character sheet (the same person).`);
+  // The room reference, when there is one, is the LAST image.
+  const sheets = images - 1 - (room && images > 1 ? 1 : 0);
+  if (sheets > 0) names.push(`${Array.from({ length: sheets }, (_, i) => `@Image${i + 2}`).join(", ")} ${sheets > 1 ? "are" : "is"} the character sheet (the same person).`);
+  if (room && images > 1) names.push(`@Image${images} is the room: keep this exact room, furniture, plants, windows and light throughout.`);
   if (video) names.push("@Video1 is the reference video.");
   if (audio) names.push("@Audio1 is the reference audio.");
   return names.join(" ");
@@ -88,6 +91,8 @@ async function submit(body: Record<string, unknown>, what: string): Promise<stri
  *  shot, the model's room tone). */
 export async function seedanceShot(opts: {
   images: string[]; audio?: string; prompt: string; seconds: number; ratio: string;
+  /** The last image is the room reference (labelled so in the prompt). */
+  room?: boolean;
   draft?: boolean; resolution?: string; resume?: string; onSubmit?: (predictionId: string) => Promise<void> | void;
 }): Promise<SeedanceResult> {
   const headers = auth();
@@ -96,7 +101,7 @@ export async function seedanceShot(opts: {
     id = await submit({
       model: "bytedance/seedance-2.5/reference-to-video",
       // The references named first -- unless the prompt names them itself.
-      prompt: /@Image1\b/.test(opts.prompt) ? opts.prompt : `${seedanceRefs(opts.images.length, !!opts.audio)} ${opts.prompt}`,
+      prompt: /@Image1\b/.test(opts.prompt) ? opts.prompt : `${seedanceRefs(opts.images.length, !!opts.audio, false, !!opts.room)} ${opts.prompt}`,
       reference_images: opts.images.slice(0, 30),
       ...(opts.audio ? { reference_audios: [opts.audio] } : {}),
       duration: Math.max(4, Math.min(30, Math.ceil(opts.seconds))),
