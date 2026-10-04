@@ -347,7 +347,7 @@ export async function runSeedance25Recast(video: string, img: string, seconds: n
 /** The performance-transfer prompt that worked through Higgsfield on Oct 3
  *  (Marc's brief): the face from the sheet, the body language from the take,
  *  the words and voice from the audio. */
-export const HF_PERFORMANCE_PROMPT = "The person from the reference character sheet (the same face, hair, clothes and accessories) talks directly to the camera " +
+export const HF_PERFORMANCE_PROMPT = "The person from the first reference image (the start frame) and the character sheet (the same face, hair, clothes and accessories) talks directly to the camera " +
   "in a vertical selfie-style medium close-up in a bright modern office. They perform exactly like the person in the reference video: " +
   "copy the head movements, hand gestures, timing and energy. Do not copy that person's face, hair or clothes. " +
   "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
@@ -748,7 +748,8 @@ export async function startActorTest(opts: {
    *  heygen-v3: a look id (listHeygenLooks); without one it animates the portrait. */
   heygen_avatar_id?: string;
   /** genjutsu: a SETTING reference (tenant-relative image) -- the actor is
-   *  placed there (a podcast set), the motion kept. */
+   *  placed there (a podcast set), the motion kept. hf-seedance25: a second
+   *  reference image (the model sheet behind the start frame). */
   scene_image?: string;
   /** genjutsu / hf-seedance25: "480p" | "720p" | "1080p" (720p / 480p by default). */
   resolution?: string;
@@ -949,6 +950,14 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       // third of a wide image; actor.jpg is capped at 1024 wide).
       await ffmpeg(["-i", img.path, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet.jpg")]);
       test.files.sheet = "sheet.jpg";
+      // A second reference (scene_image): in the Oct 3 runs the GPT Image
+      // start frame went first and the model sheet second.
+      const refs = [`${pub}/sheet.jpg`];
+      if (heygenOpts.sceneAbs) {
+        await ffmpeg(["-i", heygenOpts.sceneAbs, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", f("sheet2.jpg")]);
+        test.files.sheet2 = "sheet2.jpg";
+        refs.push(`${pub}/sheet2.jpg`);
+      }
       // The voice track as the brief asks: the converted voice, -14 LUFS, WAV.
       await voiceJob;
       let audio: string | undefined;
@@ -957,7 +966,7 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
         test.files.voice_wav = "voice.wav";
         audio = `${pub}/voice.wav`;
       }
-      url = await runHiggsfieldSeedance25(`${pub}/source.mp4`, `${pub}/sheet.jpg`, srcSecs, aspect, {
+      url = await runHiggsfieldSeedance25(`${pub}/source.mp4`, refs, srcSecs, aspect, {
         prompt, resolution: heygenOpts.resolution || "480p", audio,
         onSubmit: async (statusUrl) => { await fs.writeFile(f("hf-seedance25-request.json"), JSON.stringify({ status_url: statusUrl })); },
       });
