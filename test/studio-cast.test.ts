@@ -59,7 +59,7 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(src).toContain("api('/scene-performance/' + castT() + '/' + castP())");
     expect(src).toContain("{ actor: rcA.id, performer: rcP.id, scenes: [Number(v)] }");
     expect(src).toContain("{ action: 'recording' }");
-    expect(src).toContain("{ action: 'frame', actor: spActor, shot: spShot(v) || undefined }");
+    expect(src).toContain("{ action: 'frame', actor: spActor, shot: spShot(v) || undefined, frame_prompt: spPrompt('f', v) }");
     expect(src).toContain("quality: fin ? 'final' : 'draft'");
     expect(src).toContain("{ action: 'clip', actor: spActor, shot: cs.value.trim(), seconds: sec ? Number(sec.value) : 5 }");
     // The poll keeps going while a scene works, and never redraws the box being typed in.
