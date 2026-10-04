@@ -2918,7 +2918,8 @@ Rules:
       // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?}
       //                                                           {action:"pick", url}
       //                                                           {action:"continue", from_scene?}
-      //                                                           {action:"revoice", voice_track?: "converted" | "seedance"}  (the sound, without making it again)  (the start frame = that scene's last frame; default the scene before)
+      //                                                           {action:"revoice", voice_track?: "converted" | "seedance"}  (the sound, without making it again)
+      //                                                           {action:"restore", url, draft_id?}  (an earlier performance of the scene back as its take)  (the start frame = that scene's last frame; default the scene before)
       //                                                           {action:"perform", actor?, shot?, voice_source?, quality?, frame_prompt?, video_prompt?}
       //                                                           (a prompt replaces the default built from the shot; "" goes back to it)
       //                                                           {action:"clip", actor?, shot, seconds?}  (b-roll, no speech)
@@ -2934,6 +2935,11 @@ Rules:
             const body = await parseBody(req).catch(() => ({} as any));
             const str = (v: unknown) => typeof v === "string" ? v : undefined;
             if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt) })); return; }
+            if (body.action === "restore") {
+              const { restoreSceneTake } = await import("./core/scene-performance.js");
+              jsonResponse(res, 200, await restoreSceneTake(spTenant, spProject, si, { url: String(body.url || ""), draft_id: str(body.draft_id) }));
+              return;
+            }
             if (body.action === "revoice") {
               const { revoiceScene } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await revoiceScene(spTenant, spProject, si, { voice_track: body.voice_track === "seedance" ? "seedance" : "converted" }));
@@ -2970,7 +2976,7 @@ Rules:
               jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined }));
               return;
             }
-            jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "perform", "revoice", "clip", "cast" or "recording"' });
+            jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "perform", "revoice", "restore", "clip", "cast" or "recording"' });
             return;
           }
           jsonResponse(res, 405, { error: "Method not allowed" });

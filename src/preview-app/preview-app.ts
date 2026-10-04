@@ -12109,7 +12109,7 @@ ${QUOTIENT_CSS}
         + '<option value="converted"' + (vt === 'converted' ? ' selected' : '') + '>The exact voice file (may drift off the lips)</option></select>'
         + (perf.voice_url ? ' <a href="' + escAttr(withToken(perf.voice_url)) + '" target="_blank">hear the voice file</a>' : '')
         + (perf.voice_offset ? '<small>lined up ' + Math.round(perf.voice_offset * 1000) + ' ms</small>' : '')
-        + (perf.voice_pitch ? '<small>voice pitch ' + perf.voice_pitch.measured + ' Hz' + (perf.voice_pitch.shifted ? ', raised toward ' + escHtml(a ? a.name : 'the actor') + '&#8217;s ' + perf.voice_pitch.target + ' Hz' + (perf.voice_pitch.result ? ' (now ' + perf.voice_pitch.result + ' Hz)' : '') : ' (already ' + escHtml(a ? a.name : 'the actor') + '&#8217;s)') + '</small>' : '') + '</div></div>';
+        + '</div></div>';
     }
     if (run && mine) h += '<div class="np-armed"><span></span>' + escHtml(SP_STAGE[perf.stage] || 'starting') + (s.vendor ? ' &#183; Seedance ' + escHtml(rcVendorWord(s.vendor)) : '') + '</div>';
     else if (mine && perf.status === 'failed') h += '<div class="np-note">It failed: ' + escHtml(perf.error || '') + '</div>';

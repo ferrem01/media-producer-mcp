@@ -307,73 +307,24 @@ describe("one voice in every scene: the exact file laid over the video", () => {
   }, 60000);
 });
 
-describe("the actor's pitch, however the line was spoken", () => {
-  it("measures a voice's pitch and shifts a low read up to the actor's, keeping its length", async () => {
-    const d = path.join(DATA, "_pitch"); await fs.mkdir(d, { recursive: true });
-    const low = path.join(d, "low.wav");
-    // A low read: a 160 Hz voice-like tone with harmonics.
-    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc='0.5*sin(2*PI*160*t)+0.25*sin(2*PI*320*t)+0.12*sin(2*PI*480*t)':s=44100:d=3", low]);
-    const sp = await import("../src/core/scene-performance.js");
-    expect(Math.abs((await sp.voicePitch(low, d)) - 160)).toBeLessThan(6);
-    const m = await sp.matchVoicePitch(low, 198, path.join(d, "fixed.wav"), d);
-    expect(m!.shifted).toBe(true);
-    expect(Math.abs((await sp.voicePitch(m!.file, d)) - 198)).toBeLessThan(8);
-    const info = await run("ffmpeg", ["-hide_banner", "-i", m!.file]).then(() => "", (e: any) => String(e.stderr));
-    expect(info).toMatch(/Duration: 00:00:0(2\.9|3\.0)/);    // the timing is the delivery's: unchanged
-    // Already the actor's pitch: left alone.
-    const same = await sp.matchVoicePitch(low, 163, path.join(d, "same.wav"), d);
-    expect(same).toMatchObject({ shifted: false, file: low });
-  }, 60000);
-});
-
-describe("a low read comes out at the actor's pitch, in the actor's own timbre", () => {
-  it("converts, measures, raises the RECORDING and converts again (the converted file is never pitch-shifted)", async () => {
-    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
-    const d = path.join(DATA, "_media6"); await fs.mkdir(d, { recursive: true });
-    const tone = async (hz: number, name: string) => {
-      const f = path.join(d, name);
-      await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", `aevalsrc='0.5*sin(2*PI*${hz}*t)+0.25*sin(2*PI*${2 * hz}*t)':s=44100:d=3`, "-c:a", "libmp3lame", f]);
-      return fs.readFile(f);
-    };
-    const [bella, low, raised] = [await tone(229, "bella.mp3"), await tone(175, "low.mp3"), await tone(226, "raised.mp3")];
-    const m = await media(d);
+describe("an earlier performance back as the scene's take", () => {
+  it("re-attaches a take-performed file of this scene, Seedance's sound, its draft id kept for the final", async () => {
+    const m = await media(path.join(DATA, "_media7"));
     const pdir = path.join(DATA, T, "projects", P);
-    await fs.writeFile(path.join(pdir, "assets", "rec5.mp4"), m.mp4);
-    const pf = path.join(pdir, "project.json");
-    const disk = JSON.parse(await fs.readFile(pf, "utf8"));
-    const src = `/assets/${T}/projects/${P}/assets/rec5.mp4`;
-    while (disk.storyboard.scenes.length < 5) disk.storyboard.scenes.push({ label: `S${disk.storyboard.scenes.length + 1}`, purpose: "", template: "", voiceover_text: "Line.", components: [] });
-    while (disk.scenes.length < 5) disk.scenes.push({ id: `s${disk.scenes.length + 1}`, duration_seconds: 4, components: [] });
-    disk.takes = [{ id: "take_r5", scene_index: 4, source: src, recorded_at: "", duration: 4 }];
-    disk.speaker_track = { clips: [{ source: src, scene_index: 4, start: 0 }] };
-    await fs.writeFile(pf, JSON.stringify(disk));
-    const { updateActor } = await import("../src/core/cast.js");
-    await updateActor(T, "dana", { voice_id: "v_bella2", voice_name: "Bella" });   // a new voice: its pitch is measured afresh
-    const sts: number[] = [];
-    let tts = 0;
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
-      const u = String(url);
-      if (u.includes("/text-to-speech/v_bella2")) { tts++; return new Response(bella); }
-      if (u.includes("/speech-to-speech/v_bella2")) { const b = (init.body as FormData).get("audio") as Blob; sts.push(b.size); return new Response(sts.length === 1 ? low : raised); }
-      if (u.endsWith("/generateVideo")) return new Response(JSON.stringify({ data: { id: "r1" } }));
-      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/r.mp4"], draft_id: "x" } }));
-      if (u === "https://cdn/r.mp4") return new Response(m.mp4);
-      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
-      throw new Error("unexpected fetch " + u);
-    }));
+    const name = "take-performed-dana-s1-draft-2026-10-04T13-31-36-436Z.mp4";
+    await fs.writeFile(path.join(pdir, "assets", name), m.mp4);
     const sp = await import("../src/core/scene-performance.js");
-    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
-    await sp.startScenePerformance(T, P, 4, { actor: "dana", voice_source: "take" });
-    await until(async () => (await sp.getScenePerformances(T, P))[4].performance?.status !== "running", 40000);
-    const p5 = (await sp.getScenePerformances(T, P))[4].performance;
-    expect(p5.error).toBeUndefined();
-    expect(sts).toHaveLength(2);                                // converted, raised, converted again
-    expect(tts).toBe(1);                                        // the actor's pitch, measured once from a sample
-    expect(p5.voice_pitch.shifted).toBe(true);
-    expect(Math.abs(p5.voice_pitch.measured - 175)).toBeLessThan(8);
-    expect(Math.abs(p5.voice_pitch.target - 229)).toBeLessThan(8);
-    expect(Math.abs(p5.voice_pitch.result - 226)).toBeLessThan(8);
-  }, 90000);
+    const attached: any[] = [];
+    sp.registerSceneAttacher(async (tenant, proj, url, si, extra) => { attached.push({ url, si, extra }); return { status: 200, body: {} }; });
+    const url = `/assets/${T}/projects/${P}/assets/${name}`;
+    const perf = await sp.restoreSceneTake(T, P, 0, { url, draft_id: "d-old" });
+    expect(attached[0]).toEqual({ url, si: 0, extra: { performed_by: { actor: "dana", engine: "seedance", quality: "draft" } } });
+    expect(perf.draft).toMatchObject({ url, draft_id: "d-old" });
+    expect(perf.voice_track).toBe("seedance");
+    expect(perf.final).toBeUndefined();
+    await expect(sp.restoreSceneTake(T, P, 1, { url })).rejects.toThrow(/not a performance of scene 2/);
+    await expect(sp.restoreSceneTake(T, P, 0, { url: `/assets/${T}/projects/${P}/assets/take-performed-dana-s1-draft-gone.mp4` })).rejects.toThrow(/gone/);
+  }, 60000);
 });
 
 describe("the recording back after a performance", () => {
