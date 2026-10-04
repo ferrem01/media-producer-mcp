@@ -326,6 +326,56 @@ describe("the actor's pitch, however the line was spoken", () => {
   }, 60000);
 });
 
+describe("a low read comes out at the actor's pitch, in the actor's own timbre", () => {
+  it("converts, measures, raises the RECORDING and converts again (the converted file is never pitch-shifted)", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const d = path.join(DATA, "_media6"); await fs.mkdir(d, { recursive: true });
+    const tone = async (hz: number, name: string) => {
+      const f = path.join(d, name);
+      await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", `aevalsrc='0.5*sin(2*PI*${hz}*t)+0.25*sin(2*PI*${2 * hz}*t)':s=44100:d=3`, "-c:a", "libmp3lame", f]);
+      return fs.readFile(f);
+    };
+    const [bella, low, raised] = [await tone(229, "bella.mp3"), await tone(175, "low.mp3"), await tone(226, "raised.mp3")];
+    const m = await media(d);
+    const pdir = path.join(DATA, T, "projects", P);
+    await fs.writeFile(path.join(pdir, "assets", "rec5.mp4"), m.mp4);
+    const pf = path.join(pdir, "project.json");
+    const disk = JSON.parse(await fs.readFile(pf, "utf8"));
+    const src = `/assets/${T}/projects/${P}/assets/rec5.mp4`;
+    while (disk.storyboard.scenes.length < 5) disk.storyboard.scenes.push({ label: `S${disk.storyboard.scenes.length + 1}`, purpose: "", template: "", voiceover_text: "Line.", components: [] });
+    while (disk.scenes.length < 5) disk.scenes.push({ id: `s${disk.scenes.length + 1}`, duration_seconds: 4, components: [] });
+    disk.takes = [{ id: "take_r5", scene_index: 4, source: src, recorded_at: "", duration: 4 }];
+    disk.speaker_track = { clips: [{ source: src, scene_index: 4, start: 0 }] };
+    await fs.writeFile(pf, JSON.stringify(disk));
+    const { updateActor } = await import("../src/core/cast.js");
+    await updateActor(T, "dana", { voice_id: "v_bella2", voice_name: "Bella" });   // a new voice: its pitch is measured afresh
+    const sts: number[] = [];
+    let tts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/v_bella2")) { tts++; return new Response(bella); }
+      if (u.includes("/speech-to-speech/v_bella2")) { const b = (init.body as FormData).get("audio") as Blob; sts.push(b.size); return new Response(sts.length === 1 ? low : raised); }
+      if (u.endsWith("/generateVideo")) return new Response(JSON.stringify({ data: { id: "r1" } }));
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/r.mp4"], draft_id: "x" } }));
+      if (u === "https://cdn/r.mp4") return new Response(m.mp4);
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
+    await sp.startScenePerformance(T, P, 4, { actor: "dana", voice_source: "take" });
+    await until(async () => (await sp.getScenePerformances(T, P))[4].performance?.status !== "running", 40000);
+    const p5 = (await sp.getScenePerformances(T, P))[4].performance;
+    expect(p5.error).toBeUndefined();
+    expect(sts).toHaveLength(2);                                // converted, raised, converted again
+    expect(tts).toBe(1);                                        // the actor's pitch, measured once from a sample
+    expect(p5.voice_pitch.shifted).toBe(true);
+    expect(Math.abs(p5.voice_pitch.measured - 175)).toBeLessThan(8);
+    expect(Math.abs(p5.voice_pitch.target - 229)).toBeLessThan(8);
+    expect(Math.abs(p5.voice_pitch.result - 226)).toBeLessThan(8);
+  }, 90000);
+});
+
 describe("the recording back after a performance", () => {
   it("finds the recording under a performance, converts it when asked, and re-attaches it for 'My recording'", async () => {
     const sp = await import("../src/core/scene-performance.js");
