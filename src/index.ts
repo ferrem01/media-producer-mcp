@@ -2922,6 +2922,7 @@ Rules:
               video_asset: typeof body.video_asset === "string" ? body.video_asset : undefined,
               max_seconds: body.max_seconds != null ? Number(body.max_seconds) : undefined,
               hf_urls: body.hf_urls && typeof body.hf_urls === "object" ? body.hf_urls : undefined,
+              compare_with: Array.isArray(body.compare_with) ? body.compare_with : undefined,
               });
             jsonResponse(res, 202, withUrls(t));
             return;
