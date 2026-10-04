@@ -51,6 +51,16 @@ MCP: `cast` actions `scenes`, `start_frame`, `pick_frame`, `perform_scene`,
 `scene_cast`, `actor_clip`; `recast`/`clear` take `scenes`. HTTP:
 `/api/scene-performance/{t}/{p}[/{scene}]`; `/api/recast` takes `scenes`.
 
+First live run (proj_566ccd05, a copy): scene 1 as Dana -- frame in ~16 s,
+a 9 s draft in ~1.5 min (draft id returned), attached and re-timed; the
+other scenes kept the film's cast. Then Marc: "make the fix so we can define
+any prompt for any scene". The frame prompt no longer forces "head and
+shoulders" (it pulled a couch shot into a close-up), and each scene can
+carry `frame_prompt` / `video_prompt` written in full (MCP, API, Studio's
+Prompts boxes prefilled with the defaults from the shot; "" back to the
+default). A video prompt that names @Image1 itself is sent as written; a new
+one means the draft is not finished from the old.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

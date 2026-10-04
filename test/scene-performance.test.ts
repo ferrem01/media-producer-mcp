@@ -177,6 +177,52 @@ describe("a scene performed by a cast actor", () => {
   }, 60000);
 });
 
+describe("any prompt for any scene", () => {
+  it("a written frame or video prompt is used in full, a draft made on another prompt is not finished, and '' goes back to the default", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media3"));
+    const prompts: string[] = [], atlas: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.endsWith("/images/edits")) { prompts.push(String((init.body as FormData).get("prompt"))); return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] })); }
+      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
+      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: `q${atlas.length}` } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/p.mp4"], draft_id: "dd" } }));
+      if (u === "https://cdn/p.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
+    const done = async () => (await sp.getScenePerformances(T, P))[1].performance?.status === "done";
+    // The defaults are shown, built from the shot.
+    let s1 = (await sp.getScenePerformances(T, P))[1];
+    expect(s1.defaults.video_prompt).toMatch(/^@Image1 is the first frame of the video\. @Image2 is the character sheet/);
+    const FP = "Dana sits on a grey couch in a sunlit loft, wide shot, whole body in frame, the room sharp and in focus.";
+    await sp.startSceneFrame(T, P, 1, { actor: "dana", shot: "On a couch, wide", frame_prompt: FP });
+    await until(done);
+    expect(prompts.at(-1)).toBe(FP);
+    s1 = (await sp.getScenePerformances(T, P))[1];
+    expect(s1.performance.frame_prompt).toBe(FP);
+    expect(s1.performance.frames.at(-1).prompt).toBe(FP);
+    const VP = "@Image1 is the first frame. @Image2 is her sheet. @Audio1 is her voice. She sits back on the couch and talks to the camera, the room in focus.";
+    await sp.startScenePerformance(T, P, 1, { video_prompt: VP });
+    await until(done);
+    expect(atlas.at(-1).prompt).toBe(VP);                     // used in full, the references not named twice
+    // Another video prompt: the draft made on the old one is not finished.
+    await sp.startScenePerformance(T, P, 1, { video_prompt: "She laughs, then talks to the camera.", quality: "final" });
+    await until(async () => atlas.length === 2 && await done());
+    expect(atlas[1].model).toBe("bytedance/seedance-2.5/reference-to-video");
+    expect(atlas[1].prompt).toMatch(/^@Image1 is the first frame of the video\. .*She laughs, then talks to the camera\.$/);
+    // '' goes back to the default.
+    await sp.startScenePerformance(T, P, 1, { frame_prompt: "", video_prompt: "" });
+    await until(async () => atlas.length === 3 && await done());
+    s1 = (await sp.getScenePerformances(T, P))[1];
+    expect(s1.performance.frame_prompt).toBeUndefined();
+    expect(s1.performance.video_prompt).toBeUndefined();
+    expect(atlas[2].prompt).toBe(s1.defaults.video_prompt);
+  }, 60000);
+});
+
 describe("the recording back after a performance", () => {
   it("finds the recording under a performance, converts it when asked, and re-attaches it for 'My recording'", async () => {
     const sp = await import("../src/core/scene-performance.js");

@@ -95,7 +95,8 @@ export async function seedanceShot(opts: {
   if (!id) {
     id = await submit({
       model: "bytedance/seedance-2.5/reference-to-video",
-      prompt: `${seedanceRefs(opts.images.length, !!opts.audio)} ${opts.prompt}`,
+      // The references named first -- unless the prompt names them itself.
+      prompt: /@Image1\b/.test(opts.prompt) ? opts.prompt : `${seedanceRefs(opts.images.length, !!opts.audio)} ${opts.prompt}`,
       reference_images: opts.images.slice(0, 30),
       ...(opts.audio ? { reference_audios: [opts.audio] } : {}),
       duration: Math.max(4, Math.min(30, Math.ceil(opts.seconds))),

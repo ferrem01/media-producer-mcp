@@ -577,8 +577,14 @@ export interface ScenePerformance {
    *  voice ("script"), or the scene's recorded take converted to it
    *  ("take": the delivery kept). */
   voice_source: "script" | "take";
+  /** The prompts, written out in full when the defaults built from the shot
+   *  are not what is wanted (Marc: "define any prompt for any scene"):
+   *  `frame_prompt` what GPT Image draws, `video_prompt` what Seedance gets.
+   *  Absent: the defaults. */
+  frame_prompt?: string;
+  video_prompt?: string;
   /** Start frames drawn for the shot, newest last; `frame` the one used. */
-  frames?: Array<{ url: string; shot: string; made_at: string }>;
+  frames?: Array<{ url: string; shot: string; prompt?: string; made_at: string }>;
   frame?: string;
   /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */
   draft?: { url: string; draft_id?: string; inputs: string; made_at: string };

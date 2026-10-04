@@ -32,7 +32,7 @@ import { elevenSpeech, scriptWithBreaks, spokenParts } from "./generated-take.js
 import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, cutClock, cutFileFor } from "./take-clock.js";
 import { editImage } from "../media/image-gen.js";
-import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio } from "./seedance.js";
+import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import type { ScenePerformance } from "./types.js";
 
@@ -111,13 +111,28 @@ export function framePrompt(shot: string, vertical: boolean, sheet: boolean): st
     "realistic skin texture, natural light, no text, no logos.";
 }
 
-async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number): Promise<string> {
+/** A written prompt: undefined keeps what the scene has, "" goes back to the
+ *  default, text replaces it. */
+function setPrompt(p: ScenePerformance, key: "frame_prompt" | "video_prompt", v: string | undefined): boolean {
+  if (v === undefined) return false;
+  const t = String(v).trim().slice(0, 4000);
+  const before = p[key];
+  if (t) p[key] = t; else delete p[key];
+  return before !== p[key];
+}
+
+/** The prompts a scene uses unless it says otherwise: built from the shot. */
+export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean): { frame_prompt: string; video_prompt: string } {
+  return { frame_prompt: framePrompt(shot, vertical, sheet), video_prompt: `${seedanceRefs(sheet ? 2 : 1, true)} ${speakingPrompt(shot)}` };
+}
+
+async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string): Promise<string> {
   const vertical = height > width;
   const sheetAbs = actor.sheet ? path.join(config.dataDir, tenant, actor.sheet) : undefined;
   const work = path.join(projectDir(tenant, projectId), "_work");
   await fs.mkdir(work, { recursive: true });
   const drawn = path.join(work, `frame-${stamp()}.png`);
-  await editImage({ prompt: framePrompt(shot, vertical, !!sheetAbs), images: [portraitPath(tenant, actor), ...(sheetAbs ? [sheetAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
+  await editImage({ prompt: prompt || framePrompt(shot, vertical, !!sheetAbs), images: [portraitPath(tenant, actor), ...(sheetAbs ? [sheetAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
   // Cut to the film's exact shape (2:3 drawn, 9:16 wanted), centred.
   const name = `frame-${actor.id}-${stamp()}.jpg`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
@@ -129,7 +144,7 @@ async function drawFrame(tenant: string, projectId: string, actor: CastActor, sh
 
 /** Draw (or redraw) a scene's start frame. Returns at once; the frame lands
  *  on the scene's performance (frames, frame). */
-export async function startSceneFrame(tenant: string, projectId: string, si: number, opts: { actor?: string; shot?: string }): Promise<ScenePerformance> {
+export async function startSceneFrame(tenant: string, projectId: string, si: number, opts: { actor?: string; shot?: string; frame_prompt?: string }): Promise<ScenePerformance> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
   const actor = await needActor(tenant, opts.actor || prev?.actor);
@@ -141,16 +156,18 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   running.add(key);
   const perf = await patch(tenant, projectId, si, (p) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
-    p.actor = actor.id; p.shot = shot; p.status = "running"; p.stage = "frame"; delete p.error;
+    p.actor = actor.id; p.shot = shot; setPrompt(p, "frame_prompt", opts.frame_prompt);
+    p.status = "running"; p.stage = "frame"; delete p.error;
     p.started_at = new Date().toISOString(); delete p.finished_at;
   });
+  const prompt = perf.frame_prompt;
   void (async () => {
     try {
-      const url = await drawFrame(tenant, projectId, actor, shot, W, H);
+      const url = await drawFrame(tenant, projectId, actor, shot, W, H, prompt);
       // Free before "done": a poll that reads done may start the next job at once.
       running.delete(key);
       await patch(tenant, projectId, si, (p) => {
-        p.frames = [...(p.frames || []), { url, shot, made_at: new Date().toISOString() }].slice(-6);
+        p.frames = [...(p.frames || []), { url, shot, ...(prompt ? { prompt } : {}), made_at: new Date().toISOString() }].slice(-6);
         p.frame = url; p.status = "done"; delete p.stage; p.finished_at = new Date().toISOString();
       });
     } catch (e: any) {
@@ -240,6 +257,8 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
  *  Returns at once; the work runs on (poll getScenePerformances). */
 export async function startScenePerformance(tenant: string, projectId: string, si: number, opts: {
   actor?: string; shot?: string; voice_source?: "script" | "take"; quality?: "draft" | "final";
+  /** Full prompts in place of the defaults ("" back to the default). */
+  frame_prompt?: string; video_prompt?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -259,6 +278,9 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   const perf = await patch(tenant, projectId, si, (p) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     if (p.shot !== shot || p.voice_source !== source) delete p.draft;
+    setPrompt(p, "frame_prompt", opts.frame_prompt);
+    // A new video prompt is a new shot: the draft no longer stands.
+    if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
     p.status = "running"; p.stage = "voice"; delete p.error; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
@@ -282,9 +304,9 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   let frame = perf.frame;
   if (!frame) {
     await stage("frame");
-    frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H);
+    frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt);
     const made = frame;
-    await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
+    await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
   }
   await stage("voice");
   const voice = await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
@@ -292,7 +314,8 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   // What makes the shot: a final can finish the draft only if none changed.
   // (The script voice is made fresh each time and differs by a hair, so a
   // draft from the script is finished whatever the new read sounds like.)
-  const inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, perf.voice_source === "take" ? voiceHash : ""].join("|");
+  const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot);
+  const inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, perf.voice_source === "take" ? voiceHash : "", perf.video_prompt || ""].join("|");
 
   await stage(quality === "final" ? "final" : "draft");
   const kept = path.join(workDir, `seedance-${quality}.json`);
@@ -306,7 +329,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     const images = [await publicUrl(tenant, projectId, frameAbs)];
     if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));
     return seedanceShot({
-      images, audio: await publicUrl(tenant, projectId, voice.file), prompt: speakingPrompt(perf.shot),
+      images, audio: await publicUrl(tenant, projectId, voice.file), prompt: videoPrompt,
       // A breath of room past the voice (the proven run gave 10.03 s of voice
       // 10 s and held sync: headroom is not what keeps the lips on).
       seconds: voice.seconds + 0.3, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
@@ -337,7 +360,12 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const project = await loadProject(tenant, projectId);
   if (!project) throw new Error("Project not found");
   const clips = (project as any).speaker_track?.clips || [];
+  const { listCast } = await import("./cast.js");
+  const actors = await listCast(tenant);
+  const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
+    const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
+    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;
@@ -347,6 +375,8 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       has_recording: !!sceneRecording(project, i),
       cast, cast_follows_film: s.cast === undefined,
       performance: s.performance || null,
+      // What the scene uses when it writes no prompt of its own.
+      defaults,
       actor_clip: s.actor_clip || null,
       running: running.has(`${tenant}/${projectId}/${i}`),
       vendor: vendorNow.get(`${tenant}/${projectId}/${i}`) || null,

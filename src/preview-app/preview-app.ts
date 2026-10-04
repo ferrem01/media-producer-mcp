@@ -12072,6 +12072,21 @@ ${QUOTIENT_CSS}
       + '<textarea id="sp-shot-' + i + '" rows="2" maxlength="1000" style="' + ta + '" placeholder="A selfie-style medium close-up in a bright modern office, talking straight to the camera">' + escHtml(shot) + '</textarea>';
     h += '<label class="np-row"><div class="np-what"><input type="radio" name="sp-voice-' + i + '" value="script"' + (voice === 'script' ? ' checked' : '') + '> Read the script in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice</div></label>'
       + '<label class="np-row' + (s.has_recording ? '' : ' dis') + '"><div class="np-what"><input type="radio" name="sp-voice-' + i + '" value="take"' + (voice === 'take' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> Convert my recording of this scene<small>Your delivery and timing, in ' + escHtml(a ? a.name : 'the actor') + '&#8217;s voice' + (s.has_recording ? '' : ' &#8212; record the scene first') + '</small></div></label>';
+    // The prompts in full, prefilled with what the scene uses (its own, else
+    // the default built from the shot). Cleared: back to the default.
+    castUi.spFP = castUi.spFP || {}; castUi.spVP = castUi.spVP || {}; castUi.spPrompts = castUi.spPrompts || {};
+    var dflt = s.defaults || {};
+    var fp = castUi.spFP[i] != null ? castUi.spFP[i] : (mine && perf.frame_prompt) || dflt.frame_prompt || '';
+    var vp = castUi.spVP[i] != null ? castUi.spVP[i] : (mine && perf.video_prompt) || dflt.video_prompt || '';
+    var custom = !!(mine && (perf.frame_prompt || perf.video_prompt));
+    h += '<div style="margin:6px 0"><button class="np-btn' + (castUi.spPrompts[i] ? ' active' : '') + '" data-sp-prompts="' + i + '">Prompts' + (custom ? ' (edited)' : '') + '</button></div>';
+    if (castUi.spPrompts[i]) {
+      h += '<div class="np-hint">The start frame (GPT Image, from the portrait and sheet):</div>'
+        + '<textarea id="sp-fprompt-' + i + '" rows="4" maxlength="4000" style="' + ta + '">' + escHtml(fp) + '</textarea>'
+        + '<div class="np-hint">The video (Seedance: @Image1 the frame, @Image2 the sheet, @Audio1 the voice):</div>'
+        + '<textarea id="sp-vprompt-' + i + '" rows="5" maxlength="4000" style="' + ta + '">' + escHtml(vp) + '</textarea>'
+        + '<div class="np-hint">Edit either in full. Clear a box to go back to the default built from the shot.</div>';
+    }
     var frames = mine ? (perf.frames || []) : [];
     if (frames.length) {
       h += '<div class="np-grid">';
@@ -12187,6 +12202,16 @@ ${QUOTIENT_CSS}
     // Scene by scene.
     var spActor = castUi.actor;
     var spShot = function(i) { var x = document.getElementById('sp-shot-' + i); return x ? x.value.trim() : (castUi.spShot || {})[i] || ''; };
+    // A prompt box's text, or undefined when it says the default (or is not open).
+    var spPrompt = function(kind, i) {
+      var box = document.getElementById('sp-' + kind + 'prompt-' + i);
+      if (!box) return undefined;
+      var sc = ((castUi.data && castUi.data.scenes) || [])[i] || {};
+      var dv = (sc.defaults || {})[kind === 'f' ? 'frame_prompt' : 'video_prompt'] || '';
+      var t = box.value.trim();
+      return !t || t === dv.trim() ? '' : t;
+    };
+    if ((v = el('data-sp-prompts')) !== null) { castUi.spPrompts = castUi.spPrompts || {}; castUi.spPrompts[v] = !castUi.spPrompts[v]; castRender(); return; }
     if ((v = el('data-sp-open')) !== null) { castUi.spOpen = castUi.spOpen || {}; castUi.spOpen[v] = !castUi.spOpen[v]; castRender(); return; }
     if ((v = el('data-sp-rec')) !== null) {
       spPost(v, { action: 'recording' }, 'Back to your recording on scene ' + (Number(v) + 1) + '…').then(function() { loadProject(castUi.project.project_id); });
@@ -12203,11 +12228,11 @@ ${QUOTIENT_CSS}
       }).catch(function(e) { castSay(e.message || String(e), 'err'); });
       return;
     }
-    if ((v = el('data-sp-frame')) !== null) { spPost(v, { action: 'frame', actor: spActor, shot: spShot(v) || undefined }, 'Drawing the start frame…'); return; }
+    if ((v = el('data-sp-frame')) !== null) { spPost(v, { action: 'frame', actor: spActor, shot: spShot(v) || undefined, frame_prompt: spPrompt('f', v) }, 'Drawing the start frame…'); return; }
     if ((v = el('data-sp-pick')) !== null) { var pk = v.split('|'); spPost(pk[0], { action: 'pick', url: pk.slice(1).join('|') }, 'Using that frame.'); return; }
     if ((v = el('data-sp-draft')) !== null || (v = el('data-sp-final')) !== null) {
       var fin = el('data-sp-final') !== null;
-      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft' },
+      spPost(v, { action: 'perform', actor: spActor, shot: spShot(v) || undefined, voice_source: (castUi.spVoice || {})[v] || undefined, quality: fin ? 'final' : 'draft', frame_prompt: spPrompt('f', v), video_prompt: spPrompt('v', v) },
         fin ? 'Making the 1080p final…' : 'Making the draft (a few minutes)…');
       return;
     }
@@ -12248,6 +12273,8 @@ ${QUOTIENT_CSS}
     castUi.spShot = castUi.spShot || {}; castUi.spClip = castUi.spClip || {};
     if ((m = /^sp-shot-(\\d+)$/.exec(t.id || ''))) castUi.spShot[m[1]] = t.value;
     if ((m = /^sp-clip-(\\d+)$/.exec(t.id || ''))) castUi.spClip[m[1]] = t.value;
+    if ((m = /^sp-fprompt-(\\d+)$/.exec(t.id || ''))) { castUi.spFP = castUi.spFP || {}; castUi.spFP[m[1]] = t.value; }
+    if ((m = /^sp-vprompt-(\\d+)$/.exec(t.id || ''))) { castUi.spVP = castUi.spVP || {}; castUi.spVP[m[1]] = t.value; }
   }
   function castChange(ev) {
     var t = ev.target, m;
