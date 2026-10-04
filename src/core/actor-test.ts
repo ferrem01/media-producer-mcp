@@ -37,6 +37,8 @@ export type ActorProvider = "wan" | "wan-move" | "runway" | "seedance" | "seedan
 type StepStatus = "running" | "done" | "failed" | "skipped";
 
 export interface ActorTest {
+  /** Earlier tests' files shown beside this one in compare.mp4. */
+  compare_with?: { test: string; file: string }[];
   id: string;
   tenant_id: string;
   project_id: string;
@@ -345,14 +347,14 @@ export async function runSeedance25Recast(video: string, img: string, seconds: n
  *  start frame alongside references, so the start frame is named in the
  *  prompt (@Image1), its documented workaround. URL inputs of real people
  *  are registered as assets by Atlas. */
-export function atlasRefPrompt(prompt: string, images: number, audio: boolean): string {
+export function atlasRefPrompt(prompt: string, images: number, audio: boolean, video = true): string {
   const names = ["@Image1 is the first frame of the video."];
   if (images > 1) names.push(`${Array.from({ length: images - 1 }, (_, i) => `@Image${i + 2}`).join(", ")} ${images > 2 ? "are" : "is"} the character sheet (the same person).`);
-  names.push("@Video1 is the reference video.");
+  if (video) names.push("@Video1 is the reference video.");
   if (audio) names.push("@Audio1 is the reference audio.");
   return `${names.join(" ")} ${prompt}`;
 }
-export async function runAtlasSeedance25(video: string, img: string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; duration?: number; draft?: boolean; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+export async function runAtlasSeedance25(video: string | null, img: string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; duration?: number; draft?: boolean; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
   const key = process.env.ATLASCLOUD_API_KEY;
   if (!key) throw new Error("ATLASCLOUD_API_KEY is not set");
   const headers = { Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
@@ -360,8 +362,8 @@ export async function runAtlasSeedance25(video: string, img: string[], seconds: 
     method: "POST", headers,
     body: JSON.stringify({
       model: "bytedance/seedance-2.5/reference-to-video",
-      prompt: atlasRefPrompt(opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), img.length, !!opts.audio),
-      reference_images: img, reference_videos: [video], ...(opts.audio ? { reference_audios: [opts.audio] } : {}),
+      prompt: atlasRefPrompt(opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), img.length, !!opts.audio, !!video),
+      reference_images: img, ...(video ? { reference_videos: [video] } : {}), ...(opts.audio ? { reference_audios: [opts.audio] } : {}),
       duration: Math.max(4, Math.min(30, opts.duration ? Math.round(opts.duration) : opts.audio ? Math.ceil(seconds) + 1 : Math.round(seconds))),
       ratio: aspect, resolution: opts.resolution || "480p", generate_audio: !!opts.audio, watermark: false,
       draft: opts.draft !== false,
@@ -399,14 +401,14 @@ export const HF_PERFORMANCE_PROMPT = "The person from the first reference image 
   "copy the head movements, hand gestures, timing and energy. Do not copy that person's face, hair or clothes. " +
   "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
   "Dry close-mic'd voice, no room echo, no music. Soft natural window light, realistic skin texture, no text on screen.";
-export async function runHiggsfieldSeedance25(video: string, img: string | string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; duration?: number; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
+export async function runHiggsfieldSeedance25(video: string | null, img: string | string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; duration?: number; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
   const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
   if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");
   const headers = { Authorization: `Key ${id}:${secret}`, "Content-Type": "application/json" };
   const sub = await okJson(await fetch("https://api.higgsfield.ai/bytedance/seedance-2.5/reference-to-video", {
     method: "POST", headers: { ...headers, "Idempotency-Key": crypto.randomBytes(12).toString("hex") },
     body: JSON.stringify({
-      prompt: opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), video_urls: [video], image_urls: Array.isArray(img) ? img : [img],
+      prompt: opts.prompt || (opts.audio ? HF_PERFORMANCE_PROMPT : SEEDANCE25_RECAST_PROMPT), ...(video ? { video_urls: [video] } : {}), image_urls: Array.isArray(img) ? img : [img],
       ...(opts.audio ? { audio_urls: [opts.audio] } : {}),
       // With a voice track, a second of headroom past it (Marc's app run
       // gave 8.7 s of voice 10 s); the model squeezing the words lost sync.
@@ -771,7 +773,7 @@ export async function convertVoice(wav: string, out: string, voiceId: string): P
   await fs.writeFile(out, Buffer.from(await r.arrayBuffer()));
 }
 
-type HfUrls = { video_url: string; audio_url?: string; image_urls: string[]; duration?: number; mute_video?: boolean };
+type HfUrls = { video_url: string; audio_url?: string; image_urls: string[]; duration?: number; mute_video?: boolean; no_video?: boolean };
 
 export async function startActorTest(opts: {
   tenant: string;
@@ -810,9 +812,12 @@ export async function startActorTest(opts: {
   video_asset?: string;
   /** Cap the source at this many seconds (a cheap test). */
   max_seconds?: number;
+  /** Extra panels for compare.mp4 from earlier tests' files (e.g. the same
+   *  call with the reference video, beside this one without it). */
+  compare_with?: { test: string; file: string }[];
   /** hf-seedance25: send these public URLs exactly as given, nothing made
    *  on our side (an A/B against a Higgsfield app run's own inputs). */
-  hf_urls?: { video_url: string; audio_url?: string; image_urls: string[]; duration?: number; mute_video?: boolean };
+  hf_urls?: { video_url: string; audio_url?: string; image_urls: string[]; duration?: number; mute_video?: boolean; no_video?: boolean };
   /** heygen-v3: "low" | "medium" | "high" (Avatar IV). */
   expressiveness?: string;
   /** heygen-v3: "avatar_iv" | "avatar_v" | "avatar_iii" (HeyGen's default when omitted). */
@@ -875,6 +880,7 @@ export async function startActorTest(opts: {
     image: opts.image_from ? `${opts.image_from.test}/${opts.image_from.file}@${opts.image_from.at || 0}` : opts.image || "",
     providers,
     voice,
+    ...(opts.compare_with?.length ? { compare_with: await Promise.all(opts.compare_with.slice(0, 4).map(async (r) => { await fromFile(r, "compare_with"); return { test: r.test, file: r.file }; })) } : {}),
     status: "running",
     started_at: new Date().toISOString(),
     steps: {},
@@ -897,7 +903,7 @@ export async function startActorTest(opts: {
   if (opts.hf_urls) {
     const u = opts.hf_urls, isUrl = (x: unknown) => typeof x === "string" && /^https:\/\/[^\s]+$/.test(x);
     if (!isUrl(u.video_url) || (u.audio_url != null && !isUrl(u.audio_url)) || !Array.isArray(u.image_urls) || !u.image_urls.length || u.image_urls.length > 30 || !u.image_urls.every(isUrl)) throw new Error("hf_urls: video_url, image_urls (1-30) and audio_url must be https URLs");
-    hfUrls = { video_url: u.video_url, audio_url: u.audio_url, image_urls: u.image_urls, duration: Number(u.duration) > 0 ? Math.max(4, Math.min(30, Math.round(Number(u.duration)))) : undefined, mute_video: u.mute_video === true };
+    hfUrls = { video_url: u.video_url, audio_url: u.audio_url, image_urls: u.image_urls, duration: Number(u.duration) > 0 ? Math.max(4, Math.min(30, Math.round(Number(u.duration)))) : undefined, mute_video: u.mute_video === true, no_video: u.no_video === true };
   }
   void run(test, src, img, frame, opts.voice_id, opts.prompt, line, fps, opts.heygen_avatar_id, { expressiveness: opts.expressiveness, engine: opts.engine, sceneAbs, resolution: opts.resolution, hfUrls })
     .catch(async (e) => { test.status = "failed"; test.error = e?.message || String(e); test.finished_at = new Date().toISOString(); await save(test).catch(() => {}); });
@@ -1006,7 +1012,7 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (!img) throw new Error(`${p} needs a portrait (image or image_from)`);
       if (!config.publicUrl.startsWith("https://")) throw new Error(`${p} needs the server's public https address (the vendor fetches by URL)`);
       // One reference call, two routes: Higgsfield's API, or Atlas Cloud's (with draft).
-      const seedance = (v: string, imgs: string[], o: { audio?: string; duration?: number; onSubmit: (u: string) => Promise<void> }) => p === "atlas-seedance25"
+      const seedance = (v: string | null, imgs: string[], o: { audio?: string; duration?: number; onSubmit: (u: string) => Promise<void> }) => p === "atlas-seedance25"
         ? runAtlasSeedance25(v, imgs, srcSecs, aspect, { prompt, resolution: heygenOpts.resolution || "480p", ...o })
         : runHiggsfieldSeedance25(v, imgs, srcSecs, aspect, { prompt, resolution: heygenOpts.resolution || "480p", ...o });
       const pub = `${config.publicUrl}/output/${encodeURIComponent(test.tenant_id)}/projects/${encodeURIComponent(test.project_id)}/actor-tests/${test.id}`;
@@ -1015,16 +1021,22 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
       if (heygenOpts.hfUrls) {
         // Exactly the given inputs (Marc's app run): the A/B is the route.
         const u = heygenOpts.hfUrls;
-        let video = u.video_url;
-        if (u.mute_video) {
+        // The clip itself, kept: compare.mp4 shows it beside her (not the
+        // scene's take, which is another recording).
+        const r = await fetch(u.video_url);
+        if (!r.ok) throw new Error(`hf_urls video: fetch ${r.status}`);
+        await fs.writeFile(f("ref.mp4"), Buffer.from(await r.arrayBuffer()));
+        test.files.ref = "ref.mp4";
+        let video: string | null = u.video_url;
+        if (u.no_video) {
+          // The A/B: the same call with no performance at all -- does the
+          // take's motion show up in her, or does she move the same anyway?
+          video = null;
+        } else if (u.mute_video) {
           // A silent copy: Atlas hands a reference video's soundtrack to the
           // model, so the take's own voice played under hers (measured Oct 4;
           // Higgsfield's app mutes it).
-          const r = await fetch(u.video_url);
-          if (!r.ok) throw new Error(`mute_video: fetch ${r.status}`);
-          await fs.writeFile(f("ref-in.mp4"), Buffer.from(await r.arrayBuffer()));
-          await ffmpeg(["-i", f("ref-in.mp4"), "-an", "-c:v", "copy", "-movflags", "+faststart", f("motion.mp4")]);
-          await fs.rm(f("ref-in.mp4"), { force: true });
+          await ffmpeg(["-i", f("ref.mp4"), "-an", "-c:v", "copy", "-movflags", "+faststart", f("motion.mp4")]);
           test.files.motion = "motion.mp4";
           video = `${pub}/motion.mp4`;
         }
@@ -1100,6 +1112,9 @@ async function run(test: ActorTest, src: { path: string; start: number; end: num
   await finishTest(test, done);
 }
 
+/** Providers whose video carries the voice they lip-synced. */
+const SELF_VOICED = new Set<ActorProvider>(["seedance", "seedance-t2v", "hf-seedance25", "atlas-seedance25"]);
+
 /** Each provider's raw video with sound, and the side-by-side; the test closes. */
 async function finishTest(test: ActorTest, done: ActorProvider[]): Promise<void> {
   const f = (name: string) => path.join(actorTestDir(test.tenant_id, test.project_id, test.id), name);
@@ -1107,7 +1122,7 @@ async function finishTest(test: ActorTest, done: ActorProvider[]): Promise<void>
   // the take's own audio. The picture is re-encoded so every file streams.
   const audio = test.files.voice ? f("voice.mp3") : f("source.mp4");
   for (const p of done) {
-    if ((p === "seedance" || p === "seedance-t2v" || p === "hf-seedance25" || p === "atlas-seedance25") && (await hasAudio(f(`${p}-raw.mp4`)))) {
+    if (SELF_VOICED.has(p) && (await hasAudio(f(`${p}-raw.mp4`)))) {
       // Seedance renders the voice itself, placed where it lip-synced it.
       // (The 2.5 routes once had theirs replaced by the take's own audio:
       // Marc heard a different take under her moving lips, Oct 4.)
@@ -1123,10 +1138,16 @@ async function finishTest(test: ActorTest, done: ActorProvider[]): Promise<void>
   }
   // Side by side, same height: you (the take), then each actor.
   if (done.length) {
-    const ins = [f("source.mp4"), ...done.map((p) => f(`${p}.mp4`))];
+    // Left: what the actor copied (the hf_urls clip, else the take); then
+    // any earlier tests' panels; then this test's results.
+    const extra = (test.compare_with || []).map((r) => path.join(actorTestDir(test.tenant_id, test.project_id, r.test), r.file));
+    const ins = [test.files.ref ? f(test.files.ref) : f("source.mp4"), ...extra, ...done.map((p) => f(`${p}.mp4`))];
+    // The sound of a result that voiced itself (Seedance), else the track laid on.
+    const own = done.find((p) => SELF_VOICED.has(p));
+    const compareAudio = own ? f(`${own}.mp4`) : audio;
     const scaled = ins.map((_, i) => `[${i}:v]scale=-2:960,setsar=1,fps=30[v${i}]`).join(";");
     const stack = `${ins.map((_, i) => `[v${i}]`).join("")}hstack=inputs=${ins.length}[v]`;
-    await ffmpeg([...ins.flatMap((x) => ["-i", x]), "-i", audio,
+    await ffmpeg([...ins.flatMap((x) => ["-i", x]), "-i", compareAudio,
       "-filter_complex", `${scaled};${stack}`, "-map", "[v]", "-map", `${ins.length}:a:0`,
       "-c:v", "libx264", "-crf", "22", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
       "-shortest", "-movflags", "+faststart", f("compare.mp4")]);

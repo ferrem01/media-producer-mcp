@@ -33,6 +33,14 @@ result except fal's Seedance, so both 2.5 routes lost the voice they
 lip-synced. They now keep their own audio, like fal's Seedance. The raw
 outputs (`<provider>-raw.mp4`) had the real audio all along.
 
+**Does the take's motion reach her?** With the sound fixed, Marc couldn't
+tell whether his mannerisms showed up at all. Two tools for that:
+`hf_urls.no_video` runs the same call with no reference video (the A/B),
+and compare.mp4 now puts the clip she actually copied on the left (the
+hf_urls video, kept as `ref.mp4`; before, it was the scene's take, a
+different recording), then `compare_with` panels from earlier tests, then
+this test's results, with her own voice as the sound.
+
 ## 2026-10-04 — hf-seedance25: one voice, headroom, the app run's fields
 
 The first API run lost lip sync partway. Marc's app run (job 040426e3)

@@ -71,6 +71,12 @@ describe("Seedance 2.5 on Atlas Cloud", () => {
       reference_videos: ["https://x/v.mp4"], reference_audios: ["https://x/a.mp3"], duration: 10, ratio: "9:16", draft: true, generate_audio: true,
     });
     expect(sent[0].body.prompt).toBe("@Image1 is the first frame of the video. @Image2 is the character sheet (the same person). @Video1 is the reference video. @Audio1 is the reference audio. She talks.");
+
+    // The A/B without a performance: no reference_videos, no @Video1.
+    sent.length = 0; polls = 0;
+    await runAtlasSeedance25(null, ["https://x/head.png"], 8.7, "9:16", { audio: "https://x/a.mp3", prompt: "She talks." });
+    expect(sent[0].body.reference_videos).toBeUndefined();
+    expect(sent[0].body.prompt).toBe("@Image1 is the first frame of the video. @Audio1 is the reference audio. She talks.");
     delete process.env.ATLASCLOUD_API_KEY;
   });
 });
@@ -78,6 +84,9 @@ describe("Seedance 2.5 on Atlas Cloud", () => {
 describe("the actor test keeps a Seedance 2.5 result's own voice", () => {
   it("finishTest does not lay the take's audio over hf-seedance25 / atlas-seedance25", () => {
     const src = (require("node:fs") as typeof import("node:fs")).readFileSync(require("node:path").join(__dirname, "..", "src/core/actor-test.ts"), "utf8");
-    expect(src).toMatch(/p === "seedance" \|\| p === "seedance-t2v" \|\| p === "hf-seedance25" \|\| p === "atlas-seedance25"\) && \(await hasAudio/);
+    expect(src).toMatch(/SELF_VOICED = new Set<ActorProvider>\(\["seedance", "seedance-t2v", "hf-seedance25", "atlas-seedance25"\]\)/);
+    expect(src).toMatch(/if \(SELF_VOICED\.has\(p\) && \(await hasAudio/);
+    // The side-by-side shows the clip she copied and plays her own voice.
+    expect(src).toMatch(/test\.files\.ref \? f\(test\.files\.ref\) : f\("source\.mp4"\)/);
   });
 });
