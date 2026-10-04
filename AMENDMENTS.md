@@ -118,6 +118,16 @@ no generation). A final with a draft id now always finishes the draft
 (draft-complete inherits frame, prompt, voice and seed): no voice is made
 for it.
 
+Scene 3 re-recorded in Marc's usual voice came out at 203 Hz (scenes 1-2:
+200, 186). Then Marc: "check the pitch on the recording before you create
+the Dana scene". The PITCH CHECK -- a measurement only, nothing touches the
+voice: after the conversion and before Seedance is paid, the voice's median
+pitch (`voicePitch`, also the recording's) against the actor's other scenes
+in this film (`filmVoicePitch`: each performed scene measured once from its
+take, kept as `voice_hz`). More than 10% off stops the scene with the
+numbers (`performance.pitch_check`, "Nothing was sent to Seedance"); Studio
+offers "Make it anyway", the MCP `force`.
+
 Also: `saveProject` is now atomic (temp file, then rename). The new suite's
 polls read a half-written project.json as "Project not found"; Studio's
 polls during any long job could too.

@@ -304,6 +304,62 @@ export async function layVoice(videoAbs: string, voiceAbs: string, outAbs: strin
   return lag;
 }
 
+/** The median pitch of a voice (Hz): 40 ms frames, autocorrelation within
+ *  70-400 Hz, voiced frames only; 0 when nothing voiced was found. A
+ *  MEASUREMENT only -- nothing here changes a voice. */
+export async function voicePitch(file: string, work: string, start?: number, end?: number): Promise<number> {
+  const pcm = path.join(work, `pitch-${crypto.randomBytes(3).toString("hex")}.raw`);
+  await fs.mkdir(work, { recursive: true });
+  await ffmpeg([...(start != null ? ["-ss", String(start)] : []), ...(end != null ? ["-to", String(end)] : []), "-i", file, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", pcm]);
+  const buf = await fs.readFile(pcm);
+  await fs.rm(pcm, { force: true }).catch(() => {});
+  const n = Math.floor(buf.length / 2), x = new Float32Array(n);
+  for (let i = 0; i < n; i++) x[i] = buf.readInt16LE(i * 2) / 32768;
+  const sr = 16000, w = 640, hop = 160, lo = Math.floor(sr / 400), hi = Math.floor(sr / 70);
+  const win = Float32Array.from({ length: w }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (w - 1)));
+  const f0: number[] = [], fr = new Float32Array(w);
+  for (let s = 0; s + w <= n; s += hop) {
+    let e = 0;
+    for (let i = 0; i < w; i++) { fr[i] = x[s + i] * win[i]; e += fr[i] * fr[i]; }
+    if (Math.sqrt(e / w) < 0.02) continue;
+    let best = 0, bk = 0;
+    for (let k = lo; k < hi; k++) { let c = 0; for (let i = 0; i + k < w; i++) c += fr[i] * fr[i + k]; if (c > best) { best = c; bk = k; } }
+    if (bk && best / e > 0.45) f0.push(sr / bk);
+  }
+  if (!f0.length) return 0;
+  f0.sort((a, b) => a - b);
+  return Math.round(f0[Math.floor(f0.length / 2)]);
+}
+
+/** The actor's voice in this film so far: the median pitch of their other
+ *  performed scenes (each measured once from its take and remembered). */
+async function filmVoicePitch(tenant: string, projectId: string, actorId: string, exceptSi: number, work: string): Promise<number> {
+  const project = await loadProject(tenant, projectId);
+  const board: any[] = (project as any)?.storyboard?.scenes || [];
+  const clips: any[] = (project as any)?.speaker_track?.clips || [];
+  const found: number[] = [];
+  for (let i = 0; i < board.length; i++) {
+    const p = board[i]?.performance;
+    if (i === exceptSi || !p || p.actor !== actorId) continue;
+    const clip = clips.find((c) => c.scene_index === i);
+    const take: any = clip ? takeForClip(project as any, clip) : null;
+    if (!take?.performed_by || take.performed_by.actor !== actorId) continue;
+    let hz = Number(p.voice_hz) || 0;
+    if (!hz) {
+      hz = await voicePitch(resolveVideoPath(clip.source, config.dataDir), work, clip.trim_start, clip.trim_end).catch(() => 0);
+      if (hz) { const si = i, v = hz; await patch(tenant, projectId, si, (q) => { q.voice_hz = v; }).catch(() => {}); }
+    }
+    if (hz) found.push(hz);
+  }
+  if (!found.length) return 0;
+  found.sort((a, b) => a - b);
+  return found[Math.floor(found.length / 2)];
+}
+
+/** How far a voice may sit from the actor's other scenes before the scene
+ *  stops for a look (scene 3 at 160 Hz against 186-200 was 17% off). */
+const PITCH_TOLERANCE = 0.1;
+
 /** The scene's voice as an MP3 at -14 LUFS (what the proven run sent). */
 async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number }> {
   if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
@@ -346,6 +402,8 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   /** Full prompts in place of the defaults ("" back to the default). */
   frame_prompt?: string; video_prompt?: string;
   voice_track?: "converted" | "seedance";
+  /** Make it even when the pitch check would stop it. */
+  force?: boolean;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -370,17 +428,17 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
     if (opts.voice_track) p.voice_track = opts.voice_track;
-    p.status = "running"; p.stage = "voice"; delete p.error; p.started_at = new Date().toISOString(); delete p.finished_at;
+    p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
   const release = () => { running.delete(key); vendorNow.delete(key); };
-  void runPerformance(tenant, projectId, si, actor, quality, doAttach, release).catch(async (e) => {
+  void runPerformance(tenant, projectId, si, actor, quality, doAttach, release, opts.force === true).catch(async (e) => {
     release();
     await patch(tenant, projectId, si, (p) => { p.status = "failed"; p.error = String(e?.message || e).slice(0, 300); delete p.stage; p.finished_at = new Date().toISOString(); }).catch(() => {});
   }).finally(() => { running.delete(key); vendorNow.delete(key); });
   return perf;
 }
 
-async function runPerformance(tenant: string, projectId: string, si: number, actor: CastActor, quality: "draft" | "final", attach: Attacher, release: () => void): Promise<void> {
+async function runPerformance(tenant: string, projectId: string, si: number, actor: CastActor, quality: "draft" | "final", attach: Attacher, release: () => void, force = false): Promise<void> {
   const stage = (s: string) => patch(tenant, projectId, si, (p) => { p.stage = s; });
   const { project, scene } = await loadScene(tenant, projectId, si);
   const perf: ScenePerformance = scene.performance;
@@ -405,6 +463,20 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     }
     await stage("voice");
     voice = await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
+    // THE PITCH CHECK, before Seedance is paid: the voice against the
+    // actor's other scenes in this film. A line spoken low converts low
+    // (scene 3: 160 Hz against 186-200), and Seedance copies it faithfully.
+    const hz = await voicePitch(voice.file, workDir).catch(() => 0);
+    const recHz = perf.voice_source === "take" ? await voicePitch(path.join(workDir, "take.wav"), workDir).catch(() => 0) : 0;
+    const reference = hz ? await filmVoicePitch(tenant, projectId, actor.id, si, workDir).catch(() => 0) : 0;
+    await patch(tenant, projectId, si, (p) => { if (hz) p.voice_hz = hz; if (recHz) p.recording_hz = recHz; else delete p.recording_hz; });
+    if (!force && hz && reference && Math.abs(hz / reference - 1) > PITCH_TOLERANCE) {
+      const check = { hz, reference, ...(recHz ? { recording_hz: recHz } : {}) };
+      await patch(tenant, projectId, si, (p) => { p.pitch_check = check; });
+      const pct = Math.round((hz / reference - 1) * 100);
+      throw new Error(`Pitch check: the voice is ${hz} Hz, ${Math.abs(pct)}% ${pct < 0 ? "lower" : "higher"} than ${actor.name}'s other scenes (${reference} Hz)` +
+        `${recHz ? `; your recording is ${recHz} Hz` : ""}. Nothing was sent to Seedance. ${perf.voice_source === "take" ? "Re-record the scene in your usual voice, or make it anyway." : "Make it anyway, or change the line."}`);
+    }
     // The voice kept beside the take: heard, checked.
     const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
     await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });

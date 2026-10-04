@@ -594,6 +594,15 @@ export interface ScenePerformance {
    *  the video, which Marc measured "totally off from the lips" (Oct 4:
    *  Seedance re-performs the line, it does not keep the file's timing). */
   voice_track?: "converted" | "seedance";
+  /** The pitch of the voice Seedance was given (median Hz), and of the
+   *  recording it was converted from. Measured before Seedance is paid. */
+  voice_hz?: number;
+  recording_hz?: number;
+  /** Set when the pitch check stopped the scene before Seedance: the voice
+   *  was more than 10% off the actor's other scenes in this film (Marc,
+   *  Oct 4: "check the pitch on the recording before you create the Dana
+   *  scene"). Perform again with force to make it anyway. */
+  pitch_check?: { hz: number; reference: number; recording_hz?: number };
   /** The voice file the scene was performed to (a project asset), and how
    *  far it was shifted to line up with the video (s). */
   voice_url?: string;

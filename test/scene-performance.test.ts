@@ -307,6 +307,59 @@ describe("one voice in every scene: the exact file laid over the video", () => {
   }, 60000);
 });
 
+describe("the pitch check, before Seedance is paid", () => {
+  it("measures the voice, compares it with the actor's other scenes, stops a voice 10%+ off without calling Seedance, and force makes it anyway", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const d = path.join(DATA, "_pitchcheck"); await fs.mkdir(d, { recursive: true });
+    const tone = (hz: number) => `aevalsrc='0.5*sin(2*PI*${hz}*t)+0.25*sin(2*PI*${2 * hz}*t)':s=44100:d=3`;
+    const low = path.join(d, "low.mp3");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", tone(160), "-c:a", "libmp3lame", low]);
+    // Scene 1's take: Dana at ~200 Hz.
+    const pdir = path.join(DATA, T, "projects", P);
+    const s1 = path.join(pdir, "assets", "take-performed-dana-s1-draft-pc.mp4");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=270x480:rate=24:duration=3", "-f", "lavfi", "-i", tone(200),
+      "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", s1]);
+    const sp = await import("../src/core/scene-performance.js");
+    expect(Math.abs((await sp.voicePitch(low, d)) - 160)).toBeLessThan(6);
+    const pf = path.join(pdir, "project.json");
+    const disk = JSON.parse(await fs.readFile(pf, "utf8"));
+    const src = `/assets/${T}/projects/${P}/assets/take-performed-dana-s1-draft-pc.mp4`;
+    disk.storyboard.scenes[0].performance = { actor: "dana", shot: "couch", voice_source: "script", draft: { url: src, inputs: "", made_at: "" }, status: "done" };
+    disk.storyboard.scenes[1].performance = { actor: "dana", shot: "couch", voice_source: "script", frame: disk.storyboard.scenes[0].performance.frame, status: "done" };
+    disk.takes = [{ id: "take_pc", scene_index: 0, source: src, recorded_at: "", performed_by: { actor: "dana", engine: "seedance", quality: "draft" } }];
+    disk.speaker_track = { clips: [{ source: src, scene_index: 0, start: 0 }] };
+    await fs.writeFile(pf, JSON.stringify(disk));
+    const m = await media(path.join(d, "m"));
+    const atlas: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) return new Response(await fs.readFile(low));
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: "pc1" } })); }
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/pc.mp4"], draft_id: "pcd" } }));
+      if (u === "https://cdn/pc.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
+    const { updateActor } = await import("../src/core/cast.js");
+    await updateActor(T, "dana", { voice_id: "v_bella", voice_name: "Bella" });
+    await sp.startScenePerformance(T, P, 1, { actor: "dana", voice_source: "script" });
+    await until(async () => (await sp.getScenePerformances(T, P))[1].performance?.status !== "running", 40000);
+    let p2 = (await sp.getScenePerformances(T, P))[1].performance;
+    expect(p2.status).toBe("failed");
+    expect(p2.error).toMatch(/^Pitch check: the voice is 1[56]\d Hz, 1\d% lower than Dana's other scenes \((19|20)\d Hz\)\. Nothing was sent to Seedance\./);
+    expect(p2.pitch_check).toMatchObject({ hz: expect.any(Number), reference: expect.any(Number) });
+    expect(atlas).toHaveLength(0);                              // nothing paid
+    expect((await sp.getScenePerformances(T, P))[0].performance.voice_hz).toBeGreaterThan(190);   // the reference, measured once and kept
+    await sp.startScenePerformance(T, P, 1, { actor: "dana", voice_source: "script", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P))[1].performance?.status !== "running", 40000);
+    p2 = (await sp.getScenePerformances(T, P))[1].performance;
+    expect(p2.status).toBe("done");
+    expect(p2.pitch_check).toBeUndefined();
+    expect(atlas).toHaveLength(1);
+  }, 120000);
+});
+
 describe("an earlier performance back as the scene's take", () => {
   it("re-attaches a take-performed file of this scene, Seedance's sound, its draft id kept for the final", async () => {
     const m = await media(path.join(DATA, "_media7"));
