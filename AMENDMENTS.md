@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-04 — Sign out, then sign in as someone else
+
+Marc signed in on his phone (Claude's in-app browser) with the wrong Gmail;
+Sign out "doesn't clear it" -- every way back in landed on the same account.
+Sign-out did expire the session cookie; the next sign-in bounced through
+Google with no `prompt`, and Google silently returned the account the
+browser was signed into. The Google redirect now always asks
+`prompt=select_account` (the account chooser, with "use another account"),
+and /auth/logout expires `mp_session` with the attributes it was set with
+(SameSite=Lax, Secure on https) plus `Clear-Site-Data: "cookies"`.
+
 ## 2026-10-04 — Scenes performed by cast actors; cast scene by scene; actor b-roll
 
 Marc: "I want to make sure we are building the seedance pipeline ... take an

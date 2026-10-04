@@ -167,6 +167,11 @@ export async function handleGoogleLogin(req: IncomingMessage, res: ServerRespons
     response_type: "code",
     scope: "email profile",
     access_type: "offline",
+    // Always the account chooser: without it Google silently hands back the
+    // account the browser is signed into, so after a sign-out you came
+    // straight back in as the same (wrong) Gmail and never saw a login
+    // (Marc, Oct 4, on his phone's in-app browser).
+    prompt: "select_account",
     state: internalState,
   });
 
