@@ -6,47 +6,6 @@ session can pick up mid-thread.
 
 ---
 
-## 2026-10-05 — The room on the droplet's ffmpeg 4.x
-
-The first live `room_test` failed: on 4.x, afir's output carries no channel
-layout and amerge refuses it ("No channel layout for input 1"); aformat and
-pan after it did not help. The mixes are now amix with weights (4.x has
-them; every input is scaled by the same 1/n, so the ratios hold and the
-loudness pass sets the level). Verified against a 4.2.2 static build locally
-(the same numbers as 7.0: pauses about -57 dB, the echo trailing).
-
-## 2026-10-05 — The room, before Seedance: we were ASKING for a studio voice
-
-Marc chose the long-term fix ("for every video we make"), cost no object.
-The cause was in our own prompt: every speaking shot told Seedance "Dry
-close-mic'd voice, no room echo" (there since #1089, no reason recorded).
-Seedance makes the sound with the picture, so the room belongs at the
-source: `performance.sound: "room"` swaps that line for `ROOM_SOUND` (the
-phone filming them in this room, room tone, closer near the camera, more
-room farther away; not a studio voiceover), and `sound_reference` (0-1)
-puts the voice-room treatment on the reference before Seedance hears it.
-Both are part of the job key only when not the default; a new value is a new
-draft. MCP `perform_scene` takes `sound` / `sound_reference`. The default
-stays "studio" until Marc has heard the A/B on a duplicate of the replica.
-
-## 2026-10-05 — The room: the generated voice put back in the room
-
-Marc on the replica: Dana's voice sounds "so forward ... layered on top", "a
-disconnect between the video and the audio" -- not the words. What plays IS
-Seedance's own read (`voice_track: "seedance"`; none of the replica's takes
-lays the ElevenLabs file over). But Seedance copies the character of the read
-it is handed: a dry, close-mic studio voice, over a picture of a person
-across a living room -- and dead digital silence between the words.
-
-`core/voice-room.ts`: phone/lav mic shaping (rumble and the too-clean top
-trimmed, the 3 kHz presence eased, gentle compression), a small room (a
-short decaying noise impulse through `afir`, mixed under the dry voice), a
-faint room-tone floor, one linear loudness pass to -17 LUFS. Only ffmpeg 4.x
-filters (mixes are amerge + pan). Measured on a synthetic take: the pauses go
-from -91 dB to about -59 dB, the echo trails after each phrase. MCP `cast`
-`room_test` makes TEST COPIES of a scene's take (`room_amounts`) to hear
-beside it; nothing attached. Applying it to a film waits on Marc's ears.
-
 ## 2026-10-05 — The music's level, set in Studio
 
 Marc: "can you lower the background music? what is it set to now? ... i know
