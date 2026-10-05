@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — The music's level, set in Studio
+
+Marc: "can you lower the background music? what is it set to now? ... i know
+it is ducking too." The replica's bed sat at 0.18 with `ducked_volume` 0.35.
+But ducking only listens to voiceover TRACKS (Studio's loop and the render's
+`resolveDucking` alike), and a speaker film's voice is the speaker track -- so
+on his film the bed never dipped; it played at 0.18 under the whole film.
+Lowered it to 0.10 in place.
+
+The music card now has the dials: **Music level** (every music clip's
+`volume`) and, only where the bed really dips, **Under the voice**
+(`audio.ducking.ducked_volume`, a share of the level). On a speaker film the
+card says the bed plays at its level throughout instead of offering a dead
+dial. Heard at once while dragging (the ducking loop now reads the dip every
+tick), saved on release through `POST /api/music-level/{t}/{p}`;
+`audio/music-level.ts` holds the read and the write.
+
+## 2026-10-05 — Cutaways froze and filled the lane: the clip's own timing
+
+Marc on the replica (proj_b1f4b7cd): scene 2's cutaways were "freezing and
+jumping" in Studio, and the media lane drew every clip across the whole
+scene. The video component times itself from `data.at` / `data.exit_at`
+(a timed clip plays from its own first frame); actor clips set only the
+component's enter/exit, so they ran on the scene's clock -- seeked past their
+4 s and frozen -- and the lane read them as full-scene. `startActorClip` now
+writes `data.at` / `data.exit_at`; the replica's five clips were patched in
+place, their word anchors moved onto `at` / `exit_at`.
+
 ## 2026-10-05 — The voice picker
 
 **Read speed** (same PR): `performance.voice_speed` (0.8-1.25, 1 = as voiced)

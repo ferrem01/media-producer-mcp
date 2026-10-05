@@ -27,6 +27,7 @@ import { provideAsset, openAssetNeeds, recastProvidedNeed, isScreenSlate } from 
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
 import { listMusicOptions, resolveMusicChoice, musicLocalPath, musicAssetUrl } from "./audio/music.js";
+import { musicLevel, setMusicLevel } from "./audio/music-level.js";
 import { resolveSfxChoice, listSfxOptions, SFX_DIR } from "./audio/sfx.js";
 import { ensureFoleyLibrary } from "./audio/foley.js";
 import { qrSvg } from "./core/qr.js";
@@ -1334,7 +1335,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|music-level|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -3538,7 +3539,7 @@ Rules:
         const bed = (moProj.audio?.tracks || []).find((t) => t.type === "music");
         try {
           const options = await listMusicOptions({ tenantId: moTenant, brandKit, mood: mood === "none" ? "corporate" : mood, query: q.get("q") || undefined, minDuration: total || undefined });
-          jsonResponse(res, 200, { ok: true, mood, choice: moProj.music || { source: "auto" }, bed: bed ? { id: bed.id, source: bed.source, preview_url: musicAssetUrl(bed.source) } : null, ...options });
+          jsonResponse(res, 200, { ok: true, mood, choice: moProj.music || { source: "auto" }, bed: bed ? { id: bed.id, source: bed.source, preview_url: musicAssetUrl(bed.source) } : null, level: musicLevel(moProj), ...options });
         } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
         return;
       }
@@ -3556,6 +3557,27 @@ Rules:
             .map((t) => ({ id: t.id, source: t.source, start_time: t.start_time, volume: t.volume }));
           jsonResponse(res, 200, { ok: true, ...options, placed });
         } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
+        return;
+      }
+
+      // POST /api/music-level/{tenant}/{project} {volume?, ducked_volume?}
+      //   The bed's level (music_bed.volume, 0-1) and how far it dips under
+      //   a voiceover (audio.ducking.ducked_volume, a multiplier of that
+      //   level). Studio's music card; the render reads both as they are.
+      const musicLevelMatch = urlPath.match(/^\/api\/music-level\/([^/]+)\/([^/]+)$/);
+      if (musicLevelMatch && method === "POST") {
+        const [, mlTenant, mlProject] = musicLevelMatch.map(decodeURIComponent);
+        let mlBody: Record<string, unknown> = {};
+        try { mlBody = await parseBody(req); } catch { jsonResponse(res, 400, { error: "Invalid JSON body" }); return; }
+        const mlProj = await loadProject(mlTenant, mlProject);
+        if (!mlProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        try {
+          setMusicLevel(mlProj, mlBody);
+        } catch (e: any) { jsonResponse(res, 400, { error: e?.message || String(e) }); return; }
+        mlProj.updated_at = new Date().toISOString();
+        await saveProject(mlProj);
+        console.log(`  music level: ${mlTenant}/${mlProject} <- ${JSON.stringify(musicLevel(mlProj))}`);
+        jsonResponse(res, 200, { ok: true, level: musicLevel(mlProj) });
         return;
       }
 

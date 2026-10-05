@@ -1238,6 +1238,12 @@ ${QUOTIENT_CSS}
   .mu-search { display: flex; gap: 6px; margin: 10px 0 4px; }
   .mu-search input { flex: 1; min-width: 0; box-sizing: border-box; height: 32px; padding: 0 10px; font: 13px/18px inherit; border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--surface-primary); color: var(--foreground); }
   .mu-list { max-height: 46vh; overflow-y: auto; }
+  .mu-level { padding: 8px 12px 10px; border: 1px solid var(--border-secondary); border-radius: var(--radius); margin-bottom: 12px; font-size: 13px; }
+  .mu-level label { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+  .mu-level label b { width: 110px; font-weight: 500; }
+  .mu-level label input { flex: 1; min-width: 0; }
+  .mu-level label span { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--content-secondary); }
+  .mu-level small { display: block; color: var(--content-secondary); font-size: 12px; margin-top: 4px; }
 
   /* ── Storyboard draft view: THE TRUE STORYBOARD, one card at a time ──
      Rail = thumbnail strip (pick a scene). Main = that scene's full card:
@@ -2744,8 +2750,6 @@ ${QUOTIENT_CSS}
     stopDucking();
     var p = state.currentProject;
     if (!p || !p.audio || !p.audio.ducking) return;
-    var duckedVolume = p.audio.ducking.ducked_volume || 0.12;
-
     var mv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
     state.audioDuckingInterval = setInterval(function() {
       var voActive = false;
@@ -2756,6 +2760,10 @@ ${QUOTIENT_CSS}
       });
 
       var curMv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
+      // Read every tick: the music card's "Under the voice" dial moves it live.
+      var cp = state.currentProject;
+      var dk = cp && cp.audio && cp.audio.ducking;
+      var duckedVolume = (dk && typeof dk.ducked_volume === 'number') ? dk.ducked_volume : 0.12;
       state.audioElements.forEach(function(audio) {
         if (audio._trackType === 'music') {
           // ducked_volume is a RELATIVE multiplier of the track's own level --
@@ -5266,6 +5274,50 @@ ${QUOTIENT_CSS}
       })
       .catch(function(e) { if (row) row.classList.remove('busy'); studioStatus(e.message || String(e), 'err'); });
   }
+  // THE BED'S LEVEL (audio/music-level.ts): how loud the music sits, and how
+  // far it dips under a voiceover. Heard at once while dragging; saved on
+  // release. A speaker film's voice is the speaker track, which ducking does
+  // not hear, so there the card says so instead of offering a dead dial.
+  function muLevelHtml(lv) {
+    if (!lv || lv.volume == null) return '';
+    var v = Math.round(lv.volume * 100);
+    var d = Math.round((lv.ducked_volume != null ? lv.ducked_volume : 0.12) * 100);
+    var h = '<div class="mu-level"><label><b>Music level</b><input type="range" id="mu-vol" min="0" max="100" step="1" value="' + v + '"><span id="mu-vol-n">' + v + '%</span></label>';
+    if (lv.ducks) h += '<label><b>Under the voice</b><input type="range" id="mu-duck" min="0" max="100" step="1" value="' + d + '"><span id="mu-duck-n">' + d + '%</span></label><small>While the voiceover plays, the music drops to this share of its level.</small>';
+    else if (lv.speaker) h += '<small>Your voice is the speaker track, so the music plays at this level under the whole film. It does not dip.</small>';
+    else h += '<small>No voiceover to dip under: the music plays at this level throughout.</small>';
+    return h + '</div>';
+  }
+  function muApplyLevel(volume, ducked) {
+    var a = (state.currentProject && state.currentProject.audio) || {};
+    if (volume != null) {
+      (a.tracks || []).forEach(function(t) { if (t.type === 'music') t.volume = volume; });
+      state.audioElements.forEach(function(audio) {
+        if (audio._trackType !== 'music') return;
+        audio._baseVolume = volume;
+        // The ducking loop re-reads the level every tick; set it here only when it isn't running.
+        if (!state.audioDuckingInterval) audio.volume = effVolume(audio);
+      });
+    }
+    if (ducked != null && a.ducking) a.ducking.ducked_volume = ducked;
+  }
+  function muLevelWire(project) {
+    [['mu-vol', 'volume'], ['mu-duck', 'ducked_volume']].forEach(function(k) {
+      var el = document.getElementById(k[0]); if (!el) return;
+      var n = document.getElementById(k[0] + '-n');
+      el.addEventListener('input', function() {
+        var x = parseInt(el.value, 10) / 100;
+        if (n) n.textContent = el.value + '%';
+        if (k[1] === 'volume') muApplyLevel(x, null); else muApplyLevel(null, x);
+      });
+      el.addEventListener('change', function() {
+        var body = {}; body[k[1]] = parseInt(el.value, 10) / 100;
+        api('POST', '/music-level/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), body)
+          .then(function() { studioStatus(k[1] === 'volume' ? 'Music level: ' + el.value + '%.' : 'Under the voice: ' + el.value + '% of the music level.', 'ok'); })
+          .catch(function(e) { studioStatus(e.message || String(e), 'err'); });
+      });
+    });
+  }
   function muLoad(project, q) {
     var body = document.getElementById('mu-body'); if (!body) return;
     api('/music-options/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + (q ? '?q=' + encodeURIComponent(q) : ''))
@@ -5276,6 +5328,7 @@ ${QUOTIENT_CSS}
           '<div class="np-act"><button class="np-btn" id="mu-upload">Upload</button>' +
           ((r.choice || {}).source !== 'none' ? '<button class="np-btn" id="mu-none">No music</button>' : '') +
           ((r.choice || {}).source && (r.choice || {}).source !== 'auto' ? '<button class="np-btn" id="mu-auto">Let the build pick</button>' : '') + '</div></div>';
+        h += muLevelHtml(r.level);
         h += '<div class="mu-search"><input id="mu-q" type="text" placeholder="Search Jamendo by mood or words (' + escAttr(r.mood || 'corporate') + ')" value="' + escAttr(q || '') + '"><button class="np-btn" id="mu-go">Search</button></div>';
         h += '<div class="mu-list">';
         var groups = [['Your tracks', r.brand || []], ['Library', r.stock || []], ['Jamendo' + (r.jamendo_configured ? '' : ' (not configured on this server)'), r.jamendo || []]];
@@ -5312,6 +5365,7 @@ ${QUOTIENT_CSS}
           npPick = { scene: -1, asset: -1, type: 'music', project: project.project_id };
           var f = document.getElementById('np-file'); f.accept = 'audio/*'; f.value = ''; f.click();
         });
+        muLevelWire(project);
         function go() { muStop(); muLoad(project, document.getElementById('mu-q').value.trim()); }
         document.getElementById('mu-go').addEventListener('click', go);
         document.getElementById('mu-q').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
