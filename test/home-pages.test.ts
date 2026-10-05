@@ -7,6 +7,7 @@ import { chromium, type Browser } from "playwright";
 import { getLibraryHtml } from "../src/preview-app/library-app.js";
 import { getBrandPageHtml } from "../src/preview-app/brand-page.js";
 import { getTeamHtml } from "../src/team-page.js";
+import { getCastHtml, getLocationsHtml } from "../src/cast-page.js";
 
 // HOME is Films, Team and Brand behind one rail. They were three different
 // things in three places (a page, a page, and a tray inside Studio), which is
@@ -99,6 +100,8 @@ describe("home", () => {
         ["films", getLibraryHtml(), "nav-films"],
         ["team", getTeamHtml(), "nav-team"],
         ["brand", getBrandPageHtml(), "nav-brand"],
+        ["cast", getCastHtml(), "nav-cast"],
+        ["locations", getLocationsHtml(), "nav-locations"],
       ] as const) {
         const { page, cleanup } = await open(browser, html);
         try {
@@ -109,11 +112,11 @@ describe("home", () => {
           }, { timeout: 15_000 });
           // The rail carries all three, and the signed-in person, on every page.
           const rail = await page.$$eval(".rail a.rail-item", (a) => a.map((x) => x.id));
-          expect(rail, `${name} rail`).toEqual(["nav-films", "nav-team", "nav-brand", "nav-components"]);
+          expect(rail, `${name} rail`).toEqual(["nav-films", "nav-team", "nav-brand", "nav-cast", "nav-locations", "nav-components"]);
           expect(await page.$eval(`#${active}`, (e) => e.classList.contains("on")), `${name} marks itself`).toBe(true);
           expect(await page.textContent("#rail-me"), `${name} shows who is signed in`).toContain("Marc Ferrentino");
           // Every item points at a real page, with the tenant carried across.
-          for (const [id, href] of [["nav-films", "/library"], ["nav-team", "/team"], ["nav-brand", "/brand"]]) {
+          for (const [id, href] of [["nav-films", "/library"], ["nav-team", "/team"], ["nav-brand", "/brand"], ["nav-cast", "/cast"], ["nav-locations", "/locations"]]) {
             const url = await page.$eval(`#${id}`, (e) => (e as HTMLAnchorElement).getAttribute("href"));
             expect(url, `${name} -> ${id}`).toContain(href);
             expect(url, `${name} -> ${id} carries the tenant`).toContain("tenant=marc-getquotient-ai");

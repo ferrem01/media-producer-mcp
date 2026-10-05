@@ -412,6 +412,23 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
  *  or render in flight, and a failed project, are locked. */
 const EDITABLE_BOARD_STATES = new Set<string>(["storyboard", "draft", "generated", "rendered"]);
 
+/** Carry the cast fields of a board across a rebuild of it (core/cast-plan.ts):
+ *  the film's cast_plan and, per scene (by index, or by label when the scene
+ *  count changed), performer / performance / cast / actor_clip(s). */
+export function keepCastFields(before: any, after: any): void {
+  if (!before || !after) return;
+  if (before.cast_plan && after.cast_plan === undefined) after.cast_plan = before.cast_plan;
+  const was: any[] = before.scenes || [], now: any[] = after.scenes || [];
+  const sameShape = was.length === now.length;
+  now.forEach((sc, i) => {
+    const old = sameShape ? was[i] : was.find((w) => w && w.label && w.label === sc?.label);
+    if (!sc || !old) return;
+    for (const k of ["performer", "performance", "cast", "actor_clip", "actor_clips"]) {
+      if (old[k] !== undefined && sc[k] === undefined) sc[k] = old[k];
+    }
+  });
+}
+
 /** The film's WORLD is project-level state written once at generate time;
  *  the update tool re-derives it with the pin (brand palette + seed stay
  *  consistent), stores it, and stamps the saved treatment so builds inherit
@@ -611,7 +628,15 @@ export async function queueBuildFromStoryboard(
           // The build fills needs on the storyboard (a fetched clip, a drawn
           // illustration: path + status "provided"); without this the original
           // kept its pre-build board and every need stayed open in Studio.
-          if (generatedProject.storyboard) origProject.storyboard = retarget(generatedProject.storyboard);
+          if (generatedProject.storyboard) {
+            const before: any = origProject.storyboard;
+            origProject.storyboard = retarget(generatedProject.storyboard);
+            // Who performs each scene is the user's plan, not the writer's: the
+            // cast plan, each scene's plan, performances, recast casting and
+            // b-roll survive the build (measured live, proj_d872a7e4: the build
+            // dropped cast_plan and the film read "Me · Record" again).
+            keepCastFields(before, origProject.storyboard);
+          }
           origProject.canvas = generatedProject.canvas;
           // Never WIPE a speaker track the user already attached: the
           // pipeline only produces one in speaker-source mode, so an
@@ -671,6 +696,15 @@ export async function queueBuildFromStoryboard(
       if (pipelineResult && typeof pipelineResult === "object" && "project_id" in (pipelineResult as any)) {
         j.projectId = (pipelineResult as any).project_id;
       }
+
+      // Scenes the cast plan has an actor generate: their lines read in the
+      // actor's voice now, the read their takes will be made to.
+      try {
+        j.progress = { step: "voices", percent: 97, detail: "Voicing the scenes in the cast's voices" };
+        const { voicePlanScenes } = await import("./core/scene-performance.js");
+        const voiced = await voicePlanScenes(tenantId, projectId);
+        if (voiced.length) console.log(`  Build-from-storyboard: voiced scenes ${voiced.map((x) => x + 1).join(", ")} in the plan's actor's voice`);
+      } catch (e: any) { console.warn(`  Build-from-storyboard: voicing the plan failed: ${e?.message || e}`); }
 
       j.progress = { step: "complete", percent: 100 };
       trace.setOutcome("success");

@@ -489,6 +489,20 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
   return { file, seconds };
 }
 
+/** The scene's heard voice, when it is still the one to send. */
+function heardVoice(perf: ScenePerformance, actorId: string, line: string): NonNullable<ScenePerformance["voice_preview"]> | null {
+  const vp = perf.voice_preview;
+  if (!vp || vp.actor !== actorId || vp.source !== (perf.voice_source || "script")) return null;
+  if (vp.line !== undefined && vp.line !== line) return null;
+  if (vp.source === "script" && (vp.delivery || "") !== (perf.delivery || "")) return null;
+  return vp;
+}
+async function useHeard(vp: NonNullable<ScenePerformance["voice_preview"]>, workDir: string): Promise<{ file: string; seconds: number }> {
+  const file = path.join(workDir, "voice.mp3");
+  await fs.copyFile(resolveVideoPath(vp.url, config.dataDir), file);
+  return { file, seconds: (await durationOf(file)) || vp.seconds };
+}
+
 /** Perform a scene: frame (drawn if none), voice, Seedance, attach. A draft
  *  first (480p); `quality: "final"` renders the draft's shot at 1080p.
  *  Returns at once; the work runs on (poll getScenePerformances). */
@@ -676,7 +690,11 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
       await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), ...(perf.location ? { location: perf.location } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
     }
     await stage("voice");
-    voice = await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
+    // The voice heard is the voice sent: a scene whose heard read still
+    // matches (actor, source, delivery, line) gives Seedance that very file,
+    // not a fresh render with its own intonation.
+    const heard = heardVoice(perf, actor.id, String(scene.voiceover_text || ""));
+    voice = heard ? await useHeard(heard, workDir) : await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
     // THE PITCH CHECK, before Seedance is paid: the voice against the
     // actor's other scenes in this film. A line spoken low converts low
     // (scene 3: 160 Hz against 186-200), and Seedance copies it faithfully.
@@ -850,8 +868,59 @@ export async function previewSceneVoice(tenant: string, projectId: string, si: n
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
   await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), name));
   const hz = await voicePitch(voice.file, workDir).catch(() => 0);
-  const after = (await loadScene(tenant, projectId, si)).scene.performance;
-  return { url: assetUrl(tenant, projectId, name), seconds: Math.round(voice.seconds * 100) / 100, hz, ...(after?.delivery ? { delivery: after.delivery } : {}) };
+  const url = assetUrl(tenant, projectId, name), seconds = Math.round(voice.seconds * 100) / 100;
+  // Kept on the scene: the take panel shows the voice is ready (Marc: "it
+  // doesn't seem to acknowledge that there was already voice generated").
+  const after = await patch(tenant, projectId, si, (p) => {
+    p.voice_preview = { url, seconds, hz, actor: actor.id, source, line: String(scene.voiceover_text || ""), ...(p.delivery ? { delivery: p.delivery } : {}), made_at: new Date().toISOString() };
+  });
+  return { url, seconds, hz, ...(after?.delivery ? { delivery: after.delivery } : {}) };
+}
+
+/** THE VOICE THE PLAN SAYS, at the build: every scene planned as GENERATE by
+ *  an actor with a voice gets its line read in that voice (its delivery, if
+ *  any) -- the very file its take will be performed to -- and the build's
+ *  scratch read under the scene points at it, so the film plays Dana before
+ *  any video is made (Marc, Oct 5: the generic scratch voice "doesn't really
+ *  make sense"). A scene with a performed take, or no line, is left alone.
+ *  Returns the scenes voiced. */
+export async function voicePlanScenes(tenant: string, projectId: string): Promise<number[]> {
+  const project: any = await loadProject(tenant, projectId);
+  if (!project?.storyboard?.scenes?.length) return [];
+  const grammar = project.treatment?.filmGrammar;
+  if (grammar !== "speaker" && grammar !== "creator-cut") return [];
+  if (!process.env.ELEVENLABS_API_KEY) return [];
+  const actors = await listCast(tenant);
+  const done: number[] = [];
+  for (let si = 0; si < project.storyboard.scenes.length; si++) {
+    const sc = project.storyboard.scenes[si];
+    const line = String(sc?.voiceover_text || "").trim();
+    if (!line) continue;
+    const plan = resolvePlan(project, si, actors, !!sceneRecording(project, si));
+    const actor = plan.how === "generate" && plan.actor ? actors.find((a) => a.id === plan.actor) : null;
+    if (!actor?.voice_id) continue;
+    const clip = (project.speaker_track?.clips || []).find((c: any) => c.scene_index === si);
+    if (clip && (takeForClip(project, clip) as any)?.performed_by) continue;
+    const perf: ScenePerformance = sc.performance || { actor: actor.id, shot: DEFAULT_SHOT, voice_source: "script" };
+    let vp = heardVoice({ ...perf, voice_source: perf.voice_source || "script" }, actor.id, String(sc.voiceover_text || ""));
+    if (!vp) {
+      try { await previewSceneVoice(tenant, projectId, si, { actor: actor.id, voice_source: "script" }); } catch (e: any) { console.warn(`  voice the plan: scene ${si + 1}: ${e?.message || e}`); continue; }
+      vp = (await loadScene(tenant, projectId, si)).scene.performance?.voice_preview || null;
+    }
+    if (!vp) continue;
+    done.push(si);
+    // The scratch read under the scene plays the actor's voice.
+    const k = `${tenant}/${projectId}`;
+    const abs = resolveVideoPath(vp.url, config.dataDir);
+    const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+      const p: any = await loadProject(tenant, projectId);
+      const tr = (p?.audio?.tracks || []).find((t: any) => t.id === `vo_scene_${si}`);
+      if (tr) { tr.source = abs; tr.voice_of = actor.id; p.updated_at = new Date().toISOString(); await saveProject(p); }
+    });
+    chains.set(k, next);
+    await next;
+  }
+  return done;
 }
 
 /** Every scene's performer at a glance: who plays it, and any performance. */

@@ -6,6 +6,44 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — Who performs a scene: chosen in its take and on the storyboard; Cast and Locations are tenant pages
+
+Marc's first fully generated film (proj_d872a7e4) showed the Cast dialog was
+three tools in one overloaded box, the take slot offered only "me" sources,
+and a generic scratch voice sat under scenes the plan gives to Dana. Agreed
+layout, built:
+
+- **Cast and Locations are tenant pages** in the rail beside Team and Brand
+  (`cast-page.ts`, `/cast`, `/locations`): add a generated person (portrait +
+  sheet), a real person (consent) or a HeyGen look/presenter, set each actor's
+  ElevenLabs voice; draw a location from a description or clean a photo.
+  Uploads go into the tenant's `library` pseudo-project (the existing route).
+- **The take dialog and the storyboard's need row offer every way to fill a
+  take**: Me (record here / phone / across the room / upload) or A cast member
+  (Recast my recording / Generate). One performer panel (`perfPanel`) serves
+  both: who, engine, location (Seedance), shot, first frame (draw / redraw /
+  start from the previous scene's last frame), voice + delivery with Hear,
+  Make the draft (its cost) / the 1080p final, status, cutaways. Every choice
+  is written into the scene's plan. The dialog opens on the source the plan says.
+- **The Cast button and dialog are gone.** Under the scene list, the film's
+  plan: "Performed by Dana · Generate · Seedance · Loft lounge", counts (ready /
+  to make / stale), Change (who / how / with / where) and Make all / Finals with
+  the cost first.
+- **The voice**: "Hear the voice" is kept on the scene (`voice_preview`); a
+  perform sends that very file when it still matches (actor, source, delivery,
+  line) instead of a fresh render with its own intonation; the build voices
+  every Generate scene in the actor's voice (`voicePlanScenes`) and points the
+  scratch read at it; the take slot says "Dana · voice ready · make the take".
+  Scenes planned as Me keep the build's scratch read for timing.
+
+## 2026-10-05 — A build keeps who performs
+
+Building proj_d872a7e4 (the Dana x Quotient reel) copied the writer's board
+back over the film's and dropped `storyboard.cast_plan`. `keepCastFields`
+(server.ts) now carries the cast plan and each scene's performer /
+performance / cast / actor_clip(s) across the copy (by index, or by label when
+the scene count changed); a value the build wrote itself wins.
+
 ## 2026-10-05 — B-roll montages: several clips per scene, shown for a beat
 
 The reel Marc sent to replicate (a creator UGC ad, 28.7 s, 14 shots) cuts

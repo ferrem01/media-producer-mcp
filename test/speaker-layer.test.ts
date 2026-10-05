@@ -291,7 +291,10 @@ describe("the choice, wherever it is made", () => {
     expect(studio).not.toMatch(/data-np-bg=/);
     expect(studio).toMatch(/<div class="np-tabs">/);
     expect(studio).toMatch(/Camera take \\u00b7 Scene ' \+ \(si \+ 1\)/);
-    expect(studio).toMatch(/npOpenPanel\(project, cardC, 'booth', si, ai\);/);
+    // The recorder opens unless the scene's plan gives the take to a cast member (SPEC-cast-scenes.md).
+    expect(studio).toMatch(/npOpenPanel\(project, cardC, pfStart, si, ai\);/);
+    expect(studio).toMatch(/if \(how === 'generate' && actor\) return 'generate';/);
+    expect(studio).toMatch(/return 'booth';\n  \}/);
     // The Recorder button answers the click: arming, then armed with a pulse; the panel keeps a live waiting mark.
     expect(studio).toMatch(/armBtn\.textContent = '\\u2713 Recorder armed'/);
     // ...and only the button arms: opening the dialog does not.

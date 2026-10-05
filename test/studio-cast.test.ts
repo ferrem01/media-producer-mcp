@@ -10,11 +10,27 @@ import { getPreviewHtml } from "../src/preview-app/preview-app.js";
 describe("Studio: the Cast card", () => {
   const html = getPreviewHtml();
 
-  it("a Cast button in the header, shown on built films a person carries, locked while rendering", () => {
-    expect(html).toContain('id="cast-btn"');
-    expect(html).toContain("castBtnEl.style.display = (project.scenes || []).length && castIsPersonFilm(project) ? '' : 'none';");
-    expect(html).toContain("body.mp-rendering #cast-btn");
-    expect(html).toContain("openCastCard(state.currentProject)");
+  it("no Cast button: who performs a scene is chosen in its take and on the storyboard; the film's plan sits under the scene list", () => {
+    expect(html).not.toContain('id="cast-btn"');
+    expect(html).toContain('<div id="pf-film-bar" style="display:none"></div>');
+    // The take dialog: me, or a cast member -- opened on the source the plan says.
+    expect(html).toContain('<span class="np-group">Me</span>');
+    expect(html).toContain('<span class="np-group">A cast member</span>');
+    expect(html).toContain('data-np-src="recast"');
+    expect(html).toContain('data-np-src="generate"');
+    expect(html).toContain("npOpenPanel(project, cardC, pfStart, si, ai);");
+    // The board's need row offers the same two sources (not on a cameo clip).
+    expect(html).toContain("camera_video: ['booth', 'phone', 'room', 'upload', 'recast', 'generate']");
+    expect(html).toContain("if ((src === 'recast' || src === 'generate') && a.use === 'clip') return;");
+    expect(html).toContain("if (src === 'recast' || src === 'generate') { perfPanel(project, panel, src, si); return; }");
+    // Every choice in the panel is the scene's plan.
+    expect(html).toContain("{ action: 'plan', scenes: [{ index: si, performer: perfm }] }");
+    expect(html).toContain("api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si] })");
+    // Make all: the cost first, then confirm.
+    expect(html).toContain("api('POST', '/scene-performance/' + pfT() + '/' + pfP(project), { action: kind })");
+    expect(html).toContain("{ action: kind, confirm: true }");
+    // The slot says who and whether their voice is ready.
+    expect(html).toContain("nb.textContent = slotLbl || 'take needed';");
   });
 
   it("loads the cast, the vendors, who plays now and the voices; recasts, generates, and puts you back", () => {

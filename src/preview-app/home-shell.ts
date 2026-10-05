@@ -1,7 +1,7 @@
 /**
  * HOME'S SHELL — the left rail, the tokens, and the signed-in chip.
  *
- * Home is Films, Team and Brand. They used to be three different things in
+ * Home is Films, Team, Brand, Cast and Locations. They used to be three different things in
  * three different places (a page, a page, and a tray inside Studio), which is
  * why Studio's header kept growing. One rail, shared, so every one of them is
  * the same room with a different panel open.
@@ -99,7 +99,7 @@ export const RAIL_CSS = `
   }
 `;
 
-export type RailPage = "films" | "team" | "brand" | "components";
+export type RailPage = "films" | "team" | "brand" | "cast" | "locations" | "components";
 
 /** The rail's icons, in Quotient's family: Lucide, 24-viewBox, stroked. `users`
  *  is lifted verbatim from the app shell's own nav so Team looks the same in
@@ -108,6 +108,8 @@ const ICONS: Record<RailPage, string> = {
   films: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg>',
   team: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
   brand: '<svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.83-.44-1.12-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 011.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.96 6.01 17.46 2 12 2z"/><circle cx="6.5" cy="12.5" r=".6"/><circle cx="8.5" cy="7.5" r=".6"/><circle cx="13.5" cy="6.5" r=".6"/><circle cx="17.5" cy="10.5" r=".6"/></svg>',
+  cast: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/><path d="M17 3l1.5 1.5M19.5 7H21"/></svg>',
+  locations: '<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/></svg>',
   components: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>',
 };
 
@@ -119,6 +121,8 @@ export function railHtml(active: RailPage): string {
   ${item("films", "Films")}
   ${item("team", "Team")}
   ${item("brand", "Brand")}
+  ${item("cast", "Cast")}
+  ${item("locations", "Locations")}
   <div class="rail-group">Workshop</div>
   ${item("components", "Components")}
   <div class="rail-spacer"></div>
@@ -164,6 +168,10 @@ export const RAIL_JS = `
     if (films) films.href = withToken('/library' + q);
     if (team) team.href = withToken('/team' + q);
     if (brandN) brandN.href = withToken('/brand' + q);
+    var castN = document.getElementById('nav-cast');
+    if (castN) castN.href = withToken('/cast' + q);
+    var locN = document.getElementById('nav-locations');
+    if (locN) locN.href = withToken('/locations' + q);
     // The playground already has a My Components tab and reads ?tenant= off
     // its own url; without the tenant it just says "enter a tenant id". The
     // house library is global, but WHOSE components to show beside it is not.

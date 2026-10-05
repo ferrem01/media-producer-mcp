@@ -1149,6 +1149,38 @@ ${QUOTIENT_CSS}
   .np-note { font-size: 11px; color: var(--content-secondary); margin-top: 8px; }
   /* THE SOURCES: each need collects its own way, inline under its row. */
   .np-act { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  #pf-film-bar { padding: 6px 10px 8px; border-bottom: 1px solid var(--border-secondary); font-size: 12px; }
+  .pf-bar-line { line-height: 1.5; } .pf-bar-sub { color: var(--content-tertiary, #888); margin-top: 2px; }
+  .pf-bar-sub b.warn { color: #b45309; }
+  .pf-mini { font-size: 11px; padding: 1px 7px; border-radius: 6px; border: 1px solid var(--border-secondary); background: transparent; color: var(--content-secondary); cursor: pointer; }
+  .pf-mini:hover { border-color: var(--ring); color: var(--content-primary); }
+  .pf-list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 10px; }
+  .pf-li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; } .pf-li small { color: var(--content-tertiary, #888); }
+  .np-btn.primary { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
+  .np-btn.primary:hover { background: color-mix(in srgb, var(--primary) 90%, transparent); }
+  .np-btn.primary:disabled { opacity: .5; }
+  .np-groups { align-items: center; }
+  .np-group { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary, #888); margin: 0 2px 0 6px; }
+  .np-group:first-child { margin-left: 0; }
+  .pf-head { font-size: 13px; margin: 0 0 10px; }
+  .pf-head b.ok { color: #15803d; } .pf-head b.warn { color: #b45309; }
+  .pf-row { display: flex; gap: 10px; align-items: center; margin: 0 0 10px; font-size: 13px; }
+  .pf-row.top { align-items: flex-start; }
+  .pf-row > label { flex: 0 0 76px; color: var(--content-tertiary, #888); font-size: 12px; }
+  .pf-row select { max-width: 280px; }
+  .pf-link { font-size: 12px; margin-left: auto; }
+  .pf-engines { display: flex; flex-direction: column; gap: 4px; }
+  .pf-eng { cursor: pointer; } .pf-eng.dis { opacity: .45; cursor: default; }
+  .pf-eng small { color: var(--content-tertiary, #888); }
+  .pf-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+  .pf-acts small { color: var(--content-tertiary, #888); }
+  .pf-make { margin: 12px 0 6px; padding-top: 10px; border-top: 1px solid var(--border-secondary); }
+  .pf-frames { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pf-frame { position: relative; width: 64px; aspect-ratio: 9 / 16; border-radius: 4px; overflow: hidden; cursor: pointer; border: 1px solid var(--border-secondary); background: #111; }
+  .pf-frame.sel { outline: 2px solid var(--content-primary); outline-offset: -2px; }
+  .pf-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pf-frame small { position: absolute; left: 2px; bottom: 2px; font-size: 9px; background: rgba(0,0,0,.6); color: #fff; padding: 0 3px; border-radius: 3px; }
+  .pf-cut { margin-top: 10px; font-size: 13px; } .pf-cut summary { cursor: pointer; color: var(--content-secondary); }
   .np-panel { flex-basis: 100%; margin: 6px 0 2px; padding: 10px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--surface-secondary, var(--core-panel-bg)); }
   .np-panel .np-search { display: flex; gap: 6px; margin-bottom: 8px; }
   .np-panel input, .np-panel textarea { flex: 1; min-width: 0; box-sizing: border-box; padding: 6px 10px; font: 13px/18px inherit; border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--surface-primary); color: var(--foreground); }
@@ -1379,7 +1411,6 @@ ${QUOTIENT_CSS}
     <div class="header-controls">
       <button class="btn btn-secondary" id="project-delete-btn" style="display:none;" title="Delete this project &#8212; scenes, assets and rendered MP4. Asks first; cannot be undone.">&#128465;</button>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
-      <button class="btn btn-secondary" id="cast-btn" style="display:none;" title="Cast: who performs the person in this film &#8212; you, a recast actor, or a take generated from the script">&#127917; Cast</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <span id="render-wrap" style="display:none;align-items:center;gap:8px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
@@ -1401,6 +1432,7 @@ ${QUOTIENT_CSS}
          editor), not here (Marc). One hidden picker serves every Upload. -->
     <input type="file" id="np-file" accept="image/*,video/*" style="display:none">
     <div class="sidebar-header" id="scene-list-head">Scenes</div>
+    <div id="pf-film-bar" style="display:none"></div>
     <div id="scene-list"><div class="empty-state">Load a project</div></div>
   </div>
 
@@ -3196,6 +3228,7 @@ ${QUOTIENT_CSS}
         // were in (a revision reloads it, and should not bounce you out).
         if (draftModeFor !== project.project_id) { draftMode = 'plan'; draftModeFor = project.project_id; }
         renderDraftView(project);
+        pfFilmBar(project);
         return;
       }
 
@@ -3211,8 +3244,9 @@ ${QUOTIENT_CSS}
       }
       try { booth.script = null; } catch (eBS) {} // re-fetch per project
       // Cast: offered on a built film a person carries (speaker / creator-cut, or any film with a take).
-      var castBtnEl = document.getElementById('cast-btn');
-      if (castBtnEl) castBtnEl.style.display = (project.scenes || []).length && castIsPersonFilm(project) ? '' : 'none';
+      // (No Cast button: who performs a scene is chosen in its take and on
+      // the storyboard; actors and locations are tenant pages in the rail.)
+      pfFilmBar(project);
 
       // Mobile: don't boot the composite (all scenes' runtimes in one doc)
       // until the user asks for it.
@@ -4969,8 +5003,8 @@ ${QUOTIENT_CSS}
   // ACROSS THE ROOM (SPEC-remote-booth.md): a wide take from 6-10 ft --
   // the phone on a tripod is the camera, this screen the prompter and the
   // remote. It opens the remote booth in its own tab for the scene.
-  var NP_SOURCES = { camera_video: ['booth', 'phone', 'room', 'upload'], screen_recording: ['recorder', 'upload'], screenshot: ['recorder', 'upload'], stock_footage: ['find', 'upload'], illustration: ['draw', 'upload'], mockup: ['draw', 'upload'] };
-  var NP_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Record with the Recorder', booth: 'Record here', phone: 'On your phone', room: 'Across the room' };
+  var NP_SOURCES = { camera_video: ['booth', 'phone', 'room', 'upload', 'recast', 'generate'], screen_recording: ['recorder', 'upload'], screenshot: ['recorder', 'upload'], stock_footage: ['find', 'upload'], illustration: ['draw', 'upload'], mockup: ['draw', 'upload'] };
+  var NP_SOURCE_LABELS = { find: 'Find b-roll', draw: 'Draw it', recorder: 'Record with the Recorder', booth: 'Record here', phone: 'On your phone', room: 'Across the room', recast: 'Recast my recording', generate: 'Generate' };
   var npPick = null;
   function sceneNeedsHtml(project, si) {
     var s = ((project.storyboard && project.storyboard.scenes) || [])[si];
@@ -4992,6 +5026,8 @@ ${QUOTIENT_CSS}
       var srcs = NP_SOURCES[a.type] || ['upload'];
       var acts = have ? '<button class="np-btn np-view" data-np-src="view" data-np-scene="' + si + '" data-np-asset="' + r.ai + '">View</button>' : '';
       srcs.forEach(function(src) {
+        // A cast member performs the scene's TAKE; a cameo clip is footage.
+        if ((src === 'recast' || src === 'generate') && a.use === 'clip') return;
         if (src === 'upload') {
           acts += '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + r.ai + '" data-np-type="' + escAttr(a.type) + '">' + (have ? 'Replace' : 'Upload') + '</button>';
         } else {
@@ -5076,6 +5112,7 @@ ${QUOTIENT_CSS}
       if (vClose) vClose.addEventListener('click', function() { panel.style.display = 'none'; panel.dataset.src = ''; panel.innerHTML = ''; });
       return;
     }
+    if (src === 'recast' || src === 'generate') { perfPanel(project, panel, src, si); return; }
     if (src === 'booth') {
       // RECORD HERE: the take page itself, in the dialog, on this scene. It
       // tells us when the take is attached (postMessage) and the film reloads.
@@ -7993,8 +8030,11 @@ ${QUOTIENT_CSS}
         nb.style.top = (y.speaker + 3) + 'px';
         nb.style.left = ((f1 / total) * 100).toFixed(2) + '%';
         nb.style.width = ((Math.min(total - f1, d1) / total) * 100).toFixed(2) + '%';
-        nb.textContent = 'take needed';
-        nb.title = 'Scene ' + (n.si + 1) + ' still needs its take. Click to record it here, on your phone, or upload one \u2014 it lands here.';
+        // A scene the plan has a cast member generate says who, and whether
+        // their voice for it is ready (the read the take will be made to).
+        var slotLbl = pfSlotLabel(p, n.si);
+        nb.textContent = slotLbl || 'take needed';
+        nb.title = slotLbl ? 'Scene ' + (n.si + 1) + ': ' + slotLbl + '. Click to make the take, or record it yourself.' : 'Scene ' + (n.si + 1) + ' still needs its take. Click to record it here, on your phone, upload one, recast your recording or have a cast member generate it \u2014 it lands here.';
         nb.addEventListener('click', function(ev) { ev.stopPropagation(); openNeedPicker(p, n.si, n.ai); });
         track.insertBefore(nb, document.getElementById('wave-strip'));
       });
@@ -11133,6 +11173,390 @@ ${QUOTIENT_CSS}
   // THE PICKER: the need's sources in the dialog, the make-it panel already
   // open (find for b-roll, draw for a drawing), Upload beside it. A pick
   // lands in the scene at once and the dialog closes.
+  // ── WHO PERFORMS THIS SCENE (SPEC-cast-scenes.md): the take's other two
+  // sources, beside Record / phone / room / upload -- in the take dialog and
+  // on the storyboard's need row, one panel for both (Marc, Oct 5: "it should
+  // be both in take and storyboard"). RECAST performs the scene's recording
+  // as a cast member; GENERATE has one perform the scene with no recording
+  // (Seedance in a location, or a HeyGen look in its own setting). Every
+  // choice here is written into the scene's plan, so the board reads the same.
+  var pf = { data: null, loading: null, draft: {}, open: [], timer: null, audio: null };
+  var PF_ENGINES = { recast: [['higgsfield', 'Genjutsu', 'one-to-one: your gestures, the actor’s face'], ['kling', 'Kling', 'one-to-one'], ['heygen', 'HeyGen', 'hears your voice, draws its own movement'], ['runway', 'Runway', 'one-to-one, a glossier look']],
+    generate: [['seedance', 'Seedance', 'any shot, in a location you pick'], ['heygen', 'HeyGen', 'a HeyGen look speaks the line in its own setting']] };
+  var PF_STAGE = { frame: 'drawing the first frame', voice: 'voicing the line', draft: 'Seedance is making the draft', final: 'Seedance is making the 1080p final', heygen: 'HeyGen is performing it', attach: 'putting it on the scene' };
+  function pfT() { return encodeURIComponent(state.tenantId); }
+  function pfP(project) { return encodeURIComponent(project.project_id); }
+  function pfLoad(project, force) {
+    if (pf.data && !force && pf.data.pid === project.project_id) return Promise.resolve(pf.data);
+    if (pf.loading && !force) return pf.loading;
+    pf.loading = Promise.all([
+      api('/cast/' + pfT()),
+      api('/locations/' + pfT()).catch(function() { return { locations: [] }; }),
+      api('/scene-performance/' + pfT() + '/' + pfP(project)),
+      api('/recast/' + pfT() + '/' + pfP(project)).catch(function() { return {}; }),
+    ]).then(function(r) {
+      pf.loading = null;
+      pf.data = { pid: project.project_id, cast: r[0].cast || [], performers: r[0].performers || [], locations: r[1].locations || [], scenes: r[2].scenes || [], cast_plan: r[2].cast_plan || null, recast: r[3].recast || null };
+      return pf.data;
+    }, function(e) { pf.loading = null; throw e; });
+    return pf.loading;
+  }
+  function pfActor(id) { return ((pf.data && pf.data.cast) || []).filter(function(a) { return a.id === id; })[0] || null; }
+  function pfOpt(v, label, cur, dis) { return '<option value="' + escAttr(v) + '"' + (v === cur ? ' selected' : '') + (dis ? ' disabled' : '') + '>' + escHtml(label) + '</option>'; }
+  // What a Seedance draft of the scene costs: the voice's length (heard),
+  // else the scene's; 4 s at least, whole seconds, $0.134/s at 480p.
+  function pfCost(project, si, perS) {
+    var s = pf.data.scenes[si] || {}, vp = (s.performance || {}).voice_preview;
+    var secs = vp && vp.seconds ? vp.seconds : Number(((project.scenes || [])[si] || {}).duration_seconds) || 5;
+    return '$' + (Math.max(4, Math.ceil(secs + 0.3)) * perS).toFixed(2);
+  }
+  // The scene's take state in words, for the panel's head.
+  function pfStateLine(s) {
+    var st = s.state === 'ready' ? '<b class="ok">&#10003; ready</b>' : s.state === 'stale' ? '<b class="warn">stale</b>' : 'to make';
+    return '<div class="pf-head"><b>' + escHtml(s.plan_line || '') + '</b> &#183; ' + st + (s.why && s.state === 'stale' ? ' <small>' + escHtml(s.why) + '</small>' : '') + '</div>';
+  }
+  function pfRender(project, panel, kind, si) {
+    if (!panel || !panel.isConnected) return;
+    var d = pf.data, s = d.scenes[si];
+    if (!s) { panel.innerHTML = '<div class="np-hint">This scene is not on the board.</div>'; return; }
+    var perf = s.performance || {}, plan = s.plan || {}, dr = pf.draft[si] = pf.draft[si] || {};
+    var cast = d.cast || [];
+    var ta = 'width:100%;box-sizing:border-box;resize:vertical;font:inherit;font-size:13px;line-height:1.45;padding:8px 10px;';
+    var h = pfStateLine(s);
+    var actorId = dr.actor || (kind === 'generate' ? (plan.how === 'generate' && plan.actor) || perf.actor : (plan.how === 'recast' && plan.actor) || s.cast) || (d.cast_plan && d.cast_plan.actor) || (cast[0] && cast[0].id) || '';
+    if (!cast.length) {
+      panel.innerHTML = h + '<div class="np-hint">No cast yet. <a href="' + escAttr(withToken('/cast?tenant=' + pfT())) + '" target="_blank">Add an actor in Cast</a>, then come back.</div>';
+      return;
+    }
+    h += '<div class="pf-row"><label>Who</label><select data-pf="actor">' + cast.map(function(a) { return pfOpt(a.id, a.name + (a.heygen_look_id ? ' (HeyGen look)' : a.fictional ? ' (generated)' : ''), actorId); }).join('') + '</select>'
+      + '<a class="pf-link" href="' + escAttr(withToken('/cast?tenant=' + pfT())) + '" target="_blank">Manage cast &#8599;</a></div>';
+    var a = pfActor(actorId);
+    if (kind === 'recast') {
+      var eng = dr.engine || (plan.how === 'recast' && plan.engine) || (a && a.heygen_look_id ? 'heygen' : 'higgsfield');
+      h += '<div class="pf-row"><label>With</label><div class="pf-engines">' + PF_ENGINES.recast.map(function(e) {
+        var p = (d.performers || []).filter(function(x) { return x.id === e[0]; })[0] || {};
+        return '<label class="pf-eng' + (p.available ? '' : ' dis') + '"><input type="radio" name="pf-eng-' + si + '" data-pf="engine" value="' + e[0] + '"' + (e[0] === eng ? ' checked' : '') + (p.available ? '' : ' disabled') + '> <b>' + e[1] + '</b> <small>' + e[2] + (p.available ? '' : ' &#183; not set up') + '</small></label>';
+      }).join('') + '</div></div>';
+      var rc = d.recast && d.recast.status === 'running' ? d.recast : null;
+      if (!s.has_recording) h += '<div class="np-note">A recast performs <b>your recording</b> of this scene: record it first (Record here, On your phone, Across the room), then recast it.</div>';
+      else if (rc) h += '<div class="np-armed"><span></span>Recasting' + (rc.scenes ? ' scenes ' + rc.scenes.map(function(x) { return x + 1; }).join(', ') : '') + ' as ' + escHtml((pfActor(rc.actor) || {}).name || rc.actor) + '&#8230;</div>';
+      else h += '<div class="pf-acts"><button class="np-btn primary" data-pf-go="recast">Recast scene ' + (si + 1) + ' as ' + escHtml(a ? a.name : '…') + '</button></div>'
+        + '<div class="np-hint">Your words, timing and cuts stay; only the person changes. Your recording is kept: Me puts it back.</div>';
+      if (s.has_recording && (s.cast || (s.take && s.take.performed_by))) h += '<div class="pf-acts"><button class="np-btn" data-pf-go="mine">Back to my recording</button></div>';
+      panel.innerHTML = h;
+      return;
+    }
+    // GENERATE
+    var geng = dr.engine || (plan.how === 'generate' && plan.actor === actorId && plan.engine) || (a && a.heygen_look_id ? 'heygen' : 'seedance');
+    h += '<div class="pf-row"><label>With</label><div class="pf-engines">' + PF_ENGINES.generate.map(function(e) {
+      return '<label class="pf-eng"><input type="radio" name="pf-geng-' + si + '" data-pf="engine" value="' + e[0] + '"' + (e[0] === geng ? ' checked' : '') + '> <b>' + e[1] + '</b> <small>' + e[2] + '</small></label>';
+    }).join('') + '</div></div>';
+    var run = s.running || perf.status === 'running';
+    if (geng === 'seedance') {
+      var locs = (d.locations || []).filter(function(l) { return l.image; });
+      var where = dr.location != null ? dr.location : (plan.location || perf.location || '');
+      h += '<div class="pf-row"><label>Where</label><select data-pf="location"' + (run ? ' disabled' : '') + '>' + pfOpt('', 'No location (the shot describes it)', where) + locs.map(function(l) { return pfOpt(l.id, l.name, where); }).join('') + '</select>'
+        + '<a class="pf-link" href="' + escAttr(withToken('/locations?tenant=' + pfT())) + '" target="_blank">Manage locations &#8599;</a></div>';
+      var shot = dr.shot != null ? dr.shot : (perf.shot || '');
+      h += '<div class="pf-row top"><label>The shot</label><textarea data-pf="shot" rows="2" maxlength="1000" style="' + ta + '" placeholder="A selfie at arm’s length on a wide-angle phone lens, talking straight to the camera">' + escHtml(shot) + '</textarea></div>';
+      var frames = perf.actor === actorId ? (perf.frames || []) : [];
+      h += '<div class="pf-row top"><label>First frame</label><div style="flex:1;min-width:0">';
+      if (frames.length) {
+        h += '<div class="pf-frames">' + frames.map(function(f) {
+          return '<div class="pf-frame' + (f.url === perf.frame ? ' sel' : '') + '" data-pf-pick="' + escAttr(f.url) + '" title="' + escAttr(f.from_scene != null ? 'Scene ' + (f.from_scene + 1) + '’s last frame' : (f.shot || '')) + '"><img src="' + escAttr(withToken(f.url)) + '" alt="">' + (f.from_scene != null ? '<small>from ' + (f.from_scene + 1) + '</small>' : '') + '</div>';
+        }).join('') + '</div>';
+      }
+      var prevTake = si > 0 && (d.scenes[si - 1] || {}).take;
+      h += '<div class="pf-acts"><button class="np-btn" data-pf-go="frame"' + (run ? ' disabled' : '') + '>' + (frames.length ? 'Redraw' : 'Draw the frame') + '</button>'
+        + (prevTake ? '<button class="np-btn" data-pf-go="continue"' + (run ? ' disabled' : '') + '>Start from scene ' + si + '’s last frame</button>' : '')
+        + '<small>' + (frames.length ? 'Click a frame to use it.' : 'Optional: see ' + escHtml(a ? a.name : 'them') + ' in the shot first (cents). The draft draws one if there is none.') + '</small></div></div></div>';
+    }
+    // The voice.
+    var src = dr.voice_source || perf.voice_source || 'script';
+    h += '<div class="pf-row"><label>Voice</label><div class="pf-engines">'
+      + '<label class="pf-eng"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="script"' + (src === 'script' ? ' checked' : '') + '> Read the script in ' + escHtml(a ? a.name : 'their') + '’s voice</label>'
+      + '<label class="pf-eng' + (s.has_recording ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="take"' + (src === 'take' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> My recording, in their voice' + (s.has_recording ? '' : ' <small>(record the scene first)</small>') + '</label></div></div>';
+    if (src === 'script') {
+      var del = dr.delivery != null ? dr.delivery : (perf.delivery || String(s.lines || ''));
+      h += '<div class="pf-row top"><label>Delivery</label><div style="flex:1;min-width:0"><textarea data-pf="delivery" rows="3" maxlength="4000" style="' + ta + '">' + escHtml(del) + '</textarea>'
+        + '<div class="np-hint">How it is said: [excited] [whispers] [sighs] [laughs], ... or a dash for a pause, CAPITALS for emphasis. Keep the words the same as the line (the captions read the line).</div></div></div>';
+    }
+    var vp = perf.voice_preview;
+    var vpFresh = vp && vp.actor === actorId && (src !== 'script' || (vp.delivery || '') === (perf.delivery || ''));
+    h += '<div class="pf-row"><label></label><div class="pf-acts"><button class="np-btn" data-pf-go="hear"' + (run ? ' disabled' : '') + '>' + (vpFresh ? 'Hear it again' : 'Hear the voice') + '</button>'
+      + (vp ? '<audio controls src="' + escAttr(withToken(vp.url)) + '" style="height:32px;max-width:260px"></audio><small>' + (vpFresh ? '&#10003; voice ready' : 'the last one heard') + ' &#183; ' + vp.seconds + ' s' + (vp.hz ? ' &#183; ' + vp.hz + ' Hz' : '') + '</small>' : '<small>just the voice, no video: cents</small>') + '</div></div>';
+    // Make it.
+    var hasDraft = !!(perf.draft && perf.actor === actorId);
+    h += '<div class="pf-acts pf-make">';
+    if (geng === 'heygen') h += '<button class="np-btn primary" data-pf-go="draft"' + (run ? ' disabled' : '') + '>Make it with HeyGen</button><small>HeyGen API credits &#183; one render, no draft</small>';
+    else {
+      h += '<button class="np-btn primary" data-pf-go="draft"' + (run ? ' disabled' : '') + '>' + (hasDraft ? 'Make a new draft' : 'Make the draft') + ' &#183; ' + pfCost(project, si, 0.134) + '</button>';
+      if (hasDraft && perf.draft.draft_id) h += '<button class="np-btn" data-pf-go="final"' + (run ? ' disabled' : '') + '>Make the 1080p final &#183; ' + pfCost(project, si, 0.30) + '</button>';
+      h += '<small>480p preview first; the final renders the same shot.</small>';
+    }
+    h += '</div>';
+    if (run) h += '<div class="np-armed"><span></span>' + escHtml(PF_STAGE[perf.stage] || 'starting') + (s.vendor && s.vendor.status ? ' &#183; ' + escHtml(String(s.vendor.status)) : '') + '</div>';
+    else if (perf.status === 'failed' && perf.pitch_check) h += '<div class="np-note">' + escHtml(perf.error || '') + '</div><div class="pf-acts"><button class="np-btn" data-pf-go="force">Make it anyway</button></div>';
+    else if (perf.status === 'failed') h += '<div class="np-note">It failed: ' + escHtml(perf.error || '') + '</div>';
+    else if (perf.final && perf.actor === actorId) h += '<div class="np-hint">&#10003; The ' + (perf.made_with && perf.made_with.engine === 'heygen' ? 'HeyGen take' : '1080p final') + ' is this scene’s take. <a href="' + escAttr(withToken(perf.final.url)) + '" target="_blank">Watch</a></div>';
+    else if (hasDraft) h += '<div class="np-hint">&#10003; The draft is this scene’s take. <a href="' + escAttr(withToken(perf.draft.url)) + '" target="_blank">Watch</a> &#183; happy? make the final.</div>';
+    // Cutaways: the actor with no speech, over the scene's voice.
+    var clips = s.actor_clips || [];
+    h += '<details class="pf-cut"' + (clips.length || dr.cutOpen ? ' open' : '') + '><summary>Cutaways over this scene (' + clips.length + ')</summary>';
+    clips.forEach(function(c) {
+      h += '<div class="np-hint">' + escHtml(String(c.at)) + ' s &#183; ' + escHtml(c.shot || '') + ' &#183; ' + (c.show || c.seconds) + ' s on screen' + (c.status === 'running' ? ' &#183; making&#8230;' : c.status === 'failed' ? ' &#183; failed: ' + escHtml(c.error || '') : ' &#183; &#10003;') + '</div>';
+    });
+    h += '<div class="pf-row top"><label>Add</label><div style="flex:1;min-width:0"><input data-pf="cut_shot" class="np-search" style="width:100%" maxlength="1000" placeholder="Talks into her phone while driving" value="' + escAttr(dr.cut_shot || '') + '">'
+      + '<div class="pf-acts">At <input data-pf="cut_at" type="number" step="0.1" min="0" value="' + escAttr(dr.cut_at != null ? dr.cut_at : 0) + '" style="width:64px"> s, on screen <select data-pf="cut_show">' + [0.8, 1.2, 1.6, 2, 3, 4].map(function(n) { return pfOpt(String(n), n + ' s', String(dr.cut_show || 2)); }).join('') + '</select>'
+      + ' <select data-pf="cut_where">' + pfOpt('scene', 'In this scene’s location', dr.cut_where || 'scene') + pfOpt('elsewhere', 'Somewhere else (the shot says where)', dr.cut_where || 'scene') + '</select>'
+      + '<button class="np-btn" data-pf-go="cut">Add cutaway</button><small>a 4 s Seedance shot, silent</small></div></div></div></details>';
+    panel.innerHTML = h;
+  }
+  function pfTyping(panel) { var x = document.activeElement; return !!(x && panel.contains(x) && (x.tagName === 'TEXTAREA' || x.tagName === 'INPUT')); }
+  // Look again while something on the film is being made; redraw the open panels.
+  function pfPoll(project) {
+    clearTimeout(pf.timer);
+    pf.timer = setTimeout(function() {
+      pf.open = pf.open.filter(function(o) { return o.panel.isConnected && o.panel.dataset.src === o.kind; });
+      if (!pf.open.length) return;
+      pfLoad(project, true).then(function(d) {
+        pf.open.forEach(function(o) { if (!pfTyping(o.panel)) pfRender(project, o.panel, o.kind, o.si); });
+        var busy = d.scenes.some(function(s) { return s.running || (s.performance && s.performance.status === 'running') || (s.actor_clips || []).some(function(c) { return c.status === 'running'; }); }) || (d.recast && d.recast.status === 'running');
+        if (busy) pfPoll(project);
+        else if (pf.wasBusy) loadProject(project.project_id);
+        pf.wasBusy = busy;
+      }).catch(function() { pfPoll(project); });
+    }, 4000);
+  }
+  function pfSay(panel, msg, err) {
+    var x = panel.querySelector('.pf-say');
+    if (!x) { x = document.createElement('div'); x.className = 'pf-say np-hint'; panel.appendChild(x); }
+    x.textContent = msg || ''; x.style.color = err ? 'var(--danger, #b91c1c)' : '';
+  }
+  // POST a scene-performance action, then reload and redraw.
+  function pfPost(project, panel, kind, si, body, said) {
+    pfSay(panel, said || 'Working…');
+    return api('POST', '/scene-performance/' + pfT() + '/' + pfP(project) + (si == null ? '' : '/' + si), body).then(function(r) {
+      return pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pf.wasBusy = true; pfPoll(project); return r; });
+    }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
+  }
+  function perfPanel(project, panel, kind, si) {
+    panel.innerHTML = '<div class="np-hint">Loading the cast&#8230;</div>';
+    pf.open = pf.open.filter(function(o) { return o.panel !== panel && o.panel.isConnected; });
+    pf.open.push({ panel: panel, kind: kind, si: si });
+    pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pfPoll(project); })
+      .catch(function(e) { panel.innerHTML = '<div class="np-note"></div>'; panel.firstChild.textContent = e.message || String(e); });
+    var dr = function() { return (pf.draft[si] = pf.draft[si] || {}); };
+    panel.oninput = function(ev) {
+      var k = ev.target.getAttribute && ev.target.getAttribute('data-pf');
+      if (k && ['shot', 'delivery', 'cut_shot', 'cut_at'].indexOf(k) >= 0) dr()[k] = ev.target.value;
+    };
+    panel.onchange = function(ev) {
+      var t = ev.target, k = t.getAttribute && t.getAttribute('data-pf');
+      if (!k) return;
+      var d = dr();
+      if (k === 'actor') {
+        d.actor = t.value; delete d.engine;
+        // The choice is the scene's plan: the board says it too.
+        var perfm = kind === 'recast' ? { actor: t.value, how: 'recast' } : { actor: t.value, how: 'generate' };
+        pfPost(project, panel, kind, null, { action: 'plan', scenes: [{ index: si, performer: perfm }] }, 'Saved: ' + ((pfActor(t.value) || {}).name || t.value) + ' plays scene ' + (si + 1) + '.');
+        return;
+      }
+      if (k === 'engine') {
+        d.engine = t.value;
+        var who = d.actor || ((pf.data.scenes[si] || {}).plan || {}).actor;
+        pfPost(project, panel, kind, null, { action: 'plan', scenes: [{ index: si, performer: { actor: who || undefined, how: kind === 'recast' ? 'recast' : 'generate', engine: t.value } }] }, 'Saved.');
+        return;
+      }
+      if (k === 'location') { d.location = t.value; pfPost(project, panel, kind, si, { action: 'location', location: t.value }, t.value ? 'Set: the frame is drawn there, and every take keeps the room.' : 'No location.'); return; }
+      if (k === 'voice_source') { d.voice_source = t.value; pfRender(project, panel, kind, si); return; }
+      if (k === 'cut_show' || k === 'cut_where') { d[k] = t.value; return; }
+    };
+    panel.onclick = function(ev) {
+      var t = ev.target.closest ? ev.target.closest('[data-pf-go],[data-pf-pick]') : null;
+      if (!t) return;
+      var d = dr(), s = pf.data.scenes[si] || {}, perf = s.performance || {};
+      var actor = d.actor || (s.plan || {}).actor || perf.actor;
+      var pick = t.getAttribute('data-pf-pick');
+      if (pick) { pfPost(project, panel, kind, si, { action: 'pick', url: pick }, 'Using that frame.'); return; }
+      var go = t.getAttribute('data-pf-go');
+      var shot = d.shot != null ? d.shot : undefined;
+      var engine = d.engine || ((s.plan || {}).how === 'generate' ? (s.plan || {}).engine : undefined);
+      if (go === 'recast') {
+        var eng = d.engine || ((s.plan || {}).how === 'recast' && (s.plan || {}).engine) || 'higgsfield';
+        pfSay(panel, 'Starting the recast…');
+        api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si] }).then(function() {
+          return pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pf.wasBusy = true; pfPoll(project); });
+        }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
+        return;
+      }
+      if (go === 'mine') { pfPost(project, panel, kind, si, { action: 'recording' }, 'Your recording is back on scene ' + (si + 1) + '.').then(function() { loadProject(project.project_id); }); return; }
+      if (go === 'frame') { pfPost(project, panel, kind, si, { action: 'frame', actor: actor, shot: shot }, 'Drawing the first frame…'); return; }
+      if (go === 'continue') { pfPost(project, panel, kind, si, { action: 'continue', actor: actor, from_scene: si - 1, shot: shot }, 'Taking scene ' + si + '’s last frame…'); return; }
+      if (go === 'hear') {
+        pfSay(panel, 'Making the voice…');
+        api('POST', '/scene-performance/' + pfT() + '/' + pfP(project) + '/' + si, { action: 'voice', actor: actor, voice_source: d.voice_source || undefined, delivery: d.delivery != null ? d.delivery : undefined }).then(function(r) {
+          return pfLoad(project, true).then(function() {
+            pfRender(project, panel, kind, si);
+            try { if (pf.audio) pf.audio.pause(); pf.audio = new Audio(withToken(r.url)); pf.audio.play(); } catch (e) {}
+          });
+        }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
+        return;
+      }
+      if (go === 'draft' || go === 'final' || go === 'force') {
+        pfPost(project, panel, kind, si, { action: 'perform', actor: actor, engine: engine, shot: shot, voice_source: d.voice_source || undefined,
+          delivery: d.delivery != null ? d.delivery : undefined, quality: go === 'final' ? 'final' : 'draft', force: go === 'force' || undefined },
+          go === 'final' ? 'Making the 1080p final…' : engine === 'heygen' ? 'HeyGen is performing it (a few minutes)…' : 'Making the draft (2-4 minutes)…');
+        return;
+      }
+      if (go === 'cut') {
+        var cs = (d.cut_shot || '').trim();
+        if (!cs) { pfSay(panel, 'Say what ' + ((pfActor(actor) || {}).name || 'the actor') + ' does in the cutaway.', true); return; }
+        d.cutOpen = true;
+        pfPost(project, panel, kind, si, { action: 'clip', actor: actor, shot: cs, at: Number(d.cut_at) || 0, show: Number(d.cut_show) || 2, location: d.cut_where === 'elsewhere' ? '' : undefined }, 'Making the cutaway (a frame, then Seedance)…')
+          .then(function() { d.cut_shot = ''; });
+        return;
+      }
+    };
+  }
+  // The take slot's words for a scene the plan has a cast member perform.
+  function pfSlotLabel(project, si) {
+    var sb = project.storyboard || {}, film = sb.cast_plan || {}, sc = (sb.scenes || [])[si] || {}, own = sc.performer || {};
+    var how = own.how || film.how, actor = own.actor !== undefined ? own.actor : film.actor;
+    if (!actor || (how && how !== 'generate' && how !== 'recast')) return '';
+    var a = pf.data && pf.data.pid === project.project_id ? pfActor(actor) : null;
+    var name = (a && a.name) || String(actor).charAt(0).toUpperCase() + String(actor).slice(1);
+    if (how === 'recast') return name + ' \u00b7 recast my recording';
+    var perf = sc.performance || {}, vp = perf.voice_preview;
+    var ready = vp && vp.actor === actor && (vp.line === undefined || vp.line === String(sc.voiceover_text || '')) && (vp.delivery || '') === (perf.delivery || '');
+    if (perf.status === 'running') return name + ' \u00b7 making the take\u2026';
+    return name + (ready ? ' \u00b7 voice ready \u00b7 make the take' : ' \u00b7 make the take');
+  }
+  // The scene's plan says how its take is made: open that source first.
+  function pfDefaultSource(project, si) {
+    var sb = project.storyboard || {}, film = sb.cast_plan || {}, own = ((sb.scenes || [])[si] || {}).performer || {};
+    var how = own.how || film.how, actor = own.actor !== undefined ? own.actor : film.actor;
+    if (how === 'generate' && actor) return 'generate';
+    if (how === 'recast' && actor) return 'recast';
+    return 'booth';
+  }
+  // ── THE FILM'S PLAN, under the scene list (SPEC-cast-scenes.md): who
+  // performs every scene that does not say otherwise, how many takes are
+  // ready, and Make all with its cost shown first.
+  var PF_HOW_WORD = { record: 'Record', recast: 'Recast', generate: 'Generate' };
+  var PF_ENGINE_WORD = { higgsfield: 'Genjutsu', kling: 'Kling', heygen: 'HeyGen', runway: 'Runway', seedance: 'Seedance' };
+  function pfFilmLine(d) {
+    var fp = d.cast_plan || {};
+    if (!fp.actor) return 'Me &#183; Record';
+    var a = pfActor(fp.actor), how = fp.how || 'generate';
+    var eng = fp.engine || (a && a.heygen_look_id ? 'heygen' : how === 'recast' ? 'higgsfield' : 'seedance');
+    var loc = how === 'generate' && eng === 'seedance' && fp.location ? ((d.locations || []).filter(function(l) { return l.id === fp.location; })[0] || {}).name || fp.location : '';
+    return escHtml((a && a.name) || fp.actor) + ' &#183; ' + PF_HOW_WORD[how] + ' &#183; ' + (PF_ENGINE_WORD[eng] || eng) + (loc ? ' &#183; ' + escHtml(loc) : '');
+  }
+  function pfFilmBar(project) {
+    var bar = document.getElementById('pf-film-bar');
+    if (!bar) return;
+    if (!project || !castIsPersonFilm(project) || !((project.storyboard || {}).scenes || []).length) { bar.style.display = 'none'; return; }
+    bar.style.display = '';
+    pfLoad(project, true).then(function(d) {
+      var n = { ready: 0, todo: 0, stale: 0 }, drafts = 0;
+      d.scenes.forEach(function(s) { n[s.state] = (n[s.state] || 0) + 1; var p = s.performance || {}; if (p.draft && p.draft.draft_id && !p.final && s.state === 'ready') drafts++; });
+      bar.innerHTML = '<div class="pf-bar-line"><span class="np-group">Performed by</span> <b>' + pfFilmLine(d) + '</b> <button class="pf-mini" data-pfb="change">Change</button></div>'
+        + '<div class="pf-bar-sub">' + n.ready + ' ready &#183; ' + n.todo + ' to make' + (n.stale ? ' &#183; <b class="warn">' + n.stale + ' stale</b>' : '')
+        + (n.todo + n.stale ? ' <button class="pf-mini" data-pfb="all">Make all&#8230;</button>' : '')
+        + (drafts ? ' <button class="pf-mini" data-pfb="finals">Finals&#8230;</button>' : '') + '</div>';
+      bar.onclick = function(ev) {
+        var b = ev.target.closest ? ev.target.closest('[data-pfb]') : null;
+        if (!b) return;
+        var k = b.getAttribute('data-pfb');
+        if (k === 'change') pfPlanModal(project);
+        else pfMakeAllModal(project, k === 'finals' ? 'finals_all' : 'perform_all');
+      };
+    }).catch(function() { bar.style.display = 'none'; });
+  }
+  function pfPlanModal(project) {
+    var d = pf.data, fp = d.cast_plan || {};
+    var who = fp.actor || 'me';
+    var a = pfActor(fp.actor);
+    var how = fp.how || (fp.actor ? 'generate' : 'record');
+    var opt = pfOpt;
+    var h = '<h3 class="sm-title">Who performs this film</h3><p class="sm-desc">The default for every scene; a scene can say otherwise in its take or on the storyboard. Changing it makes nothing: scenes it no longer matches show stale until you make them.</p>'
+      + '<div class="pf-row"><label>Who</label><select id="pfm-who">' + opt('me', 'Me (my recording)', who) + (d.cast || []).map(function(x) { return opt(x.id, x.name, who); }).join('') + '</select><a class="pf-link" href="' + escAttr(withToken('/cast?tenant=' + pfT())) + '" target="_blank">Manage cast &#8599;</a></div>'
+      + '<div class="pf-row" id="pfm-how-row"><label>How</label><select id="pfm-how">' + opt('recast', 'Recast my recording', how) + opt('generate', 'Generate (no recording)', how) + '</select></div>'
+      + '<div class="pf-row" id="pfm-eng-row"><label>With</label><select id="pfm-eng"></select></div>'
+      + '<div class="pf-row" id="pfm-loc-row"><label>Where</label><select id="pfm-loc">' + opt('', 'No location', fp.location || '') + (d.locations || []).filter(function(l) { return l.image; }).map(function(l) { return opt(l.id, l.name, fp.location || ''); }).join('') + '</select><a class="pf-link" href="' + escAttr(withToken('/locations?tenant=' + pfT())) + '" target="_blank">Manage locations &#8599;</a></div>'
+      + '<div class="sm-status" id="pfm-status"></div><div class="sm-actions"><button class="sm-btn" id="pfm-cancel">Cancel</button><button class="sm-btn primary" id="pfm-save">Save</button></div>';
+    studioModalOpen(h);
+    var $ = function(id) { return document.getElementById(id); };
+    function sync() {
+      var me = $('pfm-who').value === 'me';
+      $('pfm-how-row').style.display = me ? 'none' : '';
+      var hw = $('pfm-how').value, list = PF_ENGINES[hw] || [], cur = $('pfm-eng').value || fp.engine || '';
+      $('pfm-eng-row').style.display = me ? 'none' : '';
+      $('pfm-eng').innerHTML = opt('', 'Best for them', cur) + list.map(function(e) { return opt(e[0], e[1], cur); }).join('');
+      var eng = $('pfm-eng').value, act = pfActor($('pfm-who').value);
+      $('pfm-loc-row').style.display = !me && hw === 'generate' && (eng === 'seedance' || (!eng && !(act && act.heygen_look_id))) ? '' : 'none';
+    }
+    ['pfm-who', 'pfm-how', 'pfm-eng'].forEach(function(id) { $(id).addEventListener('change', sync); });
+    sync();
+    $('pfm-cancel').onclick = function() { studioModalClose(); };
+    $('pfm-save').onclick = function() {
+      var me = $('pfm-who').value === 'me';
+      var plan = me ? { actor: null, how: 'record', engine: '', location: '' }
+        : { actor: $('pfm-who').value, how: $('pfm-how').value, engine: $('pfm-eng').value, location: $('pfm-loc-row').style.display === 'none' ? '' : $('pfm-loc').value };
+      $('pfm-status').textContent = 'Saving…';
+      api('POST', '/scene-performance/' + pfT() + '/' + pfP(project), { action: 'plan', cast_plan: plan }).then(function() {
+        studioModalClose(); pfFilmBar(project); loadProject(project.project_id);
+      }).catch(function(e) { $('pfm-status').textContent = e.message || String(e); });
+    };
+  }
+  function pfMakeAllModal(project, kind) {
+    studioModalOpen('<h3 class="sm-title">' + (kind === 'finals_all' ? 'Finals at 1080p' : 'Make all') + '</h3><p class="sm-desc">Working out what it takes&#8230;</p>');
+    api('POST', '/scene-performance/' + pfT() + '/' + pfP(project), { action: kind }).then(function(r) {
+      var rows = r.scenes || [];
+      var todo = kind === 'finals_all' ? rows : rows.filter(function(x) { return x.action !== 'skip'; });
+      var skip = kind === 'finals_all' ? [] : rows.filter(function(x) { return x.action === 'skip' && x.note && x.note !== 'ready'; });
+      var h = '<h3 class="sm-title">' + (kind === 'finals_all' ? 'Finals at 1080p' : 'Make all') + '</h3>';
+      if (!todo.length) h += '<p class="sm-desc">' + (kind === 'finals_all' ? 'No ready drafts to finish.' : 'Every scene already answers the plan.') + '</p>';
+      else {
+        h += '<p class="sm-desc">' + (kind === 'finals_all' ? 'The same shots at 1080p, from their drafts.' : 'Each scene made the way its plan says. Drafts are 480p previews; finals come after.') + '</p><div class="pf-list">';
+        todo.forEach(function(x) {
+          var sc = ((project.storyboard || {}).scenes || [])[x.index] || {};
+          h += '<div class="pf-li"><span>Scene ' + (x.index + 1) + (sc.label ? ' &#183; ' + escHtml(String(sc.label).replace(/^Scene \\d+\\s*[-–—:·]\\s*/i, '')) : '') + '</span><small>'
+            + (kind === 'finals_all' ? '1080p final' : x.action === 'perform' ? (x.plan && x.plan.engine === 'heygen' ? 'HeyGen' : 'Seedance draft') : x.action === 'recast' ? 'recast' : 'your recording back')
+            + (x.usd ? ' &#183; $' + x.usd.toFixed(2) : x.note ? ' &#183; ' + escHtml(x.note) : '') + '</small></div>';
+        });
+        h += '</div><p class="sm-desc">About <b>$' + (r.usd || 0).toFixed(2) + '</b>' + (r.minutes ? ' &#183; ~' + r.minutes + ' min' : '') + '.</p>';
+      }
+      skip.forEach(function(x) { h += '<div class="np-hint">Scene ' + (x.index + 1) + ': ' + escHtml(x.note) + '</div>'; });
+      h += '<div class="sm-status" id="pfa-status"></div><div class="sm-actions"><button class="sm-btn" id="pfa-cancel">Cancel</button>' + (todo.length ? '<button class="sm-btn primary" id="pfa-go">' + (kind === 'finals_all' ? 'Make the finals' : 'Make them') + '</button>' : '') + '</div>';
+      studioModalOpen(h);
+      document.getElementById('pfa-cancel').onclick = function() { studioModalClose(); };
+      var go = document.getElementById('pfa-go');
+      if (go) go.onclick = function() {
+        go.disabled = true; document.getElementById('pfa-status').textContent = 'Starting…';
+        api('POST', '/scene-performance/' + pfT() + '/' + pfP(project), { action: kind, confirm: true }).then(function(res) {
+          var n = (res.started || []).length + (res.recast ? res.recast.scenes.length : 0);
+          var waits = (res.waiting || []).map(function(w) { return 'Scene ' + (w.index + 1) + ': ' + w.note; });
+          studioModalClose();
+          studioStatus(n + ' scene' + (n === 1 ? '' : 's') + ' started' + (waits.length ? ' · ' + waits.join(' · ') : '') + '.', waits.length ? 'warn' : 'ok');
+          pfFilmBarWatch(project);
+        }).catch(function(e) { go.disabled = false; document.getElementById('pfa-status').textContent = e.message || String(e); });
+      };
+    }).catch(function(e) { studioModalOpen('<h3 class="sm-title">Make all</h3><p class="sm-desc"></p><div class="sm-actions"><button class="sm-btn" id="pfa-x">Close</button></div>'); document.querySelector('#studio-modal-card .sm-desc').textContent = e.message || String(e); document.getElementById('pfa-x').onclick = function() { studioModalClose(); }; });
+  }
+  // While scenes are being made from the bar: refresh it, and the film when they land.
+  function pfFilmBarWatch(project) {
+    clearTimeout(pf.barTimer);
+    pf.barTimer = setTimeout(function() {
+      if (!state.currentProject || state.currentProject.project_id !== project.project_id) return;
+      pfLoad(project, true).then(function(d) {
+        pfFilmBar(project);
+        var busy = d.scenes.some(function(s) { return s.running || (s.performance && s.performance.status === 'running'); }) || (d.recast && d.recast.status === 'running');
+        if (busy) pfFilmBarWatch(project); else loadProject(project.project_id);
+      }).catch(function() { pfFilmBarWatch(project); });
+    }, 5000);
+  }
   function openNeedPicker(project, si, ai) {
     var sb = ((project.storyboard || {}).scenes || [])[si]; var a = sb && (sb.assets || [])[ai];
     if (!a) return;
@@ -11147,20 +11571,26 @@ ${QUOTIENT_CSS}
       var lbl = sb.label ? String(sb.label).replace(/^Scene \\d+\\s*[-–—:·]\\s*/i, '') : '';
       var tk = (project.takes || []).filter(function(t) { return t.scene_index === si; }).slice(-1)[0];
       var tkDur = tk && tk.duration ? Math.round(tk.duration * 10) / 10 + ' s' : '';
+      var pfStart = pfDefaultSource(project, si);
       studioModalOpen('<h3 class="sm-title">Camera take \u00b7 Scene ' + (si + 1) + (lbl ? ' \u00b7 ' + escHtml(lbl) : '') + '</h3>' +
         '<p class="sm-desc">' + (have ? 'A take is on this scene' + (tkDur ? ' (' + tkDur + ')' : '') + '; a new one replaces it.' : 'No take on this scene yet.') + ' Soft look and the background are set in the recorder and apply to the take you make.</p>' +
-        '<div class="np-tabs">' +
-          '<button class="np-btn active" data-np-src="booth" data-np-scene="' + si + '" data-np-asset="' + ai + '">Record here</button>' +
+        // WHO PERFORMS IT: me (record, phone, room, upload) or a cast member
+        // (recast my recording, generate with no recording) -- one dialog.
+        '<div class="np-tabs np-groups"><span class="np-group">Me</span>' +
+          '<button class="np-btn' + (pfStart === 'booth' ? ' active' : '') + '" data-np-src="booth" data-np-scene="' + si + '" data-np-asset="' + ai + '">Record here</button>' +
           '<button class="np-btn" data-np-src="phone" data-np-scene="' + si + '" data-np-asset="' + ai + '">On your phone</button>' +
           '<button class="np-btn" data-np-src="room" data-np-scene="' + si + '" data-np-asset="' + ai + '">Across the room</button>' +
           '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="camera_video">Upload a file</button>' +
+          '<span class="np-group">A cast member</span>' +
+          '<button class="np-btn' + (pfStart === 'recast' ? ' active' : '') + '" data-np-src="recast" data-np-scene="' + si + '" data-np-asset="' + ai + '">Recast my recording</button>' +
+          '<button class="np-btn' + (pfStart === 'generate' ? ' active' : '') + '" data-np-src="generate" data-np-scene="' + si + '" data-np-asset="' + ai + '">Generate</button>' +
         '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div>' +
         '<div class="sm-actions"><button class="sm-btn" id="np-picker-close">Close</button></div>');
       var cardC = document.getElementById('studio-modal-card');
       bindSceneNeeds(project, cardC);
       cardC.querySelectorAll('.np-tabs .np-btn').forEach(function(b) { b.addEventListener('click', function() { cardC.querySelectorAll('.np-tabs .np-btn').forEach(function(x) { x.classList.toggle('active', x === b); }); }); });
       document.getElementById('np-picker-close').addEventListener('click', function() { muStop(); studioModalClose(); });
-      npOpenPanel(project, cardC, 'booth', si, ai);
+      npOpenPanel(project, cardC, pfStart, si, ai);
       return;
     }
     studioModalOpen('<h3 class="sm-title">' + (have ? 'Replace the ' : 'Provide the ') + escHtml(kind) + '</h3>' +
