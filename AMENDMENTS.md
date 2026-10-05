@@ -6,20 +6,6 @@ session can pick up mid-thread.
 
 ---
 
-## 2026-10-05 — The room, before Seedance: we were ASKING for a studio voice
-
-Marc chose the long-term fix ("for every video we make"), cost no object.
-The cause was in our own prompt: every speaking shot told Seedance "Dry
-close-mic'd voice, no room echo" (there since #1089, no reason recorded).
-Seedance makes the sound with the picture, so the room belongs at the
-source: `performance.sound: "room"` swaps that line for `ROOM_SOUND` (the
-phone filming them in this room, room tone, closer near the camera, more
-room farther away; not a studio voiceover), and `sound_reference` (0-1)
-puts the voice-room treatment on the reference before Seedance hears it.
-Both are part of the job key only when not the default; a new value is a new
-draft. MCP `perform_scene` takes `sound` / `sound_reference`. The default
-stays "studio" until Marc has heard the A/B on a duplicate of the replica.
-
 ## 2026-10-05 — The room: the generated voice put back in the room
 
 Marc on the replica: Dana's voice sounds "so forward ... layered on top", "a

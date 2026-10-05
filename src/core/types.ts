@@ -637,13 +637,6 @@ export interface ScenePerformance {
    *  the video, which Marc measured "totally off from the lips" (Oct 4:
    *  Seedance re-performs the line, it does not keep the file's timing). */
   voice_track?: "converted" | "seedance";
-  /** What Seedance is told the voice sounds like (core/seedance.ts): "studio"
-   *  (default; a dry close-mic voice) or "room" -- the phone filming them
-   *  in that room. */
-  sound?: "studio" | "room";
-  /** 0-1: the room put on the reference voice before Seedance hears it
-   *  (core/voice-room.ts); 0 or absent sends the voice as it is. */
-  sound_reference?: number;
   /** The pitch of the voice Seedance was given (median Hz), and of the
    *  recording it was converted from. Measured before Seedance is paid. */
   voice_hz?: number;

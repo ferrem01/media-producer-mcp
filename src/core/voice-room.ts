@@ -92,29 +92,6 @@ async function durationOf(file: string): Promise<number> {
   } catch { return 0; }
 }
 
-/** The treated voice as a 48 kHz mono wav, at ROOM_LOUDNESS_LUFS (one
- *  linear pass): the room's sound, without a container. */
-async function treat(input: string, wavOut: string, amount: number, seconds: number): Promise<number | null> {
-  const raw = `${wavOut}.raw.wav`;
-  try {
-    await ffmpeg(["-i", input, "-filter_complex", roomFilter(amount, seconds) + `;[room]atrim=0:${seconds.toFixed(3)}[out]`,
-      "-map", "[out]", "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le", raw]);
-    const target = `I=${ROOM_LOUDNESS_LUFS}:TP=-1.5:LRA=11`;
-    const err = await ffmpeg(["-i", raw, "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"]);
-    const json = err.match(/\{[\s\S]*?"input_i"[\s\S]*?\}/);
-    let m: Record<string, string> | null = null;
-    try { m = json ? JSON.parse(json[0]) : null; } catch { m = null; }
-    const filter = m
-      ? `loudnorm=${target}:measured_I=${m.input_i}:measured_LRA=${m.input_lra}:measured_TP=${m.input_tp}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`
-      : `loudnorm=${target}`;
-    await ffmpeg(["-i", raw, "-af", filter, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", wavOut]);
-    const loud = m ? Number(m.input_i) : NaN;
-    return Number.isFinite(loud) ? loud : null;
-  } finally {
-    await fs.rm(raw, { force: true }).catch(() => {});
-  }
-}
-
 /** Write a copy of `videoIn` whose sound is in the room. The picture is
  *  copied as it is; the voice keeps its timing to the sample. */
 export async function roomVoiceCopy(videoIn: string, videoOut: string, opts: { amount?: number; work: string }): Promise<{ settings: RoomSettings; loudness: number | null }> {
@@ -123,26 +100,22 @@ export async function roomVoiceCopy(videoIn: string, videoOut: string, opts: { a
   await fs.mkdir(opts.work, { recursive: true });
   const wav = path.join(opts.work, `room-${process.pid}-${Date.now()}.wav`);
   try {
-    const loudness = await treat(videoIn, wav, settings.amount, seconds);
-    await ffmpeg(["-i", videoIn, "-i", wav, "-map", "0:v:0", "-map", "1:a:0",
+    // The treated voice, cut to the take's own length.
+    await ffmpeg(["-i", videoIn, "-filter_complex", roomFilter(settings.amount, seconds) + `;[room]atrim=0:${seconds.toFixed(3)}[out]`,
+      "-map", "[out]", "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le", wav]);
+    // One linear loudness pass: measured, then applied as a single gain.
+    const target = `I=${ROOM_LOUDNESS_LUFS}:TP=-1.5:LRA=11`;
+    const err = await ffmpeg(["-i", wav, "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"]);
+    const json = err.match(/\{[\s\S]*?"input_i"[\s\S]*?\}/);
+    let m: Record<string, string> | null = null;
+    try { m = json ? JSON.parse(json[0]) : null; } catch { m = null; }
+    const filter = m
+      ? `loudnorm=${target}:measured_I=${m.input_i}:measured_LRA=${m.input_lra}:measured_TP=${m.input_tp}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`
+      : `loudnorm=${target}`;
+    await ffmpeg(["-i", videoIn, "-i", wav, "-map", "0:v:0", "-map", "1:a:0", "-af", filter,
       "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", seconds.toFixed(3), "-movflags", "+faststart", videoOut]);
-    return { settings, loudness };
-  } finally {
-    await fs.rm(wav, { force: true }).catch(() => {});
-  }
-}
-
-/** The same room on a voice file (an mp3): the reference Seedance performs
- *  to, so the sound it makes starts in the room (`performance.sound_reference`). */
-export async function roomAudioCopy(audioIn: string, audioOut: string, opts: { amount?: number; work: string }): Promise<RoomSettings> {
-  const settings = roomSettings(opts.amount);
-  const seconds = (await durationOf(audioIn)) || 30;
-  await fs.mkdir(opts.work, { recursive: true });
-  const wav = path.join(opts.work, `room-ref-${process.pid}-${Date.now()}.wav`);
-  try {
-    await treat(audioIn, wav, settings.amount, seconds);
-    await ffmpeg(["-i", wav, "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "48000", "-ac", "1", audioOut]);
-    return settings;
+    const loudness = m ? Number(m.input_i) : null;
+    return { settings, loudness: Number.isFinite(loudness) ? loudness : null };
   } finally {
     await fs.rm(wav, { force: true }).catch(() => {});
   }
