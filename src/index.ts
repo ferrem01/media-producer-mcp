@@ -100,6 +100,7 @@ import { verifyToken } from "./auth/jwt.js";
 import { initTenantStoreFromFile, listTenants } from "./auth/tenant-store.js";
 import { initTeamStoreFromFile, listTeam, inviteMember, removeMember } from "./auth/team-store.js";
 import { getTeamHtml } from "./team-page.js";
+import { getCastHtml, getLocationsHtml } from "./cast-page.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
 import { solveMediaEdits, inferIntents, contractSceneToEdl } from "./core/media-edl.js";
@@ -1392,6 +1393,12 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Team page: who shares this tenant, invite, remove (SPEC-team.md). ──
+      // ── Cast and Locations: the tenant's libraries (cast-page.ts). ──
+      if (urlPath === "/cast" || urlPath === "/locations") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(urlPath === "/cast" ? getCastHtml() : getLocationsHtml());
+        return;
+      }
       if (urlPath === "/team") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getTeamHtml());

@@ -838,3 +838,58 @@ describe("HeyGen generates a scene: the look is the setting", () => {
     expect((await pp.planFinals(T, P3, { scenes: [1] })).scenes).toEqual([]);   // nothing to finish: HeyGen's render is the take
   }, 90000);
 });
+
+describe("the voice heard is the voice sent, and the build voices the plan", () => {
+  it("perform reuses the heard read (no second voice call); a changed delivery voices again; the build points the scratch read at the actor's voice", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_vp"));
+    const P4 = "proj_vp";
+    const pdir = path.join(DATA, T, "projects", P4);
+    await fs.mkdir(path.join(pdir, "assets"), { recursive: true });
+    await fs.writeFile(path.join(pdir, "project.json"), JSON.stringify({
+      project_id: P4, tenant_id: T, name: "VP", format: "video", status: "generated", canvas: { width: 1080, height: 1920, fps: 30 },
+      created_at: "2026-10-05T00:00:00.000Z", updated_at: "2026-10-05T00:00:00.000Z", treatment: { filmGrammar: "creator-cut" },
+      storyboard: { cast_plan: { actor: "dana", how: "generate" }, scenes: [
+        { label: "A", voiceover_text: "One line.", duration_seconds: 4, components: [] },
+        { label: "B", voiceover_text: "Two line.", duration_seconds: 4, components: [], performer: { actor: null, how: "record" } },
+      ] },
+      scenes: [{ id: "a", duration_seconds: 4, components: [] }, { id: "b", duration_seconds: 4, components: [] }],
+      audio: { tracks: [{ id: "vo_scene_0", type: "voiceover", source: "/x/scratch0.mp3", start_time: 0 }, { id: "vo_scene_1", type: "voiceover", source: "/x/scratch1.mp3", start_time: 4 }] },
+    }));
+    const tts: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/text-to-speech/")) { tts.push(JSON.parse(init.body).text); return new Response(m.mp3); }
+      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.endsWith("/generateVideo")) return new Response(JSON.stringify({ data: { id: "vp1" } }));
+      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/vp.mp4"], draft_id: "vpd" } }));
+      if (u === "https://cdn/vp.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
+
+    // The build: scene 1 (Generate, Dana) voiced in Bella's voice; scene 2 (Me) left alone.
+    expect(await sp.voicePlanScenes(T, P4)).toEqual([0]);
+    expect(tts).toEqual(["One line."]);
+    let pr = JSON.parse(await fs.readFile(path.join(pdir, "project.json"), "utf8"));
+    const vp = pr.storyboard.scenes[0].performance.voice_preview;
+    expect(vp).toMatchObject({ actor: "dana", source: "script", line: "One line." });
+    expect(pr.audio.tracks[0]).toMatchObject({ voice_of: "dana" });
+    expect(pr.audio.tracks[0].source).toMatch(/voice-preview-dana-s1-.*\.mp3$/);
+    expect(pr.audio.tracks[1].source).toBe("/x/scratch1.mp3");
+    // Again: already voiced, nothing new made.
+    await sp.voicePlanScenes(T, P4);
+    expect(tts).toHaveLength(1);
+
+    // Perform: the heard read is sent, not a fresh one.
+    await sp.startScenePerformance(T, P4, 0, { voice_source: "script", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P4))[0].performance?.status !== "running", 40000);
+    expect((await sp.getScenePerformances(T, P4))[0].performance.error).toBeUndefined();
+    expect(tts).toHaveLength(1);
+    // A new delivery is a new read.
+    await sp.startScenePerformance(T, P4, 0, { voice_source: "script", force: true, delivery: "[sighs] One line." });
+    await until(async () => (await sp.getScenePerformances(T, P4))[0].performance?.status !== "running", 40000);
+    expect(tts).toEqual(["One line.", "[sighs] One line."]);
+  }, 90000);
+});

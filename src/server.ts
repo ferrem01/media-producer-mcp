@@ -697,6 +697,15 @@ export async function queueBuildFromStoryboard(
         j.projectId = (pipelineResult as any).project_id;
       }
 
+      // Scenes the cast plan has an actor generate: their lines read in the
+      // actor's voice now, the read their takes will be made to.
+      try {
+        j.progress = { step: "voices", percent: 97, detail: "Voicing the scenes in the cast's voices" };
+        const { voicePlanScenes } = await import("./core/scene-performance.js");
+        const voiced = await voicePlanScenes(tenantId, projectId);
+        if (voiced.length) console.log(`  Build-from-storyboard: voiced scenes ${voiced.map((x) => x + 1).join(", ")} in the plan's actor's voice`);
+      } catch (e: any) { console.warn(`  Build-from-storyboard: voicing the plan failed: ${e?.message || e}`); }
+
       j.progress = { step: "complete", percent: 100 };
       trace.setOutcome("success");
       return pipelineResult;
