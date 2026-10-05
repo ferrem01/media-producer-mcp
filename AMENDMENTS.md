@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — Plans per scene only; no "make all"; the Generate panel simplified
+
+Marc, on the live take dialog and the left nav:
+- **No film-level plan.** "This might be performed by many things ... it does
+  not make sense to have that data stored at the film level." Plans live only
+  on `scenes[i].performer`; `update` storyboard `cast_plan` now writes onto
+  every scene and keeps nothing on the film; a film still carrying a
+  `cast_plan` has it copied onto its scenes at its next plan edit (until then
+  it reads as each scene's default). Nothing about performers in the scene
+  list ("you don't need to show this in the nav").
+- **"Make all" deleted**, MCP and API (`perform_all`, `finals_all`,
+  `core/perform-plan.ts`): each scene is made on purpose.
+- **The Generate panel**: Who first, grouped (generated people / HeyGen looks /
+  photos); With follows from who (a look: HeyGen; anyone else: Seedance), no
+  choice to make; no first-frame row (drawn by itself; a new shot draws a new
+  one); Make opens a **progress screen** (steps ticking, a percentage, elapsed,
+  the vendor's word) and ends on the draft playing in place with Make the
+  1080p final; "cutaways" are now "extra shots"; the six sources in one row
+  without "Me / A cast member" labels.
+- **The old Cast dialog's code is deleted** (it was unreachable after the
+  button went).
+
 ## 2026-10-05 — Who performs a scene: chosen in its take and on the storyboard; Cast and Locations are tenant pages
 
 Marc's first fully generated film (proj_d872a7e4) showed the Cast dialog was
