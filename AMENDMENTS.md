@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+
+## 2026-10-05 — The voice's level in Studio; the voice sounds like where it is
+
+After the room experiment was reverted (#1113; the lisp Marc heard was in the
+original take -- the Abby voice -- not anything the experiment did), two small
+changes. Studio: the speaker lane's icon opens a **Voice** card, one slider
+for `speaker_track.volume` (the level the render already mixes the composite
+at), heard while dragging, saved on release (`POST /api/speaker-level`).
+Prompts: every speaking shot told Seedance "Dry close-mic'd voice, no room
+echo" -- the studio sound laid over a room. Now the voice sounds like where
+the shot is (a room, outdoors, a car), and like a mic when they hold one.
+The recast (Higgsfield) prompt had the same line; it now says the same.
+
 ## 2026-10-05 — The music's level, set in Studio
 
 Marc: "can you lower the background music? what is it set to now? ... i know
