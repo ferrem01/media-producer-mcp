@@ -489,7 +489,13 @@ export async function removeComponent(
   const scene = project.scenes.find((s) => s.id === sceneId);
   if (!scene) return null;
 
+  const removed = scene.components.find((c) => c.id === componentId);
   scene.components = scene.components.filter((c) => c.id !== componentId);
+  // A scene's custom graphic (a codegen scene_* component) is what its
+  // critique report described: with it gone, the report goes too -- it read
+  // "6 unresolved" on a scene that was then just the person and captions
+  // (proj_d872a7e4, Oct 5).
+  if (removed && /^scene_/.test(String(removed.type || "")) && (scene as any).quality) delete (scene as any).quality;
   await saveProject(project);
   return project;
 }

@@ -6,6 +6,15 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — A removed custom graphic takes its critique with it
+
+proj_d872a7e4's scenes 2-3 kept "6 unresolved" / "23 unresolved" badges after
+their failed codegen graphics were removed by hand (they were then just Dana
+and captions). `removeComponent` now drops `scene.quality` when the removed
+component is a custom graphic (`scene_*`); removing a library component keeps
+the report. The `update` tool takes `clear_quality: true` on a scene to
+dismiss a report that no longer describes it (used once, on those two scenes).
+
 ## 2026-10-05 — Plans per scene only; no "make all"; the Generate panel simplified
 
 Marc, on the live take dialog and the left nav:
