@@ -884,6 +884,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       // What the scene uses when it writes no prompt of its own.
       defaults,
       actor_clip: s.actor_clip || null,
+      actor_clips: s.actor_clips || (s.actor_clip ? [s.actor_clip] : []),
       running: running.has(`${tenant}/${projectId}/${i}`),
       vendor: vendorNow.get(`${tenant}/${projectId}/${i}`) || null,
     };
@@ -895,20 +896,33 @@ export async function getScenePerformances(tenant: string, projectId: string) {
  *  720p (no draft: a cutaway is short and must look finished), laid over the
  *  scene as a video component from `at` for its length. Returns at once; the
  *  clip lands on the scene (`actor_clip`). */
-export async function startActorClip(tenant: string, projectId: string, si: number, opts: { actor?: string; shot: string; seconds?: number; at?: number }): Promise<Record<string, unknown>> {
+export async function startActorClip(tenant: string, projectId: string, si: number, opts: {
+  actor?: string; shot: string; seconds?: number; at?: number;
+  /** How long it is ON SCREEN (s). Seedance makes at least 4 s; a montage
+   *  beat shows 0.6-2.5 s of it (the reel Marc sent: a cut every ~2 s). */
+  show?: number;
+  /** Where it is set: a location id, "" none (a one-off place the shot
+   *  describes: a car, a park). Omitted: the scene's. */
+  location?: string;
+}): Promise<Record<string, unknown>> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || scene.performance?.actor);
   if (!process.env.ATLASCLOUD_API_KEY) throw new Error("Seedance is not set up on this server (ATLASCLOUD_API_KEY)");
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the frame is drawn by GPT Image)");
   const shot = String(opts.shot || "").trim().slice(0, 1000);
-  // The b-roll is set where the scene is: the plan's location, else the last one used.
-  const clipWhere = planField(project, si, "location") ?? scene.performance?.location;
+  // The b-roll is set where the scene is (the plan's location, else the last
+  // one used) unless it names its own place.
+  const clipWhere = opts.location !== undefined ? (opts.location || undefined) : (planField(project, si, "location") ?? scene.performance?.location);
   if (clipWhere) await locationImage(tenant, clipWhere);
   if (!shot) throw new Error("shot is required: what the actor does (\"sips a coffee at her desk, looking out the window\")");
-  const seconds = Math.max(4, Math.min(15, Math.round(Number(opts.seconds) || 5)));
-  const at = Math.max(0, Number(opts.at) || 0);
-  const key = `${tenant}/${projectId}/${si}/clip`;
-  if (running.has(key)) throw new Error(`A clip for scene ${si + 1} is already being made`);
+  const show = Number(opts.show) > 0 ? Math.max(0.3, Math.min(15, Number(opts.show))) : undefined;
+  const seconds = Math.max(4, Math.min(15, Math.round(Number(opts.seconds) || (show ? Math.ceil(show) : 5))));
+  const onScreen = show ? Math.min(show, seconds) : seconds;
+  const at = Math.max(0, Math.round((Number(opts.at) || 0) * 100) / 100);
+  // Several clips per scene (a montage), one per start time: a new clip at
+  // the same start replaces that one.
+  const key = `${tenant}/${projectId}/${si}/clip@${at}`;
+  if (running.has(key)) throw new Error(`A clip at ${at} s in scene ${si + 1} is already being made`);
   const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
   const setClip = (fn: (c: any, sc: any, p: any) => void) => {
     const k = `${tenant}/${projectId}`;
@@ -916,17 +930,21 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
       const p = await loadProject(tenant, projectId);
       const sc: any = (p as any)?.storyboard?.scenes?.[si];
       if (!p || !sc) throw new Error("The scene is gone");
-      sc.actor_clip = sc.actor_clip || {};
-      fn(sc.actor_clip, sc, p);
+      sc.actor_clips = Array.isArray(sc.actor_clips) ? sc.actor_clips : (sc.actor_clip ? [sc.actor_clip] : []);
+      let c = sc.actor_clips.find((x: any) => Number(x?.at || 0) === at);
+      if (!c) { c = {}; sc.actor_clips.push(c); sc.actor_clips.sort((a: any, b: any) => Number(a.at || 0) - Number(b.at || 0)); }
+      fn(c, sc, p);
+      // The last one touched, for the card that shows one.
+      sc.actor_clip = c;
       p.updated_at = new Date().toISOString();
       await saveProject(p);
-      return sc.actor_clip;
+      return c;
     });
     chains.set(k, next);
     return next;
   };
   running.add(key);
-  const started = await setClip((c) => { for (const k of Object.keys(c)) delete c[k]; Object.assign(c, { actor: actor.id, shot, seconds, at, status: "running", started_at: new Date().toISOString() }); });
+  const started = await setClip((c) => { for (const k of Object.keys(c)) delete c[k]; Object.assign(c, { actor: actor.id, shot, seconds, ...(show ? { show: onScreen } : {}), ...(clipWhere ? { location: clipWhere } : {}), at, status: "running", started_at: new Date().toISOString() }); });
   void (async () => {
     try {
       // In the scene's location when it has one: the cutaway is the same room.
@@ -948,13 +966,13 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
       const url = assetUrl(tenant, projectId, name);
       await setClip((c, sc, p) => {
         const comp = { type: "video", position: { x: 0, y: 0, width: "100%", height: "100%" }, z_index: 12,
-          data: { src: url, object_fit: "cover", actor_clip: actor.id },
-          enter: { effect: "cut", at }, exit: { effect: "cut", at: at + seconds } };
-        // One actor clip per scene: a new one replaces the last.
-        const mine = (x: any) => x && x.type === "video" && x.data && x.data.actor_clip;
+          data: { src: url, object_fit: "cover", actor_clip: actor.id, clip_at: at },
+          enter: { effect: "cut", at }, exit: { effect: "cut", at: Math.round((at + onScreen) * 100) / 100 } };
+        // One clip per start time: a new one at the same start replaces it.
+        const mine = (x: any) => x && x.type === "video" && x.data && x.data.actor_clip && Number(x.data.clip_at ?? x.enter?.at ?? 0) === at;
         sc.components = [...(sc.components || []).filter((x: any) => !mine(x)), comp];
         const built: any = (p.scenes || [])[si];
-        if (built) built.components = [...(built.components || []).filter((x: any) => !mine(x)), { id: `actor_clip_${si}`, ...comp }];
+        if (built) built.components = [...(built.components || []).filter((x: any) => !mine(x)), { id: `actor_clip_${si}_${String(at).replace(".", "_")}`, ...comp }];
         running.delete(key);
         Object.assign(c, { status: "done", url, finished_at: new Date().toISOString() });
       });

@@ -3072,7 +3072,7 @@ Rules:
             }
             if (body.action === "clip") {
               const { startActorClip } = await import("./core/scene-performance.js");
-              jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined }));
+              jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined, at: Number(body.at) || undefined, show: Number(body.show) || undefined, location: str(body.location) }));
               return;
             }
             jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "location", "voice", "perform", "revoice", "restore", "clip", "cast" or "recording"' });

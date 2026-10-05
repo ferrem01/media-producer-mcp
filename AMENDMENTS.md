@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — B-roll montages: several clips per scene, shown for a beat
+
+The reel Marc sent to replicate (a creator UGC ad, 28.7 s, 14 shots) cuts
+every ~2 s: three vignettes of the presenter in a row (loft, car, park), each on
+screen 0.6-2.5 s. Actor b-roll held one clip per scene and showed all of it,
+and Seedance makes 4 s at least. Now `actor_clip` takes `show` (on screen, s)
+apart from `seconds` (made; default show rounded up, min 4), keeps one clip per
+start time (`storyboard.scenes[i].actor_clips`; a new clip at the same `at`
+replaces that one), and takes `location` ("" = a one-off place the shot
+describes; omitted = the scene's).
+
 ## 2026-10-04 — Studio: the cast plan as a decision tree (SPEC-cast-scenes.md, phase E)
 
 Cast card, Scene by scene:
