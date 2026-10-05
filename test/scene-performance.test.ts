@@ -170,7 +170,10 @@ describe("a scene performed by a cast actor", () => {
     expect(atlas[0].prompt).toMatch(/no music, no speech/);
     const proj = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
     const comp = proj.scenes[1].components.find((c: any) => c.data?.actor_clip === "dana");
-    expect(comp).toMatchObject({ type: "video", enter: { effect: "cut", at: 1.5 }, exit: { effect: "cut", at: 7.5 }, data: { object_fit: "cover" } });
+    expect(comp).toMatchObject({ type: "video", enter: { effect: "cut", at: 1.5 }, exit: { effect: "cut", at: 7.5 }, data: { object_fit: "cover", at: 1.5, exit_at: 7.5 } });
+    // The video component times itself from data.at / exit_at: the clip plays from its own first frame.
+    const vid = await fs.readFile(path.join(process.cwd(), "src/components/media/video.component.html"), "utf8");
+    expect(vid).toMatch(/startAt: timed && at > 0 \? -at : startAt/);
     const clipFile = path.join(DATA, comp.data.src.replace(/^\/assets\//, ""));
     const info = await run("ffmpeg", ["-hide_banner", "-i", clipFile]).then(() => "", (e: any) => String(e.stderr));
     expect(info).not.toMatch(/Audio:/);                        // silent: the scene's voice plays under it

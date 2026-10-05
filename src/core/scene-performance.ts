@@ -1074,7 +1074,11 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
       const url = assetUrl(tenant, projectId, name);
       await setClip((c, sc, p) => {
         const comp = { type: "video", position: { x: 0, y: 0, width: "100%", height: "100%" }, z_index: 12,
-          data: { src: url, object_fit: "cover", actor_clip: actor.id, clip_at: at },
+          // The video component times itself from data.at / data.exit_at: the
+          // clip plays from ITS first frame when it lands (without them it ran
+          // on the scene's clock -- frozen past its 4 s, Marc saw it jump --
+          // and Studio's lane drew it the whole scene).
+          data: { src: url, object_fit: "cover", actor_clip: actor.id, clip_at: at, at, exit_at: Math.round((at + onScreen) * 100) / 100 },
           enter: { effect: "cut", at }, exit: { effect: "cut", at: Math.round((at + onScreen) * 100) / 100 } };
         // One clip per start time: a new one at the same start replaces it.
         const mine = (x: any) => x && x.type === "video" && x.data && x.data.actor_clip && Number(x.data.clip_at ?? x.enter?.at ?? 0) === at;

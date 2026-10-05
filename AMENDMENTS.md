@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — Cutaways froze and filled the lane: the clip's own timing
+
+Marc on the replica (proj_b1f4b7cd): scene 2's cutaways were "freezing and
+jumping" in Studio, and the media lane drew every clip across the whole
+scene. The video component times itself from `data.at` / `data.exit_at`
+(a timed clip plays from its own first frame); actor clips set only the
+component's enter/exit, so they ran on the scene's clock -- seeked past their
+4 s and frozen -- and the lane read them as full-scene. `startActorClip` now
+writes `data.at` / `data.exit_at`; the replica's five clips were patched in
+place, their word anchors moved onto `at` / `exit_at`.
+
 ## 2026-10-05 — The voice picker
 
 **Read speed** (same PR): `performance.voice_speed` (0.8-1.25, 1 = as voiced)
