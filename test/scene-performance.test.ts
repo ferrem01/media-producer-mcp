@@ -921,3 +921,24 @@ describe("the voice picker", () => {
     expect((await sp.getScenePerformances(T, P4))[0].state).toBe("ready");
   });
 });
+
+describe("the read speed", () => {
+  it("speeds the voice up with its pitch kept, keeps it on the scene, and a heard read at another speed is not the one sent", async () => {
+    process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_speed"));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (String(url).includes("/text-to-speech/")) return new Response(m.mp3);
+      throw new Error("unexpected fetch " + url);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const P4 = "proj_vp";
+    const slow = await sp.previewSceneVoice(T, P4, 1 - 1, { voice_speed: 1 });
+    const fast = await sp.previewSceneVoice(T, P4, 0, { voice_speed: 1.2 });
+    expect(fast.seconds).toBeLessThan(slow.seconds * 0.9);
+    const perf = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P4, "project.json"), "utf8")).storyboard.scenes[0].performance;
+    expect(perf.voice_speed).toBe(1.2);
+    expect(perf.voice_preview.speed).toBe(1.2);
+    expect(sp.voiceSpeedOf({ voice_speed: 3 } as any)).toBe(1.25);
+    expect(sp.voiceSpeedOf({} as any)).toBe(1);
+  });
+});

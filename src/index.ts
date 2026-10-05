@@ -3036,7 +3036,7 @@ Rules:
             if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), location: str(body.location) })); return; }
             if (body.action === "voice") {
               const { previewSceneVoice } = await import("./core/scene-performance.js");
-              jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined, voice_id: str(body.voice_id),
+              jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined, voice_id: str(body.voice_id), voice_speed: Number(body.voice_speed) || undefined,
                 voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined }));
               return;
             }
@@ -3072,6 +3072,7 @@ Rules:
                 room_url: typeof body.room_url === "string" ? body.room_url : undefined,
                 location: str(body.location),
                 engine: body.engine === "heygen" ? "heygen" : body.engine === "seedance" ? "seedance" : undefined,
+                voice_speed: Number(body.voice_speed) || undefined,
                 motion: str(body.motion),
               }));
               return;
