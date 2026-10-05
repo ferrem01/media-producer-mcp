@@ -38,12 +38,19 @@ export function seedanceRefs(images: number, audio: boolean, video = false, room
 
 /** A speaking shot: the person from the frame and sheet says the reference
  *  audio's words in the shot the scene asks for. */
-export function speakingPrompt(shot: string): string {
+export function speakingPrompt(shot: string, sound: "studio" | "room" = "studio"): string {
   return "The person from the first frame and the character sheet (the same face, hair, clothes and accessories) talks directly to the camera. " +
     `${shot.trim().replace(/\.?$/, ".")} ` +
     "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
-    "Dry close-mic'd voice, no room echo, no music. Realistic, natural light, no text on screen.";
+    (sound === "room" ? ROOM_SOUND : "Dry close-mic'd voice, no room echo, no music. ") +
+    "Realistic, natural light, no text on screen.";
 }
+
+/** THE ROOM'S SOUND (core/voice-room.ts): the voice as the phone filming
+ *  them hears it in that place. The "studio" line asked for exactly the
+ *  forward, laid-on-top voice Marc heard on the Dana replica (Oct 5). */
+export const ROOM_SOUND = "Sound: their voice as recorded by the phone that is filming them, in this room -- natural room acoustics and a soft room tone, " +
+  "closer and fuller when they are near the camera, a little more room when they are farther away or moving; not a studio voiceover. No music. ";
 
 /** A shot with no speech (b-roll): the person in the action asked for. */
 export function silentPrompt(shot: string): string {
