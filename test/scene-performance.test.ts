@@ -694,7 +694,7 @@ describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
     s0 = (await sp.getScenePerformances(T, P))[0];
     expect(s0.performance.error).toBeUndefined();
     expect(s0.performance.location).toBe(plate.id);
-    expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance", location: plate.id });
+    expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance", voice_id: "v_bella", location: plate.id });
     expect(atlas[0].reference_images[2]).toMatch(new RegExp(`${plate.id}\\.jpg$`));
     // A film-wide edit is written onto each scene: the film keeps no plan of its own.
     expect(s0.performer).toMatchObject({ actor: "dana", how: "generate", location: plate.id });
@@ -821,7 +821,7 @@ describe("HeyGen generates a scene: the look is the setting", () => {
     expect(gen.motion_prompt).toMatch(/calm, grounded presenter/);
     expect(s1.performance.final.url).toMatch(/take-performed-dana-s2-final-heygen-.*\.mp4$/);
     expect(s1.performance.draft).toBeUndefined();
-    expect(s1.performance.made_with).toEqual({ actor: "dana", engine: "heygen" });
+    expect(s1.performance.made_with).toEqual({ actor: "dana", engine: "heygen", voice_id: "v_bella" });
     expect(s1).toMatchObject({ state: "ready", plan_line: "Dana · Generate · HeyGen" });
   }, 90000);
 });
@@ -879,4 +879,45 @@ describe("the voice heard is the voice sent, and the build voices the plan", () 
     await until(async () => (await sp.getScenePerformances(T, P4))[0].performance?.status !== "running", 40000);
     expect(tts).toEqual(["One line.", "[sighs] One line."]);
   }, 90000);
+});
+
+describe("the voice picker", () => {
+  it("hears the line in another voice without changing anything, and a scene made in the old voice reads stale once the actor's voice changes", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_vpick"));
+    const said: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      const tts = u.match(/\/text-to-speech\/([^?]+)/);
+      if (tts) { said.push(tts[1]); return new Response(m.mp3); }
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const P4 = "proj_vp";
+    const before = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P4, "project.json"), "utf8")).storyboard.scenes[0].performance;
+    const r = await sp.previewSceneVoice(T, P4, 0, { voice_id: "abbyVoice1" });
+    expect(said.at(-1)).toBe("abbyVoice1");
+    expect(r.voice_id).toBe("abbyVoice1");
+    expect(r.url).toMatch(/voice-preview-dana-s1-try-.*\.mp3$/);
+    const after = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P4, "project.json"), "utf8")).storyboard.scenes[0].performance;
+    expect(after.voice_preview).toEqual(before.voice_preview);       // only heard: nothing kept
+    await expect(sp.previewSceneVoice(T, P4, 0, { voice_id: "../x" })).rejects.toThrow(/Not a voice id/);
+
+    // Scene 1 was made in Bella's voice (made_with.voice_id): Dana now speaks as Abby -> stale.
+    expect(after.made_with).toMatchObject({ voice_id: "v_bella" });
+    // (its take on the film: performed by Dana -- the test attacher is a stub)
+    const pj = path.join(DATA, T, "projects", P4, "project.json");
+    const pr = JSON.parse(await fs.readFile(pj, "utf8"));
+    pr.takes = [{ id: "tk0", scene_index: 0, source: after.draft.url, performed_by: { actor: "dana", engine: "seedance", quality: "draft" }, created_at: "2026-10-05T00:00:00.000Z" }];
+    pr.speaker_track = { clips: [{ scene_index: 0, source: after.draft.url }] };
+    await fs.writeFile(pj, JSON.stringify(pr));
+    let s0 = (await sp.getScenePerformances(T, P4))[0];
+    expect(s0.state).toBe("ready");
+    const { updateActor } = await import("../src/core/cast.js");
+    await updateActor(T, "dana", { voice_id: "abbyVoice1", voice_name: "Abby" });
+    s0 = (await sp.getScenePerformances(T, P4))[0];
+    expect(s0).toMatchObject({ state: "stale", why: "made in another voice" });
+    await updateActor(T, "dana", { voice_id: "v_bella", voice_name: "Bella" });
+    expect((await sp.getScenePerformances(T, P4))[0].state).toBe("ready");
+  });
 });

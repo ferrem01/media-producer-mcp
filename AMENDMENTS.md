@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — The voice picker
+
+Marc: Bella "sounds like AI"; is there a better voice? (v4 is a model, not a
+voice set: any voice reads with it.) The Generate panel's "Speaks as" row opens
+a picker:
+- **Your voices** (the ElevenLabs account's): ▶ their sample, **Hear this line**
+  (this scene's line and delivery in that voice -- `hear_voice` / the voice
+  action with `voice_id`, only heard, nothing kept), **Use for <actor>** (the
+  actor's voice, every film).
+- **Voice Library** (ElevenLabs' community voices, searchable by words, gender,
+  use): ▶ free sample, **Add & use for <actor>** (adds it to the account --
+  `/api/cast/{t}/voices` POST -- then sets it).
+- A take records the voice it was made in (`made_with.voice_id`); when the
+  actor's voice changes, those scenes read **stale: made in another voice**.
+  A heard read only counts as ready for its own voice.
+
+Confirmed live: a voice Marc added on elevenlabs.io (Abby) appeared on the
+server's list -- the server uses his ElevenLabs account.
+
 ## 2026-10-05 — Replace this take, from the take popover
 
 Clicking a take on the speaker lane opens its trim/cut popover; Marc wanted a

@@ -744,6 +744,30 @@ export async function listVoices(): Promise<any[]> {
   return j?.voices || [];
 }
 
+/** THE VOICE LIBRARY: ElevenLabs' shared voices, searchable (the community
+ *  voices sound most like real creators). Listening to a sample is free;
+ *  reading a line needs the voice added to the account (addSharedVoice). */
+export async function searchSharedVoices(opts: { search?: string; gender?: string; use_case?: string; page?: number } = {}): Promise<{ voices: any[]; has_more: boolean }> {
+  const q = new URLSearchParams({ page_size: "30", sort: "trending" });
+  if (opts.search) q.set("search", opts.search.slice(0, 80));
+  if (opts.gender) q.set("gender", opts.gender);
+  if (opts.use_case) q.set("use_cases", opts.use_case);
+  if (opts.page) q.set("page", String(opts.page));
+  const headers = { "xi-api-key": String(process.env.ELEVENLABS_API_KEY) };
+  const j = await okJson(await fetch(`https://api.elevenlabs.io/v1/shared-voices?${q}`, { headers }), "elevenlabs shared voices");
+  return { voices: j?.voices || [], has_more: !!j?.has_more };
+}
+
+/** Add a Voice Library voice to the account, so it can read lines. */
+export async function addSharedVoice(publicOwnerId: string, voiceId: string, name: string): Promise<{ voice_id: string }> {
+  if (!/^[A-Za-z0-9]+$/.test(publicOwnerId) || !/^[A-Za-z0-9]+$/.test(voiceId)) throw new Error("Not a Voice Library voice");
+  const headers = { "xi-api-key": String(process.env.ELEVENLABS_API_KEY), "Content-Type": "application/json" };
+  const j = await okJson(await fetch(`https://api.elevenlabs.io/v1/voices/add/${publicOwnerId}/${voiceId}`, {
+    method: "POST", headers, body: JSON.stringify({ new_name: String(name || voiceId).slice(0, 80) }),
+  }), "elevenlabs add voice");
+  return { voice_id: String(j?.voice_id || voiceId) };
+}
+
 /** A voice by id or by name ("Brian" matches "Brian - Deep, Resonant..."). */
 export function findVoice(voices: any[], want: string): { id: string; name: string } | null {
   const w = want.toLowerCase();

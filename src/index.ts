@@ -2793,13 +2793,32 @@ Rules:
             res.end(img);
             return;
           }
+          if (caSub === "voices" && method === "GET" && new URL(req.url || "/", "http://x").searchParams.get("library") === "1") {
+            // GET /api/cast/{tenant}/voices?library=1&search=&gender=&use_case=&page=   the ElevenLabs Voice Library
+            if (!process.env.ELEVENLABS_API_KEY) { jsonResponse(res, 400, { error: "ElevenLabs is not set up on this server" }); return; }
+            const { searchSharedVoices } = await import("./core/actor-test.js");
+            const lq = new URL(req.url || "/", "http://x").searchParams;
+            const lib = await searchSharedVoices({ search: lq.get("search") || undefined, gender: lq.get("gender") || undefined, use_case: lq.get("use_case") || undefined, page: Number(lq.get("page")) || undefined });
+            jsonResponse(res, 200, {
+              voices: lib.voices.map((v: any) => ({ id: v.voice_id, owner: v.public_owner_id, name: v.name, gender: v.gender, age: v.age, accent: v.accent, use_case: v.use_case, descriptive: v.descriptive, description: String(v.description || "").slice(0, 240), preview: v.preview_url, free: v.free_users_allowed !== false })),
+              has_more: lib.has_more,
+            });
+            return;
+          }
+          if (caSub === "voices" && method === "POST") {
+            // POST /api/cast/{tenant}/voices {owner, id, name}   add a Voice Library voice to the account
+            const body = await parseBody(req).catch(() => ({} as any));
+            const { addSharedVoice } = await import("./core/actor-test.js");
+            jsonResponse(res, 200, await addSharedVoice(String(body.owner || ""), String(body.id || ""), String(body.name || "")));
+            return;
+          }
           if (caSub === "voices" && method === "GET") {
             const [eleven, hey] = await Promise.all([
               process.env.ELEVENLABS_API_KEY ? listVoices().catch(() => []) : Promise.resolve([]),
               process.env.HEYGEN_API_KEY ? listHeygenVoices().catch(() => []) : Promise.resolve([]),
             ]);
             jsonResponse(res, 200, {
-              elevenlabs: eleven.map((v: any) => ({ id: v.voice_id, name: v.name, category: v.category, gender: v.labels?.gender, preview: v.preview_url })),
+              elevenlabs: eleven.map((v: any) => ({ id: v.voice_id, name: v.name, category: v.category, gender: v.labels?.gender, age: v.labels?.age, accent: v.labels?.accent, use_case: v.labels?.use_case || v.labels?.["use case"], description: String(v.description || v.labels?.description || "").slice(0, 200), preview: v.preview_url })),
               heygen: hey,
             });
             return;
@@ -3017,7 +3036,7 @@ Rules:
             if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), location: str(body.location) })); return; }
             if (body.action === "voice") {
               const { previewSceneVoice } = await import("./core/scene-performance.js");
-              jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined,
+              jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined, voice_id: str(body.voice_id),
                 voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined }));
               return;
             }

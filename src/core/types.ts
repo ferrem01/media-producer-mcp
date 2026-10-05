@@ -650,9 +650,9 @@ export interface ScenePerformance {
   seedance_url?: string;
   /** The voice last heard for the scene ("Hear the voice"): what Seedance
    *  will be given unless the line, delivery or actor change. */
-  voice_preview?: { url: string; seconds: number; hz: number; actor: string; source: "script" | "take"; line?: string; delivery?: string; made_at: string };
+  voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take"; line?: string; delivery?: string; made_at: string };
   /** What the scene's current take was made with (the plan it answers). */
-  made_with?: { actor: string; engine: string; location?: string };
+  made_with?: { actor: string; engine: string; voice_id?: string; location?: string };
   /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */
   draft?: { url: string; draft_id?: string; inputs: string; made_at: string };
   final?: { url: string; made_at: string };

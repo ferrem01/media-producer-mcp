@@ -1917,7 +1917,7 @@ export function createMcpServer(): McpServer {
       actor: z.string().optional().describe("recast / generate / update_actor / remove_actor: a cast actor id (from list)."),
       performer: z.enum(["heygen", "kling", "higgsfield", "runway"]).optional().describe("recast / generate: the vendor. Default: HeyGen for a HeyGen look, else the best configured vendor (Kling first)."),
       voice: z.enum(["heygen", "elevenlabs"]).optional().describe("generate: who voices the script (default heygen: the look's own voice)."),
-      voice_id: z.string().optional().describe("recast: an ElevenLabs voice the delivery is converted to ('mine' keeps the recording's voice; omitted, the actor's own). generate: the HeyGen or ElevenLabs voice to read with."),
+      voice_id: z.string().optional().describe("recast: an ElevenLabs voice the delivery is converted to ('mine' keeps the recording's voice; omitted, the actor's own). generate: the HeyGen or ElevenLabs voice to read with. hear_voice: TRY the scene's line in this ElevenLabs voice -- only heard, nothing changes (set the actor's voice with update_actor)."),
       fresh: z.boolean().optional().describe("recast: make it again even if this performance exists."),
       motion: z.string().optional().describe("recast / generate / perform_scene with HeyGen: a direction for the invented movement (Avatar V motion_prompt), e.g. 'calm, head level, small nods'. generate defaults to a grounded presenter; '' for none."),
       heygen_look_id: z.string().optional().describe("add_actor: a HeyGen look id (from looks). new_look: the look to base the new one on."),
@@ -1990,7 +1990,7 @@ export function createMcpServer(): McpServer {
             const sp = await import("./core/scene-performance.js");
             const pid = needProject(), si = params.scene_index;
             if (params.action === "start_frame") return ok({ ...(await sp.startSceneFrame(t, pid, si, { actor: params.actor, shot: params.shot, frame_prompt: params.frame_prompt, location: params.location })), message: "Drawing (~20-60 s). Poll action='scenes'; redraw with another start_frame, or pick_frame an earlier one." });
-            if (params.action === "hear_voice") return ok({ ...(await sp.previewSceneVoice(t, pid, si, { actor: params.actor, voice_source: params.voice_source, delivery: params.delivery })), message: "The voice alone (no video made): listen to url. perform_scene when it is right." });
+            if (params.action === "hear_voice") return ok({ ...(await sp.previewSceneVoice(t, pid, si, { actor: params.actor, voice_source: params.voice_source, delivery: params.delivery, voice_id: params.voice_id })), message: "The voice alone (no video made): listen to url. perform_scene when it is right." });
             if (params.action === "revoice") return ok({ ...(await sp.revoiceScene(t, pid, si, { voice_track: params.voice_track })), message: "The scene's sound is changed and re-attached; nothing was made again." });
             if (params.action === "continue_from") return ok({ ...(await sp.continueSceneFrom(t, pid, si, { actor: params.actor, from_scene: params.from_scene ?? si - 1, shot: params.shot })), message: "The start frame is that scene's last frame. perform_scene next." });
             if (params.action === "pick_frame") { if (!params.frame_url) return err("frame_url is required"); return ok(await sp.pickSceneFrame(t, pid, si, params.frame_url)); }

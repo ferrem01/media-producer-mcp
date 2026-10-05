@@ -54,4 +54,14 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(html).toContain("var start = tk && tk.performed_by ? 'generate' : cast ? 'recast' : 'booth';");
     expect(html).toContain("var pfStart = (opts && opts.start) || pfDefaultSource(project, si);");
   });
+
+  it("the voice picker: who the actor speaks as, your voices (hear this line, use for the actor) and the Voice Library (sample, add & use)", () => {
+    const html = getPreviewHtml();
+    expect(html).toContain("<label>Speaks as</label>");
+    expect(html).toContain("data-pf-vtab=\"lib\">Voice Library</button>");
+    expect(html).toContain("{ action: 'voice', actor: actor, voice_id: vid, delivery: d.delivery != null ? d.delivery : undefined }");
+    expect(html).toContain("api('PATCH', '/cast/' + pfT() + '/' + encodeURIComponent(actor), { voice_id: id, voice_name: name })");
+    expect(html).toContain("api('POST', '/cast/' + pfT() + '/voices', { owner: va[0], id: va[1], name: va[2] })");
+    expect(html).toContain("'?library=1&gender='");
+  });
 });
