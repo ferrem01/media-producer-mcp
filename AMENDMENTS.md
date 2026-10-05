@@ -7,6 +7,20 @@ session can pick up mid-thread.
 ---
 
 
+
+## 2026-10-05 — A timed cutaway waits on its first frame (Studio)
+
+Marc on the replica: "in a car, it's just a frozen still" -- couch and walk
+moved. Studio's sync played every scene video from the scene's start, even a
+TIMED clip whose cue was seconds away (start_at = -at, so its target was
+negative): it ran unseen, re-seeked to 0 every 1.25 s, and once starved was
+never seeked again -- a 4 s cutaway could run off its end before it landed
+and show its last frame, frozen. A scene video with a negative target is now
+parked: paused on frame 0, preloading, until its cue. The render was never
+affected (the capture seeks every frame). Same day, data: the replica was
+remade in Jessica's voice at 1.15x, wider; the place cutaways remade "already
+there" and re-anchored a quarter second ahead of their words.
+
 ## 2026-10-05 — The voice's level in Studio; the voice sounds like where it is
 
 After the room experiment was reverted (#1113; the lisp Marc heard was in the
