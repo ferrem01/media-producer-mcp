@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — The music's level, set in Studio
+
+Marc: "can you lower the background music? what is it set to now? ... i know
+it is ducking too." The replica's bed sat at 0.18 with `ducked_volume` 0.35.
+But ducking only listens to voiceover TRACKS (Studio's loop and the render's
+`resolveDucking` alike), and a speaker film's voice is the speaker track -- so
+on his film the bed never dipped; it played at 0.18 under the whole film.
+Lowered it to 0.10 in place.
+
+The music card now has the dials: **Music level** (every music clip's
+`volume`) and, only where the bed really dips, **Under the voice**
+(`audio.ducking.ducked_volume`, a share of the level). On a speaker film the
+card says the bed plays at its level throughout instead of offering a dead
+dial. Heard at once while dragging (the ducking loop now reads the dip every
+tick), saved on release through `POST /api/music-level/{t}/{p}`;
+`audio/music-level.ts` holds the read and the write.
+
 ## 2026-10-05 — Cutaways froze and filled the lane: the clip's own timing
 
 Marc on the replica (proj_b1f4b7cd): scene 2's cutaways were "freezing and
