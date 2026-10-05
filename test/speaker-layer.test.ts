@@ -289,7 +289,7 @@ describe("the choice, wherever it is made", () => {
     // The take dialog: one header, one row of tabs (record here / phone / upload), the recorder open;
     // the background is chosen in the recorder or in Inspect, not on the card (Marc: "why is there these buttons and radio buttons?").
     expect(studio).not.toMatch(/data-np-bg=/);
-    expect(studio).toMatch(/<div class="np-tabs">/);
+    expect(studio).toMatch(/<div class="np-tabs np-groups">/);
     expect(studio).toMatch(/Camera take \\u00b7 Scene ' \+ \(si \+ 1\)/);
     // The recorder opens unless the scene's plan gives the take to a cast member (SPEC-cast-scenes.md).
     expect(studio).toMatch(/npOpenPanel\(project, cardC, pfStart, si, ai\);/);

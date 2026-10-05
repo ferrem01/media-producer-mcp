@@ -541,14 +541,16 @@ export interface Storyboard {
   estimated_duration: number;
   /** Feedback that shaped this storyboard */
   revision_notes?: string[];
-  /** Who performs the person, how and where, for every scene that does not
-   *  say otherwise (core/cast-plan.ts, SPEC-cast-scenes.md). */
+  /** LEGACY (Oct 4-5): a film-wide default plan. Plans now live on each scene
+   *  (`scenes[i].performer`); a film still carrying one reads it as every
+   *  scene's default until its next plan edit, which copies it onto the
+   *  scenes and drops it (core/cast-plan.ts applyPlanEdit). */
   cast_plan?: CastPlan;
 }
 
-/** WHO performs a person-carried scene, HOW, with which ENGINE, and WHERE.
- *  The film's default on `storyboard.cast_plan`; a scene's own on
- *  `storyboard.scenes[i].performer` (each field absent: the film's). The plan
+/** WHO performs a person-carried scene, HOW, with which ENGINE, and WHERE,
+ *  on `storyboard.scenes[i].performer` -- per scene, since every scene can be
+ *  someone else (the legacy film-wide `storyboard.cast_plan` fills in). The plan
  *  only says what is wanted -- a change never makes anything by itself; the
  *  scene shows as stale until it is performed again. */
 export interface CastPlan {
@@ -675,7 +677,7 @@ export interface StoryboardScene {
    *  a cast actor id plays that actor's recast of the take; null plays the
    *  recording itself; absent follows the film (project.speaker_cast). */
   cast?: string | null;
-  /** This scene's plan, over the film's `storyboard.cast_plan`. */
+  /** Who performs this scene, how and where (core/cast-plan.ts). */
   performer?: CastPlan;
   /** A cast actor performing the scene without a recording (Seedance). */
   performance?: ScenePerformance;

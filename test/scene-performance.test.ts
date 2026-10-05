@@ -696,7 +696,9 @@ describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
     expect(s0.performance.location).toBe(plate.id);
     expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance", location: plate.id });
     expect(atlas[0].reference_images[2]).toMatch(new RegExp(`${plate.id}\\.jpg$`));
-    expect(s0.performer).toBeNull();                                  // it followed the film: nothing written
+    // A film-wide edit is written onto each scene: the film keeps no plan of its own.
+    expect(s0.performer).toMatchObject({ actor: "dana", how: "generate", location: plate.id });
+    expect(JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8")).storyboard.cast_plan).toBeUndefined();
     // (the attacher here is a stub, so the take is read from the scene's own record)
 
     // The film's location changes: the scene no longer matches -- stale, never remade by itself.
@@ -712,17 +714,17 @@ describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
     await sp.startScenePerformance(T, P, 0, { voice_source: "script", force: true, location: plate.id });
     await until(async () => (await sp.getScenePerformances(T, P))[0].performance?.status !== "running", 40000);
     s0 = (await sp.getScenePerformances(T, P))[0];
-    expect(s0.performer).toEqual({ location: plate.id });
+    expect(s0.performer).toMatchObject({ location: plate.id });
     expect(s0.plan_line).toBe("Dana · Generate · Seedance · Den");
-    // null follows the film again.
+    // null clears the scene's plan.
     await sp.editCastPlan(T, P, { scenes: [{ index: 0, performer: null }] });
     expect((await sp.getScenePerformances(T, P))[0].performer).toBeNull();
     await sp.editCastPlan(T, P, { cast_plan: null });
   }, 120000);
 });
 
-describe("perform the plan: every scene that does not answer it, with the cost first", () => {
-  it("lists what each scene needs and what it costs, starts it only when asked, and finishes ready drafts at 1080p", async () => {
+describe("a scene's state follows its own plan", () => {
+  it("a scene performed reads ready; a changed plan reads stale; a draft finishes at 1080p from its id", async () => {
     process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
     delete process.env.KLING_API_KEY; delete process.env.KLING_ACCESS_KEY;
     const m = await media(path.join(DATA, "_media_pp"));
@@ -763,39 +765,29 @@ describe("perform the plan: every scene that does not answer it, with the cost f
       await svp(pr);
       return { status: 200, body: {} };
     });
-    const pp = await import("../src/core/perform-plan.js");
-    const est = await pp.planPerformance(T, P3);
-    expect(est.scenes.map((r) => [r.index, r.state, r.action])).toEqual([[0, "todo", "perform"], [1, "ready", "skip"], [2, "todo", "recast"]]);
-    expect(est.scenes[0]).toMatchObject({ seconds: 10, usd: 1.34 });       // the built scene's 9.2 s, billed whole
-    expect(est.usd).toBe(1.34);
-    expect(atlas).toHaveLength(0);                                         // an estimate makes nothing
-
-    const go = await pp.performPlan(T, P3);
-    expect(go.started).toEqual([0]);
-    expect(go.waiting).toEqual([{ index: 2, note: expect.stringMatching(/Kling/) }]);   // not set up here: said, not hidden
+    let s0 = (await sp.getScenePerformances(T, P3)).map((r: any) => [r.scene_index, r.state]);
+    expect(s0).toEqual([[0, "todo"], [1, "ready"], [2, "todo"]]);
+    await sp.startScenePerformance(T, P3, 0, { quality: "draft" });
     await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done", 40000);
     let s = await sp.getScenePerformances(T, P3);
     expect(s[0]).toMatchObject({ state: "ready", plan_line: "Dana · Generate · Seedance" });
     expect(s[0].performer).toBeNull();                                     // it followed the film's plan
 
-    // The plan for scene 1 becomes Dana generated: stale until performed.
-    await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: null }] });
+    // The plan for scene 1 becomes Dana generated: stale until performed. (The
+    // first edit also moves the film's old plan onto its scenes.)
+    await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: { actor: "dana", how: "generate" } }] });
+    expect(JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P3, "project.json"), "utf8")).storyboard.cast_plan).toBeUndefined();
     s = await sp.getScenePerformances(T, P3);
     expect(s[1]).toMatchObject({ state: "stale", why: expect.stringMatching(/your recording plays/) });
     // ...and back to me: the recording is put back for free when it is not playing.
     await sp.editCastPlan(T, P3, { scenes: [{ index: 0, performer: { how: "record" } }] });
-    const back = await pp.planPerformance(T, P3, { scenes: [0] });
-    expect(back.scenes[0]).toMatchObject({ action: "skip", note: expect.stringMatching(/waits for your recording/) });
+    expect((await sp.getScenePerformances(T, P3))[0]).toMatchObject({ state: "stale" });
     await sp.editCastPlan(T, P3, { scenes: [{ index: 0, performer: null }] });
 
-    // Finals: the ready draft, at 1080p.
-    const fin = await pp.planFinals(T, P3);
-    expect(fin.scenes).toEqual([{ index: 0, seconds: 10, usd: 3 }]);
-    const fgo = await pp.finalsAll(T, P3);
-    expect(fgo.started).toEqual([0]);
+    // The final: the draft's shot at 1080p, from its id.
+    await sp.startScenePerformance(T, P3, 0, { quality: "final" });
     await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done" && !!(await sp.getScenePerformances(T, P3))[0].performance?.final, 40000);
     expect(atlas.at(-1)).toEqual({ model: "bytedance/seedance-2.5/draft-complete", draft_id: "ppd", watermark: false });
-    expect((await pp.planFinals(T, P3)).scenes).toEqual([]);
   }, 120000);
 });
 
@@ -817,11 +809,7 @@ describe("HeyGen generates a scene: the look is the setting", () => {
       throw new Error("unexpected fetch " + u);
     }));
     const sp = await import("../src/core/scene-performance.js");
-    const pp = await import("../src/core/perform-plan.js");
     await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: { actor: "dana", how: "generate", engine: "heygen" } }] });
-    const est = await pp.planPerformance(T, P3, { scenes: [1] });
-    expect(est.scenes[0]).toMatchObject({ action: "perform", note: "HeyGen API credits" });
-    expect(est.scenes[0].usd).toBeUndefined();
     // No engine named: the plan's (HeyGen).
     await sp.startScenePerformance(T, P3, 1, { voice_source: "script" });
     await until(async () => (await sp.getScenePerformances(T, P3))[1].performance?.status !== "running", 40000);
@@ -835,7 +823,6 @@ describe("HeyGen generates a scene: the look is the setting", () => {
     expect(s1.performance.draft).toBeUndefined();
     expect(s1.performance.made_with).toEqual({ actor: "dana", engine: "heygen" });
     expect(s1).toMatchObject({ state: "ready", plan_line: "Dana · Generate · HeyGen" });
-    expect((await pp.planFinals(T, P3, { scenes: [1] })).scenes).toEqual([]);   // nothing to finish: HeyGen's render is the take
   }, 90000);
 });
 

@@ -1,8 +1,9 @@
 /**
  * THE CAST PLAN: who performs each person-carried scene, how, with which
- * engine and where (SPEC-cast-scenes.md). The film's default lives on
- * `storyboard.cast_plan`; a scene overrides any field on
- * `storyboard.scenes[i].performer`. Two functions, three choices:
+ * engine and where (SPEC-cast-scenes.md), on each scene:
+ * `storyboard.scenes[i].performer` -- every scene can be someone else, so the
+ * film holds no plan of its own (a legacy `storyboard.cast_plan` fills in for
+ * old films until their next plan edit). Two functions, three choices:
  *
  *   me            record                      (the booth)
  *   a cast member recast my recording         Genjutsu (higgsfield), Kling, HeyGen, Runway
@@ -47,7 +48,7 @@ export interface ResolvedPlan {
   inferred?: boolean;
 }
 
-/** A scene's plan: its own fields over the film's. No how anywhere: a cast
+/** A scene's plan: its own fields (a legacy film-wide plan fills in). No how anywhere: a cast
  *  member recasts the scene's recording when there is one, else generates;
  *  nobody named is me, recording. */
 export function resolvePlan(project: Project, si: number, actors: CastActor[] = [], hasRecording = false): ResolvedPlan {
@@ -184,6 +185,10 @@ export function writePlan(plan: CastPlan | undefined, fields: Partial<Record<key
  *  (`performer`: fields to set, or null to follow the film again). Checked
  *  against the tenant's cast and locations. Nothing is made. */
 export async function applyPlanEdit(tenant: string, project: Project, edit: {
+  /** Applied to EVERY scene (each scene's own plan is written); nothing is
+   *  kept on the film -- a film's scenes can each be someone else (Marc,
+   *  Oct 5: "it does not make sense to have that data stored at the film
+   *  level"). null clears every scene's plan. */
   cast_plan?: Record<string, unknown> | null;
   scenes?: Array<{ index: number; performer: Record<string, unknown> | null }>;
 }): Promise<void> {
@@ -192,9 +197,19 @@ export async function applyPlanEdit(tenant: string, project: Project, edit: {
   const { listCast } = await import("./cast.js");
   const { listLocations } = await import("./locations.js");
   const [actors, locations] = await Promise.all([listCast(tenant), listLocations(tenant)]);
+  // A film still carrying the old film-level plan: it becomes each scene's
+  // own (a scene's own fields win), and the film keeps none.
+  if (sb.cast_plan) {
+    for (const sc of sb.scenes || []) if (sc) sc.performer = { ...sb.cast_plan, ...(sc.performer || {}) };
+    delete sb.cast_plan;
+  }
   if (edit.cast_plan !== undefined) {
-    const next = edit.cast_plan === null ? undefined : writePlan(sb.cast_plan, cleanPlan(edit.cast_plan, actors, locations));
-    if (next) sb.cast_plan = next; else delete sb.cast_plan;
+    const fields = edit.cast_plan === null ? null : cleanPlan(edit.cast_plan, actors, locations);
+    for (const sc of sb.scenes || []) {
+      if (!sc) continue;
+      const next = fields === null ? undefined : writePlan(sc.performer, fields);
+      if (next) sc.performer = next; else delete sc.performer;
+    }
   }
   for (const e of edit.scenes || []) {
     const sc = sb.scenes?.[e.index];

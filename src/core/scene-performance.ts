@@ -557,6 +557,9 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     if (p.shot !== shot || p.voice_source !== source) delete p.draft;
+    // The first frame is drawn for the shot: a new shot draws a new one (the
+    // panel no longer shows frames -- Marc: "just go create the first frame").
+    if (p.shot !== shot && p.frame && !(p.frames || []).some((f) => f.url === p.frame && f.from_scene != null)) delete p.frame;
     setPrompt(p, "frame_prompt", opts.frame_prompt);
     // A new video prompt is a new shot: the draft no longer stands.
     if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;

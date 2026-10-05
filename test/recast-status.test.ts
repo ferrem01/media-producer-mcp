@@ -61,11 +61,8 @@ describe("where a recast is", () => {
 
   it("Studio lists every take and keeps the count in the header pill", () => {
     const s = fs.readFileSync(path.join(__dirname, "..", "src/preview-app/preview-app.ts"), "utf8");
-    expect(s).toMatch(/function castRecastStatus\(rc, prog\)/);
     expect(s).toMatch(/function rcVendorWord\(v\)/);
     expect(s).toMatch(/jobs = jobs\.concat\(\[\{ kind: 'recast'/);
-    // The Direction box spans the panel.
-    expect(s).toMatch(/<textarea id="cast-motion" rows="4" maxlength="1000" style="width:100%/);
   });
 });
 
