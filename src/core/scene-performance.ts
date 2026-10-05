@@ -39,7 +39,6 @@ import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import type { ScenePerformance, CastPlan } from "./types.js";
-import { roomVoiceCopy, type RoomSettings } from "./voice-room.js";
 
 /** Where an actor stands when no shot is given. */
 export const DEFAULT_SHOT = "A selfie-style medium close-up in a bright modern office, the person talking straight to the camera";
@@ -840,26 +839,6 @@ export async function revoiceScene(tenant: string, projectId: string, si: number
       else if (p.draft) p.draft.url = url;
     });
   } finally { running.delete(key); }
-}
-
-/** THE ROOM, AS A TEST (core/voice-room.ts): copies of the scene's take with
- *  its voice put in the room, one per amount, to listen to beside the take
- *  as it is. Nothing is attached and the film is untouched. */
-export async function roomTestScene(tenant: string, projectId: string, si: number, opts: { amounts?: number[] } = {}): Promise<{ scene: number; original_url: string; tests: Array<{ amount: number; url: string; settings: RoomSettings }> }> {
-  const { project } = await loadScene(tenant, projectId, si);
-  const clip = ((project as any).speaker_track?.clips || []).find((c: any) => c.scene_index === si);
-  const take: any = clip ? takeForClip(project as any, clip) : null;
-  if (!take) throw new Error(`Scene ${si + 1} has no take to put in a room`);
-  const raw = takeCopies(take).raw;
-  const amounts = (opts.amounts && opts.amounts.length ? opts.amounts : [0.5]).slice(0, 4).map((a) => Math.max(0, Math.min(1, Number(a) || 0)));
-  const work = path.join(projectDir(tenant, projectId), "_work", `room-s${si + 1}`);
-  const tests = [];
-  for (const amount of amounts) {
-    const name = `room-test-s${si + 1}-${Math.round(amount * 100)}-${stamp()}.mp4`;
-    const { settings } = await roomVoiceCopy(resolveVideoPath(raw, config.dataDir), path.join(assetsDir(tenant, projectId), name), { amount, work });
-    tests.push({ amount, url: assetUrl(tenant, projectId, name), settings });
-  }
-  return { scene: si, original_url: raw, tests };
 }
 
 /** Put an EARLIER performance of this scene back as its take: a

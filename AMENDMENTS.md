@@ -6,24 +6,6 @@ session can pick up mid-thread.
 
 ---
 
-## 2026-10-05 — The room: the generated voice put back in the room
-
-Marc on the replica: Dana's voice sounds "so forward ... layered on top", "a
-disconnect between the video and the audio" -- not the words. What plays IS
-Seedance's own read (`voice_track: "seedance"`; none of the replica's takes
-lays the ElevenLabs file over). But Seedance copies the character of the read
-it is handed: a dry, close-mic studio voice, over a picture of a person
-across a living room -- and dead digital silence between the words.
-
-`core/voice-room.ts`: phone/lav mic shaping (rumble and the too-clean top
-trimmed, the 3 kHz presence eased, gentle compression), a small room (a
-short decaying noise impulse through `afir`, mixed under the dry voice), a
-faint room-tone floor, one linear loudness pass to -17 LUFS. Only ffmpeg 4.x
-filters (mixes are amerge + pan). Measured on a synthetic take: the pauses go
-from -91 dB to about -59 dB, the echo trails after each phrase. MCP `cast`
-`room_test` makes TEST COPIES of a scene's take (`room_amounts`) to hear
-beside it; nothing attached. Applying it to a film waits on Marc's ears.
-
 ## 2026-10-05 — The music's level, set in Studio
 
 Marc: "can you lower the background music? what is it set to now? ... i know
