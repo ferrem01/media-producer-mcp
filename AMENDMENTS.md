@@ -6,6 +6,14 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — A build keeps who performs
+
+Building proj_d872a7e4 (the Dana x Quotient reel) copied the writer's board
+back over the film's and dropped `storyboard.cast_plan`. `keepCastFields`
+(server.ts) now carries the cast plan and each scene's performer /
+performance / cast / actor_clip(s) across the copy (by index, or by label when
+the scene count changed); a value the build wrote itself wins.
+
 ## 2026-10-05 — B-roll montages: several clips per scene, shown for a beat
 
 The reel Marc sent to replicate (a creator UGC ad, 28.7 s, 14 shots) cuts
