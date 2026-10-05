@@ -2308,6 +2308,20 @@ ${QUOTIENT_CSS}
           // Regular video asset: start_at is source offset
           target = clip.offset + localTime;
           clip._baseRate = 1;
+          // A TIMED clip before its cue (start_at = -at): parked on its first
+          // frame, paused. It used to PLAY unseen from the scene's start --
+          // re-seeked to 0 every 1.25 s, and once starved never seeked, so a
+          // 4 s cutaway ran off its end before it landed and showed as a
+          // frozen still (Marc, proj_b1f4b7cd: "in a car, it's just a frozen
+          // still"). Primed with preload so it is ready when it cuts in.
+          if (target < 0) {
+            if (!el.paused) el.pause();
+            if (el.preload !== 'auto') { try { el.preload = 'auto'; } catch (eP) {} }
+            if (el.currentTime > 0.05 && el.readyState >= 1) { try { if (el._mpSeek) el._mpSeek(0); else el.currentTime = 0; } catch (eS) {} }
+            clip.lastOffset = null;
+            clip.driftSamples = 0;
+            continue;
+          }
         }
         syncElement(clip, el, target, playing, true);
         continue;
