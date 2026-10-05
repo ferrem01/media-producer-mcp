@@ -68,7 +68,7 @@ describe("the sources: every need is collected its own way, in the board", () =>
 
   it("Studio: the desktop card and the phone card offer each need its sources, inline", async () => {
     const desktop = await read("src/preview-app/preview-app.ts");
-    expect(desktop).toMatch(/var NP_SOURCES = \{ camera_video: \['booth', 'phone', 'room', 'upload'\], screen_recording: \['recorder', 'upload'\], screenshot: \['recorder', 'upload'\], stock_footage: \['find', 'upload'\], illustration: \['draw', 'upload'\], mockup: \['draw', 'upload'\] \};/);
+    expect(desktop).toMatch(/var NP_SOURCES = \{ camera_video: \['booth', 'phone', 'room', 'upload', 'recast', 'generate'\], screen_recording: \['recorder', 'upload'\], screenshot: \['recorder', 'upload'\], stock_footage: \['find', 'upload'\], illustration: \['draw', 'upload'\], mockup: \['draw', 'upload'\] \};/);
     expect(desktop).toMatch(/'\/stock-search\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/'\/need-source\/' \+ encodeURIComponent\(state\.tenantId\)/);
     expect(desktop).toMatch(/data-np-src="' \+ src \+ '"/);
