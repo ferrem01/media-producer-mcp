@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — The voice picker
+
+**Read speed** (same PR): `performance.voice_speed` (0.8-1.25, 1 = as voiced)
+speeds the scene's voice with a tempo change (pitch kept) before anyone hears
+it -- for the shot-for-shot replica of Marc's reel, whose creator talks ~3
+words a second. Kept on the scene; a heard read at another speed is not the
+one sent; a new speed drops the draft. `hear_voice` / `perform_scene` take
+`voice_speed`.
+
+Marc: Bella "sounds like AI"; is there a better voice? (v4 is a model, not a
+voice set: any voice reads with it.) The Generate panel's "Speaks as" row opens
+a picker:
+- **Your voices** (the ElevenLabs account's): ▶ their sample, **Hear this line**
+  (this scene's line and delivery in that voice -- `hear_voice` / the voice
+  action with `voice_id`, only heard, nothing kept), **Use for <actor>** (the
+  actor's voice, every film).
+- **Voice Library** (ElevenLabs' community voices, searchable by words, gender,
+  use): ▶ free sample, **Add & use for <actor>** (adds it to the account --
+  `/api/cast/{t}/voices` POST -- then sets it).
+- A take records the voice it was made in (`made_with.voice_id`); when the
+  actor's voice changes, those scenes read **stale: made in another voice**.
+  A heard read only counts as ready for its own voice.
+
+Confirmed live: a voice Marc added on elevenlabs.io (Abby) appeared on the
+server's list -- the server uses his ElevenLabs account.
+
 ## 2026-10-05 — Replace this take, from the take popover
 
 Clicking a take on the speaker lane opens its trim/cut popover; Marc wanted a

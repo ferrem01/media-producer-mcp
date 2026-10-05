@@ -1153,6 +1153,12 @@ ${QUOTIENT_CSS}
   .np-btn.primary:hover { background: color-mix(in srgb, var(--primary) 90%, transparent); }
   .np-btn.primary:disabled { opacity: .5; }
   .np-groups { align-items: center; }
+  .pf-vpick { margin: -4px 0 12px 86px; padding: 10px; border: 1px solid var(--border-secondary); border-radius: 8px; max-height: 360px; overflow: auto; }
+  .pf-voice { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border-secondary); font-size: 13px; flex-wrap: wrap; }
+  .pf-voice.cur .pf-vname b { color: #15803d; }
+  .pf-vname small { color: var(--content-tertiary, #888); }
+  .pf-vmeta { display: block; }
+  .pf-voice .pf-acts { margin: 0; }
   .pf-status { padding: 4px 2px; }
   .pf-st-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; margin-bottom: 8px; }
   .pf-st-head span { color: var(--content-tertiary, #888); font-variant-numeric: tabular-nums; font-size: 13px; }
@@ -11295,6 +11301,56 @@ ${QUOTIENT_CSS}
     return '<div class="pf-status"><div class="pf-st-head"><b>Scene ' + (si + 1) + ' did not finish</b></div><div class="np-note">' + escHtml(perf.error || 'Something went wrong.') + '</div>'
       + '<div class="pf-acts">' + (perf.pitch_check ? '<button class="np-btn primary" data-pf-go="force">Make it anyway</button>' : '') + '<button class="np-btn" data-pf-go="back">Back to the scene</button></div></div>';
   }
+  // ── THE VOICE PICKER: who the actor speaks as. Your voices read the line at
+  // once; Voice Library voices play a free sample and are added to the
+  // ElevenLabs account only when chosen. Changing the voice marks scenes made
+  // in the old one stale.
+  function pfVoiceName(id) {
+    var v = ((pf.voices && pf.voices.elevenlabs) || []).filter(function(x) { return x.id === id; })[0];
+    return v ? String(v.name).split(' - ')[0] : id ? 'a voice' : 'no voice';
+  }
+  function pfVoiceRow(v, a, lib) {
+    var meta = [v.gender, v.age, v.accent, v.use_case].filter(Boolean).join(' \u00b7 ');
+    var cur = a && a.voice_id === v.id;
+    return '<div class="pf-voice' + (cur ? ' cur' : '') + '"><div class="pf-vname"><b>' + escHtml(String(v.name).split(' - ')[0]) + '</b>' + (String(v.name).indexOf(' - ') > 0 ? ' <small>' + escHtml(String(v.name).split(' - ').slice(1).join(' - ')) + '</small>' : '')
+      + (meta ? '<small class="pf-vmeta">' + escHtml(meta) + '</small>' : '') + '</div><div class="pf-acts">'
+      + (v.preview ? '<button class="np-btn" data-pf-vplay="' + escAttr(v.preview) + '" title="Its own sample">&#9654;</button>' : '')
+      + (lib ? '<button class="np-btn" data-pf-vadd="' + escAttr(v.owner + '|' + v.id + '|' + v.name) + '">Add &amp; use for ' + escHtml(a ? a.name : 'them') + '</button>'
+        : '<button class="np-btn" data-pf-vhear="' + escAttr(v.id) + '">Hear this line</button>'
+          + (cur ? '<small>&#10003; ' + escHtml(a ? a.name : '') + '\u2019s voice</small>' : '<button class="np-btn" data-pf-vuse="' + escAttr(v.id + '|' + v.name) + '">Use for ' + escHtml(a ? a.name : 'them') + '</button>'))
+      + '</div></div>';
+  }
+  function pfVoicePickerHtml(si, a) {
+    var dr = pf.draft[si] || {}, tab = dr.vtab || 'mine';
+    var h = '<div class="pf-vpick"><div class="np-tabs"><button class="np-btn' + (tab === 'mine' ? ' active' : '') + '" data-pf-vtab="mine">Your voices</button><button class="np-btn' + (tab === 'lib' ? ' active' : '') + '" data-pf-vtab="lib">Voice Library</button></div>';
+    if (tab === 'mine') {
+      if (!pf.voices) return h + '<div class="np-hint">Loading the voices&#8230;</div></div>';
+      var list = (pf.voices.elevenlabs || []).slice().sort(function(x, y) { var g = function(v) { return v.category === 'premade' ? 1 : 0; }; return g(x) - g(y) || ((x.gender === 'female') === (y.gender === 'female') ? 0 : x.gender === 'female' ? -1 : 1); });
+      h += '<div class="np-hint">On your ElevenLabs account. <b>Hear this line</b> reads ' + escHtml(a ? a.name : 'the actor') + '\u2019s line for this scene in that voice (cents).</div>' + list.map(function(v) { return pfVoiceRow(v, a, false); }).join('');
+    } else {
+      var res = pf.lib;
+      h += '<div class="pf-acts"><input data-pf="vq" class="np-search" placeholder="Search: calm, creator, British\u2026" value="' + escAttr(dr.vq || '') + '" style="flex:1;min-width:140px">'
+        + '<select data-pf="vgender">' + pfOpt('female', 'Female', dr.vgender || 'female') + pfOpt('male', 'Male', dr.vgender || 'female') + pfOpt('', 'Any', dr.vgender || 'female') + '</select>'
+        + '<select data-pf="vuse">' + [['conversational', 'Conversational'], ['social_media', 'Social media'], ['advertisement', 'Ads'], ['narrative_story', 'Narration'], ['', 'Any use']].map(function(o) { return pfOpt(o[0], o[1], dr.vuse != null ? dr.vuse : 'conversational'); }).join('') + '</select>'
+        + '<button class="np-btn" data-pf-go="vsearch">Search</button></div>'
+        + '<div class="np-hint">ElevenLabs\u2019 community voices. &#9654; plays their sample (free); <b>Add</b> puts the voice on your ElevenLabs account so it can read lines.</div>';
+      if (!res) h += '<div class="np-hint">Searching&#8230;</div>';
+      else if (!res.voices.length) h += '<div class="np-hint">Nothing found.</div>';
+      else h += res.voices.map(function(v) { return pfVoiceRow(v, a, true); }).join('');
+    }
+    return h + '</div>';
+  }
+  function pfLoadVoices(project, panel, kind, si, lib) {
+    var dr = pf.draft[si] = pf.draft[si] || {};
+    if (!lib) {
+      if (pf.voices) return;
+      api('/cast/' + pfT() + '/voices').then(function(r) { pf.voices = r; pfRender(project, panel, kind, si); }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
+      return;
+    }
+    pf.lib = null; pfRender(project, panel, kind, si);
+    var q = '?library=1&gender=' + encodeURIComponent(dr.vgender != null ? dr.vgender : 'female') + '&use_case=' + encodeURIComponent(dr.vuse != null ? dr.vuse : 'conversational') + (dr.vq ? '&search=' + encodeURIComponent(dr.vq) : '');
+    api('/cast/' + pfT() + '/voices' + q).then(function(r) { pf.lib = r; pfRender(project, panel, kind, si); }).catch(function(e) { pf.lib = { voices: [] }; pfRender(project, panel, kind, si); pfSay(panel, e.message || String(e), true); });
+  }
   function pfRender(project, panel, kind, si) {
     if (!panel || !panel.isConnected) return;
     var d = pf.data, s = d.scenes[si];
@@ -11347,6 +11403,10 @@ ${QUOTIENT_CSS}
       var shot = dr.shot != null ? dr.shot : (perf.shot || '');
       h += '<div class="pf-row top"><label>The shot</label><textarea data-pf="shot" rows="2" maxlength="1000" style="' + ta + '" placeholder="A selfie at arm’s length on a wide-angle phone lens, talking straight to the camera">' + escHtml(shot) + '</textarea></div>';
     }
+    // The voice: who the actor speaks as, and the picker.
+    h += '<div class="pf-row"><label>Speaks as</label><div class="pf-acts"><b>' + escHtml(a && a.voice_id ? (pf.voices ? pfVoiceName(a.voice_id) : (a.voice_name || 'their voice').split(' - ')[0]) : 'no voice yet') + '</b>'
+      + '<button class="np-btn" data-pf-go="vpick">' + (dr.vpick ? 'Close the voices' : 'Change voice&#8230;') + '</button></div></div>';
+    if (dr.vpick) h += pfVoicePickerHtml(si, a);
     // The voice.
     var src = dr.voice_source || perf.voice_source || 'script';
     h += '<div class="pf-row"><label>Voice</label><div class="pf-engines">'
@@ -11424,7 +11484,7 @@ ${QUOTIENT_CSS}
     var dr = function() { return (pf.draft[si] = pf.draft[si] || {}); };
     panel.oninput = function(ev) {
       var k = ev.target.getAttribute && ev.target.getAttribute('data-pf');
-      if (k && ['shot', 'delivery', 'cut_shot', 'cut_at'].indexOf(k) >= 0) dr()[k] = ev.target.value;
+      if (k && ['shot', 'delivery', 'cut_shot', 'cut_at', 'vq'].indexOf(k) >= 0) dr()[k] = ev.target.value;
     };
     panel.onchange = function(ev) {
       var t = ev.target, k = t.getAttribute && t.getAttribute('data-pf');
@@ -11446,15 +11506,53 @@ ${QUOTIENT_CSS}
       if (k === 'location') { d.location = t.value; pfPost(project, panel, kind, si, { action: 'location', location: t.value }, t.value ? 'Set: the frame is drawn there, and every take keeps the room.' : 'No location.'); return; }
       if (k === 'voice_source') { d.voice_source = t.value; pfRender(project, panel, kind, si); return; }
       if (k === 'cut_show' || k === 'cut_where') { d[k] = t.value; return; }
+      if (k === 'vgender' || k === 'vuse') { d[k] = t.value; pfLoadVoices(project, panel, kind, si, true); return; }
     };
     panel.onclick = function(ev) {
-      var t = ev.target.closest ? ev.target.closest('[data-pf-go],[data-pf-pick]') : null;
+      var t = ev.target.closest ? ev.target.closest('[data-pf-go],[data-pf-pick],[data-pf-vtab],[data-pf-vplay],[data-pf-vhear],[data-pf-vuse],[data-pf-vadd]') : null;
       if (!t) return;
       var d = dr(), s = pf.data.scenes[si] || {}, perf = s.performance || {};
       var actor = d.actor || (s.plan || {}).actor || perf.actor;
+      var playUrl = function(u) { try { if (pf.audio) pf.audio.pause(); pf.audio = new Audio(u); pf.audio.play(); } catch (e) {} };
+      var setVoice = function(id, name, said) {
+        return api('PATCH', '/cast/' + pfT() + '/' + encodeURIComponent(actor), { voice_id: id, voice_name: name }).then(function() {
+          pf.voices = null; pfLoadVoices(project, panel, kind, si, false);
+          return pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pfSay(panel, said); });
+        });
+      };
+      if (t.hasAttribute('data-pf-vtab')) { d.vtab = t.getAttribute('data-pf-vtab'); pfRender(project, panel, kind, si); if (d.vtab === 'lib' && !pf.lib) pfLoadVoices(project, panel, kind, si, true); else pfLoadVoices(project, panel, kind, si, false); return; }
+      if (t.hasAttribute('data-pf-vplay')) { playUrl(t.getAttribute('data-pf-vplay')); return; }
+      if (t.hasAttribute('data-pf-vhear')) {
+        var vid = t.getAttribute('data-pf-vhear');
+        pfSay(panel, 'Reading the line in ' + pfVoiceName(vid) + '\u2019s voice…');
+        api('POST', '/scene-performance/' + pfT() + '/' + pfP(project) + '/' + si, { action: 'voice', actor: actor, voice_id: vid, delivery: d.delivery != null ? d.delivery : undefined })
+          .then(function(r) { pfSay(panel, pfVoiceName(vid) + ': ' + r.seconds + ' s' + (r.hz ? ' \u00b7 ' + r.hz + ' Hz' : '')); playUrl(withToken(r.url)); })
+          .catch(function(e) { pfSay(panel, e.message || String(e), true); });
+        return;
+      }
+      if (t.hasAttribute('data-pf-vuse')) {
+        var vu = t.getAttribute('data-pf-vuse').split('|');
+        var nm = (pfActor(actor) || {}).name || 'The actor';
+        if (!confirm(nm + ' will speak as ' + String(vu[1]).split(' - ')[0] + ' in every film. Scenes already made in the old voice will show stale until you make them again. Go ahead?')) return;
+        setVoice(vu[0], vu[1], nm + ' now speaks as ' + String(vu[1]).split(' - ')[0] + '.').catch(function(e) { pfSay(panel, e.message || String(e), true); });
+        return;
+      }
+      if (t.hasAttribute('data-pf-vadd')) {
+        var va = t.getAttribute('data-pf-vadd').split('|');
+        var nm2 = (pfActor(actor) || {}).name || 'The actor';
+        if (!confirm('Add ' + va[2] + ' to your ElevenLabs account and make it ' + nm2 + '\u2019s voice in every film? Scenes made in the old voice will show stale.')) return;
+        pfSay(panel, 'Adding ' + va[2] + ' to your ElevenLabs voices…');
+        api('POST', '/cast/' + pfT() + '/voices', { owner: va[0], id: va[1], name: va[2] }).then(function(r) {
+          d.vtab = 'mine';
+          return setVoice(r.voice_id, va[2], va[2] + ' is on your account, and ' + nm2 + ' speaks as them now.');
+        }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
+        return;
+      }
       var pick = t.getAttribute('data-pf-pick');
       if (pick) { pfPost(project, panel, kind, si, { action: 'pick', url: pick }, 'Using that frame.'); return; }
       var go = t.getAttribute('data-pf-go');
+      if (go === 'vpick') { d.vpick = !d.vpick; pfRender(project, panel, kind, si); if (d.vpick) pfLoadVoices(project, panel, kind, si, (d.vtab || 'mine') === 'lib'); return; }
+      if (go === 'vsearch') { pfLoadVoices(project, panel, kind, si, true); return; }
       if (go === 'back') { delete pf.making[si]; pfRender(project, panel, kind, si); return; }
       if (go === 'watch') { ev.preventDefault(); pf.making[si] = { what: 'done', at: Date.now() }; pfRender(project, panel, kind, si); return; }
       var shot = d.shot != null ? d.shot : undefined;
