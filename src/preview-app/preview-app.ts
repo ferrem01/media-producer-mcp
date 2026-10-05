@@ -8357,10 +8357,13 @@ ${QUOTIENT_CSS}
       + cuts.map(function(c, i) {
           return '<div class="tk-row"><span class="tk-lab">Cut ' + (c.src_end - c.src_start).toFixed(2) + 's at ' + (takeCutClock(cuts, c.src_start) - takeCutClock(cuts, tk.trim_start || 0)).toFixed(2) + 's</span><button class="rv-go secondary" data-tk-restore="' + i + '">↩ Restore</button></div>';
         }).join('')
-      + '<div class="sp-region" style="margin-top:4px;">Or shift-click the first and last word on the word lane to cut them.</div>';
+      + '<div class="sp-region" style="margin-top:4px;">Or shift-click the first and last word on the word lane to cut them.</div>'
+      // A new take, any way: one button into the take dialog (Marc: not six here).
+      + '<div class="sp-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><button class="rv-go secondary" id="tk-replace" style="flex:1;">Replace this take&#8230;</button></div>';
     pop.innerHTML = h;
     spkPopPlace(pop, anchorEl);
     document.getElementById('tk-x').addEventListener('click', camPopClose);
+    document.getElementById('tk-replace').addEventListener('click', function() { camPopClose(); openTakeDialog(p, si, tk); });
     pop.querySelectorAll('[data-tk]').forEach(function(b) {
       b.addEventListener('click', function() {
         var body = { op: 'trim' }; body[b.getAttribute('data-tk')] = Number(b.getAttribute('data-v'));
@@ -11521,8 +11524,19 @@ ${QUOTIENT_CSS}
   // ── THE FILM'S PLAN, under the scene list (SPEC-cast-scenes.md): who
   // performs every scene that does not say otherwise, how many takes are
   // ready, and Make all with its cost shown first.
-  function openNeedPicker(project, si, ai) {
+  // Replace a scene's take: the take dialog, opened on what made this one --
+  // Generate for a performance, Recast for a recast, else Record here.
+  function openTakeDialog(project, si, tk) {
+    var sb = ((project.storyboard || {}).scenes || [])[si] || {};
+    var ai = (sb.assets || []).findIndex(function(a) { return a && a.type === 'camera_video' && a.use !== 'clip'; });
+    var cast = sb.cast !== undefined ? sb.cast : project.speaker_cast;
+    var start = tk && tk.performed_by ? 'generate' : cast ? 'recast' : 'booth';
+    openNeedPicker(project, si, ai, { start: start });
+  }
+  function openNeedPicker(project, si, ai, opts) {
     var sb = ((project.storyboard || {}).scenes || [])[si]; var a = sb && (sb.assets || [])[ai];
+    // A scene whose take came without a need on the board still opens the take dialog.
+    if (!a && opts && opts.start) { a = { type: 'camera_video', status: 'provided', path: 'take' }; if (ai < 0) ai = 0; }
     if (!a) return;
     rvPopClose(); camPopClose(); muStop();
     var kind = NP_KIND[a.type] || a.type, have = a.status === 'provided' && a.path;
@@ -11535,7 +11549,7 @@ ${QUOTIENT_CSS}
       var lbl = sb.label ? String(sb.label).replace(/^Scene \\d+\\s*[-–—:·]\\s*/i, '') : '';
       var tk = (project.takes || []).filter(function(t) { return t.scene_index === si; }).slice(-1)[0];
       var tkDur = tk && tk.duration ? Math.round(tk.duration * 10) / 10 + ' s' : '';
-      var pfStart = pfDefaultSource(project, si);
+      var pfStart = (opts && opts.start) || pfDefaultSource(project, si);
       studioModalOpen('<h3 class="sm-title">Camera take \u00b7 Scene ' + (si + 1) + (lbl ? ' \u00b7 ' + escHtml(lbl) : '') + '</h3>' +
         '<p class="sm-desc">' + (have ? 'A take is on this scene' + (tkDur ? ' (' + tkDur + ')' : '') + '; a new one replaces it.' : 'No take on this scene yet.') + ' Soft look and the background are set in the recorder and apply to the take you make.</p>' +
         // WHO PERFORMS IT: me (record, phone, room, upload) or a cast member

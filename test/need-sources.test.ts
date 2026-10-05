@@ -127,7 +127,7 @@ describe("the sources: every need is collected its own way, in the board", () =>
     // THE PICKER in the dialog, the find/draw panel already open (Marc: the
     // grid needs room the popover lacks).
     expect(desktop).toMatch(/function needSourcesHtml\(project, si, ai\)/);
-    expect(desktop).toMatch(/function openNeedPicker\(project, si, ai\) \{[\s\S]*?studioModalOpen\([\s\S]*?needSourcesHtml\(project, si, ai\)[\s\S]*?bindSceneNeeds\(project, card\);[\s\S]*?npOpenPanel\(project, card, first, si, ai\);/);
+    expect(desktop).toMatch(/function openNeedPicker\(project, si, ai, opts\) \{[\s\S]*?studioModalOpen\([\s\S]*?needSourcesHtml\(project, si, ai\)[\s\S]*?bindSceneNeeds\(project, card\);[\s\S]*?npOpenPanel\(project, card, first, si, ai\);/);
     expect(desktop).toMatch(/slotRowHtml\(sel\) \+/);
     expect(desktop).toMatch(/needSlotLineHtml\(state\.currentProject, hit\.si, hit\.ai, 'rv-pop-slot'\)/);
     expect(desktop).toMatch(/item\(\(have \? 'Replace the ' : 'Provide the '\)[\s\S]*?openNeedPicker\(state\.currentProject, hit\.si, hit\.ai\)/);

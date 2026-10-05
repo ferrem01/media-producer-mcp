@@ -6,6 +6,15 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-05 — Replace this take, from the take popover
+
+Clicking a take on the speaker lane opens its trim/cut popover; Marc wanted a
+way from there to every way of making a new take, without six buttons in it.
+One button, **Replace this take…**, opens the take dialog for that scene on
+what made the current take (Generate for a performance, Recast for a recast,
+else Record here). A scene whose take came with no need on the board still
+opens it.
+
 ## 2026-10-05 — A removed custom graphic takes its critique with it
 
 proj_d872a7e4's scenes 2-3 kept "6 unresolved" / "23 unresolved" badges after
