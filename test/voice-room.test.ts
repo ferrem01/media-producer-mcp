@@ -23,9 +23,9 @@ describe("the room: a generated voice put back in the room the picture shows", (
   it("builds the mic, the room and the room tone from filters the deployed ffmpeg 4.x has", () => {
     const f = roomFilter(0.5, 9);
     for (const part of ["highpass=f=95", "equalizer=f=3200", "acompressor", "afir", "anoisesrc=d=10:c=brown", "[room]"]) expect(f).toContain(part);
-    // amix with weights (4.x has them); its `normalize` is newer than 4.x.
-    expect(f).not.toMatch(/normalize|amerge/);
-    expect(f).toContain("amix=inputs=2:duration=first:dropout_transition=0:weights=1 0.23[voiced]");
+    // Mixed with amerge + pan: amix's `normalize` is newer than 4.x.
+    expect(f).not.toMatch(/amix|normalize/);
+    expect(f).toMatch(/pan=mono\|c0=c0\+0\.23\*c1\[voiced\]/);
   });
 
   it("is a test copy: room_test makes files beside the take and attaches nothing", () => {

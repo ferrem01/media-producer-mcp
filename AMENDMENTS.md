@@ -6,15 +6,6 @@ session can pick up mid-thread.
 
 ---
 
-## 2026-10-05 — The room on the droplet's ffmpeg 4.x
-
-The first live `room_test` failed: on 4.x, afir's output carries no channel
-layout and amerge refuses it ("No channel layout for input 1"); aformat and
-pan after it did not help. The mixes are now amix with weights (4.x has
-them; every input is scaled by the same 1/n, so the ratios hold and the
-loudness pass sets the level). Verified against a 4.2.2 static build locally
-(the same numbers as 7.0: pauses about -57 dB, the echo trailing).
-
 ## 2026-10-05 — The room, before Seedance: we were ASKING for a studio voice
 
 Marc chose the long-term fix ("for every video we make"), cost no object.
