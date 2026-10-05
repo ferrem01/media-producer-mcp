@@ -18,8 +18,8 @@
  *   4. one linear loudness pass (two-pass loudnorm), so the level lands
  *      without pumping the room tone up in the pauses.
  *
- * Only filters the deployed ffmpeg 4.x has: the mixes are amerge + pan, not
- * amix's newer `normalize`.
+ * Only what the deployed ffmpeg 4.x has: the mixes are amix with weights,
+ * not its newer `normalize`. Tested against a 4.2 build.
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -70,13 +70,17 @@ export function roomFilter(amount = 0.5, seconds = 30): string {
       "highpass=f=250,lowpass=f=5500," +
       `afade=t=out:st=0:d=${s.decay}:curve=exp,` +
       "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=mono[ir]",
+    // Mixed with amix's weights (4.x has them): amix scales every input by
+    // the same 1/n, so the RATIOS hold and the loudness pass sets the level.
+    // amerge + pan failed on the droplet's 4.x: afir's output carries no
+    // channel layout and amerge will not take one without (Oct 5).
     "[send][ir]afir[verb]",
-    `[dry][verb]amerge=inputs=2,pan=mono|c0=c0+${s.wet}*c1[voiced]`,
+    `[dry][verb]amix=inputs=2:duration=first:dropout_transition=0:weights=1 ${s.wet}[voiced]`,
     // 3. room tone
     `anoisesrc=d=${dur}:c=brown:r=48000:a=1:seed=11,` +
       "highpass=f=70,lowpass=f=1600," +
       "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=mono[tone]",
-    `[voiced][tone]amerge=inputs=2,pan=mono|c0=c0+${s.tone}*c1[room]`,
+    `[voiced][tone]amix=inputs=2:duration=first:dropout_transition=0:weights=1 ${s.tone}[room]`,
   ].join(";");
 }
 
