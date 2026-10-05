@@ -46,4 +46,12 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(html).toContain("Extra shots over this scene (");
     expect(html).not.toContain("Cutaways over this scene");
   });
+
+  it("the take popover has one way out to a new take: Replace this take, opening the take dialog on what made it", () => {
+    const html = getPreviewHtml();
+    expect(html).toContain('id="tk-replace" style="flex:1;">Replace this take&#8230;</button>');
+    expect(html).toContain("camPopClose(); openTakeDialog(p, si, tk);");
+    expect(html).toContain("var start = tk && tk.performed_by ? 'generate' : cast ? 'recast' : 'booth';");
+    expect(html).toContain("var pfStart = (opts && opts.start) || pfDefaultSource(project, si);");
+  });
 });
