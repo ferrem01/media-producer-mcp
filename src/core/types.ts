@@ -659,6 +659,10 @@ export interface ScenePerformance {
   finished_at?: string;
 }
 
+/** A cast actor's b-roll over a scene (no speech, Seedance): made `seconds`
+ *  long (4 s at least), on screen `show` s from `at`. */
+export interface ActorClip { actor: string; shot: string; seconds: number; show?: number; location?: string; at: number; status: "running" | "done" | "failed"; url?: string; error?: string; started_at: string; finished_at?: string }
+
 export interface StoryboardScene {
   /** Scene label */
   label: string;
@@ -674,7 +678,9 @@ export interface StoryboardScene {
   performance?: ScenePerformance;
   /** The last cast-actor b-roll made for this scene (no speech, Seedance),
    *  laid over the scene as a video component. */
-  actor_clip?: { actor: string; shot: string; seconds: number; at: number; status: "running" | "done" | "failed"; url?: string; error?: string; started_at: string; finished_at?: string };
+  actor_clip?: ActorClip;
+  /** Every b-roll clip on the scene, by start time (a montage holds several). */
+  actor_clips?: ActorClip[];
   /** The cast or needs were SET BY HAND (the update tool's storyboard edit):
    *  the build's recipe passes, creator-cut defaults, slates-over-mocks and
    *  b-roll fetch leave this scene as it is. */

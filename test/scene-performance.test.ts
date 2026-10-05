@@ -175,6 +175,23 @@ describe("a scene performed by a cast actor", () => {
     const info = await run("ffmpeg", ["-hide_banner", "-i", clipFile]).then(() => "", (e: any) => String(e.stderr));
     expect(info).not.toMatch(/Audio:/);                        // silent: the scene's voice plays under it
     expect(proj.storyboard.scenes[1].components.filter((c: any) => c.data?.actor_clip)).toHaveLength(1);
+
+    // A MONTAGE: several clips in one scene, each a 4 s shot shown for a beat,
+    // a one-off place with no location; a new clip at the same start replaces that one.
+    await sp.startActorClip(T, P, 1, { actor: "dana", shot: "Talks into her phone while driving", at: 0, show: 0.6, location: "" });
+    await until(async () => ((await sp.getScenePerformances(T, P))[1].actor_clips || []).filter((c: any) => c.status === "done").length === 2);
+    expect(atlas[1]).toMatchObject({ duration: 4 });           // Seedance's minimum, shown 0.6 s
+    expect(atlas[1].reference_images).toHaveLength(2);         // the frame and the sheet: no room
+    let p2 = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
+    let clips = p2.storyboard.scenes[1].components.filter((c: any) => c.data?.actor_clip);
+    expect(clips.map((c: any) => [c.enter.at, c.exit.at])).toEqual([[1.5, 7.5], [0, 0.6]]);
+    expect(p2.scenes[1].components.filter((c: any) => c.data?.actor_clip)).toHaveLength(2);
+    await sp.startActorClip(T, P, 1, { actor: "dana", shot: "Walks in a park, phone at her mouth", at: 0, show: 1.2, location: "" });
+    await until(async () => { const x = (await sp.getScenePerformances(T, P))[1].actor_clips.find((c: any) => c.at === 0); return x?.status === "done" && x.show === 1.2; });
+    p2 = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
+    clips = p2.storyboard.scenes[1].components.filter((c: any) => c.data?.actor_clip);
+    expect(clips.map((c: any) => [c.enter.at, c.exit.at])).toEqual([[1.5, 7.5], [0, 1.2]]);
+    expect(p2.storyboard.scenes[1].actor_clips.map((c: any) => c.at)).toEqual([0, 1.5]);
   }, 60000);
 });
 
