@@ -39,7 +39,7 @@ import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import type { ScenePerformance, CastPlan } from "./types.js";
-import { roomVoiceCopy, type RoomSettings } from "./voice-room.js";
+import { roomVoiceCopy, roomAudioCopy, type RoomSettings } from "./voice-room.js";
 
 /** Where an actor stands when no shot is given. */
 export const DEFAULT_SHOT = "A selfie-style medium close-up in a bright modern office, the person talking straight to the camera";
@@ -545,6 +545,10 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   motion?: string;
   /** The read speed (1 = as voiced, up to 1.25). */
   voice_speed?: number;
+  /** What Seedance is told the voice sounds like: "studio" or "room". */
+  sound?: "studio" | "room";
+  /** 0-1: the room put on the reference voice (0 = as it is). */
+  sound_reference?: number;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -589,6 +593,12 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
     // A new pace is a new read: the draft no longer stands.
     if (setSpeed(p, opts.voice_speed)) delete p.draft;
+    // A new sound is a new shot: Seedance makes the sound with the picture.
+    if (opts.sound && (p.sound || "studio") !== opts.sound) { if (opts.sound === "room") p.sound = "room"; else delete p.sound; delete p.draft; }
+    if (opts.sound_reference !== undefined) {
+      const r = Math.max(0, Math.min(1, Number(opts.sound_reference) || 0));
+      if ((p.sound_reference || 0) !== r) { if (r) p.sound_reference = r; else delete p.sound_reference; delete p.draft; }
+    }
     if (!finishingDraft && setLocation(p, where) && opts.room_url === undefined) delete p.room_url;
     // Performing it IS the choice: the scene's plan is this actor, generated with Seedance.
     followPlan(sc, project, { actor: actor.id, how: "generate", engine: "seedance", ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
@@ -741,9 +751,17 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
     voiceUrl = assetUrl(tenant, projectId, voiceName);
     const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
-    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.room_url || "", perf.location || ""].join("|");
+    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.room_url || "", perf.location || "",
+      // The sound, only when it is not the default: a studio scene's job key is what it always was.
+      ...(perf.sound === "room" || perf.sound_reference ? [`sound:${perf.sound || "studio"}:${perf.sound_reference || 0}`] : [])].join("|");
+    // The reference in the room: what Seedance performs to (the kept voice stays as heard).
+    if (perf.sound_reference && perf.sound_reference > 0) {
+      const treated = path.join(workDir, "voice-room.mp3");
+      await roomAudioCopy(voice.file, treated, { amount: perf.sound_reference, work: workDir });
+      voice = { file: treated, seconds: voice.seconds };
+    }
   }
-  const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot);
+  const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot, perf.sound || "studio");
 
   await stage(quality === "final" ? "final" : "draft");
   const kept = path.join(workDir, `seedance-${quality}.json`);
