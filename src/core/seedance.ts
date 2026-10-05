@@ -42,7 +42,9 @@ export function speakingPrompt(shot: string): string {
   return "The person from the first frame and the character sheet (the same face, hair, clothes and accessories) talks directly to the camera. " +
     `${shot.trim().replace(/\.?$/, ".")} ` +
     "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
-    "Dry close-mic'd voice, no room echo, no music. Realistic, natural light, no text on screen.";
+    "Sound: their voice as it really sounds where they are in this shot -- the acoustics of that place " +
+    "(a room sounds like a room, outdoors like outdoors, a car like a car), and if they hold a microphone, close and clear like that mic; " +
+    "not a dry studio voiceover. No music. Realistic, natural light, no text on screen.";
 }
 
 /** A shot with no speech (b-roll): the person in the action asked for. */

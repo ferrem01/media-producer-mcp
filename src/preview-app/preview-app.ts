@@ -5255,6 +5255,28 @@ ${QUOTIENT_CSS}
     var what = c.source === 'none' ? 'no music' : (c.source && c.source !== 'auto' ? (c.title || (c.path || '').split('/').pop()) : (bed ? 'picked by the build: ' + (bed.source || '').split('/').pop() : 'the build picks a track'));
     return 'MUSIC \u2014 ' + what + '. Click to change it.';
   }
+  // THE VOICE'S LEVEL (speaker_track.volume, what the render mixes the
+  // speaker at): heard at once while dragging, saved on release.
+  function openVoiceCard(project) {
+    var st = project.speaker_track;
+    if (!st) { studioStatus('This film has no speaker voice to set.', 'err'); return; }
+    var v = Math.round((typeof st.volume === 'number' ? st.volume : 1) * 100);
+    studioModalOpen('<h3 class="sm-title">Voice</h3><p class="sm-desc">How loud the speaker sits in the film. The render uses the same level.</p>' +
+      '<div class="mu-level"><label><b>Voice level</b><input type="range" id="vo-vol" min="0" max="100" step="1" value="' + v + '"><span id="vo-vol-n">' + v + '%</span></label></div>' +
+      '<div class="sm-actions"><button class="sm-btn" id="vo-close">Close</button></div>');
+    document.getElementById('vo-close').addEventListener('click', function() { studioModalClose(); });
+    var el = document.getElementById('vo-vol'), n = document.getElementById('vo-vol-n');
+    el.addEventListener('input', function() {
+      n.textContent = el.value + '%';
+      if (state.currentProject && state.currentProject.speaker_track) state.currentProject.speaker_track.volume = parseInt(el.value, 10) / 100;
+      [els.speakerBg, els.speakerBg2].forEach(function(x) { if (x) { try { x.volume = speakerVoiceLevel(); } catch (eV) {} } });
+    });
+    el.addEventListener('change', function() {
+      api('POST', '/speaker-level/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), { volume: parseInt(el.value, 10) / 100 })
+        .then(function() { studioStatus('Voice level: ' + el.value + '%.', 'ok'); })
+        .catch(function(e) { studioStatus(e.message || String(e), 'err'); });
+    });
+  }
   function openMusicCard(project) {
     muStop();
     studioModalOpen('<h3 class="sm-title">Music</h3><p class="sm-desc">The film\u2019s bed. Pick one of your tracks, one from the library, search Jamendo, or upload. The player carries it right away; the build keeps it and cuts to its bars.</p><div id="mu-body"><div class="np-empty">Loading\u2026</div></div><div class="sm-actions"><button class="sm-btn" id="mu-close">Close</button></div>');
@@ -7853,11 +7875,13 @@ ${QUOTIENT_CSS}
       if (y.film >= 0) html += '<span class="lg-ic" style="top:' + (y.film + y.filmH / 2 - 8) + 'px" title="FILM \u2014 every scene\\'s poster frame. Click to jump to the scene.">' + LG_ICONS.film + '</span>';
       if (y.comps >= 0) html += '<span class="lg-ic" style="top:' + (y.comps + y.compsH / 2 - 8) + 'px" title="COMPONENTS \u2014 every scene\\'s cast. Click a bar to inspect it; double-click to edit its timing.">' + LG_ICONS.comps + '</span>';
       if (y.screen >= 0) html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="SCREEN \u2014 your recording. Click a block to split, speed up or remove footage.">' + LG_ICONS.screen + '</span>';
-      if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="SPEAKER \u2014 your voice (and camera). Click a piece to play, split or remove talk.">' + LG_ICONS.speaker + '</span>';
+      if (y.speaker >= 0) html += '<span class="lg-ic lg-speaker" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="SPEAKER \u2014 your voice (and camera). Click here to set the voice level; click a piece to play, split or remove talk.">' + LG_ICONS.speaker + '</span>';
       if (y.music >= 0) html += '<span class="lg-ic lg-music" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="MUSIC \u2014 the bed under the film, ducked while you speak. Click to change it.">' + LG_ICONS.music + '</span>';
       gut.innerHTML = html;
       var lgf = gut.querySelector('.lg-fx');
       if (lgf) lgf.addEventListener('click', function(ev) { ev.stopPropagation(); sfxAddAtPlayhead(lgf); });
+      var lgs = gut.querySelector('.lg-speaker');
+      if (lgs) lgs.addEventListener('click', function(ev) { ev.stopPropagation(); if (state.currentProject) openVoiceCard(state.currentProject); });
       var lgm = gut.querySelector('.lg-music');
       if (lgm) lgm.addEventListener('click', function(ev) { ev.stopPropagation(); if (state.currentProject) openMusicCard(state.currentProject); });
     }
