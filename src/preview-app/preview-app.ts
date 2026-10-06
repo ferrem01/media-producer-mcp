@@ -11300,7 +11300,7 @@ ${QUOTIENT_CSS}
       api('/recast/' + pfT() + '/' + pfP(project)).catch(function() { return {}; }),
     ]).then(function(r) {
       pf.loading = null;
-      pf.data = { pid: project.project_id, cast: r[0].cast || [], performers: r[0].performers || [], locations: r[1].locations || [], scenes: r[2].scenes || [], cast_plan: r[2].cast_plan || null, recast: r[3].recast || null };
+      pf.data = { pid: project.project_id, cast: r[0].cast || [], performers: r[0].performers || [], locations: r[1].locations || [], scenes: r[2].scenes || [], recast: r[3].recast || null };
       return pf.data;
     }, function(e) { pf.loading = null; throw e; });
     return pf.loading;
@@ -11458,7 +11458,7 @@ ${QUOTIENT_CSS}
       if (perf.status === 'done') { panel.innerHTML = pfDoneHtml(project, si, s, perf); return; }
     }
     var h = pfStateLine(s);
-    var actorId = dr.actor || (kind === 'generate' ? (plan.how === 'generate' && plan.actor) || perf.actor : (plan.how === 'recast' && plan.actor) || s.cast) || (d.cast_plan && d.cast_plan.actor) || (cast[0] && cast[0].id) || '';
+    var actorId = dr.actor || (kind === 'generate' ? (plan.how === 'generate' && plan.actor) || perf.actor : (plan.how === 'recast' && plan.actor) || s.cast) || (cast[0] && cast[0].id) || '';
     if (!cast.length) {
       panel.innerHTML = h + '<div class="np-hint">No cast yet. <a href="' + escAttr(withToken('/cast?tenant=' + pfT())) + '" target="_blank">Add an actor in Cast</a>, then come back.</div>';
       return;
@@ -11692,8 +11692,8 @@ ${QUOTIENT_CSS}
   }
   // The take slot's words for a scene the plan has a cast member perform.
   function pfSlotLabel(project, si) {
-    var sb = project.storyboard || {}, film = sb.cast_plan || {}, sc = (sb.scenes || [])[si] || {}, own = sc.performer || {};
-    var how = own.how || film.how, actor = own.actor !== undefined ? own.actor : film.actor;
+    var sb = project.storyboard || {}, sc = (sb.scenes || [])[si] || {}, own = sc.performer || {};
+    var how = own.how, actor = own.actor;
     if (!actor || (how && how !== 'generate' && how !== 'recast')) return '';
     var a = pf.data && pf.data.pid === project.project_id ? pfActor(actor) : null;
     var name = (a && a.name) || String(actor).charAt(0).toUpperCase() + String(actor).slice(1);
@@ -11705,15 +11705,12 @@ ${QUOTIENT_CSS}
   }
   // The scene's plan says how its take is made: open that source first.
   function pfDefaultSource(project, si) {
-    var sb = project.storyboard || {}, film = sb.cast_plan || {}, own = ((sb.scenes || [])[si] || {}).performer || {};
-    var how = own.how || film.how, actor = own.actor !== undefined ? own.actor : film.actor;
+    var own = (((project.storyboard || {}).scenes || [])[si] || {}).performer || {};
+    var how = own.how, actor = own.actor;
     if (how === 'generate' && actor) return 'generate';
     if (how === 'recast' && actor) return 'recast';
     return 'booth';
   }
-  // ── THE FILM'S PLAN, under the scene list (SPEC-cast-scenes.md): who
-  // performs every scene that does not say otherwise, how many takes are
-  // ready, and Make all with its cost shown first.
   // Replace a scene's take: the take dialog, opened on what made this one --
   // Generate for a performance, Recast for a recast, else Record here.
   function openTakeDialog(project, si, tk) {

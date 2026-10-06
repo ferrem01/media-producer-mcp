@@ -54,9 +54,9 @@ Revised Oct 5 (Marc): every scene can be someone else, so **the film holds no
 plan**. Each scene's own `storyboard.scenes[i].performer = { actor (null = me),
 how: record | recast | generate, engine?, location? }`; nothing set = read off
 what the scene already plays (its performance, else its recast), else me. (The
-first build carried a film-wide `storyboard.cast_plan`; a film that still has
-one reads it as each scene's default until its next plan edit copies it onto
-the scenes and drops it.) `storyboard.scenes[i].performance` carries the
+first build carried a film-wide `storyboard.cast_plan`; loading a film moves
+it onto the scenes, `migrateProject`.) The take keeps Seedance's own sound:
+the lips were made to it. `storyboard.scenes[i].performance` carries the
 execution and results: `shot`, `voice_source`, `delivery`, prompts, `frames` /
 `frame`, `voice_preview` (the read heard -- what Seedance is sent while it
 still matches), `draft`, `final`, `made_with`, `status`, `stage`, `error`.
@@ -88,7 +88,7 @@ stale (made for another plan). Nothing is ever remade by itself.
   scene list. **Cast** and **Locations** are tenant pages in the rail.
 - **MCP**: `update` storyboard `scenes[].performer` (one scene) or `cast_plan`
   (written onto every scene); `cast` actions `scenes`, `hear_voice`,
-  `perform_scene`, `revoice`, `restore`, `scene_cast`, `actor_clip`,
+  `perform_scene`, `restore`, `scene_cast`, `actor_clip`,
   `scene_location`, `recast` with `scenes`, `locations` / `add_location` /
   `remove_location`.
 - **API**: `/api/scene-performance/{t}/{p}[/{si}]`, `/api/locations/{t}[/{id}]`.

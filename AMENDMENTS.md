@@ -8,6 +8,27 @@ session can pick up mid-thread.
 
 
 
+
+## 2026-10-06 — Cast cleanup: experiment leftovers out
+
+Marc: "I want to make sure we don't have cruft ... no extra garbage." Four
+leftovers removed:
+1. `voice_track: "converted"` and its machinery (`revoiceScene`, `layVoice`,
+   `bestLag`, `envelope`, `seedance_url`, `voice_offset`; MCP `revoice` and
+   `voice_track`; the API's `revoice` action). The laid-over ElevenLabs file
+   was "totally off from the lips" on Oct 4; every take since keeps
+   Seedance's own sound, and now that is the only path.
+2. `room_url`, the room reference before Locations (no film used it); a
+   location's clean plate is the one room reference.
+3. `actor_clip` (singular), the "last cutaway touched"; `actor_clips` is the
+   one list.
+4. The film-level `storyboard.cast_plan` fallback: plans live only on scenes.
+   (`cast_plan` survives as an EDIT that writes every scene, never stored.)
+Old films are upgraded on load (`migrateLegacyCast` in `migrateProject`): the
+film plan moves onto the scenes (a scene's own fields win), a lone
+`actor_clip` joins the list, the dead performance fields are dropped. Every
+fallback that read the old shapes is gone, Studio's included.
+
 ## 2026-10-05 — A timed cutaway waits on its first frame (Studio)
 
 Marc on the replica: "in a car, it's just a frozen still" -- couch and walk

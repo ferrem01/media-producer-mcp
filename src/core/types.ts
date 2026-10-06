@@ -541,16 +541,11 @@ export interface Storyboard {
   estimated_duration: number;
   /** Feedback that shaped this storyboard */
   revision_notes?: string[];
-  /** LEGACY (Oct 4-5): a film-wide default plan. Plans now live on each scene
-   *  (`scenes[i].performer`); a film still carrying one reads it as every
-   *  scene's default until its next plan edit, which copies it onto the
-   *  scenes and drops it (core/cast-plan.ts applyPlanEdit). */
-  cast_plan?: CastPlan;
 }
 
 /** WHO performs a person-carried scene, HOW, with which ENGINE, and WHERE,
  *  on `storyboard.scenes[i].performer` -- per scene, since every scene can be
- *  someone else (the legacy film-wide `storyboard.cast_plan` fills in). The plan
+ *  someone else. The plan
  *  only says what is wanted -- a change never makes anything by itself; the
  *  scene shows as stale until it is performed again. */
 export interface CastPlan {
@@ -609,14 +604,9 @@ export interface ScenePerformance {
    *  pace -- the reel Marc is replicating runs ~3 words a second). Applied as
    *  a tempo change, the pitch kept, before Seedance hears it. */
   voice_speed?: number;
-  /** The ROOM reference: an image of the set (a project asset -- usually
-   *  the first scene's drawn frame) sent to Seedance with every take as the
-   *  last reference image, so the room stops drifting from scene to scene
-   *  (Marc, Oct 4: "the apartment and the couch is changing slightly"). */
-  room_url?: string;
   /** The LOCATION the scene is set in (a tenant location id, core/locations.ts):
    *  the start frame is drawn in it and its clean plate goes to Seedance as
-   *  the room reference (room_url, when set, overrides the plate). */
+   *  the room reference. */
   location?: string;
   /** The prompts, written out in full when the defaults built from the shot
    *  are not what is wanted (Marc: "define any prompt for any scene"):
@@ -632,11 +622,6 @@ export interface ScenePerformance {
     /** The location it was drawn in. */
     location?: string }>;
   frame?: string;
-  /** The sound: "seedance" (default) keeps the model's own read -- the only
-   *  track the lips were made to; "converted" lays the exact voice file over
-   *  the video, which Marc measured "totally off from the lips" (Oct 4:
-   *  Seedance re-performs the line, it does not keep the file's timing). */
-  voice_track?: "converted" | "seedance";
   /** The pitch of the voice Seedance was given (median Hz), and of the
    *  recording it was converted from. Measured before Seedance is paid. */
   voice_hz?: number;
@@ -646,12 +631,9 @@ export interface ScenePerformance {
    *  Oct 4: "check the pitch on the recording before you create the Dana
    *  scene"). Perform again with force to make it anyway. */
   pitch_check?: { hz: number; reference: number; recording_hz?: number };
-  /** The voice file the scene was performed to (a project asset), and how
-   *  far it was shifted to line up with the video (s). */
+  /** The voice file Seedance was given to perform to (a project asset). The
+   *  take keeps Seedance's own sound: the lips were made to it. */
   voice_url?: string;
-  voice_offset?: number;
-  /** The video as Seedance made it, before the voice was laid over it. */
-  seedance_url?: string;
   /** The voice last heard for the scene ("Hear the voice"): what Seedance
    *  will be given unless the line, delivery or actor change. */
   voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take"; line?: string; delivery?: string; speed?: number; made_at: string };
@@ -685,9 +667,6 @@ export interface StoryboardScene {
   performer?: CastPlan;
   /** A cast actor performing the scene without a recording (Seedance). */
   performance?: ScenePerformance;
-  /** The last cast-actor b-roll made for this scene (no speech, Seedance),
-   *  laid over the scene as a video component. */
-  actor_clip?: ActorClip;
   /** Every b-roll clip on the scene, by start time (a montage holds several). */
   actor_clips?: ActorClip[];
   /** The cast or needs were SET BY HAND (the update tool's storyboard edit):
