@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { config } from "../src/config.js";
-import { deployLockPath, writeDeployLock, isDeploying, machineStats } from "../src/core/server-health.js";
+import { deployLockPath, writeDeployLock, isDeploying, machineStats, diskTooFull, MIN_FREE_DISK_MB } from "../src/core/server-health.js";
 import { queueJob } from "../src/core/job-queue.js";
 
 // Deploys that don't kill renders, and a box you can see (Oct 6: a render
@@ -27,6 +27,13 @@ describe("the deploy lock and the box's health", () => {
     const old = new Date(Date.now() - 31 * 60 * 1000);
     fs.utimesSync(deployLockPath(), old, old);
     expect(isDeploying()).toBe(false);
+  });
+
+  it("refuses a render when the disk is nearly full, in plain words", () => {
+    expect(MIN_FREE_DISK_MB).toBeGreaterThanOrEqual(1024);
+    expect(diskTooFull()).toBeNull();                                   // this box has room
+    const src = fs.readFileSync("src/core/job-queue.ts", "utf8");
+    expect(src).toMatch(/if \(type !== "take"\) \{ const full = diskTooFull\(\); if \(full\) throw new Error\(full\); \}/);
   });
 
   it("reports memory, load, browsers and render workers", () => {

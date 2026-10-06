@@ -70,6 +70,20 @@ function diskFree(dir: string): { free_mb: number; used_pct: number } | null {
   } catch { return null; }
 }
 
+/** Below this, renders and builds are refused: a full disk failed every
+ *  render at its first screenshot (Oct 6: 73 MB free, 61 GB of a June
+ *  experiment's Remotion bundles in /tmp) with nothing saying "disk". */
+export const MIN_FREE_DISK_MB = 2048;
+
+/** A plain sentence when /tmp or the data dir is nearly full, else null. */
+export function diskTooFull(): string | null {
+  for (const [label, dir] of [["temp space", os.tmpdir()], ["data disk", config.dataDir]] as const) {
+    const d = diskFree(dir);
+    if (d && d.free_mb < MIN_FREE_DISK_MB) return `The server's ${label} is full (${d.free_mb} MB free, ${d.used_pct}% used): renders fail without room to work. Free some space on the server, then start this again -- nothing was started.`;
+  }
+  return null;
+}
+
 export function machineStats(): Record<string, unknown> {
   const mb = (b: number) => Math.round(b / 1048576);
   const procs = processes();
