@@ -71,6 +71,7 @@ import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
 import { queueRender, getJobStatus, listJobs, activeRender } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
+import { deployLockPath, writeDeployLock, isDeploying, machineStats, sweepOrphans } from "./core/server-health.js";
 import { assembleSceneAuto, loadSharedUtilities, generateBrandCSS, generateFontLinks, type ComponentSource } from "./core/scene-assembler.js";
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
 import { getWaveformPeaks } from "./core/waveform.js";
@@ -757,6 +758,10 @@ async function main() {
   initTenantStoreFromFile(path.join(config.dataDir, "_system", "tenants.json"));
   initTeamStoreFromFile(path.join(config.dataDir, "_system", "team.json"));
 
+  // Render workers and browsers a killed server left behind hold memory the
+  // next render needs (Oct 6: Chromium's GPU process killed, exit 9).
+  try { const n = sweepOrphans(); if (n) console.log(`  Stopped ${n} leftover render process(es) from a previous server`); } catch { /* best-effort */ }
+
   // Create MCP server
   const server = createMcpServer();
 
@@ -1159,6 +1164,11 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           // Set by scripts/deploy.sh -- lets anyone (including a remote
           // debugging session) verify WHICH commit is actually serving.
           commit: process.env.MP_GIT_SHA || "unknown",
+          // The box at a glance (core/server-health.ts): renders and builds
+          // running, a deploy under way, memory, load, browsers.
+          busy: listAllJobs().filter((j: any) => (j.status === "running" || j.status === "queued") && j.type !== "take").length,
+          deploying: isDeploying(),
+          ...machineStats(),
         });
         return;
       }
@@ -1466,6 +1476,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         }
         const branch = typeof deployBody.branch === "string" && /^[\w./-]+$/.test(deployBody.branch)
           ? deployBody.branch : "master";
+        // From here until scripts/deploy.sh finishes, new renders and builds
+        // are refused (core/server-health.ts): the reload cannot land mid-job.
+        writeDeployLock(branch);
         // dist/index.js -> repo root
         const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
         const deployScript = path.join(repoRoot, "scripts", "deploy.sh");
@@ -1486,7 +1499,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           cwd: repoRoot,
           detached: true,
           stdio: "ignore",
-          env: { ...process.env },
+          env: { ...process.env, MP_DEPLOY_LOCK: deployLockPath(), MP_DEPLOY_FORCE: deployBody.force === true ? "1" : "" },
         });
         child.unref();
         jsonResponse(res, 202, {

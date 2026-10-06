@@ -11,6 +11,32 @@ session can pick up mid-thread.
 
 
 
+
+## 2026-10-06 — Deploys that don't kill renders; a box you can see
+
+Marc's re-render started at 01:51 while the speaker-slot deploy was
+building; the reload at ~01:52 cut it off. The renders at 02:00 and 02:08
+then died in screenshot capture -- Chromium's GPU process killed (exit 9),
+"GPU process isn't usable" -- most likely the cut-off and failed renders'
+browsers still holding memory. And every share link he made snapshotted the
+last SUCCESSFUL render (01:11, before the fix), so the old glitch kept
+showing. (`core/server-health.ts`)
+- **Deploy lock**: /api/deploy writes `_system/deploy.lock`; while it stands
+  `queueJob` refuses renders and builds ("The server is updating ...
+  nothing was started"; a take still passes). `deploy.sh` removes it on
+  exit, and before the pm2 reload waits up to 20 min for /health's `busy` to
+  reach 0 (skipped when forced).
+- **Workers die with their server**: scene and capture workers exit on IPC
+  `disconnect`, taking their browser with them. The channel is then
+  unref'd: a 'disconnect' listener refs it, and a FINISHED worker never
+  exited (its parent waits for exit) -- the first cut hung every render in
+  the suite. Verified both ways: a finished worker exits 0; a busy one
+  exits when its server is SIGKILLed.
+- **Startup sweep**: render workers and Playwright browsers reparented to
+  init (ppid 1) -- a killed server's leftovers -- are stopped at start.
+- **/health** now reports `busy`, `deploying`, `memory_mb` (total, free,
+  server rss), `load_1m`, `browsers`, `render_workers`.
+
 ## 2026-10-06 — The speaker base: each take in its slot
 
 Marc rendered the replica: "start of scene 3 freezes for a second and then

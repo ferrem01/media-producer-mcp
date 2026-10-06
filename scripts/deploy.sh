@@ -14,6 +14,9 @@ BRANCH="${1:-master}"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${MP_ENV_FILE:-/etc/media-producer/env}"
 APP_NAME="${MP_PM2_NAME:-media-producer-mcp}"
+# The deploy lock (/api/deploy wrote it; core/server-health.ts): new renders
+# and builds are refused while it stands. Removed however this script ends.
+trap 'rm -f "${MP_DEPLOY_LOCK:-}"' EXIT
 
 cd "$REPO_DIR"
 echo "== media-producer deploy =="
@@ -52,6 +55,19 @@ fi
 echo "auth:    AUTH_TOKENS=$([ -n "${AUTH_TOKENS:-}" ] && echo set || echo unset)  SESSION_SECRET=$([ -n "${SESSION_SECRET:-}" ] && echo set || echo unset)"
 PORT="${MP_PORT:-3200}"
 export MP_GIT_SHA="$SHA"
+
+# The reload kills whatever is running. /api/deploy refused to start with a
+# job in flight, but a job started in the minutes before the lock went up, or
+# a forced deploy, may still be going: wait for it (up to 20 min; the
+# watchdog's /health reports busy). MP_DEPLOY_FORCE=1 skips the wait.
+if [ "${MP_DEPLOY_FORCE:-}" != "1" ]; then
+  for i in $(seq 1 120); do
+    busy="$(curl -sf --max-time 2 "http://127.0.0.1:${PORT}/health" 2>/dev/null | sed -n 's/.*"busy":\([0-9]*\).*/\1/p')"
+    if [ -z "$busy" ] || [ "$busy" = "0" ]; then break; fi
+    [ "$i" = "1" ] && echo "wait:    $busy job(s) running -- holding the reload until they finish"
+    sleep 10
+  done
+fi
 
 if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
   pm2 reload "$APP_NAME" --update-env

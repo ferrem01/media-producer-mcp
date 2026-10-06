@@ -22,6 +22,15 @@ import { resolveVideoPath } from "./video-path.js";
 import { mapSourceTime, parseEdlAttr } from "./media-edl.js";
 import { localizeRemoteMedia } from "./remote-media.js";
 
+// A worker never outlives its server: when the server goes (a deploy's
+// reload, a crash) the IPC channel closes and the worker exits, taking its
+// browser with it (Oct 6: a cut-off render's leftovers starved the next one).
+// The listener refs the channel, which would keep a FINISHED worker alive
+// forever (its parent waits for it to exit): unref it -- the event still
+// fires while the worker is busy.
+process.on("disconnect", () => process.exit(1));
+process.channel?.unref();
+
 // Resilience: this worker is forked with stdio:"inherit" and logs progress
 // heavily. Under concurrent load the parent's pipe buffer can fill, and a write
 // to stdout/stderr then throws EPIPE as an UNHANDLED 'error' event -- which would
