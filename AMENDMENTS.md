@@ -14,6 +14,26 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-06 — Studio painted a timed plate over the whole scene
+
+Marc's churn film: in Studio the signal visuals (calendar, charts, card fan)
+never showed -- a blank pale frame with the caption -- while the thumbnails
+had them. The plates (gradient-background, z 30, under the proof at z 34+)
+are backdrops, and the Studio composite's camera rig PARKS backdrops outside
+itself. The rig is a stacking context at z 2, so the parked plate was weighed
+against 2, not against the components, and painted over every one of them.
+The render was right (there the plate sits inside `.mp-camera`, which the rig
+adopts whole), and `get target:'motion'` said visible (it checks opacity and
+box, not what is on top).
+
+Fix (`cameraMovesScript`, scene-assembler.ts): a backdrop with z above the
+rig's 2 rides the rig, like the travel-safe surfaces already did. Low
+backdrops (z 0/1) stay parked as before. Test: `composite-plate-z.test.ts`
+(fails without the fix). Checked on the live film's composite with the fix
+patched in: every scene's visual paints.
+
+---
+
 ## 2026-10-06 — A built person film keeps its timed plates, rings and placed notifications
 
 The churn film (proj_3bd9cad6) was built from a hand-set board and lost
