@@ -119,9 +119,6 @@ function followPlan(scene: any, project: any, want: Partial<CastPlan>, before: R
   if (want.engine !== undefined && want.engine !== before.engine) fields.engine = want.engine;
   if (want.location !== undefined && (want.location || "") !== (before.location || "")) fields.location = want.location || "";
   if (!Object.keys(fields).length) return;
-  // Clearing a location the film supplies would only inherit it back: say none.
-  const film: CastPlan = project?.storyboard?.cast_plan || {};
-  if (fields.location === "" && film.location) fields.location = null;
   const next = writePlan(scene.performer, fields);
   if (next) scene.performer = next; else delete scene.performer;
 }
@@ -205,8 +202,7 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     p.actor = actor.id; p.shot = shot; setPrompt(p, "frame_prompt", opts.frame_prompt);
-    // A location chosen now is the room: an older raw room reference yields.
-    if (setLocation(p, where)) delete p.room_url;
+    setLocation(p, where);
     followPlan(sc, project, { ...(opts.actor && plan.how !== "record" ? { actor: actor.id } : {}), ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
     p.status = "running"; p.stage = "frame"; delete p.error;
     p.started_at = new Date().toISOString(); delete p.finished_at;
@@ -277,8 +273,8 @@ export async function setSceneLocation(tenant: string, projectId: string, si: nu
   if (location) await locationImage(tenant, location);
   const plan = await planOf(tenant, project, si);
   return patch(tenant, projectId, si, (p, sc) => {
-    if (setLocation(p, location)) delete p.room_url;
-    // The scene's plan says where it is set (none: over the film's, too).
+    setLocation(p, location);
+    // The scene's plan says where it is set.
     followPlan(sc, project, { location }, { ...plan, location: planField(project, si, "location") || undefined });
   });
 }
@@ -337,51 +333,6 @@ export async function useSceneRecording(tenant: string, projectId: string, si: n
   const { setSceneCast } = await import("./recast.js");
   await setSceneCast(tenant, projectId, [si], null);
   return { reattached };
-}
-
-/** 10 ms loudness envelope of a file's sound (16 kHz mono). */
-async function envelope(file: string, work: string): Promise<Float32Array> {
-  const pcm = path.join(work, `env-${crypto.randomBytes(3).toString("hex")}.raw`);
-  await ffmpeg(["-i", file, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", pcm]);
-  const buf = await fs.readFile(pcm);
-  await fs.rm(pcm, { force: true }).catch(() => {});
-  const n = Math.floor(buf.length / 2), hop = 160, out = new Float32Array(Math.floor(n / hop));
-  for (let f = 0; f < out.length; f++) {
-    let s = 0;
-    for (let i = 0; i < hop; i++) { const v = buf.readInt16LE((f * hop + i) * 2) / 32768; s += v * v; }
-    out[f] = Math.sqrt(s / hop);
-  }
-  return out;
-}
-
-/** How far the voice file must move to line up with the video's own read
- *  (s; positive = later), by cross-correlating their envelopes within
- *  +-0.6 s. 0 when the match is too weak to trust. */
-export function bestLag(video: Float32Array, voice: Float32Array, maxFrames = 60): { lag: number; score: number } {
-  const norm = (a: Float32Array) => { let m = 0; for (const v of a) m += v; m /= a.length || 1; let sd = 0; for (const v of a) sd += (v - m) ** 2; sd = Math.sqrt(sd / (a.length || 1)) || 1; return Float32Array.from(a, (v) => (v - m) / sd); };
-  const a = norm(video), b = norm(voice);
-  let best = 0, bestScore = -Infinity;
-  for (let lag = -maxFrames; lag <= maxFrames; lag++) {
-    let s = 0, n = 0;
-    for (let i = 0; i < b.length; i++) { const j = i + lag; if (j < 0 || j >= a.length) continue; s += a[j] * b[i]; n++; }
-    const score = n ? s / n : -Infinity;
-    if (score > bestScore) { bestScore = score; best = lag; }
-  }
-  return bestScore >= 0.3 ? { lag: best / 100, score: bestScore } : { lag: 0, score: bestScore };
-}
-
-/** The exact voice file laid over the video in place of the model's read,
- *  shifted to line up with it, padded to the video's length. */
-export async function layVoice(videoAbs: string, voiceAbs: string, outAbs: string, work: string): Promise<number> {
-  const { lag } = bestLag(await envelope(videoAbs, work), await envelope(voiceAbs, work));
-  const shift = lag > 0 ? `adelay=${Math.round(lag * 1000)}:all=1,` : lag < 0 ? `atrim=start=${(-lag).toFixed(3)},asetpts=PTS-STARTPTS,` : "";
-  // An explicit length: an endless apad with -shortest never ended under a
-  // copied video stream (measured: the encode hung).
-  const dur = (await durationOf(videoAbs)) || 0;
-  if (!dur) throw new Error("the video has no length");
-  await ffmpeg(["-i", videoAbs, "-i", voiceAbs, "-filter_complex", `[1:a]${shift}apad=whole_dur=${dur.toFixed(3)},atrim=0:${dur.toFixed(3)}[a]`, "-map", "0:v:0", "-map", "[a]",
-    "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", dur.toFixed(3), "-movflags", "+faststart", outAbs]);
-  return lag;
 }
 
 /** The median pitch of a voice (Hz): 40 ms frames, autocorrelation within
@@ -528,13 +479,10 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   actor?: string; shot?: string; voice_source?: "script" | "take"; quality?: "draft" | "final";
   /** Full prompts in place of the defaults ("" back to the default). */
   frame_prompt?: string; video_prompt?: string;
-  voice_track?: "converted" | "seedance";
   /** Make it even when the pitch check would stop it. */
   force?: boolean;
   /** The delivery the script voice reads ("" back to the plain line). */
   delivery?: string;
-  /** The room reference: a project image asset ("" for none). */
-  room_url?: string;
   /** The location (a tenant location id; "" for none). */
   location?: string;
   /** Who makes it: "seedance" or "heygen" (a HeyGen look's own setting).
@@ -563,11 +511,6 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
   const shot = String(opts.shot ?? prev?.shot ?? DEFAULT_SHOT).trim().slice(0, 1000) || DEFAULT_SHOT;
   const source = opts.voice_source || prev?.voice_source || "script";
-  if (opts.room_url) {
-    const prefix = `/assets/${tenant}/projects/${projectId}/assets/`;
-    if (!opts.room_url.startsWith(prefix) || opts.room_url.includes("..") || !/\.(jpe?g|png|webp)$/i.test(opts.room_url)) throw new Error("room_url must be an image asset of this film");
-    if (!(await fs.stat(resolveVideoPath(opts.room_url, config.dataDir)).then(() => true, () => false))) throw new Error("room_url not found");
-  }
   // The location the take is made in (asked for, else the plan's), checked
   // before anything is spent. A final finishing its draft keeps the draft's.
   const finishingDraft = quality === "final" && !!prev?.draft?.draft_id && opts.location === undefined;
@@ -584,14 +527,12 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     // A new video prompt is a new shot: the draft no longer stands.
     if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
-    if (opts.voice_track) p.voice_track = opts.voice_track;
     if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
     // A new pace is a new read: the draft no longer stands.
     if (setSpeed(p, opts.voice_speed)) delete p.draft;
-    if (!finishingDraft && setLocation(p, where) && opts.room_url === undefined) delete p.room_url;
+    if (!finishingDraft) setLocation(p, where);
     // Performing it IS the choice: the scene's plan is this actor, generated with Seedance.
     followPlan(sc, project, { actor: actor.id, how: "generate", engine: "seedance", ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
-    if (opts.room_url !== undefined) { if (opts.room_url) p.room_url = opts.room_url; else delete p.room_url; }
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
   const release = () => { running.delete(key); vendorNow.delete(key); };
@@ -705,7 +646,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   let inputs = `final:${perf.draft?.draft_id || ""}`;
   // The location's plate: the room the frame is drawn in and Seedance keeps.
   const locationAbs = !finishing && perf.location ? await locationImage(tenant, perf.location) : undefined;
-  const roomAbs = perf.room_url ? resolveVideoPath(perf.room_url, config.dataDir) : locationAbs;
+  const roomAbs = locationAbs;
   if (!finishing) {
     // The frame: the one picked, else one drawn now.
     if (!frame) {
@@ -740,7 +681,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
     voiceUrl = assetUrl(tenant, projectId, voiceName);
     const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
-    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.room_url || "", perf.location || ""].join("|");
+    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.location || ""].join("|");
   }
   const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot);
 
@@ -769,15 +710,8 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   const raw = `take-performed-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
   await download(result.url, path.join(assetsDir(tenant, projectId), raw));
-  const seedanceUrl = assetUrl(tenant, projectId, raw);
-  // The sound: the exact voice file lined up to the video (default), or
-  // the model's own read.
-  let url = seedanceUrl, offset: number | undefined;
-  if (perf.voice_track === "converted" && voiceUrl) {
-    const name = `take-performed-${actor.id}-s${si + 1}-${quality}-voiced-${stamp()}.mp4`;
-    offset = await layVoice(path.join(assetsDir(tenant, projectId), raw), resolveVideoPath(voiceUrl!, config.dataDir), path.join(assetsDir(tenant, projectId), name), workDir);
-    url = assetUrl(tenant, projectId, name);
-  }
+  // The take is Seedance's own video and sound: the lips were made to it.
+  const url = assetUrl(tenant, projectId, raw);
   const out = await attach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "seedance", quality } });
   if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
   await fs.rm(kept, { force: true }).catch(() => {});
@@ -788,57 +722,9 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     if (quality === "draft") p.draft = { url, ...(result.draftId ? { draft_id: result.draftId } : {}), inputs, made_at: now };
     else p.final = { url, made_at: now };
     if (voiceUrl) p.voice_url = voiceUrl; else delete p.voice_url;
-    p.seedance_url = seedanceUrl;
     p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id ? { voice_id: actor.voice_id } : {}), ...(p.location ? { location: p.location } : {}) };
-    if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
-}
-
-/** Change a performed scene's sound without making it again: "converted"
- *  lays the exact voice file over the video Seedance made (lined up), or
- *  "seedance" puts the model's own read back. Re-attached as the scene's
- *  take. For a scene made before the voice was kept, the voice from its
- *  work folder (the last one made for the scene) is used and kept. */
-export async function revoiceScene(tenant: string, projectId: string, si: number, opts: { voice_track?: "converted" | "seedance" } = {}): Promise<ScenePerformance> {
-  const doAttach = attacher;
-  if (!doAttach) throw new Error("Takes cannot be attached here");
-  const key = `${tenant}/${projectId}/${si}`;
-  if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
-  const { project, scene } = await loadScene(tenant, projectId, si);
-  const perf: ScenePerformance | undefined = scene.performance;
-  const clip = ((project as any).speaker_track?.clips || []).find((c: any) => c.scene_index === si);
-  const take: any = clip ? takeForClip(project as any, clip) : null;
-  if (!perf || !take?.performed_by) throw new Error(`Scene ${si + 1} is not performed by a cast actor`);
-  const track = opts.voice_track || "seedance";
-  const seedanceUrl = perf.seedance_url || take.source;
-  const workDir = path.join(projectDir(tenant, projectId), "_work", `perform-s${si + 1}`);
-  running.add(key);
-  try {
-    let voiceUrl = perf.voice_url;
-    if (!voiceUrl) {
-      const old = path.join(workDir, "voice.mp3");
-      if (!(await fs.stat(old).then(() => true, () => false))) throw new Error(`Scene ${si + 1}'s voice file is gone: perform it again`);
-      const name = `voice-${perf.actor}-s${si + 1}-${stamp()}.mp3`;
-      await fs.copyFile(old, path.join(assetsDir(tenant, projectId), name));
-      voiceUrl = assetUrl(tenant, projectId, name);
-    }
-    let url = seedanceUrl, offset: number | undefined;
-    if (track === "converted") {
-      const name = `take-performed-${perf.actor}-s${si + 1}-${take.performed_by.quality}-voiced-${stamp()}.mp4`;
-      await fs.mkdir(workDir, { recursive: true });
-      offset = await layVoice(resolveVideoPath(seedanceUrl, config.dataDir), resolveVideoPath(voiceUrl, config.dataDir), path.join(assetsDir(tenant, projectId), name), workDir);
-      url = assetUrl(tenant, projectId, name);
-    }
-    const out = await doAttach(tenant, projectId, url, si, { performed_by: take.performed_by });
-    if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
-    return await patch(tenant, projectId, si, (p) => {
-      p.voice_track = track; p.voice_url = voiceUrl; p.seedance_url = seedanceUrl;
-      if (offset !== undefined) p.voice_offset = offset; else delete p.voice_offset;
-      if (take.performed_by.quality === "final" && p.final) p.final.url = url;
-      else if (p.draft) p.draft.url = url;
-    });
-  } finally { running.delete(key); }
 }
 
 /** Put an EARLIER performance of this scene back as its take: a
@@ -866,7 +752,7 @@ export async function restoreSceneTake(tenant: string, projectId: string, si: nu
       const now = new Date().toISOString();
       if (quality === "final") p.final = { url: opts.url, made_at: now };
       else { p.draft = { url: opts.url, ...(opts.draft_id ? { draft_id: String(opts.draft_id) } : {}), inputs: "restored", made_at: now }; delete p.final; }
-      p.seedance_url = opts.url; delete p.voice_url; delete p.voice_offset; p.voice_track = "seedance";
+      delete p.voice_url;
     });
   } finally { running.delete(key); }
 }
@@ -970,7 +856,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
-    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true, !!(s.performance?.room_url || s.performance?.location), !!s.performance?.location);
+    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;
@@ -991,8 +877,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       performance: s.performance || null,
       // What the scene uses when it writes no prompt of its own.
       defaults,
-      actor_clip: s.actor_clip || null,
-      actor_clips: s.actor_clips || (s.actor_clip ? [s.actor_clip] : []),
+      actor_clips: s.actor_clips || [],
       running: running.has(`${tenant}/${projectId}/${i}`),
       vendor: vendorNow.get(`${tenant}/${projectId}/${i}`) || null,
     };
@@ -1003,7 +888,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
  *  the scene's voice. A frame drawn for the shot, a silent Seedance shot at
  *  720p (no draft: a cutaway is short and must look finished), laid over the
  *  scene as a video component from `at` for its length. Returns at once; the
- *  clip lands on the scene (`actor_clip`). */
+ *  clip lands on the scene (`actor_clips`, one per start time). */
 export async function startActorClip(tenant: string, projectId: string, si: number, opts: {
   actor?: string; shot: string; seconds?: number; at?: number;
   /** How long it is ON SCREEN (s). Seedance makes at least 4 s; a montage
@@ -1038,12 +923,10 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
       const p = await loadProject(tenant, projectId);
       const sc: any = (p as any)?.storyboard?.scenes?.[si];
       if (!p || !sc) throw new Error("The scene is gone");
-      sc.actor_clips = Array.isArray(sc.actor_clips) ? sc.actor_clips : (sc.actor_clip ? [sc.actor_clip] : []);
+      sc.actor_clips = Array.isArray(sc.actor_clips) ? sc.actor_clips : [];
       let c = sc.actor_clips.find((x: any) => Number(x?.at || 0) === at);
       if (!c) { c = {}; sc.actor_clips.push(c); sc.actor_clips.sort((a: any, b: any) => Number(a.at || 0) - Number(b.at || 0)); }
       fn(c, sc, p);
-      // The last one touched, for the card that shows one.
-      sc.actor_clip = c;
       p.updated_at = new Date().toISOString();
       await saveProject(p);
       return c;

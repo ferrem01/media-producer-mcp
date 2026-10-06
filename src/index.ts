@@ -2994,13 +2994,12 @@ Rules:
       // GET  /api/actor-test/{tenant}/{project}/{id}   status, steps, file urls
       // POST /api/actor-test/{tenant}/{project}/{id} {action:"collect"}   a Higgsfield job the test stopped waiting for
       // ── API: Scenes performed by cast actors (core/scene-performance.ts) ──
-      // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, its plan and state, any performance; the film's cast_plan
-      // POST /api/scene-performance/{tenant}/{project}            {action:"plan", cast_plan?, scenes?: [{index, performer}]}  (core/cast-plan.ts; nothing is made)
+      // GET  /api/scene-performance/{tenant}/{project}            every scene: who plays it, its plan and state, any performance
+      // POST /api/scene-performance/{tenant}/{project}            {action:"plan", cast_plan? (applied to every scene), scenes?: [{index, performer}]}  (core/cast-plan.ts; nothing is made)
       // POST /api/scene-performance/{tenant}/{project}/{scene}    {action:"frame", actor, shot, frame_prompt?, location?}  (location: a location id, "" none)
       //                                                           {action:"pick", url}
       //                                                           {action:"location", location}  (a location id, "" none: frames drawn there, its plate the room)
       //                                                           {action:"continue", from_scene?}
-      //                                                           {action:"revoice", voice_track?: "converted" | "seedance"}  (the sound, without making it again)
       //                                                           {action:"restore", url, draft_id?}  (an earlier performance of the scene back as its take)
       //                                                           {action:"voice", delivery?, voice_source?}  (hear the voice alone before Seedance: url, pitch)  (the start frame = that scene's last frame; default the scene before)
       //                                                           {action:"perform", actor?, shot?, voice_source?, quality?, frame_prompt?, video_prompt?}
@@ -3013,8 +3012,7 @@ Rules:
         const spTenant = decodeURIComponent(spApi[1]), spProject = decodeURIComponent(spApi[2]);
         try {
           if (method === "GET" && spApi[3] === undefined) {
-            const spProj = await loadProject(spTenant, spProject);
-            jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject), cast_plan: (spProj as any)?.storyboard?.cast_plan || null });
+            jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject) });
             return;
           }
           if (method === "POST" && spApi[3] === undefined) {
@@ -3026,8 +3024,7 @@ Rules:
               ...(body.cast_plan !== undefined ? { cast_plan: body.cast_plan && typeof body.cast_plan === "object" ? body.cast_plan : null } : {}),
               scenes: Array.isArray(body.scenes) ? body.scenes.filter((x: any) => x && Number.isInteger(x.index)).map((x: any) => ({ index: x.index, performer: x.performer && typeof x.performer === "object" ? x.performer : null })) : [],
             });
-            const spProj = await loadProject(spTenant, spProject);
-            jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject), cast_plan: (spProj as any)?.storyboard?.cast_plan || null });
+            jsonResponse(res, 200, { scenes: await getScenePerformances(spTenant, spProject) });
             return;
           }
           if (method === "POST" && spApi[3] !== undefined) {
@@ -3046,11 +3043,6 @@ Rules:
               jsonResponse(res, 200, await restoreSceneTake(spTenant, spProject, si, { url: String(body.url || ""), draft_id: str(body.draft_id) }));
               return;
             }
-            if (body.action === "revoice") {
-              const { revoiceScene } = await import("./core/scene-performance.js");
-              jsonResponse(res, 200, await revoiceScene(spTenant, spProject, si, { voice_track: body.voice_track === "seedance" ? "seedance" : "converted" }));
-              return;
-            }
             if (body.action === "continue") {
               const { continueSceneFrom } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await continueSceneFrom(spTenant, spProject, si, { actor: str(body.actor), from_scene: Number(body.from_scene ?? si - 1), shot: str(body.shot) }));
@@ -3067,10 +3059,8 @@ Rules:
                 actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), video_prompt: str(body.video_prompt),
                 voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined,
                 quality: body.quality === "final" ? "final" : "draft",
-                voice_track: body.voice_track === "seedance" ? "seedance" : body.voice_track === "converted" ? "converted" : undefined,
                 force: body.force === true,
                 delivery: typeof body.delivery === "string" ? body.delivery : undefined,
-                room_url: typeof body.room_url === "string" ? body.room_url : undefined,
                 location: str(body.location),
                 engine: body.engine === "heygen" ? "heygen" : body.engine === "seedance" ? "seedance" : undefined,
                 voice_speed: Number(body.voice_speed) || undefined,
@@ -3094,7 +3084,7 @@ Rules:
               jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined, at: Number(body.at) || undefined, show: Number(body.show) || undefined, location: str(body.location) }));
               return;
             }
-            jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "location", "voice", "perform", "revoice", "restore", "clip", "cast" or "recording"' });
+            jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "location", "voice", "perform", "restore", "clip", "cast" or "recording"' });
             return;
           }
           jsonResponse(res, 405, { error: "Method not allowed" });
@@ -4708,7 +4698,7 @@ Rules:
         // its take answers that (core/cast-plan.ts) -- the board's one line.
         const pg = (project as any).treatment?.filmGrammar;
         const sbScenes: any[] = (project as any).storyboard?.scenes || [];
-        if ((pg === "speaker" || pg === "creator-cut") && ((project as any).storyboard?.cast_plan || sbScenes.some((s) => s?.performer || s?.performance))) {
+        if ((pg === "speaker" || pg === "creator-cut") && sbScenes.some((s) => s?.performer || s?.performance)) {
           const perfRows = await getScenePerformances(tenantId, projectId).catch(() => []);
           for (const r of rows) {
             const p: any = perfRows.find((x: any) => x.scene_index === r.index);

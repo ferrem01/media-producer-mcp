@@ -2,8 +2,7 @@
  * THE CAST PLAN: who performs each person-carried scene, how, with which
  * engine and where (SPEC-cast-scenes.md), on each scene:
  * `storyboard.scenes[i].performer` -- every scene can be someone else, so the
- * film holds no plan of its own (a legacy `storyboard.cast_plan` fills in for
- * old films until their next plan edit). Two functions, three choices:
+ * film holds no plan of its own. Two functions, three choices:
  *
  *   me            record                      (the booth)
  *   a cast member recast my recording         Genjutsu (higgsfield), Kling, HeyGen, Runway
@@ -41,31 +40,23 @@ export interface ResolvedPlan {
   how: PlanHow;
   engine?: string;
   location?: string;
-  /** The fields this scene takes from the film's plan. */
-  from_film: Array<keyof CastPlan>;
   /** No plan anywhere: read off what the scene already plays (a film made
    *  before plans existed reads as what it is, not as stale). */
   inferred?: boolean;
 }
 
-/** A scene's plan: its own fields (a legacy film-wide plan fills in). No how anywhere: a cast
- *  member recasts the scene's recording when there is one, else generates;
- *  nobody named is me, recording. */
+/** A scene's plan, from its own fields. No how: a cast member recasts the
+ *  scene's recording when there is one, else generates; nobody named is me,
+ *  recording. */
 export function resolvePlan(project: Project, si: number, actors: CastActor[] = [], hasRecording = false): ResolvedPlan {
-  const film: CastPlan = (project as any).storyboard?.cast_plan || {};
   const own: CastPlan = (project as any).storyboard?.scenes?.[si]?.performer || {};
-  const from_film: Array<keyof CastPlan> = [];
-  const pick = <K extends keyof CastPlan>(k: K): CastPlan[K] => {
-    if (own[k] !== undefined) return own[k];
-    if (film[k] !== undefined) { from_film.push(k); return film[k]; }
-    return undefined;
-  };
+  const pick = <K extends keyof CastPlan>(k: K): CastPlan[K] => own[k];
   let actor = pick("actor") ?? null;
   let how = pick("how") as PlanHow | undefined;
   // Nothing planned at all: what the scene already is -- its performance
   // (generated), else the recast it plays.
   const sc: any = (project as any).storyboard?.scenes?.[si] || {};
-  const planned = Object.keys(own).length || Object.keys(film).length;
+  const planned = Object.keys(own).length;
   let inferred = false;
   if (!planned) {
     const perf = sc.performance;
@@ -74,7 +65,7 @@ export function resolvePlan(project: Project, si: number, actors: CastActor[] = 
       inferred = true; actor = perf.actor; how = "generate";
       const made = perf.made_with?.engine || "seedance";
       const loc = perf.made_with?.location || perf.location;
-      const out = { actor, how, engine: made, ...(made === "seedance" && loc ? { location: loc } : {}), from_film, inferred };
+      const out = { actor, how, engine: made, ...(made === "seedance" && loc ? { location: loc } : {}), inferred };
       return out as ResolvedPlan;
     }
     if (cast) { inferred = true; actor = cast; how = "recast"; }
@@ -86,15 +77,13 @@ export function resolvePlan(project: Project, si: number, actors: CastActor[] = 
   const engine = how === "record" ? undefined : (named && ENGINES[how].includes(named) ? named : defaultEngine(how, actorObj));
   const loc = pick("location");
   const location = how === "generate" && engine === "seedance" && loc ? loc : undefined;
-  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), from_film, ...(inferred ? { inferred } : {}) };
+  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), ...(inferred ? { inferred } : {}) };
 }
 
-/** One field of a scene's plan as written: its own, else the film's (no
- *  defaults, no checks) -- e.g. the location a Seedance perform uses even
- *  when the plan says recast. */
+/** One field of a scene's plan as written (no defaults, no checks) -- e.g.
+ *  the location a Seedance perform uses even when the plan says recast. */
 export function planField<K extends keyof CastPlan>(project: Project, si: number, k: K): CastPlan[K] {
-  const own: CastPlan = (project as any).storyboard?.scenes?.[si]?.performer || {};
-  return own[k] !== undefined ? own[k] : ((project as any).storyboard?.cast_plan || {})[k];
+  return ((project as any).storyboard?.scenes?.[si]?.performer || {})[k];
 }
 
 /** One line for a board card: "Dana · Generate · Seedance · Loft lounge". */
@@ -142,7 +131,7 @@ export function planState(project: Project, si: number, plan: ResolvedPlan,
 export function cleanPlan(input: Record<string, unknown>, actors: CastActor[], locations: Array<{ id: string }>): Partial<Record<keyof CastPlan, unknown>> {
   const out: Partial<Record<keyof CastPlan, unknown>> = {};
   if (input.actor !== undefined) {
-    // null (or "me"): me, even when the film names an actor; "": the film's.
+    // null (or "me"): me; "": no actor named (the default).
     const a = input.actor === null || input.actor === "me" ? null : String(input.actor);
     if (a && !actors.some((x) => x.id === a)) throw new Error(`No cast actor "${a}"`);
     out.actor = a;
@@ -158,7 +147,7 @@ export function cleanPlan(input: Record<string, unknown>, actors: CastActor[], l
     out.engine = e;
   }
   if (input.location !== undefined) {
-    // null (or "none"): no location, even when the film has one; "": the film's.
+    // null (or "none"): no location; "": unset (the default).
     const l = input.location === null || input.location === "none" ? null : String(input.location);
     if (l && !locations.some((x) => x.id === l)) throw new Error(`No location "${l}"`);
     out.location = l;
@@ -167,8 +156,8 @@ export function cleanPlan(input: Record<string, unknown>, actors: CastActor[], l
 }
 
 /** Write cleaned fields onto a plan object ("" removes a field, back to the
- *  film's; null stays: actor null = me, location null = none, over the
- *  film's). Returns the plan, or undefined when nothing is left. */
+ *  default; null stays: actor null = me, location null = none). Returns the
+ *  plan, or undefined when nothing is left. */
 export function writePlan(plan: CastPlan | undefined, fields: Partial<Record<keyof CastPlan, unknown>>): CastPlan | undefined {
   const p: any = { ...(plan || {}) };
   for (const [k, v] of Object.entries(fields)) {
@@ -181,8 +170,8 @@ export function writePlan(plan: CastPlan | undefined, fields: Partial<Record<key
   return Object.keys(p).length ? p : undefined;
 }
 
-/** Apply a plan edit to a project in memory: the film's plan and/or scenes'
- *  (`performer`: fields to set, or null to follow the film again). Checked
+/** Apply a plan edit to a project in memory: to every scene and/or to some
+ *  (`performer`: fields to set, or null to clear the scene's plan). Checked
  *  against the tenant's cast and locations. Nothing is made. */
 export async function applyPlanEdit(tenant: string, project: Project, edit: {
   /** Applied to EVERY scene (each scene's own plan is written); nothing is
@@ -197,12 +186,6 @@ export async function applyPlanEdit(tenant: string, project: Project, edit: {
   const { listCast } = await import("./cast.js");
   const { listLocations } = await import("./locations.js");
   const [actors, locations] = await Promise.all([listCast(tenant), listLocations(tenant)]);
-  // A film still carrying the old film-level plan: it becomes each scene's
-  // own (a scene's own fields win), and the film keeps none.
-  if (sb.cast_plan) {
-    for (const sc of sb.scenes || []) if (sc) sc.performer = { ...sb.cast_plan, ...(sc.performer || {}) };
-    delete sb.cast_plan;
-  }
   if (edit.cast_plan !== undefined) {
     const fields = edit.cast_plan === null ? null : cleanPlan(edit.cast_plan, actors, locations);
     for (const sc of sb.scenes || []) {

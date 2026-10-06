@@ -201,6 +201,7 @@ export function migrateProject(p: any): Project {
       }
     });
   }
+  if (p && p.storyboard) migrateLegacyCast(p);
   // A speaker board always carries its take needs (idempotent; boards saved
   // before needs existed get them on first load).
   if (p && p.storyboard) ensureSpeakerNeeds(p as Project);
@@ -208,6 +209,29 @@ export function migrateProject(p: any): Project {
   // the generated clips under them on load (self-healing for saved films).
   if (p && p.storyboard) dropVoiceUnderTakes(p as Project);
   return p as Project;
+}
+
+/** Cast shapes retired on Oct 6 (Marc: "no extra garbage"), upgraded in
+ *  place: the film-level `cast_plan` becomes each scene's own plan (a scene's
+ *  own fields win -- plans live per scene); the single `actor_clip` record
+ *  joins `actor_clips`; a performance sheds `voice_track` / `voice_offset` /
+ *  `seedance_url` (the laid-over ElevenLabs file, off the lips, Oct 4) and
+ *  `room_url` (the room reference before Locations). */
+function migrateLegacyCast(p: any): void {
+  const sb = p.storyboard;
+  if (sb.cast_plan) {
+    for (const sc of sb.scenes || []) if (sc) sc.performer = { ...sb.cast_plan, ...(sc.performer || {}) };
+    delete sb.cast_plan;
+  }
+  for (const sc of sb.scenes || []) {
+    if (!sc) continue;
+    if (sc.actor_clip) {
+      if (!Array.isArray(sc.actor_clips) || !sc.actor_clips.length) sc.actor_clips = [sc.actor_clip];
+      delete sc.actor_clip;
+    }
+    const perf = sc.performance;
+    if (perf) for (const k of ["voice_track", "voice_offset", "seedance_url", "room_url"]) delete perf[k];
+  }
 }
 
 export async function loadProject(tenantId: string, projectId: string): Promise<Project | null> {

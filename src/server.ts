@@ -413,17 +413,16 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
 const EDITABLE_BOARD_STATES = new Set<string>(["storyboard", "draft", "generated", "rendered"]);
 
 /** Carry the cast fields of a board across a rebuild of it (core/cast-plan.ts):
- *  the film's cast_plan and, per scene (by index, or by label when the scene
- *  count changed), performer / performance / cast / actor_clip(s). */
+ *  per scene (by index, or by label when the scene count changed),
+ *  performer / performance / cast / actor_clips. */
 export function keepCastFields(before: any, after: any): void {
   if (!before || !after) return;
-  if (before.cast_plan && after.cast_plan === undefined) after.cast_plan = before.cast_plan;
   const was: any[] = before.scenes || [], now: any[] = after.scenes || [];
   const sameShape = was.length === now.length;
   now.forEach((sc, i) => {
     const old = sameShape ? was[i] : was.find((w) => w && w.label && w.label === sc?.label);
     if (!sc || !old) return;
-    for (const k of ["performer", "performance", "cast", "actor_clip", "actor_clips"]) {
+    for (const k of ["performer", "performance", "cast", "actor_clips"]) {
       if (old[k] !== undefined && sc[k] === undefined) sc[k] = old[k];
     }
   });
@@ -631,9 +630,9 @@ export async function queueBuildFromStoryboard(
           if (generatedProject.storyboard) {
             const before: any = origProject.storyboard;
             origProject.storyboard = retarget(generatedProject.storyboard);
-            // Who performs each scene is the user's plan, not the writer's: the
-            // cast plan, each scene's plan, performances, recast casting and
-            // b-roll survive the build (measured live, proj_d872a7e4: the build
+            // Who performs each scene is the user's plan, not the writer's:
+            // each scene's plan, performances, recast casting and b-roll
+            // survive the build (measured live, proj_d872a7e4: the build
             // dropped cast_plan and the film read "Me · Record" again).
             keepCastFields(before, origProject.storyboard);
           }
@@ -1891,16 +1890,14 @@ export function createMcpServer(): McpServer {
     "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). SCENE BY SCENE (one film can mix them): perform_scene -- a cast actor performs ONE scene with no recording: a start frame drawn for the shot (start_frame first to see and redraw it -- cheap), the scene's line voiced in the actor's ElevenLabs voice (voice_source script) or the scene's recording converted to it (take: the delivery kept), Seedance 2.5 performs it, attached as that scene's take (quality draft = 480p preview ~2 min; then final = the same shot at 1080p); recast with scenes:[...] -- only those scenes' recordings, performed one-to-one (Higgsfield) and those scenes cast as the actor; hear_voice -- the scene's voice alone, before any video (a delivery with v4 tags, pauses, CAPS, /IPA/); continue_from -- the scene starts from another scene's LAST frame (default the one before), so they link without a jump; scene_cast -- who plays a scene (an actor, 'recording', or 'film' to follow the film); actor_clip -- b-roll of the actor, no speech, over a scene (shot, seconds, at); scenes -- every scene's performer, its PLAN (set with the update tool's storyboard cast_plan / scenes[].performer: who, how, engine, where) and state (ready / todo / stale: made for another plan), and any job. A perform_scene or start_frame with no actor or location uses the plan's; choosing one there writes it into the scene's plan. LOCATIONS (Seedance only; a HeyGen look is its own setting): a tenant library of sets, each a clean plate (the room with nobody in it) -- add_location from a prompt (drawn), or an image (a frame of a take: the person is removed; clean:false keeps it as is), async: it lists as 'drawing' until it lands; locations lists them; scene_location sets a scene's (or pass location on start_frame / perform_scene). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the ElevenLabs voice a recast converts to, '' clears -- or sheet), remove_actor, voices, recast, generate, status, clear (back to the recording). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
     {
       tenant_id: z.string(),
-      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "voices", "recast", "generate", "status", "clear", "scenes", "start_frame", "continue_from", "pick_frame", "hear_voice", "perform_scene", "revoice", "scene_cast", "actor_clip", "locations", "add_location", "remove_location", "scene_location"]),
+      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "voices", "recast", "generate", "status", "clear", "scenes", "start_frame", "continue_from", "pick_frame", "hear_voice", "perform_scene", "scene_cast", "actor_clip", "locations", "add_location", "remove_location", "scene_location"]),
       voice_speed: z.number().min(0.8).max(1.25).optional().describe("hear_voice / perform_scene: how fast the line is read (1 = as voiced; 1.1-1.2 is a fast creator pace). A tempo change, pitch kept, kept on the scene."),
       engine: z.enum(["seedance", "heygen"]).optional().describe("perform_scene: who makes it -- seedance (a frame, a location, a 480p draft then the 1080p final) or heygen (a HeyGen look speaks the line; the look is the setting; one render, no draft). Omitted: the scene's plan, else the best for the actor (HeyGen for a look)."),
       location: z.string().optional().describe("start_frame / perform_scene / scene_location / actor_clip ('' = a one-off place the shot describes): the LOCATION the scene is set in (a location id from action='locations'; '' none) -- the start frame is drawn in that room and its clean plate goes to Seedance as the room reference, so the room holds from scene to scene. remove_location: the location to remove."),
       clean: z.boolean().optional().describe("add_location with image: false keeps the image as it is (default: the person is removed -- a clean plate pins the room, not a pose)."),
       shape: z.enum(["wide", "tall", "square"]).optional().describe("add_location: the plate's shape (default wide from a prompt, the image's own from an image)."),
-      room_url: z.string().optional().describe("perform_scene: the ROOM reference -- an image asset of this film (usually the first scene's drawn frame) sent with the take as the last reference image, so the room, couch and windows stay the same from scene to scene. '' for none."),
       delivery: z.string().optional().describe("hear_voice / perform_scene with voice_source script: HOW the line is said, read by ElevenLabs v4 -- the line with tags in brackets ([excited], [whispers], [sighs], [laughs], [sarcastic]), '...' or dashes for pauses (no <break> tags), CAPITALS for emphasis, /IPA/ for a pronunciation. Kept apart from the script (never in captions). '' back to the plain line."),
       force: z.boolean().optional().describe("perform_scene: make it even if the PITCH CHECK stops it (the voice more than 10% off the actor's other scenes in this film; the scene's performance.pitch_check says by how much). Nothing is sent to Seedance when the check stops a scene."),
-      voice_track: z.enum(["converted", "seedance"]).optional().describe("perform_scene / revoice: the sound -- 'seedance' (default) keeps the model's own read, the only track the lips were made to; 'converted' lays the exact voice file over the video (it does not hold lip sync: Seedance re-performs the line)."),
       from_scene: z.number().int().min(0).optional().describe("continue_from: the scene whose LAST frame starts this one (0-based; default the scene before) -- the two scenes link without a jump."),
       scene_index: z.number().int().min(0).optional().describe("start_frame / pick_frame / perform_scene / scene_cast / actor_clip: the scene (0-based)."),
       scenes: z.array(z.number().int().min(0)).optional().describe("recast / clear: only these scenes (0-based); the rest of the film stays as it is."),
@@ -1975,13 +1972,11 @@ export function createMcpServer(): McpServer {
             return ok({ ...(await startRecast(t, needProject(), needActor(), { performer: params.performer, voice_id: params.voice_id, fresh: params.fresh === true, motion: params.motion, scenes: params.scenes })), message: "Running. Poll action='status'." });
           case "scenes": {
             const sp = await import("./core/scene-performance.js");
-            const proj = await loadProject(t, needProject());
-            return ok({ cast_plan: (proj as any)?.storyboard?.cast_plan || null, scenes: await sp.getScenePerformances(t, needProject()), studio_url: previewUrl(t, needProject()) });
+            return ok({ scenes: await sp.getScenePerformances(t, needProject()), studio_url: previewUrl(t, needProject()) });
           }
           case "start_frame":
           case "continue_from":
           case "hear_voice":
-          case "revoice":
           case "pick_frame":
           case "perform_scene":
           case "actor_clip":
@@ -1992,10 +1987,9 @@ export function createMcpServer(): McpServer {
             const pid = needProject(), si = params.scene_index;
             if (params.action === "start_frame") return ok({ ...(await sp.startSceneFrame(t, pid, si, { actor: params.actor, shot: params.shot, frame_prompt: params.frame_prompt, location: params.location })), message: "Drawing (~20-60 s). Poll action='scenes'; redraw with another start_frame, or pick_frame an earlier one." });
             if (params.action === "hear_voice") return ok({ ...(await sp.previewSceneVoice(t, pid, si, { actor: params.actor, voice_source: params.voice_source, delivery: params.delivery, voice_id: params.voice_id, voice_speed: params.voice_speed })), message: "The voice alone (no video made): listen to url. perform_scene when it is right." });
-            if (params.action === "revoice") return ok({ ...(await sp.revoiceScene(t, pid, si, { voice_track: params.voice_track })), message: "The scene's sound is changed and re-attached; nothing was made again." });
             if (params.action === "continue_from") return ok({ ...(await sp.continueSceneFrom(t, pid, si, { actor: params.actor, from_scene: params.from_scene ?? si - 1, shot: params.shot })), message: "The start frame is that scene's last frame. perform_scene next." });
             if (params.action === "pick_frame") { if (!params.frame_url) return err("frame_url is required"); return ok(await sp.pickSceneFrame(t, pid, si, params.frame_url)); }
-            if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, quality: params.quality, frame_prompt: params.frame_prompt, video_prompt: params.video_prompt, voice_track: params.voice_track, force: params.force === true, delivery: params.delivery, room_url: params.room_url, location: params.location, engine: params.engine, motion: params.motion, voice_speed: params.voice_speed })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
+            if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, quality: params.quality, frame_prompt: params.frame_prompt, video_prompt: params.video_prompt, force: params.force === true, delivery: params.delivery, location: params.location, engine: params.engine, motion: params.motion, voice_speed: params.voice_speed })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
             if (params.action === "scene_location") return ok({ ...(await sp.setSceneLocation(t, pid, si, String(params.location ?? ""))), message: params.location ? "Set. The next frame is drawn there and every take sends its plate as the room." : "Cleared." });
             if (params.action === "actor_clip") return ok({ ...(await sp.startActorClip(t, pid, si, { actor: params.actor, shot: String(params.shot || ""), seconds: params.seconds, at: params.at, show: params.show, location: params.location })), message: "Making the clip (~3-5 min). Poll action='scenes'." });
             const { setSceneCast } = await import("./core/recast.js");

@@ -164,7 +164,7 @@ describe("a scene performed by a cast actor", () => {
     }));
     const sp = await import("../src/core/scene-performance.js");
     await sp.startActorClip(T, P, 1, { actor: "dana", shot: "Sips a coffee at her desk, looking out the window", seconds: 6, at: 1.5 });
-    await until(async () => (await sp.getScenePerformances(T, P))[1].actor_clip?.status === "done");
+    await until(async () => (await sp.getScenePerformances(T, P))[1].actor_clips?.[0]?.status === "done");
     expect(atlas[0]).toMatchObject({ draft: false, resolution: "720p", duration: 6 });
     expect(atlas[0].reference_audios).toBeUndefined();
     expect(atlas[0].prompt).toMatch(/no music, no speech/);
@@ -195,6 +195,7 @@ describe("a scene performed by a cast actor", () => {
     clips = p2.storyboard.scenes[1].components.filter((c: any) => c.data?.actor_clip);
     expect(clips.map((c: any) => [c.enter.at, c.exit.at])).toEqual([[1.5, 7.5], [0, 1.2]]);
     expect(p2.storyboard.scenes[1].actor_clips.map((c: any) => c.at)).toEqual([0, 1.5]);
+    expect(p2.storyboard.scenes[1].actor_clip).toBeUndefined();   // one list, no "last one touched" copy
   }, 60000);
 });
 
@@ -263,67 +264,6 @@ describe("linking scenes: start from the last frame", () => {
     expect(info).toMatch(/720x1280/);                          // 270x480 take, cut and scaled to the 9:16 frame
     await expect(sp.continueSceneFrom(T, P, 1, { actor: "dana", from_scene: 1 })).rejects.toThrow(/another scene/);
     await expect(sp.continueSceneFrom(T, P, 0, { actor: "dana", from_scene: 1 })).rejects.toThrow(/no take to continue from/);
-  }, 60000);
-});
-
-describe("one voice in every scene: the exact file laid over the video", () => {
-  it("finds the offset between the video's read and the voice file", async () => {
-    const { bestLag } = await import("../src/core/scene-performance.js");
-    const voice = new Float32Array(300); for (let i = 40; i < 60; i++) voice[i] = 1; for (let i = 150; i < 190; i++) voice[i] = 0.7;
-    const video = new Float32Array(320); for (let i = 40; i < 60; i++) video[i + 12] = 1; for (let i = 150; i < 190; i++) video[i + 12] = 0.7;
-    expect(bestLag(video, voice).lag).toBeCloseTo(0.12, 5);
-    expect(bestLag(new Float32Array(300).fill(0.5), voice).lag).toBe(0);   // nothing to line up to: left as is
-  });
-
-  it("lays the voice file over the video, shifted to the video's read, as long as the video", async () => {
-    const d = path.join(DATA, "_lay"); await fs.mkdir(d, { recursive: true });
-    const vid = path.join(d, "v.mp4"), voice = path.join(d, "voice.mp3"), out = path.join(d, "out.mp4");
-    // The video's own read: a tone from 1.0 s; the voice file: the same from 0.8 s.
-    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=160x284:rate=24:duration=4", "-f", "lavfi", "-i", "aevalsrc='if(between(t,1,1.6),sin(2*PI*330*t),0)':s=48000:d=4",
-      "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", vid]);
-    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc='if(between(t,0.8,1.4),sin(2*PI*220*t),0)':s=48000:d=3", "-c:a", "libmp3lame", voice]);
-    const { layVoice } = await import("../src/core/scene-performance.js");
-    const lag = await layVoice(vid, voice, out, d);
-    expect(lag).toBeGreaterThan(0.15); expect(lag).toBeLessThan(0.25);
-    const info = await run("ffmpeg", ["-hide_banner", "-i", out]).then(() => "", (e: any) => String(e.stderr));
-    expect(info).toMatch(/Duration: 00:00:0(3\.9|4\.0)/);
-    // The tone now starts at ~1.0 s, under the video's read.
-    const pcm = path.join(d, "o.raw");
-    await run("ffmpeg", ["-y", "-loglevel", "error", "-i", out, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", pcm]);
-    const b = await fs.readFile(pcm);
-    let first = -1;
-    for (let i = 0; i < b.length / 2; i++) if (Math.abs(b.readInt16LE(i * 2)) > 3000) { first = i / 16000; break; }
-    expect(first).toBeGreaterThan(0.9); expect(first).toBeLessThan(1.1);
-  }, 60000);
-
-  it("revoice: an existing scene gets the voice file from its work folder, laid and re-attached; 'seedance' puts the model's read back", async () => {
-    const m = await media(path.join(DATA, "_media5"));
-    const pdir = path.join(DATA, T, "projects", P);
-    await fs.writeFile(path.join(pdir, "assets", "perf2.mp4"), m.mp4);
-    await fs.mkdir(path.join(pdir, "_work", "perform-s3"), { recursive: true });
-    await fs.writeFile(path.join(pdir, "_work", "perform-s3", "voice.mp3"), m.mp3);
-    const pf = path.join(pdir, "project.json");
-    const disk = JSON.parse(await fs.readFile(pf, "utf8"));
-    disk.storyboard.scenes[2] = { label: "Three", purpose: "", template: "", voiceover_text: "x", components: [],
-      performance: { actor: "dana", shot: "couch", voice_source: "take", draft: { url: `/assets/${T}/projects/${P}/assets/perf2.mp4`, inputs: "", made_at: "" }, status: "done" } };
-    const src = `/assets/${T}/projects/${P}/assets/perf2.mp4`;
-    disk.takes = [...(disk.takes || []), { id: "take_9", scene_index: 2, source: src, recorded_at: "", performed_by: { actor: "dana", engine: "seedance", quality: "draft" } }];
-    disk.speaker_track = { clips: [...(disk.speaker_track?.clips || []).filter((c: any) => c.scene_index !== 2), { source: src, scene_index: 2, start: 0 }] };
-    await fs.writeFile(pf, JSON.stringify(disk));
-    const sp = await import("../src/core/scene-performance.js");
-    const attached: any[] = [];
-    sp.registerSceneAttacher(async (tenant, proj, url, si, extra) => { attached.push({ url, si, extra }); return { status: 200, body: {} }; });
-    let perf = await sp.revoiceScene(T, P, 2, { voice_track: "converted" });
-    expect(attached[0]).toMatchObject({ si: 2, extra: { performed_by: { actor: "dana", quality: "draft" } } });
-    expect(attached[0].url).toMatch(/take-performed-dana-s3-draft-voiced-.*\.mp4$/);
-    expect(perf.voice_url).toMatch(/voice-dana-s3-.*\.mp3$/);
-    expect(perf.seedance_url).toBe(src);
-    expect(perf.voice_track).toBe("converted");
-    expect(perf.draft!.url).toBe(attached[0].url);
-    perf = await sp.revoiceScene(T, P, 2, { voice_track: "seedance" });
-    expect(attached[1].url).toBe(src);
-    expect(perf.voice_track).toBe("seedance");
-    await expect(sp.revoiceScene(T, P, 1)).rejects.toThrow(/not performed/);
   }, 60000);
 });
 
@@ -407,38 +347,11 @@ describe("delivery: how the line is said (ElevenLabs v4)", () => {
 });
 
 describe("the room reference: the same room in every scene", () => {
-  it("labels the room as the last reference image and sends it with the take", async () => {
+  it("labels the room (a location's plate) as the last reference image", async () => {
     const sd = await import("../src/core/seedance.js");
     expect(sd.seedanceRefs(3, true, false, true)).toBe("@Image1 is the first frame of the video. @Image2 is the character sheet (the same person). @Image3 is the room: keep this exact room, furniture, plants, windows and light throughout. @Audio1 is the reference audio.");
     expect(sd.seedanceRefs(2, true, false, true)).toBe("@Image1 is the first frame of the video. @Image2 is the room: keep this exact room, furniture, plants, windows and light throughout. @Audio1 is the reference audio.");
-    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
-    const m = await media(path.join(DATA, "_media9"));
-    const pdir = path.join(DATA, T, "projects", P);
-    await fs.writeFile(path.join(pdir, "assets", "room.png"), m.png);
-    const room = `/assets/${T}/projects/${P}/assets/room.png`;
-    const atlas: any[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
-      const u = String(url);
-      if (u.includes("/text-to-speech/")) return new Response(m.mp3);
-      if (u.endsWith("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
-      if (u.endsWith("/generateVideo")) { atlas.push(JSON.parse(init.body)); return new Response(JSON.stringify({ data: { id: "rm1" } })); }
-      if (u.includes("/prediction/")) return new Response(JSON.stringify({ data: { status: "completed", outputs: ["https://cdn/rm.mp4"], draft_id: "rmd" } }));
-      if (u === "https://cdn/rm.mp4") return new Response(m.mp4);
-      throw new Error("unexpected fetch " + u);
-    }));
-    const sp = await import("../src/core/scene-performance.js");
-    sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
-    await expect(sp.startScenePerformance(T, P, 1, { actor: "dana", voice_source: "script", room_url: "/assets/elsewhere/x.png" })).rejects.toThrow(/image asset of this film/);
-    await sp.startScenePerformance(T, P, 1, { actor: "dana", voice_source: "script", room_url: room, video_prompt: "", force: true });
-    await until(async () => (await sp.getScenePerformances(T, P))[1].performance?.status !== "running", 40000);
-    const s2 = (await sp.getScenePerformances(T, P))[1];
-    expect(s2.performance.error).toBeUndefined();
-    expect(s2.performance.room_url).toBe(room);
-    expect(atlas[0].reference_images).toHaveLength(3);
-    expect(atlas[0].reference_images[2]).toMatch(/_perform\/.*room\.png$/);
-    expect(atlas[0].prompt).toMatch(/@Image3 is the room: keep this exact room/);
-    expect(s2.defaults.video_prompt).toMatch(/@Image3 is the room/);
-  }, 90000);
+  });
 });
 
 describe("locations: a clean plate per set, the room of every take made there", () => {
@@ -487,13 +400,12 @@ describe("locations: a clean plate per set, the room of every take made there", 
     expect(calls.edits).toHaveLength(1);
     expect((await loc.listLocations(T)).map((l) => l.id)).toEqual(["loft-lounge", "office", kept.id]);
 
-    // A scene set there: the old raw room yields, the frame is drawn in the plate.
+    // A scene set there: the frame is drawn in the plate.
     const sp = await import("../src/core/scene-performance.js");
     sp.registerSceneAttacher(async () => ({ status: 200, body: {} }));
     await expect(sp.setSceneLocation(T, P, 1, "attic")).rejects.toThrow(/No location "attic"/);
     const set = await sp.setSceneLocation(T, P, 1, "loft-lounge");
     expect(set.location).toBe("loft-lounge");
-    expect(set.room_url).toBeUndefined();
     expect(set.frame).toBeUndefined();
     expect(set.draft).toBeUndefined();
     const s1 = (await sp.getScenePerformances(T, P))[1];
@@ -537,7 +449,6 @@ describe("an earlier performance back as the scene's take", () => {
     const perf = await sp.restoreSceneTake(T, P, 0, { url, draft_id: "d-old" });
     expect(attached[0]).toEqual({ url, si: 0, extra: { performed_by: { actor: "dana", engine: "seedance", quality: "draft" } } });
     expect(perf.draft).toMatchObject({ url, draft_id: "d-old" });
-    expect(perf.voice_track).toBe("seedance");
     expect(perf.final).toBeUndefined();
     await expect(sp.restoreSceneTake(T, P, 1, { url })).rejects.toThrow(/not a performance of scene 2/);
     await expect(sp.restoreSceneTake(T, P, 0, { url: `/assets/${T}/projects/${P}/assets/take-performed-dana-s1-draft-gone.mp4` })).rejects.toThrow(/gone/);
@@ -604,18 +515,20 @@ describe("cast scene by scene", () => {
 });
 
 describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
-  it("resolves a scene's plan over the film's, picks engines, writes a line, and says ready / todo / stale", async () => {
+  it("resolves a scene's own plan (an old film-level plan moved onto the scenes on load), picks engines, writes a line, and says ready / todo / stale", async () => {
     const cp = await import("../src/core/cast-plan.js");
+    const { migrateProject } = await import("../src/persistence/project.js");
     const actors: any[] = [{ id: "dana", name: "Dana" }, { id: "marc-look", name: "Marc look", heygen_look_id: "hl1" }];
     const locs = [{ id: "loft", name: "Loft lounge" }];
-    const proj: any = { storyboard: { cast_plan: { actor: "dana", how: "generate", location: "loft" }, scenes: [
+    const proj: any = migrateProject({ storyboard: { cast_plan: { actor: "dana", how: "generate", location: "loft" }, scenes: [
       {}, { performer: { location: null } }, { performer: { actor: null } }, { performer: { how: "recast" } }, { performer: { actor: "marc-look" } },
-    ] } };
+    ] } });
+    expect(proj.storyboard.cast_plan).toBeUndefined();                       // plans live on the scenes
+    expect(proj.storyboard.scenes[1].performer).toEqual({ actor: "dana", how: "generate", location: null });   // a scene's own field wins
     const r0 = cp.resolvePlan(proj, 0, actors);
     expect(r0).toMatchObject({ actor: "dana", how: "generate", engine: "seedance", location: "loft" });
-    expect(r0.from_film.sort()).toEqual(["actor", "how", "location"]);
     expect(cp.planLine(r0, actors, locs)).toBe("Dana · Generate · Seedance · Loft lounge");
-    expect(cp.resolvePlan(proj, 1, actors).location).toBeUndefined();          // none, over the film's
+    expect(cp.resolvePlan(proj, 1, actors).location).toBeUndefined();          // none
     expect(cp.resolvePlan(proj, 2, actors)).toMatchObject({ actor: null });
     expect(cp.planLine(cp.resolvePlan(proj, 3, actors), actors)).toBe("Dana · Recast · Genjutsu");   // a location means nothing to a recast
     expect(cp.resolvePlan(proj, 4, actors)).toMatchObject({ actor: "marc-look", engine: "heygen" });  // a look is its own setting
@@ -628,7 +541,7 @@ describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
 
     // No plan anywhere (a film made before plans): read off what each scene plays.
     const legacy: any = { speaker_cast: null, storyboard: { scenes: [
-      { performance: { actor: "dana", draft: { url: "x" }, room_url: "/r.jpg" } }, { cast: "dana" }, {},
+      { performance: { actor: "dana", draft: { url: "x" } } }, { cast: "dana" }, {},
     ] } };
     expect(cp.resolvePlan(legacy, 0, actors)).toMatchObject({ actor: "dana", how: "generate", engine: "seedance", inferred: true });
     expect(cp.planState(legacy, 0, cp.resolvePlan(legacy, 0, actors), { performed_by: { actor: "dana", engine: "seedance" } }, true).state).toBe("ready");
@@ -650,7 +563,7 @@ describe("the cast plan: who, how, engine, where -- on the storyboard", () => {
     proj.storyboard.scenes[3].cast = "dana";
     expect(cp.planState(proj, 3, rec, { recast_by: ["dana"] }, true).state).toBe("ready");
 
-    // Edits: checked, '' back to the film's, null kept.
+    // Edits: checked, '' back to the default, null kept.
     expect(() => cp.cleanPlan({ actor: "nobody" }, actors, locs)).toThrow(/No cast actor "nobody"/);
     expect(() => cp.cleanPlan({ location: "attic" }, actors, locs)).toThrow(/No location "attic"/);
     expect(() => cp.cleanPlan({ how: "dance" }, actors, locs)).toThrow(/how must be/);
@@ -774,10 +687,10 @@ describe("a scene's state follows its own plan", () => {
     await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done", 40000);
     let s = await sp.getScenePerformances(T, P3);
     expect(s[0]).toMatchObject({ state: "ready", plan_line: "Dana · Generate · Seedance" });
-    expect(s[0].performer).toBeNull();                                     // it followed the film's plan
+    expect(s[0].performer).toMatchObject({ actor: "dana", how: "generate" });   // the film's old plan, moved onto the scene on load
 
     // The plan for scene 1 becomes Dana generated: stale until performed. (The
-    // first edit also moves the film's old plan onto its scenes.)
+    // save writes the moved plan: the file keeps no film-level one.)
     await sp.editCastPlan(T, P3, { scenes: [{ index: 1, performer: { actor: "dana", how: "generate" } }] });
     expect(JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P3, "project.json"), "utf8")).storyboard.cast_plan).toBeUndefined();
     s = await sp.getScenePerformances(T, P3);
