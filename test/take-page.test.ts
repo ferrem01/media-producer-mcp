@@ -356,3 +356,71 @@ describe("the booth keeps to one scene: films are chosen in Studio (SPEC-remote-
     expect(html).toContain('<p><a class="link" id="studioLinkTop" href="#">← Back to Studio</a></p>');
   });
 });
+
+describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
+  it("picks the next scene with lines and no take, wrapping round; none when all are done", async () => {
+    const { NEXT_SCENE_JS } = await import("../src/take-page.js");
+    const next = new Function(NEXT_SCENE_JS + "; return nextOpenScene;")() as (s: any[], t: number[], f: number) => number;
+    const s = [{ lines: true }, { lines: true }, { lines: false }, { lines: true }];
+    expect(next(s, [0], 0)).toBe(1);
+    expect(next(s, [0, 1], 1)).toBe(3);          // a scene with no lines is skipped
+    expect(next(s, [1, 3], 3)).toBe(0);          // wraps to an earlier one still open
+    expect(next(s, [0, 1, 3], 3)).toBe(-1);
+    const html = getTakeHtml();
+    expect(html).not.toContain("Desktop Studio");
+    expect(html.match(/id="studioLink"/g)).toHaveLength(1);
+  });
+
+  it("records a scene, attaches it, and Next scene opens the next unrecorded one on the same page", async () => {
+    const closers: Array<() => Promise<void>> = [];
+    const { chromium, devices } = await import("playwright");
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined, args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+    try {
+      const ctx = await browser.newContext({ ...devices["iPhone 13"], permissions: ["camera", "microphone"] });
+      const page = await ctx.newPage();
+      const errors: string[] = []; page.on("pageerror", (e) => errors.push(e.message));
+      const proj = { name: "T", canvas: { width: 1080, height: 1920 }, treatment: { filmGrammar: "creator-cut" }, scenes: [],
+        takes: [{ id: "t1", scene_index: 1, source: "/a.mp4" }],
+        storyboard: { scenes: [
+          { label: "Hook", duration_seconds: 3, voiceover_text: "One." },
+          { label: "Signal one", duration_seconds: 3, voiceover_text: "Two." },
+          { label: "Signal two", duration_seconds: 3, voiceover_text: "Three." } ] } };
+      const attached: any[] = [];
+      const http = await import("node:http");
+      const server = http.createServer((req, res) => {
+        const u = req.url || "";
+        let body = ""; req.on("data", (c) => { body += c; });
+        req.on("end", () => {
+          if (u.startsWith("/api/projects/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(proj)); return; }
+          if (u.startsWith("/api/upload-asset/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ url: "/assets/t/projects/p/assets/take.webm" })); return; }
+          if (u.startsWith("/api/take/")) { attached.push(JSON.parse(body)); res.writeHead(200, { "content-type": "application/json" }); res.end("{}"); return; }
+          res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+        });
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+      closers.push(() => new Promise<void>((r) => server.close(() => r())));
+      const port = (server.address() as any).port;
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=0`);
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      await page.click("#recordBtn");
+      await page.waitForSelector("#goBtn", { state: "visible", timeout: 8000 });
+      await page.click("#goBtn");
+      await page.waitForSelector("#stopBtn", { state: "visible", timeout: 8000 });
+      await page.waitForTimeout(4500);                                        // count-in, then a beat of recording
+      await page.click("#stopBtn");
+      await page.waitForSelector("#useBtn", { state: "visible", timeout: 8000 });
+      await page.click("#useBtn");
+      await page.waitForSelector("#nextBtn", { state: "visible", timeout: 10000 });
+      expect(attached[0].scene_index).toBe(0);
+      // Scene 2 already has a take: Next skips to scene 3.
+      expect(await page.textContent("#nextBtn")).toBe("Next: Scene 3 · Signal two");
+      expect(await page.getAttribute("#studioLink", "class")).toBe("btn ghost");
+      await page.click("#nextBtn");
+      await page.waitForFunction(() => document.getElementById("ready")!.classList.contains("on") && /Scene 3/.test(document.getElementById("title")!.textContent || ""), null, { timeout: 8000 });
+      expect(new URL(page.url()).searchParams.get("scene")).toBe("2");
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 8000 });
+      expect(await page.textContent("#script")).toContain("Three.");
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); for (const c of closers) await c(); }
+  }, 90000);
+});
