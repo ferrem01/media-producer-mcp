@@ -97,6 +97,6 @@ describe("a voice on one channel plays centered", () => {
     const src = (f: string) => fs.readFile(path.join(__dirname, "..", "src", f), "utf8");
     expect(await src("core/take-sanitize.ts")).toMatch(/const pan = await deadChannelPan\(filePath\);/);
     const base = await src("core/speaker-track.ts");
-    expect(base.match(/await centerDeadChannel\(outputPath\)/g)?.length).toBe(2); // single clip and concat paths
+    expect(base.match(/await centerDeadChannel\(outputPath\)/g)?.length).toBe(3); // single clip, concat and slotted paths
   });
 });
