@@ -3195,6 +3195,17 @@ ${QUOTIENT_CSS}
       // makes a take revalidate; the fresh file comes down).
       var gradeKey = function(pr) { return ((pr && pr.takes) || []).map(function(t) { return [t.graded_at || '', t.blur || '', t.blur_strength == null ? '' : t.blur_strength, t.alpha || ''].join(','); }).join('|'); };
       var regraded = gradeKey(state.currentProject) !== gradeKey(project);
+      // A take or recast landed, or a take was trimmed or cut outside
+      // Studio: the words, the waveform and the take pictures are all
+      // derived from the speaker lane, and each was fetched once per film.
+      // The preview reloaded but the lanes kept the pre-take words and wave
+      // (Marc, Oct 6: "it updates the preview area but the scrubber is not
+      // updated"). Drop them; the composite-ready pass fetches them again.
+      var laneChanged = speakerLaneKey(state.currentProject) !== speakerLaneKey(project);
+      if (laneChanged) {
+        state._transcript = null; state._transcriptFor = null;
+        state._wavePeaks = null; state._wavePeaksFor = null; state._wavePeaksLoading = null;
+      }
       state.currentProject = project;
       state.totalDuration = calcTotalDuration();
       if (state.masterTime > state.totalDuration) state.masterTime = Math.max(0, state.totalDuration - 0.1);
@@ -3215,6 +3226,13 @@ ${QUOTIENT_CSS}
     }).catch(function() {});
   }
   liveSync.timer = setInterval(liveSyncTick, 4000);
+  // What the speaker lane is made of: which file each scene plays, and each
+  // take's trim and cuts. Any change makes the lane's words and wave stale.
+  function speakerLaneKey(pr) {
+    var clips = ((pr && pr.speaker_track && pr.speaker_track.clips) || []).map(function(c) { return [c.scene_index, c.source, c.trim_start || 0, c.trim_end || 0].join(','); });
+    var takes = ((pr && pr.takes) || []).map(function(t) { return [t.id, t.trim_start || 0, t.trim_end || 0, (t.cuts || []).length].join(','); });
+    return clips.join('|') + '#' + takes.join('|');
+  }
 
   // Load a specific project
   function loadProject(projectId) {
@@ -8094,7 +8112,12 @@ ${QUOTIENT_CSS}
         // The take behind the clip (the clip may play a blur, recast or cut copy of it).
         var tk = sceneTakeFor(si);
         if (tk) {
-          blk.style.backgroundImage = 'url(' + '/api' + withToken('/take-poster/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '/' + encodeURIComponent(tk.id)) + ')';
+          // Keyed by the file the clip plays: the server stills the recast
+          // (not the recording) once one lands, and a new key skips the
+          // browser's copy of the old picture.
+          var posterUrl = '/api' + withToken('/take-poster/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '/' + encodeURIComponent(tk.id));
+          posterUrl += (posterUrl.indexOf('?') === -1 ? '?' : '&') + 'v=' + encodeURIComponent(String(c.source || '').split('/').pop());
+          blk.style.backgroundImage = 'url(' + posterUrl + ')';
           blk.style.backgroundSize = 'auto 100%';
           blk.style.backgroundRepeat = 'repeat-x';
           blk.title = 'Take for scene ' + (si + 1) + ' \u2014 ' + d0.toFixed(1) + 's. Click: trim or cut it. Drag an edge to trim. Shift-click words to cut them.';

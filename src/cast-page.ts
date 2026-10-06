@@ -136,7 +136,7 @@ export function getCastHtml(): string {
     </div>
   </main>`;
   const script = `
-  var actors = [], voices = { elevenlabs: [], heygen: [] }, tab = 'gen', looks = null, pub = null, pubToken = null, audio = null;
+  var actors = [], voices = { elevenlabs: [], heygen: [] }, tab = 'gen', looks = null, pub = null, pubToken = null, pubGender = '', audio = null;
   function start() {
     railApi('/api/cast/' + enc(tenant) + '/voices').then(function (v) { voices = v || voices; render(); }).catch(function () {});
     load();
@@ -219,16 +219,23 @@ export function getCastHtml(): string {
     var list = t === 'looks' ? looks : pub;
     if (!list) {
       body.innerHTML = '<div class="empty">Loading&#8230;</div>';
-      railApi('/api/heygen-avatars/' + enc(tenant) + (t === 'looks' ? '?looks=1' : '?public=1')).then(function (r) {
+      railApi('/api/heygen-avatars/' + enc(tenant) + (t === 'looks' ? '?looks=1' : pubQuery(''))).then(function (r) {
         var got = (r.looks || []).filter(function (l) { return !l.status || l.status === 'completed'; });
         if (t === 'looks') looks = got; else { pub = got; pubToken = r.next_token || null; }
         if (tab === t) showTab(t);
       }).catch(function (e) { body.innerHTML = '<div class="empty"></div>'; body.firstChild.textContent = e.message || String(e); });
       return;
     }
-    if (!list.length) { body.innerHTML = '<div class="empty">' + (t === 'looks' ? 'No looks on your HeyGen account.' : 'No presenters.') + '</div>'; return; }
-    body.innerHTML = '<p class="sub" style="margin:0 0 10px">Click one to add it. A look is its own setting: HeyGen draws the person and the place.</p><div class="looks" id="lookGrid"></div>'
+    // Presenters: who to browse. HeyGen lists one person's looks together
+    // and cannot filter, so the server pages on until it has some of them.
+    var genders = t === 'pub' ? '<div class="tabs" id="pubGender" style="margin:0 0 10px">'
+      + [['', 'Everyone'], ['female', 'Women'], ['male', 'Men']].map(function (g) {
+        return '<button class="btn small' + (pubGender === g[0] ? ' on' : '') + '" data-gender="' + g[0] + '">' + g[1] + '</button>';
+      }).join('') + '</div>' : '';
+    if (!list.length) { body.innerHTML = genders + '<div class="empty">' + (t === 'looks' ? 'No looks on your HeyGen account.' : 'No presenters.') + '</div>'; bindGender(); return; }
+    body.innerHTML = genders + '<p class="sub" style="margin:0 0 10px">Click one to add it. A look is its own setting: HeyGen draws the person and the place.</p><div class="looks" id="lookGrid"></div>'
       + (t === 'pub' && pubToken ? '<button class="btn small" id="more" style="margin-top:10px">More</button>' : '');
+    bindGender();
     var grid = $('lookGrid');
     list.forEach(function (l) {
       var c = document.createElement('div'); c.className = 'card';
@@ -238,10 +245,19 @@ export function getCastHtml(): string {
       grid.appendChild(c);
     });
     if ($('more')) $('more').onclick = function () {
-      railApi('/api/heygen-avatars/' + enc(tenant) + '?public=1&token=' + enc(pubToken)).then(function (r) {
+      $('more').disabled = true; $('more').textContent = 'Loading…';
+      railApi('/api/heygen-avatars/' + enc(tenant) + pubQuery(pubToken)).then(function (r) {
         pub = pub.concat((r.looks || []).filter(function (l) { return !l.status || l.status === 'completed'; })); pubToken = r.next_token || null; showTab('pub');
       }).catch(function (e) { say(e.message || String(e), 'err'); });
     };
+  }
+  function pubQuery(page) {
+    return '?public=1' + (pubGender ? '&gender=' + enc(pubGender) : '') + (page ? '&page=' + enc(page) : '');
+  }
+  function bindGender() {
+    Array.prototype.forEach.call(document.querySelectorAll('#pubGender button'), function (b) {
+      b.onclick = function () { pubGender = b.getAttribute('data-gender') || ''; pub = null; pubToken = null; showTab('pub'); };
+    });
   }
   Array.prototype.forEach.call(document.querySelectorAll('#addTabs button'), function (b) { b.onclick = function () { showTab(b.getAttribute('data-tab')); }; });
 `;
