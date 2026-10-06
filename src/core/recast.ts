@@ -26,7 +26,7 @@ import { loadProject, saveProject } from "../persistence/project.js";
 import { recutProjectTakes } from "./take-edits.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
-import { takeCopies, takeForClip, syncSpeakerClips } from "./speaker-layer.js";
+import { takeCopies, takeForClip, syncSpeakerClips, sceneCastOf, softenCastPunchIns } from "./speaker-layer.js";
 import { getActor, portraitPath, type CastActor } from "./cast.js";
 import { ffmpeg, convertVoice, durationOf } from "./actor-test.js";
 import { detectFace } from "./face-band.js";
@@ -44,7 +44,7 @@ export interface RecastStatus {
   started_at: string;
   finished_at?: string;
   files: Array<{
-    raw: string; file: string; status: "running" | "done" | "failed" | "reused"; chunks_done: number; chunks_total: number; stage?: string; error?: string;
+    raw: string; file: string; frame?: RecastFrame; wide?: string; status: "running" | "done" | "failed" | "reused"; chunks_done: number; chunks_total: number; stage?: string; error?: string;
     /** The take's length (s): with the vendor's pace, the time-left estimate. */
     seconds?: number;
     started_at?: string;
@@ -191,7 +191,9 @@ export async function performTakeFile(opts: {
   ctx: PerformContext;
   voiceId?: string;
   onChunk?: (done: number, total: number) => void;
-}): Promise<void> {
+  /** How far back a picture of another shape sits in the take's frame. */
+  frame?: RecastFrame;
+}): Promise<{ wide?: string }> {
   const { rawAbs, outAbs, performer, ctx } = opts;
   await fs.mkdir(ctx.workDir, { recursive: true });
   const w = (n: string) => path.join(ctx.workDir, n);
@@ -243,16 +245,86 @@ export async function performTakeFile(opts: {
   }
 
   ctx.onStage?.("fit");
-  // Exactly the take's frame (cover), rate and length: a short return holds
-  // its last frame. A picture of another shape (a landscape look performing
-  // a portrait take) is cropped around the FACE, not the middle (Marc: "I am
-  // not exactly centered in the frame").
-  const crop = await faceCrop(picture, W, H, duration);
-  await ffmpeg(["-i", picture, "-i", opts.voiceId ? audio : rawAbs, "-map", "0:v:0", "-map", "1:a:0",
-    "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H}${crop ? `:${crop.x}:${crop.y}` : ""},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=${Math.ceil(duration) + 1}`,
-    "-af", opts.voiceId ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
+  // A picture of another shape (a landscape look performing a portrait take)
+  // is KEPT beside the recast: the frame can then be pulled back or pushed in
+  // later without paying the vendor again (Marc, Oct 6: "it is zoomed in for
+  // some reason ... I have the footage" -- the work dir holding HeyGen's
+  // landscape render was deleted with the pieces).
+  let wide: string | undefined;
+  const [pw, ph] = await sizeOf(picture).catch(() => [W, H] as [number, number]);
+  if (Math.abs(pw / ph - W / H) >= 0.05) {
+    wide = wideFileFor(outAbs);
+    await fs.mkdir(path.dirname(wide), { recursive: true });
+    await fs.copyFile(picture, wide);
+  }
+  await fitPicture({ picture, audio: opts.voiceId ? audio : rawAbs, voiced: !!opts.voiceId, outAbs, W, H, duration, frame: opts.frame });
+  return { wide };
+}
+
+/** How far back a recast sits when its picture is wider than the take (a
+ *  landscape look in a portrait film): the share of the frame's height the
+ *  picture fills. Tight covers the frame (the middle third of a 16:9
+ *  picture, about 1.8x in); medium and wide pull back and fill above and
+ *  below with a soft, darkened copy of the same shot. */
+export type RecastFrame = "tight" | "medium" | "wide";
+export const RECAST_FRAMES: Record<RecastFrame, number> = { tight: 1, medium: 0.8, wide: 0.65 };
+export function asRecastFrame(v: unknown): RecastFrame | null {
+  return typeof v === "string" && v in RECAST_FRAMES ? (v as RecastFrame) : null;
+}
+
+/** The kept original beside a recast: take.actor-x-heygen.mp4 -> .original.mp4
+ *  (never a frame's name: the wide fit is .wide.mp4). */
+export function wideFileFor(file: string): string {
+  return file.replace(/(\.(tight|medium|wide))?\.mp4$/, "") + ".original.mp4";
+}
+/** The recast file for a frame: tight keeps the plain name, the others say theirs. */
+export function frameFileFor(file: string, frame: RecastFrame): string {
+  const base = file.replace(/(\.(tight|medium|wide))?\.mp4$/, "");
+  return frame === "tight" ? `${base}.mp4` : `${base}.${frame}.mp4`;
+}
+
+/** The ffmpeg filter that fits a sw x sh picture into a W x H frame at a
+ *  frame setting. Shapes that match, or tight: cover, cropped around the
+ *  face. Medium/wide on another shape: the picture scaled to that share of
+ *  the frame's height, cut to the frame's width around the face, centred
+ *  over a blurred, darkened cover of the same shot. */
+export function frameFilter(sw: number, sh: number, W: number, H: number, frame: RecastFrame, face: { cx: number; cy: number } | null): string {
+  const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+  const s = Math.max(W / sw, H / sh);
+  const cw = Math.round(sw * s), ch = Math.round(sh * s);
+  const coverCrop = face && Math.abs(sw / sh - W / H) >= 0.05 ? placeCrop(face, cw, ch, W, H) : null;
+  const cover = `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H}${coverCrop ? `:${coverCrop.x}:${coverCrop.y}` : ""}`;
+  const fill = RECAST_FRAMES[frame] ?? 1;
+  if (fill >= 1 || Math.abs(sw / sh - W / H) < 0.05) return `[0:v]${cover},setsar=1[v]`;
+  // The foreground: the picture's height at that share of the frame, its
+  // width cut to the frame's around the face (a narrower picture keeps all).
+  const fh = even(H * fill);
+  const fw = even((sw * fh) / sh);
+  const cutW = Math.min(W, fw);
+  const fx = even(Math.min(Math.max(0, (face ? face.cx : 0.5) * fw - cutW / 2), fw - cutW));
+  return `[0:v]split[a][b];[a]${cover},boxblur=24:2,eq=brightness=-0.06:saturation=0.85[bg];`
+    + `[b]scale=${fw}:${fh}:flags=lanczos,crop=${cutW}:${fh}:${fx}:0[fg];`
+    + `[bg][fg]overlay=${Math.round((W - cutW) / 2)}:${Math.round((H - fh) / 2)},setsar=1[v]`;
+}
+
+/** Fit a performance's picture to exactly the take's frame, rate and length
+ *  (a short return holds its last frame), the voice laid under it. */
+async function fitPicture(o: { picture: string; audio: string; voiced: boolean; outAbs: string; W: number; H: number; duration: number; frame?: RecastFrame; audioCopy?: boolean }): Promise<void> {
+  const [sw, sh] = await sizeOf(o.picture).catch(() => [o.W, o.H] as [number, number]);
+  // Cropped around the FACE, not the middle (Marc: "I am not exactly
+  // centered in the frame").
+  const face = Math.abs(sw / sh - o.W / o.H) >= 0.05 ? await faceOf(o.picture, sw, sh, o.duration) : null;
+  const graph = frameFilter(sw, sh, o.W, o.H, o.frame || "tight", face) + `;[v]fps=30,tpad=stop_mode=clone:stop_duration=${Math.ceil(o.duration) + 1}[out]`;
+  await fs.mkdir(path.dirname(o.outAbs), { recursive: true });
+  await ffmpeg(["-i", o.picture, "-i", o.audio, "-filter_complex", graph, "-map", "[out]", "-map", "1:a:0",
+    "-af", o.voiced ? "loudnorm=I=-16:TP=-1.5:LRA=11,pan=stereo|c0=c0|c1=c0" : "anull",
     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", duration.toFixed(3), "-movflags", "+faststart", outAbs]);
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", o.duration.toFixed(3), "-movflags", "+faststart", o.outAbs]);
+}
+
+/** The face in a picture of another shape (fractions of it), or null. */
+async function faceOf(picture: string, sw: number, sh: number, duration: number): Promise<{ cx: number; cy: number } | null> {
+  return detectFace(picture, duration, 6, sw >= sh ? [480, Math.round((480 * sh) / sw)] : [270, Math.round((270 * sh) / sw)]).catch(() => null);
 }
 
 /** Where to cut a W x H frame out of a picture of another shape, covering
@@ -323,7 +395,10 @@ export async function setSceneCast(tenant: string, projectId: string, scenes: nu
 export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string; motion?: string;
   /** Only these scenes (0-based): their takes are recast and the scenes cast
    *  as the actor; the rest of the film is left as it is. */
-  scenes?: number[] } = {}): Promise<RecastStatus> {
+  scenes?: number[];
+  /** How far back the performance sits (a picture of another shape);
+   *  omitted, the frame the take's last recast by this actor had. */
+  frame?: RecastFrame } = {}): Promise<RecastStatus> {
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A recast of this film is already running");
   const project = await loadProject(tenant, projectId);
@@ -384,8 +459,9 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
       // A sheet added or changed is a new performance for a vendor that reads it.
       && (existing.sheet || undefined) === (sheetFor(tenant, actor, performer.id) ? actor.sheet : undefined)
       && (await fs.access(resolveVideoPath(existing.file, config.dataDir)).then(() => true, () => false));
-    const file = reusable ? existing.file : raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`);
-    st.files.push({ raw, file, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0 });
+    const frame: RecastFrame = opts.frame || asRecastFrame(existing?.frame) || "tight";
+    const file = reusable ? existing.file : frameFileFor(raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`), frame);
+    st.files.push({ raw, file, frame, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0 });
   }
   running.set(key, st);
   await saveStatus(tenant, st);
@@ -408,8 +484,8 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
       f.seconds = Math.round(((await durationOf(rawAbs)) || 0) * 10) / 10 || undefined;
       f.started_at = f.stage_at = new Date().toISOString();
       // Every vendor reply for this take lands on it (Studio's status list).
-      await withVendorStatus((v) => { f.vendor = v; void saveStatus(tenant, st); }, () => performTakeFile({
-        rawAbs, outAbs: resolveVideoPath(f.file, config.dataDir), performer, voiceId,
+      const made = await withVendorStatus((v) => { f.vendor = v; void saveStatus(tenant, st); }, () => performTakeFile({
+        rawAbs, outAbs: resolveVideoPath(f.file, config.dataDir), performer, voiceId, frame: f.frame,
         ctx: {
           tenant, actor, portraitAbs: portraitPath(tenant, actor), sheetAbs: sheetFor(tenant, actor, performer.id), width, height, publicUrl, motion,
           workDir: recastWorkDir(tenant, projectId, actor.id, performer.id, i),
@@ -417,6 +493,8 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
         },
         onChunk: (done, total) => { f.chunks_done = done; f.chunks_total = total; void saveStatus(tenant, st); },
       }));
+      // The kept original, named beside the recast (the same url style).
+      if (made?.wide) f.wide = wideFileFor(f.file);
       f.status = "done";
     } catch (e: any) {
       f.status = "failed"; f.error = String(e?.message || e).slice(0, 300);
@@ -432,7 +510,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     const now = new Date().toISOString();
     for (const t of (project as any).takes || []) {
       const hit = ok.find((f) => f.raw === takeCopies(t).raw);
-      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: actor.sheet } : {}), framing: FRAMING, made_at: now } };
+      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: actor.sheet } : {}), framing: FRAMING, ...(hit.frame ? { frame: hit.frame } : {}), ...(hit.wide ? { wide: hit.wide } : {}), made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
     // face and half in another is worse than none. A recast of some scenes
@@ -442,7 +520,13 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
       else (project as any).speaker_cast = actor.id;
     }
     syncSpeakerClips(project as any);
+    softenCastPunchIns(project as any);
     await saveProject(project);
+    // A new performance makes the other frames' fits of the old one stale.
+    for (const f of ok) if (f.status === "done") for (const fr of Object.keys(RECAST_FRAMES) as RecastFrame[]) {
+      const other = frameFileFor(f.file, fr);
+      if (other !== f.file) await fs.rm(resolveVideoPath(other, config.dataDir), { force: true }).catch(() => {});
+    }
     // A take cut by hand plays cut copies: the new performance gets its own.
     await recutProjectTakes(tenant, projectId).catch((e) => console.warn(`  recast: cutting the new performance failed: ${e?.message || e}`));
   }
@@ -457,4 +541,66 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
   st.finished_at = new Date().toISOString();
   await saveStatus(tenant, st);
   running.delete(key);
+}
+
+/** PULL BACK OR PUSH IN a recast that is already made (Marc, Oct 6: the
+ *  landscape twin cropped to a portrait frame sat "so close"): each scene's
+ *  performance is fitted again from the vendor's kept original at the frame
+ *  asked for -- ffmpeg only, no vendor call. Scenes whose recast predates
+ *  the kept original are listed as skipped (recast them again to frame
+ *  them). Returns at once with what will change; the fitting runs on and
+ *  the project is saved as each scene lands (Studio's live sync shows it). */
+export async function reframeRecast(tenant: string, projectId: string, frame: RecastFrame, scenes?: number[]): Promise<{
+  frame: RecastFrame; scenes: number[]; skipped: Array<{ scene_index: number; reason: string }> }> {
+  const project = await loadProject(tenant, projectId);
+  if (!project) throw new Error("Project not found");
+  const only = scenes && scenes.length ? new Set(scenes) : null;
+  const jobs: Array<{ si: number; takeId: string; actorId: string }> = [];
+  const skipped: Array<{ scene_index: number; reason: string }> = [];
+  const seen = new Set<string>();
+  for (const clip of (project as any).speaker_track?.clips || []) {
+    const si = clip.scene_index;
+    if (si === undefined || (only && !only.has(si))) continue;
+    const castId = sceneCastOf(project as any, si);
+    const take = takeForClip(project as any, clip) as any;
+    const entry = castId ? take?.actors?.[castId] : undefined;
+    if (!entry) { skipped.push({ scene_index: si, reason: "no recast plays here" }); continue; }
+    if (!entry.wide) { skipped.push({ scene_index: si, reason: "made before the wide footage was kept: recast it again to frame it" }); continue; }
+    const k = `${take.id}/${castId}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    jobs.push({ si, takeId: take.id, actorId: castId! });
+  }
+  void (async () => {
+    for (const j of jobs) {
+      try {
+        const p0 = await loadProject(tenant, projectId);
+        const t0 = ((p0 as any)?.takes || []).find((t: any) => t.id === j.takeId);
+        const e0 = t0?.actors?.[j.actorId];
+        if (!p0 || !e0?.wide) continue;
+        const out = frameFileFor(e0.file, frame);
+        const outAbs = resolveVideoPath(out, config.dataDir);
+        if (!(await fs.access(outAbs).then(() => true, () => false))) {
+          const rawAbs = resolveVideoPath(takeCopies(t0).raw, config.dataDir);
+          const [W, H] = await sizeOf(rawAbs);
+          const current = resolveVideoPath(e0.file, config.dataDir);
+          // The voice the recast already carries (the take's, or converted).
+          await fitPicture({ picture: resolveVideoPath(e0.wide, config.dataDir), audio: current, voiced: false, outAbs, W, H, duration: (await durationOf(current)) || (await durationOf(rawAbs)) || 0, frame });
+        }
+        // Saved per scene, on a fresh read: the film may be edited meanwhile.
+        const p1 = await loadProject(tenant, projectId);
+        const e1 = ((p1 as any)?.takes || []).find((t: any) => t.id === j.takeId)?.actors?.[j.actorId];
+        if (!p1 || !e1) continue;
+        e1.file = out; e1.frame = frame;
+        syncSpeakerClips(p1 as any);
+        softenCastPunchIns(p1 as any);
+        p1.updated_at = new Date().toISOString();
+        await saveProject(p1);
+        await recutProjectTakes(tenant, projectId).catch((e) => console.warn(`  reframe: cutting failed: ${e?.message || e}`));
+      } catch (e: any) {
+        console.warn(`  reframe scene ${j.si + 1}: ${e?.message || e}`);
+      }
+    }
+  })();
+  return { frame, scenes: jobs.map((j) => j.si), skipped };
 }

@@ -53,6 +53,6 @@ describe("cropping around the face", () => {
   it("a HeyGen recast made before the face crop is made again", () => {
     const src = require("node:fs").readFileSync(path.join(__dirname, "..", "src/core/recast.ts"), "utf8") as string;
     expect(src).toMatch(/performer\.id !== "heygen" \|\| existing\.framing === FRAMING/);
-    expect(src).toMatch(/framing: FRAMING, made_at: now/);
+    expect(src).toMatch(/framing: FRAMING, .*made_at: now/);
   });
 });

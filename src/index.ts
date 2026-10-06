@@ -84,7 +84,7 @@ import { performerList } from "./core/performers/index.js";
 import { startActorTest, startVoiceLineup, getActorTest, collectActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, listVoices, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor, removeActor, getActor, portraitPath } from "./core/cast.js";
-import { startRecast, getRecastStatus, recastProgress } from "./core/recast.js";
+import { startRecast, getRecastStatus, recastProgress, reframeRecast, asRecastFrame } from "./core/recast.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -2913,7 +2913,9 @@ Rules:
       }
 
       // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
-      // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based]}
+      // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based], frame?}
+      // POST /api/recast/{tenant}/{project} {action: "frame", frame: "tight"|"medium"|"wide", scenes?}
+      //      a made recast refitted from the kept original (a landscape look in a portrait film: how far back it sits)
       //      null puts the recording's person back; performer picks the vendor; voice_id an
       //      ElevenLabs voice ("mine" keeps the recording's); fresh makes it again
       // GET  /api/recast/{tenant}/{project}                       progress and who plays
@@ -2923,7 +2925,16 @@ Rules:
         try {
           if (method === "POST") {
             const body = await parseBody(req).catch(() => ({} as any));
+            const rcScenes = Array.isArray(body.scenes) ? body.scenes.map(Number).filter((n: number) => Number.isInteger(n) && n >= 0) : undefined;
+            if (body.action === "frame") {
+              // Pull a made recast back or push it in: refitted from the kept original, no vendor call.
+              const fr = asRecastFrame(body.frame);
+              if (!fr) { jsonResponse(res, 400, { error: 'frame must be "tight", "medium" or "wide"' }); return; }
+              jsonResponse(res, 202, await reframeRecast(rcTenant, rcProject, fr, rcScenes));
+              return;
+            }
             jsonResponse(res, 202, await startRecast(rcTenant, rcProject, body.actor ? String(body.actor) : null, {
+              frame: asRecastFrame(body.frame) || undefined,
               fresh: body.fresh === true,
               performer: typeof body.performer === "string" ? body.performer : undefined,
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,

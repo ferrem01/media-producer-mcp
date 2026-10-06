@@ -21,6 +21,7 @@ import { loadAssetIntel } from "../core/asset-intel.js";
 import { recoverAssetUrl, resolveVideoPath } from "../core/video-path.js";
 import { isProofSurface } from "../core/asset-needs.js";
 import { readsOnTallFrame } from "../core/fit-box.js";
+import { PUNCH_ON_PERSON, PUNCH_ON_CAST } from "../core/speaker-layer.js";
 import { hexIsLight, worldBackground } from "./world.js";
 
 // ── Types ──
@@ -505,6 +506,8 @@ export interface CreatorCutCameraOpts {
   face?: TakeFace;
   duration: number;
   takeover: boolean;
+  /** A cast actor performs the scene: a gentler punch-in (PUNCH_ON_CAST). */
+  cast?: boolean;
 }
 
 /** The region a cutaway mock is framed on (SPEC-creator-cut.md): the one its
@@ -534,7 +537,7 @@ export function creatorCutCameraMoves(
   if (dur <= 0) return null;
   var punchy = String(o.motion || "") !== "calm";
   var fx = o.face ? Math.round(o.face.cx * 100) : 50, fy = o.face ? Math.round(o.face.cy * 100) : 42;
-  var person = (at: number, d: number) => ({ at: Math.round(at * 100) / 100, type: "zoom", x: fx, y: fy, scale: punchy ? 1.22 : 1.1, duration: d });
+  var person = (at: number, d: number) => ({ at: Math.round(at * 100) / 100, type: "zoom", x: fx, y: fy, scale: punchy && !o.cast ? PUNCH_ON_PERSON : PUNCH_ON_CAST, duration: d });
   var moves: Array<Record<string, unknown>> = [punchy ? person(0.2, 0.45) : person(0.3, Math.max(2, Math.min(4, dur - 0.6)))];
   var cuts = components
     .filter((c) => isCutaway(c as any))
@@ -1430,6 +1433,7 @@ export function buildAuthoredCompositionScene(
       face: (draft as any).take_face,
       duration: draft.duration_seconds || 8,
       takeover: isTakeover,
+      cast: !!((draft as any).performer && (draft as any).performer.actor),
     });
     if (autoCam && autoCam.length) {
       cameraMoves = autoCam;
