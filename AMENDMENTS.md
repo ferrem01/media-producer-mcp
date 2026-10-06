@@ -14,6 +14,29 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-06 — Studio's take lanes follow a landed recast; HeyGen presenters page and filter again
+
+Marc recorded the churn film and the HeyGen recasts landed: the preview
+reloaded, but the timeline kept the old picture and lost the words and wave.
+
+- **Lanes:** Studio fetches the words (`/speaker-transcript`) and the wave
+  (`/speaker-waveform`) once per film. The live-sync reload swapped the project
+  and rebuilt the preview but kept both caches, so the lanes showed what was
+  there before the takes. `liveSyncReload` now compares a speaker-lane key
+  (each clip's file and trim, each take's trim and cuts) and drops both caches
+  when it changes; the composite-ready pass fetches them again.
+- **Take picture:** the lane and the board card stilled the raw recording. A
+  scene playing a recast (or blur/cut copy) now wears that copy
+  (`posterSourceFor`, core/take-poster.ts), cached by the playing file, and
+  Studio's URL carries the file name so the browser's old still is skipped.
+- **HeyGen presenters (Cast page):** "More" sent HeyGen's cursor as `?token=`,
+  which is the login token's name; the Cast page signs in by cookie, so auth
+  read the cursor as the login: "Invalid token". The cursor is `?page=` now.
+  The Women/Men filter went with the old Cast dialog (#1105); it is back on the
+  presenters tab (the server already paged on until it found some).
+
+---
+
 ## 2026-10-06 — Studio painted a timed plate over the whole scene
 
 Marc's churn film: in Studio the signal visuals (calendar, charts, card fan)
