@@ -14,6 +14,34 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-06 — A recast's framing: pull it back without paying the vendor again; gentler punch-ins on cast scenes
+
+Marc: "when I recast it puts the camera so close ... I want to be further back
+and I have the footage." Two causes. His twin `marc-at-his-desk` is a
+LANDSCAPE HeyGen look: covering a 9:16 frame keeps the middle third of its
+width (~1.8x in). And creator-cut's punch-ins added 1.22x on top, from 0.2 s.
+
+- **The original is kept.** A vendor picture of another shape is copied beside
+  the recast as `take.actor-x-heygen.original.mp4` (`actors[id].wide`). Until
+  now it lived only in the recast's work dir, which is deleted when the recast
+  finishes -- so the existing recasts on proj_3bd9cad6 have no original.
+- **Framing per scene:** tight (cover, as before) / medium (the picture fills
+  80% of the frame's height) / wide (65%), cut to the frame's width around the
+  face, centred over a blurred, darkened cover of the same shot
+  (`frameFilter`). `reframeRecast` refits made recasts from the original --
+  ffmpeg only -- into `.medium.mp4` / `.wide.mp4` and points the clips there
+  (a take owns every framing of its recast: `recastStem` in speaker-layer).
+  A new recast keeps the take's last frame; a fresh one drops the other
+  frames' stale fits. Studio: a Framing row on the take card. API: POST
+  /api/recast {action:"frame", frame, scenes?}. MCP: cast action `frame`
+  (framing), and `framing` on recast.
+- **Gentler punch-ins:** the rule's person zoom is 1.1x on a scene a cast
+  actor performs (`PUNCH_ON_CAST`): at build when the scene's plan names an
+  actor, and when a recast lands or is reframed (`softenCastPunchIns`, which
+  only touches the rule's own unanchored 1.22x zooms).
+
+---
+
 ## 2026-10-06 — Studio's take lanes follow a landed recast; HeyGen presenters page and filter again
 
 Marc recorded the churn film and the HeyGen recasts landed: the preview

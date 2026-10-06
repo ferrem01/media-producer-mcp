@@ -67,6 +67,33 @@ export function sceneCastOf(project: ProjectLike, sceneIndex: number): string | 
   return project.speaker_cast || null;
 }
 
+/** The punch-in on a person (creator-cut's camera rule): 1.22x on the
+ *  recording; 1.1x where a cast actor performs, whose picture is often a
+ *  landscape look already cut close to fill a portrait frame (Marc, Oct 6:
+ *  the recast sat "so close"). */
+export const PUNCH_ON_PERSON = 1.22;
+export const PUNCH_ON_CAST = 1.1;
+
+/** Ease the rule's punch-ins to PUNCH_ON_CAST on every scene a cast actor's
+ *  recast plays. Only the rule's own moves change (a zoom at exactly
+ *  PUNCH_ON_PERSON with no anchor or target): a hand-set move is left alone.
+ *  Returns how many moves changed. */
+export function softenCastPunchIns(project: ProjectLike): number {
+  let n = 0;
+  for (const clip of project.speaker_track?.clips || []) {
+    const si = clip.scene_index;
+    if (si === undefined) continue;
+    const castId = sceneCastOf(project, si);
+    const take = castId ? takeForClip(project, clip) : undefined;
+    if (!castId || !take?.actors?.[castId]?.file) continue;
+    const scene: any = (project.scenes || [])[si];
+    for (const m of (scene && Array.isArray(scene.camera_moves) ? scene.camera_moves : [])) {
+      if (m && m.type === "zoom" && !m.anchor && !m.target && m.scale === PUNCH_ON_PERSON) { m.scale = PUNCH_ON_CAST; n++; }
+    }
+  }
+  return n;
+}
+
 export function asSpeakerBackground(v: unknown): SpeakerBackground | null {
   if (v === "none") return "room";
   return (SPEAKER_BACKGROUNDS as readonly string[]).includes(String(v)) ? (v as SpeakerBackground) : null;
@@ -258,9 +285,18 @@ export function takeOwns(take: TakeLike | null | undefined, url: string | undefi
   if (!take || !url) return false;
   const c = takeCopies(take);
   return url === c.raw || url === c.blur || url === c.alpha || (!!c.raw && copyNamesOf(c.raw).includes(url))
-    || Object.values(take.actors || {}).some((a) => a && a.file === url)
+    || Object.values(take.actors || {}).some((a) => a && (a.file === url || recastStem(a.file) === recastStem(url)))
     // The take's cut copies (core/take-edits.ts).
     || Object.values(take.cut_files || {}).some((v) => v && v.file === url);
+}
+
+/** A recast's files share one stem: each framing's fit (take.actor-x.mp4,
+ *  .medium.mp4, .wide.mp4) and the kept original (.original.mp4). A clip on
+ *  one framing still belongs to the take after the recast points at another
+ *  (core/recast.ts reframeRecast). */
+function recastStem(url: string | undefined): string | null {
+  const m = String(url || "").match(/^(.*\.actor-[^/]+?)(\.(tight|medium|wide|original))?\.mp4$/);
+  return m ? m[1] : null;
 }
 
 /** The newest take behind a clip. */

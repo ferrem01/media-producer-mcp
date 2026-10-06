@@ -8479,6 +8479,7 @@ ${QUOTIENT_CSS}
           return '<div class="tk-row"><span class="tk-lab">Cut ' + (c.src_end - c.src_start).toFixed(2) + 's at ' + (takeCutClock(cuts, c.src_start) - takeCutClock(cuts, tk.trim_start || 0)).toFixed(2) + 's</span><button class="rv-go secondary" data-tk-restore="' + i + '">↩ Restore</button></div>';
         }).join('')
       + '<div class="sp-region" style="margin-top:4px;">Or shift-click the first and last word on the word lane to cut them.</div>'
+      + takeFramingRow(p, si, tk)
       // A new take, any way: one button into the take dialog (Marc: not six here).
       + '<div class="sp-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><button class="rv-go secondary" id="tk-replace" style="flex:1;">Replace this take&#8230;</button></div>';
     pop.innerHTML = h;
@@ -8499,6 +8500,18 @@ ${QUOTIENT_CSS}
         takeEditRequest(si, { op: 'restore', src_start: c.src_start, src_end: c.src_end }, 'Restoring the cut').then(function() { camPopClose(); }, function() { b.disabled = false; });
       });
     });
+    pop.querySelectorAll('[data-tk-frame]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var fr = b.getAttribute('data-tk-frame');
+        pop.querySelectorAll('[data-tk-frame]').forEach(function(x) { x.disabled = true; });
+        api('POST', '/recast/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { action: 'frame', frame: fr, scenes: [si] }).then(function(r) {
+          var sk = (r && r.skipped || [])[0];
+          if (sk) { studioStatus('Scene ' + (si + 1) + ': ' + sk.reason, 'err'); takePopOpen(si, anchorEl); return; }
+          camPopClose();
+          studioStatus('Reframing scene ' + (si + 1) + ' (' + fr + ') \u2014 it updates here when it lands', 'ok');
+        }).catch(function(e) { studioStatus((e && e.message) || 'Reframing failed', 'err'); takePopOpen(si, anchorEl); });
+      });
+    });
     var um = document.getElementById('tk-unmark');
     if (um) um.addEventListener('click', function() { state._takeMark = null; takePopOpen(si, anchorEl); });
     document.getElementById('tk-mark').addEventListener('click', function() {
@@ -8510,6 +8523,22 @@ ${QUOTIENT_CSS}
       camPopClose();
       takeEditRequest(si, { op: 'cut', from: Math.max(0, a), to: z }, 'Cutting the take');
     });
+  }
+  // FRAMING (a recast whose picture is another shape -- a landscape look in
+  // a portrait film): how far back the actor sits. Refitted from the kept
+  // original on the server, no vendor call (Marc: "it puts the camera so
+  // close ... I have the footage").
+  function takeFramingRow(p, si, tk) {
+    var sb = (p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si]) || {};
+    var castId = sb.cast !== undefined ? sb.cast : (p.speaker_cast || null);
+    var entry = castId && tk.actors ? tk.actors[castId] : null;
+    if (!entry) return '';
+    var cur = entry.frame || 'tight';
+    var btns = [['tight', 'Tight'], ['medium', 'Medium'], ['wide', 'Wide']].map(function(f) {
+      return '<button class="rv-go ' + (cur === f[0] ? '' : 'secondary') + '" data-tk-frame="' + f[0] + '"' + (entry.wide ? '' : ' disabled') + '>' + f[1] + '</button>';
+    }).join('');
+    return '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Framing</span>' + btns + '</div>'
+      + (entry.wide ? '' : '<div class="sp-region">This recast was made before its wide footage was kept. Recast the scene again to change its framing.</div>');
   }
   // Shift-click two words of a camera take: cut them (one scene at a time).
   function takeWordCutSelect(seg, el) {

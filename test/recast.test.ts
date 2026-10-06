@@ -206,6 +206,39 @@ describe("recast with a HeyGen look: one call, HeyGen draws the whole performanc
     expect(proj.speaker_cast).toBe("marc-at-his-desk");
     expect(proj.speaker_track.clips[0].source).toBe(src.replace(".mp4", ".actor-marc-at-his-desk-heygen.mp4"));
     expect(proj.takes[0].actors["marc-at-his-desk"].heygen_look_id).toBe("lk_twin");
+    // HeyGen's landscape render is KEPT beside the recast (Oct 6: the work dir
+    // holding it was deleted, so the frame could never be pulled back).
+    const wide = path.join(assets, "take-1.actor-marc-at-his-desk-heygen.original.mp4");
+    expect(await info(wide)).toMatch(/Video:.*640x360/);
+    expect(proj.takes[0].actors["marc-at-his-desk"].wide).toBe(src.replace(".mp4", ".actor-marc-at-his-desk-heygen.original.mp4"));
+
+    // PULL BACK: refitted from the kept original, no HeyGen call; the clip moves to the medium fit.
+    const { reframeRecast } = await import("../src/core/recast.js");
+    const before = calls.length;
+    const rf = await reframeRecast(T, P2, "medium");
+    expect(rf).toMatchObject({ frame: "medium", scenes: [0], skipped: [] });
+    const medium = src.replace(".mp4", ".actor-marc-at-his-desk-heygen.medium.mp4");
+    let pj: any = null;
+    for (let i = 0; i < 300; i++) {
+      pj = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P2, "project.json"), "utf8"));
+      if (pj.speaker_track.clips[0].source === medium) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(pj.speaker_track.clips[0].source).toBe(medium);
+    expect(pj.takes[0].actors["marc-at-his-desk"]).toMatchObject({ frame: "medium", file: medium });
+    const mediumAbs = path.join(assets, "take-1.actor-marc-at-his-desk-heygen.medium.mp4");
+    expect(await info(mediumAbs)).toMatch(/Video:.*360x640/);                // still the take's frame
+    expect(await info(mediumAbs)).toMatch(/Audio:/);                         // the voice carried over
+    expect(Math.abs((await dur(mediumAbs)) - 6)).toBeLessThan(0.1);
+    expect(calls.length).toBe(before);                                       // no vendor call
+    // And back to tight: the original fit, just pointed at again.
+    await reframeRecast(T, P2, "tight");
+    for (let i = 0; i < 100; i++) {
+      pj = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P2, "project.json"), "utf8"));
+      if (pj.speaker_track.clips[0].source === src.replace(".mp4", ".actor-marc-at-his-desk-heygen.mp4")) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(pj.speaker_track.clips[0].source).toBe(src.replace(".mp4", ".actor-marc-at-his-desk-heygen.mp4"));
 
     // RESUME: a video HeyGen already has is collected, not paid for twice.
     const { performTakeFile } = await import("../src/core/recast.js");
