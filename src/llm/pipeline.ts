@@ -3125,7 +3125,13 @@ async function runUnifiedPipeline(
       if (d.transparent_background === false) continue; // takeovers may own their frame
       const comps: any[] = Array.isArray(d.components) ? d.components : [];
       const before = comps.length;
-      d.components = comps.filter((c) => !(c && typeof c === "object" && typeof c.type === "string" && BACKDROP_RE.test(c.type)));
+      // A TIMED plate is not a backdrop: cut in behind a chart for its
+      // window (an enter time or word, or an exit), it hides the camera only
+      // while the chart is up -- the person comes straight back (Oct 6,
+      // proj_3bd9cad6: every chart's plate was dropped and the lines were
+      // drawn over Marc's face).
+      const timedPlate = (c: any) => !!c && (Number(c.enter?.at) > 0 || !!c.exit || !!c.anchors?.["enter.at"] || !!c.anchors?.["exit.at"]);
+      d.components = comps.filter((c) => !(c && typeof c === "object" && typeof c.type === "string" && BACKDROP_RE.test(c.type) && !timedPlate(c)));
       if (d.components.length !== before) {
         console.log(`  Takeover recipe: scene "${d.label || "?"}" -- dropped a full-bleed backdrop (the camera is the background)`);
       }

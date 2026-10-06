@@ -228,6 +228,16 @@ describe("desktop furniture on a phone reel", () => {
     expect(comps[0].data.at).toBe(1.5);
     expect(comps[0].zoom).toBe(1.8);
   });
+  it("keeps a notification cut in where the author placed it, and a ring gauge (the churn film, Oct 6)", () => {
+    const comps = build({ width: 1080, height: 1920 }, [
+      { type: "notification-stack", data: { notifications: [{ title: "Jordan Lee replied", body: "No! Keep them coming." }] }, position: { x: "5%", y: "68%", width: "90%", height: "16%" }, enter: { effect: "cut", at: 8.9 } } as any,
+      { type: "progress-bar", data: { value: 58, style: "ring", label: "Acme Co." } },
+      { type: "progress-bar", data: { value: 40, label: "rail" } },
+    ]);
+    expect(comps.map((c) => c.type)).toEqual(["notification-stack", "progress-bar"]);
+    expect(comps[0].data.notifications[0].body).toMatch(/Keep them coming/);
+    expect(comps[1].data.style).toBe("ring");
+  });
   it("leaves them alone on a wide frame", () => {
     const comps = build({ width: 1920, height: 1080 }, [{ type: "progress-bar", data: { value: 50 } }, { type: "notification-stack", data: { notifications: [{ app: "Slack" }] } }]);
     expect(comps.map((c) => c.type)).toEqual(["progress-bar", "notification-stack"]);

@@ -1290,6 +1290,13 @@ export function cameraMovesScript(
           if (f.parentNode !== root) root.appendChild(f);
         });
       } catch (eFix) {}
+      // A backdrop ABOVE THE RIG'S z -- a timed plate over the speaker and
+      // under the proof -- rides the rig too. Parked outside, its z is weighed
+      // against the rig's 2, not the components', so a z-30 plate painted over
+      // every component inside (Oct 6, Marc's churn film: Studio showed a
+      // blank pale frame where the calendar and charts were; the render, with
+      // the plate inside .mp-camera, was right).
+      var zOf = function(el) { var z = parseInt((el.style && el.style.zIndex) || getComputedStyle(el).zIndex, 10); return isNaN(z) ? 0 : z; };
       Array.prototype.slice.call(root.childNodes).forEach(function(n) {
         if (n.nodeType === 1) {
           var t = n.tagName;
@@ -1298,11 +1305,11 @@ export function cameraMovesScript(
           if (n.hasAttribute && n.hasAttribute('data-mp-fixed')) return;
           // Flat-laid backdrops (the composite path): a travel-safe surface
           // now rides the rig -- Studio finally previews the same moving
-          // sheet the render produces. Everything else stays parked outside,
-          // exactly as before.
+          // sheet the render produces. A plate above the rig's z rides it
+          // (above). Everything else stays parked outside, as before.
           if (n.hasAttribute && n.hasAttribute('data-mp-backdrop')) {
             var ct = n.getAttribute('data-ctype') || '';
-            if (OVERSCAN !== null && TRAVEL_SAFE[ct]) cam.appendChild(n);
+            if ((OVERSCAN !== null && TRAVEL_SAFE[ct]) || zOf(n) > 2) cam.appendChild(n);
             return;
           }
           if (n.classList && n.classList.contains('mp-page-bg')) return;
