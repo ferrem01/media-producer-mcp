@@ -45,6 +45,12 @@
     // time 0 (the take as a layer plays from its trim, on the base's clock).
     var startAt = Number(data.start_at);
     if (!isFinite(startAt) || startAt < 0) startAt = 0;
+    // clip_in: where a TIMED clip starts in its source when it cuts in -- a
+    // 4 s Seedance cutaway shown for a second skips its slow first second
+    // (Marc, Oct 6: "the couch shot by the time it gets started we switch out").
+    var clipIn = Number(data.clip_in);
+    if (!isFinite(clipIn) || clipIn < 0) clipIn = 0;
+    var timedStart = timed && (at > 0 || clipIn > 0) ? clipIn - at : startAt;
     // fill 'blur': off-aspect footage (a 16:9 clip in a 9:16 frame) sits
     // whole in the middle over a blurred, scaled-up copy of itself filling
     // the frame -- no black bars, no crop. Both copies ride the capture's
@@ -52,12 +58,12 @@
     if (data.fill === 'blur') {
       loadVideoForCapture(container, data.src, {
         style: 'position:absolute;inset:-6%;width:112%;height:112%;object-fit:cover;display:block;filter:blur(38px) brightness(0.72) saturate(1.2);',
-        startAt: timed && at > 0 ? -at : startAt,
+        startAt: timedStart,
       });
       container.style.overflow = 'hidden'; container.style.position = 'relative';
       style = 'position:relative;width:100%;height:100%;object-fit:contain;display:block;';
     }
-    var video = loadVideoForCapture(container, data.src, { style: style, startAt: timed && at > 0 ? -at : startAt });
+    var video = loadVideoForCapture(container, data.src, { style: style, startAt: timedStart });
 
     if (timed) {
       // A TIMED clip is a cut, not a fade (SPEC-creator-cut.md). Sub-frame

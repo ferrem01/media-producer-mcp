@@ -167,13 +167,15 @@ describe("a scene performed by a cast actor", () => {
     await until(async () => (await sp.getScenePerformances(T, P))[1].actor_clips?.[0]?.status === "done");
     expect(atlas[0]).toMatchObject({ draft: false, resolution: "720p", duration: 6 });
     expect(atlas[0].reference_audios).toBeUndefined();
-    expect(atlas[0].prompt).toMatch(/no music, no speech/);
+    expect(atlas[0].prompt).toMatch(/move naturally the whole time, from the very first frame/);   // a silent cutaway still moves
+    expect(atlas[0].prompt).toMatch(/no music/);
     const proj = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
     const comp = proj.scenes[1].components.find((c: any) => c.data?.actor_clip === "dana");
     expect(comp).toMatchObject({ type: "video", enter: { effect: "cut", at: 1.5 }, exit: { effect: "cut", at: 7.5 }, data: { object_fit: "cover", at: 1.5, exit_at: 7.5 } });
     // The video component times itself from data.at / exit_at: the clip plays from its own first frame.
     const vid = await fs.readFile(path.join(process.cwd(), "src/components/media/video.component.html"), "utf8");
-    expect(vid).toMatch(/startAt: timed && at > 0 \? -at : startAt/);
+    expect(vid).toMatch(/var timedStart = timed && \(at > 0 \|\| clipIn > 0\) \? clipIn - at : startAt;/);
+    expect(comp.data.clip_in).toBeUndefined();                 // shown for its whole 6 s: nothing to skip
     const clipFile = path.join(DATA, comp.data.src.replace(/^\/assets\//, ""));
     const info = await run("ffmpeg", ["-hide_banner", "-i", clipFile]).then(() => "", (e: any) => String(e.stderr));
     expect(info).not.toMatch(/Audio:/);                        // silent: the scene's voice plays under it
@@ -188,6 +190,7 @@ describe("a scene performed by a cast actor", () => {
     let p2 = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
     let clips = p2.storyboard.scenes[1].components.filter((c: any) => c.data?.actor_clip);
     expect(clips.map((c: any) => [c.enter.at, c.exit.at])).toEqual([[1.5, 7.5], [0, 0.6]]);
+    expect(clips[1].data.clip_in).toBe(1);                     // a 4 s shot shown 0.6 s starts 1 s in: past Seedance's ease-in
     expect(p2.scenes[1].components.filter((c: any) => c.data?.actor_clip)).toHaveLength(2);
     await sp.startActorClip(T, P, 1, { actor: "dana", shot: "Walks in a park, phone at her mouth", at: 0, show: 1.2, location: "" });
     await until(async () => { const x = (await sp.getScenePerformances(T, P))[1].actor_clips.find((c: any) => c.at === 0); return x?.status === "done" && x.show === 1.2; });
@@ -195,6 +198,19 @@ describe("a scene performed by a cast actor", () => {
     clips = p2.storyboard.scenes[1].components.filter((c: any) => c.data?.actor_clip);
     expect(clips.map((c: any) => [c.enter.at, c.exit.at])).toEqual([[1.5, 7.5], [0, 1.2]]);
     expect(p2.storyboard.scenes[1].actor_clips.map((c: any) => c.at)).toEqual([0, 1.5]);
+    // A clip timed to words keeps its words when it is made again.
+    const pj = path.join(DATA, T, "projects", P, "project.json");
+    const disk = JSON.parse(await fs.readFile(pj, "utf8"));
+    const atZero = (c: any) => c.data?.actor_clip && c.data.clip_at === 0;
+    for (const list of [disk.storyboard.scenes[1].components, disk.scenes[1].components]) {
+      const c = list.find(atZero); c.anchors = { at: { word: "coffee" } }; c.data.at = 2.2; c.enter.at = 2.2;
+    }
+    await fs.writeFile(pj, JSON.stringify(disk));
+    await sp.startActorClip(T, P, 1, { actor: "dana", shot: "Walks faster in the park, phone at her mouth", at: 0, show: 1.2, location: "" });
+    await until(async () => { const x = (await sp.getScenePerformances(T, P))[1].actor_clips.find((c: any) => c.at === 0); return x?.status === "done" && /faster/.test(x.shot); });
+    const remade = JSON.parse(await fs.readFile(pj, "utf8")).scenes[1].components.find(atZero);
+    expect(remade.anchors).toEqual({ at: { word: "coffee" } });
+    expect([remade.data.at, remade.enter.at]).toEqual([2.2, 2.2]);
     expect(p2.storyboard.scenes[1].actor_clip).toBeUndefined();   // one list, no "last one touched" copy
   }, 60000);
 });

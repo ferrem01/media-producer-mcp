@@ -897,6 +897,10 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
   /** Where it is set: a location id, "" none (a one-off place the shot
    *  describes: a car, a park). Omitted: the scene's. */
   location?: string;
+  /** Seconds into the clip where it starts when it cuts in. Default: 1 s
+   *  when the clip has it to spare -- Seedance eases in, and a cutaway shown
+   *  for a second was over before she got going. */
+  clip_in?: number;
 }): Promise<Record<string, unknown>> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || scene.performance?.actor);
@@ -911,6 +915,7 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
   const show = Number(opts.show) > 0 ? Math.max(0.3, Math.min(15, Number(opts.show))) : undefined;
   const seconds = Math.max(4, Math.min(15, Math.round(Number(opts.seconds) || (show ? Math.ceil(show) : 5))));
   const onScreen = show ? Math.min(show, seconds) : seconds;
+  const clipIn = Math.max(0, Math.min(seconds - onScreen, Number.isFinite(Number(opts.clip_in)) && opts.clip_in !== undefined ? Number(opts.clip_in) : 1));
   const at = Math.max(0, Math.round((Number(opts.at) || 0) * 100) / 100);
   // Several clips per scene (a montage), one per start time: a new clip at
   // the same start replaces that one.
@@ -961,13 +966,25 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
           // clip plays from ITS first frame when it lands (without them it ran
           // on the scene's clock -- frozen past its 4 s, Marc saw it jump --
           // and Studio's lane drew it the whole scene).
-          data: { src: url, object_fit: "cover", actor_clip: actor.id, clip_at: at, at, exit_at: Math.round((at + onScreen) * 100) / 100 },
+          data: { src: url, object_fit: "cover", actor_clip: actor.id, clip_at: at, at, exit_at: Math.round((at + onScreen) * 100) / 100, ...(clipIn > 0 ? { clip_in: Math.round(clipIn * 100) / 100 } : {}) },
           enter: { effect: "cut", at }, exit: { effect: "cut", at: Math.round((at + onScreen) * 100) / 100 } };
-        // One clip per start time: a new one at the same start replaces it.
+        // One clip per start time: a new one at the same start replaces it,
+        // and keeps the old one's timing -- its word anchors and where they
+        // landed (a remake used to drop them; the cut fell back to `at`).
         const mine = (x: any) => x && x.type === "video" && x.data && x.data.actor_clip && Number(x.data.clip_at ?? x.enter?.at ?? 0) === at;
-        sc.components = [...(sc.components || []).filter((x: any) => !mine(x)), comp];
+        const timedLike = (old: any, c: any) => {
+          if (!old?.anchors || !Object.keys(old.anchors).length) return c;
+          const out: any = { ...c, data: { ...c.data }, enter: { ...c.enter }, exit: { ...c.exit } };
+          if (old.anchors) out.anchors = { ...old.anchors };
+          if (old.data?.at !== undefined) out.data.at = old.data.at;
+          if (old.data?.exit_at !== undefined) out.data.exit_at = old.data.exit_at;
+          if (old.enter?.at !== undefined) out.enter.at = old.enter.at;
+          if (old.exit?.at !== undefined) out.exit.at = old.exit.at;
+          return out;
+        };
+        sc.components = [...(sc.components || []).filter((x: any) => !mine(x)), timedLike((sc.components || []).find(mine), comp)];
         const built: any = (p.scenes || [])[si];
-        if (built) built.components = [...(built.components || []).filter((x: any) => !mine(x)), { id: `actor_clip_${si}_${String(at).replace(".", "_")}`, ...comp }];
+        if (built) built.components = [...(built.components || []).filter((x: any) => !mine(x)), { id: `actor_clip_${si}_${String(at).replace(".", "_")}`, ...timedLike((built.components || []).find(mine), comp) }];
         running.delete(key);
         Object.assign(c, { status: "done", url, finished_at: new Date().toISOString() });
       });

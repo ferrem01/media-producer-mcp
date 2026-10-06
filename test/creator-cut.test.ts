@@ -196,7 +196,7 @@ describe("proof on the board: the needs a claim asks for", () => {
       expect(html, rel).toMatch(/tl\.to\((root|container), \{ autoAlpha: 0, duration: 0\.02, ease: 'none' \}, exitAt\)/);
     }
     const video = await read("../src/components/media/video.component.html");
-    expect(video).toMatch(/startAt: timed && at > 0 \? -at : startAt/);
+    expect(video).toMatch(/var timedStart = timed && \(at > 0 \|\| clipIn > 0\) \? clipIn - at : startAt;/);   // from its own start, or its in-point
   });
 });
 
