@@ -1139,7 +1139,11 @@ export function buildAuthoredCompositionScene(
   // every scene). They are rewritten before the layout sees them.
   if (speakerBase && tallFrame && !isTakeover) {
     authored = authored.flatMap((c) => {
-      if (c.type === "progress-bar") {
+      // A RING (or stars) gauge reads at phone size; and a gauge cut in where
+      // the author placed it is a choice, not a stray rail (Oct 6: the
+      // churn film's health ring, pinned top-right, was dropped).
+      var gaugeStyle = String(((c.data as any) || {}).style || "bar");
+      if (c.type === "progress-bar" && !isCutaway(c as any) && gaugeStyle !== "ring" && gaugeStyle !== "stars") {
         console.log(`    progress-bar: no phone form on a speaker reel -- dropped`);
         return [];
       }
@@ -1147,7 +1151,10 @@ export function buildAuthoredCompositionScene(
         console.log(`    ${c.type}: an app mock has no phone form on a speaker reel (the person carries it) -- dropped`);
         return [];
       }
-      if (c.type === "notification-stack") {
+      // A notification cut in at full width is readable: it is the beat
+      // (Oct 6: the churn film's "Jordan Lee replied" with its reply text
+      // became a bare floating pill).
+      if (c.type === "notification-stack" && !isCutaway(c as any)) {
         var notes = Array.isArray((c.data as any).notifications) ? ((c.data as any).notifications as any[]) : [];
         var apps = Array.from(new Set(notes.map((n) => String(n?.app || n?.title || "").trim()).filter(Boolean)));
         if (!apps.length) apps = ["Slack", "Mail", "Sheets"];

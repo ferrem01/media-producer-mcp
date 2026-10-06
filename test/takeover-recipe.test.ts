@@ -158,6 +158,8 @@ describe("takeover enforcement (pipeline, deterministic)", () => {
     expect(block).toMatch(/BACKDROP_RE/);
     expect(block).toMatch(/mesh-gradient\|webgl-backdrop/);
     expect(block).toMatch(/the camera is the background/);
+    // ...but a TIMED plate behind a chart stays: it hides the camera only for its window.
+    expect(block).toMatch(/BACKDROP_RE\.test\(c\.type\) && !timedPlate\(c\)/);
   });
 });
 

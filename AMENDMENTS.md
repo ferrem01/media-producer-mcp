@@ -13,6 +13,20 @@ session can pick up mid-thread.
 
 
 
+
+## 2026-10-06 — A built person film keeps its timed plates, rings and placed notifications
+
+The churn film (proj_3bd9cad6) was built from a hand-set board and lost
+three things: every chart's backing plate (the takeover recipe drops any
+`gradient-background` on the speaker's scenes -- meant for a full-scene
+backdrop over the camera, it also took the timed plates behind the charts,
+and wrote the loss back to the board), the health ring (the phone-reel rule
+drops every `progress-bar` -- meant for a thin rail), and the reply
+notification (rewritten into a bare floating pill). Now: a plate with an
+enter time or word, or an exit, is kept; a ring/stars gauge or a cut-in
+`progress-bar` is kept; a cut-in `notification-stack` is kept. The film's
+built scenes were patched in place (no rebuild).
+
 ## 2026-10-06 — The real cause: a full disk
 
 Marc ran the diagnostics on the droplet: `/` at 100% (73 MB free of 155
