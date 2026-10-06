@@ -6,6 +6,7 @@
  */
 
 import crypto from "node:crypto";
+import { isDeploying } from "./server-health.js";
 
 export interface Job {
   id: string;
@@ -37,6 +38,12 @@ export function queueJob(
   tenantId: string,
   runner: (job: Job) => Promise<unknown>,
 ): Job {
+  // A deploy is under way: its reload would kill this job part-way (Oct 6,
+  // a render cut off at 01:53). Say so now rather than fail later. A take is
+  // a wait, not work -- it survives a reload.
+  if (type !== "take" && isDeploying()) {
+    throw new Error("The server is updating right now (a few minutes). Start this again once it's back -- nothing was started.");
+  }
   const id = `job_${crypto.randomUUID().slice(0, 8)}`;
   const job: Job = {
     id,
