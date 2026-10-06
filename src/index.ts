@@ -81,7 +81,7 @@ import { resolveVideoPath } from "./core/video-path.js";
 import { startGeneratedTake, getGeneratedTakeStatus, registerTakeAttacher } from "./core/generated-take.js";
 import { registerSceneAttacher, startSceneFrame, pickSceneFrame, startScenePerformance, getScenePerformances } from "./core/scene-performance.js";
 import { performerList } from "./core/performers/index.js";
-import { startActorTest, startVoiceLineup, getActorTest, collectActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, listVoices, type ActorTest } from "./core/actor-test.js";
+import { startActorTest, startVoiceLineup, getActorTest, collectActorTest, listHeygenAvatars, listHeygenLooks, getHeygenLook, createHeygenLook, heygenQuota, listHeygenVoices, heygenLookPage, heygenPeoplePage, listVoices, type ActorTest } from "./core/actor-test.js";
 import { ensureCenteredTake, isTakeAsset } from "./audio/channels.js";
 import { listCast, addActor, removeActor, getActor, portraitPath } from "./core/cast.js";
 import { startRecast, getRecastStatus, recastProgress, reframeRecast, asRecastFrame } from "./core/recast.js";
@@ -2983,7 +2983,8 @@ Rules:
       // GET  /api/heygen-avatars/{tenant}?looks=1    the account's own looks (v3 ids), for heygen-v3 tests and the cast
       // GET  /api/heygen-avatars/{tenant}?quota=1    the API credit balance (apart from the web app's)
       // GET  /api/heygen-avatars/{tenant}?voices=1   the account's own voices (clones), for a generated take
-      // GET  /api/heygen-avatars/{tenant}?public=1&page=&gender=    a page of HeyGen's stock presenters (page: the next_token of the last one)
+      // GET  /api/heygen-avatars/{tenant}?people=1&page=&gender=    a page of HeyGen's stock presenters, one per person
+      // GET  /api/heygen-avatars/{tenant}?public=1&group=<id>        that person's looks (or ?public=1&page=&gender= all looks)
       // POST /api/heygen-avatars/{tenant}            {prompt, avatar_id | avatar_group_id, name?, aspect_ratio?} -> a new look
       // GET  /api/heygen-avatars/{tenant}/{look_id}  one look (poll a new one until "completed")
       const hgAvatars = urlPath.match(/^\/api\/heygen-avatars\/([^/]+)(?:\/([A-Za-z0-9_-]+))?$/);
@@ -3000,7 +3001,9 @@ Rules:
               // login token (auth reads it whenever there is no Bearer
               // header), so on the cookie-signed Cast page "More" answered
               // "Invalid token" (Marc, Oct 6).
-              : q.get("public") ? await heygenLookPage({ ownership: "public", token: q.get("page") || undefined, gender: q.get("gender") || undefined, limit: Number(q.get("limit")) || undefined })
+              // One card per PERSON, then that person's looks (?public=1&group=<id>).
+              : q.get("people") ? await heygenPeoplePage({ token: q.get("page") || undefined, gender: q.get("gender") || undefined })
+              : q.get("public") ? await heygenLookPage({ ownership: "public", token: q.get("page") || undefined, gender: q.get("gender") || undefined, group_id: q.get("group") || undefined, limit: Number(q.get("limit")) || undefined })
               : q.get("looks") ? { looks: await listHeygenLooks() } : { avatars: await listHeygenAvatars() });
           }
           else if (method === "POST" && !lookId) {

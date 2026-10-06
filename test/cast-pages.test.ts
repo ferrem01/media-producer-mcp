@@ -17,7 +17,7 @@ describe("the Cast and Locations pages", () => {
     expect(h).toContain("body.fictional = true; else body.consent = true;");
     expect(h).toContain("if (sheetRel) body.sheet = sheetRel;");
     expect(h).toContain("'/api/upload-asset/' + enc(tenant) + '/library?name='");
-    expect(h).toContain("'/api/heygen-avatars/' + enc(tenant) + (t === 'looks' ? '?looks=1' : pubQuery(''))");
+    expect(h).toContain("railApi('/api/heygen-avatars/' + enc(tenant) + '?looks=1')");
     expect(h).toContain("patch(a, { voice_id: id, voice_name: v ? v.name : '' }");
   });
   it("HeyGen presenters browse by Women / Men and page with ?page=, never ?token= (the login token's name)", async () => {
@@ -26,7 +26,7 @@ describe("the Cast and Locations pages", () => {
     // server read it as the login and answered "Invalid token".
     const h = getCastHtml();
     expect(h).toContain("[['', 'Everyone'], ['female', 'Women'], ['male', 'Men']]");
-    expect(h).toContain("(pubGender ? '&gender=' + enc(pubGender) : '') + (page ? '&page=' + enc(page) : '')");
+    expect(h).toContain("'?people=1' + (pubGender ? '&gender=' + enc(pubGender) : '') + (page ? '&page=' + enc(page) : '')");
     expect(h).not.toMatch(/public=1&token=/);
     const fs = await import("node:fs/promises");
     const server = await fs.readFile(new URL("../src/index.ts", import.meta.url), "utf8");

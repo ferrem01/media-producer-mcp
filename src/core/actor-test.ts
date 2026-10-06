@@ -574,10 +574,11 @@ export async function listHeygenLooks(): Promise<HeygenLook[]> {
 
 /** One page of looks: the account's own ("private") or HeyGen's stock
  *  presenters ("public"), optionally by gender, for browsing. */
-export async function heygenLookPage(opts: { ownership: "private" | "public"; token?: string; limit?: number; gender?: string }): Promise<{ looks: HeygenLook[]; next_token: string | null }> {
+export async function heygenLookPage(opts: { ownership: "private" | "public"; token?: string; limit?: number; gender?: string; group_id?: string }): Promise<{ looks: HeygenLook[]; next_token: string | null }> {
   if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
   const fetchPage = async (token?: string) => {
     const q = new URLSearchParams({ ownership: opts.ownership, limit: String(Math.max(1, Math.min(50, opts.limit || 50))) });
+    if (opts.group_id) q.set("group_id", opts.group_id);
     if (token) q.set("token", token);
     const j = await okJson(await fetch(`${HEYGEN_V3}/avatars/looks?${q}`, { headers: heygenHeaders(false) }), "heygen looks");
     const looks: HeygenLook[] = (j?.data || []).map((l: any) => ({ ...toLook(l), ...(l.gender ? { gender: l.gender } : {}) }));
@@ -601,6 +602,35 @@ export async function heygenLookPage(opts: { ownership: "private" | "public"; to
     token = next;
   }
   return { looks: out, next_token: next };
+}
+
+/** One of HeyGen's stock presenters: the PERSON (an avatar group), not each
+ *  of their looks. The looks list shows one person's ~20 looks together
+ *  (Dante Office 1-15, Living Room 1-7...), so browsing for someone meant
+ *  scrolling past pages of one face (Marc, Oct 6). */
+export interface HeygenPerson { id: string; name: string; gender?: string; preview?: string; looks_count?: number }
+
+/** A page of HeyGen's stock presenters, one per person (GET /v3/avatars).
+ *  With a gender, pages on until there are some (HeyGen cannot filter). */
+export async function heygenPeoplePage(opts: { token?: string; gender?: string; limit?: number } = {}): Promise<{ people: HeygenPerson[]; next_token: string | null }> {
+  if (!process.env.HEYGEN_API_KEY) throw new Error("HEYGEN_API_KEY is not set");
+  const want = (opts.gender || "").toLowerCase();
+  const out: HeygenPerson[] = [];
+  let token = opts.token, next: string | null = null;
+  for (let i = 0; i < 12; i++) {
+    const q = new URLSearchParams({ ownership: "public", limit: String(Math.max(1, Math.min(50, opts.limit || 50))) });
+    if (token) q.set("token", token);
+    const j = await okJson(await fetch(`${HEYGEN_V3}/avatars?${q}`, { headers: heygenHeaders(false) }), "heygen avatars");
+    for (const g of (j?.data || []) as any[]) {
+      if (g.status && g.status !== "completed") continue;
+      if (want && g.gender && String(g.gender).toLowerCase() !== want) continue;
+      out.push({ id: g.id, name: g.name || g.id, ...(g.gender ? { gender: g.gender } : {}), ...(g.preview_image_url ? { preview: g.preview_image_url } : {}), ...(g.looks_count != null ? { looks_count: g.looks_count } : {}) });
+    }
+    next = j?.has_more && j?.next_token ? String(j.next_token) : null;
+    if (!next || !want || out.length >= 24) break;
+    token = next;
+  }
+  return { people: out, next_token: next };
 }
 
 export async function getHeygenLook(id: string): Promise<HeygenLook> {
