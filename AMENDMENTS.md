@@ -14,6 +14,21 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-06 — HeyGen presenters, one card per person
+
+Marc: "is there a way to search by gender and ethnicity? I am looking for an
+Indian woman." HeyGen exposes no ethnicity (a look has gender, a name, style
+tags and a preview), so nothing to filter on. What made the search hopeless
+was the listing: the looks endpoint returns one person's ~20 looks together
+(Dante Office 1-15, Living Room 1-7...). The presenters tab now lists PEOPLE
+-- `GET /v3/avatars?ownership=public` (`heygenPeoplePage`: completed groups,
+gender filtered by paging on) -- with Everyone/Women/Men, and a person opens
+onto their looks (`?public=1&group=<id>`); a look click adds the actor.
+Route: `/api/heygen-avatars/{t}?people=1&gender=&page=`. A described-photo
+search (an AI's guess at apparent background) was offered and parked.
+
+---
+
 ## 2026-10-06 — A recast's framing: pull it back without paying the vendor again; gentler punch-ins on cast scenes
 
 Marc: "when I recast it puts the camera so close ... I want to be further back

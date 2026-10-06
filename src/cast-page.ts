@@ -136,7 +136,7 @@ export function getCastHtml(): string {
     </div>
   </main>`;
   const script = `
-  var actors = [], voices = { elevenlabs: [], heygen: [] }, tab = 'gen', looks = null, pub = null, pubToken = null, pubGender = '', audio = null;
+  var actors = [], voices = { elevenlabs: [], heygen: [] }, tab = 'gen', looks = null, people = null, peopleToken = null, person = null, pubGender = '', audio = null;
   function start() {
     railApi('/api/cast/' + enc(tenant) + '/voices').then(function (v) { voices = v || voices; render(); }).catch(function () {});
     load();
@@ -216,47 +216,90 @@ export function getCastHtml(): string {
       };
       return;
     }
-    var list = t === 'looks' ? looks : pub;
-    if (!list) {
+    if (t === 'pub') { showPresenters(body); return; }
+    if (!looks) {
       body.innerHTML = '<div class="empty">Loading&#8230;</div>';
-      railApi('/api/heygen-avatars/' + enc(tenant) + (t === 'looks' ? '?looks=1' : pubQuery(''))).then(function (r) {
-        var got = (r.looks || []).filter(function (l) { return !l.status || l.status === 'completed'; });
-        if (t === 'looks') looks = got; else { pub = got; pubToken = r.next_token || null; }
+      railApi('/api/heygen-avatars/' + enc(tenant) + '?looks=1').then(function (r) {
+        looks = (r.looks || []).filter(function (l) { return !l.status || l.status === 'completed'; });
         if (tab === t) showTab(t);
       }).catch(function (e) { body.innerHTML = '<div class="empty"></div>'; body.firstChild.textContent = e.message || String(e); });
       return;
     }
-    // Presenters: who to browse. HeyGen lists one person's looks together
-    // and cannot filter, so the server pages on until it has some of them.
-    var genders = t === 'pub' ? '<div class="tabs" id="pubGender" style="margin:0 0 10px">'
-      + [['', 'Everyone'], ['female', 'Women'], ['male', 'Men']].map(function (g) {
-        return '<button class="btn small' + (pubGender === g[0] ? ' on' : '') + '" data-gender="' + g[0] + '">' + g[1] + '</button>';
-      }).join('') + '</div>' : '';
-    if (!list.length) { body.innerHTML = genders + '<div class="empty">' + (t === 'looks' ? 'No looks on your HeyGen account.' : 'No presenters.') + '</div>'; bindGender(); return; }
-    body.innerHTML = genders + '<p class="sub" style="margin:0 0 10px">Click one to add it. A look is its own setting: HeyGen draws the person and the place.</p><div class="looks" id="lookGrid"></div>'
-      + (t === 'pub' && pubToken ? '<button class="btn small" id="more" style="margin-top:10px">More</button>' : '');
-    bindGender();
-    var grid = $('lookGrid');
+    if (!looks.length) { body.innerHTML = '<div class="empty">No looks on your HeyGen account.</div>'; return; }
+    body.innerHTML = '<p class="sub" style="margin:0 0 10px">Click one to add it. A look is its own setting: HeyGen draws the person and the place.</p><div class="looks" id="lookGrid"></div>';
+    lookCards($('lookGrid'), looks);
+  }
+  // A grid of looks; a click adds that look as an actor.
+  function lookCards(grid, list) {
     list.forEach(function (l) {
       var c = document.createElement('div'); c.className = 'card';
-      c.innerHTML = '<div class="pic">' + (l.preview ? '<img alt="" src="' + railEsc(l.preview) + '">' : '') + '</div><div class="body"><div class="meta"></div></div>';
+      c.innerHTML = '<div class="pic">' + (l.preview ? '<img alt="" loading="lazy" src="' + railEsc(l.preview) + '">' : '') + '</div><div class="body"><div class="meta"></div></div>';
       c.querySelector('.meta').textContent = l.name || l.id;
       c.onclick = function () { add({ heygen_look_id: l.id }, l.name || 'the look').catch(function (e) { say(e.message || String(e), 'err'); }); };
       grid.appendChild(c);
     });
+  }
+  // HEYGEN PRESENTERS, one card per PERSON (Marc, Oct 6: one person's ~20
+  // looks filled the page, so finding someone meant scrolling past Dante
+  // Office 1-15). Pick the person, then their look.
+  function showPresenters(body) {
+    var genders = '<div class="tabs" id="pubGender" style="margin:0 0 10px">'
+      + [['', 'Everyone'], ['female', 'Women'], ['male', 'Men']].map(function (g) {
+        return '<button class="btn small' + (pubGender === g[0] ? ' on' : '') + '" data-gender="' + g[0] + '">' + g[1] + '</button>';
+      }).join('') + '</div>';
+    if (person) {
+      body.innerHTML = '<div class="tabs" style="margin:0 0 10px"><button class="btn small" id="pubBack">&#8592; All presenters</button></div>'
+        + '<p class="sub" style="margin:0 0 10px"></p><div class="looks" id="lookGrid"></div>';
+      body.querySelector('p.sub').textContent = person.name + ': click a look to add it. A look is its own setting: HeyGen draws the person and the place.';
+      $('pubBack').onclick = function () { person = null; showPresenters(body); };
+      if (!person.looks) {
+        $('lookGrid').innerHTML = '<div class="empty">Loading&#8230;</div>';
+        var who = person;
+        railApi('/api/heygen-avatars/' + enc(tenant) + '?public=1&group=' + enc(who.id)).then(function (r) {
+          who.looks = (r.looks || []).filter(function (l) { return !l.status || l.status === 'completed'; });
+          if (person === who && tab === 'pub') showPresenters(body);
+        }).catch(function (e) { say(e.message || String(e), 'err'); });
+        return;
+      }
+      if (!person.looks.length) { $('lookGrid').innerHTML = '<div class="empty">No looks.</div>'; return; }
+      lookCards($('lookGrid'), person.looks);
+      return;
+    }
+    if (!people) {
+      body.innerHTML = genders + '<div class="empty">Loading&#8230;</div>';
+      bindGender(body);
+      railApi('/api/heygen-avatars/' + enc(tenant) + peopleQuery('')).then(function (r) {
+        people = r.people || []; peopleToken = r.next_token || null;
+        if (tab === 'pub') showPresenters(body);
+      }).catch(function (e) { body.innerHTML = '<div class="empty"></div>'; body.firstChild.textContent = e.message || String(e); });
+      return;
+    }
+    if (!people.length) { body.innerHTML = genders + '<div class="empty">No presenters.</div>'; bindGender(body); return; }
+    body.innerHTML = genders + '<p class="sub" style="margin:0 0 10px">Pick a person to see their looks.</p><div class="looks" id="peopleGrid"></div>'
+      + (peopleToken ? '<button class="btn small" id="more" style="margin-top:10px">More</button>' : '');
+    bindGender(body);
+    var grid = $('peopleGrid');
+    people.forEach(function (g) {
+      var c = document.createElement('div'); c.className = 'card';
+      c.innerHTML = '<div class="pic">' + (g.preview ? '<img alt="" loading="lazy" src="' + railEsc(g.preview) + '">' : '') + '</div><div class="body"><div class="name"></div><div class="meta"></div></div>';
+      c.querySelector('.name').textContent = g.name;
+      c.querySelector('.meta').textContent = g.looks_count ? g.looks_count + (g.looks_count === 1 ? ' look' : ' looks') : '';
+      c.onclick = function () { person = g; showPresenters(body); };
+      grid.appendChild(c);
+    });
     if ($('more')) $('more').onclick = function () {
       $('more').disabled = true; $('more').textContent = 'Loading…';
-      railApi('/api/heygen-avatars/' + enc(tenant) + pubQuery(pubToken)).then(function (r) {
-        pub = pub.concat((r.looks || []).filter(function (l) { return !l.status || l.status === 'completed'; })); pubToken = r.next_token || null; showTab('pub');
+      railApi('/api/heygen-avatars/' + enc(tenant) + peopleQuery(peopleToken)).then(function (r) {
+        people = people.concat(r.people || []); peopleToken = r.next_token || null; showPresenters(body);
       }).catch(function (e) { say(e.message || String(e), 'err'); });
     };
   }
-  function pubQuery(page) {
-    return '?public=1' + (pubGender ? '&gender=' + enc(pubGender) : '') + (page ? '&page=' + enc(page) : '');
+  function peopleQuery(page) {
+    return '?people=1' + (pubGender ? '&gender=' + enc(pubGender) : '') + (page ? '&page=' + enc(page) : '');
   }
-  function bindGender() {
+  function bindGender(body) {
     Array.prototype.forEach.call(document.querySelectorAll('#pubGender button'), function (b) {
-      b.onclick = function () { pubGender = b.getAttribute('data-gender') || ''; pub = null; pubToken = null; showTab('pub'); };
+      b.onclick = function () { pubGender = b.getAttribute('data-gender') || ''; people = null; peopleToken = null; person = null; showPresenters(body); };
     });
   }
   Array.prototype.forEach.call(document.querySelectorAll('#addTabs button'), function (b) { b.onclick = function () { showTab(b.getAttribute('data-tab')); }; });
