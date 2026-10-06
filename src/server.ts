@@ -1910,6 +1910,7 @@ export function createMcpServer(): McpServer {
       cast: z.string().optional().describe("scene_cast: an actor id, 'recording' (the recorded person), or 'film' (follow the film)."),
       seconds: z.number().optional().describe("actor_clip: how long Seedance makes it, 4-15 s (default: show rounded up, else 5)."),
       show: z.number().optional().describe("actor_clip: how long it is ON SCREEN, s (a montage beat: 0.6-2.5 s of a 4 s shot). Several clips per scene, one per `at` (a new clip at the same at replaces it)."),
+      clip_in: z.number().min(0).optional().describe("actor_clip: seconds into the clip where it starts when it cuts in (default 1 s when the clip has it to spare: Seedance eases in, and a one-second cutaway was over before the action got going)."),
       at: z.number().optional().describe("actor_clip: when it starts in the scene, seconds (default 0)."),
       project_id: z.string().optional().describe("recast / generate / status / clear: the film."),
       actor: z.string().optional().describe("recast / generate / update_actor / remove_actor: a cast actor id (from list)."),
@@ -1991,7 +1992,7 @@ export function createMcpServer(): McpServer {
             if (params.action === "pick_frame") { if (!params.frame_url) return err("frame_url is required"); return ok(await sp.pickSceneFrame(t, pid, si, params.frame_url)); }
             if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, quality: params.quality, frame_prompt: params.frame_prompt, video_prompt: params.video_prompt, force: params.force === true, delivery: params.delivery, location: params.location, engine: params.engine, motion: params.motion, voice_speed: params.voice_speed })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
             if (params.action === "scene_location") return ok({ ...(await sp.setSceneLocation(t, pid, si, String(params.location ?? ""))), message: params.location ? "Set. The next frame is drawn there and every take sends its plate as the room." : "Cleared." });
-            if (params.action === "actor_clip") return ok({ ...(await sp.startActorClip(t, pid, si, { actor: params.actor, shot: String(params.shot || ""), seconds: params.seconds, at: params.at, show: params.show, location: params.location })), message: "Making the clip (~3-5 min). Poll action='scenes'." });
+            if (params.action === "actor_clip") return ok({ ...(await sp.startActorClip(t, pid, si, { actor: params.actor, shot: String(params.shot || ""), seconds: params.seconds, at: params.at, show: params.show, location: params.location, clip_in: params.clip_in })), message: "Making the clip (~3-5 min). Poll action='scenes'." });
             const { setSceneCast } = await import("./core/recast.js");
             const c = params.cast;
             if (!c) return err("cast is required: an actor id, 'recording' or 'film'");

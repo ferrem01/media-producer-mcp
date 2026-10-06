@@ -3081,7 +3081,7 @@ Rules:
             }
             if (body.action === "clip") {
               const { startActorClip } = await import("./core/scene-performance.js");
-              jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined, at: Number(body.at) || undefined, show: Number(body.show) || undefined, location: str(body.location) }));
+              jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined, at: Number(body.at) || undefined, show: Number(body.show) || undefined, location: str(body.location) , clip_in: Number.isFinite(Number(body.clip_in)) && body.clip_in !== undefined && body.clip_in !== null ? Number(body.clip_in) : undefined}));
               return;
             }
             jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "location", "voice", "perform", "restore", "clip", "cast" or "recording"' });

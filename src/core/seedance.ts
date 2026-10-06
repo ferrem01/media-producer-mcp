@@ -51,7 +51,8 @@ export function speakingPrompt(shot: string): string {
 export function silentPrompt(shot: string): string {
   return "The person from the first frame and the character sheet (the same face, hair, clothes and accessories). " +
     `${shot.trim().replace(/\.?$/, ".")} ` +
-    "Realistic body movement and weight, natural light, cinematic, no text on screen. Sound: quiet room tone only, no music, no speech.";
+    "They move naturally the whole time, from the very first frame -- gesturing, shifting, reacting, talking if the shot says so; never a held pose. " +
+    "Realistic body movement and weight, natural light, cinematic, no text on screen. Sound: quiet room tone, no music (the clip plays silent under the scene's voice).";
 }
 
 async function poll(id: string, headers: Record<string, string>): Promise<SeedanceResult> {

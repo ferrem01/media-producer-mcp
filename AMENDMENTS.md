@@ -9,6 +9,22 @@ session can pick up mid-thread.
 
 
 
+
+## 2026-10-06 — Cutaways that move: an in-point, a prompt that asks for motion
+
+Marc on the replica: "the couch shot by the time it gets started we switch
+out of it, and the car one she is barely moving" -- the pace (a cut every
+~0.75-1 s) against Seedance's slow first second, and a silent prompt that
+said "no speech" (a seated actor told not to speak holds still). Three fixes:
+- `data.clip_in` on a timed video component: where it starts in its source
+  when it cuts in (Studio and the render both read it through start_at).
+  `startActorClip` defaults it to 1 s when the clip has it to spare;
+  MCP/API `clip_in` overrides.
+- The silent prompt asks for movement the whole time, from the first frame;
+  the clip's sound is stripped anyway, so "no speech" is gone.
+- Remaking a cutaway keeps its word anchors and where they landed (a remake
+  used to drop them and the cut fell back to `at`).
+
 ## 2026-10-06 — Cast cleanup: experiment leftovers out
 
 Marc: "I want to make sure we don't have cruft ... no extra garbage." Four
