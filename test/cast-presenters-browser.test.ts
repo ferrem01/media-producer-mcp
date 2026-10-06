@@ -78,3 +78,39 @@ describe("heygenPeoplePage: HeyGen's people, gender filtered by paging on", () =
     } finally { vi.unstubAllGlobals(); delete process.env.HEYGEN_API_KEY; }
   });
 });
+
+describe("Cast page: an actor's model sheet opens", () => {
+  it("a generated person's card has Model sheet; it and the portrait open a full-size viewer with both pictures", async () => {
+    const browser = await chromium.launch({ ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}) });
+    try {
+      const page = await browser.newPage();
+      const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+      await page.route("**/*", async (route) => {
+        const u = new URL(route.request().url());
+        const json = (o: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+        if (u.pathname === "/cast") return route.fulfill({ status: 200, contentType: "text/html", body: getCastHtml() });
+        if (u.pathname === "/auth/me") return json({ tenant_id: "t" });
+        if (/\/(portrait|sheet)$/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "image/png", body: png });
+        if (u.pathname === "/api/cast/t") return json({ cast: [
+          { id: "dana", name: "Dana", portrait: "cast/dana.jpg", sheet: "cast/dana-sheet.jpg", fictional: { at: "x" } },
+          { id: "marc", name: "Marc", portrait: "cast/marc.jpg", heygen_look_id: "lk" } ] });
+        if (u.pathname.startsWith("/api/")) return json({});
+        return route.fulfill({ status: 404, body: "" });
+      });
+      await page.goto("http://studio.test/cast?tenant=t");
+      await page.waitForSelector("#actors .card");
+      expect(await page.$$eval("#actors .card button.sheet", (b) => b.length)).toBe(1);   // only the actor with a sheet
+      await page.click("#actors .card button.sheet");
+      await page.waitForSelector("#viewer img");
+      expect(await page.getAttribute("#viewer img", "src")).toContain("/api/cast/t/dana/sheet");
+      expect(await page.textContent("#viewer")).toContain("Dana \u00b7 Model sheet");
+      await page.click('#viewer [data-i="0"]');
+      expect(await page.getAttribute("#viewer img", "src")).toContain("/api/cast/t/dana/portrait");
+      await page.keyboard.press("Escape");
+      expect(await page.$("#viewer")).toBeNull();
+      await page.click("#actors .card:nth-child(2) .pic");                 // a look: the portrait alone
+      await page.waitForSelector("#viewer img");
+      expect(await page.$$eval("#viewer [data-i]", (b) => b.length)).toBe(1);
+    } finally { await browser.close(); }
+  }, 60000);
+});

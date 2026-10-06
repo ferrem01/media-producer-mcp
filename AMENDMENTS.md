@@ -14,6 +14,16 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-06 — An actor's model sheet opens on the Cast page
+
+Marc: "a way to show the model sheet for cast members that have them". The
+sheet was kept (`cast/<id>-sheet.jpg`) but nothing served or showed it.
+`GET /api/cast/{t}/{actor}/sheet`; on the Cast page an actor with a sheet has
+a Model sheet button, and the portrait opens too: a full-size viewer with
+Portrait / Model sheet, Open full size, Esc or a click outside to close.
+
+---
+
 ## 2026-10-06 — The take page's done screen: Next scene, no Desktop Studio
 
 Marc, recording on the phone: after attaching a scene the done screen offered
