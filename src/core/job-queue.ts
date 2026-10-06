@@ -6,7 +6,7 @@
  */
 
 import crypto from "node:crypto";
-import { isDeploying } from "./server-health.js";
+import { isDeploying, diskTooFull } from "./server-health.js";
 
 export interface Job {
   id: string;
@@ -44,6 +44,7 @@ export function queueJob(
   if (type !== "take" && isDeploying()) {
     throw new Error("The server is updating right now (a few minutes). Start this again once it's back -- nothing was started.");
   }
+  if (type !== "take") { const full = diskTooFull(); if (full) throw new Error(full); }
   const id = `job_${crypto.randomUUID().slice(0, 8)}`;
   const job: Job = {
     id,

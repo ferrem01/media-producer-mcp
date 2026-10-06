@@ -12,6 +12,21 @@ session can pick up mid-thread.
 
 
 
+
+## 2026-10-06 — The real cause: a full disk
+
+Marc ran the diagnostics on the droplet: `/` at 100% (73 MB free of 155
+GB), `/tmp` holding 62 GB -- 2,752 `remotion-webpack-bundle-*` folders
+(43 MB each, newest June 3) left by an old Remotion experiment on the box,
+nothing this repo makes. Chromium keeps its shared memory in /tmp
+(--disable-dev-shm-usage), so every render died at its first screenshot
+("Unable to capture screenshot", GPU process killed) while RAM was fine.
+Cleared (`find /tmp -maxdepth 1 -name 'remotion-*' -mmin +60 -exec rm -rf {} +`):
+62% used. The 29 browsers /health counted were 120-day-old `node -e`
+Playwright probes, harmless. Guards: renders and builds are refused below
+2 GB free on /tmp or the data dir, in plain words (`diskTooFull`); /health
+reports `disk` and `browser_owners`.
+
 ## 2026-10-06 — Deploys that don't kill renders; a box you can see
 
 Marc's re-render started at 01:51 while the speaker-slot deploy was

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { config } from "../src/config.js";
-import { deployLockPath, writeDeployLock, isDeploying, machineStats } from "../src/core/server-health.js";
+import { deployLockPath, writeDeployLock, isDeploying, machineStats, diskTooFull, MIN_FREE_DISK_MB } from "../src/core/server-health.js";
 import { queueJob } from "../src/core/job-queue.js";
 
 // Deploys that don't kill renders, and a box you can see (Oct 6: a render
@@ -29,6 +29,13 @@ describe("the deploy lock and the box's health", () => {
     expect(isDeploying()).toBe(false);
   });
 
+  it("refuses a render when the disk is nearly full, in plain words", () => {
+    expect(MIN_FREE_DISK_MB).toBeGreaterThanOrEqual(1024);
+    expect(diskTooFull()).toBeNull();                                   // this box has room
+    const src = fs.readFileSync("src/core/job-queue.ts", "utf8");
+    expect(src).toMatch(/if \(type !== "take"\) \{ const full = diskTooFull\(\); if \(full\) throw new Error\(full\); \}/);
+  });
+
   it("reports memory, load, browsers and render workers", () => {
     const s: any = machineStats();
     expect(s.memory_mb.total).toBeGreaterThan(0);
@@ -36,6 +43,8 @@ describe("the deploy lock and the box's health", () => {
     expect(typeof s.load_1m).toBe("number");
     expect(s.browsers).toBeGreaterThanOrEqual(0);
     expect(s.render_workers).toBeGreaterThanOrEqual(0);
+    expect(s.disk.tmp.free_mb).toBeGreaterThan(0);                       // a full /tmp breaks screenshots
+    expect(typeof s.browser_owners).toBe("object");
   });
 
   it("is wired: /health reports it, /api/deploy writes the lock, deploy.sh removes it and waits for running jobs; workers die with their server; leftovers are swept at start", () => {
