@@ -36,6 +36,8 @@ describe("the deploy lock and the box's health", () => {
     expect(typeof s.load_1m).toBe("number");
     expect(s.browsers).toBeGreaterThanOrEqual(0);
     expect(s.render_workers).toBeGreaterThanOrEqual(0);
+    expect(s.disk.tmp.free_mb).toBeGreaterThan(0);                       // a full /tmp breaks screenshots
+    expect(typeof s.browser_owners).toBe("object");
   });
 
   it("is wired: /health reports it, /api/deploy writes the lock, deploy.sh removes it and waits for running jobs; workers die with their server; leftovers are swept at start", () => {
