@@ -14,6 +14,20 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-06 — The take page's done screen: Next scene, no Desktop Studio
+
+Marc, recording on the phone: after attaching a scene the done screen offered
+Back to Studio / Record again / Desktop Studio, so the next scene meant going
+back to Studio, scrolling the board and picking it. Desktop Studio is gone
+(it was also a second element with id studioLink). A **Next: Scene N ·
+label** button opens the next scene with lines and no take yet (wrapping
+round; `NEXT_SCENE_JS`) on the same page: the URL's scene changes and the
+ready screen loads its lines. Hidden in Studio's dialog (it closes on
+attach) and for a whole-film take; with nothing left, Back to Studio is the
+primary button.
+
+---
+
 ## 2026-10-06 — HeyGen presenters, one card per person
 
 Marc: "is there a way to search by gender and ethnicity? I am looking for an

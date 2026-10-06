@@ -24,6 +24,22 @@ import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
 import { LIGHT_CHECK_JS } from "./core/light-check.js";
 import { PROMPTER_TIMING_JS, PROMPTER_VIEW_JS } from "./core/prompter.js";
 
+/** NEXT SCENE from the done screen (Marc, Oct 6: after attaching a scene he
+ *  went back to Studio, scrolled the board and picked the next one he had
+ *  not recorded). The next scene after the current one that has lines and no take
+ *  yet, wrapping round to the start; -1 when every scene is done. Browser
+ *  JS, shared with the test. */
+export const NEXT_SCENE_JS = `
+  function nextOpenScene(scenes, taken, from) {
+    var n = scenes.length;
+    for (var k = 1; k < n; k++) {
+      var i = (from + k) % n;
+      if (scenes[i] && scenes[i].lines && taken.indexOf(i) < 0) return i;
+    }
+    return -1;
+  }
+`;
+
 export function getTakeHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -256,10 +272,10 @@ ${QUOTIENT_CSS}
   <p class="big">✓</p>
   <h1>Attached</h1>
   <p class="sub" id="doneMeta"></p>
-  <p class="note">The take is now this scene's speaker base. Head back to Studio for the next scene, or record this one again.</p>
+  <p class="note" id="doneNote">The take is now this scene's speaker base. Go on to the next scene, or record this one again.</p>
   <div class="spacer"></div>
-  <a class="btn" id="studioLink" href="#">Back to Studio</a>
-  <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Desktop Studio</a></div>
+  <button class="btn" id="nextBtn" style="display:none">Next scene</button>
+  <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Back to Studio</a></div>
 </section>
 
 <section id="err" class="pad">
@@ -311,6 +327,10 @@ ${QUOTIENT_CSS}
   }
   if (embedded) { ['studioLinkTop'].forEach(function (id) { var el = document.getElementById(id); if (el && el.parentNode) el.parentNode.style.display = 'none'; }); document.querySelectorAll('#studioLink').forEach(function (el) { el.style.display = 'none'; }); }
   ${PROMPTER_TIMING_JS}
+  ${NEXT_SCENE_JS}
+  // The film's scenes (has lines?) and which already have a take: the done
+  // screen's Next scene.
+  var filmScenes = [], takenScenes = [];
 
   function show(id) {
     ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
@@ -392,6 +412,8 @@ ${QUOTIENT_CSS}
         var r0 = document.querySelector('input[name="bg"][value="' + mode + '"]'); if (r0) r0.checked = true;
       } catch (eBg) {}
       var allScenes = (p.storyboard && p.storyboard.scenes) || [];
+      filmScenes = allScenes.map(function (s0) { return { label: s0.label || '', lines: !!String(s0.voiceover_text || '').trim() }; });
+      takenScenes = (p.takes || []).map(function (t0) { return t0.scene_index; }).filter(function (x) { return typeof x === 'number'; });
       // A CLIP, NOT THE SPEAKER: a scene whose camera need is a clip (or a
       // film no person carries) records a live-action moment that lands as
       // a video on the scene -- room/blur/alpha do not apply.
@@ -829,8 +851,8 @@ ${QUOTIENT_CSS}
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
         .then(function (j) {
           $('doneMeta').textContent = projectName + ' · ' + fmt(blobDuration) + ' take';
-          $('studioLink').href = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + '&token=' + encodeURIComponent(token) + '&desktop=1';
           $('studioLink').href = studioHref;
+          showNext();
           show('done');
           // The take is in: the camera goes off (it stayed lit in the dialog
           // after "Use this take" -- measured live on a laptop).
@@ -843,6 +865,29 @@ ${QUOTIENT_CSS}
   });
 
   $('againBtn').addEventListener('click', function () { blob = null; chunks = []; show('ready'); $('recordBtn').disabled = false; });
+  // Next scene: the next one with lines and no take, straight onto its ready
+  // screen -- no trip back through Studio. Not in Studio's dialog (it closes
+  // on attach) and not for a whole-film take.
+  function showNext() {
+    var nb = $('nextBtn');
+    if (sceneIndex >= 0 && takenScenes.indexOf(sceneIndex) < 0) takenScenes.push(sceneIndex);
+    var n = (embedded || recordAll) ? -1 : nextOpenScene(filmScenes, takenScenes, sceneIndex);
+    nb.dataset.scene = String(n);
+    nb.style.display = n >= 0 ? '' : 'none';
+    if (n >= 0) nb.textContent = 'Next: Scene ' + (n + 1) + (filmScenes[n] && filmScenes[n].label ? ' \u00b7 ' + filmScenes[n].label : '');
+    // With no next scene, Back to Studio is the way on.
+    $('studioLink').className = n >= 0 ? 'btn ghost' : 'btn';
+    $('doneNote').textContent = n >= 0 ? 'The take is in. Go on to the next scene you have not recorded, or record this one again.'
+      : (recordAll || embedded ? 'The take is in.' : 'The take is in, and every scene now has one.');
+  }
+  $('nextBtn').addEventListener('click', function () {
+    var n = Number($('nextBtn').dataset.scene);
+    if (!(n >= 0)) return;
+    sceneIndex = n; recordAll = false; blob = null; chunks = [];
+    try { var u = new URL(location.href); u.searchParams.set('scene', String(n)); history.replaceState(null, '', u.toString()); } catch (eU) {}
+    show('ready');
+    loadFilm();
+  });
   $('errBtn').addEventListener('click', function () { stopAll(); show('ready'); $('recordBtn').disabled = !cues && false; $('recordBtn').disabled = false; });
 })();
 </script>
