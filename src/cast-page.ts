@@ -160,7 +160,7 @@ export function getCastHtml(): string {
         + '<div class="body"><div class="name"><span class="nm"></span><span class="badge">' + kindOf(a) + '</span></div>'
         + '<div class="meta">' + (a.sheet ? 'Portrait + model sheet' : a.heygen_look_id ? 'HeyGen draws the person' : 'Portrait') + '</div>'
         + '<div class="row"><select class="voice" title="The ElevenLabs voice this actor speaks with">' + opts + '</select><button class="quiet hear" title="Hear the voice">&#9654;</button></div>'
-        + '<div class="row"><button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
+        + '<div class="row">' + (a.sheet ? '<button class="quiet sheet">Model sheet</button>' : '') + '<button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
       card.querySelector('.nm').textContent = a.name;
       card.querySelector('.voice').onchange = function (ev) {
         var id = ev.target.value, v = (voices.elevenlabs || []).filter(function (x) { return x.id === id; })[0];
@@ -171,6 +171,10 @@ export function getCastHtml(): string {
         if (!v || !v.preview) { say('No sample for this voice.'); return; }
         try { if (audio) audio.pause(); audio = new Audio(v.preview); audio.play(); } catch (e) {}
       };
+      // The portrait opens large; the model sheet (a generated person) beside it.
+      card.querySelector('.pic').style.cursor = 'zoom-in';
+      card.querySelector('.pic').onclick = function () { viewActor(a, false); };
+      if (a.sheet) card.querySelector('.sheet').onclick = function () { viewActor(a, true); };
       card.querySelector('.ren').onclick = function () { var n = prompt('Rename ' + a.name, a.name); if (n && n.trim()) patch(a, { name: n.trim() }, 'Renamed.'); };
       card.querySelector('.del').onclick = function () {
         if (!confirm('Remove ' + a.name + ' from the cast? Takes already made with them stay on their films.')) return;
@@ -178,6 +182,34 @@ export function getCastHtml(): string {
       };
       box.appendChild(card);
     });
+  }
+  // A look at an actor's pictures, full size: the portrait (the start frame)
+  // and, for a generated person, the model sheet it was drawn from.
+  function viewActor(a, sheetFirst) {
+    var pics = [{ label: 'Portrait', url: withToken('/api/cast/' + enc(tenant) + '/' + enc(a.id) + '/portrait') }];
+    if (a.sheet) pics.push({ label: 'Model sheet', url: withToken('/api/cast/' + enc(tenant) + '/' + enc(a.id) + '/sheet') });
+    var at = sheetFirst && a.sheet ? 1 : 0;
+    var box = document.createElement('div'); box.id = 'viewer';
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:50;background:rgba(10,10,12,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;');
+    var dark = 'background:#222;color:#ddd;border-color:#444';
+    function draw() {
+      box.innerHTML = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center">' + pics.map(function (p, i) {
+          return '<button class="btn small" data-i="' + i + '" style="' + (i === at ? '' : dark) + '">' + p.label + '</button>';
+        }).join('') + '<a class="btn small" target="_blank" rel="noopener" style="' + dark + '" href="' + railEsc(pics[at].url) + '">Open full size</a>'
+        + '<button class="btn small" id="viewerX" style="' + dark + '">Close</button></div>'
+        + '<img alt="" src="' + railEsc(pics[at].url) + '" style="max-width:min(1400px,96vw);max-height:82vh;object-fit:contain;border-radius:8px;background:#111">'
+        + '<div style="color:#bbb;font-size:13px"></div>';
+      box.lastChild.textContent = a.name + ' \u00b7 ' + pics[at].label;
+      Array.prototype.forEach.call(box.querySelectorAll('[data-i]'), function (b) { b.onclick = function (ev) { ev.stopPropagation(); at = Number(b.getAttribute('data-i')); draw(); }; });
+      box.querySelector('#viewerX').onclick = close;
+      box.querySelector('img').onclick = function (ev) { ev.stopPropagation(); };
+    }
+    function close() { box.remove(); document.removeEventListener('keydown', onKey); }
+    function onKey(ev) { if (ev.key === 'Escape') close(); }
+    box.onclick = function (ev) { if (ev.target === box) close(); };
+    document.addEventListener('keydown', onKey);
+    draw();
+    document.body.appendChild(box);
   }
   function patch(a, body, done) {
     railApi('/api/cast/' + enc(tenant) + '/' + enc(a.id), { method: 'PATCH', body: JSON.stringify(body) }).then(function () { say(done, 'ok'); load(); }).catch(function (e) { say(e.message || String(e), 'err'); });

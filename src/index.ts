@@ -2792,7 +2792,8 @@ Rules:
       // GET    /api/cast/{tenant}/voices          voices to pick: ElevenLabs (stock + clones) and HeyGen (the account's own)
       // DELETE /api/cast/{tenant}/{actor}         remove an actor
       // GET    /api/cast/{tenant}/{actor}/portrait  the actor's picture
-      const castApi = urlPath.match(/^\/api\/cast\/([^/]+)(?:\/([A-Za-z0-9_-]+)(\/portrait)?)?$/);
+      // GET    /api/cast/{tenant}/{actor}/sheet     the model sheet (a generated person)
+      const castApi = urlPath.match(/^\/api\/cast\/([^/]+)(?:\/([A-Za-z0-9_-]+)(\/portrait|\/sheet)?)?$/);
       if (castApi) {
         const caTenant = decodeURIComponent(castApi[1]);
         const caSub = castApi[2];
@@ -2801,9 +2802,13 @@ Rules:
             // GET /api/cast/{tenant}/{actor}/portrait   the actor's picture, for the Studio's Cast card
             const actor = caSub ? await getActor(caTenant, caSub) : null;
             if (!actor) { jsonResponse(res, 404, { error: "No such actor" }); return; }
-            const img = await fs.readFile(portraitPath(caTenant, actor)).catch(() => null);
-            if (!img) { jsonResponse(res, 404, { error: "No portrait" }); return; }
-            res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=300" });
+            // GET /api/cast/{tenant}/{actor}/sheet   the model sheet a generated person was drawn from
+            const wantSheet = castApi[3] === "/sheet";
+            if (wantSheet && !actor.sheet) { jsonResponse(res, 404, { error: "This actor has no model sheet" }); return; }
+            const file = wantSheet ? path.join(config.dataDir, caTenant, actor.sheet!) : portraitPath(caTenant, actor);
+            const img = await fs.readFile(file).catch(() => null);
+            if (!img) { jsonResponse(res, 404, { error: wantSheet ? "No model sheet" : "No portrait" }); return; }
+            res.writeHead(200, { "Content-Type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "Cache-Control": "private, max-age=300" });
             res.end(img);
             return;
           }
