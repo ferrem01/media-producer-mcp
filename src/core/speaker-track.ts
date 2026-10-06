@@ -107,6 +107,11 @@ export async function buildSpeakerBase(opts: {
   outputPath: string;
   /** Working directory for intermediate concat files */
   workDir?: string;
+  /** Per-scene takes: where each clip sits in the film, in clip order --
+   *  `lead` seconds of black and silence before it (the first clip only,
+   *  when the film opens on a scene with no take) and exactly `length`
+   *  seconds of it (its scene plus the transition after it). */
+  slots?: Array<{ lead?: number; length: number }>;
 }): Promise<string> {
   const { speakerTrack, totalDuration, width, height, outputPath } = opts;
   const workDir = opts.workDir ?? path.dirname(outputPath);
@@ -159,6 +164,11 @@ export async function buildSpeakerBase(opts: {
     await execFileAsync("ffmpeg", args, { maxBuffer: 50 * 1024 * 1024 });
     if (await centerDeadChannel(outputPath)) console.log(`  [speaker-track] voice was on one channel -- centered`);
     return outputPath;
+  }
+
+  // ── One take per scene, each in ITS slot of the film ──
+  if (opts.slots && opts.slots.length === clips.length) {
+    return buildSlottedBase(clips, opts.slots, width, height, totalDuration, outputPath, workDir);
   }
 
   // ── Multiple clips: concat + scale + trim ──
@@ -226,6 +236,69 @@ export async function buildSpeakerBase(opts: {
   // A take recorded with the voice on one channel (a lav receiver's mono
   // into the left side) plays centered, like every film mix (audio/channels.ts).
   if (speakerHasAudio && (await centerDeadChannel(outputPath))) console.log(`  [speaker-track] voice was on one channel -- centered`);
+  return outputPath;
+}
+
+/**
+ * PER-SCENE TAKES, EACH IN ITS SLOT. The film puts a rendered transition
+ * between scenes (a 0.2 s glitch-cut), but the takes used to be glued end to
+ * end with the concat demuxer: by scene 3 the voice ran 0.45 s ahead of the
+ * film, and a take whose sound and picture ended at different times jolted
+ * the join (Marc, proj_b1f4b7cd, Oct 6: "start of scene 3 freezes for a
+ * second and then the audio scrambles"). Each take is now cut to exactly its
+ * slot -- its scene plus the transition after it: the picture holds its last
+ * frame, the sound pads with silence, both at one clock (30 fps, 48 kHz
+ * stereo) -- and the slots are joined by the concat FILTER, which re-times
+ * every frame instead of trusting each file's timestamps.
+ */
+async function buildSlottedBase(
+  clips: SpeakerTrack["clips"],
+  slots: Array<{ lead?: number; length: number }>,
+  width: number,
+  height: number,
+  totalDuration: number,
+  outputPath: string,
+  workDir: string,
+): Promise<string> {
+  const parts: string[] = [];
+  for (let i = 0; i < clips.length; i++) {
+    const clip: any = clips[i];
+    const lead = Math.max(0, Number(slots[i].lead) || 0);
+    const len = Math.max(0.05, Number(slots[i].length) || 0) + lead;
+    const src = resolveVideoPath(clip.source);
+    const [hasV, hasA] = await Promise.all([hasVideoStream(src), hasAudioStream(src)]);
+    const trimStart = clip.trim_start ?? clip.start ?? 0;
+    const win = clip.trim_end !== undefined ? clip.trim_end - trimStart : undefined;
+    const out = path.join(workDir, `speaker_slot_${i}.mp4`);
+    const args: string[] = ["-y"];
+    if (trimStart > 0) args.push("-ss", String(trimStart));
+    if (win !== undefined && win > 0) args.push("-t", String(win));
+    args.push("-i", src);
+    let n = 1;
+    const vIn = hasV ? "0:v" : `${n}:v`;
+    if (!hasV) { args.push("-f", "lavfi", "-i", `color=c=black:s=${width}x${height}:r=30`); n++; }
+    const aIn = hasA ? "0:a" : `${n}:a`;
+    if (!hasA) { args.push("-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"); n++; }
+    const leadV = lead > 0 ? `,tpad=start_mode=add:start_duration=${lead.toFixed(3)}:color=black` : "";
+    const leadA = lead > 0 ? `,adelay=${Math.round(lead * 1000)}:all=1` : "";
+    args.push("-filter_complex",
+      `[${vIn}]fps=30,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1` +
+      `${leadV},tpad=stop_mode=clone:stop_duration=${len.toFixed(3)},trim=0:${len.toFixed(3)},setpts=PTS-STARTPTS[v];` +
+      `[${aIn}]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo${leadA},apad,atrim=0:${len.toFixed(3)},asetpts=PTS-STARTPTS[a]`,
+      "-map", "[v]", "-map", "[a]",
+      "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+      "-c:a", "pcm_s16le", "-t", len.toFixed(3), out.replace(/\.mp4$/, ".mov"));
+    console.log(`  [speaker-track] Slot ${i + 1}/${clips.length}: ${len.toFixed(2)}s${lead ? ` (${lead.toFixed(2)}s lead)` : ""}`);
+    await execFileAsync("ffmpeg", args, { maxBuffer: 50 * 1024 * 1024 });
+    parts.push(out.replace(/\.mp4$/, ".mov"));
+  }
+  const inputs = parts.flatMap((p) => ["-i", p]);
+  const chain = parts.map((_, i) => `[${i}:v][${i}:a]`).join("") + `concat=n=${parts.length}:v=1:a=1[v][a]`;
+  await execFileAsync("ffmpeg", ["-y", ...inputs, "-filter_complex", chain, "-map", "[v]", "-map", "[a]",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", String(totalDuration), outputPath], { maxBuffer: 50 * 1024 * 1024 });
+  for (const p of parts) await fs.unlink(p).catch(() => {});
+  if (await centerDeadChannel(outputPath)) console.log(`  [speaker-track] voice was on one channel -- centered`);
   return outputPath;
 }
 
@@ -404,6 +477,26 @@ export function speakerSceneFilmStarts(scenes: Array<{ duration_seconds: number;
     }
   }
   return starts;
+}
+
+/** Each per-scene take's slot in the film (core/speaker-track.ts
+ *  buildSlottedBase): from its scene's film start to the next take's (or the
+ *  film's end), so the transitions between scenes are inside the slots.
+ *  null when the clips are not one-per-scene (a continuous track). */
+export function speakerSlots(
+  clips: Array<{ scene_index?: number }>,
+  scenes: Array<{ duration_seconds: number; transition_in?: { type: string; duration_seconds?: number } }>,
+  totalDuration: number,
+): Array<{ lead?: number; length: number }> | null {
+  if (clips.length < 2 || clips.some((c) => typeof c.scene_index !== "number")) return null;
+  const idx = clips.map((c) => c.scene_index as number);
+  if (idx.some((v, i) => v < 0 || v >= scenes.length || (i > 0 && v <= idx[i - 1]))) return null;
+  const starts = speakerSceneFilmStarts(scenes);
+  return idx.map((si, i) => {
+    const from = starts[si];
+    const to = i + 1 < idx.length ? starts[idx[i + 1]] : totalDuration;
+    return { ...(i === 0 && from > 0 ? { lead: from } : {}), length: Math.max(0.05, to - from) };
+  });
 }
 
 /**

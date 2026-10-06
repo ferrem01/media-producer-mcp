@@ -47,7 +47,7 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
-import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts, speakerClipForScene } from "./speaker-track.js";
+import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts, speakerClipForScene, speakerSlots } from "./speaker-track.js";
 import { isSpeakerLayer } from "./speaker-layer.js";
 import { resolveVideoPath } from "./video-path.js";
 import { projectAssetsDir } from "../persistence/paths.js";
@@ -662,6 +662,8 @@ async function renderVideoWithSpeakerTrack(
     height,
     outputPath: speakerBasePath,
     workDir: speakerBaseDir,
+    // One take per scene: each in its slot, the transitions inside them.
+    slots: speakerSlots(speaker_track.clips as any, scenes, totalDuration) || undefined,
   });
   console.log(`  Speaker base: ${speakerBasePath}`);
 

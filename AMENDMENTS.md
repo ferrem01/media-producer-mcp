@@ -10,6 +10,23 @@ session can pick up mid-thread.
 
 
 
+
+## 2026-10-06 — The speaker base: each take in its slot
+
+Marc rendered the replica: "start of scene 3 freezes for a second and then
+the audio scrambles" (Studio was fine). The render glued the per-scene takes
+end to end with the concat demuxer, but the film puts a rendered transition
+between scenes (0.25 s whip-pan, 0.2 s glitch-cut): by scene 3 the voice ran
+0.45 s ahead of the film, and Seedance takes whose sound and picture end at
+different times jolted the joins. `buildSpeakerBase` now takes `slots`
+(`speakerSlots`: each take from its scene's film start to the next take's, so
+the transitions are inside the slots): every take is cut to exactly its slot
+-- the picture holds its last frame, the sound pads with silence, one clock
+(30 fps, 48 kHz stereo) -- and the slots are joined with the concat FILTER.
+Verified with Seedance-like takes (24 fps, sound 0.2 s short / 0.3 s long)
+on ffmpeg 7 and 4.2: every take's voice lands within a frame of its scene's
+film start. A continuous track (no scene_index) keeps the old path.
+
 ## 2026-10-06 — Cutaways that move: an in-point, a prompt that asks for motion
 
 Marc on the replica: "the couch shot by the time it gets started we switch
