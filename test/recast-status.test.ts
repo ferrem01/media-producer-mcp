@@ -56,7 +56,9 @@ describe("where a recast is", () => {
     expect(rc).toMatch(/f\.finished_at = new Date\(\)\.toISOString\(\);/);
     const idx = fs.readFileSync(path.join(__dirname, "..", "src/index.ts"), "utf8");
     expect(idx).toMatch(/recast: rcNow, progress: recastProgress\(rcNow\)/);
-    expect(idx).toMatch(/jsonResponse\(res, 200, \{ jobs, errors, recast \}\)/);
+    expect(idx).toMatch(/jsonResponse\(res, 200, \{ jobs, errors, recast, \.\.\.\(recastFailed \? \{ recast_failed: recastFailed \} : \{\}\) \}\)/);
+    // A recast that failed lately is reported, so the pill never reads "Done" for it.
+    expect(idx).toContain('(rcSt.status === "failed" || rcSt.status === "interrupted") && Date.now() - rcAt < 10 * 60 * 1000');
   });
 
   it("Studio lists every take and keeps the count in the header pill", () => {

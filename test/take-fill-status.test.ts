@@ -146,7 +146,7 @@ describe("Studio: the dials and the status line", () => {
     expect(html).toContain("'Blurring the background'");
     expect(html).toContain("'Applying the look'");
     expect(html).toContain("Done \u2014 the preview has the new version.");
-    expect(html).toContain('<a class="jp-retry">Retry</a><a class="jp-close">Dismiss</a>');
+    expect(html).toContain("(err.kind === 'recast' ? '' : '<a class=\"jp-retry\">Retry</a>') + '<a class=\"jp-close\">Dismiss</a>'");
     // Marc: the progress belongs in the pill at the bottom, and it stays
     // until the work is done -- not hidden in the inspector.
     expect(html).toContain('<div id="job-pill"></div>');
