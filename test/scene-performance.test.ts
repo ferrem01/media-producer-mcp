@@ -278,6 +278,11 @@ describe("linking scenes: start from the last frame", () => {
     expect(perf.frames!.at(-1)).toMatchObject({ from_scene: 0, url: perf.frame });
     const info = await run("ffmpeg", ["-hide_banner", "-i", path.join(DATA, perf.frame!.replace(/^\/assets\//, ""))]).then(() => "", (e: any) => String(e.stderr));
     expect(info).toMatch(/720x1280/);                          // 270x480 take, cut and scaled to the 9:16 frame
+    // Asked again for the same end: that frame is picked, never a copy (Marc: each click added another).
+    const again = await sp.continueSceneFrom(T, P, 1, { actor: "dana", from_scene: 0 });
+    expect(again.frame).toBe(perf.frame);
+    expect(again.frames!.filter((f) => f.from_scene === 0)).toHaveLength(1);
+    expect(again.frames!.at(-1)).toMatchObject({ from_kind: "end", from_key: `${src}@3` });
     await expect(sp.continueSceneFrom(T, P, 1, { actor: "dana", from_scene: 1 })).rejects.toThrow(/another scene/);
     await expect(sp.continueSceneFrom(T, P, 0, { actor: "dana", from_scene: 1 })).rejects.toThrow(/no take to continue from/);
   }, 60000);

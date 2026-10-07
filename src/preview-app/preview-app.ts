@@ -1231,7 +1231,10 @@ ${QUOTIENT_CSS}
   .pf-place.none small { display: block; font-size: 10px; color: var(--content-tertiary, #888); }
   .pf-place.add { border-style: dashed; }
   .pf-newplace { margin: 8px 0 0; padding: 10px; border: 1px dashed var(--border-secondary); border-radius: 8px; }
-  .pf-others { align-items: center; }
+  .pf-step .pf-frame { width: 84px; }
+  .pf-step .pf-frame small { right: 2px; font-size: 9px; line-height: 1.25; white-space: normal; }
+  .pf-frame.ph { display: flex; align-items: center; justify-content: center; background: var(--surface-secondary, #f4f4f5); border-style: dashed; }
+  .pf-frame.ph i { font-style: normal; font-size: 11px; text-align: center; color: var(--content-secondary); line-height: 1.3; }
   .pf-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
   .pf-shotview { display: flex; gap: 12px; align-items: flex-start; margin-top: 8px; }
   .pf-shotbig { width: 180px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; background: #111; flex: 0 0 180px; }
@@ -11742,10 +11745,7 @@ ${QUOTIENT_CSS}
       var vendor = kind === 'recast' ? pfEngLabel(kind, eng) : 'Seedance';
       if (kind === 'recast') h += '<div class="pf-row" style="justify-content:flex-end;margin:-4px 0 4px"><button class="np-btn" data-pf-go="rcamera">' + (dr.rcamera ? '&#10003; ' : '') + 'Keep my camera instead</button></div>';
       if (kind === 'recast' && dr.rcamera) return h + '<div class="np-hint">Your recording’s own camera and room: nothing is drawn, and ' + escHtml(vendor) + ' keeps your framing.</div>';
-      // SAME AS ANOTHER SCENE (Marc, Oct 7: "in scene two, I want it to look
-      // the same as scene one"): the start pictures this actor already has in
-      // the film's other scenes, one click to use; or the last frame of the
-      // scene before, so this one picks up where it ended.
+      // Start pictures this actor already has in the film's other scenes.
       var others = [], seenU = {};
       (pf.data.scenes || []).forEach(function(o, j) {
         if (j === si) return;
@@ -11754,12 +11754,6 @@ ${QUOTIENT_CSS}
           if (u && !seenU[u]) { seenU[u] = 1; others.push({ url: u, scene: j }); }
         });
       });
-      if (others.length || si > 0) {
-        h += '<div class="pf-sub">Same as another scene</div><div class="pf-frames pf-others">' + others.map(function(o) {
-          return '<div class="pf-frame' + (o.url === fr ? ' sel' : '') + '" data-pf-adopt="' + escAttr(o.url) + '" title="Use scene ' + (o.scene + 1) + '’s start picture: the same place and framing"><img src="' + escAttr(withToken(o.url)) + '" alt=""><small>Scene ' + (o.scene + 1) + '</small></div>';
-        }).join('') + (si > 0 ? '<button class="np-btn" data-pf-go="continue"' + (drawing ? ' disabled' : '') + '>Last frame of scene ' + si + '</button>' : '') + '</div>'
-          + '<div class="np-hint" style="margin-top:4px">' + (others.length ? 'One click and this scene starts from the same picture: nothing is drawn.' : 'No other scene has a start picture of ' + escHtml(a.name) + ' yet.') + (si > 0 ? ' Last frame: picks up exactly where scene ' + si + ' ends.' : '') + '</div>';
-      }
       h += '<div class="pf-sub">1 &#183; Where</div><div class="pf-places">';
       h += '<button class="pf-place none' + (!where ? ' sel' : '') + '" data-pf-place=""><span>No set place<small>the words say where</small></span></button>';
       locs.forEach(function(l) {
@@ -11785,13 +11779,29 @@ ${QUOTIENT_CSS}
         + '<small>' + (waitPlace ? 'the place is still being drawn' : 'GPT Image, a few cents, ~30 s &#183; ' + escHtml(vendor) + ' runs only at the last step') + '</small>'
         + '</div>';
       if (drawing) h += '<div class="np-armed"><span></span>Drawing ' + escHtml(a.name) + (place ? ' in ' + escHtml(place.name) : '') + '&#8230;</div>';
-      if (fr) {
-        h += '<div class="pf-shotview"><img class="pf-shotbig" src="' + escAttr(withToken(fr)) + '" alt=""><div>'
-          + (frames.length > 1 ? '<div class="np-hint" style="margin-top:0">Pick one:</div><div class="pf-frames">' + frames.slice().reverse().map(function(f) {
-            return '<div class="pf-frame' + (f.url === fr ? ' sel' : '') + '" data-pf-pick="' + escAttr(f.url) + '"><img src="' + escAttr(withToken(f.url)) + '" alt=""></div>';
-          }).join('') + '</div>' : '')
-          + '<div class="np-hint">' + (kind === 'recast' ? 'This is the shot ' + escHtml(vendor) + ' performs; only your lips, head, hands and timing come from your recording.' : 'The first frame Seedance starts from.') + ' Not right? Pick another place or framing and draw it again.</div></div></div>';
-      }
+      // PICK ONE (Marc, Oct 7: "these should just be choices in this little
+      // pick one line ... beginning of scene one ... end of previous scene"):
+      // the start of another scene (its start picture: the same place and
+      // framing), the end of the scene before (its last frame), and the
+      // pictures drawn here. A choice is picked, never copied again.
+      var picks = [], own = {}, endOf = {};
+      frames.slice().reverse().forEach(function(f) {
+        if (own[f.url]) return;
+        var end = f.from_scene != null && f.from_kind !== 'start';
+        if (end && endOf[f.from_scene]) return;   // one end frame per scene (older copies hidden)
+        own[f.url] = 1; if (end) endOf[f.from_scene] = 1;
+        picks.push({ url: f.url, label: f.from_scene == null ? 'Drawn' : (end ? 'End' : 'Start') + ' of scene ' + (f.from_scene + 1), order: f.from_scene == null ? 2 : end ? 1 : 0, mine: true });
+      });
+      others.forEach(function(o) { if (!own[o.url]) picks.push({ url: o.url, label: 'Start of scene ' + (o.scene + 1), order: 0, adopt: true }); });
+      if (si > 0 && !endOf[si - 1]) picks.push({ label: 'End of scene ' + si, order: 1, end: true });
+      picks.sort(function(x, y) { return x.order - y.order; });
+      var tiles = picks.map(function(p) {
+        if (p.end) return '<div class="pf-frame ph" data-pf-go="continue" title="Pick up exactly where scene ' + si + ' ends"><i>End of<br>scene ' + si + '</i></div>';
+        return '<div class="pf-frame' + (p.url === fr ? ' sel' : '') + '" ' + (p.adopt ? 'data-pf-adopt' : 'data-pf-pick') + '="' + escAttr(p.url) + '" title="' + escAttr(p.label) + '"><img src="' + escAttr(withToken(p.url)) + '" alt=""><small>' + escHtml(p.label) + '</small></div>';
+      }).join('');
+      var pickHint = '<div class="np-hint">' + (kind === 'recast' ? 'This is the shot ' + escHtml(vendor) + ' performs; only your lips, head, hands and timing come from your recording.' : 'The first frame Seedance starts from.') + ' Start of a scene: its place and framing. End: picks up where that scene ends.</div>';
+      if (fr) h += '<div class="pf-shotview"><img class="pf-shotbig" src="' + escAttr(withToken(fr)) + '" alt=""><div>' + (tiles ? '<div class="np-hint" style="margin-top:0">Pick one:</div><div class="pf-frames">' + tiles + '</div>' : '') + pickHint + '</div></div>';
+      else if (tiles) h += '<div class="np-hint">Or pick one:</div><div class="pf-frames">' + tiles + '</div>';
       return h;
     }
     if (step === 'voice') {

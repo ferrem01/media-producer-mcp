@@ -270,12 +270,20 @@ export async function continueSceneFrom(tenant: string, projectId: string, si: n
   const key = `${tenant}/${projectId}/${si}`;
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
   const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
-  const url = await lastFrameOf(tenant, projectId, from, actor.id, W, H);
+  // Asked again for the same end (the same take, the same cut): the frame
+  // already cut is picked, never a copy (Marc: each click added another).
+  const clip = ((project as any).speaker_track?.clips || []).find((c: any) => c.scene_index === from);
+  const endKey = clip?.source ? `${clip.source}@${clip.trim_end ?? ""}` : undefined;
+  const have = prev?.actor === actor.id && endKey ? (prev?.frames || []).find((f) => f.from_scene === from && f.from_key === endKey) : undefined;
+  const url = have ? have.url : await lastFrameOf(tenant, projectId, from, actor.id, W, H);
   return patch(tenant, projectId, si, (p) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     p.actor = actor.id;
     if (opts.shot !== undefined) p.shot = String(opts.shot).trim().slice(0, 1000) || DEFAULT_SHOT;
-    p.frames = [...(p.frames || []), { url, shot: p.shot, from_scene: from, made_at: new Date().toISOString() }].slice(-6);
+    // One end frame per scene: a new one (the take changed) replaces the old.
+    if (!(p.frames || []).some((f) => f.url === url)) {
+      p.frames = [...(p.frames || []).filter((f) => !(f.from_scene === from && f.from_kind !== "start")), { url, shot: p.shot, from_scene: from, from_kind: "end" as const, ...(endKey ? { from_key: endKey } : {}), made_at: new Date().toISOString() }].slice(-6);
+    }
     p.frame = url;
   });
 }
@@ -322,7 +330,7 @@ export async function pickSceneFrame(tenant: string, projectId: string, si: numb
     p.actor = src.actor;
     if (src.shot) p.shot = src.shot;
     setLocation(p, src.location || "");
-    p.frames = [...(p.frames || []), { url, shot: p.shot, ...(src.location ? { location: src.location } : {}), from_scene: src.scene, made_at: new Date().toISOString() }].slice(-6);
+    p.frames = [...(p.frames || []), { url, shot: p.shot, ...(src.location ? { location: src.location } : {}), from_scene: src.scene, from_kind: "start" as const, made_at: new Date().toISOString() }].slice(-6);
     p.frame = url;
   });
 }
