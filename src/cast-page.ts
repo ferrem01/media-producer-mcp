@@ -32,6 +32,9 @@ const PAGE_CSS = `
   .card .pic { position: relative; background: #111; aspect-ratio: 4 / 5; }
   .card.wide .pic { aspect-ratio: 4 / 3; }
   .card .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .ph-item { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 12px; color: #666; }
+  .ph-item img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
   .card .pic .wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 13px; text-align: center; padding: 10px; }
   .card .body { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
   .card .name { font-weight: 600; display: flex; justify-content: space-between; gap: 6px; align-items: center; }
@@ -158,9 +161,9 @@ export function getCastHtml(): string {
       if (a.voice_id && !(voices.elevenlabs || []).some(function (v) { return v.id === a.voice_id; })) opts += '<option value="' + railEsc(a.voice_id) + '" selected>' + railEsc(a.voice_name || a.voice_id) + '</option>';
       card.innerHTML = '<div class="pic"><img alt="" src="' + railEsc(withToken('/api/cast/' + enc(tenant) + '/' + enc(a.id) + '/portrait')) + '"></div>'
         + '<div class="body"><div class="name"><span class="nm"></span><span class="badge">' + kindOf(a) + '</span></div>'
-        + '<div class="meta">' + (a.sheet ? 'Portrait + model sheet' : a.heygen_look_id ? 'HeyGen draws the person' : 'Portrait') + '</div>'
+        + '<div class="meta">' + metaOf(a) + '</div>'
         + '<div class="row"><select class="voice" title="The ElevenLabs voice this actor speaks with">' + opts + '</select><button class="quiet hear" title="Hear the voice">&#9654;</button></div>'
-        + '<div class="row">' + (a.sheet ? '<button class="quiet sheet">Model sheet</button>' : '') + '<button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
+        + '<div class="row">' + (a.sheet ? '<button class="quiet sheet">Model sheet</button>' : '') + (a.heygen_look_id ? '' : '<button class="quiet photos">Photos &amp; sheet</button>') + '<button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
       card.querySelector('.nm').textContent = a.name;
       card.querySelector('.voice').onchange = function (ev) {
         var id = ev.target.value, v = (voices.elevenlabs || []).filter(function (x) { return x.id === id; })[0];
@@ -175,6 +178,7 @@ export function getCastHtml(): string {
       card.querySelector('.pic').style.cursor = 'zoom-in';
       card.querySelector('.pic').onclick = function () { viewActor(a, false); };
       if (a.sheet) card.querySelector('.sheet').onclick = function () { viewActor(a, true); };
+      if (!a.heygen_look_id) card.querySelector('.photos').onclick = function () { photosPanel(a.id); };
       card.querySelector('.ren').onclick = function () { var n = prompt('Rename ' + a.name, a.name); if (n && n.trim()) patch(a, { name: n.trim() }, 'Renamed.'); };
       card.querySelector('.del').onclick = function () {
         if (!confirm('Remove ' + a.name + ' from the cast? Takes already made with them stay on their films.')) return;
@@ -182,6 +186,79 @@ export function getCastHtml(): string {
       };
       box.appendChild(card);
     });
+  }
+  // What the card says about the pictures behind the person.
+  function metaOf(a) {
+    if (a.heygen_look_id) return 'HeyGen draws the person';
+    var n = (a.photos || []).length;
+    var bits = [n ? 'Portrait + ' + n + ' photo' + (n === 1 ? '' : 's') : 'Portrait'];
+    if (a.sheet) bits.push('model sheet');
+    if (sheetDrawing(a)) bits.push('sheet drawing…');
+    else if (a.sheet_draft) bits.push('a sheet to approve');
+    return bits.join(' · ');
+  }
+  // A sheet is drawing for at most ten minutes; past that the server was
+  // restarted under it and it can be started again.
+  function sheetDrawing(a) {
+    return !!(a.sheet_job && a.sheet_job.status === 'drawing' && (Date.now() - Date.parse(a.sheet_job.started_at)) < 600000);
+  }
+  // PHOTOS & MODEL SHEET: more photos of the person (up to five beside the
+  // portrait), a sheet drawn from them, approved before anything uses it.
+  var panelTimer = null;
+  function photosPanel(id) {
+    var old = document.getElementById('photosPanel'); if (old) old.remove();
+    if (panelTimer) { clearTimeout(panelTimer); panelTimer = null; }
+    var a = actors.filter(function (x) { return x.id === id; })[0];
+    if (!a) return;
+    var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
+    var bust = '&v=' + Date.now();
+    var box = document.createElement('div'); box.id = 'photosPanel';
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:50;background:rgba(10,10,12,0.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;');
+    var photos = a.photos || [];
+    var drawing = sheetDrawing(a);
+    var thumbs = '<div class="ph-item"><img alt="" src="' + railEsc(withToken(base + '/portrait') + bust) + '"><span>Portrait</span></div>'
+      + photos.map(function (p, i) { return '<div class="ph-item"><img alt="" src="' + railEsc(withToken(base + '/photos/' + i) + bust) + '"><button class="quiet ph-del" data-i="' + i + '" title="Remove this photo">Remove</button></div>'; }).join('');
+    box.innerHTML = '<div class="box" style="max-width:860px;width:100%;margin:0;background:#fff">'
+      + '<div class="lead" style="display:flex;justify-content:space-between;align-items:center"><span></span><button class="quiet" id="phClose">Close</button></div>'
+      + '<p class="sub" style="margin:0 0 10px">The more angles the vendors see, the more it stays you when you turn, look down or laugh. Add up to 5 photos beside the portrait (front, three-quarter, side, smiling; good light), then draw a model sheet from them. You approve it before anything uses it.</p>'
+      + '<div class="ph-grid">' + thumbs + '</div>'
+      + (photos.length < 5 ? '<div class="field" style="margin-top:10px"><span>Add photos</span><input type="file" id="phAdd" accept="image/*" multiple></div>' : '<p class="sub">Five photos: remove one to add another.</p>')
+      + '<div class="row" style="margin-top:12px;gap:8px;align-items:center"><button class="btn primary" id="phMake"' + (drawing ? ' disabled' : '') + '>' + (drawing ? 'Drawing the sheet…' : a.sheet ? 'Draw a new model sheet' : 'Make model sheet') + '</button><span class="sub" id="phNote" style="margin:0"></span></div>'
+      + (a.sheet_job && a.sheet_job.status === 'failed' ? '<p class="sub err" style="color:#b42318"></p>' : '')
+      + (a.sheet_draft ? '<div style="margin-top:14px"><div class="lead">The new sheet: use it?</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(withToken(base + '/sheet-draft') + bust) + '"><div class="row" style="margin-top:8px;gap:8px"><button class="btn primary" id="phUse">Use this sheet</button><button class="quiet" id="phDiscard">Discard</button></div></div>' : '')
+      + (a.sheet ? '<div style="margin-top:14px"><div class="lead">The sheet in use</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(withToken(base + '/sheet') + bust) + '"></div>' : '')
+      + '</div>';
+    box.querySelector('.lead span').textContent = a.name + ': photos & model sheet';
+    var errP = box.querySelector('.err'); if (errP) errP.textContent = 'The last sheet could not be drawn: ' + (a.sheet_job.error || 'unknown error');
+    document.body.appendChild(box);
+    function close() { box.remove(); if (panelTimer) { clearTimeout(panelTimer); panelTimer = null; } }
+    box.onclick = function (ev) { if (ev.target === box) close(); };
+    box.querySelector('#phClose').onclick = close;
+    function reload(msg) {
+      return railApi('/api/cast/' + enc(tenant)).then(function (r) { actors = r.cast || []; render(); if (document.getElementById('photosPanel')) photosPanel(id); if (msg) say(msg, 'ok'); });
+    }
+    function fail(e) { say(e.message || String(e), 'err'); var n = document.getElementById('phNote'); if (n) n.textContent = e.message || String(e); }
+    Array.prototype.forEach.call(box.querySelectorAll('.ph-del'), function (b) {
+      b.onclick = function () { railApi(base + '/photos/' + b.getAttribute('data-i'), { method: 'DELETE' }).then(function () { return reload('Photo removed.'); }).catch(fail); };
+    });
+    var inp = box.querySelector('#phAdd');
+    if (inp) inp.onchange = function () {
+      var files = Array.prototype.slice.call(inp.files || [], 0, 5 - photos.length);
+      if (!files.length) return;
+      box.querySelector('#phNote').textContent = 'Uploading ' + files.length + ' photo' + (files.length === 1 ? '' : 's') + '…';
+      files.reduce(function (p, f) {
+        return p.then(function () { return upload(f, 'cast-photo').then(function (rel) { return railApi(base + '/photos', { method: 'POST', body: JSON.stringify({ image: rel }) }); }); });
+      }, Promise.resolve()).then(function () { return reload('Photos added.'); }).catch(fail);
+    };
+    box.querySelector('#phMake').onclick = function () {
+      railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'make' }) }).then(function () { return reload('Drawing ' + a.name + "'s model sheet (about a minute)…"); }).catch(fail);
+    };
+    var useB = box.querySelector('#phUse');
+    if (useB) useB.onclick = function () { railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'use' }) }).then(function () { return reload(a.name + "'s model sheet is in use: recasts and generated scenes read it."); }).catch(fail); };
+    var disB = box.querySelector('#phDiscard');
+    if (disB) disB.onclick = function () { railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'discard' }) }).then(function () { return reload('Draft discarded.'); }).catch(fail); };
+    // While it draws, look again every five seconds.
+    if (drawing) panelTimer = setTimeout(function () { panelTimer = null; reload(); }, 5000);
   }
   // A look at an actor's pictures, full size: the portrait (the start frame)
   // and, for a generated person, the model sheet it was drawn from.
@@ -229,6 +306,7 @@ export function getCastHtml(): string {
             + '<div class="field"><span>Model sheet (optional, recommended): the same person from several angles</span><input type="file" id="aSheet" accept="image/*"></div>'
             + '<p class="sub" style="margin:0 0 10px">A generated person is nobody real: no consent needed. Give them a voice once added.</p>'
           : '<div class="field"><span>Photo: clear, front-facing</span><input type="file" id="aPhoto" accept="image/*"></div>'
+            + '<div class="field"><span>More photos (optional, up to 5): other angles and light. A model sheet is drawn from all of them, for you to approve.</span><input type="file" id="aMore" accept="image/*" multiple></div>'
             + '<label class="field" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="aConsent"> This is me, or a person who agreed to be cast.</label>')
         + '<button class="btn primary" id="aAdd">Add</button>';
       $('aAdd').onclick = function () {
@@ -242,7 +320,19 @@ export function getCastHtml(): string {
             var body = { name: name, image: rel };
             if (t === 'gen') body.fictional = true; else body.consent = true;
             if (sheetRel) body.sheet = sheetRel;
-            return add(body, name);
+            var more = $('aMore') ? Array.prototype.slice.call($('aMore').files || [], 0, 5) : [];
+            if (!more.length) return add(body, name);
+            // A real person with more photos: add them, then draw the sheet
+            // (it waits for approval under Photos & sheet).
+            say('Adding ' + name + '…');
+            return railApi('/api/cast/' + enc(tenant), { method: 'POST', body: JSON.stringify(body) }).then(function (a) {
+              var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
+              return more.reduce(function (p, f) {
+                return p.then(function () { return upload(f, 'cast-photo').then(function (rel2) { return railApi(base + '/photos', { method: 'POST', body: JSON.stringify({ image: rel2 }) }); }); });
+              }, Promise.resolve()).then(function () {
+                return railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'make' }) }).catch(function () {});
+              }).then(function () { say(a.name + ' is in the cast. Their model sheet is drawing: approve it under Photos & sheet.', 'ok'); load(); });
+            });
           });
         }).catch(function (e) { say(e.message || String(e), 'err'); });
       };

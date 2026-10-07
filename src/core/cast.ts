@@ -47,8 +47,20 @@ export interface CastActor {
    *  person from several angles. The portrait is the start frame drawn from
    *  it. Genjutsu gets both (a second reference image). */
   sheet?: string;
+  /** More photos of the person (tenant-relative, cast/<id>-photo-<n>.jpg),
+   *  beside the portrait: the references a model sheet is drawn from
+   *  (SPEC-cast-scenes.md, "a sheet from photos"). Up to MAX_ACTOR_PHOTOS. */
+  photos?: string[];
+  /** A model sheet drawn from the portrait and the photos, waiting to be
+   *  approved: nothing uses it until it is made the sheet. */
+  sheet_draft?: { file: string; made_at: string };
+  /** The sheet being drawn, or the reason it could not be. */
+  sheet_job?: { status: "drawing" | "failed"; started_at: string; error?: string };
   created_at: string;
 }
+
+/** Photos beside the portrait an actor may carry. */
+export const MAX_ACTOR_PHOTOS = 5;
 
 function castDir(tenant: string): string {
   return path.join(config.dataDir, tenant, "cast");
@@ -186,6 +198,117 @@ export async function removeActor(tenant: string, id: string): Promise<boolean> 
   if (!actor) return false;
   await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast.filter((a) => a.id !== id), null, 2));
   await fs.rm(portraitPath(tenant, actor), { force: true }).catch(() => {});
-  if (actor.sheet) await fs.rm(path.join(config.dataDir, tenant, actor.sheet), { force: true }).catch(() => {});
+  for (const f of [actor.sheet, actor.sheet_draft?.file, ...(actor.photos || [])]) if (f) await fs.rm(path.join(config.dataDir, tenant, f), { force: true }).catch(() => {});
   return true;
+}
+
+async function saveCast(tenant: string, cast: CastActor[]): Promise<void> {
+  await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast, null, 2));
+}
+/** Load, change one actor, save -- the background sheet job writes this way
+ *  so an edit made while it draws is kept. */
+async function patchActor(tenant: string, id: string, fn: (a: CastActor) => void): Promise<CastActor> {
+  const cast = await listCast(tenant);
+  const actor = cast.find((a) => a.id === id);
+  if (!actor) throw new Error("No such actor");
+  fn(actor);
+  await saveCast(tenant, cast);
+  return actor;
+}
+
+/** Add a photo of the person (a tenant file): another angle, another light.
+ *  A HeyGen look is HeyGen's own person -- it takes none. */
+export async function addActorPhoto(tenant: string, id: string, image: string): Promise<CastActor> {
+  const actor = await getActor(tenant, id);
+  if (!actor) throw new Error("No such actor");
+  if (actor.heygen_look_id) throw new Error("A HeyGen look is drawn by HeyGen: it takes no photos");
+  if ((actor.photos || []).length >= MAX_ACTOR_PHOTOS) throw new Error(`Up to ${MAX_ACTOR_PHOTOS} photos beside the portrait`);
+  const tenantDir = path.resolve(config.dataDir, tenant);
+  const src = path.resolve(tenantDir, String(image || "").replace(/^\/+/, ""));
+  if (!src.startsWith(tenantDir + path.sep)) throw new Error("image must be a path inside the tenant");
+  await fs.access(src).catch(() => { throw new Error("photo not found"); });
+  await fs.mkdir(castDir(tenant), { recursive: true });
+  const rel = path.join("cast", `${id}-photo-${crypto.randomBytes(3).toString("hex")}.jpg`);
+  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-frames:v", "1", "-vf", "scale='min(1536,iw)':-2", "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+  return patchActor(tenant, id, (a) => { a.photos = [...(a.photos || []), rel].slice(0, MAX_ACTOR_PHOTOS); });
+}
+
+/** Remove one of the actor's photos (by its place in the list). */
+export async function removeActorPhoto(tenant: string, id: string, index: number): Promise<CastActor> {
+  let gone: string | undefined;
+  const actor = await patchActor(tenant, id, (a) => {
+    const list = a.photos || [];
+    if (!Number.isInteger(index) || index < 0 || index >= list.length) throw new Error("No such photo");
+    gone = list[index];
+    a.photos = list.filter((_, i) => i !== index);
+    if (!a.photos.length) delete a.photos;
+  });
+  if (gone) await fs.rm(path.join(config.dataDir, tenant, gone), { force: true }).catch(() => {});
+  return actor;
+}
+
+/** The prompt a model sheet is drawn from. A REAL person is drawn as the
+ *  photos show them and nothing else -- a sheet that improves a face is a
+ *  different person on camera. */
+export function sheetPrompt(refs: number, real: boolean): string {
+  return `A character model sheet of ONE person: the person in ${refs > 1 ? `the ${refs} reference photos (all the same person)` : "the reference photo"}. `
+    + "Lay out on a plain light-grey studio background, evenly lit, in a clean grid: a large front-facing head-and-shoulders portrait; three-quarter left and three-quarter right; left and right profiles; a slight look up and a slight look down; three expressions (neutral, a warm smile, talking mid-sentence); and one full-body standing view, front. "
+    + "Same clothes, hair and build in every panel; consistent scale; no text, no labels, no borders, no props. "
+    + (real
+      ? "This is a real person: keep their exact face -- bone structure, skin texture and tone, age, hairline, facial hair, eye colour, every mark -- exactly as the photos show. Do not beautify, slim, smooth, de-age or restyle them. Where a photo does not show an angle, infer it faithfully from the others."
+      : "Keep the face, age and features exactly as the reference shows.");
+}
+
+const sheetJobs = new Set<string>();
+/** Draw a model sheet from the portrait and the photos, in the background:
+ *  it lands as the actor's sheet_draft (approve it with useSheetDraft).
+ *  `draw` is the image call (GPT Image edit by default). */
+export async function startActorSheet(tenant: string, id: string, draw?: (o: { prompt: string; images: string[]; outputPath: string }) => Promise<unknown>): Promise<CastActor> {
+  const actor = await getActor(tenant, id);
+  if (!actor) throw new Error("No such actor");
+  if (actor.heygen_look_id) throw new Error("A HeyGen look is drawn by HeyGen: it has no model sheet");
+  const key = `${tenant}/${id}`;
+  if (sheetJobs.has(key)) throw new Error(`${actor.name}'s sheet is already being drawn`);
+  const refs = [portraitPath(tenant, actor), ...(actor.photos || []).map((f) => path.join(config.dataDir, tenant, f))];
+  const real = !actor.fictional;
+  const draft = path.join("cast", `${id}-sheet-draft.jpg`);
+  const drawn = path.join(castDir(tenant), `${id}-sheet-draft.png`);
+  sheetJobs.add(key);
+  const started = await patchActor(tenant, id, (a) => { a.sheet_job = { status: "drawing", started_at: new Date().toISOString() }; });
+  (async () => {
+    try {
+      const fn = draw || (async (o: { prompt: string; images: string[]; outputPath: string }) => {
+        const { editImage } = await import("../media/image-gen.js");
+        return editImage({ ...o, size: "1536x1024" });
+      });
+      await fn({ prompt: sheetPrompt(refs.length, real), images: refs, outputPath: drawn });
+      await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", drawn, "-frames:v", "1", "-q:v", "2", path.join(config.dataDir, tenant, draft)]);
+      await fs.rm(drawn, { force: true }).catch(() => {});
+      await patchActor(tenant, id, (a) => { a.sheet_draft = { file: draft, made_at: new Date().toISOString() }; delete a.sheet_job; });
+    } catch (e: any) {
+      await patchActor(tenant, id, (a) => { a.sheet_job = { status: "failed", started_at: a.sheet_job?.started_at || new Date().toISOString(), error: String(e?.message || e).slice(0, 300) }; }).catch(() => {});
+    } finally {
+      sheetJobs.delete(key);
+    }
+  })();
+  return started;
+}
+
+/** The draft becomes the actor's model sheet (Higgsfield's second reference,
+ *  Seedance's start frames); the old sheet is replaced. */
+export async function useSheetDraft(tenant: string, id: string): Promise<CastActor> {
+  const actor = await getActor(tenant, id);
+  if (!actor) throw new Error("No such actor");
+  if (!actor.sheet_draft) throw new Error("No sheet draft to use");
+  const rel = path.join("cast", `${id}-sheet.jpg`);
+  await fs.rename(path.join(config.dataDir, tenant, actor.sheet_draft.file), path.join(config.dataDir, tenant, rel));
+  return patchActor(tenant, id, (a) => { a.sheet = rel; delete a.sheet_draft; delete a.sheet_job; });
+}
+
+/** Throw the draft away (the sheet in use, if any, stays). */
+export async function discardSheetDraft(tenant: string, id: string): Promise<CastActor> {
+  const actor = await getActor(tenant, id);
+  if (!actor) throw new Error("No such actor");
+  if (actor.sheet_draft) await fs.rm(path.join(config.dataDir, tenant, actor.sheet_draft.file), { force: true }).catch(() => {});
+  return patchActor(tenant, id, (a) => { delete a.sheet_draft; delete a.sheet_job; });
 }
