@@ -192,6 +192,14 @@ describe("the take's copies and the speaker track", () => {
     // drops the list; a clip left on the copy must not lose its take).
     expect(takeOwns({ source: raw }, blur)).toBe(true);
     expect(takeOwns({ source: "/assets/t/projects/p/assets/other.mp4" }, blur)).toBe(false);
+    // So is a recast the take no longer lists: a newer recast of the same
+    // actor on another vendor took the slot, the clip stayed on the old file.
+    const kling = "/assets/t/projects/p/assets/take.actor-kavya-kling.mp4";
+    const higgs = "/assets/t/projects/p/assets/take.actor-kavya-higgsfield.mp4";
+    expect(takeOwns({ source: raw, actors: { kavya: { file: kling } } } as any, higgs)).toBe(true);
+    expect(takeOwns({ source: raw }, higgs)).toBe(true);
+    expect(takeOwns({ source: "/assets/t/projects/p/assets/other.mp4" }, higgs)).toBe(false);
+    expect(takeOwns({ source: "/assets/t/projects/p/assets/take2.mp4" }, higgs)).toBe(false);
   });
   it("points each clip at the copy its scene's setting wants; a missing copy leaves the raw take", () => {
     const project: any = {
