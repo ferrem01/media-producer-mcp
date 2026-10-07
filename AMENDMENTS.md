@@ -14,6 +14,23 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-07 — Captions read the script, timed by the recording
+
+Marc's churn film captions read what whisper HEARD from the HeyGen recasts:
+"Turn doesn't happen on Renewable Day", "Sigma 5", "it's soft", "Why are one
+flow into it?", "gatequotion.ai". The measured spine was whisper's words, so
+the caption lane (rebuilt from the spine) and every anchor written against
+the script ("Signal", "Churn") followed the mishearings.
+`alignToScript` (word-anchors.ts), called by `spineForScene`: when a scene
+has a script, the measured spine keeps the SCRIPT's words and takes the
+recording's timing -- matched words (longest common subsequence on
+normalized tokens) keep their times, a misheard run shares the span of what
+was heard there, a dropped word shares its gap. A take that left the script
+(under half its words heard) keeps what was said. Test:
+`test/spine-script-align.test.ts`.
+
+---
+
 ## 2026-10-06 — An actor's model sheet opens on the Cast page
 
 Marc: "a way to show the model sheet for cast members that have them". The
