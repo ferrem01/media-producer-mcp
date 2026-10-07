@@ -1205,6 +1205,9 @@ ${QUOTIENT_CSS}
   .pf-chosen { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: -4px 0 10px; color: var(--content-secondary); }
   .pf-chosen img { width: 28px; height: 35px; object-fit: cover; border-radius: 4px; background: #111; }
   .pf-step { min-height: 80px; }
+  #studio-modal-card .pf-wizbox { display: flex; flex-direction: column; height: min(66vh, 720px); }
+  #studio-modal-card .pf-wizbox .pf-step { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 4px 2px 2px; }
+  #studio-modal-card .pf-wizbox .pf-nav { flex: 0 0 auto; margin-top: 10px; }
   .pf-cast { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 12px; }
   .pf-castpic { flex: 0 0 76px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: #111; padding: 0; overflow: hidden; cursor: pointer; position: relative; aspect-ratio: 4 / 5; }
   .pf-castpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -6673,6 +6676,9 @@ ${QUOTIENT_CSS}
       if (r && r.recast) jobs = jobs.concat([{ kind: 'recast', raw: 'recast', recast: r.recast, started_at: r.recast.started_at }]);
       if (jobs.length) takeStatus.idle = 0; else takeStatus.idle++;
       if (takeStatus.timer && takeStatus.idle >= 3) { clearInterval(takeStatus.timer); takeStatus.timer = null; }
+      // A recast that failed is an error on the pill, not "Done".
+      var rf = r && r.recast_failed;
+      if (rf && !jobs.length) errors = errors.concat([{ kind: 'recast', raw: 'recast', at: rf.at, message: rf.error, actor: rf.actor }]);
       renderTakeStatus(jobs, errors);
     }).catch(function() {});
   }
@@ -6717,11 +6723,14 @@ ${QUOTIENT_CSS}
     }
     if (err) {
       pill.className = 'show err';
-      pill.innerHTML = escHtml((err.kind === 'matte' ? 'The background copy failed' : 'The re-grade failed') + (err.scenes && err.scenes.length ? ' (' + sceneRange(err.scenes) + ')' : '') + ': ' + String(err.message || '').slice(0, 160)) +
-        '<a class="jp-retry">Retry</a><a class="jp-close">Dismiss</a>';
+      takeStatus.wasBusy = false;   // a failure is the outcome: no "Done" after it is dismissed
+      var errWhat = err.kind === 'recast' ? 'The recast as ' + ((pf.data ? (pfActor(err.actor) || {}).name : '') || String(err.actor || '').replace(/-/g, ' ')) + ' failed'
+        : err.kind === 'matte' ? 'The background copy failed' : 'The re-grade failed';
+      pill.innerHTML = escHtml(errWhat + (err.scenes && err.scenes.length ? ' (' + sceneRange(err.scenes) + ')' : '') + ': ' + String(err.message || '').slice(0, 160)) +
+        (err.kind === 'recast' ? '' : '<a class="jp-retry">Retry</a>') + '<a class="jp-close">Dismiss</a>';
       document.body.classList.add('has-job-pill');
       pill.querySelector('.jp-close').addEventListener('click', function() { takeStatus.dismissed = takeStatus.dismissed || {}; takeStatus.dismissed[err.raw + err.at] = true; jobPillHide(); });
-      pill.querySelector('.jp-retry').addEventListener('click', function() {
+      if (pill.querySelector('.jp-retry')) pill.querySelector('.jp-retry').addEventListener('click', function() {
         var p = state.currentProject, si = (err.scenes || [0])[0], tk = sceneTakeFor(si) || {};
         var comp0 = ((p.scenes[si] || {}).components || []).filter(function(c) { return c && c.type === 'video' && c.data && (c.data.src === 'speaker' || c.data.src === 'speaker-alpha'); })[0];
         var req = err.kind === 'matte'
@@ -11599,7 +11608,11 @@ ${QUOTIENT_CSS}
       h += '<div class="pf-nav">' + (cur > 0 ? '<button class="np-btn" data-pf-step="prev">&#8592; Back</button>' : '<span></span>')
         + '<span class="pf-nav-r">' + (why ? '<small>' + escHtml(why) + '</small>' : '') + '<button class="np-btn primary" data-pf-step="next"' + (why ? ' disabled' : '') + '>Next: ' + escHtml(steps[cur + 1][1]) + ' &#8594;</button></span></div>';
     } else if (cur > 0) h += '<div class="pf-nav"><button class="np-btn" data-pf-step="prev">&#8592; Back</button><span></span></div>';
-    panel.innerHTML = h;
+    // One size for every step (Marc: "keep the dialog the same size between
+    // steps"): the step scrolls inside, Back / Next stay put at the bottom.
+    var keep = panel.querySelector('.pf-step'), top = keep ? keep.scrollTop : 0, was = keep ? keep.getAttribute('data-step') : '';
+    panel.innerHTML = '<div class="pf-wizbox">' + h.replace('<div class="pf-step">', '<div class="pf-step" data-step="' + step + '">') + '</div>';
+    if (was === step && top) panel.querySelector('.pf-step').scrollTop = top;
   }
   // ── THE WIZARD (Marc, Oct 7: "a wizard that takes the user step wise
   // through the process ... every step is aware of the selection. Only show
@@ -12008,6 +12021,11 @@ ${QUOTIENT_CSS}
         var inShot = pfPerformer(eng).takesShot && !d.rcamera && perf.actor === actor && perf.frame;
         pfSay(panel, 'Starting the recast…');
         api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine', shot: inShot ? String(perf.shot || '') : '', start_frame: inShot ? perf.frame : undefined }).then(function() {
+          // Started: the dialog closes and the pill at the bottom carries it
+          // (Marc: "hit recast and it closed the dialog and then the status pill appears").
+          var x = document.getElementById('np-picker-close');
+          if (x && panel.closest && panel.closest('#studio-modal-card')) x.click();
+          watchTakeStatus();
           return pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pf.wasBusy = true; pfPoll(project); });
         }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
         return;

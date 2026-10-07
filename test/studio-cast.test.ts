@@ -56,6 +56,11 @@ describe("Studio: the Cast card", () => {
     expect(html).toContain("{ action: 'frame', actor: actor, shot: rs, location: pfWhere(d, s.plan || {}, perf) }");
     // Recast and Generate keep their own place in the wizard.
     expect(html).toContain("var SK = kind === 'recast' ? 'rstep' : 'gstep';");
+    // One size for every step in the take dialog; Recast closes it and the job pill takes over.
+    expect(html).toContain("#studio-modal-card .pf-wizbox { display: flex; flex-direction: column; height: min(66vh, 720px); }");
+    expect(html).toContain("if (x && panel.closest && panel.closest('#studio-modal-card')) x.click();\n          watchTakeStatus();");
+    // A failed recast is an error on the pill, never "Done".
+    expect(html).toContain("if (rf && !jobs.length) errors = errors.concat([{ kind: 'recast', raw: 'recast', at: rf.at, message: rf.error, actor: rf.actor }]);");
     // The recast asks for the voice: the recording's by default, the actor's when they have one.
     expect(html).toContain('data-pf="rvoice" value="mine"');
     expect(html).toContain('data-pf="rvoice" value="actor"');
