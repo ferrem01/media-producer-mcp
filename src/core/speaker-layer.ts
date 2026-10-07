@@ -286,8 +286,18 @@ export function takeOwns(take: TakeLike | null | undefined, url: string | undefi
   const c = takeCopies(take);
   return url === c.raw || url === c.blur || url === c.alpha || (!!c.raw && copyNamesOf(c.raw).includes(url))
     || Object.values(take.actors || {}).some((a) => a && (a.file === url || recastStem(a.file) === recastStem(url)))
+    // A recast the take no longer lists: a newer recast of the same actor
+    // (another vendor) took its slot and left the clip on the old file, so
+    // no take owned it and the scene read as having no recording to recast
+    // (Kavya, proj_c6bc133e scene 1). The NAME is the take's.
+    || (!!c.raw && !!recastStem(url) && recastStem(url)!.startsWith(`${rawStem(c.raw)}.actor-`))
     // The take's cut copies (core/take-edits.ts).
     || Object.values(take.cut_files || {}).some((v) => v && v.file === url);
+}
+
+/** The raw take's path without its extension (take.mp4 -> take). */
+function rawStem(raw: string): string {
+  return raw.replace(/\.[^./]+$/, "");
 }
 
 /** A recast's files share one stem: each framing's fit (take.actor-x.mp4,
