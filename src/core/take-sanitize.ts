@@ -42,7 +42,7 @@ import { deadChannelPan } from "../audio/channels.js";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { measureTake, studioGradeFilter, faceFillGraph, faceEllipse, DEFAULT_FILL_STRENGTH, type FaceHint, type TakeStudioStats, type TakeStudioCorrection } from "./take-studio.js";
+import { measureTake, studioGradeFilter, faceFillGraph, faceEllipse, FILL_WHEN_UNSET, type FaceHint, type TakeStudioStats, type TakeStudioCorrection } from "./take-studio.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -311,7 +311,7 @@ export async function gradeTake(filePath: string, o: {
   // The fill light needs a DETECTED face: the measured region, else the
   // detection itself. An assumed face is a guess, and a lift in the wrong
   // place is worse than none.
-  const fillWant = Math.max(0, Math.min(1, Number.isFinite(o.fill as number) ? (o.fill as number) : DEFAULT_FILL_STRENGTH));
+  const fillWant = Math.max(0, Math.min(1, Number.isFinite(o.fill as number) ? (o.fill as number) : FILL_WHEN_UNSET));
   const measuredFace = studio?.measured.face || o.stats?.face;
   const region = measuredFace && measuredFace.source === "detected" ? measuredFace : o.face && o.face.size > 0 ? faceEllipse(o.face) : null;
   let fillVf = "";

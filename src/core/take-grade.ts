@@ -20,9 +20,9 @@
  * kept original never changes).
  *
  * THE FILL LIGHT (core/take-studio.ts, faceFillGraph) rides there too,
- * between the correction and the look: `take.fill` 0-1, absent = the
- * default (0.5), 0 = off. A re-grade keeps the take's value unless the job
- * sets one.
+ * between the correction and the look: `take.fill` 0-1, absent = off
+ * (FILL_WHEN_UNSET; Studio's dial starts at 0.5 when switched on). A
+ * re-grade keeps the take's value unless the job sets one.
  *
  * Studio sees the job while it runs (core/take-jobs.ts) and a failure after
  * (`take.job_error`).
