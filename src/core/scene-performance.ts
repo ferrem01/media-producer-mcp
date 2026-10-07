@@ -67,7 +67,7 @@ const vendorNow = new Map<string, VendorStatus>();
 const chains = new Map<string, Promise<unknown>>();
 
 /** Change a scene's performance: load, mutate, save, one writer per film. */
-async function patch(tenant: string, projectId: string, si: number, fn: (perf: ScenePerformance, scene: any) => void): Promise<ScenePerformance> {
+async function patch(tenant: string, projectId: string, si: number, fn: (perf: ScenePerformance, scene: any, project: any) => void): Promise<ScenePerformance> {
   const k = `${tenant}/${projectId}`;
   const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
     const project = await loadProject(tenant, projectId);
@@ -75,7 +75,7 @@ async function patch(tenant: string, projectId: string, si: number, fn: (perf: S
     const scene: any = (project as any).storyboard?.scenes?.[si];
     if (!scene) throw new Error(`No scene ${si + 1}`);
     const perf: ScenePerformance = scene.performance || { actor: "", shot: DEFAULT_SHOT, voice_source: "script" };
-    fn(perf, scene);
+    fn(perf, scene, project);
     scene.performance = perf;
     project.updated_at = new Date().toISOString();
     await saveProject(project);
@@ -309,11 +309,40 @@ export async function editCastPlan(tenant: string, projectId: string, edit: Para
 }
 
 /** Pick which drawn frame the scene uses. */
-export async function pickSceneFrame(tenant: string, projectId: string, si: number, url: string): Promise<ScenePerformance> {
-  return patch(tenant, projectId, si, (p) => {
-    if (!(p.frames || []).some((f) => f.url === url)) throw new Error("That frame was not drawn for this scene");
+export async function pickSceneFrame(tenant: string, projectId: string, si: number, url: string, actorId?: string): Promise<ScenePerformance> {
+  return patch(tenant, projectId, si, (p, _sc, project) => {
+    if ((p.frames || []).some((f) => f.url === url)) { p.frame = url; return; }
+    // SAME AS ANOTHER SCENE (Marc, Oct 7: "in scene two, I want it to look the
+    // same as scene one ... I want the same starting frame"): a start picture
+    // drawn for this actor in another scene of the film -- its place and
+    // words come with it, so the scene is set exactly there.
+    const src = otherSceneFrame(project, si, url, actorId || p.actor || undefined);
+    if (!src) throw new Error("That frame was not drawn for this scene, nor for this actor in another scene of the film");
+    if (p.actor && p.actor !== src.actor) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
+    p.actor = src.actor;
+    if (src.shot) p.shot = src.shot;
+    setLocation(p, src.location || "");
+    p.frames = [...(p.frames || []), { url, shot: p.shot, ...(src.location ? { location: src.location } : {}), from_scene: src.scene, made_at: new Date().toISOString() }].slice(-6);
     p.frame = url;
   });
+}
+
+/** A start picture another scene of the film has for this actor: one drawn
+ *  for it (its performance's frames) or one a recast was performed in. */
+export function otherSceneFrame(project: any, si: number, url: string, actorId?: string): { actor: string; shot?: string; location?: string; scene: number } | null {
+  const scenes = project?.storyboard?.scenes || [];
+  for (let j = 0; j < scenes.length; j++) {
+    if (j === si) continue;
+    const perf = scenes[j]?.performance;
+    const f = (perf?.frames || []).find((x: any) => x.url === url);
+    if (f && perf.actor && (!actorId || perf.actor === actorId)) return { actor: perf.actor, shot: f.shot, location: f.location, scene: j };
+  }
+  for (const t of project?.takes || []) {
+    for (const [aid, e] of Object.entries<any>(t.actors || {})) {
+      if (e?.start_frame === url && (!actorId || aid === actorId) && t.scene_index !== si) return { actor: aid, shot: e.shot, scene: t.scene_index };
+    }
+  }
+  return null;
 }
 
 /** The scene's latest RECORDING (not a performance): the clip's take when it
@@ -892,6 +921,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       // A shot-taking recast (Higgsfield): the shot the scene's recast was made
       // in, and the one its setting gives (Studio's "The shot" box).
       ...(cast && take?.actors?.[cast]?.shot ? { recast_shot: take.actors[cast].shot } : {}),
+      ...(cast && take?.actors?.[cast]?.start_frame ? { recast_start_frame: take.actors[cast].start_frame } : {}),
       // The recast playing here (Studio's "made" step shows it).
       ...(cast && take?.actors?.[cast]?.file ? { recast_file: take.actors[cast].file, recast_engine: take.actors[cast].performer || null } : {}),
       ...(shotForSetting(plan.setting) ? { setting_shot: shotForSetting(plan.setting) } : {}),
