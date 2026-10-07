@@ -90,6 +90,60 @@ export function measuredSpine(segments: Array<{ text: string; start: number; end
   return { source: "measured", words, duration: Math.max(0, Number(duration) || 0) };
 }
 
+/**
+ * THE SCRIPT'S WORDS ON THE RECORDING'S CLOCK (Oct 7, Marc's churn film): the
+ * measured spine was whisper's words, so the captions read what whisper
+ * HEARD -- "Turn doesn't happen on Renewable Day", "Sigma 5", "gatequotion.ai"
+ * -- and every anchor written against the script ("Signal", "Churn") missed.
+ * When the take follows its script, the spine keeps the script's words and
+ * takes the timing from the transcript: words matched one to one keep their
+ * measured times; a run whisper got wrong takes the measured span of what it
+ * heard there, shared by character weight; a script word whisper dropped
+ * shares the gap it sits in. A take that left the script (under half the
+ * script's words heard) keeps what was actually said.
+ */
+export function alignToScript(spine: Spine, script: string): Spine {
+  const heard = spine.words || [];
+  const lines = scriptLines(script);
+  const said = lines.filter((l) => !l.pause).flatMap((l) => l.text.split(/\s+/).filter((w) => normalizeToken(w)));
+  if (!heard.length || !said.length) return spine;
+  const a = said.map(normalizeToken), b = heard.map((w) => normalizeToken(w.text));
+  // Longest common subsequence of the two token lists.
+  const n = a.length, m = b.length;
+  const L: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let k = m - 1; k >= 0; k--) L[i][k] = a[i] === b[k] ? L[i + 1][k + 1] + 1 : Math.max(L[i + 1][k], L[i][k + 1]);
+  if (L[0][0] < n * 0.5) return spine;
+  const pairs: Array<[number, number]> = [];
+  for (let i = 0, k = 0; i < n && k < m;) {
+    if (a[i] === b[k]) { pairs.push([i, k]); i++; k++; }
+    else if (L[i + 1][k] >= L[i][k + 1]) i++; else k++;
+  }
+  const words: SpineWord[] = said.map((t) => ({ text: t, start: 0, end: 0 }));
+  // Share [t0, t1] across script words i0..i1-1 by character weight.
+  const share = (i0: number, i1: number, t0: number, t1: number) => {
+    if (i1 <= i0) return;
+    const span = Math.max(0, t1 - t0);
+    const wts = said.slice(i0, i1).map((w) => normalizeToken(w).length + 1);
+    const tot = wts.reduce((x, y) => x + y, 0);
+    let t = t0;
+    for (let i = i0; i < i1; i++) { const d = (span * wts[i - i0]) / tot; words[i].start = round(t); words[i].end = round(t + d); t += d; }
+  };
+  let pi = 0, pk = 0, prevEnd = heard[0].start;
+  for (const [i, k] of [...pairs, [n, m] as [number, number]]) {
+    // The run between the last match and this one: script i..pi, heard pk..k.
+    // Script words nobody heard: the gap they sit in -- before the first
+    // heard word, a beat ahead of it; after the last, a beat after it.
+    const unheard = (i - pi) * 0.25;
+    if (k > pk) share(pi, i, heard[pk].start, heard[k - 1].end);
+    else if (pi === 0 && k === 0) share(pi, i, Math.max(0, heard[0].start - unheard), heard[0].start);
+    else if (k >= m) share(pi, i, prevEnd, spine.duration > 0 ? Math.min(spine.duration, prevEnd + unheard) : prevEnd + unheard);
+    else share(pi, i, prevEnd, heard[k].start);
+    if (i < n) { words[i].start = heard[k].start; words[i].end = heard[k].end; prevEnd = heard[k].end; }
+    pi = i + 1; pk = k + 1;
+  }
+  return { ...spine, words };
+}
+
 /** Time of an anchor against a spine, or null when the word is not there. */
 export function resolveAnchor(spine: Spine, a: WordAnchor): number | null {
   const target = String(a.word || "").split(/\s+/).map(normalizeToken).filter(Boolean);

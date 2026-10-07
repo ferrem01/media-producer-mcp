@@ -15,7 +15,7 @@ import { detectSilence } from "./idle-silence.js";
 import { resolveVideoPath } from "./video-path.js";
 import { activeTake, attachTake } from "./take-needs.js";
 import { cutClock, keptSeconds, wordsThroughCuts } from "./take-clock.js";
-import { assertedSpine, measuredSpine, applySpine, splitByScripts, type Spine, type ResolveReport } from "./word-anchors.js";
+import { assertedSpine, measuredSpine, alignToScript, applySpine, splitByScripts, type Spine, type ResolveReport } from "./word-anchors.js";
 
 const dataDirOf = (dataDir?: string) => dataDir || process.env.MP_DATA_DIR || "/data/media-producer";
 
@@ -98,7 +98,9 @@ export async function spineForScene(
   if (take) {
     try {
       const words = await wordsForTake(project!, take, dataDir);
-      if (words && words.length) return measuredSpine(windowWords(words, take), dur);
+      // The script's words on the recording's clock: captions and anchors read
+      // what was written, not what whisper misheard (alignToScript).
+      if (words && words.length) return alignToScript(measuredSpine(windowWords(words, take), dur), script);
     } catch (e: any) {
       console.warn(`  [spine] scene ${sceneIndex + 1}: transcript failed (${e?.message || e}) -- asserting from the script over the take's length`);
     }
