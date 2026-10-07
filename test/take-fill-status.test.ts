@@ -225,3 +225,21 @@ describe("a take re-made in place plays its new version (Marc: \"I just changed 
     expect(idx).toContain('const urlPath = url.split("?")[0];');
   });
 });
+
+describe("the failures Studio shows", () => {
+  it("only for takes a speaker clip still plays: a re-recorded scene's old take keeps its record, not its banner", async () => {
+    const { takeErrors } = await import("../src/core/take-jobs.js");
+    const err = { kind: "grade", message: "take grade failed: error reading header", at: "2026-10-07T14:13:31Z" };
+    const takes = [
+      { scene_index: 0, source: "/a/old.mp4", job_error: err },
+      { scene_index: 1, source: "/a/close.mp4" },
+      { scene_index: 0, source: "/a/new.mp4" },
+      { scene_index: 1, source: "/a/close2.mp4", job_error: { ...err, kind: "matte" } },
+    ];
+    const clips = [{ scene_index: 0, source: "/a/new.mp4" }, { scene_index: 1, source: "/a/close2.mp4" }];
+    const plays = (t: any) => clips.some((c) => c.scene_index === t.scene_index && c.source === t.source);
+    expect(takeErrors(takes, plays, (t) => t.source)).toEqual([{ raw: "/a/close2.mp4", scenes: [1], ...err, kind: "matte" }]);
+    // The old take played again (restored): its failure shows again.
+    expect(takeErrors(takes, () => true, (t) => t.source).map((e) => e.raw)).toEqual(["/a/old.mp4", "/a/close2.mp4"]);
+  });
+});
