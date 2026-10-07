@@ -66,3 +66,22 @@ export function markTakeJobError(project: any, raw: string, kind: TakeJobKind, e
   }
   return n;
 }
+
+/** THE FAILURES STUDIO SHOWS: the last failure on each take file the film
+ *  still plays. A take a re-record replaced keeps its record (and its
+ *  error) but no speaker clip plays it, so its failure is not news (Marc,
+ *  Oct 7: the broken first take's re-grade error stayed up after the
+ *  re-record). `plays(take)` says whether a speaker clip plays the take;
+ *  `takeRaw` names its file. Pure. */
+export function takeErrors(takes: any[], plays: (t: any) => boolean, takeRaw: (t: any) => string): Array<{ raw: string; scenes: number[]; kind: string; message: string; at: string }> {
+  const scenesOf = (raw: string) => takes.filter((t) => takeRaw(t) === raw).map((t) => t.scene_index);
+  const seen = new Set<string>();
+  const out: Array<{ raw: string; scenes: number[]; kind: string; message: string; at: string }> = [];
+  for (const t of takes) {
+    const raw = takeRaw(t);
+    if (!t || !t.job_error || seen.has(raw) || !plays(t)) continue;
+    seen.add(raw);
+    out.push({ raw, scenes: scenesOf(raw), ...t.job_error });
+  }
+  return out;
+}

@@ -42,10 +42,10 @@ import { speakerSceneFilmStarts, speakerClipForScene } from "./core/speaker-trac
 import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
 import { queueTakeMatte, blurPreviewFrame } from "./core/take-matte.js";
-import { takeJobsFor } from "./core/take-jobs.js";
+import { takeJobsFor, takeErrors } from "./core/take-jobs.js";
 import { queueTakeGrade } from "./core/take-grade.js";
 import { DEFAULT_SOFT_STRENGTH } from "./core/take-sanitize.js";
-import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies, takeForClip } from "./core/speaker-layer.js";
+import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies, takeForClip, takeOwns } from "./core/speaker-layer.js";
 import { wordsThroughCuts, speedOf } from "./core/take-clock.js";
 import { editSceneTake } from "./core/take-edits.js";
 import { wordsForTake } from "./core/measured-spine.js";
@@ -3892,14 +3892,10 @@ Rules:
         if (!tsProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const scenesOf = (raw: string) => (tsProj.takes || []).filter((t) => takeCopies(t).raw === raw).map((t) => t.scene_index);
         const jobs = takeJobsFor(tsTenant, tsProject).map((j) => ({ ...j, scenes: scenesOf(j.raw) }));
-        const seen = new Set<string>();
-        const errors: Array<{ raw: string; scenes: number[]; kind: string; message: string; at: string }> = [];
-        for (const t of tsProj.takes || []) {
-          const raw = takeCopies(t).raw;
-          if (!t.job_error || seen.has(raw)) continue;
-          seen.add(raw);
-          errors.push({ raw, scenes: scenesOf(raw), ...t.job_error });
-        }
+        // Only takes a speaker clip still plays: a re-recorded scene's old
+        // take keeps its record, not its error banner.
+        const tsClips = tsProj.speaker_track?.clips || [];
+        const errors = takeErrors(tsProj.takes || [], (t) => tsClips.some((c) => c.scene_index === t.scene_index && takeOwns(t, c.source)), (t) => takeCopies(t).raw);
         // A recast running on the film rides along: the header pill counts
         // its takes and the time left even with the Cast panel closed.
         const rcSt = await getRecastStatus(tsTenant, tsProject);

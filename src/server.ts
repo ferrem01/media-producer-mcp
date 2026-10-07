@@ -7,6 +7,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { vocabulary } from "./core/vocabulary.js";
+import { FILL_WHEN_UNSET } from "./core/take-studio.js";
 import { recipeForFormat, loadRecipes } from "./core/recipes.js";
 import { FORMAT_IDS } from "./core/formats.js";
 import { ensureStickerFiles, ensureStickerLibrary, mintSticker, drawSticker, cutoutSubject } from "./core/sticker-library.js";
@@ -2192,7 +2193,7 @@ export function createMcpServer(): McpServer {
 
   tool(
     "edit_speaker",
-    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'. A CAMERA-TAKE film (one take per scene) edits each scene's take instead: pass scene_index -- action='trim' takes head/tail seconds off the take's start/end (negative gives them back), action='cut' removes from/to in SCENE seconds (a jump cut; the take's blur, alpha and recast copies follow), action='restore' gives a cut back, action='list' shows every scene's take window and cuts; action='speed' sets a take's pace (speed 0.75-1.5, pitch kept; no scene_index = every scene); the scene re-times to what is left. action='look' sets the soft look on the booth take behind scene_index -- look 'soft' with strength 0-1 (skin smoothing; 0.5 the house pick) or 'natural'; correct:false turns off the studio colour/exposure correction every take gets (true back on); fill 0-1 sets the fill light on the face's shadows (default 0.5, 0 off) -- re-graded from the kept original in the background (every scene cut from the same recording follows; Studio refreshes when it lands).",
+    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'. A CAMERA-TAKE film (one take per scene) edits each scene's take instead: pass scene_index -- action='trim' takes head/tail seconds off the take's start/end (negative gives them back), action='cut' removes from/to in SCENE seconds (a jump cut; the take's blur, alpha and recast copies follow), action='restore' gives a cut back, action='list' shows every scene's take window and cuts; action='speed' sets a take's pace (speed 0.75-1.5, pitch kept; no scene_index = every scene); the scene re-times to what is left. action='look' sets the soft look on the booth take behind scene_index -- look 'soft' with strength 0-1 (skin smoothing; 0.5 the house pick) or 'natural'; correct:false turns off the studio colour/exposure correction every take gets (true back on); fill 0-1 sets the fill light on the face's shadows (default off; 0.5 a gentle lift, 0 off) -- re-graded from the kept original in the background (every scene cut from the same recording follows; Studio refreshes when it lands).",
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),
@@ -2230,7 +2231,7 @@ export function createMcpServer(): McpServer {
           afterSave: (t, p) => reshootStoryboardCardsSoon(t, p),
         });
         const scenes = (project.takes || []).filter((t) => takeCopies(t).raw === raw).map((t) => t.scene_index + 1);
-        return ok({ status: "grading", look: lk, strength, correct: params.correct ?? take.correct !== false, fill: params.fill ?? take.fill ?? 0.5, scenes, note: "Re-grading in the background from the kept original (about a minute); the project saves when it lands." });
+        return ok({ status: "grading", look: lk, strength, correct: params.correct ?? take.correct !== false, fill: params.fill ?? take.fill ?? FILL_WHEN_UNSET, scenes, note: "Re-grading in the background from the kept original (about a minute); the project saves when it lands." });
       }
       // A camera-take film: each scene's take (core/take-edits.ts).
       const perSceneTakes = !(project as any).speaker?.clips?.length && (project.speaker_track?.clips || []).some((c) => c.scene_index !== undefined);

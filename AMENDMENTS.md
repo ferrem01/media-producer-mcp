@@ -6,6 +6,15 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-07 — Booth takes: no soft look or fill unless asked; no stale error banner
+
+Marc: "maybe the fill and soft should not be default on for recorded
+videos." The take page's Soft look starts unchecked and an unset fill is
+none (`FILL_WHEN_UNSET`, #1130; the look tool's reply now says so). And a
+re-recorded scene's broken first take kept its "re-grade failed" banner in
+Studio although nothing played it: `/api/take-status` now reports failures
+only on takes a speaker clip plays (`takeErrors`, core/take-jobs.ts).
+
 ## 2026-10-07 — The creator vocabulary: four hard concepts, each a list
 
 Marc, on the 10 viral formats and the 17 talking-head types: "as long as
