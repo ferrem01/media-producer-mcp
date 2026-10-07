@@ -72,6 +72,7 @@ export const runway: Performer = {
   label: "Runway",
   drivenBy: "video",
   keeps: "Recast: your gestures and expressions. From a script: Runway animates the portrait from the voice",
+  framedBy: "Your camera: the recording's framing",
   limits: "Short clips (seams on longer takes); a glossier look",
   key: "RUNWAYML_API_SECRET",
   minutesPer30s: 4,

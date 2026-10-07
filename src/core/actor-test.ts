@@ -301,6 +301,17 @@ export const GENJUTSU_SHEET_PROMPT = "Replace the person in the video with the p
 export const GENJUTSU_SCENE_PROMPT = "Replace the person in the video with the person in the first reference image: the same face, hair and clothes. " +
   "Place them in the setting of the second reference image (the room, the desk, the lighting). " +
   "Keep the motion, gestures, hand positions, head movement, timing, lip movement, expressions and camera framing of the video exactly. Photorealistic.";
+/** A recast IN A SHOT: the first reference image is the actor drawn in the
+ *  framing and setting the scene asks for, and that -- not the recording's
+ *  camera -- is the shot; the recording gives only the performance. Measured
+ *  Oct 7 (proj_c6bc133e scene 1): a phone selfie came back as Kavya seated
+ *  at a table, medium-wide, lips and hands still the recording's. */
+export function genjutsuShotPrompt(shot: string, sheet: boolean): string {
+  return "Replace the person in the video with the person in the first reference image: the same face, hair and clothes. " +
+    (sheet ? "The second reference image is that same person's character sheet, from other angles. " : "") +
+    `Use the FIRST REFERENCE IMAGE's camera framing and setting, not the video's: ${shot.trim().replace(/\.$/, "")}, the camera steady. ` +
+    "From the video keep only the performance: head movement, expressions, lip movement and timing exactly, and the hand gestures. Photorealistic.";
+}
 export async function runGenjutsu(video: string, images: string[], opts: { prompt?: string; resolution?: string; resume?: string; onSubmit?: (statusUrl: string) => Promise<void> | void; deadlineMs?: number } = {}): Promise<string> {
   const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
   if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");

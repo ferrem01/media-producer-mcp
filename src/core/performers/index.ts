@@ -18,7 +18,7 @@ export function getPerformer(id: string): Performer | undefined {
  *  it can do (recast a recording; generate a take from the script). */
 export function performerList(): Array<PerformerInfo & { available: boolean; recast: boolean; generate: boolean; maxSeconds?: number }> {
   return PERFORMERS.map((p) => ({
-    id: p.id, label: p.label, drivenBy: p.drivenBy, keeps: p.keeps, limits: p.limits, key: p.key,
+    id: p.id, label: p.label, drivenBy: p.drivenBy, keeps: p.keeps, limits: p.limits, framedBy: p.framedBy, ...(p.takesShot ? { takesShot: true } : {}), key: p.key,
     minutesPer30s: p.minutesPer30s, ...(p.experimental ? { experimental: true } : {}),
     ...(p.maxSeconds ? { maxSeconds: p.maxSeconds } : {}),
     available: !!process.env[p.key], recast: true, generate: !!p.fromAudio,

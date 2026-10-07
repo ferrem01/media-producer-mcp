@@ -32,6 +32,7 @@ import { ffmpeg, convertVoice, durationOf } from "./actor-test.js";
 import { detectFace } from "./face-band.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import { PERFORMERS, getPerformer, defaultPerformer, type Performer, type PerformContext } from "./performers/index.js";
+import { shotForSetting } from "./performer-settings.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,6 +46,9 @@ export interface RecastStatus {
   finished_at?: string;
   files: Array<{
     raw: string; file: string; frame?: RecastFrame; wide?: string; status: "running" | "done" | "failed" | "reused"; chunks_done: number; chunks_total: number; stage?: string; error?: string;
+    /** A vendor that takes a shot (Higgsfield): the shot the take is
+     *  performed in, and the start picture drawn for it (an asset url). */
+    shot?: string; start_frame?: string;
     /** The take's length (s): with the vendor's pace, the time-left estimate. */
     seconds?: number;
     started_at?: string;
@@ -393,13 +397,28 @@ export async function setSceneCast(tenant: string, projectId: string, scenes: nu
   return board.map((s, i) => ({ scene_index: i, cast: s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null, follows_film: s.cast === undefined }));
 }
 
+/** The shot a recast is made in, for a vendor that takes one: the one asked
+ *  for ('' = none: the recording's camera), else the one this actor's last
+ *  recast of the take had, else the scene's setting's. */
+export function recastShot(asked: string | undefined, previous: string | undefined, setting: unknown): string | undefined {
+  if (asked !== undefined) return String(asked).trim().slice(0, 1000) || undefined;
+  return (previous && String(previous).trim()) || shotForSetting(setting) || undefined;
+}
+
 export async function startRecast(tenant: string, projectId: string, actorId: string | null, opts: { fresh?: boolean; performer?: string; voice_id?: string; motion?: string;
   /** Only these scenes (0-based): their takes are recast and the scenes cast
    *  as the actor; the rest of the film is left as it is. */
   scenes?: number[];
   /** How far back the performance sits (a picture of another shape);
    *  omitted, the frame the take's last recast by this actor had. */
-  frame?: RecastFrame } = {}): Promise<RecastStatus> {
+  frame?: RecastFrame;
+  /** THE SHOT, for a vendor that takes one (Higgsfield): where the actor is
+   *  and how far back the camera sits ("seated at a table, medium-wide").
+   *  A start picture is drawn for it and the recording gives only the
+   *  performance. Omitted: the shot this actor's last recast of the take
+   *  had, else the scene's setting (core/performer-settings.ts); '' or none
+   *  of those: the recording's own camera, as before. */
+  shot?: string } = {}): Promise<RecastStatus> {
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A recast of this film is already running");
   const project = await loadProject(tenant, projectId);
@@ -439,18 +458,21 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   st.performer = performer.id;
   st.minutes_per_30s = performer.minutesPer30s;
   if (voiceId) st.voice_id = voiceId;
-  // The raw files behind the track's clips (a one-take film is one file).
-  const raws = new Set<string>();
+  // The raw files behind the track's clips (a one-take film is one file),
+  // each with the first scene it plays in (whose setting is its shot).
+  const raws = new Map<string, number>();
   for (const clip of (project as any).speaker_track?.clips || []) {
     if (only && !only.has(clip.scene_index)) continue;
     const take = takeForClip(project as any, clip);
     // A scene a cast actor already performs (core/scene-performance.ts) is
     // not a recording: there is nobody to recast.
-    if (take && !(take as any).performed_by) raws.add(takeCopies(take).raw);
+    if (take && !(take as any).performed_by && !raws.has(takeCopies(take).raw)) raws.set(takeCopies(take).raw, clip.scene_index);
   }
   if (!raws.size) throw new Error(only ? "Those scenes have no recording to recast" : "This film has no speaker take to recast");
-  for (const raw of raws) {
+  for (const [raw, si] of raws) {
     const existing = ((project as any).takes || []).find((t: any) => takeCopies(t).raw === raw && t.actors?.[actor.id]?.file)?.actors?.[actor.id];
+    const shot = performer.takesShot ? recastShot(opts.shot, existing?.shot, (project as any).storyboard?.scenes?.[si]?.performer?.setting) : undefined;
+    if (shot && !process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the shot's start picture is drawn by GPT Image)");
     // Reused only when it is the same performance: the same vendor, voice
     // and look, and the file is still there. fresh: made again regardless.
     const reusable = !opts.fresh && existing && madeBy(existing) === performer.id && existing.voice_id === voiceId
@@ -462,10 +484,15 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
       && (performer.id !== "heygen" || existing.framing === FRAMING)
       // A sheet added or changed is a new performance for a vendor that reads it.
       && (existing.sheet || undefined) === (sheetFor(tenant, actor, performer.id) ? actor.sheet : undefined)
+      // Another shot is another performance (a selfie vs seated at a table).
+      && (existing.shot || undefined) === shot
       && (await fs.access(resolveVideoPath(existing.file, config.dataDir)).then(() => true, () => false));
     const frame: RecastFrame = opts.frame || asRecastFrame(existing?.frame) || "tight";
     const file = reusable ? existing.file : frameFileFor(raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`), frame);
-    st.files.push({ raw, file, frame, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0 });
+    // The start picture is kept with the shot: made again in the same shot, the
+    // actor sits in the same room (and GPT Image is not paid twice).
+    const startFrame = shot && existing?.shot === shot && existing?.start_frame ? existing.start_frame : undefined;
+    st.files.push({ raw, file, frame, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0, ...(shot ? { shot } : {}), ...(startFrame ? { start_frame: startFrame } : {}) });
   }
   running.set(key, st);
   await saveStatus(tenant, st);
@@ -487,11 +514,18 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
       const [width, height] = await sizeOf(rawAbs);
       f.seconds = Math.round(((await durationOf(rawAbs)) || 0) * 10) / 10 || undefined;
       f.started_at = f.stage_at = new Date().toISOString();
+      // In a shot: the actor drawn in it first (kept when it is still there).
+      if (f.shot && !(f.start_frame && await fs.access(resolveVideoPath(f.start_frame, config.dataDir)).then(() => true, () => false))) {
+        f.stage = "frame"; void saveStatus(tenant, st);
+        const { drawFrame } = await import("./scene-performance.js");
+        f.start_frame = await drawFrame(tenant, projectId, actor, f.shot, width, height);
+      }
       // Every vendor reply for this take lands on it (Studio's status list).
       const made = await withVendorStatus((v) => { f.vendor = v; void saveStatus(tenant, st); }, () => performTakeFile({
         rawAbs, outAbs: resolveVideoPath(f.file, config.dataDir), performer, voiceId, frame: f.frame,
         ctx: {
           tenant, actor, portraitAbs: portraitPath(tenant, actor), sheetAbs: sheetFor(tenant, actor, performer.id), width, height, publicUrl, motion,
+          ...(f.shot && f.start_frame ? { shot: f.shot, startFrameAbs: resolveVideoPath(f.start_frame, config.dataDir) } : {}),
           workDir: recastWorkDir(tenant, projectId, actor.id, performer.id, i),
           onStage: (stage) => { f.stage = stage; f.stage_at = new Date().toISOString(); void saveStatus(tenant, st); },
         },
@@ -514,7 +548,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     const now = new Date().toISOString();
     for (const t of (project as any).takes || []) {
       const hit = ok.find((f) => f.raw === takeCopies(t).raw);
-      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: actor.sheet } : {}), framing: FRAMING, ...(hit.frame ? { frame: hit.frame } : {}), ...(hit.wide ? { wide: hit.wide } : {}), made_at: now } };
+      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: actor.sheet } : {}), ...(hit.shot ? { shot: hit.shot, ...(hit.start_frame ? { start_frame: hit.start_frame } : {}) } : {}), framing: FRAMING, ...(hit.frame ? { frame: hit.frame } : {}), ...(hit.wide ? { wide: hit.wide } : {}), made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
     // face and half in another is worse than none. A recast of some scenes

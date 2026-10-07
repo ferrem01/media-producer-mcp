@@ -27,7 +27,11 @@ describe("Studio: the Cast card", () => {
     expect(html).toContain("if (src === 'recast' || src === 'generate') { perfPanel(project, panel, src, si); return; }");
     // Every choice in the panel is the scene's plan.
     expect(html).toContain("{ action: 'plan', scenes: [{ index: si, performer: perfm }] }");
-    expect(html).toContain("api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine' })");
+    expect(html).toContain("api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine', shot: d.rshot != null ? d.rshot : (s.recast_shot || s.setting_shot || '') })");
+    // A vendor that takes a shot (Higgsfield) gets the shot box; the others say where their framing comes from.
+    expect(html).toContain('data-pf="rshot"');
+    expect(html).toContain("if (pinfo.takesShot)");
+    expect(html).toContain("pinfo.framedBy");
     // The recast asks for the voice: the recording's by default, the actor's when they have one.
     expect(html).toContain('data-pf="rvoice" value="mine"');
     expect(html).toContain('data-pf="rvoice" value="actor"');

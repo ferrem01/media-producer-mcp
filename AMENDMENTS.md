@@ -6,6 +6,27 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-07 — A recast's framing is the vendor's own: Higgsfield takes the scene's shot
+
+Marc, on Kavya's Higgsfield recast "right up on her grill": "it seems like we
+need specific pipelines for each model." Where a recast's framing comes from
+differs by vendor, and each now says so (`framedBy` in `performerList`, shown
+in Studio): HeyGen -- the look (its own room); Kling / Runway -- the
+recording's camera; Higgsfield -- THE SHOT (`takesShot`). Genjutsu copied the
+recording's phone-selfie camera because we told it to; given a start picture
+of the actor drawn in the shot and a prompt that takes the framing from that
+picture (`genjutsuShotPrompt`), it performed the same selfie seated at a table,
+medium-wide, lips and hands still the recording's (actor test, Oct 7).
+
+- `startRecast` `shot` (the cast tool's `shot`, `/api/recast` `shot`, Studio's
+  "The shot" box under Higgsfield): asked, else the actor's last recast of the
+  take's, else the scene's setting's (core/performer-settings.ts); '' = the
+  recording's camera, as before. The start picture is drawn by
+  `drawFrame` (Seedance's start frame) and kept on `take.actors[id]`
+  (`shot`, `start_frame`); another shot is another performance.
+- PRs #1131 (a recast keeps the recording's voice) and #1132 (a take owns a
+  recast it no longer lists) were the same thread.
+
 ## 2026-10-07 — Booth takes: no soft look or fill unless asked; no stale error banner
 
 Marc: "maybe the fill and soft should not be default on for recorded

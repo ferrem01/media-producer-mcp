@@ -2930,7 +2930,8 @@ Rules:
       }
 
       // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
-      // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based], frame?}
+      // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based], frame?, shot?}
+      //        shot: Higgsfield performs the recording in it (a start picture drawn; '' = the recording's camera)
       // POST /api/recast/{tenant}/{project} {action: "frame", frame: "tight"|"medium"|"wide", scenes?}
       //      a made recast refitted from the kept original (a landscape look in a portrait film: how far back it sits)
       //      null puts the recording's person back; performer picks the vendor; voice_id the
@@ -2957,6 +2958,7 @@ Rules:
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
               motion: typeof body.motion === "string" ? body.motion : undefined,
               scenes: Array.isArray(body.scenes) ? body.scenes.map(Number).filter((n: number) => Number.isInteger(n) && n >= 0) : undefined,
+              shot: typeof body.shot === "string" ? body.shot : undefined,
             }));
             return;
           }

@@ -25,6 +25,7 @@ export const heygen: Performer = {
   label: "HeyGen",
   drivenBy: "audio",
   keeps: "Your voice and timing; HeyGen draws the movement",
+  framedBy: "The look: each HeyGen look is its own room and framing",
   limits: "Gestures are HeyGen's, not yours",
   key: "HEYGEN_API_KEY",
   minutesPer30s: 3,
