@@ -1,0 +1,154 @@
+{
+  "id": "reaction-split",
+  "name": "Reaction: split",
+  "grammar": "creator-cut",
+  "format": "reaction",
+  "variant": "split",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "reacting to a competitor's ad, a viral post or a bad email",
+    "teardown of someone else's work",
+    "commentary on news"
+  ],
+  "length_s": [
+    20,
+    45
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:title"
+      ],
+      "note": "What you are about to react to, and your gut take in five words."
+    },
+    {
+      "role": "react",
+      "shot": "person+split",
+      "made": "recording",
+      "dur": [
+        4,
+        6,
+        9
+      ],
+      "repeat": [
+        2,
+        4
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 0.9,
+        "exit_before": "next_beat",
+        "use": "react",
+        "kind": "screen_recording"
+      },
+      "note": "The source on top (a screen_recording need with use \"react\": the clip or screenshot you react to, the part this beat shows), you under it: watch, stop, say what is right or wrong with it."
+    },
+    {
+      "role": "verdict",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        3,
+        4,
+        6
+      ],
+      "enters": [
+        "stamp:noun"
+      ],
+      "note": "The verdict, to camera, one stamp."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [],
+      "note": "What you would do instead, or follow for more."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 5,
+    "max_hold_s": 9,
+    "wpm": 175,
+    "first_cut_by_s": 2.5,
+    "end_card_s": 0
+  },
+  "layers": {
+    "captions": {
+      "style": "pill",
+      "words": 3,
+      "pos": "chest",
+      "through_cutaways": true
+    },
+    "stamps": {
+      "pos": "top-center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": false,
+      "duck": true
+    }
+  },
+  "motion": {
+    "elements": {
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "react": "fixed",
+      "verdict": "fixed",
+      "close": "fixed"
+    },
+    "physics": "punchy"
+  },
+  "asks": {
+    "take": "continuous",
+    "screens": "one source clip or screenshot per react beat",
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "close"
+    ],
+    "fixed": [
+      "hook",
+      "verdict"
+    ],
+    "may_double": [
+      "react"
+    ]
+  },
+  "source": {
+    "film": "composed from the viral formats list (Reaction); not measured from one film",
+    "length_s": 30,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

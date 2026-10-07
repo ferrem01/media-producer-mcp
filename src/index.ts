@@ -22,7 +22,8 @@ import { getRemoteBoothHtml, getRemoteCameraHtml } from "./remote-booth-page.js"
 import { boothFilms } from "./core/booth-films.js";
 import { getPhoneStudioHtml } from "./studio-phone.js";
 import { sanitizeTake, type TakeSanitizeResult } from "./core/take-sanitize.js";
-import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries, dropVoiceUnderTakes, clipNeedOf, ensureClipNeed } from "./core/take-needs.js";
+import { ensureSpeakerNeeds, openTakeNeeds, attachTake, resolveTakeWaiters, activeTake, personCarries, dropVoiceUnderTakes, clipNeedOf, ensureClipNeed, cloneNeedOf } from "./core/take-needs.js";
+import { placeProof } from "./core/proof-placement.js";
 import { provideAsset, openAssetNeeds, recastProvidedNeed, isScreenSlate } from "./core/asset-needs.js";
 import { drawPrompt, tallFrame, needSources } from "./core/need-sources.js";
 import { searchStockFootage, downloadStockFootage } from "./media/stock-footage.js";
@@ -465,7 +466,7 @@ const ARMED_TTL_MS = 2 * 60 * 60 * 1000;
  *  (the need's position, else the whole frame, cover), the need flips to
  *  provided, and a scene shorter than the clip grows to it. Nothing about
  *  the speaker runs. The take job waiting on the scene is released. */
-async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Record<string, unknown>, peek: Project, sceneIndex: number): Promise<{ status: number; body: Record<string, unknown> }> {
+async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Record<string, unknown>, peek: Project, sceneIndex: number, kind: "clip" | "clone" = "clip"): Promise<{ status: number; body: Record<string, unknown> }> {
   const url = String(tkBody.url || "");
   let sanitized: TakeSanitizeResult | undefined;
   // The clip keeps its whole picture: no reframe to the canvas (the
@@ -480,16 +481,25 @@ async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Re
   if (!project) return { status: 404, body: { error: "Project not found" } };
   const sbScene = project.storyboard?.scenes?.[sceneIndex] as any;
   if (!sbScene) return { status: 404, body: { error: `Scene ${sceneIndex + 1} not found` } };
-  const need = ensureClipNeed(project, sceneIndex);
+  // THE CLONE (SPEC-creator-formats.md): Take B of the scene, laid in its
+  // half of the frame (core/proof-placement.ts placeProof "clone"), the
+  // speaker's own take untouched.
+  const cloneNeed = kind === "clone" ? cloneNeedOf(project, sceneIndex) : undefined;
+  if (kind === "clone" && !cloneNeed) return { status: 400, body: { error: `Scene ${sceneIndex + 1} has no clone need` } };
+  const need = cloneNeed || ensureClipNeed(project, sceneIndex);
   need.status = "provided"; need.path = url;
   const dur = Number(tkBody.duration) > 0 ? Math.round(Number(tkBody.duration) * 100) / 100 : (sanitized?.probe.duration ? Math.round(sanitized.probe.duration * 100) / 100 : 0);
   const position = (need as any).position && typeof (need as any).position === "object" ? (need as any).position : { x: 0, y: 0, width: "100%", height: "100%" };
-  const comp = { type: "video", position, z_index: 12, data: { src: url, object_fit: "cover", start_at: 0, clip: true }, enter: { effect: "cut", at: 0 } };
+  const marker = kind === "clone" ? "clone" : "clip";
+  // A clone is a clip too (data.clip: the render knows its file); its
+  // marker keeps it apart from a cameo on the same scene.
+  const base = { type: "video", position, z_index: 12, data: { src: url, object_fit: "cover", start_at: 0, clip: true, ...(kind === "clone" ? { clone: true } : {}) } as Record<string, unknown>, enter: { effect: "cut", at: 0 } };
+  const comp = kind === "clone" ? (placeProof(base, "clone", { side: (need as any).side }) as typeof base) : base;
   // The clip takes the slot: the earlier clip and the slate the board cast
   // for this need both leave (measured live, proj_09b6d0cb: the slate stayed
   // on the board under the clip after the take landed).
   const stale = (c: any) => !!c && typeof c === "object"
-    && ((c.type === "video" && c.data && c.data.clip === true) || (isScreenSlate(c) && String(c.data.need) === need.description));
+    && ((c.type === "video" && c.data && c.data.clip === true && !!c.data.clone === (kind === "clone")) || (isScreenSlate(c) && String(c.data.need) === need.description));
   const replaceClip = (list: any[] | undefined) => [...(list || []).filter((c) => !stale(c)), comp];
   sbScene.components = replaceClip(sbScene.components);
   if (dur > 0 && (Number(sbScene.duration_seconds) || 0) < dur) sbScene.duration_seconds = Math.ceil(dur * 10) / 10;
@@ -502,10 +512,10 @@ async function attachClipToScene(tkTenant: string, tkProject: string, tkBody: Re
   project.updated_at = new Date().toISOString();
   await saveProject(project);
   reshootStoryboardCardsSoon(tkTenant, tkProject);
-  const take: Take = { id: `clip_${sceneIndex}`, scene_index: sceneIndex, source: url, recorded_at: new Date().toISOString(), duration: dur || undefined, capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw" } as Take;
+  const take: Take = { id: `${marker}_${sceneIndex}`, scene_index: sceneIndex, source: url, recorded_at: new Date().toISOString(), duration: dur || undefined, capture: typeof tkBody.capture === "string" ? tkBody.capture : "raw" } as Take;
   const released = resolveTakeWaiters(tkTenant, tkProject, take);
   console.log(`  clip: scene ${sceneIndex + 1} -- ${path.basename(url)} attached as a video component (${dur}s)${released ? `, ${released} waiter(s) released` : ""}`);
-  return { status: 200, body: { ok: true, clip: true, scene_index: sceneIndex, url, duration: dur, component: comp, retime: null, note: "a clip on the scene, not the speaker" } };
+  return { status: 200, body: { ok: true, [marker]: true, scene_index: sceneIndex, url, duration: dur, component: comp, retime: null, note: kind === "clone" ? "the clone's take (Take B), in its half of the frame" : "a clip on the scene, not the speaker" } };
 }
 
 // A generated take (core/generated-take.ts) is attached like a booth
@@ -540,6 +550,8 @@ async function attachTakeToScene(tkTenant: string, tkProject: string, tkBody: Re
     // component on that scene -- no speaker track, matte, words or re-time.
     if (!recordAll) {
       const tkSceneIdx = Number.isInteger(Number(tkBody.scene_index)) && Number(tkBody.scene_index) >= 0 ? Number(tkBody.scene_index) : -1;
+      // THE CLONE'S TAKE (Take B): the booth says which take it records.
+      if (tkBody.as === "clone" && tkSceneIdx >= 0) return attachClipToScene(tkTenant, tkProject, tkBody, tkPeek, tkSceneIdx, "clone");
       const tkClipNeed = tkSceneIdx >= 0 ? clipNeedOf(tkPeek, tkSceneIdx) : undefined;
       if (tkClipNeed || (tkSceneIdx >= 0 && !personCarries((tkPeek.treatment as any)?.filmGrammar))) {
         return attachClipToScene(tkTenant, tkProject, tkBody, tkPeek, tkSceneIdx);

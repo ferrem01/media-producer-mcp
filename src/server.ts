@@ -6,6 +6,9 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { vocabulary } from "./core/vocabulary.js";
+import { recipeForFormat, loadRecipes } from "./core/recipes.js";
+import { FORMAT_IDS } from "./core/formats.js";
 import { ensureStickerFiles, ensureStickerLibrary, mintSticker, drawSticker, cutoutSubject } from "./core/sticker-library.js";
 import { DEFAULT_IMAGE_MODEL } from "./media/image-gen.js";
 import { extractBriefLocks, briefLockBlock, previousBoardBlock } from "./llm/brief-locks.js";
@@ -116,11 +119,15 @@ export const animationSchema = z.object({
 }).optional();
 
 /** A cast plan (core/cast-plan.ts): who performs, how, with what, where. */
+/** The recipe param's words, from the library itself (never a stale list). */
+const RECIPE_DESCRIBE = `The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (${loadRecipes().map((r) => r.id).join(", ")}). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none. list target='vocabulary' shows each with its format, grammar and frames.`;
+
 const planSchema = z.object({
   actor: z.string().nullable().optional(),
   how: z.enum(["record", "recast", "generate", ""]).optional(),
   engine: z.string().optional(),
   location: z.string().nullable().optional(),
+  setting: z.string().nullable().optional().describe("Where the person is (SPEC-creator-formats.md): selfie | sit-down | walk-talk | car | podcast | outdoor-sit | doing | second-camera. The booth shows its filming guidance; a generated performer gets its shot when none is named. '' or null clears it. list target='vocabulary' lists them."),
 });
 
 const transitionSchema = z.object({
@@ -1048,7 +1055,7 @@ export function createMcpServer(): McpServer {
       include_output: z.boolean().optional().describe("copy_of only: also copy the original's rendered mp4 (an archive copy). Default false."),
       format: z.enum(["video", "image", "slideshow", "presentation", "one-pager", "gif", "social", "email-header", "thumbnail"]).optional().describe("Output format"),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry (default: 16x9). 9x16 for Reels/TikTok/Shorts, 4x5 for feed posts, 1x1 square."),
-      recipe: z.string().optional().describe("The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (presenter-n-things, presenter-split-tour, presenter-location-hop, founder-story-broll, speaker-kinetic-claims, speaker-one-take-cards, story-ad-idea-beats, ask-work-result, founder-bookends-chapters, launch-what-if-features, founder-selfie-punch-cards). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none."),
+      recipe: z.string().optional().describe(RECIPE_DESCRIBE),
       fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
     async (params) => {
@@ -1155,10 +1162,10 @@ export function createMcpServer(): McpServer {
 
   tool(
     "list",
-    "List projects for a tenant (each with its tags), or available component types. Pass tag to list only the films carrying it. Pass target='components' to see the component catalog.",
+    "List projects for a tenant (each with its tags), or available component types. Pass tag to list only the films carrying it. Pass target='components' to see the component catalog. Pass target='vocabulary' for the creator vocabulary (SPEC-creator-formats.md): every option of the four hard concepts -- grammars (film), recipes grouped by viral format (film), settings (scene: where the person is), proof uses (beat: where the proof sits) -- and the frames.",
     {
       tenant_id: z.string().optional(),
-      target: z.enum(["projects", "components"]).optional().describe("What to list (default: projects)"),
+      target: z.enum(["projects", "components", "vocabulary"]).optional().describe("What to list (default: projects)"),
       tag: z.union([z.string(), z.array(z.string())]).optional().describe("Projects: only films carrying this tag (or every one of these tags)"),
     },
     async (params) => {
@@ -1168,6 +1175,7 @@ export function createMcpServer(): McpServer {
         const catalog = await listComponentCatalog();
         return ok(catalog);
       }
+      if (target === "vocabulary") return ok(vocabulary());
 
       const want = normalizeTags(params.tag ?? []);
       const projects = (await listProjects(params.tenant_id)).filter((p) => want.every((t) => normalizeTags(p.tags).includes(t)));
@@ -1312,7 +1320,7 @@ export function createMcpServer(): McpServer {
         width: z.number().optional(),
         height: z.number().optional(),
         frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional(),
-        recipe: z.string().optional().describe("The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (presenter-n-things, presenter-split-tour, presenter-location-hop, founder-story-broll, speaker-kinetic-claims, speaker-one-take-cards, story-ad-idea-beats, ask-work-result, founder-bookends-chapters, launch-what-if-features, founder-selfie-punch-cards). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none."),
+        recipe: z.string().optional().describe(RECIPE_DESCRIBE),
         fps: z.number().optional(),
         background: z.string().optional(),
       }).optional(),
@@ -1432,7 +1440,7 @@ export function createMcpServer(): McpServer {
             until: z.number().optional(),
           })).optional().describe("Replace this scene's NEEDS on the board, deterministically: the full list of assets the scene asks for. Pass [] when the cast IS the plan (a library stand-in for a screen nobody will record) -- an open screen need would otherwise cast a slate over it. Omit to keep the needs."),
         })).optional(),
-        cast_plan: planSchema.nullable().optional().describe("Set WHO performs, HOW and WHERE on EVERY scene at once (speaker / creator-cut films) -- written into each scene's own plan, nothing kept on the film: {actor (a cast actor id; null = me), how: record | recast | generate, engine (recast: higgsfield = Genjutsu, kling, heygen, runway; generate: seedance, heygen; omitted = the best for the actor), location (generate with Seedance: a location id)}. Only the fields you pass change ('' puts one back to its default); null clears every scene's plan. For one scene use scenes[].performer. NOTHING IS MADE: scenes whose take no longer matches show state 'stale' (cast action='scenes') until performed again."),
+        cast_plan: planSchema.nullable().optional().describe("Set WHO performs, HOW and WHERE on EVERY scene at once (speaker / creator-cut films) -- written into each scene's own plan, nothing kept on the film: {actor (a cast actor id; null = me), how: record | recast | generate, engine (recast: higgsfield = Genjutsu, kling, heygen, runway; generate: seedance, heygen; omitted = the best for the actor), location (generate with Seedance: a location id), setting (where the person is: selfie, sit-down, walk-talk, car, podcast, outdoor-sit, doing, second-camera -- the booth guidance and a generated shot)}. Only the fields you pass change ('' puts one back to its default); null clears every scene's plan. For one scene use scenes[].performer. NOTHING IS MADE: scenes whose take no longer matches show state 'stale' (cast action='scenes') until performed again."),
         remove_scenes: z.array(z.number()).optional().describe("Indices of storyboard scenes to remove"),
         reorder_scenes: z.array(z.number()).optional().describe("Current indices in desired order"),
       }).optional().describe("Direct storyboard edits. Partial updates -- only fields you pass get changed. Works in the storyboard state. scenes[].components sets a scene's cast deterministically (no writer)."),
@@ -3404,7 +3412,8 @@ export function createMcpServer(): McpServer {
       })).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc. Accepts an object or a JSON string."),
       film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. relay: every beat carried by an OBJECT -- a handoff (the thing ending one beat becomes the start of the next: point -> logo -> dot -> search bar) or a through-line (one object stays while the beats change around it); by default ONE continuous take -- scenes join on identical frames (a black flood that contracts into the next shape, or the same full-frame photo), a cursor drives every change, a beat on every beat, the last frame = the first; or 1-3 long oners with hard-cut type punctuation between them. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its proof (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry, and nothing else. 16x9 (default): embeds, landing pages, YouTube. 9x16: Reels, TikTok, Shorts, Stories (top 12% / bottom 18% are platform UI). 4x5: Instagram or LinkedIn feed post (shown whole). 1x1: square. Omit to let the director infer it from where the prompt says the film ships; pass to pin. Explicit canvas_width/canvas_height override it. A frame never changes the grammar."),
-      recipe: z.string().optional().describe("The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (presenter-n-things, presenter-split-tour, presenter-location-hop, founder-story-broll, speaker-kinetic-claims, speaker-one-take-cards, story-ad-idea-beats, ask-work-result, founder-bookends-chapters, launch-what-if-features, founder-selfie-punch-cards). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none."),
+      recipe: z.string().optional().describe(RECIPE_DESCRIBE),
+      creator_format: z.enum(FORMAT_IDS as [string, ...string[]]).optional().describe("The VIRAL FORMAT (SPEC-creator-formats.md): talking-head | screen-share | listicle | ranking | reaction | clone | split-screen | green-screen | voiceover-broll | yap. Picks the format's default recipe (for the frame when one is proven there) when no recipe is pinned; recipe wins. list target='vocabulary' shows every format's recipes."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
       voiceover: z.boolean().optional().describe("Generate TTS voiceover narration for each scene (default: false)"),
@@ -3427,6 +3436,11 @@ export function createMcpServer(): McpServer {
       ),
     },
     async (params) => {
+      // A FORMAT PICKS ITS RECIPE (SPEC-creator-formats.md) unless one is pinned.
+      if (!params.recipe && params.creator_format) {
+        const fr = recipeForFormat(params.creator_format, params.frame);
+        if (fr) params.recipe = fr.id;
+      }
       // Auth check
       // The /mcp transport already enforces auth (Bearer) before any tool runs,
       // so the per-tool `token` arg is optional — connectors authenticate at the

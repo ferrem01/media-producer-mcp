@@ -558,6 +558,11 @@ export interface CastPlan {
   /** generate with Seedance: a location id (core/locations.ts); null on a
    *  scene = no location, over the film's. */
   location?: string | null;
+  /** Where the person is and how the phone sees them (core/performer-settings.ts,
+   *  SPEC-creator-formats.md): selfie | sit-down | walk-talk | car | podcast |
+   *  outdoor-sit | doing | second-camera. The booth's guidance; the shot a
+   *  generated performer is given when none is named. */
+  setting?: string;
 }
 
 export interface StoryboardAudioDirection {
@@ -753,14 +758,21 @@ export interface AssetRequirement {
   /** cutaway (default): takes the frame for the beat, hard cut in and out.
    *  card: floats over the person on a plate.
    *  split: on a tall frame the screen owns the top of the frame and the
-   *  person stays under it (the talking-head-under-the-screen shape). */
-  use?: "cutaway" | "card" | "split" | "clip";
+   *  person stays under it (the talking-head-under-the-screen shape).
+   *  The rest (SPEC-creator-formats.md, core/proof-placement.ts): green |
+   *  tv | laptop | phone | whiteboard | point | react (placed) | prop | demo
+   *  (directions, nothing drawn) | clone (the person's Take B). */
+  use?: "cutaway" | "card" | "split" | "clip" | "green" | "tv" | "laptop" | "phone" | "whiteboard" | "point" | "react" | "prop" | "demo" | "clone";
   /** When it enters -- a word anchor ("@dashboard") or scene seconds. */
   at?: string | number;
   /** When it leaves -- a word anchor or scene seconds (omit = the claim's end). */
   until?: string | number;
   /** Where the eye should go on it, in words ("circle the Publish button"). */
   focus?: string;
+  /** A placed proof's side of the frame (core/proof-placement.ts): the frame
+   *  beside the person, or the half a clone fills. Absent: away from the face
+   *  (right for a clone). */
+  side?: "left" | "right";
 }
 
 // ── Project ──

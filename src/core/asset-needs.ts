@@ -12,6 +12,7 @@
  */
 
 import type { Project, StoryboardScene, AssetRequirement, AssetRequirementType } from "./types.js";
+import { asProofUse, placeProof, isDirectionUse, PROOF_FRAME_TYPE } from "./proof-placement.js";
 
 /** A PROOF SURFACE: a product mock the library performs, or a provided
  *  still or clip. Cut in on a claim it is the cutaway -- laid under the
@@ -73,8 +74,15 @@ export function normalizeAssetNeeds(raw: unknown): AssetRequirement[] {
     const gen = String((e as any).generation_prompt || "").trim();
     if (gen) need.generation_prompt = gen;
     else if (type === "stock_footage" || type === "mockup") need.generation_prompt = description;
-    const use = String((e as any).use || "").trim().toLowerCase();
-    if (use === "card" || use === "cutaway" || use === "split") need.use = use;
+    // WHERE THE PROOF SITS (core/proof-placement.ts). A clip is the take
+    // flow's own word (core/take-needs.ts); a clone is only ever the
+    // person's second take, and a camera take is never placed otherwise.
+    // prop / demo are directions the person performs: nothing to upload.
+    const use = asProofUse((e as any).use);
+    if (use && use !== "clip" && (use === "clone") === (type === "camera_video")) {
+      need.use = use;
+      if (isDirectionUse(use)) { need.status = "provided"; need.priority = "nice_to_have"; need.fallback = "Performed on camera; nothing to upload."; }
+    }
     for (const k of ["at", "until"] as const) {
       const v = (e as any)[k];
       if (typeof v === "number" && Number.isFinite(v)) need[k] = v;
@@ -82,6 +90,8 @@ export function normalizeAssetNeeds(raw: unknown): AssetRequirement[] {
     }
     const focus = String((e as any).focus || "").trim();
     if (focus) need.focus = focus;
+    const side = String((e as any).side || "").trim().toLowerCase();
+    if (side === "left" || side === "right") need.side = side;
     out.push(need);
   }
   return out;
@@ -111,7 +121,7 @@ export function openAssetNeeds(project: Project): OpenAssetNeed[] {
   (project.storyboard?.scenes || []).forEach((scene, si) => {
     (scene.assets || []).forEach((a, ai) => {
       if (needCoveredByCast((project.scenes || [])[si] as any, a)) return;
-      if (a && a.type !== "camera_video" && a.status === "needed") out.push({ scene_index: si, asset_index: ai, type: a.type, description: a.description });
+      if (a && a.type !== "camera_video" && a.status === "needed" && !isDirectionUse(a.use)) out.push({ scene_index: si, asset_index: ai, type: a.type, description: a.description });
     });
   });
   return out;
@@ -149,20 +159,17 @@ export function proofComponents(scene: StoryboardScene): Array<Record<string, un
   const out: Array<Record<string, unknown>> = [];
   for (const need of scene.assets || []) {
     if (!need || need.type === "camera_video" || !need.path || need.status !== "provided") continue;
-    if (need.use === "card") continue;
     const media = assetMedia(need.path);
     if (!media) continue;
     const data: Record<string, unknown> = { src: need.path };
-    // THE SPLIT rides on the component: the tall-frame layout reads it.
-    if (need.use === "split") data.use = "split";
     if (need.at !== undefined) data.at = need.at;
     if (need.until !== undefined) data.exit_at = need.until;
     if (media === "image") data.drift = false;
-    out.push({
-      type: media,
-      data,
-      position: { x: "0%", y: "0%", width: "100%", height: "100%" },
-    });
+    // WHERE IT SITS (core/proof-placement.ts): the split marks the data (the
+    // tall-frame layout reads it), a framed use becomes a proof-frame, green
+    // becomes the beat's ground.
+    const placed = placeProof({ type: media, data, position: { x: "0%", y: "0%", width: "100%", height: "100%" } }, need.use, { side: need.side });
+    if (placed) out.push(placed);
   }
   return out;
 }
@@ -193,7 +200,7 @@ export function replaceCutWindow(components: unknown[], at: unknown): unknown[] 
 /** Does the scene already show this file? (A rebuild must not stack a
  *  second copy.) */
 export function hasProofFor(components: unknown[], src: string): boolean {
-  return (components || []).some((c: any) => c && typeof c === "object" && (c.type === "image" || c.type === "video") && c.data?.src === src);
+  return (components || []).some((c: any) => c && typeof c === "object" && (c.type === "image" || c.type === "video" || c.type === PROOF_FRAME_TYPE) && c.data?.src === src);
 }
 
 /**
@@ -222,6 +229,18 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
     // a frame component (screencast-frame's `video_url`, a template-style
     // `source`): a rebuild must not lay a second copy beside it.
     if (comps.some((c) => { const d: any = c && typeof c === "object" ? (c as any).data : null; return !!d && [d.src, d.video_url, d.image_url, d.source].some((v: unknown) => String(v || "") === need.path); })) continue;
+    // A PLACED SLATE (a proof-frame waiting for its file) keeps its frame:
+    // the file fills it.
+    const framed = comps.findIndex((c, i) => !taken.has(i) && isScreenSlate(c) && (c as any).type === PROOF_FRAME_TYPE && (c as any).data.need === need.description);
+    if (framed >= 0) {
+      const f: any = comps[framed];
+      const fd: Record<string, unknown> = { ...f.data, src: need.path, media };
+      for (const k of ["need", "text", "asset_type", "hint"]) delete fd[k];
+      comps[framed] = { ...f, data: fd };
+      taken.add(framed);
+      replaced++;
+      continue;
+    }
     // Its own slate first (the honest stand-in cast while it was open), then
     // the mock the scene staged as its payoff.
     let idx = comps.findIndex((c, i) => !taken.has(i) && isScreenSlate(c) && (c as any).data.need === need.description);
@@ -261,19 +280,30 @@ export function castProvidedScreens(scene: StoryboardScene): { components: Array
  *  and is not. */
 export const SCREEN_SLATE_TYPE = "asset-placeholder";
 export function isScreenSlate(c: unknown): boolean {
-  return !!c && typeof c === "object" && (c as any).type === SCREEN_SLATE_TYPE && typeof (c as any).data?.need === "string";
+  if (!c || typeof c !== "object" || typeof (c as any).data?.need !== "string") return false;
+  const t = (c as any).type;
+  // A placed slate (core/proof-placement.ts): the proof-frame with no file yet.
+  return t === SCREEN_SLATE_TYPE || (t === PROOF_FRAME_TYPE && !(c as any).data.src);
 }
 /** A live-action clip on one scene (core/take-needs.ts, isClipNeed) is
  *  slated like a screen: the board must show a person is expected there
  *  (measured live, proj_45e6d1bb: a hook with only a clip need showed as
  *  an empty codegen frame). */
 function isClipNeedLocal(need: AssetRequirement | undefined | null): boolean {
-  return !!need && need.type === "camera_video" && (need as any).use === "clip";
+  return !!need && need.type === "camera_video" && ((need as any).use === "clip" || (need as any).use === "clone");
 }
 function isScreenNeed(need: AssetRequirement | undefined | null): need is AssetRequirement {
   return !!need && (need.type === "screen_recording" || need.type === "screenshot" || isClipNeedLocal(need));
 }
 function screenSlate(need: AssetRequirement): Record<string, unknown> {
+  if (isClipNeedLocal(need) && (need as any).use === "clone") {
+    return {
+      need: need.description,
+      text: need.description,
+      asset_type: "Clone take needed (Take B)",
+      hint: "Record Take B in the booth -- it fills this half",
+    };
+  }
   if (isClipNeedLocal(need)) {
     return {
       need: need.description,
@@ -312,10 +342,24 @@ export function castScreenSlates(scene: StoryboardScene, opts: { anchors?: boole
   const taken = new Set<number>();
   for (const need of open) {
     if (comps.some((c) => isScreenSlate(c) && (c as any).data.need === need.description)) continue;
-    const idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
+    let idx = comps.findIndex((c, i) => !taken.has(i) && c && typeof c === "object" && typeof (c as any).type === "string"
       && isProofSurface((c as any).type) && (c as any).type !== "image" && (c as any).type !== "video" && !isScreenSlate(c));
     const data = screenSlate(need);
-    if (need.use === "split") data.use = "split";
+    // WHERE IT SITS (core/proof-placement.ts): a placed use stands its slate
+    // where the file will go -- in the frame beside the person, in the clone's
+    // half -- not in a mock's slot. The mock it would have replaced leaves,
+    // its cut window kept. A green proof's slate is a card: a full-frame
+    // stand-in behind the person would cover them.
+    const use = asProofUse(need.use);
+    const placedUse = use && use !== "cutaway" && use !== "split" && use !== "clip" ? (use === "green" ? "card" : use) : undefined;
+    let mockTimes: { enter?: unknown; exit?: unknown } | null = null;
+    if (placedUse && idx >= 0) {
+      const mock: any = comps[idx];
+      mockTimes = { enter: mock.enter, exit: mock.exit };
+      comps.splice(idx, 1);
+      idx = -1;
+    }
+    if (use === "split") data.use = "split";
     let slate: Record<string, unknown>;
     if (idx >= 0) {
       const mock: any = comps[idx];
@@ -333,7 +377,10 @@ export function castScreenSlates(scene: StoryboardScene, opts: { anchors?: boole
       const keep = (v: unknown) => (typeof v === "number" ? true : (opts.anchors === true && typeof v === "string" && v.trim() !== ""));
       slate = { type: SCREEN_SLATE_TYPE, data, position: { x: "0%", y: "0%", width: "100%", height: "100%" } };
       if (keep(need.at)) slate.enter = { effect: "cut", at: need.at };
+      else if (mockTimes?.enter) slate.enter = mockTimes.enter;
       if (keep(need.until)) slate.exit = { effect: "cut", at: need.until };
+      else if (mockTimes?.exit) slate.exit = mockTimes.exit;
+      if (placedUse) slate = placeProof(slate, placedUse, { side: need.side }) || slate;
       comps.push(slate);
     }
     cast.push(slate);
@@ -403,9 +450,10 @@ export function recastProvidedNeed(
   // times (seconds; word anchors were the build's to resolve).
   const dur = Number(scene.duration_seconds) || 0;
   const cut: Record<string, unknown> = { type: media, data: { src: need.path, ...(media === "image" ? { drift: false } : {}) }, position: { x: "0%", y: "0%", width: "100%", height: "100%" } };
-  if (need.use === "split") (cut.data as any).use = "split";
   (cut.data as any).at = typeof need.at === "number" ? need.at : Math.round(dur * 0.3 * 100) / 100;
   (cut.data as any).exit_at = typeof need.until === "number" ? need.until : Math.round(dur * 0.8 * 100) / 100;
-  comps.push(cut);
-  return { components: comps, changed: 1, how: "cut in" };
+  const placed = placeProof(cut, need.use, { side: need.side });
+  if (!placed) return { components: comps, changed: 0, how: "performed on camera" };
+  comps.push(placed);
+  return { components: comps, changed: 1, how: placed === cut ? "cut in" : `placed (${need.use})` };
 }

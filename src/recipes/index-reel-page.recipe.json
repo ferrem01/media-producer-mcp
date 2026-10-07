@@ -1,0 +1,116 @@
+{
+  "id": "index-reel-page",
+  "name": "Index reel: page (no host)",
+  "grammar": "tempo-cut",
+  "format": "listicle",
+  "variant": "index-reel page",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "N examples of one thing, fast, with no one on camera",
+    "a swipe file people save"
+  ],
+  "length_s": [
+    12,
+    24
+  ],
+  "spine": [
+    {
+      "role": "run",
+      "shot": "type_card",
+      "made": "motion",
+      "dur": [
+        8,
+        13,
+        20
+      ],
+      "enters": [
+        "index-reel"
+      ],
+      "note": "ONE scene, ONE index-reel component (mode page): headline = the claim with the count in it, items = every example in order, each {title, subject, preview}, start_at 0.8, per_item_s 0.9. The numbered list fills in beside the phone as each item lands. No other component on this scene."
+    },
+    {
+      "role": "close",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:wordmark"
+      ],
+      "note": "The wordmark; save this."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 0.9,
+    "max_hold_s": 20,
+    "wpm": 170,
+    "first_cut_by_s": 1.0,
+    "end_card_s": 3
+  },
+  "layers": {
+    "voice": "type",
+    "captions": {
+      "style": "none"
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": false,
+      "feel": "driving"
+    }
+  },
+  "motion": {
+    "elements": {
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      },
+      "end_card": {
+        "in": "fade",
+        "in_s": 0.4
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "run": "fixed",
+      "close": "fixed"
+    },
+    "physics": "punchy"
+  },
+  "asks": {
+    "take": "none",
+    "screens": "optional: one screenshot per item (else the reel draws each one)",
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "close"
+    ],
+    "fixed": [
+      "run"
+    ]
+  },
+  "source": {
+    "film": "peter index reel (Marc's reference, 2026-10-06): a designed page, the numbered list filling in step with a phone example",
+    "length_s": 14,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

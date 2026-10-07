@@ -1,0 +1,75 @@
+<template>
+  <div class="tl-root">
+    <div class="tl-title"></div>
+    <div class="tl-rows"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* TIER LIST (SPEC-creator-formats.md, the Ranking format): rows S / A / B
+     / C / D, each a colored label and a track; the items drop into their
+     row on their word, the latest one ringed. Sized from its box. */
+  .tl-root, .tl-root * { max-width: none; box-sizing: border-box; }
+  .tl-root { --u: 1px; position: absolute; inset: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 14); padding: calc(var(--u) * 18);
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); background: #15161c; border-radius: calc(var(--u) * 22); box-shadow: 0 calc(var(--u) * 20) calc(var(--u) * 50) rgba(0,0,0,0.35); }
+  .tl-title { color: #ffffff; font-weight: 800; letter-spacing: -0.02em; font-size: calc(var(--u) * 40); line-height: 1.1; text-align: center; }
+  .tl-title:empty { display: none; }
+  .tl-rows { flex: 1; display: flex; flex-direction: column; gap: calc(var(--u) * 8); min-height: 0; }
+  .tl-row { flex: 1; display: flex; gap: calc(var(--u) * 8); min-height: 0; }
+  .tl-tier { flex: 0 0 auto; aspect-ratio: 1 / 1; height: 100%; border-radius: calc(var(--u) * 10); display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: calc(var(--u) * 46); color: #15161c; }
+  .tl-track { flex: 1; display: flex; align-items: center; gap: calc(var(--u) * 8); padding: 0 calc(var(--u) * 8); border-radius: calc(var(--u) * 10); background: rgba(255,255,255,0.06); overflow: hidden; }
+  .tl-item { flex: 0 0 auto; height: 82%; display: flex; align-items: center; justify-content: center; padding: 0 calc(var(--u) * 16); border-radius: calc(var(--u) * 8);
+    background: #ffffff; color: #15161c; font-weight: 700; font-size: calc(var(--u) * 26); white-space: nowrap; background-size: cover; background-position: center; }
+  .tl-item.img { aspect-ratio: 1 / 1; padding: 0; color: transparent; }
+  .tl-item.new { box-shadow: 0 0 0 calc(var(--u) * 4) var(--mp-color-primary, #393bf5); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.tl-root'), rowsEl = q('.tl-rows');
+    var DUR = (ctx && ctx.duration) || 8;
+    var DEF = [{ id: 'S', color: '#ff7f7f' }, { id: 'A', color: '#ffbf7f' }, { id: 'B', color: '#ffdf7f' }, { id: 'C', color: '#bfff7f' }, { id: 'D', color: '#7fbfff' }];
+    var tiers = Array.isArray(data.tiers) && data.tiers.length
+      ? data.tiers.slice(0, 7).map(function (t, i) { return typeof t === 'string' ? { id: t, color: (DEF[i] || DEF[DEF.length - 1]).color } : { id: String(t.id || t.label || ''), color: t.color || (DEF[i] || DEF[DEF.length - 1]).color }; })
+      : DEF;
+    q('.tl-title').textContent = data.title || '';
+    var W = el.clientWidth || 900, H = el.clientHeight || 700;
+    root.style.setProperty('--u', (Math.min(W / 900, H / 700)).toFixed(3) + 'px');
+    var tracks = {};
+    tiers.forEach(function (t) {
+      var r = document.createElement('div'); r.className = 'tl-row';
+      var lab = document.createElement('div'); lab.className = 'tl-tier'; lab.textContent = t.id; lab.style.background = t.color;
+      var tr = document.createElement('div'); tr.className = 'tl-track';
+      r.appendChild(lab); r.appendChild(tr); rowsEl.appendChild(r);
+      tracks[t.id.toUpperCase()] = tr;
+    });
+    var items = (Array.isArray(data.items) ? data.items : []).slice(0, 24).map(function (it) { return it || {}; });
+    var n = items.length;
+    var S0 = Number(data.start_at); if (!isFinite(S0) || S0 < 0) S0 = 0.5;
+    var gap = n ? Math.max(0.4, (DUR - S0 - 0.6) / n) : 1;
+    var els = items.map(function (it, i) {
+      var tr = tracks[String(it.tier || '').toUpperCase()] || tracks[tiers[tiers.length - 1].id.toUpperCase()];
+      var d = document.createElement('div'); d.className = 'tl-item';
+      d.textContent = it.label || '';
+      if (it.src) { d.classList.add('img'); d.style.backgroundImage = 'url("' + String(it.src).replace(/"/g, '%22') + '")'; }
+      tr.appendChild(d);
+      return d;
+    });
+    var starts = items.map(function (it, i) { var a = Number(it.at); return isFinite(a) && a >= 0 ? a : S0 + i * gap; });
+    gsap.set(root, { autoAlpha: 0, y: 20 });
+    tl.to(root, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power3.out' }, 0.05);
+    els.forEach(function (d, i) {
+      gsap.set(d, { autoAlpha: 0, y: -40, scale: 1.25 });
+      tl.to(d, { autoAlpha: 1, y: 0, scale: 1, duration: 0.42, ease: 'back.out(1.8)' }, starts[i]);
+    });
+    // The latest placed item is ringed until the next lands.
+    var latest = { i: -1 };
+    starts.forEach(function (t0, i) { tl.set(latest, { i: i }, t0); });
+    tl.eventCallback('onUpdate', function () { els.forEach(function (d, j) { d.classList.toggle('new', j === latest.i); }); });
+    tl.to({}, { duration: 0.01 }, DUR - 0.01);
+    return tl;
+  }
+</script>

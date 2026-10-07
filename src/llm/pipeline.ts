@@ -33,7 +33,7 @@ import { activeTake, personCarries } from "../core/take-needs.js";
 import { proofComponents, hasProofFor, replaceCutWindow, isProofSurface, castProvidedScreens, castScreenSlates } from "../core/asset-needs.js";
 import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
-import { getRecipe, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces } from "../core/recipes.js";
+import { getRecipe, recipeForFormat, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces, holdSettingToRecipe, holdUseToRecipe } from "../core/recipes.js";
 import { recipeWantsVoice } from "./storyboard-builder.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
@@ -2869,6 +2869,10 @@ async function runUnifiedPipeline(
     { let g = 0; for (const d of auto) if (holdGroundToRecipe(d, recipeObj)) g++; if (g) console.log(`  Recipe ground: ${g} scene(s) with no person are opaque (no take under them)`); }
     { const w = castWordmarkCards(storyboard as any, recipeObj); if (w) console.log(`  Recipe: ${w} wordmark card(s) cast as st-logo-close`); }
     for (const d of auto) { for (const n of holdLogoBandToBrief(d, String(opts.prompt || ""))) console.log(`  Recipe: "${d.label || ""}" -- ${n}`); }
+    // THE BEAT'S SETTING AND PROOF USE (SPEC-creator-formats.md): where the
+    // person is, where the proof sits -- written on the scene unless set.
+    { let st = 0, us = 0; for (const d of auto) { if (holdSettingToRecipe(d, recipeObj)) st++; us += holdUseToRecipe(d, recipeObj); }
+      if (st || us) console.log(`  Recipe: ${st} scene setting(s), ${us} proof use(s) from the beats`); }
   }
   // Every board, recipe or not: a blank window or an empty number row is
   // the writer's sketch of a surface it never filled.
@@ -3443,8 +3447,11 @@ async function runUnifiedPipeline(
         // A drawn object cuts in mid-claim by default; found footage is the
         // beat's world and holds for the whole beat unless the words say otherwise.
         const isFootage = needs.some((n) => n && n.type === "stock_footage" && n.path === src);
-        if (typeof c.data.at !== "number") c.data.at = isFootage ? 0 : Math.round(dur * 0.3 * 100) / 100;
-        if (typeof c.data.exit_at !== "number") c.data.exit_at = isFootage ? dur : Math.round(dur * 0.8 * 100) / 100;
+        // A green-screen ground holds the whole beat (core/proof-placement.ts).
+        if (c.data.ground !== true) {
+          if (typeof c.data.at !== "number") c.data.at = isFootage ? 0 : Math.round(dur * 0.3 * 100) / 100;
+          if (typeof c.data.exit_at !== "number") c.data.exit_at = isFootage ? dur : Math.round(dur * 0.8 * 100) / 100;
+        }
         d.components.push(cut);
         console.log(`  Idea beat: scene ${i + 1} -- the ${String(c.type)} cuts in at ${c.data.at}s, out at ${c.data.exit_at}s`);
       }
@@ -3496,6 +3503,15 @@ async function runUnifiedPipeline(
         // creator-cut default window (30% to 80% of the claim).
         extractAnchors(c);
         if (d.spine) resolveComponent(c, d.spine);
+        // A placed slate (core/proof-placement.ts) keeps its clock on its
+        // data, so the cut-in camera rules leave it alone; a clone's half
+        // holds the whole beat.
+        if (c.type === "proof-frame") {
+          if (typeof c.data.at !== "number") c.data.at = Math.round(dur * 0.3 * 100) / 100;
+          if (typeof c.data.exit_at !== "number") c.data.exit_at = Math.round(dur * 0.8 * 100) / 100;
+          continue;
+        }
+        if (c.data && typeof c.data.object_position === "string") continue;
         if (!c.enter || typeof c.enter !== "object" || typeof c.enter.at !== "number") c.enter = { effect: "cut", at: Math.round(dur * 0.3 * 100) / 100 };
         if (!c.exit || typeof c.exit !== "object" || typeof c.exit.at !== "number") c.exit = { effect: "cut", at: Math.round(dur * 0.8 * 100) / 100 };
       }

@@ -1,0 +1,188 @@
+<template>
+  <div class="ir-root">
+    <div class="ir-page"></div>
+    <div class="ir-head"><h2></h2></div>
+    <ol class="ir-list"></ol>
+    <div class="ir-label"></div>
+    <div class="ir-phone"><div class="ir-screen"></div></div>
+    <div class="ir-count"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* INDEX REEL (SPEC-creator-formats.md): the Listicle's fast version. One
+     claim pinned at the top the whole time; a phone-frame example that swaps
+     about every 0.9 s; the count, so the viewer knows how far in they are.
+     host: over the person -- headline band, the phone away from the face.
+     page: an opaque designed page -- headline, a numbered list filling in
+     step with the examples, the phone beside it. An item with no picture
+     draws its own example (an email). Places itself on the whole stage. */
+  .ir-root, .ir-root * { max-width: none; box-sizing: border-box; }
+  .ir-root { position: absolute; inset: 0; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); --ink: #15161b; --mute: #8a8c96; --paper: #f6f5f1; --pri: var(--mp-color-primary, #393bf5); }
+  .ir-root.t-dark { --ink: #f5f5f7; --mute: #8f919c; --paper: #111217; }
+  .ir-page { position: absolute; inset: 0; display: none; background: var(--paper); }
+  .m-page .ir-page { display: block; }
+  .ir-head { position: absolute; display: flex; justify-content: center; }
+  .ir-head h2 { margin: 0; text-wrap: balance; font-weight: 800; letter-spacing: -0.03em; line-height: 1.04; text-align: center; color: var(--ink); }
+  .m-host .ir-head h2 { background: #ffffff; color: #15161b; padding: 0.28em 0.5em 0.32em; border-radius: 0.28em; box-shadow: 0 0.2em 0.8em rgba(0,0,0,0.25); }
+  .m-host .ir-head h2 em { color: var(--pri); font-style: normal; }
+  .m-page .ir-head h2 em { color: var(--pri); font-style: normal; }
+  .ir-list { position: absolute; margin: 0; padding: 0; list-style: none; display: none; }
+  .m-page .ir-list { display: flex; flex-direction: column; justify-content: flex-start; }
+  .ir-list li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .ir-list li { display: flex; align-items: baseline; gap: 0.4em; color: var(--ink); font-weight: 600; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ir-list li b { display: inline-block; min-width: 1.6em; color: var(--mute); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ir-list li.on { color: var(--pri); }
+  .ir-list li.on b { color: var(--pri); }
+  .ir-label { position: absolute; text-align: center; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
+  .m-host .ir-label { color: #15161b; }
+  .m-host .ir-label span { background: #ffffff; padding: 0.18em 0.5em; border-radius: 0.3em; box-shadow: 0 0.15em 0.6em rgba(0,0,0,0.2); }
+  .m-page .ir-label { display: none; }
+  .ir-phone { position: absolute; background: #0c0c10; border-radius: 12% / 5.6%; box-shadow: 0 1.6em 3.4em rgba(0,0,0,0.38), inset 0 0 0 2px rgba(255,255,255,0.08); }
+  .ir-screen { position: absolute; inset: 2.4% 4.2%; border-radius: 9.5% / 4.4%; overflow: hidden; background: #ffffff; }
+  .ir-shot { position: absolute; inset: 0; background-size: cover; background-position: center top; visibility: hidden; }
+  .ir-mail { position: absolute; inset: 0; padding: 14% 7% 6%; display: flex; flex-direction: column; gap: 0.55em; color: #17171c; background: #ffffff; visibility: hidden; }
+  .ir-mail .tag { align-self: flex-start; font-size: 0.62em; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pri); background: color-mix(in srgb, var(--pri) 12%, #ffffff); padding: 0.25em 0.6em; border-radius: 999px; }
+  .ir-mail .from { display: flex; align-items: center; gap: 0.5em; font-size: 0.72em; color: #5c5e68; }
+  .ir-mail .from i { width: 1.9em; height: 1.9em; border-radius: 50%; background: var(--pri); color: #fff; font-style: normal; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .ir-mail .subj { font-size: 1.02em; font-weight: 800; line-height: 1.18; letter-spacing: -0.01em; }
+  .ir-mail .prev { font-size: 0.72em; line-height: 1.45; color: #4a4c56; }
+  .ir-mail .bars { display: flex; flex-direction: column; gap: 0.45em; margin-top: 0.2em; }
+  .ir-mail .bars u { display: block; height: 0.5em; border-radius: 0.25em; background: #ececf1; text-decoration: none; }
+  .ir-mail .cta { margin-top: 0.4em; align-self: flex-start; font-size: 0.72em; font-weight: 700; color: #fff; background: var(--pri); padding: 0.6em 1.1em; border-radius: 0.5em; }
+  .ir-count { position: absolute; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; color: #ffffff; background: var(--pri); padding: 0.2em 0.6em; border-radius: 999px; white-space: nowrap; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.ir-root'), head = q('.ir-head'), h2 = q('.ir-head h2'), list = q('.ir-list'), label = q('.ir-label'), phone = q('.ir-phone'), screen = q('.ir-screen'), count = q('.ir-count');
+    var DUR = (ctx && ctx.duration) || 12;
+    var items = (Array.isArray(data.items) ? data.items : []).map(function (it) { return typeof it === 'string' ? { title: it } : (it || {}); }).slice(0, 30);
+    var n = items.length;
+    var mode = data.mode === 'page' ? 'page' : 'host';
+    root.classList.add('m-' + mode);
+    if (mode === 'page') {
+      root.classList.add('t-' + (data.theme === 'dark' ? 'dark' : 'light'));
+    }
+    // THE SEEN FRAME: the wrapper may overhang it (the camera rig's
+    // overscan); lay out inside what is seen, in the wrapper's own pixels.
+    var rc = el.getBoundingClientRect(), cw = el.clientWidth || rc.width || 1, sc = rc.width / cw || 1;
+    var OX = Math.max(0, -rc.left) / sc, OY = Math.max(0, -rc.top) / sc;
+    var W = Math.min(cw - OX, (window.innerWidth || cw) / sc), H = Math.min((el.clientHeight || rc.height) - OY, (window.innerHeight || el.clientHeight) / sc);
+    var tall = H > W * 1.05;
+    var face = data.face && typeof data.face === 'object' ? data.face : { cx: 0.5, cy: tall ? 0.4 : 0.45, size: tall ? 0.2 : 0.3 };
+    var awaySide = Number(face.cx) >= 0.5 ? 'left' : 'right';
+
+    // THE HEADLINE: *word* in the brand color.
+    var hl = String(data.headline || '');
+    h2.innerHTML = hl.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // LAYOUT (px). Phone aspect 9:19.5.
+    var PA = 9 / 19.5;
+    var hx, hy, hw, hf, px, py, ph, lx, ly, lw, lh;
+    if (mode === 'page') {
+      hf = tall ? W * 0.085 : H * 0.085; hx = W * 0.06; hw = W * 0.88; hy = tall ? H * 0.06 : H * 0.07;
+      if (tall) { lx = W * 0.06; ly = H * 0.27; lh = H * 0.66; ph = H * 0.52; py = H * 0.3; px = W * 0.95 - ph * PA; }
+      else { lx = W * 0.07; ly = H * 0.28; lh = H * 0.66; ph = H * 0.66; py = H * 0.28; px = W * 0.9 - ph * PA; }
+      // The list owns what the phone leaves, with a gutter.
+      lw = px - lx - W * 0.04;
+    } else if (tall) {
+      hf = W * 0.072; hx = W * 0.05; hw = W * 0.9; hy = H * 0.045;
+      var faceBot = Math.min(0.7, Number(face.cy) + Number(face.size) / 2);
+      py = Math.max(H * 0.5, H * (faceBot + 0.02)); ph = H * 0.95 - py; ph = Math.max(H * 0.36, ph); py = H * 0.95 - ph;
+      // Under the face there is room across the frame: the phone centred.
+      px = (W - ph * PA) / 2;
+    } else {
+      hf = H * 0.075; hx = W * 0.05; hw = W * 0.9; hy = H * 0.05;
+      ph = H * 0.72; py = H * 0.2; px = awaySide === 'left' ? W * 0.07 : W * 0.93 - ph * PA;
+    }
+    var pw = ph * PA;
+    hx += OX; hy += OY; px += OX; py += OY; if (lx !== undefined) { lx += OX; ly += OY; }
+    head.style.cssText = 'left:' + hx + 'px;top:' + hy + 'px;width:' + hw + 'px';
+    h2.style.fontSize = hf.toFixed(1) + 'px';
+    if (mode === 'page') { head.style.justifyContent = 'flex-start'; h2.style.textAlign = 'left'; }
+    // The headline shrinks until it fits two lines in its band.
+    for (var k = 0; k < 24 && h2.offsetHeight > hf * 1.04 * 2.6; k++) { hf *= 0.93; h2.style.fontSize = hf.toFixed(1) + 'px'; }
+    phone.style.cssText = 'left:' + px + 'px;top:' + py + 'px;width:' + pw + 'px;height:' + ph + 'px';
+    screen.style.fontSize = (pw / 13).toFixed(1) + 'px';
+    var cf = Math.max(18, (tall ? W : H) * 0.032);
+    count.style.fontSize = cf.toFixed(1) + 'px';
+    if (mode === 'page') count.style.cssText += ';left:' + (px + pw - cf * 3.4) + 'px;top:' + (py - cf * 1.9) + 'px';
+    else count.style.cssText += ';left:' + (px + pw - cf * 2.2) + 'px;top:' + (py - cf * 0.8) + 'px';
+    var lf = Math.max(16, cf * 1.05);
+    label.style.cssText = 'font-size:' + lf.toFixed(1) + 'px;left:' + (px - pw * 0.4) + 'px;width:' + (pw * 1.8) + 'px;top:' + (py + ph + lf * 0.35) + 'px';
+    if (tall && mode === 'host' && py + ph + lf * 1.6 > OY + H * 0.985) label.style.top = (py - lf * 1.9) + 'px';
+
+    // THE EXAMPLES: a picture, or the item's own email drawn.
+    var from = String(data.from || 'Quotient');
+    var cards = items.map(function (it, i) {
+      var c;
+      if (it.src) {
+        c = document.createElement('div'); c.className = 'ir-shot';
+        c.style.backgroundImage = 'url("' + String(it.src).replace(/"/g, '%22') + '")';
+        var pre = document.createElement('img'); pre.src = String(it.src); pre.alt = ''; pre.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0'; c.appendChild(pre);
+      } else {
+        c = document.createElement('div'); c.className = 'ir-mail';
+        var tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = it.title || ('Email ' + (i + 1));
+        var fr = document.createElement('div'); fr.className = 'from'; fr.innerHTML = '<i></i><span></span>';
+        fr.querySelector('i').textContent = (it.from || from).charAt(0).toUpperCase(); fr.querySelector('span').textContent = it.from || from;
+        var sj = document.createElement('div'); sj.className = 'subj'; sj.textContent = it.subject || it.title || '';
+        var pv = document.createElement('div'); pv.className = 'prev'; pv.textContent = it.preview || '';
+        var bars = document.createElement('div'); bars.className = 'bars';
+        [92, 100, 78, 86, 54].forEach(function (w) { var u = document.createElement('u'); u.style.width = w + '%'; bars.appendChild(u); });
+        var cta = document.createElement('div'); cta.className = 'cta'; cta.textContent = it.cta || 'Open';
+        c.appendChild(tag); c.appendChild(fr); c.appendChild(sj); if (it.preview) c.appendChild(pv); c.appendChild(bars); c.appendChild(cta);
+      }
+      screen.appendChild(c);
+      return c;
+    });
+    var rows = items.map(function (it, i) {
+      var li = document.createElement('li'); li.innerHTML = '<b></b><span></span>';
+      li.querySelector('b').textContent = (i + 1) + '.'; li.querySelector('span').textContent = it.title || '';
+      list.appendChild(li); return li;
+    });
+    if (mode === 'page') {
+      list.style.cssText = 'left:' + lx + 'px;top:' + ly + 'px;width:' + lw + 'px;height:' + lh + 'px';
+      // Rows at a reading pitch (never spread to fill), the type shrinking
+      // until every row fits its width and the list fits its height.
+      var rf = Math.min((tall ? W : H) * 0.05, n ? lh / (n * 1.6) : 60);
+      list.style.gap = '0px';
+      for (var kk = 0; kk < 30; kk++) {
+        list.style.fontSize = rf.toFixed(1) + 'px';
+        rows.forEach(function (r) { r.style.marginBottom = (rf * 0.45).toFixed(1) + 'px'; });
+        var wide = rows.some(function (r) { var sp = r.querySelector('span'); return sp.scrollWidth > sp.clientWidth + 1; });
+        if (!wide && list.scrollHeight <= lh + 1) break;
+        rf *= 0.94;
+      }
+    }
+
+    // TIMING: the run starts at start_at, one item per per_item_s (about
+    // 0.9 s) unless an item names its own moment (a word anchor resolves
+    // to seconds before this runs).
+    var per = Number(data.per_item_s) > 0 ? Number(data.per_item_s) : 0.9;
+    var S0 = Number(data.start_at); if (!isFinite(S0) || S0 < 0) S0 = 0.6;
+    var starts = items.map(function (it, i) { var a = Number(it.at); return isFinite(a) && a >= 0 ? a : S0 + i * per; });
+    var st = { head: 0, phone: 0, cur: -1 };
+    tl.to(st, { head: 1, duration: 0.45, ease: 'power3.out' }, 0.05);
+    tl.to(st, { phone: 1, duration: 0.45, ease: 'back.out(1.4)' }, Math.max(0.1, (starts[0] || S0) - 0.35));
+    var cur = { i: -1 };
+    starts.forEach(function (t0, i) { tl.set(cur, { i: i }, t0); });
+    function apply() {
+      var i = cur.i;
+      gsap.set(head, { autoAlpha: st.head, y: (1 - st.head) * -24 });
+      gsap.set([phone, count, label], { autoAlpha: st.phone, y: (1 - st.phone) * 40 });
+      cards.forEach(function (c, j) { c.style.visibility = j === Math.max(0, i) ? 'visible' : 'hidden'; });
+      rows.forEach(function (r, j) { r.style.visibility = j <= i ? 'visible' : 'hidden'; r.classList.toggle('on', j === i); });
+      count.textContent = n ? Math.max(1, i + 1) + '/' + n : '';
+      var it = items[Math.max(0, i)] || {};
+      label.innerHTML = '<span></span>'; label.firstChild.textContent = it.title || '';
+      if (i < 0) label.style.visibility = 'hidden'; else label.style.visibility = '';
+    }
+    tl.to({}, { duration: 0.01 }, DUR - 0.01);
+    tl.eventCallback('onUpdate', apply);
+    apply();
+    return tl;
+  }
+</script>

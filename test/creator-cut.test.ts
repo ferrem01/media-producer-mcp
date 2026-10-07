@@ -143,18 +143,21 @@ describe("proof on the board: the needs a claim asks for", () => {
     expect(need.status).toBe("provided");
     expect(openAssetNeeds(p).map((o) => o.asset_index)).toEqual([1, 2, 3]);
     provideAsset(p, 0, 2, "/assets/t/projects/p/assets/broll.mp4");
-    provideAsset(p, 0, 1, "/assets/t/projects/p/assets/rec.mp4");   // a card: not built yet
+    provideAsset(p, 0, 1, "/assets/t/projects/p/assets/rec.mp4");   // a card: a plated frame beside the person (SPEC-creator-formats.md)
 
     const cuts = proofComponents(scene);
     expect(cuts.map((c: any) => [c.type, c.data.src])).toEqual([
       ["image", "/assets/t/projects/p/assets/proof-1.png"],
+      ["proof-frame", "/assets/t/projects/p/assets/rec.mp4"],
       ["video", "/assets/t/projects/p/assets/broll.mp4"],
     ]);
+    expect(cuts[1].data).toMatchObject({ chrome: "card", place: "side", media: "video" });
     // The existing image/video components, timed: at/exit_at from the words.
     expect(cuts[0].data).toEqual({ src: "/assets/t/projects/p/assets/proof-1.png", at: "@metrics", exit_at: "@next", drift: false });
     expect(cuts[0].position).toEqual({ x: "0%", y: "0%", width: "100%", height: "100%" });
     expect(hasProofFor(cuts, "/assets/t/projects/p/assets/proof-1.png")).toBe(true);
-    expect(hasProofFor(cuts, "/assets/t/projects/p/assets/rec.mp4")).toBe(false);
+    expect(hasProofFor(cuts, "/assets/t/projects/p/assets/rec.mp4")).toBe(true);   // a framed proof counts: a rebuild never stacks a second
+    expect(hasProofFor(cuts, "/assets/t/projects/p/assets/other.mp4")).toBe(false);
     expect(() => provideAsset(p, 0, 9, "/assets/t/projects/p/assets/x.png")).toThrow(/no need 10/);
     expect(() => provideAsset(p, 3, 0, "/assets/t/projects/p/assets/x.png")).toThrow(/scene 4 not found/);
   });

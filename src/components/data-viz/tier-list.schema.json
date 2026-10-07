@@ -1,0 +1,25 @@
+{
+  "type": "tier-list",
+  "label": "Tier List",
+  "category": "data-viz",
+  "description": "The Ranking format (SPEC-creator-formats.md): rows S / A / B / C / D (or your own), each a colored label and a track; items drop into their row on their word, the latest one ringed. Keep the whole list on one scene that runs across the ranking, or carry the placed items forward scene to scene (each scene lists every item placed so far, the new one with its `at`). On a tall person frame it takes the top band over the person.",
+  "data": {
+    "title": { "type": "string", "label": "Optional title over the rows", "optional": true },
+    "tiers": { "type": "array", "label": "Row labels top to bottom (default S, A, B, C, D), or {id, color}", "optional": true, "items": { "type": "string" } },
+    "items": {
+      "type": "array",
+      "label": "Items in the order they are placed: {label, tier, src?, at?}",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "description": "The item's name on its chip" },
+          "tier": { "type": "string", "description": "The row it lands in (S, A, B...)" },
+          "src": { "type": "string", "description": "An image instead of the name (a logo)" },
+          "at": { "type": "number", "description": "Seconds (or a word anchor) it lands; 0 = already placed" }
+        }
+      }
+    },
+    "start_at": { "type": "number", "label": "Seconds the first item lands when none has its own (default 0.5)", "optional": true }
+  }
+}

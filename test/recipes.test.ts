@@ -5,13 +5,15 @@ import path from "node:path";
 const read = (p: string) => fs.readFile(path.join(process.cwd(), p), "utf8");
 
 describe("the recipe: the measured cut of a film with the content removed", () => {
-  it("the library loads eleven valid recipes, each under one grammar with proven frames and a measured source", async () => {
+  it("the library loads its valid recipes, each under one grammar with proven frames and a measured source", async () => {
     const { loadRecipes, validateRecipe, recipeSceneBand } = await import("../src/core/recipes.js");
     const rs = loadRecipes();
-    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-selfie-punch-cards", "founder-story-broll", "launch-what-if-features", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats"]);
+    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-selfie-punch-cards", "founder-story-broll", "launch-what-if-features", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats",
+      // The creator formats (SPEC-creator-formats.md).
+      "clone-dialogue", "green-screen-explainer", "index-reel-host", "index-reel-page", "ranking-tier-list", "reaction-split", "voiceover-broll-story", "yap-one-take"].sort());
     for (const r of rs) {
       expect(validateRecipe(r)).toEqual([]);
-      expect(["creator-cut", "speaker", "hype-cut", "canvas-tour"]).toContain(r.grammar);
+      expect(["creator-cut", "speaker", "hype-cut", "canvas-tour", "tempo-cut"]).toContain(r.grammar);
       expect(r.frames_proven.length).toBeGreaterThan(0);
       expect(r.source.measured).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       const band = recipeSceneBand(r); expect(band.min).toBeGreaterThan(0); expect(band.max).toBeGreaterThanOrEqual(band.min);
@@ -25,7 +27,7 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     const { getRecipe, recipeBlock, recipeSceneBand, recipesForGrammar } = await import("../src/core/recipes.js");
     const g = getRecipe("story-ad-idea-beats")!;
     expect(g.grammar).toBe("hype-cut");
-    expect(recipesForGrammar("hype-cut").map((r) => r.id)).toEqual(["launch-what-if-features", "story-ad-idea-beats"]);
+    expect(recipesForGrammar("hype-cut").map((r) => r.id)).toEqual(["launch-what-if-features", "story-ad-idea-beats", "voiceover-broll-story"]);
     expect(recipeSceneBand(g)).toEqual({ min: 6, max: 9 });
     expect(g.asks.take).toBe("none");
     expect((g.layers as any).voice).toBe("type");
@@ -254,7 +256,8 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(pipeline).toMatch(/touched \+= applyRecipeMotion\(d, recipeObj, roleOfLabel\(d\.label, recipeObj\)\);/);
     expect(await read("src/llm/scene-generator.ts")).toMatch(/if \(!cameraMoves && !\(draft as any\)\.camera_fixed\) \{/);
     const server = await read("src/server.ts");
-    expect((server.match(/recipe: z\.string\(\)\.optional\(\)\.describe\("The RECIPE axis/g) || []).length).toBe(3);
+    expect((server.match(/recipe: z\.string\(\)\.optional\(\)\.describe\(RECIPE_DESCRIBE\)/g) || []).length).toBe(3);
+    expect(server).toMatch(/const RECIPE_DESCRIBE = `The RECIPE axis \(SPEC-recipes\.md\)[^`]*\$\{loadRecipes\(\)\.map\(\(r\) => r\.id\)\.join\(", "\)\}/);
     expect((server.match(/recipe: params\.recipe,/g) || []).length).toBe(2);
     expect(await read("package.json")).toMatch(/cp -r src\/recipes dist\//);
   });

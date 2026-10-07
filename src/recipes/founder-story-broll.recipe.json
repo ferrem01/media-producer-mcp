@@ -2,6 +2,8 @@
   "id": "founder-story-broll",
   "name": "Founder story with b-roll",
   "grammar": "creator-cut",
+  "format": "voiceover-broll",
+  "variant": "with a face",
   "frames_proven": [
     "9x16"
   ],

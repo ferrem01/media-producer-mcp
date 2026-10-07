@@ -2,6 +2,8 @@
   "id": "presenter-n-things",
   "name": "Presenter: N things",
   "grammar": "creator-cut",
+  "format": "listicle",
+  "variant": "deep",
   "frames_proven": [
     "16x9"
   ],

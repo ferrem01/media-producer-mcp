@@ -2,6 +2,8 @@
   "id": "speaker-kinetic-claims",
   "name": "Speaker: kinetic claims",
   "grammar": "speaker",
+  "format": "talking-head",
+  "variant": "kinetic claims",
   "frames_proven": [
     "9x16"
   ],

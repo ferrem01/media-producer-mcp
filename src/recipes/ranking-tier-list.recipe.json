@@ -1,0 +1,169 @@
+{
+  "id": "ranking-tier-list",
+  "name": "Ranking: tier list",
+  "grammar": "creator-cut",
+  "format": "ranking",
+  "variant": "tier list",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "ranking tools, tactics or options",
+    "an opinionated take on a category",
+    "best to worst"
+  ],
+  "length_s": [
+    25,
+    50
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:title"
+      ],
+      "note": "What you are ranking and the promise (\"ranking every lifecycle email, best to worst\")."
+    },
+    {
+      "role": "place",
+      "shot": "person+split",
+      "made": "motion",
+      "dur": [
+        3,
+        4.5,
+        6
+      ],
+      "repeat": [
+        3,
+        7
+      ],
+      "enters": [
+        "tier-list"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "use": "split",
+        "kind": "mockup"
+      },
+      "note": "One item per scene: a tier-list (data.use \"split\", enter {effect: \"cut\", at: 0}) over the person, listing EVERY item placed so far with at 0 and the new one with its at on the word where you name its tier. Say the item, the tier, and why in one line."
+    },
+    {
+      "role": "verdict",
+      "shot": "person+split",
+      "made": "motion",
+      "dur": [
+        3,
+        4,
+        6
+      ],
+      "enters": [
+        "tier-list",
+        "stamp:noun"
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "exit_before": "next_beat",
+        "use": "split",
+        "kind": "mockup"
+      },
+      "note": "The whole board, every item at 0; the top pick stamped."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [],
+      "note": "Disagree? Comment your top pick."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 4,
+    "max_hold_s": 6,
+    "wpm": 180,
+    "first_cut_by_s": 2.5,
+    "end_card_s": 0
+  },
+  "layers": {
+    "captions": {
+      "style": "pill",
+      "words": 3,
+      "pos": "chest",
+      "through_cutaways": true
+    },
+    "stamps": {
+      "pos": "top-center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": true
+    }
+  },
+  "motion": {
+    "elements": {
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      },
+      "cutaway": {
+        "in": "cut",
+        "out": "cut"
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "place": "fixed",
+      "verdict": "fixed",
+      "close": "fixed"
+    },
+    "physics": "punchy"
+  },
+  "asks": {
+    "take": "continuous",
+    "screens": 0,
+    "broll": 0,
+    "images": "optional: a logo per item"
+  },
+  "latitude": {
+    "optional": [
+      "verdict",
+      "close"
+    ],
+    "fixed": [
+      "hook"
+    ],
+    "may_double": [
+      "place"
+    ]
+  },
+  "source": {
+    "film": "composed from the viral formats list (Ranking); not measured from one film",
+    "length_s": 40,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

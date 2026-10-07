@@ -1,0 +1,139 @@
+{
+  "id": "clone-dialogue",
+  "name": "Clone: dialogue",
+  "grammar": "creator-cut",
+  "format": "clone",
+  "variant": "dialogue",
+  "frames_proven": [
+    "9x16",
+    "16x9"
+  ],
+  "suits": [
+    "the doubter vs the expert",
+    "objection handling",
+    "old way vs new way, as two people"
+  ],
+  "length_s": [
+    20,
+    45
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:title"
+      ],
+      "setting": "sit-down",
+      "note": "The doubt, said by you."
+    },
+    {
+      "role": "exchange",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        3,
+        4.5,
+        7
+      ],
+      "repeat": [
+        3,
+        6
+      ],
+      "setting": "sit-down",
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "use": "clone"
+      },
+      "note": "One line per scene. The scene's take (Take A) is whoever speaks, sitting on the LEFT half of the frame; your other self listens on the right (the clone need, Take B, recorded in the booth as Take B, silent). Write who speaks into the label (\"Exchange - Doubter: ...\" / \"Exchange - You: ...\"). Change one thing between the roles (glasses, a hoodie) and say so in the clone need's description."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [],
+      "note": "The doubter is convinced, or the takeaway to camera."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 4.5,
+    "max_hold_s": 7,
+    "wpm": 175,
+    "first_cut_by_s": 3,
+    "end_card_s": 0
+  },
+  "layers": {
+    "captions": {
+      "style": "pill",
+      "words": 3,
+      "pos": "chest",
+      "through_cutaways": true
+    },
+    "stamps": {
+      "pos": "top-center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": false,
+      "duck": true
+    }
+  },
+  "motion": {
+    "elements": {
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "exchange": "fixed",
+      "close": "fixed"
+    },
+    "physics": "calm"
+  },
+  "asks": {
+    "take": "one per scene (Take A) plus a silent Take B per exchange, the phone locked in one place",
+    "screens": 0,
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "close"
+    ],
+    "fixed": [
+      "hook"
+    ],
+    "may_double": [
+      "exchange"
+    ]
+  },
+  "source": {
+    "film": "composed from the viral formats list (Clone); the locked-off split-frame trick creators use",
+    "length_s": 30,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

@@ -2,6 +2,8 @@
   "id": "presenter-location-hop",
   "name": "Presenter: location hop",
   "grammar": "creator-cut",
+  "format": "talking-head",
+  "variant": "location hop",
   "frames_proven": [
     "9x16"
   ],

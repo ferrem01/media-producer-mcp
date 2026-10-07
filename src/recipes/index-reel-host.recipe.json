@@ -1,0 +1,112 @@
+{
+  "id": "index-reel-host",
+  "name": "Index reel: host",
+  "grammar": "creator-cut",
+  "format": "listicle",
+  "variant": "index-reel host",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "N examples of one thing, fast (12 emails in 12 seconds)",
+    "a swipe file people save",
+    "a list too long to explain one by one"
+  ],
+  "length_s": [
+    12,
+    24
+  ],
+  "spine": [
+    {
+      "role": "run",
+      "shot": "person+card",
+      "made": "motion",
+      "dur": [
+        8,
+        13,
+        20
+      ],
+      "enters": [
+        "index-reel"
+      ],
+      "note": "ONE scene, ONE index-reel component (mode host): headline = the claim with the count in it (\"12 lifecycle emails in 12 seconds\", one *word* starred), items = every example in order, each {title, subject, preview} (no src: the reel draws each email), start_at = when the headline line ends (about 1.5 s), per_item_s 0.9. The lines: the headline, then each item's title and nothing else, one after another, so each item lands as it is said. No other component on this scene."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:cta"
+      ],
+      "note": "Save this for later / follow for part 2. One short line to camera, one stamp."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 0.9,
+    "max_hold_s": 20,
+    "wpm": 210,
+    "first_cut_by_s": 1.6,
+    "end_card_s": 0
+  },
+  "layers": {
+    "captions": {
+      "style": "none"
+    },
+    "stamps": {
+      "pos": "top-center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": true,
+      "feel": "driving"
+    }
+  },
+  "motion": {
+    "elements": {
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "run": "fixed",
+      "close": "fixed"
+    },
+    "physics": "punchy"
+  },
+  "asks": {
+    "take": "continuous",
+    "screens": "optional: one screenshot per item (else the reel draws each one)",
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "close"
+    ],
+    "fixed": [
+      "run"
+    ]
+  },
+  "source": {
+    "film": "kienobi index reel (Marc's reference, 2026-10-06): one take, pinned headline, a phone example swapping about every 0.9 s",
+    "length_s": 13,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "type": "index-reel",
+  "label": "Index Reel",
+  "category": "media",
+  "description": "The Listicle's FAST version (SPEC-creator-formats.md, recipes index-reel-host / index-reel-page): one claim pinned at the top for the whole scene (\"12 lifecycle emails in 12 seconds\"), a phone-frame example that swaps about every 0.9 s, and the count (3/12) so the viewer knows how far in they are. mode host: over the person -- the headline on a white plate, the phone away from the face, the item's name under it. mode page: an opaque designed page -- headline, a numbered list that fills in step with the examples (the current one in the brand color), the phone beside it. An item with no src draws its own example: an email (sender, subject, preview, a button), so a reel needs no screenshots to look finished. Places itself on the whole stage.",
+  "data": {
+    "headline": { "type": "string", "label": "The pinned claim; *word* in the brand color", "required": true },
+    "items": {
+      "type": "array",
+      "label": "The examples in order: {title, src?, subject?, preview?, from?, cta?, at?}",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "The item's name (the list row, the label under the phone)" },
+          "src": { "type": "string", "description": "A screenshot of the example; omit to draw an email" },
+          "subject": { "type": "string", "description": "Drawn email: the subject line" },
+          "preview": { "type": "string", "description": "Drawn email: one or two lines of the body" },
+          "from": { "type": "string", "description": "Drawn email: the sender (default the data's from)" },
+          "cta": { "type": "string", "description": "Drawn email: the button" },
+          "at": { "type": "number", "description": "Seconds (or a word anchor) this item lands; default start_at + i * per_item_s" }
+        }
+      }
+    },
+    "mode": { "type": "string", "label": "host (default: over the person) | page (an opaque designed page with the numbered list)", "optional": true, "enum": ["host", "page"] },
+    "per_item_s": { "type": "number", "label": "Seconds per item (default 0.9)", "optional": true },
+    "start_at": { "type": "number", "label": "Seconds the first item lands (default 0.6)", "optional": true },
+    "from": { "type": "string", "label": "Drawn emails' sender (default Quotient)", "optional": true },
+    "theme": { "type": "string", "label": "page mode: light (default) | dark", "optional": true, "enum": ["light", "dark"] }
+  }
+}
