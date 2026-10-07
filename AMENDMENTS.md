@@ -55,6 +55,23 @@ medium-wide, lips and hands still the recording's (actor test, Oct 7).
 - PRs #1131 (a recast keeps the recording's voice) and #1132 (a take owns a
   recast it no longer lists) were the same thread.
 
+## 2026-10-07 — An actor's photos, and a model sheet drawn from them
+
+Marc added himself from one younger photo and asked whether a person
+should get several photos that feed a model sheet. Before: a real person
+was one portrait and no sheet (only generated people had sheets), so
+Higgsfield and Seedance saw one angle and guessed the rest. Now
+(core/cast.ts): up to 5 `photos` beside the portrait (`addActorPhoto`,
+`removeActorPhoto`); `startActorSheet` draws a sheet from the portrait and
+the photos with GPT Image in the background, faithful to a real face
+(`sheetPrompt`: no beautify, de-age or restyle), landing as `sheet_draft`;
+`useSheetDraft` makes it the `sheet` (Higgsfield's second reference,
+Seedance's start frames), `discardSheetDraft` throws it away; a failure
+stays on `sheet_job`. Routes `/api/cast/{t}/{actor}/photos|sheet-draft|
+model-sheet`; MCP cast actions add_photo, remove_photo, make_sheet,
+use_sheet, discard_sheet; the Cast page's "Photos & sheet" panel, and
+"More photos" on the add form (which draws the sheet for approval).
+
 ## 2026-10-07 — Booth takes: no soft look or fill unless asked; no stale error banner
 
 Marc: "maybe the fill and soft should not be default on for recorded
