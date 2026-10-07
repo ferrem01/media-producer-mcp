@@ -232,8 +232,8 @@ ${QUOTIENT_CSS}
   <div class="toggle" id="speedRow" style="display:none">Prompter speed <button type="button" class="spd" id="slowerBtn" aria-label="Slower">−</button><b id="speedWpm"></b><button type="button" class="spd" id="fasterBtn" aria-label="Faster">+</button></div>
   <div class="spacer"></div>
   <p class="note" id="readyNote">Hold your phone upright. Tap Record: the camera opens with a quick light check. Tap Start recording for a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
-  <label class="toggle"><input type="checkbox" id="softLook" checked> Soft look <span class="hint">(skin smoothing and warmth, applied when the take is processed; change it later in Studio)</span></label>
-  <div class="toggle" id="softDial">Smoothing <span class="hint">light</span><input type="range" id="softStrength" min="0" max="1" step="0.05" value="0.5" aria-label="Skin smoothing"><span class="hint">strong</span></div>
+  <label class="toggle"><input type="checkbox" id="softLook"> Soft look <span class="hint">(skin smoothing and warmth, applied when the take is processed; change it later in Studio)</span></label>
+  <div class="toggle off" id="softDial">Smoothing <span class="hint">light</span><input type="range" id="softStrength" min="0" max="1" step="0.05" value="0.5" aria-label="Skin smoothing"><span class="hint">strong</span></div>
   <div class="toggle" id="bgChoice" role="radiogroup" aria-label="Background">Background:
     <label><input type="radio" name="bg" value="room" checked> Room</label>
     <label><input type="radio" name="bg" value="blur"> Blur</label>

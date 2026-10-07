@@ -497,6 +497,10 @@ export function studioGradeFilter(s: TakeStudioStats): TakeStudioCorrection {
  * a wall.
  */
 export const DEFAULT_FILL_STRENGTH = 0.5;
+/** A take that never set the fill gets none (Marc, Oct 7: "maybe the fill
+ *  and soft should not be default on for recorded videos"). The dial still
+ *  starts at DEFAULT_FILL_STRENGTH when it is switched on in Studio. */
+export const FILL_WHEN_UNSET = 0;
 export function faceFillGraph(width: number, height: number, region: { cx: number; cy: number; rx: number; ry: number }, strength: number = DEFAULT_FILL_STRENGTH): string {
   const s = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : DEFAULT_FILL_STRENGTH));
   if (s < 0.01 || !(width > 0 && height > 0) || !(region.rx > 0 && region.ry > 0)) return "";

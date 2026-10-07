@@ -155,10 +155,12 @@ describe("what the booth does", () => {
     // ONE Studio: the link is the Studio link, which serves the phone view to a phone.
     expect(html).toMatch(/var studioHref = '\/studio\?tenant='/);
     expect(html).not.toMatch(/\/board\?/);
-    expect(html).toMatch(/id="softLook" checked/);
+    // Off by default (Marc, Oct 7: "maybe the fill and soft should not be default on").
+    expect(html).toMatch(/<input type="checkbox" id="softLook"> Soft look/);
+    expect(html).toMatch(/<div class="toggle off" id="softDial">/);
     expect(html).toMatch(/look: \(\$\('softLook'\) && \$\('softLook'\)\.checked\) \? 'soft' : 'natural'/);
     // Marc: "something we can dial up and dial down" -- a smoothing dial
-    // under the checkbox (still checked by default), starting at his pick.
+    // under the checkbox, starting at his pick when switched on.
     expect(html).toMatch(/id="softStrength" min="0" max="1" step="0\.05" value="0\.5"/);
     expect(html).toMatch(/soft_strength: \$\('softStrength'\) \? parseFloat\(\$\('softStrength'\)\.value\)/);
     expect(html).toMatch(/\$\('softDial'\)\.classList\.toggle\('off', !this\.checked\)/);

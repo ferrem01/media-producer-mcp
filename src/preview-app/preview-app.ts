@@ -4354,7 +4354,7 @@ ${QUOTIENT_CSS}
           '<span class="prop-soft-val" style="flex:0 0 34px;text-align:right;font-size:11px;color:var(--content-secondary);">' + Math.round(lookS * 100) + '</span></div>';
         // THE FILL LIGHT (core/take-studio.ts): the face's shadows lifted --
         // the dark cheek and the under-eye -- on the same re-grade.
-        var fillV = typeof lookTake.fill === 'number' ? lookTake.fill : 0.5;
+        var fillV = typeof lookTake.fill === 'number' ? lookTake.fill : 0; // unset = off (the default)
         var fillOn = fillV > 0;
         html += '<div class="prop-row"><label class="prop-label" title="Lifts the shadows on your face only -- the darker cheek and under the eyes -- like a fill light. Re-graded from the original; every scene cut from the same recording follows.">fill light</label>' +
           '<input type="checkbox" class="prop-fill-on"' + (fillOn ? ' checked' : '') + ' style="flex:0 0 auto;margin-right:8px;">' +

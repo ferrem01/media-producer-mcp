@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { faceFillGraph, DEFAULT_FILL_STRENGTH } from "../src/core/take-studio.js";
+import { faceFillGraph, DEFAULT_FILL_STRENGTH, FILL_WHEN_UNSET } from "../src/core/take-studio.js";
 import { gradeTake, gradeChain } from "../src/core/take-sanitize.js";
 import { takeJobSet, takeJobProgress, takeJobDone, takeJobsFor, markTakeJobError } from "../src/core/take-jobs.js";
 import { getPreviewHtml } from "../src/preview-app/preview-app.js";
@@ -31,7 +31,8 @@ describe("the fill light: the face's shadows lifted, nothing else", () => {
     expect(g).toContain("scale=270:480:flags=area,format=gray,geq=lum='255*pow(max(0,1-");
     expect(g).toContain("clip((186-lum(X,Y))/74,0,1)*clip((lum(X,Y)-45)/40,0,1)"); // the lit cheek and the pupils/brows left alone
     expect(g).toContain("scale=1080:1920:flags=bicubic,gblur=sigma=6");
-    expect(DEFAULT_FILL_STRENGTH).toBe(0.5);
+    expect(DEFAULT_FILL_STRENGTH).toBe(0.5);   // the dial's strength when switched on
+    expect(FILL_WHEN_UNSET).toBe(0);            // a take that never set it gets no fill
   });
 
   it("scales with strength, and is nothing at 0 or without a face", () => {
