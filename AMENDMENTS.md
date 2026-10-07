@@ -6,6 +6,34 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-07 — Recast and Generate are wizards: faces, a place you can see, the shot drawn before the vendor is paid
+
+Marc, on the recast panel: "I would love to see the headshot of the person
+after i select them ... we should be able to see a preview of the shot before
+it actually spends the money with higgsfield ... a wizard that takes the user
+step wise ... only show the steps that matter for that model and action", and
+"maybe we generated like 9 stock backgrounds or let them generate one via
+prompt with examples. I want them to see the custom one and select it."
+
+- Studio's Recast and Generate panels are one wizard (`pfWizSteps`): Who (the
+  cast as headshots, grouped; the one picked shown big with what they are and
+  their voice) -> With (only when the actor has a choice: a HeyGen look has
+  one vendor) -> The shot (only a vendor that takes one, or Seedance) -> Voice
+  (a recast only when the actor has a voice to offer) -> Recast / Make it (a
+  summary with the face, the drawn shot and the voice, then the one button
+  that spends). Every step shows the choices so far; Next waits until the step
+  is answered, and a picture of another place or other words must be drawn
+  again. Recast and Generate keep their own place.
+- The shot: WHERE as tiles -- the tenant's locations, nine STOCK places
+  (core/stock-locations.ts; plates committed in src/locations-stock, drawn once
+  by the plate prompt; picking one copies it into the library), or "Describe a
+  place" with examples, drawn into the library and selectable as soon as it
+  lands; HOW FAR BACK as framing chips; then the actor drawn there (GPT Image,
+  cents). The recast sends that very picture (`start_frame`) with its words, so
+  Higgsfield performs what was seen.
+- Fixed on the way: choosing an actor or vendor redrew the panel as "This scene
+  is not on the board" (the plan save posts with no scene; the redraw reused it).
+
 ## 2026-10-07 — A recast's framing is the vendor's own: Higgsfield takes the scene's shot
 
 Marc, on Kavya's Higgsfield recast "right up on her grill": "it seems like we

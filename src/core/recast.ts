@@ -418,7 +418,11 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
    *  performance. Omitted: the shot this actor's last recast of the take
    *  had, else the scene's setting (core/performer-settings.ts); '' or none
    *  of those: the recording's own camera, as before. */
-  shot?: string } = {}): Promise<RecastStatus> {
+  shot?: string;
+  /** The start picture to perform the shot in -- one already drawn and
+   *  looked at (Studio's preview: an asset url of this film). Without it a
+   *  picture is drawn for the shot. Needs a shot. */
+  start_frame?: string } = {}): Promise<RecastStatus> {
   const key = `${tenant}/${projectId}`;
   if (running.get(key)?.status === "running") throw new Error("A recast of this film is already running");
   const project = await loadProject(tenant, projectId);
@@ -472,7 +476,10 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   for (const [raw, si] of raws) {
     const existing = ((project as any).takes || []).find((t: any) => takeCopies(t).raw === raw && t.actors?.[actor.id]?.file)?.actors?.[actor.id];
     const shot = performer.takesShot ? recastShot(opts.shot, existing?.shot, (project as any).storyboard?.scenes?.[si]?.performer?.setting) : undefined;
-    if (shot && !process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the shot's start picture is drawn by GPT Image)");
+    // A picture already drawn and looked at: this film's own asset, still there.
+    const picked = shot && opts.start_frame ? String(opts.start_frame) : undefined;
+    if (picked && (!picked.startsWith(`/assets/${tenant}/projects/${projectId}/`) || picked.includes("..") || !(await fs.access(resolveVideoPath(picked, config.dataDir)).then(() => true, () => false)))) throw new Error("That start picture is not one of this film's");
+    if (shot && !picked && !process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the shot's start picture is drawn by GPT Image)");
     // Reused only when it is the same performance: the same vendor, voice
     // and look, and the file is still there. fresh: made again regardless.
     const reusable = !opts.fresh && existing && madeBy(existing) === performer.id && existing.voice_id === voiceId
@@ -486,12 +493,13 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
       && (existing.sheet || undefined) === (sheetFor(tenant, actor, performer.id) ? actor.sheet : undefined)
       // Another shot is another performance (a selfie vs seated at a table).
       && (existing.shot || undefined) === shot
+      && (!picked || existing.start_frame === picked)
       && (await fs.access(resolveVideoPath(existing.file, config.dataDir)).then(() => true, () => false));
     const frame: RecastFrame = opts.frame || asRecastFrame(existing?.frame) || "tight";
     const file = reusable ? existing.file : frameFileFor(raw.replace(/(\.[^./]+)?$/, `.actor-${actor.id}-${performer.id}.mp4`), frame);
     // The start picture is kept with the shot: made again in the same shot, the
     // actor sits in the same room (and GPT Image is not paid twice).
-    const startFrame = shot && existing?.shot === shot && existing?.start_frame ? existing.start_frame : undefined;
+    const startFrame = picked || (shot && existing?.shot === shot && existing?.start_frame ? existing.start_frame : undefined);
     st.files.push({ raw, file, frame, status: reusable ? "reused" : "running", chunks_done: 0, chunks_total: 0, ...(shot ? { shot } : {}), ...(startFrame ? { start_frame: startFrame } : {}) });
   }
   running.set(key, st);

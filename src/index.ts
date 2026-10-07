@@ -2886,7 +2886,9 @@ Rules:
       }
 
       // ── API: Locations (core/locations.ts): the sets generated scenes are performed in ──
-      // GET    /api/locations/{tenant}                 the tenant's locations
+      // GET    /api/locations/{tenant}                 the tenant's locations, and the stock ones (stock: [{id, name}])
+      // POST   /api/locations/{tenant} {stock}         a stock place copied into the library (once)
+      // GET    /api/locations/{tenant}/stock-{id}/image  a stock place's plate
       // POST   /api/locations/{tenant} {name, prompt?, image?, clean?, shape?}
       //        prompt alone: drawn; image (a workspace file or asset url): cleaned of people,
       //        or kept as it is with clean: false. A drawn one lists as "drawing" until it lands.
@@ -2898,7 +2900,17 @@ Rules:
         const lcTenant = decodeURIComponent(locApi[1]);
         const lcId = locApi[2];
         try {
-          const { listLocations, addLocation, renameLocation, removeLocation, locationImage } = await import("./core/locations.js");
+          const { listLocations, addLocation, addStockLocation, renameLocation, removeLocation, locationImage } = await import("./core/locations.js");
+          const { STOCK_LOCATIONS, getStockLocation, stockLocationFile } = await import("./core/stock-locations.js");
+          // A stock plate (core/stock-locations.ts): .../stock-<id>/image.
+          if (locApi[3] && lcId && lcId.startsWith("stock-") && method === "GET") {
+            const st = getStockLocation(lcId.slice(6));
+            const img = st ? await fs.readFile(stockLocationFile(st.id)).catch(() => null) : null;
+            if (!img) { jsonResponse(res, 404, { error: "No image" }); return; }
+            res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=86400" });
+            res.end(img);
+            return;
+          }
           if (locApi[3] && lcId && method === "GET") {
             const img = await locationImage(lcTenant, lcId).then((f) => fs.readFile(f)).catch(() => null);
             if (!img) { jsonResponse(res, 404, { error: "No image" }); return; }
@@ -2906,9 +2918,11 @@ Rules:
             res.end(img);
             return;
           }
-          if (!lcId && method === "GET") { jsonResponse(res, 200, { locations: await listLocations(lcTenant) }); return; }
+          if (!lcId && method === "GET") { jsonResponse(res, 200, { locations: await listLocations(lcTenant), stock: STOCK_LOCATIONS.map((s) => ({ id: s.id, name: s.name })) }); return; }
           if (!lcId && method === "POST") {
             const body = await parseBody(req).catch(() => ({} as any));
+            // {stock: id}: a stock place into the library (once).
+            if (typeof body.stock === "string") { jsonResponse(res, 200, await addStockLocation(lcTenant, body.stock)); return; }
             const shape = body.shape === "tall" || body.shape === "square" || body.shape === "wide" ? body.shape : undefined;
             jsonResponse(res, 202, await addLocation(lcTenant, {
               name: String(body.name || ""), prompt: typeof body.prompt === "string" ? body.prompt : undefined,
@@ -2932,6 +2946,7 @@ Rules:
       // ── API: Recast (core/recast.ts): the speaker take performed by a cast actor ──
       // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based], frame?, shot?}
       //        shot: Higgsfield performs the recording in it (a start picture drawn; '' = the recording's camera)
+      //        start_frame: the picture to perform it in, already drawn and looked at (a film asset url)
       // POST /api/recast/{tenant}/{project} {action: "frame", frame: "tight"|"medium"|"wide", scenes?}
       //      a made recast refitted from the kept original (a landscape look in a portrait film: how far back it sits)
       //      null puts the recording's person back; performer picks the vendor; voice_id the
@@ -2959,6 +2974,7 @@ Rules:
               motion: typeof body.motion === "string" ? body.motion : undefined,
               scenes: Array.isArray(body.scenes) ? body.scenes.map(Number).filter((n: number) => Number.isInteger(n) && n >= 0) : undefined,
               shot: typeof body.shot === "string" ? body.shot : undefined,
+              start_frame: typeof body.start_frame === "string" ? body.start_frame : undefined,
             }));
             return;
           }
