@@ -32,6 +32,8 @@ export interface Location {
   /** What it was drawn from: the prompt, or the frame it was cleaned from. */
   prompt?: string;
   made_from: "prompt" | "frame" | "upload";
+  /** Copied from a stock location (core/stock-locations.ts): its id. */
+  stock?: string;
   status?: "drawing" | "failed";
   error?: string;
   created_at: string;
@@ -168,6 +170,25 @@ export async function addLocation(tenant: string, opts: { name: string; prompt?:
     }
   })();
   return loc;
+}
+
+/** A STOCK location into the tenant's library (once: chosen again, the same
+ *  one comes back), so a scene names it like any other. */
+export async function addStockLocation(tenant: string, stockId: string): Promise<Location> {
+  const { getStockLocation, stockLocationFile } = await import("./stock-locations.js");
+  const st = getStockLocation(stockId);
+  if (!st) throw new Error(`No stock location "${stockId}"`);
+  const have = (await listLocations(tenant)).find((l) => l.stock === st.id && l.image);
+  if (have) return have;
+  const loc = await edit(tenant, (list) => {
+    let lid = slug(st.name);
+    while (list.some((l) => l.id === lid)) lid = `${slug(st.name)}-${crypto.randomBytes(2).toString("hex")}`;
+    const made: Location = { id: lid, name: st.name, prompt: st.prompt, made_from: "upload", stock: st.id, created_at: new Date().toISOString() };
+    list.push(made);
+    return made;
+  });
+  const image = await savePlate(tenant, loc.id, stockLocationFile(st.id));
+  return edit(tenant, (list) => { const l = list.find((x) => x.id === loc.id)!; l.image = image; return l; });
 }
 
 export async function renameLocation(tenant: string, id: string, name: string): Promise<Location> {

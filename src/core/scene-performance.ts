@@ -892,6 +892,8 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       // A shot-taking recast (Higgsfield): the shot the scene's recast was made
       // in, and the one its setting gives (Studio's "The shot" box).
       ...(cast && take?.actors?.[cast]?.shot ? { recast_shot: take.actors[cast].shot } : {}),
+      // The recast playing here (Studio's "made" step shows it).
+      ...(cast && take?.actors?.[cast]?.file ? { recast_file: take.actors[cast].file, recast_engine: take.actors[cast].performer || null } : {}),
       ...(shotForSetting(plan.setting) ? { setting_shot: shotForSetting(plan.setting) } : {}),
       // What the scene uses when it writes no prompt of its own.
       defaults,

@@ -27,11 +27,35 @@ describe("Studio: the Cast card", () => {
     expect(html).toContain("if (src === 'recast' || src === 'generate') { perfPanel(project, panel, src, si); return; }");
     // Every choice in the panel is the scene's plan.
     expect(html).toContain("{ action: 'plan', scenes: [{ index: si, performer: perfm }] }");
-    expect(html).toContain("api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine', shot: d.rshot != null ? d.rshot : (s.recast_shot || s.setting_shot || '') })");
-    // A vendor that takes a shot (Higgsfield) gets the shot box; the others say where their framing comes from.
-    expect(html).toContain('data-pf="rshot"');
-    expect(html).toContain("if (pinfo.takesShot)");
-    expect(html).toContain("pinfo.framedBy");
+    // The recast sends the very picture that was drawn and looked at, with its words.
+    expect(html).toContain("api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine', shot: inShot ? String(perf.shot || '') : '', start_frame: inShot ? perf.frame : undefined })");
+    expect(html).toContain("var inShot = pfPerformer(eng).takesShot && !d.rcamera && perf.actor === actor && perf.frame;");
+    // THE WIZARD (Marc, Oct 7): steps that apply to this actor and vendor only.
+    expect(html).toContain("function pfWizSteps(kind, a, eng) {");
+    expect(html).toContain("if (a && pfRecastEngines(a).length > 1) st.push(['with', 'With']);");   // a HeyGen look has one vendor: no With step
+    expect(html).toContain("if (pfPerformer(eng).takesShot) st.push(['shot', 'The shot']);");      // only a vendor that takes a shot
+    expect(html).toContain("if (a && a.voice_id) st.push(['voice', 'Voice']);");                   // no voice of their own: nothing to choose
+    expect(html).toContain("if (!a || pfGenEngine(a) === 'seedance') st.push(['shot', 'The shot']);");  // generate: HeyGen's look is the shot
+    // Faces, not names: the cast as headshots, and the one picked shown big.
+    expect(html).toContain('class="pf-castpic');
+    expect(html).toContain("return withToken('/api/cast/' + pfT() + '/' + encodeURIComponent(a.id) + '/portrait');");
+    expect(html).toContain('<div class="pf-picked">');
+    // The shot is drawn and seen (cents) before the vendor is paid: Next waits for it.
+    expect(html).toContain("var SKEY = kind === 'recast' ? 'rshot' : 'shot';");
+    expect(html).toContain("'Draw the shot first, so you see it before '");
+    expect(html).toContain("'The shot was changed: draw it again to see it.'");
+    expect(html).toContain("'The place was changed: draw it again to see it.'");
+    // The shot step (Marc, Oct 7): WHERE as places you can see -- your locations, the
+    // nine stock ones, or one you describe (with examples) -- then HOW FAR BACK, then the actor drawn there.
+    expect(html).toContain('<div class="pf-sub">1 &#183; Where</div>');
+    expect(html).toContain("'/stock-' + encodeURIComponent(st.id) + '/image'");
+    expect(html).toContain("api('POST', '/locations/' + pfT(), { stock: t.getAttribute('data-pf-stock') })");
+    expect(html).toContain("api('POST', '/locations/' + pfT(), { name: pname, prompt: pp, shape: tall ? 'tall' : 'wide' })");
+    expect(html).toContain("var PF_PLACE_EXAMPLES = [");
+    expect(html).toContain("var PF_FRAMINGS = [");
+    expect(html).toContain("{ action: 'frame', actor: actor, shot: rs, location: pfWhere(d, s.plan || {}, perf) }");
+    // Recast and Generate keep their own place in the wizard.
+    expect(html).toContain("var SK = kind === 'recast' ? 'rstep' : 'gstep';");
     // The recast asks for the voice: the recording's by default, the actor's when they have one.
     expect(html).toContain('data-pf="rvoice" value="mine"');
     expect(html).toContain('data-pf="rvoice" value="actor"');
@@ -44,7 +68,7 @@ describe("Studio: the Cast card", () => {
 describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
   it("the generate panel: who first (grouped), the engine follows from who, no first-frame row, a progress screen while it is made, extra shots in plain words", () => {
     const html = getPreviewHtml();
-    expect(html).toContain("['Generated people', function(a) { return !a.heygen_look_id && a.fictional; }], ['HeyGen looks'");
+    expect(html).toContain("['Generated people', function(x) { return !x.heygen_look_id && x.fictional; }], ['HeyGen looks'");
     expect(html).toContain("function pfGenEngine(a) { return a && a.heygen_look_id ? 'heygen' : 'seedance'; }");
     expect(html).not.toContain('<label>First frame</label>');
     expect(html).toContain("if (run) { panel.innerHTML = pfStatusHtml(project, si, s, perf); return; }");
