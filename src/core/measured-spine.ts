@@ -14,7 +14,7 @@ import { getWaveformPeaks } from "./waveform.js";
 import { detectSilence } from "./idle-silence.js";
 import { resolveVideoPath } from "./video-path.js";
 import { activeTake, attachTake } from "./take-needs.js";
-import { cutClock, keptSeconds, wordsThroughCuts } from "./take-clock.js";
+import { keptSeconds, wordsThroughCuts, bakes, playClock, speedOf } from "./take-clock.js";
 import { assertedSpine, measuredSpine, alignToScript, applySpine, splitByScripts, type Spine, type ResolveReport } from "./word-anchors.js";
 
 const dataDirOf = (dataDir?: string) => dataDir || process.env.MP_DATA_DIR || "/data/media-producer";
@@ -139,7 +139,7 @@ export function deAirWindow(
 export function takeDuration(take?: Take): number {
   if (!take) return 0;
   // Cut by hand (core/take-edits.ts): the window minus its cuts.
-  if (take.cuts && take.cuts.length) return round2(keptSeconds(take));
+  if (bakes(take)) return round2(keptSeconds(take));
   if (take.trim_end != null) return Math.max(0, round2(take.trim_end - (take.trim_start || 0)));
   return take.duration && take.duration > 0 ? take.duration : 0;
 }
@@ -148,11 +148,11 @@ export function takeDuration(take?: Take): number {
 export function windowWords(words: Array<{ text: string; start: number; end: number }>, take: Take): Array<{ text: string; start: number; end: number }> {
   const from = take.trim_start || 0;
   const to = take.trim_end != null ? take.trim_end : Infinity;
-  if (take.cuts && take.cuts.length) {
-    // Through the cuts: the words left, on what the scene plays.
-    const base = cutClock(take.cuts, from);
-    const end = to === Infinity ? Infinity : cutClock(take.cuts, to);
-    return wordsThroughCuts(words.filter((w) => w.start >= from - 0.05 && w.start < to), take.cuts)
+  if (bakes(take)) {
+    // Through the cuts and at the take's pace: the words left, on what the scene plays.
+    const base = playClock(take, from);
+    const end = to === Infinity ? Infinity : playClock(take, to);
+    return wordsThroughCuts(words.filter((w) => w.start >= from - 0.05 && w.start < to), take.cuts, speedOf(take))
       .map((w) => ({ text: w.text, start: Math.max(0, round3(w.start - base)), end: Math.max(0, round3(Math.min(w.end, end) - base)) }));
   }
   if (!from && to === Infinity) return words;

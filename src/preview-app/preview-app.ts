@@ -3230,7 +3230,7 @@ ${QUOTIENT_CSS}
   // take's trim and cuts. Any change makes the lane's words and wave stale.
   function speakerLaneKey(pr) {
     var clips = ((pr && pr.speaker_track && pr.speaker_track.clips) || []).map(function(c) { return [c.scene_index, c.source, c.trim_start || 0, c.trim_end || 0].join(','); });
-    var takes = ((pr && pr.takes) || []).map(function(t) { return [t.id, t.trim_start || 0, t.trim_end || 0, (t.cuts || []).length].join(','); });
+    var takes = ((pr && pr.takes) || []).map(function(t) { return [t.id, t.trim_start || 0, t.trim_end || 0, (t.cuts || []).length, t.speed || 1].join(','); });
     return clips.join('|') + '#' + takes.join('|');
   }
 
@@ -8124,7 +8124,7 @@ ${QUOTIENT_CSS}
           blk.classList.add('spk-take');
           takeLaneEdges(blk, si, total);
           (tk.cuts || []).forEach(function(cut) {
-            var at = takeCutClock(tk.cuts, cut.src_start) - takeCutClock(tk.cuts, tk.trim_start || 0);
+            var at = (takeCutClock(tk.cuts, cut.src_start) - takeCutClock(tk.cuts, tk.trim_start || 0)) / (tk.speed || 1);
             if (!(at > 0 && at < d0)) return;
             var seam = document.createElement('div');
             seam.className = 'spk-seam';
@@ -8476,9 +8476,10 @@ ${QUOTIENT_CSS}
       + '<div class="sp-row"><button class="rv-go secondary" id="tk-mark" style="flex:1;">' + (mark == null ? 'Mark cut start at playhead' : 'Cut from ' + fmtTime(mark) + ' to playhead') + '</button></div>'
       + (mark != null ? '<div class="sp-row"><button class="rv-go secondary" id="tk-unmark" style="flex:1;color:var(--content-secondary);">Clear the mark</button></div>' : '')
       + cuts.map(function(c, i) {
-          return '<div class="tk-row"><span class="tk-lab">Cut ' + (c.src_end - c.src_start).toFixed(2) + 's at ' + (takeCutClock(cuts, c.src_start) - takeCutClock(cuts, tk.trim_start || 0)).toFixed(2) + 's</span><button class="rv-go secondary" data-tk-restore="' + i + '">↩ Restore</button></div>';
+          return '<div class="tk-row"><span class="tk-lab">Cut ' + (c.src_end - c.src_start).toFixed(2) + 's at ' + ((takeCutClock(cuts, c.src_start) - takeCutClock(cuts, tk.trim_start || 0)) / (tk.speed || 1)).toFixed(2) + 's</span><button class="rv-go secondary" data-tk-restore="' + i + '">↩ Restore</button></div>';
         }).join('')
       + '<div class="sp-region" style="margin-top:4px;">Or shift-click the first and last word on the word lane to cut them.</div>'
+      + takePaceRow(tk)
       + takeFramingRow(p, si, tk)
       // A new take, any way: one button into the take dialog (Marc: not six here).
       + '<div class="sp-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><button class="rv-go secondary" id="tk-replace" style="flex:1;">Replace this take&#8230;</button></div>';
@@ -8498,6 +8499,20 @@ ${QUOTIENT_CSS}
         var c = cuts[Number(b.getAttribute('data-tk-restore'))];
         b.disabled = true;
         takeEditRequest(si, { op: 'restore', src_start: c.src_start, src_end: c.src_end }, 'Restoring the cut').then(function() { camPopClose(); }, function() { b.disabled = false; });
+      });
+    });
+    // PACE: the take plays faster (or slower) than it was recorded, pitch
+    // kept; the captions and word-timed graphics follow. "All scenes" sets
+    // every take in the film (Marc: "it seems like I'm not talking fast enough").
+    pop.querySelectorAll('[data-tk-pace]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var sp = Number(b.getAttribute('data-tk-pace'));
+        var all = document.getElementById('tk-pace-all') && document.getElementById('tk-pace-all').checked;
+        pop.querySelectorAll('[data-tk-pace]').forEach(function(x) { x.disabled = true; });
+        var scenes = all ? (p.speaker_track && p.speaker_track.clips || []).map(function(c) { return c.scene_index; }).filter(function(x, i, a) { return x != null && a.indexOf(x) === i; }) : [si];
+        var chain = Promise.resolve();
+        scenes.forEach(function(sx) { chain = chain.then(function() { return takeEditRequest(sx, { op: 'speed', speed: sp }, 'Setting the pace' + (all ? ' (scene ' + (sx + 1) + ')' : '')); }); });
+        chain.then(function() { camPopClose(); }, function() { pop.querySelectorAll('[data-tk-pace]').forEach(function(x) { x.disabled = false; }); });
       });
     });
     pop.querySelectorAll('[data-tk-frame]').forEach(function(b) {
@@ -8523,6 +8538,14 @@ ${QUOTIENT_CSS}
       camPopClose();
       takeEditRequest(si, { op: 'cut', from: Math.max(0, a), to: z }, 'Cutting the take');
     });
+  }
+  function takePaceRow(tk) {
+    var cur = tk.speed || 1;
+    var btns = [1, 1.1, 1.15, 1.2].map(function(v) {
+      return '<button class="rv-go ' + (Math.abs(cur - v) < 0.001 ? '' : 'secondary') + '" data-tk-pace="' + v + '">' + v + 'x</button>';
+    }).join('');
+    return '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Pace</span>' + btns + '</div>'
+      + '<div class="sp-row" style="font-size:12px;color:var(--content-secondary);"><label><input type="checkbox" id="tk-pace-all" checked> All scenes</label></div>';
   }
   // FRAMING (a recast whose picture is another shape -- a landscape look in
   // a portrait film): how far back the actor sits. Refitted from the kept

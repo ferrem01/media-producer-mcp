@@ -125,7 +125,7 @@ describe("take edits wiring", () => {
     expect(index).toMatch(/\/api\\\/take-edit\\\//);
     expect(index).toMatch(/editSceneTake\(teTenant, teProject, si/);
     const server = read("src/server.ts");
-    expect(server).toMatch(/action: z\.enum\(\["list", "cut", "restore", "look", "trim"\]\)/);
+    expect(server).toMatch(/action: z\.enum\(\["list", "cut", "restore", "look", "trim", "speed"\]\)/);
     expect(server).toMatch(/te\.editSceneTake\(/);
     const studio = read("src/preview-app/preview-app.ts");
     expect(studio).toMatch(/function takeLaneEdges\(/);

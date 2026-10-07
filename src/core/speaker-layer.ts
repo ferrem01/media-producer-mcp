@@ -39,7 +39,7 @@
  * their own paths (scene-assembler.ts) untouched.
  */
 
-import { cutClock, cutFileFor, takeWindow } from "./take-clock.js";
+import { cutFileFor, takeWindow, bakes, playClock } from "./take-clock.js";
 
 export const SPEAKER_SRC = "speaker";
 /** The older token of the alpha layer; read as background "alpha". */
@@ -330,7 +330,7 @@ export function syncSpeakerClips(project: ProjectLike): number {
     // of the wanted file, else the raw take's (a recast or matte copy made
     // since the cut waits for ensureTakeCutFiles), and an alpha copy only
     // once it is cut too -- every file the clip names shares one clock.
-    const cut = take.cuts && take.cuts.length ? take : null;
+    const cut = bakes(take) ? take : null;
     if (cut) {
       wantSource = cutFileFor(cut, wantSource) || cutFileFor(cut, copies.raw) || wantSource;
       wantAlpha = cutFileFor(cut, wantAlpha);
@@ -341,8 +341,8 @@ export function syncSpeakerClips(project: ProjectLike): number {
     if (take.edited) {
       const onCut = !!cut && Object.values(take.cut_files || {}).some((v) => v.file === wantSource);
       const w = takeWindow(take);
-      const ts = onCut ? cutClock(take.cuts, w.start) : w.start;
-      const te = onCut ? cutClock(take.cuts, w.end) : w.end;
+      const ts = onCut ? playClock(take, w.start) : w.start;
+      const te = onCut ? playClock(take, w.end) : w.end;
       if (clip.trim_start !== ts) { clip.trim_start = ts; changed++; }
       if (clip.trim_end !== te) { clip.trim_end = te; changed++; }
     }
