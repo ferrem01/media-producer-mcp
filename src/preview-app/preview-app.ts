@@ -11550,6 +11550,15 @@ ${QUOTIENT_CSS}
         return engs.length === 1 ? '<span class="pf-eng"><b>' + e[1] + '</b> <small>' + e[2] + '</small></span>'
           : '<label class="pf-eng' + (p.available ? '' : ' dis') + '"><input type="radio" name="pf-eng-' + si + '" data-pf="engine" value="' + e[0] + '"' + (e[0] === eng ? ' checked' : '') + (p.available ? '' : ' disabled') + '> <b>' + e[1] + '</b> <small>' + e[2] + (p.available ? '' : ' &#183; not set up') + '</small></label>';
       }).join('') + '</div></div>';
+      // The voice: the recording's own unless the actor's is picked (a recast
+      // swaps the person, not the voice -- the server keeps it by default too).
+      var rv = dr.rvoice === 'actor' && a && a.voice_id ? 'actor' : 'mine';
+      h += '<div class="pf-row"><label>Voice</label><div class="pf-engines">'
+        + '<label class="pf-eng"><input type="radio" name="pf-rv-' + si + '" data-pf="rvoice" value="mine"' + (rv === 'mine' ? ' checked' : '') + '> <b>My recording’s voice</b> <small>your voice, exactly as recorded</small></label>'
+        + (a && a.voice_id
+          ? '<label class="pf-eng"><input type="radio" name="pf-rv-' + si + '" data-pf="rvoice" value="actor"' + (rv === 'actor' ? ' checked' : '') + '> <b>' + escHtml(a.name) + '’s voice</b> <small>' + escHtml((a.voice_name || 'their ElevenLabs voice').split(' - ')[0]) + ', converted from your delivery (timing kept)</small></label>'
+          : '<span class="pf-eng dis"><small>' + escHtml(a ? a.name : 'This actor') + ' has no voice of their own: set one in Cast to offer it here.</small></span>')
+        + '</div></div>';
       var rc = d.recast && d.recast.status === 'running' ? d.recast : null;
       if (!s.has_recording) h += '<div class="np-note">A recast performs <b>your recording</b> of this scene: record it first (Record here, On your phone, Across the room), then recast it.</div>';
       else if (rc) h += '<div class="np-armed"><span></span>Recasting' + (rc.scenes ? ' scene ' + rc.scenes.map(function(x) { return x + 1; }).join(', ') : '') + ' as ' + escHtml((pfActor(rc.actor) || {}).name || rc.actor) + '&#8230;</div>';
@@ -11672,6 +11681,7 @@ ${QUOTIENT_CSS}
       }
       if (k === 'location') { d.location = t.value; pfPost(project, panel, kind, si, { action: 'location', location: t.value }, t.value ? 'Set: the frame is drawn there, and every take keeps the room.' : 'No location.'); return; }
       if (k === 'voice_source') { d.voice_source = t.value; pfRender(project, panel, kind, si); return; }
+      if (k === 'rvoice') { d.rvoice = t.value; return; }
       if (k === 'cut_show' || k === 'cut_where') { d[k] = t.value; return; }
       if (k === 'vgender' || k === 'vuse') { d[k] = t.value; pfLoadVoices(project, panel, kind, si, true); return; }
     };
@@ -11727,7 +11737,7 @@ ${QUOTIENT_CSS}
       if (go === 'recast') {
         var eng = d.engine || ((s.plan || {}).how === 'recast' && (s.plan || {}).engine) || 'higgsfield';
         pfSay(panel, 'Starting the recast…');
-        api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si] }).then(function() {
+        api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine' }).then(function() {
           return pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pf.wasBusy = true; pfPoll(project); });
         }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
         return;

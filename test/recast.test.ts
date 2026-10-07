@@ -102,7 +102,7 @@ describe("recast: a take performed by a cast actor", () => {
     const { startRecast, getRecastStatus } = await import("../src/core/recast.js");
     await expect(startRecast(T, P, "roger-guy", { performer: "wan" })).rejects.toThrow(/No performer "wan"/);
     const wait = async () => { for (let i = 0; i < 1200 && (await getRecastStatus(T, P))!.status === "running"; i++) await new Promise((r) => setTimeout(r, 100)); return (await getRecastStatus(T, P))!; };
-    const st0 = await startRecast(T, P, "roger-guy");   // a portrait actor: Kling (the key is there)
+    const st0 = await startRecast(T, P, "roger-guy", { voice_id: "actor" });   // a portrait actor: Kling (the key is there), in the actor's voice
     expect(st0.performer).toBe("kling");
     expect(st0.files).toHaveLength(1); // one take file behind both clips
     const st = await wait();
@@ -122,10 +122,11 @@ describe("recast: a take performed by a cast actor", () => {
     await expect(fs.access(path.join(DATA, T, "projects", P, "_work", "recast-roger-guy-kling-0"))).rejects.toThrow(); // pieces cleaned up
 
     // The same performance again is reused; another voice is another performance; fresh makes it again.
-    expect((await startRecast(T, P, "roger-guy", { performer: "kling" })).files[0].status).toBe("reused");
+    expect((await startRecast(T, P, "roger-guy", { performer: "kling", voice_id: "actor" })).files[0].status).toBe("reused");
     await wait();
     expect(klingCalls).toBe(1);
-    expect((await startRecast(T, P, "roger-guy", { performer: "kling", voice_id: "mine" })).files[0].status).toBe("running");
+    // Omitted keeps the recording's voice -- the same performance as "mine", and another than the actor's.
+    expect((await startRecast(T, P, "roger-guy", { performer: "kling" })).files[0].status).toBe("running");
     await wait();
     expect(klingCalls).toBe(2);
     expect((await startRecast(T, P, "roger-guy", { performer: "kling", voice_id: "mine", fresh: true })).files[0].status).toBe("running");
