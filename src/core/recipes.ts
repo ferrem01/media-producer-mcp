@@ -13,6 +13,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { FORMAT_IDS, getFormat } from "./formats.js";
+import { SETTING_IDS, getSetting } from "./performer-settings.js";
+import { PROOF_USE_IDS, asProofUse, isDirectionUse } from "./proof-placement.js";
+
+export const CLONE_NEED_DESCRIPTION = "Take B: you as the other role, listening on the other half of the frame";
+import { TAKE_NEED_DESCRIPTION } from "./take-needs.js";
 
 export type RecipeShot = "person" | "person+cutaway" | "person+split" | "person+card" | "broll" | "idea_card" | "type_card" | "screen";
 
@@ -39,7 +45,12 @@ export interface RecipeBeat {
   dur: [number, number, number];
   repeat?: [number, number];
   enters?: string[];
-  cutaway?: { at: string; hold: number; exit_before?: string; use?: "cutaway" | "split" | "card"; kind?: string };
+  /** Where the proof sits (SPEC-creator-formats.md): any proof use. A proof
+   *  need on this beat with no use takes it (holdUseToRecipe). */
+  cutaway?: { at: string; hold: number; exit_before?: string; use?: string; kind?: string };
+  /** The setting the person is in on this beat (SPEC-creator-formats.md):
+   *  written on the scene's performer plan when it has none. */
+  setting?: string;
   note?: string;
 }
 
@@ -47,6 +58,11 @@ export interface Recipe {
   id: string;
   name: string;
   grammar: string;
+  /** The viral format this cut is a version of (core/formats.ts); absent on
+   *  an ad cut that is none of them. */
+  format?: string;
+  /** The version within the format ("index-reel host", "deep"). */
+  variant?: string;
   frames_proven: string[];
   suits: string[];
   length_s: [number, number];
@@ -75,7 +91,10 @@ export function validateRecipe(r: any): string[] {
     if (!Array.isArray(b.dur) || b.dur.length !== 3 || !(b.dur[0] <= b.dur[1] && b.dur[1] <= b.dur[2])) errs.push(`beat ${i + 1} (${b.role}): dur must be [min, target, max]`);
     if (b.repeat && !(Array.isArray(b.repeat) && b.repeat.length === 2 && b.repeat[0] >= 1 && b.repeat[0] <= b.repeat[1])) errs.push(`beat ${i + 1} (${b.role}): repeat must be [min, max]`);
     if (b.made !== undefined && !RECIPE_MADE.has(String(b.made))) errs.push(`beat ${i + 1} (${b.role}): made must be one of ${[...RECIPE_MADE].join("|")}`);
+    if (b.setting !== undefined && !SETTING_IDS.includes(String(b.setting))) errs.push(`beat ${i + 1} (${b.role}): setting must be one of ${SETTING_IDS.join("|")}`);
+    if (b.cutaway?.use !== undefined && !asProofUse(b.cutaway.use)) errs.push(`beat ${i + 1} (${b.role}): cutaway.use must be one of ${PROOF_USE_IDS.join("|")}`);
   });
+  if (r.format !== undefined && !FORMAT_IDS.includes(String(r.format))) errs.push(`format must be one of ${FORMAT_IDS.join("|")}`);
   if (!Array.isArray(r.length_s) || r.length_s.length !== 2) errs.push("length_s must be [min, max]");
   if (!r.rhythm || typeof r.rhythm.wpm !== "number") errs.push("rhythm.wpm is required");
   return errs;
@@ -107,6 +126,15 @@ export function recipesForGrammar(grammar: string | undefined): Recipe[] {
   return loadRecipes().filter((r) => !grammar || r.grammar === grammar);
 }
 
+/** A format's recipe (SPEC-creator-formats.md): the first listed under the
+ *  format that the library holds, for the frame when one is proven there. */
+export function recipeForFormat(format: string | undefined | null, frame?: string): Recipe | undefined {
+  const f = getFormat(format);
+  if (!f) return undefined;
+  const rs = f.recipes.map((id) => getRecipe(id)).filter((r): r is Recipe => !!r);
+  return (frame && rs.find((r) => r.frames_proven.includes(frame))) || rs[0];
+}
+
 /** How the beat is made: the recipe's word, else inferred from the shot. */
 export function madeOf(b: RecipeBeat): RecipeMade {
   if (b.made) return b.made;
@@ -136,7 +164,7 @@ export function wordBudget(seconds: number, wpm: number): number { return Math.m
 export function recipeMenu(): string {
   const rs = loadRecipes();
   if (!rs.length) return "";
-  return rs.map((r) => `- "${r.id}" (${r.grammar}, proven ${r.frames_proven.join("/")}, ${r.length_s[0]}-${r.length_s[1]}s): ${r.name}. Suits: ${r.suits.join("; ")}.`).join("\n");
+  return rs.map((r) => `- "${r.id}" (${r.format ? `${r.format} format, ` : ""}${r.grammar}, proven ${r.frames_proven.join("/")}, ${r.length_s[0]}-${r.length_s[1]}s): ${r.name}. Suits: ${r.suits.join("; ")}.`).join("\n");
 }
 
 /** The recipe as the writer must fill it: the spine, beat by beat, with the
@@ -148,7 +176,8 @@ export function recipeBlock(r: Recipe, frame?: string): string {
     const cut = b.cutaway ? ` Cutaway (${b.cutaway.use || "cutaway"}${b.cutaway.kind ? `, ${b.cutaway.kind}` : ""}): enters at ${b.cutaway.at}, holds ${Math.round(b.cutaway.hold * 100)}% of the beat${b.cutaway.exit_before ? `, out before ${b.cutaway.exit_before}` : ""}.` : "";
     const ent = b.enters && b.enters.length ? ` Enters: ${b.enters.join(", ")}.` : "";
     const made = ` MADE AS: ${MADE_TEXT[madeOf(b)]}.${b.ground === "broll" ? " A found-footage GROUND may lie under it when the brief asks for one (a stock_footage need; the surface and the cards ride over the clip, and on a person beat the person rides over it too -- the take as a layer)." : ""}`;
-    return `${i + 1}. ${b.role.toUpperCase()} -- ${b.shot}, ${b.dur[1]}s (${b.dur[0]}-${b.dur[2]}s), about ${wordBudget(b.dur[1], wpm)} words (never more than ${wordBudget(b.dur[2], wpm)})${rep}.${made}${ent}${cut}${b.note ? ` ${b.note}` : ""}`;
+    const set = b.setting ? ` Setting: ${getSetting(b.setting)?.name || b.setting} (the build writes it on the scene's performer).` : "";
+    return `${i + 1}. ${b.role.toUpperCase()} -- ${b.shot}, ${b.dur[1]}s (${b.dur[0]}-${b.dur[2]}s), about ${wordBudget(b.dur[1], wpm)} words (never more than ${wordBudget(b.dur[2], wpm)})${rep}.${made}${ent}${cut}${set}${b.note ? ` ${b.note}` : ""}`;
   }).join("\n");
   const lat = r.latitude || {};
   const proven = frame && !r.frames_proven.includes(frame) ? ` (proven at ${r.frames_proven.join("/")}; this film ships ${frame} -- keep the spine, let the frame laws place things)` : "";
@@ -296,7 +325,7 @@ export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; as
   // a camera take asked for it is the writer's reflex, not the recipe's
   // (measured live, proj_2384e533: every chapter asked for a take).
   if (!String(beat.shot).startsWith("person") && Array.isArray(scene.assets)) {
-    const takes = scene.assets.filter((a) => a && typeof a === "object" && a.type === "camera_video" && a.use !== "clip" && a.status !== "provided");
+    const takes = scene.assets.filter((a) => a && typeof a === "object" && a.type === "camera_video" && a.use !== "clip" && a.use !== "clone" && a.status !== "provided");
     if (takes.length) { scene.assets = scene.assets.filter((a) => !takes.includes(a)); out.push("the camera take ask dropped: no person on this beat"); }
   }
   // A beat made as motion graphics, as the person's take, or as type asks
@@ -317,7 +346,10 @@ export function holdMadeToRecipe(scene: { label?: unknown; purpose?: unknown; as
   } else if (made === "recording") {
     const assets = Array.isArray(scene.assets) ? scene.assets : (scene.assets = []);
     if (!assets.some(isScreenNeed)) {
-      assets.push({ type: "screen_recording", description: String(scene.purpose || scene.label || "the screen this beat proves"), status: "needed", priority: "recommended", use: "cutaway", fallback: "A slate stands in the screen's slot until the recording lands." });
+      // The beat's placement rides on the need (a reaction's source on top,
+      // a green screen's ground), else the cutaway.
+      const use = asProofUse(beat.cutaway?.use);
+      assets.push({ type: "screen_recording", description: String(scene.purpose || scene.label || "the screen this beat proves"), status: "needed", priority: "recommended", use: use && use !== "clone" && !isDirectionUse(use) ? use : "cutaway", fallback: "A slate stands in the screen's slot until the recording lands." });
       out.push("a screen_recording need added: the beat is a real recording");
     }
   }
@@ -494,3 +526,45 @@ export function holdEmptySurfaces(scene: { components?: any[] }): string[] {
   return out;
 }
 
+
+/** THE BEAT'S SETTING ON THE SCENE (SPEC-creator-formats.md): a recipe beat
+ *  that names where the person is writes it on the scene's performer plan
+ *  when the plan names none (a setting chosen by hand stays). Returns true
+ *  when it was written. */
+export function holdSettingToRecipe(scene: { label?: unknown; performer?: Record<string, unknown> | null }, r: Recipe): boolean {
+  const role = roleOfLabel(scene.label, r);
+  const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+  if (!beat?.setting) return false;
+  const plan = scene.performer && typeof scene.performer === "object" ? scene.performer : {};
+  if (plan.setting) return false;
+  scene.performer = { ...plan, setting: beat.setting };
+  return true;
+}
+
+/** THE BEAT'S PROOF USE ON ITS NEEDS (SPEC-creator-formats.md): a proof need
+ *  on a beat whose cutaway names a use (green, tv, react, clone...) and that
+ *  names none itself takes the beat's. The person's own take is never a
+ *  proof. Returns how many needs changed. */
+export function holdUseToRecipe(scene: { label?: unknown; assets?: any[] }, r: Recipe): number {
+  const role = roleOfLabel(scene.label, r);
+  const beat = role ? r.spine.find((b) => b.role.toLowerCase() === role) : undefined;
+  const use = asProofUse(beat?.cutaway?.use);
+  if (!use || use === "cutaway" || !Array.isArray(scene.assets)) return 0;
+  let n = 0;
+  for (const a of scene.assets) {
+    if (!a || typeof a !== "object" || a.use) continue;
+    // A clone is the person's second take; every other use is a proof's.
+    if (use === "clone" ? a.type !== "camera_video" || a.description === TAKE_NEED_DESCRIPTION : a.type === "camera_video") continue;
+    a.use = use;
+    // prop / demo are directions the person performs: nothing to upload.
+    if (isDirectionUse(use)) { a.status = "provided"; a.fallback = "Performed on camera; nothing to upload."; }
+    n++;
+  }
+  // A CLONE BEAT ASKS FOR TAKE B even when the writer forgot it.
+  if (use === "clone" && !scene.assets.some((a) => a && a.type === "camera_video" && a.use === "clone")) {
+    scene.assets.push({ type: "camera_video", use: "clone", description: CLONE_NEED_DESCRIPTION, status: "needed", priority: "critical",
+      fallback: "The other half of the frame shows the room until Take B lands.", recording_instructions: "Take B: same phone position, sit on the other half of the frame, listen and react in silence for the whole scene." });
+    n++;
+  }
+  return n;
+}

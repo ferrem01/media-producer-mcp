@@ -1,0 +1,150 @@
+{
+  "id": "voiceover-broll-story",
+  "name": "Voiceover b-roll: story",
+  "grammar": "hype-cut",
+  "format": "voiceover-broll",
+  "variant": "story",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "a story told over footage, no face",
+    "a mood piece",
+    "a founder story without a camera"
+  ],
+  "length_s": [
+    20,
+    40
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "broll",
+      "made": "broll",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "keyword:type-on"
+      ],
+      "note": "A striking shot and the first line; the key words on screen."
+    },
+    {
+      "role": "beat",
+      "shot": "broll",
+      "made": "broll",
+      "dur": [
+        3,
+        4,
+        6
+      ],
+      "repeat": [
+        3,
+        7
+      ],
+      "enters": [
+        "keyword:type-on"
+      ],
+      "note": "One shot per line (a stock_footage need: the shot as a search phrase), the line's key words on screen."
+    },
+    {
+      "role": "close",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:wordmark"
+      ],
+      "note": "The last line, then the wordmark."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 3.5,
+    "max_hold_s": 6,
+    "wpm": 160,
+    "first_cut_by_s": 2.5,
+    "end_card_s": 3
+  },
+  "layers": {
+    "voice": "voiceover",
+    "type": {
+      "style": "display-sans-heavy",
+      "pos": "center",
+      "per": "word",
+      "max_words": 5
+    },
+    "captions": {
+      "style": "none"
+    },
+    "stamps": {
+      "pos": "center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": true,
+      "feel": "cinematic"
+    }
+  },
+  "motion": {
+    "elements": {
+      "keyword": {
+        "in": "type-on",
+        "in_s": 0.12,
+        "per": "word",
+        "out": "cut"
+      },
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      },
+      "end_card": {
+        "in": "fade",
+        "in_s": 0.4
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "beat": "fixed",
+      "close": "fixed"
+    },
+    "physics": "calm"
+  },
+  "asks": {
+    "take": "none (a narrator voice)",
+    "screens": 0,
+    "broll": "one clip per beat",
+    "images": 0
+  },
+  "latitude": {
+    "optional": [],
+    "fixed": [
+      "hook",
+      "close"
+    ],
+    "may_double": [
+      "beat"
+    ]
+  },
+  "source": {
+    "film": "composed from the viral formats list (Voiceover B-roll); not measured from one film",
+    "length_s": 30,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

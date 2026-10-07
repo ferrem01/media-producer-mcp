@@ -34,6 +34,17 @@ export function personCarries(grammar: unknown): boolean {
 export function isClipNeed(a: unknown): boolean {
   return !!a && typeof a === "object" && (a as any).type === "camera_video" && (a as any).use === "clip";
 }
+/** THE CLONE (SPEC-creator-formats.md): a camera_video need with `use:
+ *  "clone"` is the person's SECOND take of a scene (Take B) on a person film
+ *  -- recorded in the same booth, landing as a video in its half of the
+ *  frame, never the speaker track. The scene's own take need stays. */
+export function isCloneNeed(a: unknown): boolean {
+  return !!a && typeof a === "object" && (a as any).type === "camera_video" && (a as any).use === "clone";
+}
+export function cloneNeedOf(project: Project, sceneIndex: number): AssetRequirement | undefined {
+  const scene = project.storyboard?.scenes?.[sceneIndex];
+  return (scene?.assets || []).find((a) => isCloneNeed(a));
+}
 export function clipNeedOf(project: Project, sceneIndex: number): AssetRequirement | undefined {
   const scene = project.storyboard?.scenes?.[sceneIndex];
   return (scene?.assets || []).find((a) => isClipNeed(a));
@@ -100,7 +111,7 @@ export function ensureSpeakerNeeds(project: Project): boolean {
     // camera, static locked shot") on a person film duplicates the take
     // the board already asks for (measured live, proj_8b613c9a: two
     // camera rows per scene in Studio). A clip need is not a take and stays.
-    const dupes = scene.assets.filter((a) => a.type === "camera_video" && a.description !== TAKE_NEED_DESCRIPTION && !isClipNeed(a) && a.status !== "provided");
+    const dupes = scene.assets.filter((a) => a.type === "camera_video" && a.description !== TAKE_NEED_DESCRIPTION && !isClipNeed(a) && !isCloneNeed(a) && a.status !== "provided");
     if (dupes.length) { scene.assets = scene.assets.filter((a) => !dupes.includes(a)); changed = true; }
     const active = activeTake(project, i);
     if (!need) {

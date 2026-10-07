@@ -37,7 +37,11 @@ export function isCutInProof(comp: { type: string; enter?: any }): boolean {
  *  stacking list carried over the person is words too: a 1.12x punch-in on
  *  "seeing the numbers" pushed its left edge 20px off the frame (measured,
  *  Teaser D proj_86591051, the Claim scene). */
-const FIXED_TO_FRAME = new Set(["reel-caption-lane", "stack-list"]);
+const FIXED_TO_FRAME = new Set(["reel-caption-lane", "stack-list",
+  // The creator formats' frames (SPEC-creator-formats.md): the proof beside
+  // the person, the index reel's pinned headline and window, the tier list
+  // -- they hold still while the camera punches in on the person.
+  "proof-frame", "index-reel", "tier-list"]);
 export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
 /** The scatter caption lane (core/captions.ts, the Air cut): words around
  *  the person that stay; over a cutaway the choreography flags the window

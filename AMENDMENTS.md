@@ -6,13 +6,46 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-07 — The creator vocabulary: four hard concepts, each a list
 
+Marc, on the 10 viral formats and the 17 talking-head types: "as long as
+they are hard concepts and I can see lists of options for each one." No new
+layer: every name lands on grammar (film), recipe + its viral `format`
+(film), `performer.setting` (scene) or a proof's `use` (beat), and
+`list target:"vocabulary"` prints all of them from the code's own lists
+(core/vocabulary.ts). SPEC-creator-formats.md has the tables.
 
-
-
-
-
-
+- Formats (core/formats.ts): ten, each naming its recipes; recipes carry
+  `format` + `variant`; `generate creator_format` picks the format's recipe
+  (the frame's when proven there). The recipe param's description now lists
+  the library itself instead of a pasted list.
+- Settings (core/performer-settings.ts): eight; on the plan (cleanPlan,
+  board line), recipe beats write them (`holdSettingToRecipe`), the take
+  page shows the guidance, and `sceneShot` makes a setting the generated
+  performer's shot unless a shot was written by hand.
+- Proof uses (core/proof-placement.ts): fourteen. `placeProof` is the one
+  placement: framed uses (tv, laptop, phone, whiteboard, card, point, react)
+  become the new self-placing `proof-frame` (beside the face, fixed to the
+  frame, timed on its data so the cut-in camera rules leave it alone, its
+  slate in the same frame); green is the beat's ground (the speaker plays
+  the alpha copy over it); clone is Take B in its half (`object_position`,
+  muted); prop and demo draw nothing and need no upload. `card` builds now
+  (it was skipped). Recipe beats pass their use to their needs
+  (`holdUseToRecipe`; a recording beat's added need carries it too).
+- Clone: `use:"clone"` camera need beside the take need (ensureSpeakerNeeds
+  keeps it); the take page's Take A / Take B choice; `/api/take {as:"clone"}`
+  lands Take B through the clip path in its half.
+- New components: `index-reel` (headline pinned, phone example swapping
+  every 0.9 s, the count; host over the person or an opaque page with the
+  numbered list filling in; items with no picture draw an email),
+  `tier-list`, `proof-frame`. Self-placing frames lay out inside the SEEN
+  frame (the rig's overscan) and read the take's face.
+- New recipes: index-reel-host, index-reel-page, ranking-tier-list,
+  reaction-split, clone-dialogue, green-screen-explainer,
+  voiceover-broll-story, yap-one-take. Composed, not measured from one film
+  (the source says so); the index reels follow Marc's two references.
+- Not yet: a reaction source's own sound, a Studio setting picker, a
+  screen-share recipe with a face bubble over the recording.
 
 ## 2026-10-07 — A take's pace (1.15x, pitch kept)
 

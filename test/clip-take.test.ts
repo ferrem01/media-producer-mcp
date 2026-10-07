@@ -45,7 +45,7 @@ describe("the clip need", () => {
     expect(idx).toMatch(/if \(tkClipNeed \|\| \(tkSceneIdx >= 0 && !personCarries\(\(tkPeek\.treatment as any\)\?\.filmGrammar\)\)\) \{\n\s*return attachClipToScene\(/);
     const at = idx.indexOf("async function attachClipToScene(");
     const body = idx.slice(at, idx.indexOf("async function attachTakeToScene("));
-    expect(body).toMatch(/type: "video", position, z_index: 12, data: \{ src: url, object_fit: "cover", start_at: 0, clip: true \}, enter: \{ effect: "cut", at: 0 \}/);
+    expect(body).toMatch(/type: "video", position, z_index: 12, data: \{ src: url, object_fit: "cover", start_at: 0, clip: true, \.\.\.\(kind === "clone" \? \{ clone: true \} : \{\}\) \} as Record<string, unknown>, enter: \{ effect: "cut", at: 0 \}/);
     expect(body).toMatch(/need\.status = "provided"; need\.path = url;/);
     // No reframe to the canvas: the clip keeps its whole picture and the cover fit frames it.
     expect(body).toMatch(/sanitizeTake\(resolveVideoPath\(url, config\.dataDir\), undefined\)/);
@@ -87,7 +87,7 @@ describe("the clip need", () => {
     expect(builder).toMatch(/ANY FILM for a LIVE-ACTION CAMEO/);
     expect(builder).toMatch(/\{type: \\"camera_video\\", use: \\"clip\\"/);
     const recipes = await read("src/core/recipes.ts");
-    expect(recipes).toMatch(/a\.type === "camera_video" && a\.use !== "clip" && a\.status !== "provided"/);
+    expect(recipes).toMatch(/a\.type === "camera_video" && a\.use !== "clip" && a\.use !== "clone" && a\.status !== "provided"/);
     const page = await read("src/take-page.ts");
     expect(page).toMatch(/a0\.type === 'camera_video' && a0\.use === 'clip'/);
     expect(page).toMatch(/This is a clip on the scene, not the speaker/);
@@ -265,7 +265,7 @@ describe("the clip need", () => {
 
   it("the storm and the time card: two full-stage props for the sketch's montage -- self-placing, never phone-zoomed; the storm's cards sit at positive timeline positions", async () => {
     const gen = await read("src/llm/scene-generator.ts");
-    expect(gen).toMatch(/var SELF_PLACING_TYPES = \[[^\]]*"tool-storm", "time-card"\]/);
+    expect(gen).toMatch(/var SELF_PLACING_TYPES = \[[^\]]*"tool-storm", "time-card"/);
     expect(gen).toMatch(/PHONE_ZOOM_EXCLUDE = \[.*"tool-storm", "time-card", "checklist-toggles", "card-fan", "video", "image"\]/);
     const storm = await read("src/components/props/tool-storm.component.html");
     expect(storm).toMatch(/mode === 'fly'/); expect(storm).toMatch(/stage\.classList\.add\('ring'\)/); expect(storm).toMatch(/repeat: -1, immediateRender: false \}, t0 \+ first\)/);

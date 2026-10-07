@@ -2,6 +2,8 @@
   "id": "speaker-one-take-cards",
   "name": "Speaker: one take with cards",
   "grammar": "speaker",
+  "format": "talking-head",
+  "variant": "one take with cards",
   "frames_proven": [
     "9x16"
   ],

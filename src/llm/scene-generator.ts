@@ -418,6 +418,8 @@ var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 // speaker frame: a mock, a stamp, a pill set, a composer, a stat.
 var PHONE_ZOOM_EXCLUDE = ["kinetic-text", "typewriter", "auto-tagged-link", "reel-caption-lane", "text-list", "cursor-performer", "lower-third", "st-speaker-lowerthird", "narration-track", "chapter-kicker", "logo-band", "sticker-rain", "image-swarm", "dot-logo", "search-bar", "color-flood", "filter-grid", "image-graph", "collect-board", "image-scan", "tool-storm", "time-card", "checklist-toggles", "card-fan", "video", "image"];
 // relay v2 (the develop. pieces): full-frame, sized from their own box
+// The creator formats' frames (SPEC-creator-formats.md): sized from the stage.
+PHONE_ZOOM_EXCLUDE.push("proof-frame", "index-reel", "tier-list");
 PHONE_ZOOM_EXCLUDE.push("wordmark-squeeze", "iris", "photo-unfold", "framed-print", "glass-relight", "glass-lockscreen", "desktop-stage", "print-shop", "status-morph", "click-stream", "type-relay", "screen-flash");
 function phoneZoomable(type: string): boolean {
   return PHONE_ZOOM_EXCLUDE.indexOf(type) === -1 && !/^caption-/.test(type);
@@ -625,7 +627,7 @@ var HIGH_OVERLAY_TYPES = ["floating-pills"];
 // ...and the lower third, which anchors itself bottom-left/right with its
 // own safe margins: in a 35%-wide side slot it hung off the frame edge
 // (measured live, proj_438fa7db: "TEST 01 -- PL", clipped).
-var SELF_PLACING_TYPES = ["chapter-kicker", "logo-band", "lower-third", "tool-storm", "time-card"];
+var SELF_PLACING_TYPES = ["chapter-kicker", "logo-band", "lower-third", "tool-storm", "time-card", "proof-frame", "index-reel"];
 /** Ambient full-stage type BEHIND the windows, above the backdrop. */
 var GHOST_TYPES = ["ghost-type"];
 /** Backdrop-cast components: in a WORLD film these are redundant -- the
@@ -1275,6 +1277,9 @@ export function buildAuthoredCompositionScene(
     }
     var data: Record<string, unknown> = { ...c.data };
     var zoom: number | undefined;
+    // A SELF-PLACING FRAME sits beside the face (SPEC-creator-formats.md):
+    // the take's measured face rides on its data.
+    if ((c.type === "proof-frame" || c.type === "index-reel") && data.face === undefined && (draft as any).take_face) data.face = (draft as any).take_face;
     // PHONE SCALE: components size their type in fixed pixels for a wide
     // frame. On a tall speaker frame the same pixels are unreadable
     // (measured: a 17px pill, a 44px strike at 1080 wide, viewed on a

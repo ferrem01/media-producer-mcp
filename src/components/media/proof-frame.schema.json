@@ -1,0 +1,20 @@
+{
+  "type": "proof-frame",
+  "label": "Proof Frame",
+  "category": "media",
+  "description": "The proof placed BESIDE the person instead of over them (SPEC-creator-formats.md): on a TV, a laptop, a phone, a whiteboard, a plated card, or bare on top for a reaction. Self-placing over the whole stage: the frame goes on the side away from the face (or data.side), sized for the canvas, landing on its word. The build casts it from a proof need's use (tv | laptop | phone | whiteboard | card | point | react); a slate stands in it until the file lands.",
+  "data": {
+    "src": { "type": "string", "label": "Image or clip URL (omit: the slate)", "optional": true },
+    "media": { "type": "string", "label": "image (default) | video", "optional": true, "enum": ["image", "video"] },
+    "chrome": { "type": "string", "label": "tv | laptop | phone | whiteboard | card (default) | none", "optional": true, "enum": ["tv", "laptop", "phone", "whiteboard", "card", "none"] },
+    "place": { "type": "string", "label": "side (default: beside the person) | split (on top on a tall frame, a big side box on a wide one -- a reaction's source)", "optional": true, "enum": ["side", "split"] },
+    "side": { "type": "string", "label": "left | right (default: away from the face)", "optional": true, "enum": ["left", "right"] },
+    "title": { "type": "string", "label": "Whiteboard only: a marker title over the pinned proof", "optional": true },
+    "at": { "type": "number", "label": "Seconds (or a word anchor) it lands", "optional": true },
+    "exit_at": { "type": "number", "label": "Seconds (or a word anchor) it leaves", "optional": true },
+    "need": { "type": "string", "label": "Slate: the need it waits for", "optional": true },
+    "text": { "type": "string", "label": "Slate: what it shows", "optional": true },
+    "asset_type": { "type": "string", "label": "Slate: the kind of file needed", "optional": true },
+    "hint": { "type": "string", "label": "Slate: how to provide it", "optional": true }
+  }
+}

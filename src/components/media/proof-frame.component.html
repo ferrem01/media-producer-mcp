@@ -1,0 +1,135 @@
+<template>
+  <div class="pf-root">
+    <div class="pf-box">
+      <div class="pf-title"></div>
+      <div class="pf-shell"><div class="pf-screen"></div></div>
+      <div class="pf-stand"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* PROOF FRAME (SPEC-creator-formats.md): the proof placed beside the
+     person instead of over them -- on a TV, a laptop, a phone, a whiteboard,
+     a plated card, or bare on top for a reaction. It places itself: the
+     wrapper is the whole stage, the frame goes on the side away from the
+     face (or the side the need names), sized for the canvas. Until the file
+     lands it is the slate: the screen says what it waits for. */
+  .pf-root, .pf-root * { max-width: none; box-sizing: border-box; }
+  .pf-root { position: absolute; inset: 0; pointer-events: none; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); }
+  .pf-box { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .pf-shell { position: relative; overflow: hidden; }
+  .pf-screen { position: absolute; inset: 0; overflow: hidden; background: #0f1015; }
+  .pf-screen .pf-img { position: absolute; inset: 0; background-size: cover; background-position: center top; background-repeat: no-repeat; }
+  .pf-screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pf-slate { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6em; padding: 8%; text-align: center; color: #f4f4f7;
+    background: repeating-linear-gradient(135deg, #1b1c24 0 18px, #20212b 18px 36px); }
+  .pf-slate b { font-size: 0.8em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mp-color-primary, #8b8cff); }
+  .pf-slate span { font-size: 1.1em; font-weight: 700; line-height: 1.25; }
+  .pf-slate i { font-style: normal; font-size: 0.7em; opacity: 0.6; }
+  .pf-title { display: none; font-family: 'Permanent Marker', 'Marker Felt', 'Comic Sans MS', cursive; color: #1f3fbf; font-weight: 700; text-align: center; line-height: 1.1; }
+  .pf-stand { display: none; }
+
+  /* TV: a dark bezel on a slim stand */
+  .c-tv .pf-shell { background: #0b0b0e; border-radius: 1.2%; box-shadow: 0 2.5em 5em rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.06); }
+  .c-tv .pf-screen { inset: 2.2% 1.4%; border-radius: 0.4%; }
+  .c-tv .pf-stand { display: block; width: 26%; height: 0.9em; margin-top: 0.15em; background: linear-gradient(#26262c, #121216); border-radius: 0 0 0.6em 0.6em; }
+  /* LAPTOP: a screen in a thin lid over a keyboard deck */
+  .c-laptop .pf-shell { background: #1c1d22; border-radius: 3% 3% 0 0 / 4.5% 4.5% 0 0; box-shadow: 0 2em 4em rgba(0,0,0,0.4); }
+  .c-laptop .pf-screen { inset: 3.4% 2.6% 2.4%; border-radius: 0.6%; }
+  .c-laptop .pf-stand { display: block; width: 116%; height: 0.75em; background: linear-gradient(#d9dbe2, #a9acb6); border-radius: 0 0 1.2em 1.2em; box-shadow: 0 1em 2em rgba(0,0,0,0.3); }
+  /* PHONE: a black rounded slab */
+  .c-phone .pf-shell { background: #0c0c10; border-radius: 13% / 6%; box-shadow: 0 2em 4em rgba(0,0,0,0.4), inset 0 0 0 2px rgba(255,255,255,0.08); }
+  .c-phone .pf-screen { inset: 2.6% 4.4%; border-radius: 10% / 4.8%; }
+  /* WHITEBOARD: the proof pinned to a white board in an aluminium frame */
+  .c-whiteboard .pf-shell { background: #fbfbf8; border: 0.45em solid #c9ccd3; border-radius: 0.5em; box-shadow: 0 1.6em 3.2em rgba(0,0,0,0.28); }
+  .c-whiteboard .pf-screen { inset: 9% 7% 7%; transform: rotate(-1.2deg); box-shadow: 0 0.4em 1em rgba(0,0,0,0.22); background: #fff; }
+  .c-whiteboard .pf-title { display: block; position: absolute; top: 1.5%; left: 0; right: 0; z-index: 2; }
+  /* CARD: a plated card */
+  .c-card .pf-shell { background: var(--mp-color-surface, #ffffff); border-radius: 3.2%; padding: 0; box-shadow: 0 1.6em 3.6em rgba(10,10,30,0.35), 0 0 0 1px rgba(0,0,0,0.05); }
+  .c-card .pf-screen { inset: 2.2%; border-radius: 2.4%; }
+  /* NONE: the picture bare (a reaction's source on top) */
+  .c-none .pf-screen { inset: 0; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.pf-root'), box = q('.pf-box'), shell = q('.pf-shell'), screen = q('.pf-screen'), title = q('.pf-title');
+    var DUR = (ctx && ctx.duration) || 6;
+    var CH = { tv: 1, laptop: 1, phone: 1, whiteboard: 1, card: 1, none: 1 };
+    var chrome = CH[data.chrome] ? data.chrome : 'card';
+    root.classList.add('c-' + chrome);
+    // THE SEEN FRAME: the wrapper may overhang it (the camera rig's
+    // overscan); lay out inside what is seen, in the wrapper's own pixels.
+    var rc = el.getBoundingClientRect(), cw = el.clientWidth || rc.width || 1, sc = rc.width / cw || 1;
+    var OX = Math.max(0, -rc.left) / sc, OY = Math.max(0, -rc.top) / sc;
+    var W = Math.min(cw - OX, (window.innerWidth || cw) / sc), H = Math.min((el.clientHeight || rc.height) - OY, (window.innerHeight || el.clientHeight) / sc);
+    var tall = H > W * 1.05;
+    var face = data.face && typeof data.face === 'object' ? data.face : { cx: 0.5, cy: tall ? 0.42 : 0.45, size: tall ? 0.22 : 0.3 };
+    var side = data.side === 'left' || data.side === 'right' ? data.side : (Number(face.cx) >= 0.5 ? 'left' : 'right');
+    var faceTop = Math.max(0.12, Number(face.cy) - Number(face.size) / 2);
+
+    // THE SCREEN'S SHAPE: the device's own, else the picture's (16:10).
+    var aspect = chrome === 'phone' ? 9 / 19.5 : chrome === 'tv' ? 16 / 9 : chrome === 'laptop' ? 16 / 10 : chrome === 'whiteboard' ? 4 / 3 : (Number(data.aspect) || 16 / 10);
+
+    // THE BOX: the region the frame may use.
+    var bx, by, bw, bh;
+    if (data.place === 'split') {
+      if (tall) { bx = 0; by = 0; bw = W; bh = Math.max(0.34, Math.min(0.5, faceTop - 0.03)) * H; aspect = bw / bh; }
+      else { bw = W * 0.56; bh = H * 0.8; by = H * 0.1; bx = side === 'left' ? W * 0.04 : W - bw - W * 0.04; }
+    } else if (tall) {
+      // A tall frame has no room beside the face: the frame sits above it,
+      // nudged toward its side.
+      bh = Math.max(0.28, faceTop - 0.06) * H; bw = W * 0.86; by = H * 0.05;
+      bx = (W - bw) / 2 + (side === 'left' ? -1 : 1) * W * 0.02;
+    } else {
+      bw = W * (chrome === 'phone' ? 0.26 : 0.42); bh = H * 0.74; by = (H - bh) / 2 - H * 0.02;
+      bx = side === 'left' ? W * 0.05 : W - bw - W * 0.05;
+    }
+    // Room for the stand / deck / title inside the box.
+    var extra = chrome === 'tv' ? 0.08 : chrome === 'laptop' ? 0.06 : 0;
+    var sw = Math.min(bw, (bh * (1 - extra)) * aspect), sh = sw / aspect;
+    if (chrome === 'none' && data.place === 'split') { sw = bw; sh = bh; }
+    box.style.cssText = 'left:' + (OX + bx) + 'px;top:' + (OY + by) + 'px;width:' + bw + 'px;height:' + bh + 'px;font-size:' + Math.max(10, sw / 30).toFixed(1) + 'px';
+    shell.style.width = sw + 'px'; shell.style.height = sh + 'px';
+    if (chrome === 'whiteboard') {
+      title.textContent = String(data.title || '');
+      title.style.fontSize = (sh * 0.065).toFixed(1) + 'px';
+      if (!data.title) screen.style.top = '6%';
+      shell.appendChild(title);
+    }
+
+    // THE CONTENT: the file, or the slate's words.
+    var at = Number(data.at), exitAt = Number(data.exit_at);
+    var timed = isFinite(at) && at > 0;
+    if (!isFinite(at) || at < 0) at = 0.15;
+    if (!isFinite(exitAt) || exitAt <= at) exitAt = DUR;
+    if (data.src && data.media === 'video' && typeof loadVideoForCapture === 'function') {
+      loadVideoForCapture(screen, data.src, { style: 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;', startAt: timed ? -at : 0 });
+    } else if (data.src) {
+      var im = document.createElement('div'); im.className = 'pf-img';
+      im.style.backgroundImage = 'url("' + String(data.src).replace(/"/g, '%22') + '")';
+      if (chrome !== 'none' && data.fit === 'contain') im.style.backgroundSize = 'contain';
+      screen.appendChild(im);
+      var pre = document.createElement('img'); pre.src = String(data.src); pre.alt = '';
+      pre.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0'; screen.appendChild(pre);
+    } else {
+      var sl = document.createElement('div'); sl.className = 'pf-slate';
+      sl.style.fontSize = Math.max(11, Math.min(sw, sh * 1.6) / 22).toFixed(1) + 'px';
+      var b = document.createElement('b'); b.textContent = data.asset_type || 'Proof needed';
+      var sp = document.createElement('span'); sp.textContent = data.text || data.need || '';
+      var it = document.createElement('i'); it.textContent = data.hint || '';
+      sl.appendChild(b); sl.appendChild(sp); sl.appendChild(it);
+      screen.appendChild(sl);
+    }
+
+    // MOTION: it lands on its word with a small settle and leaves on the cut.
+    gsap.set(box, { autoAlpha: 0, scale: 0.92, y: 18, transformOrigin: '50% 60%' });
+    tl.to(box, { autoAlpha: 1, scale: 1, y: 0, duration: 0.38, ease: 'back.out(1.6)' }, at);
+    if (exitAt < DUR - 0.05) tl.to(box, { autoAlpha: 0, scale: 0.96, duration: 0.18, ease: 'power2.in' }, Math.max(at + 0.4, exitAt - 0.18));
+    tl.to({}, { duration: 0.01 }, DUR - 0.01);
+    return tl;
+  }
+</script>

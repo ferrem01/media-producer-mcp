@@ -38,10 +38,21 @@ import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
+import { PERFORMER_SETTINGS, shotForSetting } from "./performer-settings.js";
 import type { ScenePerformance, CastPlan } from "./types.js";
 
 /** Where an actor stands when no shot is given. */
 export const DEFAULT_SHOT = "A selfie-style medium close-up in a bright modern office, the person talking straight to the camera";
+/** THE SHOT A SCENE IS PERFORMED IN when none is asked for: the shot it was
+ *  last given, unless that was only a default (the stock shot or a
+ *  setting's) -- then the scene's setting (SPEC-creator-formats.md), so
+ *  changing the setting changes the shot; a shot written by hand stays. */
+export function sceneShot(asked: string | undefined, prevShot: string | undefined, setting: unknown): string {
+  if (asked !== undefined) return String(asked).trim().slice(0, 1000) || DEFAULT_SHOT;
+  const derived = !prevShot || prevShot === DEFAULT_SHOT || PERFORMER_SETTINGS.some((st) => st.shot === prevShot);
+  const fromSetting = shotForSetting(setting);
+  return (derived ? (fromSetting || prevShot) : prevShot) || DEFAULT_SHOT;
+}
 /** One Seedance call is at most 30 s. */
 const MAX_VOICE_SECONDS = 29;
 
@@ -193,7 +204,7 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the start frame is drawn by GPT Image)");
   const key = `${tenant}/${projectId}/${si}`;
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
-  const shot = String(opts.shot ?? prev?.shot ?? DEFAULT_SHOT).trim().slice(0, 1000) || DEFAULT_SHOT;
+  const shot = sceneShot(opts.shot, prev?.shot, scene.performer?.setting);
   const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
   // The room: the one asked for, else the plan's.
   const where = opts.location !== undefined ? opts.location : (planField(project, si, "location") || "");
@@ -509,7 +520,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   const quality = opts.quality === "final" ? "final" : "draft";
   const key = `${tenant}/${projectId}/${si}`;
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
-  const shot = String(opts.shot ?? prev?.shot ?? DEFAULT_SHOT).trim().slice(0, 1000) || DEFAULT_SHOT;
+  const shot = sceneShot(opts.shot, prev?.shot, scene.performer?.setting);
   const source = opts.voice_source || prev?.voice_source || "script";
   // The location the take is made in (asked for, else the plan's), checked
   // before anything is spent. A final finishing its draft keeps the draft's.
@@ -823,7 +834,7 @@ export async function voicePlanScenes(tenant: string, projectId: string): Promis
     if (!actor?.voice_id) continue;
     const clip = (project.speaker_track?.clips || []).find((c: any) => c.scene_index === si);
     if (clip && (takeForClip(project, clip) as any)?.performed_by) continue;
-    const perf: ScenePerformance = sc.performance || { actor: actor.id, shot: DEFAULT_SHOT, voice_source: "script" };
+    const perf: ScenePerformance = sc.performance || { actor: actor.id, shot: sceneShot(undefined, undefined, (sc as any).performer?.setting), voice_source: "script" };
     let vp = heardVoice({ ...perf, voice_source: perf.voice_source || "script" }, actor.id, String(sc.voiceover_text || ""), actor.voice_id);
     if (!vp) {
       try { await previewSceneVoice(tenant, projectId, si, { actor: actor.id, voice_source: "script" }); } catch (e: any) { console.warn(`  voice the plan: scene ${si + 1}: ${e?.message || e}`); continue; }
@@ -856,7 +867,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
-    const defaults = defaultPrompts(s.performance?.shot || DEFAULT_SHOT, vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location);
+    const defaults = defaultPrompts(sceneShot(undefined, s.performance?.shot, s.performer?.setting), vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;

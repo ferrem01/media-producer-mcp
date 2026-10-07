@@ -1,0 +1,137 @@
+{
+  "id": "green-screen-explainer",
+  "name": "Green screen: explainer",
+  "grammar": "creator-cut",
+  "format": "green-screen",
+  "variant": "explainer",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "walking through a page, a post, a chart or an email",
+    "commentary on something on screen",
+    "teardown"
+  ],
+  "length_s": [
+    20,
+    45
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [
+        "stamp:title"
+      ],
+      "note": "The claim to camera, room behind you."
+    },
+    {
+      "role": "point",
+      "shot": "person+cutaway",
+      "made": "recording",
+      "dur": [
+        4,
+        6,
+        9
+      ],
+      "repeat": [
+        2,
+        5
+      ],
+      "cutaway": {
+        "at": "start",
+        "hold": 1.0,
+        "use": "green",
+        "kind": "screenshot"
+      },
+      "note": "The proof is the ground for the whole beat (a screenshot or recording need with use \"green\"), you cut out over it in the lower part of the frame, talking about the part of it that matters. Say what to look at."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        4
+      ],
+      "enters": [],
+      "note": "The takeaway, back in the room."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 5,
+    "max_hold_s": 9,
+    "wpm": 175,
+    "first_cut_by_s": 2.5,
+    "end_card_s": 0
+  },
+  "layers": {
+    "captions": {
+      "style": "pill",
+      "words": 3,
+      "pos": "chest",
+      "through_cutaways": true
+    },
+    "stamps": {
+      "pos": "top-center",
+      "hold_s": 2
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": true,
+      "duck": true
+    }
+  },
+  "motion": {
+    "elements": {
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      }
+    },
+    "transitions": {
+      "default": "cut"
+    },
+    "camera": {
+      "hook": "fixed",
+      "point": "fixed",
+      "close": "fixed"
+    },
+    "physics": "punchy"
+  },
+  "asks": {
+    "take": "continuous",
+    "screens": "one screenshot or recording per point",
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "close"
+    ],
+    "fixed": [
+      "hook"
+    ],
+    "may_double": [
+      "point"
+    ]
+  },
+  "source": {
+    "film": "composed from the viral formats list (Green Screen); not measured from one film",
+    "length_s": 30,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

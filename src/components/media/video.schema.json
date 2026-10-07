@@ -37,6 +37,12 @@
       "enum": [
         "blur"
       ]
+    },
+    "object_position": {
+      "type": "string",
+      "label": "Object Position",
+      "optional": true,
+      "description": "CSS object-position for a cover crop: which part of the picture stays ('right center' -- a clone take's half of the room)"
     }
   }
 }

@@ -23,6 +23,13 @@
 import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
 import { LIGHT_CHECK_JS } from "./core/light-check.js";
 import { PROMPTER_TIMING_JS, PROMPTER_VIEW_JS } from "./core/prompter.js";
+import { PERFORMER_SETTINGS } from "./core/performer-settings.js";
+import { PROOF_USES } from "./core/proof-placement.js";
+
+/** What the booth tells the person (SPEC-creator-formats.md): the scene's
+ *  setting and the beats' directions, by id. */
+const BOOTH_SETTINGS = JSON.stringify(Object.fromEntries(PERFORMER_SETTINGS.map((s) => [s.id, { name: s.name, booth: s.booth }])));
+const BOOTH_USES = JSON.stringify(Object.fromEntries(PROOF_USES.filter((u) => u.booth).map((u) => [u.id, { name: u.name, booth: u.booth }])));
 
 /** NEXT SCENE from the done screen (Marc, Oct 6: after attaching a scene he
  *  went back to Studio, scrolled the board and picked the next one he had
@@ -232,6 +239,10 @@ ${QUOTIENT_CSS}
     <label><input type="radio" name="bg" value="blur"> Blur</label>
     <label><input type="radio" name="bg" value="alpha"> Alpha</label>
     <span class="hint">(Room keeps what the camera sees. Blur softens it, you stay sharp. Alpha cuts you out so whatever the scene puts behind you is the room. Blur and alpha are made a few minutes after the take lands; the raw take is kept.)</span></div>
+  <div class="toggle" id="cloneChoice" role="radiogroup" aria-label="Which take" style="display:none">Recording:
+    <label><input type="radio" name="takeAs" value="speaker" checked> Take A (you)</label>
+    <label><input type="radio" name="takeAs" value="clone"> Take B (your clone)</label></div>
+  <div id="formatNotes"></div>
   <div class="rec-dock"><button class="btn" id="recordBtn" disabled>Record</button></div>
 </section>
 
@@ -331,6 +342,10 @@ ${QUOTIENT_CSS}
   // The film's scenes (has lines?) and which already have a take: the done
   // screen's Next scene.
   var filmScenes = [], takenScenes = [];
+  // The booth's words for the scene's setting and its beats' directions
+  // (core/performer-settings.ts, core/proof-placement.ts).
+  var SETTINGS = ${BOOTH_SETTINGS}, USES = ${BOOTH_USES};
+  function takingClone() { var r = document.querySelector('input[name="takeAs"]:checked'); return !!r && r.value === 'clone' && $('cloneChoice').style.display !== 'none'; }
 
   function show(id) {
     ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
@@ -432,6 +447,28 @@ ${QUOTIENT_CSS}
           if (bgc && bgc.parentNode) bgc.parentNode.insertBefore(clipNote, bgc);
         }
       } catch (eClip) {}
+      // HOW TO FILM THIS SCENE: the setting's guidance, each beat's
+      // direction (point, prop, react...), and on a clone scene the choice
+      // of which take this is.
+      try {
+        var fNotes = $('formatNotes'); fNotes.innerHTML = '';
+        var sbF = sceneIndex >= 0 ? allScenes[sceneIndex] : null;
+        var lines = [];
+        var stg = sbF && sbF.performer ? SETTINGS[sbF.performer.setting] : null;
+        if (/^yap-/.test(String((p.treatment && p.treatment.recipe) || ''))) lines.push('Yap: the lines are talking points, not a script. Say it your way, in one go; the captions come from what you say.');
+        if (stg) lines.push(stg.name + ': ' + stg.booth);
+        var cloneNeed = null;
+        ((sbF && sbF.assets) || []).forEach(function (a0) {
+          if (!a0) return;
+          if (a0.type === 'camera_video' && a0.use === 'clone') { cloneNeed = a0; return; }
+          var u = USES[a0.use];
+          if (u) lines.push(u.name + ' (' + a0.description + '): ' + u.booth);
+        });
+        if (cloneNeed) lines.push('Clone: ' + USES.clone.booth + ' Take B listens and reacts in silence for the whole scene; its sound is not used.');
+        $('cloneChoice').style.display = cloneNeed ? '' : 'none';
+        if (!cloneNeed) { var rA = document.querySelector('input[name="takeAs"][value="speaker"]'); if (rA) rA.checked = true; }
+        lines.forEach(function (t) { var d = document.createElement('div'); d.className = 'hint'; d.textContent = t; fNotes.appendChild(d); });
+      } catch (eFmt) {}
       var scenes = sceneIndex >= 0 && allScenes[sceneIndex] ? [allScenes[sceneIndex]] : allScenes;
       sceneLabel = sceneIndex >= 0 && allScenes[sceneIndex] ? ('Scene ' + (sceneIndex + 1) + (allScenes[sceneIndex].label ? ' · ' + allScenes[sceneIndex].label : '')) : '';
       cueScenes = scenes;
@@ -847,6 +884,7 @@ ${QUOTIENT_CSS}
           soft_strength: $('softStrength') ? parseFloat($('softStrength').value) : undefined,
           background: (document.querySelector('input[name="bg"]:checked') || {}).value || 'room',
           scene_index: recordAll ? 'all' : (sceneIndex >= 0 ? sceneIndex : undefined),
+          as: takingClone() && !recordAll ? 'clone' : undefined,
           width: capture === 'canvas' ? capW : trackW, height: capture === 'canvas' ? capH : trackH }),
       }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('attach failed (' + r.status + ')')); return j; }); })
         .then(function (j) {

@@ -2,6 +2,8 @@
   "id": "presenter-split-tour",
   "name": "Presenter: split tour",
   "grammar": "creator-cut",
+  "format": "split-screen",
+  "variant": "step tour",
   "frames_proven": [
     "9x16"
   ],

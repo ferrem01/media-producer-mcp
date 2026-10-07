@@ -30,6 +30,9 @@
     // Set object-fit from data or default to cover
     var fit = data.object_fit || 'cover';
     var style = 'width:100%;height:100%;object-fit:' + fit + ';display:block;';
+    // object_position: which part of the picture a cover crop keeps (a clone
+    // take shows its own half of the room: 'right center').
+    if (typeof data.object_position === 'string' && /^[a-z0-9%. ]+$/i.test(data.object_position)) style += 'object-position:' + data.object_position + ';';
 
     var at = Number(data.at);
     var exitAt = Number(data.exit_at);

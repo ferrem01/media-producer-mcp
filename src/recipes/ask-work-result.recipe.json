@@ -2,6 +2,8 @@
   "id": "ask-work-result",
   "name": "Agent demo: ask, work, result",
   "grammar": "canvas-tour",
+  "format": "screen-share",
+  "variant": "agent demo",
   "frames_proven": [
     "1x1"
   ],

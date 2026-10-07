@@ -1,0 +1,136 @@
+{
+  "id": "yap-one-take",
+  "name": "Yap: one take",
+  "grammar": "speaker",
+  "format": "yap",
+  "variant": "one take",
+  "frames_proven": [
+    "9x16"
+  ],
+  "suits": [
+    "a hot take",
+    "a story told off the cuff",
+    "an opinion, no script"
+  ],
+  "length_s": [
+    20,
+    60
+  ],
+  "spine": [
+    {
+      "role": "hook",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        5
+      ],
+      "enters": [
+        "stamp:title"
+      ],
+      "setting": "selfie",
+      "note": "The take in one line; the topic stamped."
+    },
+    {
+      "role": "talk",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        8,
+        15,
+        25
+      ],
+      "repeat": [
+        1,
+        3
+      ],
+      "enters": [],
+      "setting": "selfie",
+      "note": "Talking points, not a script: the lines are what to cover, said your way. No graphics."
+    },
+    {
+      "role": "close",
+      "shot": "person",
+      "made": "take",
+      "dur": [
+        2,
+        3,
+        5
+      ],
+      "enters": [],
+      "setting": "selfie",
+      "note": "Where you land; ask what they think."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 0,
+    "max_hold_s": 60,
+    "wpm": 180,
+    "first_cut_by_s": 0,
+    "end_card_s": 0
+  },
+  "layers": {
+    "captions": {
+      "style": "pill",
+      "words": 3,
+      "pos": "chest",
+      "through_cutaways": true
+    },
+    "stamps": {
+      "pos": "top-center",
+      "hold_s": 2.5
+    },
+    "lower_third": {
+      "on": null
+    },
+    "camera": "fixed",
+    "music": {
+      "bed": false,
+      "duck": false
+    }
+  },
+  "motion": {
+    "elements": {
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.25
+      }
+    },
+    "transitions": {
+      "default": "none"
+    },
+    "camera": {
+      "hook": "fixed",
+      "talk": "fixed",
+      "close": "fixed"
+    },
+    "physics": "calm"
+  },
+  "asks": {
+    "take": "continuous, unscripted (talking points)",
+    "prompter": "points",
+    "screens": 0,
+    "broll": 0,
+    "images": 0
+  },
+  "latitude": {
+    "optional": [
+      "close"
+    ],
+    "fixed": [
+      "hook"
+    ],
+    "may_double": [
+      "talk"
+    ]
+  },
+  "source": {
+    "film": "composed from the viral formats list (Yap); not measured from one film",
+    "length_s": 40,
+    "frame": "9x16",
+    "measured": "2026-10-07"
+  }
+}

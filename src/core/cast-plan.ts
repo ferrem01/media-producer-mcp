@@ -14,6 +14,7 @@
  */
 import type { CastPlan, Project } from "./types.js";
 import type { CastActor } from "./cast.js";
+import { SETTING_IDS, getSetting } from "./performer-settings.js";
 
 export type PlanHow = NonNullable<CastPlan["how"]>;
 export const HOWS: PlanHow[] = ["record", "recast", "generate"];
@@ -40,6 +41,9 @@ export interface ResolvedPlan {
   how: PlanHow;
   engine?: string;
   location?: string;
+  /** Where the person is (core/performer-settings.ts): the booth's guidance,
+   *  a generated performer's shot. Any how. */
+  setting?: string;
   /** No plan anywhere: read off what the scene already plays (a film made
    *  before plans existed reads as what it is, not as stale). */
   inferred?: boolean;
@@ -77,7 +81,8 @@ export function resolvePlan(project: Project, si: number, actors: CastActor[] = 
   const engine = how === "record" ? undefined : (named && ENGINES[how].includes(named) ? named : defaultEngine(how, actorObj));
   const loc = pick("location");
   const location = how === "generate" && engine === "seedance" && loc ? loc : undefined;
-  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), ...(inferred ? { inferred } : {}) };
+  const setting = getSetting(pick("setting"))?.id;
+  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), ...(setting ? { setting } : {}), ...(inferred ? { inferred } : {}) };
 }
 
 /** One field of a scene's plan as written (no defaults, no checks) -- e.g.
@@ -88,10 +93,12 @@ export function planField<K extends keyof CastPlan>(project: Project, si: number
 
 /** One line for a board card: "Dana · Generate · Seedance · Loft lounge". */
 export function planLine(plan: ResolvedPlan, actors: CastActor[] = [], locations: Array<{ id: string; name: string }> = []): string {
-  if (plan.how === "record") return "Me · Record";
+  const where = plan.setting ? getSetting(plan.setting)?.name : undefined;
+  if (plan.how === "record") return where ? `Me · Record · ${where}` : "Me · Record";
   const who = actors.find((a) => a.id === plan.actor)?.name || plan.actor || "?";
   const parts = [who, plan.how === "recast" ? "Recast" : "Generate", ENGINE_LABEL[plan.engine || ""] || plan.engine || ""];
   if (plan.location) parts.push(locations.find((l) => l.id === plan.location)?.name || plan.location);
+  if (where) parts.push(where);
   return parts.filter(Boolean).join(" · ");
 }
 
@@ -151,6 +158,12 @@ export function cleanPlan(input: Record<string, unknown>, actors: CastActor[], l
     const l = input.location === null || input.location === "none" ? null : String(input.location);
     if (l && !locations.some((x) => x.id === l)) throw new Error(`No location "${l}"`);
     out.location = l;
+  }
+  if (input.setting !== undefined) {
+    // "" or null: no setting (the default shot).
+    const st = input.setting === null ? "" : String(input.setting).trim().toLowerCase();
+    if (st && !getSetting(st)) throw new Error(`setting must be one of ${SETTING_IDS.join(", ")}`);
+    out.setting = st;
   }
   return out;
 }
