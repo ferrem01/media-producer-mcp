@@ -1231,6 +1231,7 @@ ${QUOTIENT_CSS}
   .pf-place.none small { display: block; font-size: 10px; color: var(--content-tertiary, #888); }
   .pf-place.add { border-style: dashed; }
   .pf-newplace { margin: 8px 0 0; padding: 10px; border: 1px dashed var(--border-secondary); border-radius: 8px; }
+  .pf-others { align-items: center; }
   .pf-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
   .pf-shotview { display: flex; gap: 12px; align-items: flex-start; margin-top: 8px; }
   .pf-shotbig { width: 180px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; background: #111; flex: 0 0 180px; }
@@ -11741,6 +11742,24 @@ ${QUOTIENT_CSS}
       var vendor = kind === 'recast' ? pfEngLabel(kind, eng) : 'Seedance';
       if (kind === 'recast') h += '<div class="pf-row" style="justify-content:flex-end;margin:-4px 0 4px"><button class="np-btn" data-pf-go="rcamera">' + (dr.rcamera ? '&#10003; ' : '') + 'Keep my camera instead</button></div>';
       if (kind === 'recast' && dr.rcamera) return h + '<div class="np-hint">Your recording’s own camera and room: nothing is drawn, and ' + escHtml(vendor) + ' keeps your framing.</div>';
+      // SAME AS ANOTHER SCENE (Marc, Oct 7: "in scene two, I want it to look
+      // the same as scene one"): the start pictures this actor already has in
+      // the film's other scenes, one click to use; or the last frame of the
+      // scene before, so this one picks up where it ended.
+      var others = [], seenU = {};
+      (pf.data.scenes || []).forEach(function(o, j) {
+        if (j === si) return;
+        var op = o.performance || {};
+        [op.actor === a.id ? op.frame : '', o.cast === a.id ? o.recast_start_frame : ''].forEach(function(u) {
+          if (u && !seenU[u]) { seenU[u] = 1; others.push({ url: u, scene: j }); }
+        });
+      });
+      if (others.length || si > 0) {
+        h += '<div class="pf-sub">Same as another scene</div><div class="pf-frames pf-others">' + others.map(function(o) {
+          return '<div class="pf-frame' + (o.url === fr ? ' sel' : '') + '" data-pf-adopt="' + escAttr(o.url) + '" title="Use scene ' + (o.scene + 1) + '’s start picture: the same place and framing"><img src="' + escAttr(withToken(o.url)) + '" alt=""><small>Scene ' + (o.scene + 1) + '</small></div>';
+        }).join('') + (si > 0 ? '<button class="np-btn" data-pf-go="continue"' + (drawing ? ' disabled' : '') + '>Last frame of scene ' + si + '</button>' : '') + '</div>'
+          + '<div class="np-hint" style="margin-top:4px">' + (others.length ? 'One click and this scene starts from the same picture: nothing is drawn.' : 'No other scene has a start picture of ' + escHtml(a.name) + ' yet.') + (si > 0 ? ' Last frame: picks up exactly where scene ' + si + ' ends.' : '') + '</div>';
+      }
       h += '<div class="pf-sub">1 &#183; Where</div><div class="pf-places">';
       h += '<button class="pf-place none' + (!where ? ' sel' : '') + '" data-pf-place=""><span>No set place<small>the words say where</small></span></button>';
       locs.forEach(function(l) {
@@ -11764,7 +11783,7 @@ ${QUOTIENT_CSS}
       var waitPlace = place && !place.image;
       h += '<div class="pf-acts"><button class="np-btn' + (fr ? '' : ' primary') + '" data-pf-go="' + (kind === 'recast' ? 'rdraw' : 'frame') + '"' + (drawing || waitPlace ? ' disabled' : '') + '>' + (drawing ? 'Drawing…' : (fr ? 'Draw it again' : 'Draw ' + escHtml(a.name) + ' here')) + '</button>'
         + '<small>' + (waitPlace ? 'the place is still being drawn' : 'GPT Image, a few cents, ~30 s &#183; ' + escHtml(vendor) + ' runs only at the last step') + '</small>'
-        + (kind !== 'recast' && si > 0 ? '<button class="np-btn" data-pf-go="continue"' + (drawing ? ' disabled' : '') + '>Start from scene ' + si + '’s last frame</button>' : '') + '</div>';
+        + '</div>';
       if (drawing) h += '<div class="np-armed"><span></span>Drawing ' + escHtml(a.name) + (place ? ' in ' + escHtml(place.name) : '') + '&#8230;</div>';
       if (fr) {
         h += '<div class="pf-shotview"><img class="pf-shotbig" src="' + escAttr(withToken(fr)) + '" alt=""><div>'
@@ -11917,7 +11936,7 @@ ${QUOTIENT_CSS}
       if (k === 'vgender' || k === 'vuse') { d[k] = t.value; pfLoadVoices(project, panel, kind, si, true); return; }
     };
     panel.onclick = function(ev) {
-      var t = ev.target.closest ? ev.target.closest('[data-pf-go],[data-pf-pick],[data-pf-vtab],[data-pf-vplay],[data-pf-vhear],[data-pf-vuse],[data-pf-vadd],[data-pf-actor],[data-pf-eng],[data-pf-step],[data-pf-stepto],[data-pf-preset],[data-pf-place],[data-pf-placeex],[data-pf-stock]') : null;
+      var t = ev.target.closest ? ev.target.closest('[data-pf-go],[data-pf-pick],[data-pf-vtab],[data-pf-vplay],[data-pf-vhear],[data-pf-vuse],[data-pf-vadd],[data-pf-actor],[data-pf-eng],[data-pf-step],[data-pf-stepto],[data-pf-preset],[data-pf-place],[data-pf-placeex],[data-pf-stock],[data-pf-adopt]') : null;
       if (!t) return;
       var d = dr(), s = pf.data.scenes[si] || {}, perf = s.performance || {};
       var actor = d.actor || (s.plan || {}).actor || perf.actor;
@@ -11944,6 +11963,10 @@ ${QUOTIENT_CSS}
         if (ps) { if (kind === 'recast') { d.rshot = ps[1]; delete d.rcamera; } else d.shot = ps[1]; pfRender(project, panel, kind, si); }
         return;
       }
+      // Another scene's start picture: its place and words come with it, so the
+      // shot step reads as answered (no redraw asked for).
+      var takeOn = function(r) { if (!r) return; d.loc = r.location || ''; if (kind === 'recast') { d.rshot = r.shot || ''; delete d.rcamera; } else d.shot = r.shot || ''; pfRender(project, panel, kind, si); };
+      if (t.hasAttribute('data-pf-adopt')) { pfPost(project, panel, kind, si, { action: 'pick', url: t.getAttribute('data-pf-adopt'), actor: actor }, 'Using that start picture.').then(takeOn); return; }
       // WHERE: a place you can see. A stock one joins the library when chosen.
       if (t.hasAttribute('data-pf-place')) { d.loc = t.getAttribute('data-pf-place'); pfRender(project, panel, kind, si); return; }
       if (t.hasAttribute('data-pf-placeex')) { var pe = PF_PLACE_EXAMPLES[Number(t.getAttribute('data-pf-placeex'))]; if (pe) d.place_prompt = pe[1]; pfRender(project, panel, kind, si); return; }
@@ -12032,7 +12055,7 @@ ${QUOTIENT_CSS}
       }
       if (go === 'mine') { pfPost(project, panel, kind, si, { action: 'recording' }, 'Your recording is back on scene ' + (si + 1) + '.').then(function() { loadProject(project.project_id); }); return; }
       if (go === 'frame') { pfPost(project, panel, kind, si, { action: 'frame', actor: actor, shot: shot, location: pfWhere(d, s.plan || {}, perf) }, 'Drawing the first frame…'); return; }
-      if (go === 'continue') { pfPost(project, panel, kind, si, { action: 'continue', actor: actor, from_scene: si - 1, shot: shot }, 'Taking scene ' + si + '’s last frame…'); return; }
+      if (go === 'continue') { pfPost(project, panel, kind, si, { action: 'continue', actor: actor, from_scene: si - 1, shot: kind === 'recast' ? (d.rshot != null ? d.rshot : undefined) : shot }, 'Taking scene ' + si + '’s last frame…').then(takeOn); return; }
       if (go === 'hear') {
         pfSay(panel, 'Making the voice…');
         api('POST', '/scene-performance/' + pfT() + '/' + pfP(project) + '/' + si, { action: 'voice', actor: actor, voice_source: d.voice_source || undefined, delivery: d.delivery != null ? d.delivery : undefined }).then(function(r) {

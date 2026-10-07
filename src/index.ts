@@ -3160,7 +3160,7 @@ Rules:
               jsonResponse(res, 200, await continueSceneFrom(spTenant, spProject, si, { actor: str(body.actor), from_scene: Number(body.from_scene ?? si - 1), shot: str(body.shot) }));
               return;
             }
-            if (body.action === "pick") { jsonResponse(res, 200, await pickSceneFrame(spTenant, spProject, si, String(body.url || ""))); return; }
+            if (body.action === "pick") { jsonResponse(res, 200, await pickSceneFrame(spTenant, spProject, si, String(body.url || ""), str(body.actor))); return; }
             if (body.action === "location") {
               const { setSceneLocation } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await setSceneLocation(spTenant, spProject, si, String(body.location || "")));
