@@ -32,6 +32,12 @@ const PAGE_CSS = `
   .card .pic { position: relative; background: #111; aspect-ratio: 4 / 5; }
   .card.wide .pic { aspect-ratio: 4 / 3; }
   .card .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .more-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+  .more-item { position: relative; width: 84px; display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: #666; }
+  .more-item img { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
+  .more-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .more-item button { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.6); color: #fff; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; padding: 0; font-size: 14px; }
+  .more-list small { color: #888; font-size: 12px; }
   .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
   .ph-item { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 12px; color: #666; }
   .ph-item img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
@@ -205,19 +211,33 @@ export function getCastHtml(): string {
   // PHOTOS & MODEL SHEET: more photos of the person (up to five beside the
   // portrait), a sheet drawn from them, approved before anything uses it.
   var panelTimer = null;
+  // Photos one by one: one that fails (a HEIC the server can't read) is
+  // named, and the rest still go in.
+  function addPhotos(base, files) {
+    var out = { added: 0, failed: [] };
+    return files.reduce(function (p, f) {
+      return p.then(function () {
+        return upload(f, 'cast-photo').then(function (rel) { return railApi(base + '/photos', { method: 'POST', body: JSON.stringify({ image: rel }) }); })
+          .then(function () { out.added++; }, function (e) { out.failed.push(f.name + ': ' + (e.message || String(e))); });
+      });
+    }, Promise.resolve()).then(function () { return out; });
+  }
   function photosPanel(id) {
     var old = document.getElementById('photosPanel'); if (old) old.remove();
     if (panelTimer) { clearTimeout(panelTimer); panelTimer = null; }
     var a = actors.filter(function (x) { return x.id === id; })[0];
     if (!a) return;
     var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
-    var bust = '&v=' + Date.now();
+    // A fresh copy each time the panel opens. withParam, not '&v=': with no
+    // token in the page's address (a signed-in session) withToken adds no '?',
+    // and '/portrait&v=1' is another path -- every picture here was blank.
+    var v = Date.now(), pic = function (u) { return withParam(withToken(u), 'v', v); };
     var box = document.createElement('div'); box.id = 'photosPanel';
     box.setAttribute('style', 'position:fixed;inset:0;z-index:50;background:rgba(10,10,12,0.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;');
     var photos = a.photos || [];
     var drawing = sheetDrawing(a);
-    var thumbs = '<div class="ph-item"><img alt="" src="' + railEsc(withToken(base + '/portrait') + bust) + '"><span>Portrait</span></div>'
-      + photos.map(function (p, i) { return '<div class="ph-item"><img alt="" src="' + railEsc(withToken(base + '/photos/' + i) + bust) + '"><button class="quiet ph-del" data-i="' + i + '" title="Remove this photo">Remove</button></div>'; }).join('');
+    var thumbs = '<div class="ph-item"><img alt="" src="' + railEsc(pic(base + '/portrait')) + '"><span>Portrait</span></div>'
+      + photos.map(function (p, i) { return '<div class="ph-item"><img alt="" src="' + railEsc(pic(base + '/photos/' + i)) + '"><button class="quiet ph-del" data-i="' + i + '" title="Remove this photo">Remove</button></div>'; }).join('');
     box.innerHTML = '<div class="box" style="max-width:860px;width:100%;margin:0;background:#fff">'
       + '<div class="lead" style="display:flex;justify-content:space-between;align-items:center"><span></span><button class="quiet" id="phClose">Close</button></div>'
       + '<p class="sub" style="margin:0 0 10px">The more angles the vendors see, the more it stays you when you turn, look down or laugh. Add up to 5 photos beside the portrait (front, three-quarter, side, smiling; good light), then draw a model sheet from them. You approve it before anything uses it.</p>'
@@ -225,8 +245,8 @@ export function getCastHtml(): string {
       + (photos.length < 5 ? '<div class="field" style="margin-top:10px"><span>Add photos</span><input type="file" id="phAdd" accept="image/*" multiple></div>' : '<p class="sub">Five photos: remove one to add another.</p>')
       + '<div class="row" style="margin-top:12px;gap:8px;align-items:center"><button class="btn primary" id="phMake"' + (drawing ? ' disabled' : '') + '>' + (drawing ? 'Drawing the sheet…' : a.sheet ? 'Draw a new model sheet' : 'Make model sheet') + '</button><span class="sub" id="phNote" style="margin:0"></span></div>'
       + (a.sheet_job && a.sheet_job.status === 'failed' ? '<p class="sub err" style="color:#b42318"></p>' : '')
-      + (a.sheet_draft ? '<div style="margin-top:14px"><div class="lead">The new sheet: use it?</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(withToken(base + '/sheet-draft') + bust) + '"><div class="row" style="margin-top:8px;gap:8px"><button class="btn primary" id="phUse">Use this sheet</button><button class="quiet" id="phDiscard">Discard</button></div></div>' : '')
-      + (a.sheet ? '<div style="margin-top:14px"><div class="lead">The sheet in use</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(withToken(base + '/sheet') + bust) + '"></div>' : '')
+      + (a.sheet_draft ? '<div style="margin-top:14px"><div class="lead">The new sheet: use it?</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(pic(base + '/sheet-draft')) + '"><div class="row" style="margin-top:8px;gap:8px"><button class="btn primary" id="phUse">Use this sheet</button><button class="quiet" id="phDiscard">Discard</button></div></div>' : '')
+      + (a.sheet ? '<div style="margin-top:14px"><div class="lead">The sheet in use</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(pic(base + '/sheet')) + '"></div>' : '')
       + '</div>';
     box.querySelector('.lead span').textContent = a.name + ': photos & model sheet';
     var errP = box.querySelector('.err'); if (errP) errP.textContent = 'The last sheet could not be drawn: ' + (a.sheet_job.error || 'unknown error');
@@ -246,9 +266,7 @@ export function getCastHtml(): string {
       var files = Array.prototype.slice.call(inp.files || [], 0, 5 - photos.length);
       if (!files.length) return;
       box.querySelector('#phNote').textContent = 'Uploading ' + files.length + ' photo' + (files.length === 1 ? '' : 's') + '…';
-      files.reduce(function (p, f) {
-        return p.then(function () { return upload(f, 'cast-photo').then(function (rel) { return railApi(base + '/photos', { method: 'POST', body: JSON.stringify({ image: rel }) }); }); });
-      }, Promise.resolve()).then(function () { return reload('Photos added.'); }).catch(fail);
+      addPhotos(base, files).then(function (r) { return reload(r.failed.length ? r.added + ' added; not added: ' + r.failed.join(' \u00b7 ') : 'Photos added.'); }).catch(fail);
     };
     box.querySelector('#phMake').onclick = function () {
       railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'make' }) }).then(function () { return reload('Drawing ' + a.name + "'s model sheet (about a minute)…"); }).catch(fail);
@@ -306,9 +324,31 @@ export function getCastHtml(): string {
             + '<div class="field"><span>Model sheet (optional, recommended): the same person from several angles</span><input type="file" id="aSheet" accept="image/*"></div>'
             + '<p class="sub" style="margin:0 0 10px">A generated person is nobody real: no consent needed. Give them a voice once added.</p>'
           : '<div class="field"><span>Photo: clear, front-facing</span><input type="file" id="aPhoto" accept="image/*"></div>'
-            + '<div class="field"><span>More photos (optional, up to 5): other angles and light. A model sheet is drawn from all of them, for you to approve.</span><input type="file" id="aMore" accept="image/*" multiple></div>'
+            + '<div class="field"><span>More photos (optional, up to 5): other angles and light. A model sheet is drawn from all of them, for you to approve.</span><input type="file" id="aMore" accept="image/*" multiple><div id="aMoreList" class="more-list"></div></div>'
             + '<label class="field" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="aConsent"> This is me, or a person who agreed to be cast.</label>')
         + '<button class="btn primary" id="aAdd">Add</button>';
+      // MORE PHOTOS ADD UP (Marc: "it lets you upload one photo"): a file
+      // picker replaces its selection on every pick, so picking one at a time
+      // on a phone kept only the last. Each pick joins the list; x takes one out.
+      var moreFiles = [];
+      var drawMore = function () {
+        var list = $('aMoreList'); if (!list) return;
+        list.innerHTML = moreFiles.map(function (f, i) {
+          return '<div class="more-item"><img alt="" src="' + railEsc(f.url) + '"><span>' + railEsc(f.file.name) + '</span><button type="button" class="quiet" data-more="' + i + '" title="Take it out">&times;</button></div>';
+        }).join('') + (moreFiles.length ? '<small>' + moreFiles.length + ' of 5' + (moreFiles.length < 5 ? ': pick again to add more' : '') + '</small>' : '');
+        Array.prototype.forEach.call(list.querySelectorAll('[data-more]'), function (b) {
+          b.onclick = function () { var k = Number(b.getAttribute('data-more')); URL.revokeObjectURL(moreFiles[k].url); moreFiles.splice(k, 1); drawMore(); };
+        });
+        if ($('aMore')) $('aMore').disabled = moreFiles.length >= 5;
+      };
+      if ($('aMore')) $('aMore').onchange = function () {
+        Array.prototype.forEach.call(this.files || [], function (file) {
+          if (moreFiles.length >= 5 || moreFiles.some(function (m) { return m.file.name === file.name && m.file.size === file.size; })) return;
+          moreFiles.push({ file: file, url: URL.createObjectURL(file) });
+        });
+        this.value = '';
+        drawMore();
+      };
       $('aAdd').onclick = function () {
         var f = $('aPhoto').files[0], sheet = $('aSheet') && $('aSheet').files[0];
         var name = $('aName').value.trim() || (f ? f.name.replace(/[.][^.]+$/, '') : '');
@@ -320,18 +360,16 @@ export function getCastHtml(): string {
             var body = { name: name, image: rel };
             if (t === 'gen') body.fictional = true; else body.consent = true;
             if (sheetRel) body.sheet = sheetRel;
-            var more = $('aMore') ? Array.prototype.slice.call($('aMore').files || [], 0, 5) : [];
+            var more = moreFiles.map(function (m) { return m.file; }).slice(0, 5);
             if (!more.length) return add(body, name);
             // A real person with more photos: add them, then draw the sheet
             // (it waits for approval under Photos & sheet).
             say('Adding ' + name + '…');
             return railApi('/api/cast/' + enc(tenant), { method: 'POST', body: JSON.stringify(body) }).then(function (a) {
               var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
-              return more.reduce(function (p, f) {
-                return p.then(function () { return upload(f, 'cast-photo').then(function (rel2) { return railApi(base + '/photos', { method: 'POST', body: JSON.stringify({ image: rel2 }) }); }); });
-              }, Promise.resolve()).then(function () {
-                return railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'make' }) }).catch(function () {});
-              }).then(function () { say(a.name + ' is in the cast. Their model sheet is drawing: approve it under Photos & sheet.', 'ok'); load(); });
+              return addPhotos(base, more).then(function (r) {
+                return railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'make' }) }).catch(function () {}).then(function () { return r; });
+              }).then(function (r) { say(a.name + ' is in the cast' + (r.failed.length ? ' (not added: ' + r.failed.join(' \u00b7 ') + ')' : '') + '. Their model sheet is drawing: approve it under Photos & sheet.', r.failed.length ? 'err' : 'ok'); load(); });
             });
           });
         }).catch(function (e) { say(e.message || String(e), 'err'); });

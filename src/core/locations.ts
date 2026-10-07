@@ -123,7 +123,9 @@ async function shapeOfFile(file: string): Promise<LocationShape> {
 async function savePlate(tenant: string, id: string, src: string): Promise<string> {
   await fs.mkdir(dir(tenant), { recursive: true });
   const rel = path.join("locations", `${id}.jpg`);
-  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-frames:v", "1", "-vf", "scale='min(1536,iw)':-2", "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+  const { uprightInput } = await import("./image-orient.js");
+  const up = await uprightInput(src);
+  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...up.pre, "-i", src, "-frames:v", "1", "-vf", up.vf("scale='min(1536,iw)':-2"), "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
   return rel;
 }
 
