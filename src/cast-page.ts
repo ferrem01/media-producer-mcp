@@ -32,6 +32,12 @@ const PAGE_CSS = `
   .card .pic { position: relative; background: #111; aspect-ratio: 4 / 5; }
   .card.wide .pic { aspect-ratio: 4 / 3; }
   .card .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .more-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+  .more-item { position: relative; width: 84px; display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: #666; }
+  .more-item img { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
+  .more-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .more-item button { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.6); color: #fff; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; padding: 0; font-size: 14px; }
+  .more-list small { color: #888; font-size: 12px; }
   .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
   .ph-item { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 12px; color: #666; }
   .ph-item img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
@@ -318,9 +324,31 @@ export function getCastHtml(): string {
             + '<div class="field"><span>Model sheet (optional, recommended): the same person from several angles</span><input type="file" id="aSheet" accept="image/*"></div>'
             + '<p class="sub" style="margin:0 0 10px">A generated person is nobody real: no consent needed. Give them a voice once added.</p>'
           : '<div class="field"><span>Photo: clear, front-facing</span><input type="file" id="aPhoto" accept="image/*"></div>'
-            + '<div class="field"><span>More photos (optional, up to 5): other angles and light. A model sheet is drawn from all of them, for you to approve.</span><input type="file" id="aMore" accept="image/*" multiple></div>'
+            + '<div class="field"><span>More photos (optional, up to 5): other angles and light. A model sheet is drawn from all of them, for you to approve.</span><input type="file" id="aMore" accept="image/*" multiple><div id="aMoreList" class="more-list"></div></div>'
             + '<label class="field" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="aConsent"> This is me, or a person who agreed to be cast.</label>')
         + '<button class="btn primary" id="aAdd">Add</button>';
+      // MORE PHOTOS ADD UP (Marc: "it lets you upload one photo"): a file
+      // picker replaces its selection on every pick, so picking one at a time
+      // on a phone kept only the last. Each pick joins the list; x takes one out.
+      var moreFiles = [];
+      var drawMore = function () {
+        var list = $('aMoreList'); if (!list) return;
+        list.innerHTML = moreFiles.map(function (f, i) {
+          return '<div class="more-item"><img alt="" src="' + railEsc(f.url) + '"><span>' + railEsc(f.file.name) + '</span><button type="button" class="quiet" data-more="' + i + '" title="Take it out">&times;</button></div>';
+        }).join('') + (moreFiles.length ? '<small>' + moreFiles.length + ' of 5' + (moreFiles.length < 5 ? ': pick again to add more' : '') + '</small>' : '');
+        Array.prototype.forEach.call(list.querySelectorAll('[data-more]'), function (b) {
+          b.onclick = function () { var k = Number(b.getAttribute('data-more')); URL.revokeObjectURL(moreFiles[k].url); moreFiles.splice(k, 1); drawMore(); };
+        });
+        if ($('aMore')) $('aMore').disabled = moreFiles.length >= 5;
+      };
+      if ($('aMore')) $('aMore').onchange = function () {
+        Array.prototype.forEach.call(this.files || [], function (file) {
+          if (moreFiles.length >= 5 || moreFiles.some(function (m) { return m.file.name === file.name && m.file.size === file.size; })) return;
+          moreFiles.push({ file: file, url: URL.createObjectURL(file) });
+        });
+        this.value = '';
+        drawMore();
+      };
       $('aAdd').onclick = function () {
         var f = $('aPhoto').files[0], sheet = $('aSheet') && $('aSheet').files[0];
         var name = $('aName').value.trim() || (f ? f.name.replace(/[.][^.]+$/, '') : '');
@@ -332,7 +360,7 @@ export function getCastHtml(): string {
             var body = { name: name, image: rel };
             if (t === 'gen') body.fictional = true; else body.consent = true;
             if (sheetRel) body.sheet = sheetRel;
-            var more = $('aMore') ? Array.prototype.slice.call($('aMore').files || [], 0, 5) : [];
+            var more = moreFiles.map(function (m) { return m.file; }).slice(0, 5);
             if (!more.length) return add(body, name);
             // A real person with more photos: add them, then draw the sheet
             // (it waits for approval under Photos & sheet).

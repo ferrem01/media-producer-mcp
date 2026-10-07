@@ -19,6 +19,13 @@ describe("the Cast and Locations pages", () => {
     expect(h).toContain("'/api/upload-asset/' + enc(tenant) + '/library?name='");
     expect(h).toContain("railApi('/api/heygen-avatars/' + enc(tenant) + '?looks=1')");
     expect(h).toContain("patch(a, { voice_id: id, voice_name: v ? v.name : '' }");
+    // More photos add up pick by pick (a picker replaces its selection), up to five, x takes one out.
+    expect(h).toContain("var more = moreFiles.map(function (m) { return m.file; }).slice(0, 5);");
+    expect(h).toContain("this.value = '';");
+    expect(h).toContain('<div id="aMoreList" class="more-list"></div>');
+    // The Photos & sheet panel's pictures load signed in with no token in the address.
+    expect(h).toContain("pic = function (u) { return withParam(withToken(u), 'v', v); };");
+    expect(h).not.toContain("+ bust)");
   });
   it("HeyGen presenters browse by Women / Men and page with ?page=, never ?token= (the login token's name)", async () => {
     // Oct 6: the presenters' filter went with the old Cast dialog (#1105), and
