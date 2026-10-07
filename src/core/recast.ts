@@ -6,8 +6,8 @@
  * HeyGen hears the voice and draws the whole person in one call (the actor
  * tests' winner); Kling and Runway map the recording's motion onto the
  * actor's portrait, a call per stretch of up to maxSeconds cut at the take's
- * pauses. The voice is converted to the actor's voice when one is asked
- * for; speech-to-speech keeps every word where it was, so captions,
+ * pauses. The recording's voice is kept unless another is asked for (the
+ * actor's, or any ElevenLabs voice); speech-to-speech keeps every word where it was, so captions,
  * stickers, word anchors and cuts still land. performTakeFile is the one
  * path. (Wan 2.2 Animate was the first route: chunked redraws whose seams
  * never held -- removed.)
@@ -367,8 +367,9 @@ function madeBy(entry: any): string {
 /** Recast every take the speaker track plays as the actor (or, with null,
  *  put the recording's own person back). `performer` picks the vendor
  *  (default: HeyGen for a HeyGen look, else the best video-driven vendor
- *  with a key); `voice_id` an ElevenLabs voice the delivery is converted to
- *  ("mine" keeps the recording's voice; omitted, the actor's own voice).
+ *  with a key); `voice_id` the voice it speaks in: omitted or "mine" keeps
+ *  the recording's, "actor" converts to the actor's ElevenLabs voice, any
+ *  other id to that ElevenLabs voice.
  *  Returns at once; the work runs on. */
 /** The actor's model sheet, for the vendors that take more than one image
  *  (Genjutsu); the others draw from the portrait alone. */
@@ -430,7 +431,10 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
   const performer = opts.performer ? getPerformer(opts.performer) : defaultPerformer(actor);
   if (!performer) throw new Error(`No performer "${opts.performer}" (${PERFORMERS.map((p) => p.id).join(", ")})`);
   if (!process.env[performer.key]) throw new Error(`${performer.label} is not set up on this server (${performer.key})`);
-  const voiceId = opts.voice_id === undefined ? actor.voice_id : opts.voice_id === "mine" ? undefined : opts.voice_id || undefined;
+  // The recording's own voice unless another is asked for: a recast swaps the
+  // person, not the voice (Marc: Studio's recast gave no way to keep it).
+  // "actor" converts to the actor's ElevenLabs voice; an id to that voice.
+  const voiceId = opts.voice_id === "actor" ? actor.voice_id || undefined : !opts.voice_id || opts.voice_id === "mine" ? undefined : opts.voice_id;
   if (voiceId && !process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
   st.performer = performer.id;
   st.minutes_per_30s = performer.minutesPer30s;

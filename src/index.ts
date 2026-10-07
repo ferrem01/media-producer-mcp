@@ -2933,8 +2933,8 @@ Rules:
       // POST /api/recast/{tenant}/{project} {actor: id | null, performer?, voice_id?, fresh?, scenes?: [0-based], frame?}
       // POST /api/recast/{tenant}/{project} {action: "frame", frame: "tight"|"medium"|"wide", scenes?}
       //      a made recast refitted from the kept original (a landscape look in a portrait film: how far back it sits)
-      //      null puts the recording's person back; performer picks the vendor; voice_id an
-      //      ElevenLabs voice ("mine" keeps the recording's); fresh makes it again
+      //      null puts the recording's person back; performer picks the vendor; voice_id the
+      //      voice (omitted / "mine" keeps the recording's, "actor" the actor's); fresh makes it again
       // GET  /api/recast/{tenant}/{project}                       progress and who plays
       const recastApi = urlPath.match(/^\/api\/recast\/([^/]+)\/([^/]+)$/);
       if (recastApi) {
