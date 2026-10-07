@@ -11550,6 +11550,16 @@ ${QUOTIENT_CSS}
         return engs.length === 1 ? '<span class="pf-eng"><b>' + e[1] + '</b> <small>' + e[2] + '</small></span>'
           : '<label class="pf-eng' + (p.available ? '' : ' dis') + '"><input type="radio" name="pf-eng-' + si + '" data-pf="engine" value="' + e[0] + '"' + (e[0] === eng ? ' checked' : '') + (p.available ? '' : ' disabled') + '> <b>' + e[1] + '</b> <small>' + e[2] + (p.available ? '' : ' &#183; not set up') + '</small></label>';
       }).join('') + '</div></div>';
+      // WHERE THE SHOT COMES FROM differs by vendor (Marc, Oct 7: "2 different
+      // pipelines with 2 different abilities"): HeyGen's look is its own room,
+      // Higgsfield draws the actor in the shot written here, the others keep
+      // the recording's camera.
+      var pinfo = (d.performers || []).filter(function(x) { return x.id === eng; })[0] || {};
+      if (pinfo.takesShot) {
+        var rshot = dr.rshot != null ? dr.rshot : (s.recast_shot || s.setting_shot || '');
+        h += '<div class="pf-row top"><label>The shot</label><div style="flex:1;min-width:0"><textarea data-pf="rshot" rows="2" maxlength="1000" style="' + ta + '" placeholder="Seated at a table in a bright office, a medium-wide shot, upper body and the tabletop in frame">' + escHtml(rshot) + '</textarea>'
+          + '<div class="np-hint">Where ' + escHtml(a ? a.name : 'the actor') + ' is and how far back the camera sits: a picture of them there is drawn first, and only your performance (lips, head, hands, timing) comes from your recording. Empty: your recording’s own camera and room.</div></div></div>';
+      } else if (pinfo.framedBy) h += '<div class="pf-row"><label>Framing</label><span class="pf-eng"><small>' + escHtml(pinfo.framedBy) + '</small></span></div>';
       // The voice: the recording's own unless the actor's is picked (a recast
       // swaps the person, not the voice -- the server keeps it by default too).
       var rv = dr.rvoice === 'actor' && a && a.voice_id ? 'actor' : 'mine';
@@ -11660,7 +11670,7 @@ ${QUOTIENT_CSS}
     var dr = function() { return (pf.draft[si] = pf.draft[si] || {}); };
     panel.oninput = function(ev) {
       var k = ev.target.getAttribute && ev.target.getAttribute('data-pf');
-      if (k && ['shot', 'delivery', 'cut_shot', 'cut_at', 'vq'].indexOf(k) >= 0) dr()[k] = ev.target.value;
+      if (k && ['shot', 'rshot', 'delivery', 'cut_shot', 'cut_at', 'vq'].indexOf(k) >= 0) dr()[k] = ev.target.value;
     };
     panel.onchange = function(ev) {
       var t = ev.target, k = t.getAttribute && t.getAttribute('data-pf');
@@ -11737,7 +11747,7 @@ ${QUOTIENT_CSS}
       if (go === 'recast') {
         var eng = d.engine || ((s.plan || {}).how === 'recast' && (s.plan || {}).engine) || 'higgsfield';
         pfSay(panel, 'Starting the recast…');
-        api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine' }).then(function() {
+        api('POST', '/recast/' + pfT() + '/' + pfP(project), { actor: actor, performer: eng, scenes: [si], voice_id: d.rvoice === 'actor' ? 'actor' : 'mine', shot: d.rshot != null ? d.rshot : (s.recast_shot || s.setting_shot || '') }).then(function() {
           return pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pf.wasBusy = true; pfPoll(project); });
         }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
         return;

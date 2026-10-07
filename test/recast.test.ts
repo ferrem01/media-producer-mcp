@@ -22,6 +22,15 @@ const info = async (f: string) => { try { await run("ffmpeg", ["-hide_banner", "
 const dur = async (f: string) => { const m = (await info(f)).match(/Duration: (\d+):(\d+):([\d.]+)/)!; return +m[1] * 3600 + +m[2] * 60 + +m[3]; };
 
 describe("recast: a take performed by a cast actor", () => {
+  it("a shot-taking recast's shot: asked, else the last one, else the scene's setting; '' is the camera", async () => {
+    const { recastShot } = await import("../src/core/recast.js");
+    expect(recastShot("  Seated at a table  ", "old", "podcast")).toBe("Seated at a table");
+    expect(recastShot("", "old", "podcast")).toBeUndefined();                 // asked for none: the recording's camera
+    expect(recastShot(undefined, "old shot", "podcast")).toBe("old shot");    // made again in the shot it had
+    expect(recastShot(undefined, undefined, "sit-down")).toMatch(/^A seated medium shot/);
+    expect(recastShot(undefined, undefined, undefined)).toBeUndefined();      // nothing set: as before
+  });
+
   it("cuts the take at its pauses, never longer than a call, never leaving a sliver", async () => {
     const { planChunks } = await import("../src/core/recast.js");
     // Old Chimp's shape: ~32 s, a pause after most sentences; Runway's 15 s calls.
@@ -283,7 +292,10 @@ describe("performers: the vendor is a choice", () => {
     process.env.FAL_KEY = "fk"; delete process.env.HEYGEN_API_KEY;
     const list = performerList();
     expect(list.map((p) => p.id)).toEqual(["heygen", "kling", "higgsfield", "runway"]);   // Wan never held: gone
-    expect(list.find((p) => p.id === "higgsfield")).toMatchObject({ drivenBy: "video", generate: false, maxSeconds: 30 });   // recordings only
+    expect(list.find((p) => p.id === "higgsfield")).toMatchObject({ drivenBy: "video", generate: false, maxSeconds: 30, takesShot: true });   // recordings only; framed by the scene's shot
+    // Each vendor says where its framing comes from; only Higgsfield takes a shot.
+    for (const p of list) expect(p.framedBy).toBeTruthy();
+    expect(list.filter((p) => (p as any).takesShot).map((p) => p.id)).toEqual(["higgsfield"]);
     expect(list.find((p) => p.id === "heygen")).toMatchObject({ drivenBy: "audio", generate: true, available: false });
     // Kling and Runway copy a recording's motion AND can animate a portrait from a voice.
     expect(list.find((p) => p.id === "kling")).toMatchObject({ drivenBy: "video", generate: true, available: true, maxSeconds: 29 });
@@ -369,6 +381,16 @@ describe("performers: the vendor is a choice", () => {
     expect(subs[0]).toMatchObject({ video_url: "https://pub.example/src-0.mp4", image_urls: ["https://pub.example/portrait.jpg"], resolution: "1080p" });
     expect(JSON.parse(await fs.readFile(path.join(d, "work", "higgsfield-c0.json"), "utf8"))).toEqual({ status_url: "https://api.higgsfield.ai/requests/r1/status" });
     expect(Math.abs((await dur(path.join(d, "out.mp4"))) - 8)).toBeLessThan(0.1);
+    // IN A SHOT: the start picture drawn for it leads, and the prompt takes the
+    // framing from that picture -- the recording gives only the performance.
+    const start = path.join(d, "start.png");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=white:s=256x384", "-frames:v", "1", start]);
+    await performTakeFile({ rawAbs: take, outAbs: path.join(d, "out2.mp4"), performer: getPerformer("higgsfield")!, ctx: { ...ctx, workDir: path.join(d, "work2"), startFrameAbs: start, shot: "Seated at a table, medium-wide." } });
+    expect(subs).toHaveLength(2);
+    expect(subs[1].image_urls).toEqual(["https://pub.example/start.jpg"]);
+    expect(subs[1].prompt).toContain("Use the FIRST REFERENCE IMAGE's camera framing and setting, not the video's: Seated at a table, medium-wide, the camera steady.");
+    expect(subs[1].prompt).not.toContain("character sheet");   // no sheet given
+    expect(subs[0].prompt).not.toContain("FIRST REFERENCE IMAGE");   // without a shot: the recording's camera, as before
     delete process.env.HF_API_KEY_ID; delete process.env.HF_API_KEY_SECRET;
   }, 120000);
 });

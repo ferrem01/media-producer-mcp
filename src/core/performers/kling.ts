@@ -30,6 +30,7 @@ export const kling: Performer = {
   label: "Kling",
   drivenBy: "video",
   keeps: "Recast: your actual gestures and timing. From a script: Kling animates the portrait from the voice",
+  framedBy: "Your camera: the recording's framing",
   limits: "30 s per call (seams on longer takes); hands holding things can warp",
   key: "FAL_KEY",
   minutesPer30s: 14,

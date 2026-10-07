@@ -26,6 +26,14 @@ export interface PerformerInfo {
   keeps: string;
   /** The catch, in a phrase for the picker. */
   limits: string;
+  /** Where the shot -- framing and setting -- comes from, in a phrase for
+   *  the picker. Vendors differ (Marc, Oct 7: "2 different pipelines with 2
+   *  different abilities"): HeyGen's look is its own room, Higgsfield takes
+   *  a start picture drawn for the scene's shot, the others copy the camera. */
+  framedBy: string;
+  /** A recast honours the scene's shot: a start picture is drawn for it and
+   *  the performance is made in that framing (PerformContext.startFrameAbs). */
+  takesShot?: boolean;
   /** The server key it needs. */
   key: string;
   /** Rough minutes of work per 30 s of take (the picker's estimate). */
@@ -52,6 +60,11 @@ export interface PerformContext {
   /** A direction for an audio-driven vendor's invented movement (HeyGen's
    *  motion_prompt, honored on Avatar V twins and photo looks). */
   motion?: string;
+  /** takesShot vendors: the start picture drawn for the shot (absolute) and
+   *  the shot itself. The actor in the framing and setting asked for; only
+   *  the performance comes from the recording. Absent: the camera's own. */
+  startFrameAbs?: string;
+  shot?: string;
 }
 
 export interface Performer extends PerformerInfo {

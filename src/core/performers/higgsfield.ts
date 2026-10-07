@@ -6,17 +6,23 @@
  * is Higgsfield's own endpoint. 4-30 s a call (longer is cut at the take's
  * pauses); it fetches inputs by public URL only. The job's status URL is kept
  * in workDir so a restart collects it instead of paying twice.
+ *
+ * IN A SHOT (ctx.startFrameAbs): the actor drawn in the scene's framing and
+ * setting leads instead of the portrait, and the prompt takes the shot from
+ * that picture -- a selfie recording performed seated at a table.
  */
 import fs from "node:fs/promises";
 import path from "node:path";
-import { runGenjutsu, download, ffmpeg, GENJUTSU_SHEET_PROMPT } from "../actor-test.js";
+import { runGenjutsu, download, ffmpeg, GENJUTSU_SHEET_PROMPT, genjutsuShotPrompt } from "../actor-test.js";
 import type { Performer, PerformContext } from "./types.js";
 
 export const higgsfield: Performer = {
   id: "higgsfield",
   label: "Higgsfield",
   drivenBy: "video",
-  keeps: "Your gestures, timing, camera and room -- the person swapped",
+  keeps: "Your gestures, timing and lips -- the person swapped",
+  framedBy: "The scene's shot: a start picture is drawn for it (no shot: your camera and room)",
+  takesShot: true,
   limits: "Recordings only (no script mode); 30 s per call (seams on longer takes)",
   key: "HF_API_KEY_ID",
   minutesPer30s: 6,
@@ -26,9 +32,12 @@ export const higgsfield: Performer = {
     const w = (n: string) => path.join(ctx.workDir, n);
     const out = w(`higgsfield-${tag}.mp4`);
     if (await fs.stat(out).then((x) => x.size > 0, () => false)) return out;
-    const img = w("portrait.jpg");
+    // In a shot: the start picture drawn for it leads (its framing and room
+    // are the shot); otherwise the portrait, and the recording's camera.
+    const inShot = !!(ctx.startFrameAbs && ctx.shot);
+    const img = w(inShot ? "start.jpg" : "portrait.jpg");
     if (!(await fs.stat(img).then(() => true, () => false))) {
-      await ffmpeg(["-i", ctx.portraitAbs, "-frames:v", "1", "-vf", "scale='min(1024,iw)':-2", "-q:v", "3", img]);
+      await ffmpeg(["-i", inShot ? ctx.startFrameAbs! : ctx.portraitAbs, "-frames:v", "1", "-vf", "scale='min(1024,iw)':-2", "-q:v", "3", img]);
     }
     const src = await ctx.publicUrl?.(video), pic = await ctx.publicUrl?.(img);
     if (!src || !pic) throw new Error("Higgsfield fetches the take by URL: the server needs its public https address");
@@ -46,7 +55,7 @@ export const higgsfield: Performer = {
     const req = w(`higgsfield-${tag}.json`);
     const prior = await fs.readFile(req, "utf8").then((t) => JSON.parse(t)?.status_url as string, () => undefined);
     const call = (resume?: string) => runGenjutsu(src, images, {
-      resume, ...(images.length > 1 ? { prompt: GENJUTSU_SHEET_PROMPT } : {}), onSubmit: async (statusUrl) => { await fs.writeFile(req, JSON.stringify({ status_url: statusUrl })); },
+      resume, ...(inShot ? { prompt: genjutsuShotPrompt(ctx.shot!, images.length > 1) } : images.length > 1 ? { prompt: GENJUTSU_SHEET_PROMPT } : {}), onSubmit: async (statusUrl) => { await fs.writeFile(req, JSON.stringify({ status_url: statusUrl })); },
     });
     let url: string;
     try { url = await call(prior); }

@@ -178,7 +178,10 @@ export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, 
   return { frame_prompt: framePrompt(shot, vertical, sheet, location), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot)}` };
 }
 
-async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string, locationAbs?: string): Promise<string> {
+/** Draw the actor in a shot (GPT Image from the portrait and sheet, a
+ *  location's plate when given), cut to the film's shape; an asset url.
+ *  Seedance's start frame, and a Higgsfield recast's (core/recast.ts). */
+export async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string, locationAbs?: string): Promise<string> {
   const vertical = height > width;
   const sheetAbs = actor.sheet ? path.join(config.dataDir, tenant, actor.sheet) : undefined;
   const work = path.join(projectDir(tenant, projectId), "_work");
@@ -886,6 +889,10 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       performer: s.performer || null,
       cast, cast_follows_film: s.cast === undefined,
       performance: s.performance || null,
+      // A shot-taking recast (Higgsfield): the shot the scene's recast was made
+      // in, and the one its setting gives (Studio's "The shot" box).
+      ...(cast && take?.actors?.[cast]?.shot ? { recast_shot: take.actors[cast].shot } : {}),
+      ...(shotForSetting(plan.setting) ? { setting_shot: shotForSetting(plan.setting) } : {}),
       // What the scene uses when it writes no prompt of its own.
       defaults,
       actor_clips: s.actor_clips || [],
