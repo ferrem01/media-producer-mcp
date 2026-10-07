@@ -25,6 +25,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { config } from "../config.js";
 import { actorTestDir, isActorTestId, getHeygenLook, download } from "./actor-test.js";
+import { uprightInput } from "./image-orient.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -139,11 +140,15 @@ export async function addActor(tenant: string, opts: {
   await fs.mkdir(castDir(tenant), { recursive: true });
   const rel = path.join("cast", `${id}.jpg`);
   try {
-    await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...(at != null ? ["-ss", String(at)] : []), "-i", src,
-      "-frames:v", "1", "-vf", "scale='min(1024,iw)':-2", "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+    // A photo from a phone stands upright (its EXIF turn applied); a frame of a test is a video frame.
+    const up = opts.from ? { pre: [] as string[], vf: (r: string) => r } : await uprightInput(src);
+    await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...up.pre, ...(at != null ? ["-ss", String(at)] : []), "-i", src,
+      "-frames:v", "1", "-vf", up.vf("scale='min(1024,iw)':-2"), "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
   } finally {
     if (fetched) await fs.rm(fetched, { force: true }).catch(() => {});
   }
+  // The upload was only the way in: the cast keeps its own copy.
+  if (!look && !opts.from) await dropIntake(tenant, src);
   const sheet = opts.sheet ? await saveSheet(tenant, id, opts.sheet) : undefined;
   const actor: CastActor = {
     id, name, portrait: rel,
@@ -166,7 +171,9 @@ async function saveSheet(tenant: string, id: string, file: string): Promise<stri
   await fs.access(src).catch(() => { throw new Error("sheet not found"); });
   await fs.mkdir(castDir(tenant), { recursive: true });
   const rel = path.join("cast", `${id}-sheet.jpg`);
-  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-frames:v", "1", "-vf", "scale='min(2048,iw)':-2", "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+  const up = await uprightInput(src);
+  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...up.pre, "-i", src, "-frames:v", "1", "-vf", up.vf("scale='min(2048,iw)':-2"), "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+  await dropIntake(tenant, src);
   return rel;
 }
 
@@ -199,7 +206,36 @@ export async function removeActor(tenant: string, id: string): Promise<boolean> 
   await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast.filter((a) => a.id !== id), null, 2));
   await fs.rm(portraitPath(tenant, actor), { force: true }).catch(() => {});
   for (const f of [actor.sheet, actor.sheet_draft?.file, ...(actor.photos || [])]) if (f) await fs.rm(path.join(config.dataDir, tenant, f), { force: true }).catch(() => {});
+  // And every upload a cast member was made from that is still lying in the
+  // library (Marc: "delete all photos we have on the server of that person").
+  await sweepIntake(tenant, 0);
   return true;
+}
+
+/** THE UPLOADS A CAST MEMBER IS MADE FROM: the Cast page sends each photo
+ *  into the tenant library as cast-<ts>, cast-photo-<ts> or cast-sheet-<ts>
+ *  (projects/library/assets) and the cast copies what it keeps -- so the
+ *  upload itself is only the way in, and a face is not left lying around. */
+const INTAKE = /^cast(-photo|-sheet)?-\d{4}-\d{2}-\d{2}T[\d-]+Z\.[A-Za-z0-9]{1,5}$/;
+function intakeDir(tenant: string): string { return path.join(config.dataDir, tenant, "projects", "library", "assets"); }
+/** Remove one upload once the cast has its copy (only a Cast-page upload). */
+export async function dropIntake(tenant: string, src: string): Promise<void> {
+  if (path.dirname(path.resolve(src)) === path.resolve(intakeDir(tenant)) && INTAKE.test(path.basename(src))) await fs.rm(src, { force: true }).catch(() => {});
+}
+/** Remove Cast-page uploads older than `minAgeMs` (a photo still on its way
+ *  in, uploaded but not yet added, is younger). Returns how many went. */
+export async function sweepIntake(tenant: string, minAgeMs = 10 * 60 * 1000): Promise<number> {
+  const dir = intakeDir(tenant);
+  const names = await fs.readdir(dir).catch(() => [] as string[]);
+  let n = 0;
+  for (const f of names) {
+    if (!INTAKE.test(f)) continue;
+    const st = await fs.stat(path.join(dir, f)).catch(() => null);
+    if (!st || Date.now() - st.mtimeMs < minAgeMs) continue;
+    await fs.rm(path.join(dir, f), { force: true }).catch(() => {});
+    n++;
+  }
+  return n;
 }
 
 async function saveCast(tenant: string, cast: CastActor[]): Promise<void> {
@@ -229,7 +265,9 @@ export async function addActorPhoto(tenant: string, id: string, image: string): 
   await fs.access(src).catch(() => { throw new Error("photo not found"); });
   await fs.mkdir(castDir(tenant), { recursive: true });
   const rel = path.join("cast", `${id}-photo-${crypto.randomBytes(3).toString("hex")}.jpg`);
-  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-frames:v", "1", "-vf", "scale='min(1536,iw)':-2", "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+  const up = await uprightInput(src).catch(async (e) => { await dropIntake(tenant, src); throw e; });
+  await execFileAsync("ffmpeg", ["-y", "-loglevel", "error", ...up.pre, "-i", src, "-frames:v", "1", "-vf", up.vf("scale='min(1536,iw)':-2"), "-q:v", "2", path.join(config.dataDir, tenant, rel)]);
+  await dropIntake(tenant, src);
   return patchActor(tenant, id, (a) => { a.photos = [...(a.photos || []), rel].slice(0, MAX_ACTOR_PHOTOS); });
 }
 

@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-07 — Cast photos: upright, HEIC named, uploads never left behind
+
+Marc added himself from his phone: the Photos & sheet panel showed blank
+pictures, the portrait stood on its side, only one of several photos made it
+in, and "when we remove a cast member i want to make sure we delete all photos
+we have on the server of that person".
+
+- Blank pictures: the panel appended `&v=` to `withToken(url)`; signed in with
+  a session (no token in the address) that made `/portrait&v=1`, another path.
+  Now `withParam(withToken(url), 'v', ...)`.
+- Sideways: phones store portraits sideways with an EXIF Orientation tag and
+  the server's ffmpeg 4.4 ignores it. core/image-orient.ts reads the tag and
+  turns the picture with an explicit filter (`-noautorotate`, so a newer
+  ffmpeg never turns it twice) -- portraits, photos, sheets, location uploads.
+- HEIC (ffmpeg 4.4 can't read it) is named with what to do, and the Cast page
+  adds photos one by one, naming any that fail, instead of stopping at the first.
+- The uploads a member is made from (projects/library/assets/cast-*, cast-photo-*,
+  cast-sheet-*) are deleted as soon as the cast has its copy, and removing a
+  member sweeps any left in the library (`sweepIntake`).
+
 ## 2026-10-07 — Recast and Generate are wizards: faces, a place you can see, the shot drawn before the vendor is paid
 
 Marc, on the recast panel: "I would love to see the headshot of the person
