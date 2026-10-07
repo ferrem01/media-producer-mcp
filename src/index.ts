@@ -3920,7 +3920,12 @@ Rules:
         const recast = rcSt && rcSt.status === "running"
           ? { actor: rcSt.actor, performer: rcSt.performer, started_at: rcSt.started_at, ...recastProgress(rcSt) }
           : null;
-        jsonResponse(res, 200, { jobs, errors, recast });
+        // One that failed lately says so: the pill must not read "Done".
+        const rcAt = rcSt?.finished_at ? Date.parse(rcSt.finished_at) : 0;
+        const recastFailed = rcSt && (rcSt.status === "failed" || rcSt.status === "interrupted") && Date.now() - rcAt < 10 * 60 * 1000
+          ? { actor: rcSt.actor, at: rcSt.finished_at, status: rcSt.status, error: rcSt.error || rcSt.files?.find((f) => f.error)?.error || (rcSt.status === "interrupted" ? "the server restarted: recast it again (a paid vendor job is picked up, not paid twice)" : "it did not finish") }
+          : null;
+        jsonResponse(res, 200, { jobs, errors, recast, ...(recastFailed ? { recast_failed: recastFailed } : {}) });
         return;
       }
 
