@@ -45,7 +45,7 @@ import { takeJobsFor } from "./core/take-jobs.js";
 import { queueTakeGrade } from "./core/take-grade.js";
 import { DEFAULT_SOFT_STRENGTH } from "./core/take-sanitize.js";
 import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies, takeForClip } from "./core/speaker-layer.js";
-import { wordsThroughCuts } from "./core/take-clock.js";
+import { wordsThroughCuts, speedOf } from "./core/take-clock.js";
 import { editSceneTake } from "./core/take-edits.js";
 import { wordsForTake } from "./core/measured-spine.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
@@ -4997,7 +4997,7 @@ Rules:
               // seven new files before the lane shows a word (Marc).
               const tk = takeForClip(project as any, c as any) as any;
               if (tk) {
-                try { const w = await wordsForTake(project, { ...tk, source: takeCopies(tk).raw } as any, config.dataDir); bySrc2[c.source] = w ? wordsThroughCuts(w, tk.cuts) : null; }
+                try { const w = await wordsForTake(project, { ...tk, source: takeCopies(tk).raw } as any, config.dataDir); bySrc2[c.source] = w ? wordsThroughCuts(w, tk.cuts, speedOf(tk)) : null; }
                 catch { bySrc2[c.source] = null; }
                 continue;
               }

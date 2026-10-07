@@ -14,6 +14,24 @@ session can pick up mid-thread.
 
 
 
+## 2026-10-07 — A take's pace (1.15x, pitch kept)
+
+Marc on the churn film: "it seems like I'm not talking fast enough." The
+HeyGen recasts speak with almost no pauses, so trims bought 2.3 s of 56; the
+pace had to change. `take.speed` (0.75-1.5) is BAKED into the edited copies
+with the cuts (core/take-clock.ts): `bakes(take)` = cuts or a pace,
+`editKey` = the cut key plus the pace, the copies' clock is
+`playClock` = cut clock / speed. `bakeCut` adds `setpts=PTS/speed` and
+`atempo=speed` after the concat (picture and voice together, pitch kept).
+Trims and cuts take seconds of what PLAYS (through the pace); the spine's
+words, the lane's words and `keptSeconds` divide by the pace, so captions,
+word-timed graphics and the scene's length follow. Edit `{op:"speed"}`
+(`/api/take-edit`), MCP `take` action `speed` (no scene_index = every
+scene), and a Pace row on Studio's take card (1x / 1.1x / 1.15x / 1.2x, All
+scenes). Test: `test/take-speed.test.ts`.
+
+---
+
 ## 2026-10-07 — Captions read the script, timed by the recording
 
 Marc's churn film captions read what whisper HEARD from the HeyGen recasts:

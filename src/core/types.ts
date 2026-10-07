@@ -1009,6 +1009,8 @@ export interface Take {
   /** Spans cut out of the take, in ORIGINAL-recording seconds (the speaker
    *  lane's EDL cut shape). The scene plays the window minus these. */
   cuts?: Array<{ src_start: number; src_end: number }>;
+  /** The take's pace (core/take-clock.ts speedOf): 1 = as recorded; baked into the edited copies with the cuts. */
+  speed?: number;
   /** Cache: each of the take's files with the cuts taken out, by the
    *  original file: the copy, the cut list it was made for, and the
    *  original's mtime:size when it was made. */

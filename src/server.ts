@@ -2184,13 +2184,14 @@ export function createMcpServer(): McpServer {
 
   tool(
     "edit_speaker",
-    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'. A CAMERA-TAKE film (one take per scene) edits each scene's take instead: pass scene_index -- action='trim' takes head/tail seconds off the take's start/end (negative gives them back), action='cut' removes from/to in SCENE seconds (a jump cut; the take's blur, alpha and recast copies follow), action='restore' gives a cut back, action='list' shows every scene's take window and cuts; the scene re-times to what is left. action='look' sets the soft look on the booth take behind scene_index -- look 'soft' with strength 0-1 (skin smoothing; 0.5 the house pick) or 'natural'; correct:false turns off the studio colour/exposure correction every take gets (true back on); fill 0-1 sets the fill light on the face's shadows (default 0.5, 0 off) -- re-graded from the kept original in the background (every scene cut from the same recording follows; Studio refreshes when it lands).",
+    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'. A CAMERA-TAKE film (one take per scene) edits each scene's take instead: pass scene_index -- action='trim' takes head/tail seconds off the take's start/end (negative gives them back), action='cut' removes from/to in SCENE seconds (a jump cut; the take's blur, alpha and recast copies follow), action='restore' gives a cut back, action='list' shows every scene's take window and cuts; action='speed' sets a take's pace (speed 0.75-1.5, pitch kept; no scene_index = every scene); the scene re-times to what is left. action='look' sets the soft look on the booth take behind scene_index -- look 'soft' with strength 0-1 (skin smoothing; 0.5 the house pick) or 'natural'; correct:false turns off the studio colour/exposure correction every take gets (true back on); fill 0-1 sets the fill light on the face's shadows (default 0.5, 0 off) -- re-graded from the kept original in the background (every scene cut from the same recording follows; Studio refreshes when it lands).",
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),
-      action: z.enum(["list", "cut", "restore", "look", "trim"]),
+      action: z.enum(["list", "cut", "restore", "look", "trim", "speed"]),
       // coerce: a client holding the tool's older schema sends these as strings.
       scene_index: z.coerce.number().optional().describe("look/trim/cut/restore on a camera-take film: 0-based scene whose take"),
+      speed: z.coerce.number().optional().describe("speed (camera-take film): the take's pace, 0.75-1.5 (1 = as recorded, 1.15 a touch faster; pitch kept). The picture, voice, captions and word-timed graphics follow; omit scene_index to set every scene's take."),
       head: z.coerce.number().optional().describe("trim: seconds off the take's start (negative gives back)"),
       tail: z.coerce.number().optional().describe("trim: seconds off the take's end (negative gives back)"),
       look: z.enum(["soft", "natural"]).optional().describe("look: the grade"),
@@ -2225,13 +2226,26 @@ export function createMcpServer(): McpServer {
       }
       // A camera-take film: each scene's take (core/take-edits.ts).
       const perSceneTakes = !(project as any).speaker?.clips?.length && (project.speaker_track?.clips || []).some((c) => c.scene_index !== undefined);
+      if (params.action === "speed") {
+        if (!perSceneTakes) return err("speed is for a camera-take film (one take per scene)");
+        if (!(Number(params.speed) > 0)) return err("speed is required (0.75-1.5; 1 = as recorded)");
+        const te = await import("./core/take-edits.js");
+        const scenesToPace = params.scene_index !== undefined ? [Number(params.scene_index)]
+          : [...new Set((project.speaker_track?.clips || []).map((c) => c.scene_index).filter((i): i is number => i !== undefined))];
+        const done: Array<{ scene_index: number; plays_seconds: number }> = [];
+        for (const si of scenesToPace) {
+          try { const r = await te.editSceneTake(project.tenant_id, project.project_id, si, { op: "speed", speed: Number(params.speed) }, config.dataDir); done.push({ scene_index: si, plays_seconds: r.seconds }); }
+          catch (e: any) { return err(`scene ${si + 1}: ${e?.message || e}`); }
+        }
+        return ok({ status: "paced", speed: Number(params.speed), scenes: done, studio_url: previewUrl(project.tenant_id, project.project_id) });
+      }
       if (params.action === "trim" || (perSceneTakes && params.action !== "list" && params.scene_index !== undefined) || (perSceneTakes && params.action === "list")) {
         const te = await import("./core/take-edits.js");
         const { activeTake } = await import("./core/take-needs.js");
         if (params.action === "list") {
           const takes = (project.speaker_track?.clips || []).filter((c) => c.scene_index !== undefined).map((c) => {
             const t = activeTake(project, c.scene_index!);
-            return t ? { scene_index: c.scene_index, window: te.takeWindow(t), plays_seconds: te.keptSeconds(t), cuts: t.cuts || [] } : { scene_index: c.scene_index, take: null };
+            return t ? { scene_index: c.scene_index, window: te.takeWindow(t), plays_seconds: te.keptSeconds(t), cuts: t.cuts || [], speed: te.speedOf(t) } : { scene_index: c.scene_index, take: null };
           });
           return ok({ project_id: project.project_id, takes, note: "window and cuts are in seconds of the recording; trim/cut take seconds of what the scene plays" });
         }

@@ -29,8 +29,8 @@ import type { Project, Take } from "./types.js";
 import { activeTake } from "./take-needs.js";
 import { retimeScene } from "./measured-spine.js";
 import { mergeCut } from "./speaker-edl.js";
-import { cutClock, sourceClock, takeWindow, keptSeconds, cutsKey, type TakeCut } from "./take-clock.js";
-export { cutClock, sourceClock, takeWindow, keptSeconds, wordsThroughCuts, cutsKey, cutFileFor, type TakeCut } from "./take-clock.js";
+import { cutClock, sourceClock, takeWindow, keptSeconds, cutsKey, bakes, editKey, playClock, fromPlayClock, speedOf, type TakeCut } from "./take-clock.js";
+export { cutClock, sourceClock, takeWindow, keptSeconds, wordsThroughCuts, cutsKey, cutFileFor, speedOf, type TakeCut } from "./take-clock.js";
 import { resolveVideoPath } from "./video-path.js";
 import { takeCopies, syncSpeakerClips } from "./speaker-layer.js";
 import { probeMediaDuration } from "./auto-compress.js";
@@ -69,11 +69,12 @@ export function trimTake(take: Take, head: number, tail: number, fileSeconds: nu
   const cuts = take.cuts || [];
   const w = takeWindow(take);
   const fileEnd = fileSeconds > 0 ? fileSeconds : Math.max(w.end, take.trim_end || 0);
-  const a = cutClock(cuts, w.start) + (head || 0);
-  const b = cutClock(cuts, w.end) - (tail || 0);
-  let start = Math.max(0, sourceClock(cuts, Math.max(0, a)));
-  let end = Math.min(fileEnd, sourceClock(cuts, Math.max(0, b)));
-  if (cutClock(cuts, end) - cutClock(cuts, start) < MIN_TAKE_SECONDS) throw new Error(`a take can't be shorter than ${MIN_TAKE_SECONDS}s`);
+  // head/tail are seconds of what PLAYS: through the cuts and at the take's pace.
+  const a = playClock(take, w.start) + (head || 0);
+  const b = playClock(take, w.end) - (tail || 0);
+  let start = Math.max(0, fromPlayClock(take, Math.max(0, a)));
+  let end = Math.min(fileEnd, fromPlayClock(take, Math.max(0, b)));
+  if (playClock(take, end) - playClock(take, start) < MIN_TAKE_SECONDS) throw new Error(`a take can't be shorter than ${MIN_TAKE_SECONDS}s`);
   start = r3(start); end = r3(end);
   take.trim_start = start;
   take.trim_end = end;
@@ -90,12 +91,12 @@ export function cutTake(take: Take, from: number, to: number): TakeCut {
   pinWindow(take);
   const cuts = take.cuts || [];
   const w = takeWindow(take);
-  const base = cutClock(cuts, w.start);
+  const base = playClock(take, w.start);
   const kept = keptSeconds(take);
   const f = Math.max(0, from), t = Math.min(kept, to);
   if (!(t - f > 0.05)) throw new Error("the cut is outside the take");
   if (kept - (t - f) < MIN_TAKE_SECONDS) throw new Error(`a take can't be cut below ${MIN_TAKE_SECONDS}s`);
-  const add = { src_start: sourceClock(cuts, base + f), src_end: sourceClock(cuts, base + t) };
+  const add = { src_start: fromPlayClock(take, base + f), src_end: fromPlayClock(take, base + t) };
   // The end maps to the far side of any cut it touches: a cut abutting an
   // older one merges with it instead of leaving a sliver.
   take.cuts = mergeCut(cuts, add).map((c) => ({ src_start: r3(c.src_start), src_end: r3(c.src_end) }));
@@ -122,7 +123,7 @@ const dataDirOf = (dataDir?: string) => dataDir || process.env.MP_DATA_DIR || "/
 /** The cut copy's name: beside the file, keyed by the cut list. */
 function cutNameOf(file: string, key: string): string {
   const m = file.match(/^(.*?)(\.[^./]+)?$/);
-  const stem = (m ? m[1] : file).replace(/\.cut-[0-9a-f]{10}$/, "");
+  const stem = (m ? m[1] : file).replace(/\.cut-[0-9a-f]{10}(x[0-9p]+)?$/, "");
   const ext = m && m[2] ? m[2] : ".mp4";
   return `${stem}.cut-${key}${ext}`;
 }
@@ -131,14 +132,14 @@ function cutNameOf(file: string, key: string): string {
  *  and forget copies of older cut lists. Idempotent. Returns how many
  *  copies were made. */
 export async function ensureTakeCutFiles(take: Take, dataDir?: string): Promise<number> {
-  if (!take.cuts || !take.cuts.length) {
+  if (!bakes(take)) {
     if (take.cut_files) {
       for (const v of Object.values(take.cut_files)) await fs.rm(resolveVideoPath(v.file, dataDirOf(dataDir)), { force: true }).catch(() => {});
       delete take.cut_files;
     }
     return 0;
   }
-  const key = cutsKey(take.cuts);
+  const key = editKey(take);
   const dd = dataDirOf(dataDir);
   const next: NonNullable<Take["cut_files"]> = {};
   let made = 0;
@@ -154,7 +155,7 @@ export async function ensureTakeCutFiles(take: Take, dataDir?: string): Promise<
       next[file] = have;
       continue;
     }
-    await bakeCut(abs, outAbs, take.cuts);
+    await bakeCut(abs, outAbs, take.cuts || [], speedOf(take));
     next[file] = { file: out, cuts: key, stamp };
     made++;
   }
@@ -180,7 +181,7 @@ async function hasAudio(abs: string): Promise<boolean> {
 /** Re-encode the file without the cut spans: the kept pieces joined, a
  *  10 ms fade at each seam so the voice doesn't click. An alpha webm keeps
  *  its transparency. */
-async function bakeCut(abs: string, outAbs: string, cuts: TakeCut[]): Promise<void> {
+async function bakeCut(abs: string, outAbs: string, cuts: TakeCut[], speed = 1): Promise<void> {
   const sorted = [...cuts].sort((a, b) => a.src_start - b.src_start);
   const pieces: Array<{ from: number; to?: number }> = [];
   let cursor = 0;
@@ -201,7 +202,14 @@ async function bakeCut(abs: string, outAbs: string, cuts: TakeCut[]): Promise<vo
       graph.push(`[0:a]atrim=${at(p)},asetpts=PTS-STARTPTS${fades.length ? "," + fades.join(",") : ""}[a${i}]`);
     }
   });
-  graph.push(pieces.map((_, i) => `[v${i}]${audio ? `[a${i}]` : ""}`).join("") + `concat=n=${pieces.length}:v=1:a=${audio ? 1 : 0}[v]${audio ? "[a]" : ""}`);
+  // The pace: the picture's clock and the voice's tempo together, pitch kept.
+  const sp = speed > 0 ? speed : 1;
+  const paced = Math.abs(sp - 1) > 1e-3;
+  graph.push(pieces.map((_, i) => `[v${i}]${audio ? `[a${i}]` : ""}`).join("") + `concat=n=${pieces.length}:v=1:a=${audio ? 1 : 0}${paced ? "[vc]" : "[v]"}${audio ? (paced ? "[ac]" : "[a]") : ""}`);
+  if (paced) {
+    graph.push(`[vc]setpts=PTS/${sp.toFixed(4)}[v]`);
+    if (audio) graph.push(`[ac]atempo=${sp.toFixed(4)}[a]`);
+  }
   const enc = alpha
     ? ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-auto-alt-ref", "0", "-b:v", "0", "-crf", "30", "-row-mt", "1", "-deadline", "realtime", "-cpu-used", "8"]
     : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart"];
@@ -229,16 +237,16 @@ export async function recutProjectTakes(tenant: string, projectId: string, dataD
   const done = new Map<string, { key: string; files: NonNullable<Take["cut_files"]> }>();
   let made = 0;
   for (const t of snap.takes || []) {
-    if (!t.cuts || !t.cuts.length) continue;
+    if (!bakes(t)) continue;
     made += await ensureTakeCutFiles(t, dataDir);
-    done.set(t.id, { key: cutsKey(t.cuts), files: t.cut_files || {} });
+    done.set(t.id, { key: editKey(t), files: t.cut_files || {} });
   }
   if (!made) return 0;
   const project = await loadProject(tenant, projectId);
   if (!project) return made;
   for (const t of project.takes || []) {
     const d = done.get(t.id);
-    if (d && t.cuts && t.cuts.length && cutsKey(t.cuts) === d.key) t.cut_files = d.files;
+    if (d && bakes(t) && editKey(t) === d.key) t.cut_files = d.files;
   }
   syncSpeakerClips(project as any);
   await saveProject(project);
@@ -253,7 +261,12 @@ export async function takeFileSeconds(take: Take, dataDir?: string): Promise<num
 export type TakeEditOp =
   | { op: "trim"; head?: number; tail?: number }
   | { op: "cut"; from: number; to: number }
-  | { op: "restore"; src_start: number; src_end: number };
+  | { op: "restore"; src_start: number; src_end: number }
+  /** The take's pace: 1 as recorded, 1.15 a touch faster (pitch kept). */
+  | { op: "speed"; speed: number };
+
+/** The paces a take may play at. */
+export const MIN_TAKE_SPEED = 0.75, MAX_TAKE_SPEED = 1.5;
 
 export interface TakeEditResult {
   project: Project;
@@ -286,8 +299,14 @@ export async function editSceneTake(tenant: string, projectId: string, sceneInde
     cutTake(take0, Number(edit.from), Number(edit.to));
   } else if (edit.op === "restore") {
     restoreTakeCut(take0, Number(edit.src_start), Number(edit.src_end));
+  } else if (edit.op === "speed") {
+    const sp = Math.round(Number(edit.speed) * 100) / 100;
+    if (!(sp >= MIN_TAKE_SPEED && sp <= MAX_TAKE_SPEED)) throw new Error(`speed must be between ${MIN_TAKE_SPEED} and ${MAX_TAKE_SPEED}`);
+    pinWindow(take0);
+    if (Math.abs(sp - 1) < 1e-3) delete take0.speed; else take0.speed = sp;
+    take0.duration = keptSeconds(take0);
   } else {
-    throw new Error("op must be trim, cut or restore");
+    throw new Error("op must be trim, cut, restore or speed");
   }
   // The encode runs off the loaded copy; the edit lands on a fresh load.
   await ensureTakeCutFiles(take0, dataDir);
@@ -295,7 +314,7 @@ export async function editSceneTake(tenant: string, projectId: string, sceneInde
   if (!project) throw new Error("Project not found");
   const take = (project.takes || []).find((t) => t.id === take0.id);
   if (!take) throw new Error("the take changed while it was being edited -- try again");
-  for (const k of ["trim_start", "trim_end", "duration", "edited", "cuts", "cut_files"] as const) {
+  for (const k of ["trim_start", "trim_end", "duration", "edited", "cuts", "speed", "cut_files"] as const) {
     if ((take0 as any)[k] === undefined) delete (take as any)[k]; else (take as any)[k] = (take0 as any)[k];
   }
   // Back on the raw take first: a restore drops the cut copy the clip names

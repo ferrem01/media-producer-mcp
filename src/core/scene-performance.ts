@@ -33,7 +33,7 @@ import { getHeygenLook } from "./actor-test.js";
 import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
 import { elevenSpeech, heygenSpeech, spokenParts, DEFAULT_MOTION } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
-import { takeWindow, cutClock, cutFileFor } from "./take-clock.js";
+import { takeWindow, playClock, cutFileFor } from "./take-clock.js";
 import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
@@ -426,8 +426,8 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
     const cut = cutFileFor(take, raw);
     const onCut = !!cut && cut !== raw;
     const win = takeWindow(take);
-    const start = onCut ? cutClock(take.cuts, win.start) : win.start;
-    const end = onCut ? cutClock(take.cuts, win.end) : win.end;
+    const start = onCut ? playClock(take, win.start) : win.start;
+    const end = onCut ? playClock(take, win.end) : win.end;
     await ffmpeg(["-ss", String(start), ...(end > start ? ["-to", String(end)] : []), "-i", resolveVideoPath(onCut ? cut! : raw, config.dataDir),
       "-vn", "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("take.wav")]);
     await convertVoice(w("take.wav"), said, actor.voice_id);
