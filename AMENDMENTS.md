@@ -6,6 +6,14 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — A scene's pace is that scene's
+
+Marc: "you click on a specific scene, you set the pacing, but it changes it
+for all scenes ... I love the pace of the first scene ... the second one's
+bad." The "All scenes" box beside Pace (camera takes and voice-only lines)
+was ticked by default. It now starts unticked: Pace changes the scene whose
+take you opened; ticking "All scenes" is the opt-in for the whole film.
+
 ## 2026-10-08 — Studio: pacing every scene no longer freezes the preview
 
 Marc set Pace 1.15x on all scenes of proj_14b6c070 and replayed: "it basically

@@ -8648,8 +8648,9 @@ ${QUOTIENT_CSS}
       });
     });
     // PACE: the take plays faster (or slower) than it was recorded, pitch
-    // kept; the captions and word-timed graphics follow. "All scenes" sets
-    // every take in the film (Marc: "it seems like I'm not talking fast enough").
+    // kept; the captions and word-timed graphics follow. THIS scene by
+    // default (Marc, Oct 8: "I love the pace of the first scene ... the
+    // second one's bad"); "All scenes" is the opt-in for the whole film.
     pop.querySelectorAll('[data-tk-pace]').forEach(function(b) {
       b.addEventListener('click', function() {
         var sp = Number(b.getAttribute('data-tk-pace'));
@@ -8708,7 +8709,7 @@ ${QUOTIENT_CSS}
       return '<button class="rv-go ' + (Math.abs(cur - v) < 0.001 ? '' : 'secondary') + '" data-tk-pace="' + v + '">' + v + 'x</button>';
     }).join('');
     return '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Pace</span>' + btns + '</div>'
-      + '<div class="sp-row" style="font-size:12px;color:var(--content-secondary);"><label><input type="checkbox" id="tk-pace-all" checked> All scenes</label></div>';
+      + '<div class="sp-row" style="font-size:12px;color:var(--content-secondary);"><label><input type="checkbox" id="tk-pace-all"> All scenes</label></div>';
   }
   // ── A voice-only film's lines (POST /api/voice-line, core/voice-lines.ts) ──
   function voiceLines(p) {
@@ -8787,7 +8788,7 @@ ${QUOTIENT_CSS}
       + '<div class="tk-row"><span class="tk-lab">Pace</span>' + [1, 1.1, 1.15, 1.2].map(function(v) {
           return '<button class="rv-go ' + (Math.abs(cur - v) < 0.001 ? '' : 'secondary') + '" data-vl-pace="' + v + '">' + v + 'x</button>';
         }).join('') + '</div>'
-      + '<div class="sp-row" style="font-size:12px;color:var(--content-secondary);"><label><input type="checkbox" id="vl-pace-all" checked> All scenes</label></div>'
+      + '<div class="sp-row" style="font-size:12px;color:var(--content-secondary);"><label><input type="checkbox" id="vl-pace-all"> All scenes</label></div>'
       + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><textarea id="vl-text" rows="3" style="width:100%;box-sizing:border-box;font:13px/1.4 var(--font-sans, inherit);border:1px solid var(--border-tertiary);border-radius:6px;padding:6px;resize:vertical;">' + esc(voiceLineText(p, si)) + '</textarea></div>'
       + '<div class="sp-row"><button class="rv-go secondary" id="vl-revoice" style="flex:1;">' + (tr.take ? 'Replace my recording with a read of these words' : 'Re-read these words') + '</button></div>'
       + '<div class="sp-row" id="vl-rec-row"><button class="rv-go secondary" id="vl-rec" style="flex:1;">● Record it yourself</button></div>'
