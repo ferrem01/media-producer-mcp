@@ -17,6 +17,48 @@ quietly (`takeEditRequest(..., quiet)`), and the preview reloads ONCE at the
 start (or at the scene, for one scene); `afterSpeakerEdit` also stops playback
 before any reload, so a trim or cut can't do the same.
 
+## 2026-10-08 — A voice-only film's lines are edited like a take
+
+Marc on proj_f5c104bb: "when you have a speaker track that's voice only ...
+you can't change its pacing. And ... there's no re-record. You can't select
+the layer like you can when the speaker is a video." Clicking the voice
+lane, or the voice icon, said "This film has no speaker voice to set."
+
+- Studio draws each scene's `vo_scene_<i>` line as a piece on the speaker
+  lane. Clicking it opens a card like the take card with: Pace (1x-1.2x,
+  All scenes), the words with a Re-read button, Record it yourself (the mic,
+  then Stop uploads it), and Level. The voice icon's card sets the lines'
+  level.
+- `POST /api/voice-line` (`core/voice-lines.ts`) re-reads a line, or takes
+  the recording, then re-fits the film (`fitFilmToVoice`, shared with the
+  audio tool's fit_voiceover). A recording is kept as `take` and re-paced
+  from itself.
+- A voice line remembers what it was read from (`text`, `voice`, `speed` on
+  the track; set by the build and by `audio add`/`update`), so a re-read
+  keeps the voice.
+- A re-fit moves each sound effect with its scene (`retimeSoundTracks`);
+  before, a fit left the whoosh and the click hit where the old scenes were.
+- `/api/speaker-level` sets the voice lines' level on a film with no
+  speaker track.
+
+## 2026-10-08 — Adding a track with a known id replaces it
+
+Re-voicing vo_scene_2 on proj_f5c104bb with `audio add` stacked three copies
+of the line (the tool pushed; one call landed through an expired session
+too). `audio add` now puts the track by id (`putTrack`, `audio/tracks.ts`):
+a known id is replaced in place, a new one appended.
+
+## 2026-10-08 — A short voice line is as loud as a long one
+
+Marc on proj_f5c104bb: "the voice volume drops off in the last scene". Every
+generated line was levelled with a single-pass `loudnorm`, which rides its
+gain on a 3 s window: the 2 s closing line ("It's free. Click to save your
+spot.") came out ~2 dB under the long lines (measured: 2 s -17.8 LUFS, 8 s
+-16.0 from the same source). `speak` (`audio/tts.ts`) now measures the line
+first (`measureLoudness`) and applies ONE gain to -14 LUFS plus a -1.5 dBTP
+limiter (`levelFilter`): 2 s and 9 s lines land within 1 dB. Existing lines
+keep their level until re-voiced.
+
 ## 2026-10-08 — The bed stays down through the narration
 
 Marc on Six Tabs: "the volume is bouncing from scene to scene". Every voiced
