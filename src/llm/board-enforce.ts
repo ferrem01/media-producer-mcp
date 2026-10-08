@@ -219,7 +219,11 @@ export function captionVoicedBoard(scenes: any[], o: {
     const lane = o.lane(o.spineOf(script, Number(d.duration_seconds) || boardLengthForLine(script)), Array.isArray(d.emphasis) ? d.emphasis.map(String) : []);
     if (!lane) continue;
     const before = d.components.length;
-    d.components = d.components.filter((c: any) => !(c && LINE_TYPE.has(c.type) && recall(script, String(c.data?.text ?? (Array.isArray(c.data?.lines) ? c.data.lines.map((l: any) => (typeof l === "string" ? l : l?.text || "")).join(" ") : ""))) >= 0.7));
+    // The writer's own captions go (any caption-* style: the lane IS the
+    // captions -- proj_80559109 cast caption-kinetic-slam with the whole
+    // line on all six scenes), and so does display type that only repeats
+    // the line.
+    d.components = d.components.filter((c: any) => !(c && typeof c.type === "string" && /^caption-/.test(c.type)) && !(c && LINE_TYPE.has(c.type) && recall(script, String(c.data?.text ?? (Array.isArray(c.data?.lines) ? c.data.lines.map((l: any) => (typeof l === "string" ? l : l?.text || "")).join(" ") : ""))) >= 0.7));
     dropped += before - d.components.length;
     lane.position = o.tall ? { x: "5%", y: "66%", width: "90%", height: "11%" } : { x: "10%", y: "78%", width: "80%", height: "12%" };
     lane.z_index = 41;

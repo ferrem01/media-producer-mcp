@@ -144,6 +144,39 @@ export interface CaptionLaneOpts {
    *  plate, the tail small beneath. Anything else: the plated chest-band
    *  lane, phrases replacing each other. */
   style?: string;
+  /** How a spoken word is SHOWN when the line spells it for the voice:
+   *  the brand's people ({say: "Max DAA-vish", name: "Max Davish"}). The
+   *  anchors keep the spoken word; only the caption text changes. */
+  display?: Array<{ say: string; name: string }>;
+}
+
+/** The brand's people whose name the voice says differently (brand assets
+ *  with person.say): what captions show for what is said. */
+export function peopleDisplay(kit: { assets?: Array<{ person?: { name?: string; say?: string } }> } | null | undefined): Array<{ say: string; name: string }> {
+  return (kit?.assets || []).flatMap((a) => (a?.person?.name && a.person.say && a.person.say !== a.person.name ? [{ say: a.person.say, name: a.person.name }] : []));
+}
+
+/** The spoken-to-shown word swaps a set of people implies, word by word
+ *  ("DAA-vish" -> "Davish"); a say with a different word count than the
+ *  name swaps as a whole phrase. */
+export function displaySwaps(display: Array<{ say: string; name: string }> = []): Array<{ from: string; to: string }> {
+  const out: Array<{ from: string; to: string }> = [];
+  for (const d of display) {
+    if (!d?.say || !d?.name || d.say === d.name) continue;
+    const s = d.say.trim().split(/\s+/), n = d.name.trim().split(/\s+/);
+    if (s.length === n.length) s.forEach((w, i) => { if (w.toLowerCase() !== n[i].toLowerCase()) out.push({ from: w, to: n[i] }); });
+    else out.push({ from: d.say.trim(), to: d.name.trim() });
+  }
+  return out;
+}
+
+function showWords(text: string, swaps: Array<{ from: string; to: string }>): string {
+  let t = text;
+  for (const { from, to } of swaps) {
+    const esc = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    t = t.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${esc}(?=$|[^\\p{L}\\p{N}])`, "giu"), (_m, pre) => pre + to);
+  }
+  return t;
 }
 
 /** The caption component for a scene: the lane, its phrases from the
@@ -157,6 +190,7 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
   const tiered = opts.style === "tiered";
   const phrases = captionPhrases(spine, em, { maxWords: scatter ? SCATTER_MAX_WORDS : tiered ? TIERED_MAX_WORDS : MAX_WORDS });
   if (!phrases.length) return null;
+  const swaps = displaySwaps(opts.display);
   // Anchors: phrase i starts on its first word and ends where phrase i+1
   // starts (the same word), the last on its own last word's end plus the
   // hold. Occurrences count the token's earlier appearances in the scene.
@@ -179,6 +213,8 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
       ? { word: starts[i + 1].word, occurrence: starts[i + 1].occurrence }
       : { word: ends[i].word, occurrence: ends[i].occurrence, edge: "end", offset: TAIL_HOLD_S };
   });
+  // Shown as written on screen, anchored to the word as spoken.
+  if (swaps.length) for (const p of phrases) p.text = showWords(p.text, swaps);
   return {
     id: "captions",
     type: "reel-caption-lane",

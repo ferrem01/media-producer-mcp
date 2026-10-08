@@ -151,3 +151,26 @@ describe("a voiced film no person carries is captioned too", () => {
     expect(p).toMatch(/captionVoicedBoard\(storyboard\.scenes/);
   });
 });
+
+describe("captions show the name, the voice says it", () => {
+  it("swaps the spoken spelling for the written name in the caption text; the anchors keep the spoken word", async () => {
+    const { captionLane, peopleDisplay, displaySwaps } = await import("../src/core/captions.js");
+    const { assertedSpine } = await import("../src/core/word-anchors.js");
+    const kit = { assets: [{ person: { name: "Max Davish", say: "Max DAA-vish" } }, { person: { name: "Scott Murtaugh" } }] };
+    expect(peopleDisplay(kit)).toEqual([{ say: "Max DAA-vish", name: "Max Davish" }]);
+    expect(displaySwaps(peopleDisplay(kit))).toEqual([{ from: "DAA-vish", to: "Davish" }]);
+    const line = "On October 20th, Scott and Max DAA-vish build the answer live in Claude.";
+    const lane = captionLane(assertedSpine(line, 5), [], { display: peopleDisplay(kit) })!;
+    const shown = (lane.data.phrases as any[]).map((p) => p.text).join(" ");
+    expect(shown).toMatch(/Max Davish/);
+    expect(shown).not.toMatch(/DAA-vish/);
+    expect(JSON.stringify(lane.anchors)).not.toMatch(/"Davish/);   // anchors follow the spoken words
+  });
+
+  it("the writer's own caption-* components go when the lane is cast", async () => {
+    const { captionVoicedBoard } = await import("../src/llm/board-enforce.js");
+    const scenes: any[] = [{ duration_seconds: 3, voiceover_text: "It's free. Click to save your spot.", components: [{ type: "caption-kinetic-slam", data: { text: "It's free. Click to save your spot." } }, { type: "cta-card", data: {} }] }];
+    captionVoicedBoard(scenes, { tall: true, spineOf: (s: string, d: number) => ({ words: s.split(" ").map((t, i) => ({ text: t, start: i * 0.3, end: i * 0.3 + 0.3 })), duration: d, source: "asserted" }), lane: () => ({ type: "reel-caption-lane", data: { phrases: [] } }) });
+    expect(scenes[0].components.map((c: any) => c.type)).toEqual(["cta-card", "reel-caption-lane"]);
+  });
+});

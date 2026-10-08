@@ -38,7 +38,7 @@ import { recipeWantsVoice } from "./storyboard-builder.js";
 import { enforceBoard, captionVoicedBoard } from "./board-enforce.js";
 import { ownMusicBed, MUSIC_BED_ID } from "../audio/music-generate.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
-import { captionLane } from "../core/captions.js";
+import { captionLane, peopleDisplay } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
 import { applySpine, extractAnchors, resolveComponent, assertedSpine } from "../core/word-anchors.js";
 import { generateImage } from "../media/image-gen.js";
@@ -2837,7 +2837,7 @@ async function runUnifiedPipeline(
   // it, and the writer's own full-line type that only repeats the voice
   // dropped (proj_37f3593b: every scene's line as big kinetic text).
   if (format === "video" && (!!opts.voiceover || recipeVoice) && !personCarries(filmGrammar)) {
-    const cap = captionVoicedBoard(storyboard.scenes as any[], { tall: canvas.height > canvas.width, spineOf: (script, dur) => assertedSpine(script, dur), lane: captionLane });
+    const cap = captionVoicedBoard(storyboard.scenes as any[], { tall: canvas.height > canvas.width, spineOf: (script, dur) => assertedSpine(script, dur), lane: (sp, em) => captionLane(sp, em, { display: peopleDisplay(brandKit) }) });
     if (cap.captioned) console.log(`  Captions: ${cap.captioned} voiced scene(s) captioned${cap.dropped ? `; ${cap.dropped} line-repeating type dropped` : ""}`);
   }
 
@@ -3024,7 +3024,7 @@ async function runUnifiedPipeline(
         const hasLane = (d.components as any[]).some((c) => c && typeof c === "object" && c.type === "reel-caption-lane");
         // A recipe with no captions (the Grade film) casts no lane at all.
         if (!hasLane && spine.words.length && wantMode !== "none") {
-          const lane = captionLane(spine, Array.isArray(d.emphasis) ? d.emphasis.map(String) : [], { style: capStyle });
+          const lane = captionLane(spine, Array.isArray(d.emphasis) ? d.emphasis.map(String) : [], { style: capStyle, display: peopleDisplay(brandKit) });
           if (lane) {
             d.components.push(lane);
             const marked = (lane.data.phrases as any[]).filter((p) => /\*/.test(String(p.text))).length;
