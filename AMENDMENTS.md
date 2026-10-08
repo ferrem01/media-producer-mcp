@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — A short voice line is as loud as a long one
+
+Marc on proj_f5c104bb: "the voice volume drops off in the last scene". Every
+generated line was levelled with a single-pass `loudnorm`, which rides its
+gain on a 3 s window: the 2 s closing line ("It's free. Click to save your
+spot.") came out ~2 dB under the long lines (measured: 2 s -17.8 LUFS, 8 s
+-16.0 from the same source). `speak` (`audio/tts.ts`) now measures the line
+first (`measureLoudness`) and applies ONE gain to -14 LUFS plus a -1.5 dBTP
+limiter (`levelFilter`): 2 s and 9 s lines land within 1 dB. Existing lines
+keep their level until re-voiced.
+
 ## 2026-10-08 — The bed stays down through the narration
 
 Marc on Six Tabs: "the volume is bouncing from scene to scene". Every voiced
