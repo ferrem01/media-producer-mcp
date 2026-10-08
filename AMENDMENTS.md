@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — A tall voiced frame: one stage above the words
+
+On the fresh Six Tabs build every surface was a strip: the tall-frame
+layout stacked the flood, the click-stream and the caption lane as three
+equal surfaces (21% each), the Claude session and the people row as two,
+and stamped a sticker in the platform UI's top band. Now, on a tall frame
+with no speaker: a caption lane on the scene stops the surfaces at 64% (the
+lane owns 66-77%); a people row / logo band / stack list is a slim band
+(0.4 of a share) and the screen the beat is about takes the rest; stickers
+stamp at three spots inside the safe band; sticker-rain is a full-stage
+overlay like floating-pills.
+
 ## 2026-10-08 — The fresh Six Tabs build: a black block, flat loud music
 
 Marc on proj_27c1233f: "multiple audio tracks playing over the very techno

@@ -623,7 +623,7 @@ function isCutaway(c: { type: string; position?: any; enter?: any }): boolean {
 }
 /** Ambient full-stage text overlays that ride ABOVE the windows (their own
  *  markup scatters; the box is the whole stage). */
-var HIGH_OVERLAY_TYPES = ["floating-pills"];
+var HIGH_OVERLAY_TYPES = ["floating-pills", "sticker-rain"];
 // Overlays that PLACE THEMSELVES inside the whole frame (safe margins of
 // their own): the chapter kicker with its step dots, the logo band.
 // ...and the lower third, which anchors itself bottom-left/right with its
@@ -670,6 +670,10 @@ function accentSpotFor(k: number): Record<string, string | number> {
   return ACCENT_RING[(k - ACCENT_SPOTS.length) % ACCENT_RING.length];
 }
 var FULL_STAGE: Record<string, string | number> = { x: 0, y: 0, width: "100%", height: "100%" };
+/** Sticker spots on a tall frame: inside the safe band (12%-64%), at the sides. */
+var V_ACCENT_SPOTS: Array<Record<string, string | number>> = [pct(64, 16, 30, 9), pct(6, 38, 30, 9), pct(64, 52, 30, 9)];
+/** Surfaces that are a strip, not a screen: a slim band in a tall stack. */
+var SLIM_SURFACE_TYPES = ["people-row", "logo-band", "stack-list"];
 
 function isCaptionRole(t: string): boolean {
   return CAPTION_ROLE_TYPES.indexOf(t) !== -1 || t.indexOf("caption-") === 0;
@@ -981,13 +985,29 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
   // anything narrower is an illegible sliver.
   if (vertical) {
     var vTop = 14, vBottom = 88; // middle band: clear of platform UI
+    // A VOICED FILM'S CAPTION LANE owns 66-77%: the surfaces stop above it
+    // instead of running under the words (the Six Tabs build, proj_27c1233f).
+    if (authored.some((c) => c.type === "reel-caption-lane")) vBottom = 64;
+    // Stickers stamp inside the safe band, never in the platform UI's top 12%.
+    var vAcc = 0;
+    authored.forEach((c, i) => {
+      if (ACCENT_TYPES.indexOf(c.type) !== -1 && slots[i]) { slots[i] = { position: V_ACCENT_SPOTS[vAcc % V_ACCENT_SPOTS.length], z_index: 40 + vAcc }; vAcc++; }
+    });
     var capBand = captionIdx.length + heroIdx.length > 0;
     var surfTop = capBand ? 34 : vTop + 4;
     var freeSurf = surfaceIdx.filter((i) => !slots[i]);
     if (freeSurf.length > 0) {
-      var sh = (vBottom - surfTop - (freeSurf.length - 1) * 3) / freeSurf.length;
+      // A strip of people (the hosts) takes a slim band; the surface the
+      // beat is about takes the rest -- split evenly, a Claude session and a
+      // people row were each squeezed into a fifth of the frame.
+      var weightOf = (i: number) => (SLIM_SURFACE_TYPES.indexOf(authored[i].type) !== -1 ? 0.4 : 1);
+      var totalW = freeSurf.reduce((a, i) => a + weightOf(i), 0);
+      var room = vBottom - surfTop - (freeSurf.length - 1) * 3;
+      var yAt = surfTop;
       freeSurf.forEach((idx, k) => {
-        slots[idx] = { position: pct(0, surfTop + k * (sh + 3), 100, sh), z_index: 10 + k };
+        var h = room * weightOf(idx) / totalW;
+        slots[idx] = { position: pct(0, yAt, 100, h), z_index: 10 + k };
+        yAt += h + 3;
       });
     }
     var vEd = heroIdx.concat(captionIdx);
