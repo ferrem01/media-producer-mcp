@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — A voiceover in a cloned voice
+
+Marc: "voice six tabs with my clone." A film's narration could only be read
+by the stock TTS voices (nova and friends).
+
+- `audio add|update` voiceover with `text` + `track.actor` (a cast actor --
+  their ElevenLabs voice) or `track.voice_id`, optional `track.speed`
+  (0.8-1.25): read by ElevenLabs on the same model and level as a performed
+  scene's line (src/audio/clone-voice.ts). An update writes a fresh file name
+  so no player keeps the old read.
+
 ## 2026-10-08 — tool-storm style logo: the real logos, no windows
 
 Marc on Five Tools: the tool windows read as "generic boxy ... supposedly

@@ -86,6 +86,8 @@ import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
 import { generateSfx } from "./audio/sfx-generate.js";
 import { generateMusic } from "./audio/music-generate.js";
+import { speakInVoice, resolveCloneVoice } from "./audio/clone-voice.js";
+import { getActor } from "./core/cast.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
@@ -3207,6 +3209,9 @@ export function createMcpServer(): McpServer {
         sfx: z.string().optional().describe("A sound effect id from action='search_sfx' (e.g. 'house-whoosh-soft', 'freesound-12345'). The file is copied into the project and becomes this track's source -- pass type 'sfx' and a start_time."),
         text: z.string().optional().describe("Text to generate TTS voiceover from (type must be voiceover)"),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice (default: nova)"),
+        voice_id: z.string().optional().describe("Voiceover with text: read it in this ElevenLabs voice (a clone) instead of the stock TTS voice"),
+        actor: z.string().optional().describe("Voiceover with text: read it in this cast actor's ElevenLabs voice (e.g. 'marc' -- the person's own clone)"),
+        speed: z.number().min(0.8).max(1.25).optional().describe("Voiceover read in a voice_id/actor voice: tempo, pitch kept (1.1-1.25 is a fast creator pace)"),
         volume: z.number().min(0).max(1).optional(),
         start_time: z.number().optional(),
         trim_start: z.number().min(0).optional().describe("Skip this many seconds of the source before it plays -- land a song's drop on the film's beat (music: the drop at source 17.0 s on film 11.25 s = trim_start 5.75)."),
@@ -3313,11 +3318,18 @@ export function createMcpServer(): McpServer {
           await fs.mkdir(audioDir, { recursive: true });
 
           const outputPath = path.join(audioDir, `${params.track.id}.mp3`);
-          await generateTTS({
-            text: params.track.text,
-            voice: params.track.voice || "nova",
-            outputPath,
-          });
+          if (params.track.voice_id || params.track.actor) {
+            try {
+              const voiceId = await resolveCloneVoice(params.tenant_id, params.track, getActor);
+              await speakInVoice({ text: params.track.text, voiceId, out: outputPath, speed: params.track.speed });
+            } catch (e: any) { return err(`Voiceover: ${e.message}`); }
+          } else {
+            await generateTTS({
+              text: params.track.text,
+              voice: params.track.voice || "nova",
+              outputPath,
+            });
+          }
           source = outputPath;
         }
 
@@ -3374,12 +3386,20 @@ export function createMcpServer(): McpServer {
           const audioDir = path.join(assetsDir, "audio");
           await fs.mkdir(audioDir, { recursive: true });
 
-          const outputPath = path.join(audioDir, `${existing.id}.mp3`);
-          await generateTTS({
-            text: params.track.text,
-            voice: params.track.voice || "nova",
-            outputPath,
-          });
+          // A fresh file name: the player and render must not keep the old read.
+          const outputPath = path.join(audioDir, `${existing.id}-${Date.now().toString(36)}.mp3`);
+          if (params.track.voice_id || params.track.actor) {
+            try {
+              const voiceId = await resolveCloneVoice(params.tenant_id, params.track, getActor);
+              await speakInVoice({ text: params.track.text, voiceId, out: outputPath, speed: params.track.speed });
+            } catch (e: any) { return err(`Voiceover: ${e.message}`); }
+          } else {
+            await generateTTS({
+              text: params.track.text,
+              voice: params.track.voice || "nova",
+              outputPath,
+            });
+          }
           existing.source = outputPath;
         }
 
