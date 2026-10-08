@@ -942,12 +942,14 @@ Durations will be snapped to the bar grid after you submit -- authoring on-grid 
   var outros = brandAssets.filter(a => a.type === "outro");
   var brandMusic = brandAssets.filter(a => a.type === "music");
 
+  // DEMOTED (Marc, Oct 8: "that annoying background that we have as part of
+  // our brand ... I almost never want you to use that"): listed, never
+  // preferred -- the film's world is the ground.
   if (backgrounds.length) {
-    brandAssetsSection += `\n\n## Brand Background Images (MANDATORY)\nThese are pre-approved brand backgrounds. PREFER these over mesh-gradient or gradient-background when a matching background exists.\n`;
+    brandAssetsSection += `\n\n## Brand Background Images (only when the brief asks for them)\nThe brand kit has background images. Do NOT use them unless the brief names the brand background -- the film's world (or a flat brand colour) is the ground. If asked, place one as a full-bleed image component at z_index 0:\n`;
     for (var bg of backgrounds) {
       brandAssetsSection += `- "${bg.name}": ${bg.url}${bg.tags?.length ? ` [tags: ${bg.tags.join(", ")}]` : ""}\n`;
     }
-    brandAssetsSection += `\nTo use a brand background as a full-bleed scene background at z_index 0, use the image component:\n{ "type": "image", "data": { "src": "${backgrounds[0].url}" }, "z_index": 0 }\nOptional data props: overlay_opacity (0-1 for text readability), overlay_color, drift (true/false for ken-burns).\n`;
   }
 
   if (intros.length) {

@@ -281,7 +281,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   }
 
   // Generate brand kit CSS variables
-  const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(brandKit, scene.background, preview);
+  const { css: brandCSS, theme: sceneTheme } = generateBrandCSS(brandKit, scene.background, preview);
 
   // Determine if scene should use transparent background (for full-behind speaker overlay)
   const isTransparent = scene.transparent_background === true;
@@ -383,13 +383,6 @@ ${generateFontLinks(brandKit)}
 /* ── Brand Kit ── */
 ${brandCSS}
 
-${hasBgImage ? `
-/* ── Brand background image: reduce gradient overlay opacity ── */
-.bg-gradient {
-  opacity: 0.65 !important;
-}
-` : ''}
-
 /* ── Reset ── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -476,7 +469,6 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 ${preview && speakerUrl && isTransparent && !rigCamera ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script><script>${timelapseClockScript(scene.media_edits, canvas, "document.body", "window.__MP_TIMELINE", scene.duration_seconds)}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${rigCamera ? speakerRigVideoHtml(speakerUrl!, options.speakerOffset || 0, !!preview) : ''}${isTransparent || lockedCamera ? '' : '<div class="mp-ambient"></div>'}
-${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
 ${buildContentRegionWrapper(scene, componentBlocks)}
 </div>
 
@@ -1031,6 +1023,11 @@ export function wrapperChoreoScript(
                 'slide-up': { y: '-115%' }, 'slide-down': { y: '115%' },
                 'rise': { y: 60, autoAlpha: 0 }, 'pop': { scale: 0.72, autoAlpha: 0 },
                 'fade': { autoAlpha: 0 },
+                // COLLAPSE / EXPAND (relay, Marc Oct 8: "have that component
+                // collapse to zero and then have it open back up into Scott
+                // and Max"): the whole piece folds to nothing about its centre,
+                // or opens out of nothing. One pose, both names.
+                'collapse': { scale: 0, autoAlpha: 0 }, 'expand': { scale: 0, autoAlpha: 0 },
                 // A HARD cut (SPEC-creator-cut.md): the same pose as a fade,
                 // played in under one frame -- the wrapper is simply there,
                 // then simply gone. A set() would render on creation.
@@ -1316,7 +1313,6 @@ export function cameraMovesScript(
             if ((OVERSCAN !== null && TRAVEL_SAFE[ct]) || zOf(n) > 2) cam.appendChild(n);
             return;
           }
-          if (n.classList && n.classList.contains('mp-page-bg')) return;
           if (n.querySelector && n.children.length === 1 && n.firstElementChild && n.firstElementChild.hasAttribute && n.firstElementChild.hasAttribute('data-mp-backdrop')) return;
         }
         cam.appendChild(n);
@@ -1780,7 +1776,7 @@ export async function assembleCodegenScene(options: {
   );
 
   // 6. Generate brand CSS
-  const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(
+  const { css: brandCSS, theme: sceneTheme } = generateBrandCSS(
     brandKit, background, preview,
   );
 
@@ -1809,10 +1805,6 @@ ${generateFontLinks(brandKit)}
 <style>
 /* ── Brand Kit ── */
 ${brandCSS}
-
-${hasBgImage ? `
-.bg-gradient { opacity: 0.65 !important; }
-` : ""}
 
 /* ── Reset ── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1873,7 +1865,6 @@ ${preview && speakerUrl && isTransparent && !rigCameraC ? speakerUnderlayHtml(sp
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${rigCameraC ? speakerRigVideoHtml(speakerUrl!, options.speakerOffset || 0, !!preview) : ''}
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
-${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
 <div class="mp-scene-content" style="position:absolute;top:20px;left:20px;width:${canvas.width}px;height:${canvas.height}px;z-index:2;">
 ${tagResult.html}
 </div>
@@ -2286,38 +2277,6 @@ function isLightColor(hex: string): boolean {
 }
 
 /**
- * Pick a brand background image URL based on the scene theme.
- * Prefers dark-tagged images for dark scenes, light-tagged for light.
- * Returns undefined if no suitable background found.
- */
-function pickBrandBackground(brand: BrandKit, isDark: boolean): { url: string; isDark: boolean } | undefined {
-  const bgAssets = (brand.assets || []).filter((a: any) => a.type === 'background');
-  if (bgAssets.length === 0) return undefined;
-
-  const darkTags = /dark|night|deep|midnight/i;
-  const lightTags = /light|white|bright|soft|pastel/i;
-
-  const tagIsDark = (a: any) =>
-    (a.tags || []).some((t: string) => darkTags.test(t)) || darkTags.test(a.name);
-  const tagIsLight = (a: any) =>
-    (a.tags || []).some((t: string) => lightTags.test(t)) || lightTags.test(a.name);
-
-  const darkBgs = bgAssets.filter((a: any) => tagIsDark(a));
-  const lightBgs = bgAssets.filter((a: any) => tagIsLight(a));
-
-  if (isDark) {
-    // Prefer dark backgrounds, fall back to any
-    const pool = darkBgs.length > 0 ? darkBgs : bgAssets;
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    return picked ? { url: picked.url, isDark: tagIsDark(picked) || !tagIsLight(picked) } : undefined;
-  } else {
-    const pool = lightBgs.length > 0 ? lightBgs : bgAssets;
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    return picked ? { url: picked.url, isDark: tagIsDark(picked) } : undefined;
-  }
-}
-
-/**
  * Generate CSS custom properties from the brand kit.
  *
  * Theme-aware: detects whether the effective scene background is light or dark,
@@ -2326,11 +2285,10 @@ function pickBrandBackground(brand: BrandKit, isDark: boolean): { url: string; i
  * CSS vars match the actual scene theme so text is always readable.
  *
  * Also emits:
- *   --mp-bg-image: url(...) for brand background injection
  *   --mp-color-cta: CTA button color (from accent)
  *   --mp-color-glow: glow/shadow color based on primary
  */
-export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, preview?: boolean): { css: string; theme: "dark" | "light"; hasBgImage: boolean } {
+export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, preview?: boolean): { css: string; theme: "dark" | "light" } {
   const vars: string[] = [];
 
   // ── Determine effective theme ──
@@ -2339,9 +2297,7 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
   const effectiveBg = sceneBackground || brand.colors?.background || '#0f172a';
   const bgIsLight = isLightColor(effectiveBg);
 
-  // Start with the background color to determine theme. The background image
-  // picked below may override this if its tags disagree.
-  let sceneIsDark = !bgIsLight;
+  const sceneIsDark = !bgIsLight;
 
   // ── Colors ──
   if (brand.colors) {
@@ -2352,17 +2308,11 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
     }
   }
 
-  // ── Background image (pick before text colors so tags can refine theme) ──
-  // An EXPLICIT scene background is a director's choice of a flat canvas --
-  // it suppresses the brand-kit background image entirely. (Before this, the
-  // harvested brand "background" asset painted OVER every flat-color scene.)
-  const bgResult = sceneBackground ? null : pickBrandBackground(brand, sceneIsDark);
-  if (bgResult) {
-    // Let the picked background image's tags override the theme.
-    // If the brand bg color is light but we picked a dark-tagged image,
-    // switch to dark theme. Vice versa.
-    sceneIsDark = bgResult.isDark;
-  }
+  // A brand-kit "background" image is NEVER painted behind a scene on its
+  // own: a scene without a background sits on the brand colour (and the
+  // film's world). Marc, Oct 8: "that annoying background that we have as
+  // part of our brand ... I almost never want you to use that." A scene
+  // that wants it places it as an image component.
 
   // ── Theme-aware text colors ──
   // On dark backgrounds: white text, light muted text
@@ -2425,20 +2375,6 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
     vars.push(`  --mp-motion-style: ${brand.style.motion};`);
   }
 
-  // ── Background image ──
-  if (bgResult) {
-    // Resolve relative URLs to absolute for file:// protocol
-    const resolvedUrl = bgResult.url.startsWith('/assets/')
-      ? resolveAssetPath(bgResult.url, preview)
-      : bgResult.url.startsWith('/api/')
-      ? (preview ? bgResult.url : `http://localhost:${config.port}${bgResult.url}`)
-      : bgResult.url;
-    vars.push(`  --mp-bg-image: url(${resolvedUrl});`);
-    vars.push('  --mp-has-bg-image: 1;');
-  } else {
-    vars.push('  --mp-bg-image: none;');
-    vars.push('  --mp-has-bg-image: 0;');
-  }
 
   // ── CTA color (accent) ──
   if (brand.colors?.accent) {
@@ -2453,7 +2389,7 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
   // ── Theme hint ──
   vars.push(`  --mp-theme: ${sceneIsDark ? 'dark' : 'light'};`);
 
-  return { css: `:root {\n${vars.join('\n')}\n}`, theme: sceneIsDark ? 'dark' : 'light', hasBgImage: !!bgResult };
+  return { css: `:root {\n${vars.join('\n')}\n}`, theme: sceneIsDark ? 'dark' : 'light' };
 }
 
 
