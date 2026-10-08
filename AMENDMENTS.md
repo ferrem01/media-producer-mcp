@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Silent b-roll asks Seedance for no sound
+
+Marc's CEO sit-down test (proj_14b6c070): the walk-in-and-sit b-roll came back
+"the generated audio may be related to copyright restrictions and was blocked
+by the provider policy". `seedanceShot` sent `generate_audio: true` on every
+shot, so a silent b-roll still had Seedance invent a soundtrack -- which
+`actorClip` then stripped with `-an`. Sound is now asked for only when a voice
+is referenced (`generate_audio: !!opts.audio`), and the silent prompt drops its
+"Sound: room tone" line. Speaking shots are unchanged.
+
 ## 2026-10-08 — The brand library reaches the writer; voiced films are captioned
 
 The second cold Six Tabs run (proj_37f3593b) followed the beats, but every
