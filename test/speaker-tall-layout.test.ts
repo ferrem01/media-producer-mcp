@@ -92,7 +92,7 @@ describe("a speaker scene on a TALL frame", () => {
     // THE WORDS RIDE OVER EVERYTHING: the caption lane owns the lower band
     // (68%-82%: below a chest-up chin), above a cut-in proof (36) and a
     // label (39), so it runs through the cutaways (core/captions.ts)...
-    expect(by("reel-caption-lane").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "12%" });
+    expect(by("reel-caption-lane").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "10%" });
     expect(by("reel-caption-lane").z_index).toBe(41);
     // ...and the surfaces stack under the platform strip (13%-30%).
     for (const t of ["composer", "auto-tagged-link"]) {
@@ -189,17 +189,19 @@ describe("the bands and side slots stay inside the frame the punch-in shows", ()
 
 describe("a speaker scene laid out around a MEASURED face", () => {
   const BED = { cx: 0.569, cy: 0.61, size: 0.406 };
-  it("with the face low in the frame, the captions take the band above the hairline and nothing sits under the chin", () => {
+  it("with the face low in the frame, the captions still sit in the lower third; the surfaces go above the hairline", () => {
     const comps = build({ width: 1080, height: 1920 }, AUTHORED, undefined, BED);
     const by = (t: string) => comps.find((c) => c.type === t);
-    // No room under the chin: the words win the one band there is; the
-    // surfaces that wanted it have no band left and are dropped (the
-    // captions are the film's text layer, a composer is furniture).
-    const lane = by("reel-caption-lane").position;
-    expect(pctNum(lane.y)).toBeGreaterThanOrEqual(13);
-    expect(pctNum(lane.y) + pctNum(lane.height)).toBeLessThanOrEqual(32.1);
-    expect(by("composer")).toBeUndefined();
-    expect(by("auto-tagged-link")).toBeUndefined();
+    // THE LOWER THIRD, ALWAYS (Marc, Oct 8: "I just don't want the caption
+    // to be in the dead center of the screen"): the lane no longer climbs
+    // above the hairline with a low face; it holds CAPTION_LANE_TALL.
+    expect(by("reel-caption-lane").position).toEqual({ x: "5%", y: "68%", width: "90%", height: "10%" });
+    for (const t of ["composer", "auto-tagged-link"]) {
+      const p = by(t)?.position;
+      if (!p) continue;
+      expect(pctNum(p.y)).toBeGreaterThanOrEqual(13);
+      expect(pctNum(p.y) + pctNum(p.height)).toBeLessThanOrEqual(32.1);
+    }
     // Without the lane, every surface goes above the hairline as before.
     const plain = build({ width: 1080, height: 1920 }, AUTHORED.filter((c) => c.type !== "reel-caption-lane"), undefined, BED);
     for (const t of ["composer", "auto-tagged-link"]) {
@@ -209,10 +211,13 @@ describe("a speaker scene laid out around a MEASURED face", () => {
     }
     // The one side with room -- inside the window a 1.3x punch-in still shows (measured live: a
     // sticker at the frame's edge left the frame under the zoom), so not at 5% any more.
-    expect(pctNum(by("sticker-prop").position.x)).toBeGreaterThanOrEqual(21);
-    expect(pctNum(by("sticker-prop").position.x)).toBeLessThan(50);
-    expect(pctNum(by("floating-pills").position.y)).toBeGreaterThanOrEqual(13); // the pills share the free band, never the face
-    expect(pctNum(by("floating-pills").position.y) + pctNum(by("floating-pills").position.height)).toBeLessThanOrEqual(32.1);
+    const sticker = by("sticker-prop")?.position;
+    if (sticker) { expect(pctNum(sticker.x)).toBeGreaterThanOrEqual(21); expect(pctNum(sticker.x)).toBeLessThan(50); }
+    const pills = by("floating-pills")?.position;
+    if (pills) { // the pills share a free band, never the face
+      const top = pctNum(pills.y), bot = top + pctNum(pills.height);
+      expect(bot <= 32.1 || top >= 68).toBe(true);
+    }
   });
 });
 

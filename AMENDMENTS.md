@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Captions sit in the lower third, never mid-frame
+
+Marc: "I just don't want the caption to be in the dead center of the screen
+... Caption should be not in the middle of the screen. It should be sort of
+in the lower third." On a tall speaker frame the lane took the top of the
+chest band (as high as 55%) or, with a low face, the band above the
+hairline. Now it always sits at CAPTION_LANE_TALL (68%-78%: under the chin,
+above the platform's bottom UI); what is left of the lower band above it
+stays free for a name tag or a sticker. Wide frames already put it in the
+lower third. Fixed by hand on proj_85782f74 and proj_d37c96fe (captions
+37% -> 68%, the overlays up to 42%-66%, Marc's name tag above the lane).
+
 ## 2026-10-08 — The brand background image is demoted; collapse / expand
 
 Marc on the 16:9 Six Tabs: "the backdrop is that annoying background that we

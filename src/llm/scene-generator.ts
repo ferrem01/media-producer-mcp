@@ -712,6 +712,10 @@ type TakeFace = { cx: number; cy: number; size: number };
  * top band ends above the hairline, and accent slots sit beside the head
  * only where there is room. Fractions of the frame; y downward.
  */
+/** Where the captions sit on a tall frame (frame fractions): the lower
+ *  third, above the platform's bottom UI (the bottom 18%). Never mid-frame. */
+export const CAPTION_LANE_TALL = { top: 0.68, height: 0.10 };
+
 export function tallSpeakerBands(face: TakeFace | undefined, frameRatio = 16 / 9, punchIn = 1.3): {
   lower: { top: number; bottom: number } | null;
   top: { top: number; bottom: number } | null;
@@ -846,7 +850,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     // (39), so it keeps running through the cutaways (Marc: the voice never
     // stops, so the words never stop). It is slotted here, before the dock,
     // so the band it owns is not handed to a label as well.
-    var laneLower = false, laneTop = false;
+    var laneLower = false;
     var laneRest: { top: number; bottom: number } | null = null;
     authored.forEach((c, i) => {
       if (c.type !== "reel-caption-lane") return;
@@ -856,22 +860,20 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
       // reads --mp-cut from the choreography, not cut_top.
       if ((c as any).data && String((c as any).data.mode || "") === "scatter") { slots[i] = { position: pct(0, 0, 100, 100), z_index: 41 }; return; }
       if (vertical && !takeover) {
-        // The chest band; with the face low in the frame (no room under
-        // the chin) the band above the hairline. The words win the band:
-        // whatever else wanted it stacks elsewhere or is dropped. The lane
-        // is PINNED to the frame (never rides the rig), so its bands are
-        // the frame's own, not the punch-in window's. It takes 12% at the
-        // band's top; what is left of the band stays free for a sticker
-        // or the pills (measured live, proj_f10e79cf: a close face left
-        // no side slot, and the sticker had nowhere to go).
+        // THE LOWER THIRD, ALWAYS (Marc, Oct 8: "I just don't want the
+        // caption to be in the dead center of the screen ... Caption should
+        // be not in the middle of the screen. It should be sort of in the
+        // lower third"). The lane sits at CAPTION_LANE_TALL -- above the
+        // platform's bottom UI, under the chin -- whatever the face; it used
+        // to take the top of the chest band (as high as 55%) or, with a low
+        // face, the band above the hairline. The lane is PINNED to the frame
+        // (never rides the rig). What is left of the lower band ABOVE it
+        // stays free for a name tag, a sticker or the pills.
         const lb = tallSpeakerBands(face, frameRatio, 1);
-        const band = lb.lower || lb.top || { top: 0.68, bottom: 0.82 };
-        const laneH = Math.min(0.12, band.bottom - band.top);
         const q = (n: number) => Math.round(n * 1000) / 10;
-        slots[i] = { position: pct(5, q(band.top), 90, q(laneH)), z_index: 41 };
-        laneLower = !!lb.lower;
-        laneTop = !lb.lower && !!lb.top;
-        if (band.bottom - (band.top + laneH) >= 0.06) laneRest = { top: band.top + laneH, bottom: band.bottom };
+        slots[i] = { position: pct(5, q(CAPTION_LANE_TALL.top), 90, q(CAPTION_LANE_TALL.height)), z_index: 41 };
+        laneLower = true;
+        if (lb.lower && CAPTION_LANE_TALL.top - lb.lower.top >= 0.06) laneRest = { top: lb.lower.top, bottom: CAPTION_LANE_TALL.top - 0.01 };
       } else {
         slots[i] = { position: pct(15, 74, 70, 16), z_index: 41 };
       }
@@ -898,14 +900,14 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
       const p100 = (n: number) => Math.round(n * 1000) / 10;
       var stack = dockSurf.concat(heroIdx, captionIdx).filter((i) => !slots[i]).sort((a, b) => a - b);
       var placed: number[] = [];
-      var usedLower = laneLower, usedTop = laneTop;
+      var usedLower = laneLower, usedTop = false;
       if (bands.lower && stack.length && !laneLower) {
         const idx = stack[0];
         slots[idx] = { position: pct(5, p100(bands.lower.top), 90, p100(bands.lower.bottom - bands.lower.top)), z_index: 10 };
         placed.push(idx); usedLower = true;
       }
       var rest = stack.filter((i) => placed.indexOf(i) === -1);
-      if (bands.top && rest.length && !laneTop) {
+      if (bands.top && rest.length) {
         const rows = stackRows(Math.min(rest.length, bands.lower ? 2 : 3), p100(bands.top.top), p100(bands.top.bottom - bands.top.top), 2);
         rest.slice(0, rows.length).forEach((idx, k) => { slots[idx] = { position: pct(5, rows[k][0], 90, rows[k][1]), z_index: 20 + k }; placed.push(idx); });
         usedTop = true;
