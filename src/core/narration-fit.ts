@@ -84,6 +84,15 @@ export function fitScenesToNarration(
     sc.duration_seconds = to;
     if (Array.isArray(sc.beats) && sc.beats.length >= 2) rescaleBeats(sc.beats, to);
     if (line.spine) { sc.spine = { ...line.spine, duration: to }; applySpine(sc, sc.spine); }
+    // The board carries the same clock: an edit through the board resolves
+    // its word anchors against the BOARD scene's spine first, so a stale
+    // estimate there pulled re-timed cues back to the old times (Six Tabs:
+    // the logos on "six" at 1.16 s, the word measured at 0.85 s).
+    const bs: any = (project as any).storyboard?.scenes?.[i];
+    if (bs) {
+      bs.duration_seconds = to;
+      if (line.spine) { bs.spine = { ...line.spine, duration: to }; applySpine(bs, bs.spine); }
+    }
     if (Math.abs(to - from) > 0.01) changes.push({ scene: i, from, to });
   });
   // Each line at its scene's start (content time, as the build places them).

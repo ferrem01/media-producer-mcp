@@ -19,6 +19,10 @@ narrated film had no word timings, so its overlays were timed by hand.
   `vo_scene_<i>` sits at its scene's start; a music bed is trimmed to the film.
 - The build uses it in place of the lengthen-only block (deleted).
 - `audio action:"fit_voiceover"` runs it on a built film -- after re-voicing.
+- The board scene gets the same length and spine: a board edit resolves its
+  word anchors against the board's spine first, and a stale estimate there
+  pulled re-timed cues back to the old times (Six Tabs: the logos on "six"
+  landed at 1.16 s, the word was measured at 0.85 s).
 
 ## 2026-10-08 — Every narration is ElevenLabs; the OpenAI voices are gone
 
