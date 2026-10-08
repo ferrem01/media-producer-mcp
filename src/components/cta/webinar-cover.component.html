@@ -1,0 +1,149 @@
+<template>
+  <div class="wc-root">
+    <div class="wc-block">
+      <div class="wc-pill"><span class="wc-dot"></span><span class="wc-pill-t"></span></div>
+      <div class="wc-kicker"></div>
+      <h1 class="wc-title"></h1>
+      <p class="wc-sub"></p>
+      <div class="wc-rule"></div>
+      <div class="wc-when">
+        <div class="wc-cell wc-date">
+          <span class="wc-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/><circle cx="8.5" cy="14" r=".6" fill="currentColor"/><circle cx="12" cy="14" r=".6" fill="currentColor"/><circle cx="15.5" cy="14" r=".6" fill="currentColor"/><circle cx="8.5" cy="17.2" r=".6" fill="currentColor"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/></svg></span>
+          <span class="wc-cell-t"></span>
+        </div>
+        <div class="wc-sep"></div>
+        <div class="wc-cell wc-time">
+          <span class="wc-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+          <span class="wc-cell-t"></span>
+        </div>
+      </div>
+      <div class="wc-actions"><div class="wc-button"><span class="wc-label"></span><span class="wc-arrow">&rarr;</span><span class="wc-shine"></span></div></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* WEBINAR COVER: the event's own cover (the email header, the social card)
+     as a live card -- a FREE WEBINAR pill, a kicker, the big title with one
+     word in the accent italic, the line under it, a rule, and the date and
+     time on tinted icon tiles. With button_text it is the close: the same
+     cover with a button under it. Left-aligned like the cover, the block
+     centred in its box; type sized from the box (one unit, --u). */
+  .wc-root {
+    --u: 1px; --acc: #e0703f;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    color: var(--wc-ink, #141414);
+  }
+  .wc-block { display: flex; flex-direction: column; align-items: flex-start; text-align: left; max-width: 100%; }
+  .wc-root.center .wc-block { align-items: center; text-align: center; }
+  .wc-pill {
+    display: inline-flex; align-items: center; gap: calc(var(--u) * 16);
+    padding: calc(var(--u) * 14) calc(var(--u) * 30);
+    border-radius: 999px; border: calc(var(--u) * 2) solid color-mix(in srgb, var(--acc) 22%, transparent);
+    background: color-mix(in srgb, var(--acc) 5%, #ffffff);
+    color: var(--acc); font-size: calc(var(--u) * 30); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    margin-bottom: calc(var(--u) * 40);
+  }
+  .wc-dot { width: calc(var(--u) * 15); height: calc(var(--u) * 15); border-radius: 50%; background: var(--acc); flex: none; }
+  .wc-kicker { font-size: calc(var(--u) * 38); color: color-mix(in srgb, var(--wc-ink, #141414) 70%, #ffffff); margin-bottom: calc(var(--u) * 30); }
+  .wc-title {
+    margin: 0; font-size: calc(var(--u) * 104); font-weight: 800; line-height: 1.02; letter-spacing: -0.035em;
+    color: var(--wc-ink, #141414); white-space: pre-line;
+  }
+  .wc-title em { font-style: italic; color: var(--acc); font-weight: 800; padding-right: 0.06em; }
+  .wc-sub {
+    margin: calc(var(--u) * 34) 0 0; max-width: 24em;
+    font-size: calc(var(--u) * 36); line-height: 1.38; color: color-mix(in srgb, var(--wc-ink, #141414) 66%, #ffffff);
+  }
+  .wc-rule { align-self: stretch; height: calc(var(--u) * 2); background: rgba(20, 20, 20, 0.10); margin: calc(var(--u) * 42) 0 calc(var(--u) * 38); }
+  .wc-when { display: flex; align-items: center; gap: calc(var(--u) * 34); }
+  .wc-cell { display: flex; align-items: center; gap: calc(var(--u) * 26); }
+  .wc-tile {
+    width: calc(var(--u) * 92); height: calc(var(--u) * 92); flex: none; border-radius: calc(var(--u) * 18);
+    background: color-mix(in srgb, var(--acc) 12%, #ffffff); color: var(--acc);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .wc-tile svg { width: 62%; height: 62%; }
+  .wc-cell-t { font-size: calc(var(--u) * 34); font-weight: 500; line-height: 1.25; white-space: pre-line; color: var(--wc-ink, #141414); }
+  .wc-sep { width: calc(var(--u) * 2); align-self: stretch; background: rgba(20, 20, 20, 0.10); }
+  .wc-actions { margin-top: calc(var(--u) * 46); }
+  .wc-button {
+    position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; gap: calc(var(--u) * 16);
+    height: calc(var(--u) * 92); padding: 0 calc(var(--u) * 50); border-radius: 999px;
+    background: var(--wc-btn, var(--acc)); color: #ffffff;
+    font-size: calc(var(--u) * 36); font-weight: 700; white-space: nowrap;
+    box-shadow: 0 calc(var(--u) * 12) calc(var(--u) * 30) color-mix(in srgb, var(--wc-btn, var(--acc)) 30%, transparent);
+  }
+  .wc-shine { position: absolute; top: 0; bottom: 0; left: 0; width: 40%; pointer-events: none;
+    background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%); }
+  .wc-pill.off, .wc-kicker:empty, .wc-sub:empty, .wc-rule.off, .wc-when.off, .wc-cell.off, .wc-sep.off, .wc-actions.off { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.wc-root'), block = q('.wc-block');
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    if (data.accent) root.style.setProperty('--acc', String(data.accent));
+    if (data.ink) root.style.setProperty('--wc-ink', String(data.ink));
+    if (data.button_color) root.style.setProperty('--wc-btn', String(data.button_color));
+    if (data.align === 'center') root.classList.add('center');
+
+    if (data.pill) q('.wc-pill-t').textContent = String(data.pill); else q('.wc-pill').classList.add('off');
+    q('.wc-kicker').textContent = data.kicker ? String(data.kicker) : '';
+    // *word* is the accent italic, as on the cover ("Marketing *Analytics*").
+    q('.wc-title').innerHTML = esc(data.title || '').replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    q('.wc-sub').textContent = data.subtitle ? String(data.subtitle) : '';
+    var hasDate = !!data.date, hasTime = !!data.time;
+    q('.wc-date .wc-cell-t').textContent = hasDate ? String(data.date) : '';
+    q('.wc-time .wc-cell-t').textContent = hasTime ? String(data.time) : '';
+    if (!hasDate) q('.wc-date').classList.add('off');
+    if (!hasTime) q('.wc-time').classList.add('off');
+    if (!hasDate || !hasTime) q('.wc-sep').classList.add('off');
+    if (!hasDate && !hasTime) { q('.wc-when').classList.add('off'); q('.wc-rule').classList.add('off'); }
+    var btn = q('.wc-button');
+    if (data.button_text) q('.wc-label').textContent = String(data.button_text); else q('.wc-actions').classList.add('off');
+    if (data.arrow === false) q('.wc-arrow').style.display = 'none';
+
+    // SIZE: generous first, shrink until the block fits the box (minus a
+    // margin), so the cover owns its slot at any size.
+    var W = el.clientWidth || 1600, H = el.clientHeight || 900;
+    var pad = Math.round(Math.min(W, H) * 0.04);
+    var u = Math.min(W / 1300, H / 820);
+    for (var i = 0; i < 40; i++) {
+      root.style.setProperty('--u', u.toFixed(3) + 'px');
+      if (block.scrollHeight <= H - 2 * pad && block.scrollWidth <= W - 2 * pad) break;
+      u *= 0.95;
+    }
+
+    // MOTION: still:true shows the cover whole from the first frame (an
+    // opener whose first frame is the thumbnail). Otherwise the lines rise
+    // in reading order from `at`, and the button lands last with one shine.
+    var parts = ['.wc-pill', '.wc-kicker', '.wc-title', '.wc-sub', '.wc-rule', '.wc-when']
+      .map(q).filter(function (x) { return x && !x.classList.contains('off') && (x.textContent || x.classList.contains('wc-rule')); });
+    var AT = data.at !== undefined && data.at !== null && isFinite(Number(data.at)) ? Number(data.at) : 0.2;
+    var hasBtn = !!data.button_text;
+    if (data.still !== true) {
+      gsap.set(parts, { autoAlpha: 0, y: 18 });
+      tl.to(parts, { autoAlpha: 1, y: 0, duration: 0.45, stagger: 0.08, ease: 'power3.out' }, AT);
+    }
+    var bAt = data.button_at !== undefined && data.button_at !== null && isFinite(Number(data.button_at))
+      ? Number(data.button_at) : (data.still === true ? AT : AT + 0.25 + parts.length * 0.08);
+    if (hasBtn) {
+      gsap.set(btn, { autoAlpha: 0, y: 12 });
+      tl.to(btn, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'back.out(1.6)' }, bAt);
+      gsap.set(q('.wc-shine'), { xPercent: -110 });
+      tl.to(q('.wc-shine'), { xPercent: 260, duration: 0.9, ease: 'power2.inOut' }, bAt + 0.5);
+    }
+    if (hasBtn && data.press_at !== undefined && data.press_at !== null) {
+      var pa = Number(data.press_at);
+      tl.to(btn, { scale: 0.96, duration: 0.09, ease: 'power2.in' }, pa);
+      tl.to(btn, { scale: 1, duration: 0.18, ease: 'power2.out' }, pa + 0.09);
+    }
+    return tl;
+  }
+</script>

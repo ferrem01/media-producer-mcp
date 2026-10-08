@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The webinar's cover opens and closes the film; waves; a co-brand corner
+
+Prerna on the Six Tabs 16:9 (proj_fedfa77c): "Start with the screenshot from
+the email without the 2 speakers and then come back to it at the end. Waves
+in the background from the Claude announce email. Claude and Quotient logo in
+the upper left." Three library pieces, not hand-built frames:
+
+- `webinar-cover` (cta): the event's cover rebuilt live -- pill, kicker, the
+  title with one `*word*` in the accent italic, the line, a rule, date and
+  time on tinted icon tiles. `still:true` makes the first frame the cover (the
+  opener and the thumbnail); `button_text` makes it the close. Rebuilt rather
+  than the PNG: the speakers are baked into the image, cropping them leaves
+  half a frame empty, and the type is crisper drawn at the frame.
+- `cream-ground` `pattern:"waves"`: the announce email's texture, a faint band
+  of fine contour lines drawn in SVG (the original file was made in Claude
+  Design and is not kept anywhere). First pass bunched the lines into a dark
+  rope on the left; the spread floor is what keeps it paper.
+- `cobrand-lockup` (media): partners' marks in a corner with a thin divider;
+  `{builtin:"claude"}` draws the Claude spark, `{src}` takes a logo image.
+
+Held, per Marc: "FREE WEBINAR and the Claude icon on every video" as a
+standing badge -- not now. The cover carries its own pill.
+
 ## 2026-10-08 — The soft look sticks; a recast says it isn't graded
 
 Marc on proj_3bd9cad6: "I tried to unclick [the soft look] and it claims to

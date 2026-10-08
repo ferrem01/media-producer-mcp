@@ -1,0 +1,41 @@
+{
+  "type": "cobrand-lockup",
+  "label": "Co-brand Lockup",
+  "category": "media",
+  "description": "Partners' marks side by side in a corner (Claude + Quotient on a joint webinar film), a thin divider (or an x) between them, sized from the box height. A quiet corner bug that stays on for the scene: a short, wide box in the upper left (about 5% of the frame tall). Each mark is { builtin: 'claude' } (the orange Claude spark, label 'Claude' adds the name) or { src } (a logo image, e.g. the brand kit's wordmark).",
+  "data": {
+    "marks": {
+      "type": "array",
+      "label": "The marks, left to right: { builtin?: 'claude', src?: image url, label?: name, color?: spark colour, scale?: height vs the box (default 1) }",
+      "required": true
+    },
+    "separator": {
+      "type": "string",
+      "label": "Between marks: 'line' (default thin divider) | 'x'",
+      "optional": true,
+      "enum": [
+        "line",
+        "x"
+      ]
+    },
+    "align": {
+      "type": "string",
+      "label": "left (default) | right, inside the box",
+      "optional": true,
+      "enum": [
+        "left",
+        "right"
+      ]
+    },
+    "ink": {
+      "type": "string",
+      "label": "Colour of a text label (default near-black)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds: fades in (default 0: present from the first frame)",
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,86 @@
+<template>
+  <div class="cbl-root"><div class="cbl-row"></div></div>
+</template>
+
+<style scoped>
+  /* CO-BRAND LOCKUP: the partners' marks side by side in a corner (Claude +
+     Quotient on the Claude webinar films), one thin divider between them,
+     sized from the box height. A quiet corner bug: it stays put for the
+     scene and never competes with the subject. */
+  .cbl-root { position: absolute; inset: 0; display: flex; align-items: center; }
+  .cbl-root.right { justify-content: flex-end; }
+  .cbl-row { display: flex; align-items: center; height: 100%; }
+  .cbl-mark { display: flex; align-items: center; height: 100%; flex: none; }
+  .cbl-mark img { height: 100%; width: auto; display: block; object-fit: contain; }
+  .cbl-mark svg { height: 100%; width: auto; display: block; }
+  .cbl-name { font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); font-weight: 600; letter-spacing: -0.02em; color: var(--cbl-ink, #141414); white-space: nowrap; }
+  .cbl-div { flex: none; background: rgba(20, 20, 20, 0.22); border-radius: 1px; }
+  .cbl-x { flex: none; font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); font-weight: 400; color: rgba(20, 20, 20, 0.45); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.cbl-root'), row = el.querySelector('.cbl-row');
+    var H = el.clientHeight || 60;
+    if (data.align === 'right') root.classList.add('right');
+    if (data.ink) root.style.setProperty('--cbl-ink', String(data.ink));
+    // The Claude mark: the orange spark -- twelve rounded rays of uneven
+    // length round a small open centre.
+    function claudeSpark(color) {
+      var rays = '', n = 12, lens = [1, 0.84, 0.95, 0.8, 1, 0.88, 0.97, 0.82, 1, 0.86, 0.93, 0.8];
+      for (var i = 0; i < n; i++) {
+        var a = (i / n) * Math.PI * 2 + 0.13 * Math.sin(i * 2.1);
+        var r0 = 0.2, r1 = 0.86 * lens[i];
+        rays += '<line x1="' + (Math.cos(a) * r0).toFixed(3) + '" y1="' + (Math.sin(a) * r0).toFixed(3) +
+          '" x2="' + (Math.cos(a) * r1).toFixed(3) + '" y2="' + (Math.sin(a) * r1).toFixed(3) + '"/>';
+      }
+      return '<svg viewBox="-1 -1 2 2"><g stroke="' + color + '" stroke-width="0.17" stroke-linecap="round">' + rays + '</g></svg>';
+    }
+    var marks = Array.isArray(data.marks) && data.marks.length ? data.marks : [{ builtin: 'claude', label: 'Claude' }];
+    var gap = Math.round(H * 0.42);
+    marks.forEach(function (m, i) {
+      if (i > 0) {
+        if (data.separator === 'x') {
+          var x = document.createElement('span'); x.className = 'cbl-x'; x.textContent = '×';
+          x.style.fontSize = Math.round(H * 0.5) + 'px'; x.style.margin = '0 ' + Math.round(gap * 0.7) + 'px';
+          row.appendChild(x);
+        } else {
+          var dv = document.createElement('span'); dv.className = 'cbl-div';
+          dv.style.width = Math.max(1, Math.round(H * 0.035)) + 'px'; dv.style.height = Math.round(H * 0.7) + 'px';
+          dv.style.margin = '0 ' + gap + 'px';
+          row.appendChild(dv);
+        }
+      }
+      var box = document.createElement('div'); box.className = 'cbl-mark';
+      var scale = m && isFinite(Number(m.scale)) && Number(m.scale) > 0 ? Number(m.scale) : 1;
+      box.style.height = Math.round(H * scale) + 'px';
+      if (m && m.builtin === 'claude') {
+        var sp = document.createElement('div'); sp.className = 'cbl-mark';
+        sp.style.height = Math.round(H * 0.78 * scale) + 'px';
+        sp.innerHTML = claudeSpark(String(m.color || '#d97757'));
+        box.appendChild(sp);
+        if (m.label) {
+          var nm = document.createElement('span'); nm.className = 'cbl-name'; nm.textContent = String(m.label);
+          nm.style.fontSize = Math.round(H * 0.56 * scale) + 'px'; nm.style.marginLeft = Math.round(H * 0.18) + 'px';
+          box.appendChild(nm);
+        }
+      } else if (m && m.src) {
+        var im = document.createElement('img'); im.src = String(m.src); im.alt = String(m.label || '');
+        box.appendChild(im);
+      } else if (m && m.label) {
+        var tx = document.createElement('span'); tx.className = 'cbl-name'; tx.textContent = String(m.label);
+        tx.style.fontSize = Math.round(H * 0.56 * scale) + 'px';
+        box.appendChild(tx);
+      }
+      row.appendChild(box);
+    });
+    // Present from `at` (default the first frame): a soft fade, no pop.
+    var AT = data.at !== undefined && data.at !== null && isFinite(Number(data.at)) ? Number(data.at) : 0;
+    if (AT > 0) {
+      gsap.set(row, { autoAlpha: 0 });
+      tl.to(row, { autoAlpha: 1, duration: 0.4, ease: 'power2.out' }, AT);
+    }
+    return tl;
+  }
+</script>
