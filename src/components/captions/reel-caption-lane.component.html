@@ -53,7 +53,7 @@
      script re-tints this against the measured ground when the raw token is
      too dim to clear contrast on it. */
   .rcl-w.em {
-    color: var(--mp-color-primary, #6366f1);
+    color: var(--rcl-em, var(--mp-color-primary, #6366f1));
   }
 
   .rcl-align-left .rcl-inner {
@@ -214,6 +214,9 @@
     // silently matches nothing.
     var root = el.querySelector('.rcl') || stack;
     if (data && data.align === 'left') root.classList.add('rcl-align-left');
+    // The emphasis ink (default the brand primary): e.g. the brand's warm
+    // secondary so "free" pops off a blue film (Prerna, Six Tabs 16:9).
+    if (data && data.accent) root.style.setProperty('--rcl-em', String(data.accent));
     var scrim = (data && data.scrim) || 'none';
     if (scrim === 'shadow') root.classList.add('rcl-scrim-shadow');
     else if (scrim === 'plate') root.classList.add('rcl-scrim-plate');
