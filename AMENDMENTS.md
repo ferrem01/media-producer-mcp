@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The bed stays down through the narration
+
+Marc on Six Tabs: "the volume is bouncing from scene to scene". Every voiced
+scene ends on a 0.45 s breath; the render mixer merged voice windows only
+across 0.25 s and Studio ducked on "is a line playing right now", so the bed
+jumped back up at every cut and dropped again -- in Studio as a hard step.
+Now voice windows within `DUCK_BRIDGE_S` (1.5 s) are one narration span in
+both the mixer and Studio (`inNarration`), and Studio eases the level
+(~0.3 s down, ~1 s up) instead of stepping it.
+
 ## 2026-10-08 — Studio on a phone: every voice line started at once
 
 Marc on the Six Tabs mobile preview: "the first scene has multiple audio

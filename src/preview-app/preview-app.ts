@@ -2840,12 +2840,11 @@ ${QUOTIENT_CSS}
     if (!p || !p.audio || !p.audio.ducking) return;
     var mv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
     state.audioDuckingInterval = setInterval(function() {
-      var voActive = false;
-      state.audioElements.forEach(function(audio) {
-        if (audio._trackType === 'voiceover' && !audio.paused && audio.currentTime > 0) {
-          voActive = true;
-        }
-      });
+      // THE NARRATION IS ONE SPAN: the bed stays down from the first line to
+      // the last, through the breath between lines (the render mixer's
+      // DUCK_BRIDGE_S). Keyed on whether a line was playing, it jumped back
+      // up in every 0.45 s gap at a cut -- the volume bouncing scene to scene.
+      var voActive = inNarration(state.masterTime || 0);
 
       var curMv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
       // Read every tick: the music card's "Under the voice" dial moves it live.
@@ -2860,10 +2859,36 @@ ${QUOTIENT_CSS}
           // level made "ducking" RAISE a quiet bed (0.22 base, 0.35 ducked)
           // for the whole narration.
           var base = audio._baseVolume != null ? audio._baseVolume : 1;
-          audio.volume = Math.min(1, (voActive ? base * duckedVolume : base) * curMv);
+          // Ease toward the level (about 0.3 s down, 1 s back up), never a step.
+          var want = Math.min(1, (voActive ? base * duckedVolume : base) * curMv);
+          var cur = audio.volume;
+          var step = (want < cur ? 0.1 / 0.3 : 0.1 / 1.0) * Math.max(base * curMv, 0.01);
+          audio.volume = Math.abs(want - cur) <= step ? want : (want > cur ? cur + step : cur - step);
         }
       });
     }, 100);
+  }
+
+  var DUCK_BRIDGE_S = 1.5;
+  // Is film time t inside the narration -- a voice line, or a breath of under
+  // DUCK_BRIDGE_S between two of them?
+  function inNarration(t) {
+    var wins = [];
+    state.audioElements.forEach(function(a) {
+      if (a._trackType !== 'voiceover') return;
+      var d = a.duration;
+      var len = a._clipDur > 0 ? a._clipDur : ((d && isFinite(d)) ? d - (a._trimStart || 0) : 0);
+      if (len > 0) wins.push([a._startTime || 0, (a._startTime || 0) + len]);
+    });
+    wins.sort(function(x, y) { return x[0] - y[0]; });
+    var merged = [];
+    wins.forEach(function(w) {
+      var last = merged[merged.length - 1];
+      if (last && w[0] <= last[1] + DUCK_BRIDGE_S) last[1] = Math.max(last[1], w[1]);
+      else merged.push([w[0], w[1]]);
+    });
+    for (var i = 0; i < merged.length; i++) if (t >= merged[i][0] && t < merged[i][1]) return true;
+    return false;
   }
 
   function stopDucking() {
