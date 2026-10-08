@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — tool-storm style logo: the real logos, no windows
+
+Marc on Five Tools: the tool windows read as "generic boxy ... supposedly
+websites"; "should they be showing the logos? ... just the logo is fine."
+
+- `tool-storm` `style:"logo"` + `logos` (image srcs): each piece is a white
+  app tile holding the tool's real logo -- no window chrome, no name. Every
+  mode works; fly defaults `count` to the number of logos.
+- The logos already exist: the Analytics story cut (proj_c86d8f6e) carries
+  ~90 `logo-*.png` in its assets (GA4, HubSpot, LinkedIn, Salesforce,
+  WordPress, Facebook, Google ...), usable by url from any film of the tenant.
+
 ## 2026-10-08 — An overlay added to a speaker scene goes over the person
 
 Five Tools' tool-storm "just flashes for like a second" in Studio while

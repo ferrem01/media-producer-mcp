@@ -2,7 +2,7 @@
   "type": "tool-storm",
   "label": "Tool Storm",
   "category": "props",
-  "description": "The five tools as window cards multiplying over the person: five that read as a hundred. mode 'fly': the windows arrive one by one from the sides and stack loosely (the first beat, readable). mode 'ring': they circle the frame, the same five coming round again, near cards big and bright, far ones small and dim (the second beat). mode 'storm': a blizzard of cards crossing the frame on their own lines with a spin, too fast to read, with white flashes (the third beat). Lightweight cards (the tool's colour, mark and the shape of its surface; no cursors, no figures). Sized to its box; every position is a function of the card's index so the frames are the same on every seek. Meant to ride over a live-action clip of the person.",
+  "description": "The five tools as window cards multiplying over the person: five that read as a hundred. mode 'fly': the windows arrive one by one from the sides and stack loosely (the first beat, readable). mode 'ring': they circle the frame, the same five coming round again, near cards big and bright, far ones small and dim (the second beat). mode 'storm': a blizzard of cards crossing the frame on their own lines with a spin, too fast to read, with white flashes (the third beat). Lightweight cards (the tool's colour, mark and the shape of its surface; no cursors, no figures) -- or style 'logo': each piece is a white app tile holding the tool's real logo (`logos`: image srcs), no window and no name, recognised at a glance. Sized to its box; every position is a function of the card's index so the frames are the same on every seek. Meant to ride over a live-action clip of the person.",
   "data": {
     "mode": {
       "type": "string",
@@ -14,6 +14,20 @@
         "ring",
         "storm"
       ]
+    },
+    "style": {
+      "type": "string",
+      "label": "cards (default: window cards) | logo (a white app tile with the tool's logo -- needs logos)",
+      "optional": true,
+      "enum": [
+        "cards",
+        "logo"
+      ]
+    },
+    "logos": {
+      "type": "array",
+      "label": "style logo: the logos, image srcs (or {src}), in the order they arrive; fly defaults count to their number",
+      "optional": true
     },
     "tools": {
       "type": "array",
