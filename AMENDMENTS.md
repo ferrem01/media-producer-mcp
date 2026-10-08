@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Relay collapses: logos fold into a dot, the stream smashes into one
+
+Marc, for the 16:9 Six Tabs: "if we show a bunch of logos, those logos
+should then collapse and then expand into ... an analytics screen ... then
+collapse and expand into a series of customer engagements ... they should zip
+across the screen and then ... zing, zing, zing, collect, smash together
+again, and then open back up into a Claude session".
+
+- tool-storm `collapse_at` (any mode): the pieces zing into one point
+  (`collapse_to`), the stage folds into it, and a glowing dot stays.
+- click-stream `end_mode: "smash"`: after the last stop every piece -- the
+  ones off screen too, from their own side -- zings into the centre, a ring
+  flashes and a dot stays (`smash_at`, `smash_duration`).
+- Both dots are the anchor `core`, so the next piece is born from it with
+  the shipped morph: `enter {effect: "morph", from: "<id>.core"}`.
+  Test: `test/relay-collapse.test.ts`.
+
 ## 2026-10-08 — A scene's pace is that scene's
 
 Marc: "you click on a specific scene, you set the pacing, but it changes it

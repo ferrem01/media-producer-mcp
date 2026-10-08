@@ -295,7 +295,15 @@
     root.setAttribute('data-arrive-times', t3(arrive));
     root.setAttribute('data-leave-times', t3(leave));
     root.setAttribute('data-last-target', [f4((ltBox.x + ltBox.w / 2) / W), f4((ltBox.y + ltBox.h / 2) / H), f4(ltBox.w / W), f4(ltBox.h / H)].join(','));
-    var SETTLE = END_MODE === 'zoom' ? ZAT + ZD : arrive[N - 1];
+    // SMASH (relay, Marc Oct 8: "they should zip across the screen and then
+    // ... zing, zing, zing, collect, smash together again, and then open back
+    // up"): after the last stop every piece -- the ones off screen too --
+    // zings into the region's centre one after another, a ring flashes and a
+    // dot stays: the `core` anchor the next piece morphs out of.
+    var SMASH = data.end_mode === 'smash' && !FLOAT;
+    var SAT = num(data.smash_at, leave[N - 1]), SD = Math.max(0.3, num(data.smash_duration, 0.8));
+    var SETTLE = END_MODE === 'zoom' ? ZAT + ZD : SMASH ? SAT + SD : arrive[N - 1];
+    if (SMASH) root.setAttribute('data-smash-time', t3([SAT, SAT + SD]));
     root.setAttribute('data-settle-time', t3([SETTLE]));
 
     // ── DOM.
@@ -605,10 +613,61 @@
       return '0 ' + (h * 0.012 * f).toFixed(1) + 'px ' + (h * 0.045 * f).toFixed(1) + 'px rgba(24,20,16,' + (0.16 * f).toFixed(3) + '), 0 ' + (h * 0.002 * f).toFixed(1) + 'px ' + (h * 0.008 * f).toFixed(1) + 'px rgba(24,20,16,' + (0.1 * f).toFixed(3) + ')';
     };
 
+    var smashFrom = null;
+    var smashStarts = function () {
+      if (smashFrom) return smashFrom;
+      var cam = camAt(SAT), s = cam.s, R = Math.hypot(RW, RH) * 0.62;
+      smashFrom = items.map(function (it, j) {
+        var w = it.w * s, h = it.h * s, cx = RCX + (it.sx - cam.camX) * s, cy = RCY + it.oy * s, half = Math.hypot(w, h) / 2;
+        if (cx + half < 0 || cx - half > RW || cy + half < 0 || cy - half > RH) {
+          // Off screen at the smash: it flies in from its own side (the golden angle).
+          var a = j * 2.39996;
+          cx = RCX + Math.cos(a) * R; cy = RCY + Math.sin(a) * R;
+        }
+        return { cx: cx, cy: cy, w: w, h: h, rot: it.rot || 0 };
+      });
+      return smashFrom;
+    };
+    var core = null, coreRing = null;
+    if (SMASH) {
+      var cs = Math.max(8, Math.min(W, H) * num(data.core_size, 0.05));
+      var cc = String(data.core_color || chipColor);
+      core = document.createElement('div');
+      core.setAttribute('data-anchor', 'core');
+      core.style.cssText = 'position:absolute;z-index:8;left:' + (RX + RCX - cs / 2).toFixed(1) + 'px;top:' + (RY + RCY - cs / 2).toFixed(1) + 'px;width:' + cs.toFixed(1) + 'px;height:' + cs.toFixed(1) + 'px;border-radius:50%;background:' + cc + ';box-shadow:0 0 ' + cs.toFixed(0) + 'px ' + (cs / 3).toFixed(0) + 'px rgba(' + chipRGB + ',0.45);visibility:hidden;';
+      coreRing = document.createElement('div');
+      coreRing.style.cssText = 'position:absolute;z-index:7;left:' + (RX + RCX - cs / 2).toFixed(1) + 'px;top:' + (RY + RCY - cs / 2).toFixed(1) + 'px;width:' + cs.toFixed(1) + 'px;height:' + cs.toFixed(1) + 'px;border-radius:50%;border:' + Math.max(2, cs * 0.12).toFixed(1) + 'px solid ' + cc + ';visibility:hidden;';
+      root.appendChild(coreRing); root.appendChild(core);
+    }
+    function renderSmash(t) {
+      var from = smashStarts(), M = items.length, FLYD = SD * 0.55, GAP = (SD - FLYD) / Math.max(1, M - 1);
+      items.forEach(function (it, j) {
+        var f = from[j], q = clamp01((t - SAT - j * GAP) / FLYD);
+        if (q >= 1) { it.el.style.visibility = 'hidden'; return; }
+        var e = q * q * q;   // accelerating: the zing
+        var k = 1 - 0.94 * e, w = f.w * k, h = f.h * k;
+        put(it, f.cx + (RCX - f.cx) * e - w / 2, f.cy + (RCY - f.cy) * e - h / 2, w, h, f.rot + (j % 2 ? 1 : -1) * 140 * e);
+        it.el.style.zIndex = String(40 + j);
+        it.el.style.borderRadius = (Math.min(w, h) * 0.012).toFixed(2) + 'px';
+        it.el.style.boxShadow = shadow(h, 1);
+      });
+      var dt = t - (SAT + SD);
+      if (dt < -0.04) { core.style.visibility = 'hidden'; coreRing.style.visibility = 'hidden'; return; }
+      core.style.visibility = 'inherit';
+      core.style.transform = 'scale(' + Math.max(0, dt < 0.2 ? sPop(clamp01((dt + 0.04) / 0.24)) : 1).toFixed(4) + ')';
+      var rq = clamp01((dt + 0.04) / 0.45);
+      coreRing.style.visibility = rq < 1 ? 'inherit' : 'hidden';
+      coreRing.style.opacity = (0.9 * (1 - out2(rq))).toFixed(3);
+      coreRing.style.transform = 'scale(' + (1 + 7 * out2(rq)).toFixed(3) + ')';
+    }
+
     function render(t) {
       root.style.visibility = t >= AT - 1e-4 ? 'inherit' : 'hidden';
       var s = 1;
+      var smashing = SMASH && t >= SAT;
+      if (SMASH && !smashing) { core.style.visibility = 'hidden'; coreRing.style.visibility = 'hidden'; }
       if (FLOAT) renderFloat(t);
+      else if (smashing) renderSmash(t);
       else {
       var cam = camAt(t);
       s = cam.s;
@@ -633,7 +692,7 @@
       // Target highlight: a press ring on the clicked thing.
       stopItems.forEach(function (it, i) {
         var hl = it.hl, dt = t - click[i];
-        if (dt < 0 || dt > 0.5) { hl.style.visibility = 'hidden'; return; }
+        if (dt < 0 || dt > 0.5 || smashing) { hl.style.visibility = 'hidden'; return; }
         var k = (it === lastIt && cover) ? lastRect(t).k : FLOAT ? (it.sk || it.k) : it.k * (t >= leave[i] ? s : 1);
         var th = Math.min(it.t.w, it.t.h) * k;
         var e = out2(dt / 0.5);
@@ -647,7 +706,7 @@
       // Chips: pop out of the click point, fly an arc, land at chip_to, gone.
       stopItems.forEach(function (it, i) {
         var c = chips[i], dt = t - click[i];
-        if (dt < 0 || t > land[i] + CHOLD + 1e-3) { c.style.visibility = 'hidden'; return; }
+        if (dt < 0 || t > land[i] + CHOLD + 1e-3 || smashing) { c.style.visibility = 'hidden'; return; }
         var P = targetScreen(i, click[i]);
         // Pops up off the click point -- or down, when the target sits at the top of the frame.
         var lift = chipH * 1.15 * (P.y - chipH * 1.15 < chipH ? -1 : 1);
@@ -675,7 +734,7 @@
         var it = stopItems[i], cur = it.cur;
         var lv = i === N - 1 ? (cover ? ZAT : Infinity) : leave[i];
         var a = out2((t - (arrive[i] - 0.14)) / 0.3), b = clamp01((t - (lv - 0.06)) / 0.18), o = a * (1 - b);
-        if (!cur || o <= 0.001 || it.el.style.visibility === 'hidden') { c.style.visibility = 'hidden'; return; }
+        if (!cur || o <= 0.001 || smashing || it.el.style.visibility === 'hidden') { c.style.visibility = 'hidden'; return; }
         var top = cur.top - 0.012 * RH - capH, left = cur.left;
         // No room above (a tall stop fills the height): the pill straddles the top edge, inset like a tab.
         if (top < 0.045 * RH) { top = cur.top - capH / 2; left = cur.left + capFs * 0.9; }
@@ -704,7 +763,7 @@
       });
       // Cursor: position, press and ring from the last click.
       if (cursor) {
-        var vis = t >= AT - 1e-4 && t < cExit;
+        var vis = t >= AT - 1e-4 && t < cExit && !smashing;
         var cp = cursorAt(t);
         var last = -1; for (var i = 0; i < N; i++) if (t >= click[i]) last = i;
         var dtc = last >= 0 ? t - click[last] : 1;
