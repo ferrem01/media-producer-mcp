@@ -6,6 +6,13 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Adding a track with a known id replaces it
+
+Re-voicing vo_scene_2 on proj_f5c104bb with `audio add` stacked three copies
+of the line (the tool pushed; one call landed through an expired session
+too). `audio add` now puts the track by id (`putTrack`, `audio/tracks.ts`):
+a known id is replaced in place, a new one appended.
+
 ## 2026-10-08 — A short voice line is as loud as a long one
 
 Marc on proj_f5c104bb: "the voice volume drops off in the last scene". Every
