@@ -2820,13 +2820,16 @@ async function runUnifiedPipeline(
     }
   }
 
+  const boardWarnings: string[] = [];
   // ── THE BOARD IS ENFORCED, NOT WARNED ABOUT (llm/board-enforce.ts) ──
   // The brief's numbered lines on their beats, each voiced scene sized to its
   // line (the cast's times scaled with it), one quiet sound a scene. Not on a
   // build-from-board: the approved board is the edit.
   if (!opts.presetStoryboard && format === "video") {
-    const fixes = enforceBoard(storyboard.scenes as any[], { brief: opts.brief || opts.prompt, voiced: !!opts.voiceover || recipeVoice, personCarries: personCarries(filmGrammar) || filmGrammar === "screencast", recipe: !!recipeObj });
-    for (const f of fixes) console.log(`  Board enforced: ${f}`);
+    const enforced = enforceBoard(storyboard.scenes as any[], { brief: opts.brief || opts.prompt, voiced: !!opts.voiceover || recipeVoice, personCarries: personCarries(filmGrammar) || filmGrammar === "screencast", recipe: !!recipeObj });
+    for (const f of enforced.log) console.log(`  Board enforced: ${f}`);
+    for (const w of enforced.warnings) console.warn(`  Board: ${w}`);
+    boardWarnings.push(...enforced.warnings);
   }
 
   // ── Speaker films: resolve WORD ANCHORS against the scene's spine ──
@@ -3283,6 +3286,7 @@ async function runUnifiedPipeline(
       const locks = extractBriefLocks(project.brief);
       const missing = missingLocks(project.storyboard, locks);
       const warnings = missing.map((q) => `The brief locks this line and the board does not carry it: "${q}"`);
+      warnings.push(...boardWarnings);
       if (missing.length) console.warn(`  Storyboard: ${missing.length} locked line(s) missing -- ${missing.map((q) => `"${q}"`).join(", ")}`);
       if (recipeObj) {
         const off = checkBoardAgainstRecipe(project.storyboard as any, recipeObj);

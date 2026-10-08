@@ -38,7 +38,7 @@ describe("the board is enforced, not warned about", () => {
 
   it("a voiced board: the lines go on their beats, each scene runs as long as its line, its cast's times scale with it", () => {
     const scenes = board();
-    const log = enforceBoard(scenes, { brief: BRIEF, voiced: true });
+    const { log } = enforceBoard(scenes, { brief: BRIEF, voiced: true });
     expect(scenes.map((s) => s.voiceover_text)).toEqual(numberedBriefLines(BRIEF));
     const want = boardLengthForLine(scenes[0].voiceover_text!);
     expect(scenes[0].duration_seconds).toBe(want);
@@ -54,6 +54,22 @@ describe("the board is enforced, not warned about", () => {
     expect(log.join(" ")).toMatch(/lines put on scene\(s\) 1, 2, 3/);
   });
 
+  it("a board whose scenes are not the beats is not stamped: it is said so", () => {
+    // proj_84048b0d: scene 1 held beats 1-2 (merged), the rest were invented
+    const scenes = board();
+    scenes[0].voiceover_text = "Still opening six tabs to answer one question? Analytics, email, social, CRM, spreadsheet...";
+    scenes[1].voiceover_text = "Lock the date: October 20th.";
+    const { log, warnings } = enforceBoard(scenes, { brief: BRIEF, voiced: true });
+    expect(scenes[1].voiceover_text).toBe("Lock the date: October 20th.");
+    expect(log.join(" ")).not.toMatch(/lines put on/);
+    expect(warnings[0]).toMatch(/do not follow them one to one/);
+    // the writer's own lines that DO read as their beats are stamped exact
+    const ok = board();
+    ok[0].voiceover_text = "Still opening *six tabs* to answer a question?";
+    expect(enforceBoard(ok, { brief: BRIEF, voiced: true }).warnings).toEqual([]);
+    expect(ok[0].voiceover_text).toBe("Still opening six tabs to answer one question?");
+  });
+
   it("one quiet cue a scene, no meme stings; the strongest job wins", () => {
     const scenes = board();
     enforceBoard(scenes, { brief: BRIEF, voiced: true });
@@ -65,6 +81,10 @@ describe("the board is enforced, not warned about", () => {
     const pay = [{ sfx: [{ at: 1, role: "transition" }, { at: 2, role: "payoff", volume: 0.9 }] }];
     capSceneSounds(pay);
     expect(pay[0].sfx).toEqual([{ at: 2, role: "payoff", volume: 0.35 }]);
+    // one payoff a film: the last one stays (proj_84048b0d had three)
+    const three = [0, 1, 2].map(() => ({ sfx: [{ at: 1, role: "payoff" }] }));
+    capSceneSounds(three);
+    expect(three.map((s) => s.sfx.length)).toEqual([0, 0, 1]);
     const meme = [{ sfx: [{ at: 0.2, role: "attention" }] }];
     capSceneSounds(meme, { memes: true });
     expect(meme[0].sfx).toHaveLength(1);
@@ -93,6 +113,9 @@ describe("the board is enforced, not warned about", () => {
     expect(pipeline).toMatch(/voiced: !!opts\.voiceover \|\| recipeWantsVoice\(recipeObj\)/);
     const builder = await fs.readFile("src/llm/storyboard-builder.ts", "utf8");
     expect(builder).toMatch(/THIS FILM HAS A NARRATOR/);
+    expect(builder).toMatch(/\$\{briefBeatsBlock\(opts\.rawPrompt \|\| opts\.prompt\)\}/);
+    expect(builder).toMatch(/PEOPLE ARE NAMED BY THE BRIEF/);
+    expect(pipeline).toMatch(/warnings\.push\(\.\.\.boardWarnings\);/);
     expect(builder).not.toMatch(/FAHHH/);
   });
 });

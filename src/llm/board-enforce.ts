@@ -49,6 +49,26 @@ export function boardLengthForLine(line: string): number {
   return Math.round(Math.max(NARRATION_MIN_S, words / BOARD_WORDS_PER_SECOND + pauses + NARRATION_TAIL_S) * 100) / 100;
 }
 
+const contentWords = (t: string) => new Set(t.toLowerCase().replace(/\*/g, "").split(/[^\p{L}\p{N}'-]+/u).filter((w) => w.length >= 3));
+
+/** How much of `line` the text `said` carries (0-1, by content words). */
+function recall(line: string, said: string): number {
+  const want = contentWords(line);
+  if (!want.size) return 0;
+  const have = contentWords(said);
+  let n = 0;
+  for (const w of want) if (have.has(w)) n++;
+  return n / want.size;
+}
+
+/** The writer's line for scene i reads as beat i: empty (nothing to
+ *  contradict), or carrying beat i's line and no other beat's. */
+export function sceneReadsBeat(said: string, lines: string[], i: number): boolean {
+  if (!said.trim()) return true;
+  const r = lines.map((l) => recall(l, said));
+  return r[i] >= 0.5 && r.every((x, j) => j === i || x < 0.5);
+}
+
 const TIME_KEY = /^(at|start|end|duration|delay|[a-z]+_at)$/;
 
 /** Scale every timeline number a scene's cast carries (data `at`, `*_at`,
@@ -107,6 +127,10 @@ export function capSceneSounds(scenes: any[], opts: { memes?: boolean } = {}): n
     sc.sfx = cues;
     dropped += before - cues.length;
   }
+  // ONE PAYOFF A FILM: the hit belongs to the payoff itself -- the last
+  // scene that has one (measured live: a bass hit on three scenes running).
+  const payoffs = scenes.filter((sc) => Array.isArray(sc?.sfx) && sc.sfx.some((c: any) => c?.role === "payoff"));
+  for (const sc of payoffs.slice(0, -1)) { const n = sc.sfx.length; sc.sfx = sc.sfx.filter((c: any) => c?.role !== "payoff"); dropped += n - sc.sfx.length; }
   return dropped;
 }
 
@@ -116,15 +140,22 @@ export function capSceneSounds(scenes: any[], opts: { memes?: boolean } = {}): n
  * sets the length later). `recipe`: the board fills a measured cut, whose
  * seconds are the edit. Returns one log line per fix.
  */
-export function enforceBoard(scenes: any[], opts: { brief?: string; voiced?: boolean; personCarries?: boolean; recipe?: boolean }): string[] {
+export function enforceBoard(scenes: any[], opts: { brief?: string; voiced?: boolean; personCarries?: boolean; recipe?: boolean }): { log: string[]; warnings: string[] } {
   const log: string[] = [];
-  if (!Array.isArray(scenes) || !scenes.length) return log;
+  const warnings: string[] = [];
+  if (!Array.isArray(scenes) || !scenes.length) return { log, warnings };
 
   // 1. THE BRIEF'S LINES ARE THE LINES: a numbered line per beat goes on its
-  //    scene, word for word, when the count matches the board.
+  //    scene, word for word -- but only on a board whose scenes ARE the
+  //    beats. Measured live (proj_84048b0d): six beats came back as one oner
+  //    holding beats 1-4 plus two invented scenes; stamped by number, every
+  //    line landed on the wrong picture. The writer's own lines show which
+  //    beat each scene is; a board that does not follow the beats is left
+  //    as written and said so.
   if (opts.voiced || opts.personCarries) {
     const lines = numberedBriefLines(opts.brief);
-    if (lines.length === scenes.length) {
+    const follows = lines.length === scenes.length && scenes.every((sc, i) => sceneReadsBeat(String(sc.voiceover_text || ""), lines, i));
+    if (follows) {
       const changed: number[] = [];
       lines.forEach((line, i) => {
         const had = String(scenes[i].voiceover_text || "").replace(/\*/g, "").replace(/\s+/g, " ").trim();
@@ -132,7 +163,7 @@ export function enforceBoard(scenes: any[], opts: { brief?: string; voiced?: boo
       });
       if (changed.length) log.push(`the brief's lines put on scene(s) ${changed.join(", ")}`);
     } else if (lines.length) {
-      log.push(`the brief numbers ${lines.length} lines for ${scenes.length} scenes -- lines left as written`);
+      warnings.push(`The brief numbers ${lines.length} beats and the board's ${scenes.length} scenes do not follow them one to one -- redraft it ("one scene per numbered beat") before building.`);
     }
   }
 
@@ -160,6 +191,6 @@ export function enforceBoard(scenes: any[], opts: { brief?: string; voiced?: boo
 
   // 3. THE SOUND: one quiet cue a scene, no meme stings.
   const dropped = capSceneSounds(scenes, { memes: /\b(meme|fahh+|sting|vine boom)\b/i.test(String(opts.brief || "")) });
-  if (dropped) log.push(`${dropped} sound cue(s) dropped (one a scene, no meme stings)`);
-  return log;
+  if (dropped) log.push(`${dropped} sound cue(s) dropped (one a scene, one payoff a film, no meme stings)`);
+  return { log, warnings };
 }
