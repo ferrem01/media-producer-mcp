@@ -12,6 +12,12 @@ import path from "node:path";
 
 const execFileAsync = promisify(execFile);
 
+/** A gap between voice lines shorter than this is a breath, not a break:
+ *  the bed stays down through it. At 0.25 s the 0.45 s breath every voiced
+ *  scene ends on let the bed jump back up at every cut and drop again -- the
+ *  volume "bouncing from scene to scene" (Marc, Six Tabs, Oct 8). */
+export const DUCK_BRIDGE_S = 1.5;
+
 export interface AudioTrackInput {
   path: string;
   type: "voiceover" | "music" | "sfx";
@@ -156,7 +162,7 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
       const merged: Array<{ start: number; end: number }> = [];
       for (const w of windows) {
         const last = merged[merged.length - 1];
-        if (last && w.start <= last.end + 0.25) last.end = Math.max(last.end, w.end);
+        if (last && w.start <= last.end + DUCK_BRIDGE_S) last.end = Math.max(last.end, w.end);
         else merged.push({ ...w });
       }
 
