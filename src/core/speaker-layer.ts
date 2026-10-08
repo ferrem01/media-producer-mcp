@@ -132,6 +132,21 @@ export function speakerLayersOf(scene: SceneLike | null | undefined): Comp[] {
   return ((scene?.components || []) as Comp[]).filter((c) => isSpeakerLayer(c));
 }
 
+/** ABOVE THE PERSON: the z an overlay added without one gets in a scene
+ *  that holds a speaker -- one over the highest speaker layer, so it is
+ *  drawn over the person, not under. An overlay the scene draws the speaker
+ *  inside (camera moves, a shape) used to land at z 0 under a speaker at
+ *  z 1 and vanish in Studio while the scene probe, which draws no person,
+ *  measured it visible (Marc, Oct 8: "the tool storm just flashes"). Null
+ *  when it keeps its own z: it has one, it is a speaker, it is a backdrop,
+ *  or the scene has no speaker. */
+export function zOverSpeaker(scene: SceneLike | null | undefined, comp: Comp, isBackdrop: (type: string) => boolean = () => false): number | null {
+  if (!comp || comp.z_index != null || isSpeakerLayer(comp) || isBackdrop(String(comp.type || ""))) return null;
+  const layers = speakerLayersOf(scene);
+  if (!layers.length) return null;
+  return Math.max(...layers.map((l) => (Number.isFinite(Number(l.z_index)) ? Number(l.z_index) : 0))) + 1;
+}
+
 /** The scene's first speaker component, when cast. */
 export function speakerLayerOf(scene: SceneLike | null | undefined): Comp | undefined {
   return speakerLayersOf(scene)[0];

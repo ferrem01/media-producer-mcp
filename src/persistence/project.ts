@@ -470,7 +470,10 @@ export async function addComponent(
   const scene = project.scenes.find((s) => s.id === sceneId);
   if (!scene) return null;
 
-  scene.components.push(component);
+  const { zOverSpeaker } = await import("../core/speaker-layer.js");
+  const { BACKDROP_TYPES } = await import("../core/scene-assembler.js");
+  const z = zOverSpeaker(scene as any, component as any, (t) => BACKDROP_TYPES.has(t));
+  scene.components.push(z == null ? component : { ...component, z_index: z });
   await saveProject(project);
   return project;
 }
