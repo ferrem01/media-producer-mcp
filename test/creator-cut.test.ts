@@ -459,10 +459,10 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(marked.voiceover_text).toBe("One brief. Every surface.\nThat's Quotient.");
     expect(marked.emphasis).toEqual(["brief", "quotient"]);
     expect(liftNotes.some((n) => /emphasis lifted off the lines: brief, quotient/.test(n))).toBe(true);
-    // The layout: the lane owns the chest band above the proof and a label, and the band is not handed out twice.
+    // The layout: the lane owns the lower third (CAPTION_LANE_TALL) above the proof and a label, and the band is not handed out twice.
     const gen = await read("../src/llm/scene-generator.ts");
-    expect(gen).toMatch(/if \(c\.type !== "reel-caption-lane"\) return;[\s\S]*?=== "scatter"\) \{ slots\[i\] = \{ position: pct\(0, 0, 100, 100\), z_index: 41 \}; return; \}\s*if \(vertical && !takeover\) \{[\s\S]*?z_index: 41 \};\s*laneLower = !!lb\.lower;/);
-    expect(gen).toMatch(/var usedLower = laneLower, usedTop = laneTop;\s*if \(bands\.lower && stack\.length && !laneLower\) \{/);
+    expect(gen).toMatch(/if \(c\.type !== "reel-caption-lane"\) return;[\s\S]*?=== "scatter"\) \{ slots\[i\] = \{ position: pct\(0, 0, 100, 100\), z_index: 41 \}; return; \}\s*if \(vertical && !takeover\) \{[\s\S]*?CAPTION_LANE_TALL\.height\)\), z_index: 41 \};\s*laneLower = true;/);
+    expect(gen).toMatch(/var usedLower = laneLower, usedTop = false;\s*if \(bands\.lower && stack\.length && !laneLower\) \{/);
   });
 
   it("the cut effect is a hard cut in the choreography: sub-frame, no ease", async () => {
