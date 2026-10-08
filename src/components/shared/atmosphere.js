@@ -104,6 +104,41 @@
     }, 0);
   };
 
+  // THE WAVES (the Claude announce email's texture): a faint band of fine
+  // contour lines flowing across a sheet in a slow S, bunching and spreading
+  // as they go, plus a fainter echo rising into the lower-right corner.
+  // Returns the <path> markup for an SVG of W x H (viewBox 0 0 W H). Drawn,
+  // so it is crisp at any frame size; still. Used by cream-ground
+  // (pattern "waves") and webinar-cover (ground "waves").
+  window.mpWavesSvg = function (W, H, opts) {
+    var o = opts || {};
+    var ink = String(o.color || '#b48a6e');
+    var op = o.opacity !== undefined && isFinite(Number(o.opacity)) ? Number(o.opacity) : 0.32;
+    var N = 34, STEPS = 90, S = Math.min(W, H), out = '';
+    var bands = [
+      { n: N, c0: 0.30, c1: 0.80, bow: 0.14, spread0: 0.20, spread1: 0.46, alpha: 1 },
+      { n: Math.round(N * 0.6), c0: 1.08, c1: 0.84, bow: -0.05, spread0: 0.14, spread1: 0.28, alpha: 0.6 },
+    ];
+    for (var b = 0; b < bands.length; b++) {
+      var B = bands[b];
+      for (var i = 0; i < B.n; i++) {
+        var t = B.n > 1 ? i / (B.n - 1) : 0.5, d = '';
+        for (var k = 0; k <= STEPS; k++) {
+          var u = k / STEPS;
+          var centre = H * (B.c0 + (B.c1 - B.c0) * u) + H * B.bow * Math.sin(u * Math.PI * 1.7 + 0.4);
+          var spread = H * (B.spread0 + (B.spread1 - B.spread0) * (0.5 - 0.5 * Math.cos(u * Math.PI)));
+          var y = centre + (t - 0.5) * spread + S * 0.012 * Math.sin(u * 7.5 + t * 2.6);
+          d += (k ? 'L' : 'M') + (u * W).toFixed(1) + ' ' + y.toFixed(1);
+        }
+        // Lines thin out toward the band's edges, so it reads as one form.
+        var edge = 1 - Math.pow(Math.abs(t - 0.5) * 2, 2.2) * 0.75;
+        out += '<path d="' + d + '" fill="none" stroke="' + ink + '" stroke-width="' + (S / 1080 * 1.1).toFixed(2) +
+          '" stroke-opacity="' + (op * B.alpha * edge).toFixed(3) + '"/>';
+      }
+    }
+    return out;
+  };
+
   // RETIRED (kept as a no-op so template call sites don't break): the light
   // sweep read as a cheesy lens flare on kinetic type -- director's note is
   // that hero elements land and HOLD, no glint.

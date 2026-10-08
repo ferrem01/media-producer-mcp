@@ -1,5 +1,6 @@
 <template>
   <div class="wc-root">
+    <div class="wc-ground"><svg class="wc-waves" aria-hidden="true"></svg></div>
     <div class="wc-block">
       <div class="wc-pill"><span class="wc-dot"></span><span class="wc-pill-t"></span></div>
       <div class="wc-kicker"></div>
@@ -36,7 +37,13 @@
     font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
     color: var(--wc-ink, #141414);
   }
-  .wc-block { display: flex; flex-direction: column; align-items: flex-start; text-align: left; max-width: 100%; }
+  /* ground: the card brings its own sheet (cream, optionally the waves) so
+     it can stand full-frame over footage -- the opener on a speaker film. */
+  .wc-ground { position: absolute; inset: 0; display: none; background: #f4efe1; }
+  .wc-ground::after { content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
+  .wc-waves { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+  .wc-block { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; text-align: left; max-width: 100%; }
   .wc-root.center .wc-block { align-items: center; text-align: center; }
   .wc-pill {
     display: inline-flex; align-items: center; gap: calc(var(--u) * 16);
@@ -68,6 +75,11 @@
   .wc-tile svg { width: 62%; height: 62%; }
   .wc-cell-t { font-size: calc(var(--u) * 34); font-weight: 500; line-height: 1.25; white-space: pre-line; color: var(--wc-ink, #141414); }
   .wc-sep { width: calc(var(--u) * 2); align-self: stretch; background: rgba(20, 20, 20, 0.10); }
+  /* A tall box (a phone frame) stacks the date over the time: side by side
+     they were the widest line and held the title down to postage size. */
+  .wc-root.tall .wc-when { flex-direction: column; align-items: flex-start; gap: calc(var(--u) * 22); }
+  .wc-root.tall .wc-sep { display: none; }
+  .wc-root.tall .wc-sub { max-width: 15em; }
   .wc-actions { margin-top: calc(var(--u) * 46); }
   .wc-button {
     position: relative; overflow: hidden;
@@ -92,6 +104,15 @@
     if (data.ink) root.style.setProperty('--wc-ink', String(data.ink));
     if (data.button_color) root.style.setProperty('--wc-btn', String(data.button_color));
     if (data.align === 'center') root.classList.add('center');
+    if (data.ground === 'cream' || data.ground === 'waves') {
+      var gr = q('.wc-ground'), wv = q('.wc-waves');
+      gr.style.display = 'block';
+      if (data.ground_tone) gr.style.background = String(data.ground_tone);
+      var GW = el.clientWidth || 1080, GH = el.clientHeight || 1920;
+      wv.setAttribute('viewBox', '0 0 ' + GW + ' ' + GH);
+      wv.setAttribute('preserveAspectRatio', 'none');
+      if (data.ground === 'waves' && window.mpWavesSvg) wv.innerHTML = mpWavesSvg(GW, GH, {});
+    }
 
     if (data.pill) q('.wc-pill-t').textContent = String(data.pill); else q('.wc-pill').classList.add('off');
     q('.wc-kicker').textContent = data.kicker ? String(data.kicker) : '';
@@ -112,8 +133,10 @@
     // SIZE: generous first, shrink until the block fits the box (minus a
     // margin), so the cover owns its slot at any size.
     var W = el.clientWidth || 1600, H = el.clientHeight || 900;
-    var pad = Math.round(Math.min(W, H) * 0.04);
-    var u = Math.min(W / 1300, H / 820);
+    var tall = H > W * 1.2;
+    if (tall) root.classList.add('tall');
+    var pad = Math.round(Math.min(W, H) * (tall ? 0.09 : 0.04));
+    var u = Math.min(W / 900, H / 820);
     for (var i = 0; i < 40; i++) {
       root.style.setProperty('--u', u.toFixed(3) + 'px');
       if (block.scrollHeight <= H - 2 * pad && block.scrollWidth <= W - 2 * pad) break;

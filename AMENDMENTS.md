@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The webinar cover opens a 9:16 speaker film
+
+Marc: "can you add a 9:16 version of the email cover opener" (Dana,
+proj_d37c96fe; Five Tools next if it works). A speaker film has no cream world
+under the person, so `webinar-cover` gains `ground: "cream" | "waves"` -- its
+own sheet, so the card stands full-frame over the take and slides away on a
+word. The wave drawing moved into `atmosphere.js` (`mpWavesSvg`), shared by
+the card and `cream-ground`. A tall box stacks the date over the time and
+wraps the subhead shorter: side by side they were the widest line and held
+the title to postage size (measured in the still harness, 1080x1920).
+
 ## 2026-10-08 — The webinar's cover opens and closes the film; waves; a co-brand corner
 
 Prerna on the Six Tabs 16:9 (proj_fedfa77c): "Start with the screenshot from
