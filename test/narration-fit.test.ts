@@ -46,6 +46,8 @@ describe("the narration is the clock", () => {
     expect(pipeline).toContain("fitScenesToNarration(project, lines");
     expect(pipeline).not.toContain("Extend scene duration if voiceover is longer");
     const server = await read("src/server.ts");
-    expect(server).toMatch(/if \(params\.action === "fit_voiceover"\) \{[\s\S]*?fitScenesToNarration\(project, lines\)/);
+    expect(server).toMatch(/if \(params\.action === "fit_voiceover"\) \{[\s\S]*?fitFilmToVoice\(project/);
+    // Studio's voice card fits through the same function (core/voice-lines.ts).
+    expect(await read("src/core/voice-lines.ts")).toContain("fitScenesToNarration(project, lines)");
   });
 });

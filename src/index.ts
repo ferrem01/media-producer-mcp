@@ -1357,7 +1357,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|music-level|speaker-waveform|speaker-transcript|speaker-level|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|music-level|speaker-waveform|speaker-transcript|speaker-level|voice-line|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -3677,11 +3677,15 @@ Rules:
         if (!Number.isFinite(v) || v < 0 || v > 1) { jsonResponse(res, 400, { error: "volume must be a number from 0 to 1" }); return; }
         const slProj = await loadProject(slTenant, slProject);
         if (!slProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        if (!slProj.speaker_track) { jsonResponse(res, 400, { error: "This film has no speaker track" }); return; }
-        slProj.speaker_track.volume = Math.round(v * 1000) / 1000;
+        const lvl = Math.round(v * 1000) / 1000;
+        // A voice-only film: the level of its voice lines (every voiceover track).
+        const voLines = (slProj.audio?.tracks || []).filter((t) => t.type === "voiceover");
+        if (!slProj.speaker_track && !voLines.length) { jsonResponse(res, 400, { error: "This film has no voice" }); return; }
+        if (slProj.speaker_track) slProj.speaker_track.volume = lvl;
+        else for (const t of voLines) t.volume = lvl;
         slProj.updated_at = new Date().toISOString();
         await saveProject(slProj);
-        jsonResponse(res, 200, { ok: true, volume: slProj.speaker_track.volume });
+        jsonResponse(res, 200, { ok: true, volume: lvl });
         return;
       }
 
@@ -4377,6 +4381,73 @@ Rules:
         } catch (e: any) {
           console.error(`  booth-script: FAILED (${e?.message || e})`);
           jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
+      // ── API: A voice-only film's lines (core/voice-lines.ts) ──
+      // POST /api/voice-line/{tenant}/{project}
+      //   JSON {scene_index, text?, speed?, voice?, all?}  re-read the line (all: the
+      //        pace on every scene's line); a recorded line re-paces from the recording
+      //   raw audio ?scene=<i>&name=<file>                  the person's own recording
+      //   Then the film re-fits to its lines. Answers {ok, project}.
+      const voiceLineMatch = urlPath.match(/^\/api\/voice-line\/([^/]+)\/([^/]+)$/);
+      if (voiceLineMatch && method === "POST") {
+        const [, vlTenant, vlProject] = voiceLineMatch.map(decodeURIComponent);
+        try {
+          const project = await loadProject(vlTenant, vlProject);
+          if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          const vl = await import("./core/voice-lines.js");
+          const audioDir = path.join(projectAssetsDir(vlTenant, vlProject), "audio");
+          const q = new URL(req.url || "/", "http://localhost").searchParams;
+          const ctype = String(req.headers["content-type"] || "");
+          if (q.has("scene") && !/json/i.test(ctype)) {
+            const si = Number(q.get("scene"));
+            if (!Number.isInteger(si) || !project.scenes[si]) { jsonResponse(res, 400, { error: "scene is required" }); return; }
+            const chunks: Buffer[] = [];
+            let got = 0;
+            await new Promise<void>((resolve, reject) => {
+              req.on("data", (c: Buffer) => { got += c.length; if (got > 64 * 1024 * 1024) { reject(new Error("recording exceeds 64MB")); req.destroy(); return; } chunks.push(c); });
+              req.on("end", () => resolve());
+              req.on("error", reject);
+            });
+            const buf = Buffer.concat(chunks);
+            if (buf.length < 1024) { jsonResponse(res, 400, { error: "recording is empty" }); return; }
+            const name = path.basename(q.get("name") || `line-${si}.webm`).replace(/[^a-zA-Z0-9._-]/g, "_");
+            await fs.mkdir(audioDir, { recursive: true });
+            const file = path.join(audioDir, `take-${si}-${Date.now().toString(36)}-${name}`);
+            await fs.writeFile(file, buf);
+            const { remuxMediaRecorderFile } = await import("./core/video-normalize.js");
+            await remuxMediaRecorderFile(file);
+            await vl.attachRecordedLine(project, si, file, { audioDir });
+            console.log(`  voice-line: ${vlProject} scene ${si + 1} recorded`);
+          } else {
+            const body = await parseBody(req) as Record<string, any>;
+            const si = Number(body.scene_index);
+            if (!Number.isInteger(si) || !project.scenes[si]) { jsonResponse(res, 400, { error: "scene_index is required" }); return; }
+            const speed = body.speed != null ? Number(body.speed) : undefined;
+            const scenes = body.all && speed != null
+              ? project.scenes.map((_s, i) => i).filter((i) => vl.lineTrack(project, i))
+              : [si];
+            for (const i of scenes) {
+              const tr = vl.lineTrack(project, i);
+              const onlyPace = i !== si || body.text == null;
+              if (tr?.take && onlyPace && speed != null) await vl.paceRecordedLine(project, i, speed, { audioDir });
+              else await vl.revoiceLine(project, i, {
+                ...(i === si && body.text != null ? { text: String(body.text) } : {}),
+                ...(speed != null ? { speed } : {}),
+                ...(i === si && body.voice ? { voice: String(body.voice) } : {}),
+              }, { tenant: vlTenant, audioDir });
+            }
+            console.log(`  voice-line: ${vlProject} scene(s) ${scenes.map((i) => i + 1).join(",")} re-read${speed != null ? ` at ${speed}x` : ""}`);
+          }
+          await vl.fitFilmToVoice(project, config.dataDir, audioDir);
+          project.updated_at = new Date().toISOString();
+          await saveProject(project);
+          jsonResponse(res, 200, { ok: true, project });
+        } catch (e: any) {
+          console.error(`  voice-line: FAILED (${e?.message || e})`);
+          jsonResponse(res, 400, { error: e?.message || String(e) });
         }
         return;
       }

@@ -5390,7 +5390,19 @@ ${QUOTIENT_CSS}
   // speaker at): heard at once while dragging, saved on release.
   function openVoiceCard(project) {
     var st = project.speaker_track;
-    if (!st) { studioStatus('This film has no speaker voice to set.', 'err'); return; }
+    if (!st) {
+      // A voice-only film: its lines' level, and a way into each line.
+      if (!voiceLines(project).length) { studioStatus('This film has no voice to set.', 'err'); return; }
+      var lv = Math.round(voiceLinesLevel(project) * 100);
+      studioModalOpen('<h3 class="sm-title">Voice</h3><p class="sm-desc">How loud the voice lines sit in the film. The render uses the same level. Click a scene\u2019s line on the speaker lane to change its pace, re-read it or record it yourself.</p>' +
+        '<div class="mu-level"><label><b>Voice level</b><input type="range" id="vo-vol" min="0" max="100" step="1" value="' + lv + '"><span id="vo-vol-n">' + lv + '%</span></label></div>' +
+        '<div class="sm-actions"><button class="sm-btn" id="vo-close">Close</button></div>');
+      document.getElementById('vo-close').addEventListener('click', function() { studioModalClose(); });
+      var el0 = document.getElementById('vo-vol'), n0 = document.getElementById('vo-vol-n');
+      el0.addEventListener('input', function() { n0.textContent = el0.value + '%'; voiceLinesApplyLevel(parseInt(el0.value, 10) / 100); });
+      el0.addEventListener('change', function() { voiceLinesSaveLevel(project, parseInt(el0.value, 10) / 100); });
+      return;
+    }
     var v = Math.round((typeof st.volume === 'number' ? st.volume : 1) * 100);
     studioModalOpen('<h3 class="sm-title">Voice</h3><p class="sm-desc">How loud the speaker sits in the film. The render uses the same level.</p>' +
       '<div class="mu-level"><label><b>Voice level</b><input type="range" id="vo-vol" min="0" max="100" step="1" value="' + v + '"><span id="vo-vol-n">' + v + '%</span></label></div>' +
@@ -8248,6 +8260,29 @@ ${QUOTIENT_CSS}
         track.insertBefore(blk, document.getElementById('wave-strip'));
       });
     }
+    // A VOICE-ONLY film: each scene's line is a piece on the speaker lane,
+    // selectable like a take -- pace, re-read, record it yourself, level
+    // (Marc, Oct 8: "making that line clickable as if it was a video speaker
+    // track").
+    if (!hasSpeaker && !(p.speaker_track && p.speaker_track.clips && p.speaker_track.clips.length) && total > 0 && y.speaker >= 0) {
+      voiceLines(p).forEach(function(vl) {
+        var sc2 = p.scenes[vl.si]; if (!sc2) return;
+        var f2 = sceneStartFor(vl.si), d2 = sc2.duration_seconds || 0;
+        if (!(d2 > 0.05)) return;
+        var vb = document.createElement('div');
+        vb.className = 'spk-clip spk-voice';
+        vb.style.top = (y.speaker + 3) + 'px';
+        vb.style.left = ((f2 / total) * 100).toFixed(2) + '%';
+        vb.style.width = ((Math.min(total - f2, d2) / total) * 100).toFixed(2) + '%';
+        vb.title = 'Scene ' + (vl.si + 1) + ' voice line' + (vl.track.take ? ' (your recording)' : '') + '. Click: pace, re-read, record it yourself, level.';
+        vb.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          scrub(Math.round((f2 / total) * 1000)); els.slider.value = Math.round((f2 / total) * 1000);
+          voicePopOpen(vl.si, vb);
+        });
+        track.insertBefore(vb, document.getElementById('wave-strip'));
+      });
+    }
     // Takes still needed: a dashed piece at the scene, on the speaker lane.
     if (y.speaker >= 0 && total > 0) {
       openNeedsOf(p).filter(function(n) { return n.need.type === 'camera_video' && n.need.use !== 'clip'; }).forEach(function(n) {
@@ -8651,6 +8686,150 @@ ${QUOTIENT_CSS}
     }).join('');
     return '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Pace</span>' + btns + '</div>'
       + '<div class="sp-row" style="font-size:12px;color:var(--content-secondary);"><label><input type="checkbox" id="tk-pace-all" checked> All scenes</label></div>';
+  }
+  // ── A voice-only film's lines (POST /api/voice-line, core/voice-lines.ts) ──
+  function voiceLines(p) {
+    var out = [];
+    ((p && p.audio && p.audio.tracks) || []).forEach(function(t) {
+      var m = /^vo_scene_(\\d+)$/.exec(String(t.id || ''));
+      if (m && t.type === 'voiceover') out.push({ si: Number(m[1]), track: t });
+    });
+    return out.sort(function(a, b) { return a.si - b.si; });
+  }
+  function voiceLineText(p, si) {
+    var vl = voiceLines(p).filter(function(x) { return x.si === si; })[0];
+    var sc = (p.scenes || [])[si] || {};
+    var sb = (p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si]) || {};
+    return String((vl && vl.track.text) || (sc.audio_hints && sc.audio_hints.voiceover_text) || sb.voiceover_text || '');
+  }
+  function voiceLineDone(r, si, verb) {
+    studioStatus(verb, 'ok');
+    afterSpeakerEdit(r, Math.max(0, sceneStartFor(si) - 0.5));
+    loadTranscript();
+    renderLaneLabels();
+    return r;
+  }
+  function voiceLineRequest(si, body, verb) {
+    var p = state.currentProject;
+    if (!p) return Promise.resolve();
+    body.scene_index = si;
+    studioStatus(verb + '… (reading the line and re-fitting the film)', '');
+    return api('POST', '/voice-line/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body)
+      .then(function(r) { return voiceLineDone(r, si, 'Scene ' + (si + 1) + ' voice updated; the film re-fit to it.'); })
+      .catch(function(e) { studioStatus('Voice line failed: ' + (e.message || e), 'err'); throw e; });
+  }
+  function voiceLineUpload(si, blob, ext) {
+    var p = state.currentProject;
+    if (!p) return Promise.resolve();
+    studioStatus('Uploading your recording…', '');
+    var url = '/api' + withToken('/voice-line/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '?scene=' + si + '&name=line.' + ext);
+    var headers = { 'Content-Type': 'application/octet-stream' };
+    if (_token) headers['Authorization'] = 'Bearer ' + _token;
+    liveSync.suppressUntil = Date.now() + 8000;
+    return fetch(url, { method: 'POST', headers: headers, body: blob }).then(function(res) {
+      return res.json().catch(function() { return null; }).then(function(j) {
+        if (!res.ok) throw new Error((j && j.error) || ('API error ' + res.status));
+        return voiceLineDone(j, si, 'Scene ' + (si + 1) + ': your recording is the line now.');
+      });
+    }).catch(function(e) { studioStatus('Recording failed: ' + (e.message || e), 'err'); throw e; });
+  }
+  // The voice lines' level (every line), live while dragging.
+  function voiceLinesLevel(p) {
+    var lines = voiceLines(p);
+    return lines.length ? (typeof lines[0].track.volume === 'number' ? lines[0].track.volume : 1) : 1;
+  }
+  function voiceLinesApplyLevel(v) {
+    var p = state.currentProject;
+    voiceLines(p).forEach(function(vl) { vl.track.volume = v; });
+    state.audioElements.forEach(function(a) { if (a._trackType === 'voiceover') { a._baseVolume = v; try { a.volume = effVolume(a); } catch (eL) {} } });
+  }
+  function voiceLinesSaveLevel(p, v) {
+    return api('POST', '/speaker-level/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { volume: v })
+      .then(function() { studioStatus('Voice level: ' + Math.round(v * 100) + '%.', 'ok'); })
+      .catch(function(e) { studioStatus(e.message || String(e), 'err'); });
+  }
+  function voicePopOpen(si, anchorEl) {
+    var p = state.currentProject;
+    var pop = document.getElementById('cam-pop');
+    var vl = p && voiceLines(p).filter(function(x) { return x.si === si; })[0];
+    if (!p || !pop || !vl) return;
+    camPopClose(); rvPopClose(); wordCutClear();
+    var sc = p.scenes[si] || {};
+    var tr = vl.track;
+    var cur = tr.speed || 1;
+    var lvl = Math.round(voiceLinesLevel(p) * 100);
+    var esc = function(x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+    var h = '<div class="sp-head"><span class="sp-title"><b>Scene ' + (si + 1) + ' voice</b> — ' + Number(sc.duration_seconds || 0).toFixed(2) + 's</span><button class="sp-x" id="vl-x">✕</button></div>'
+      + '<div class="sp-region" style="margin-bottom:8px;">' + (tr.take ? 'Your recording.' : 'A generated read' + (tr.voice ? ' (' + esc(tr.voice) + ')' : '') + '.') + ' Any change re-fits the film: the scene runs to the line, and word-timed graphics and sounds follow.</div>'
+      + '<div class="tk-row"><span class="tk-lab">Pace</span>' + [1, 1.1, 1.15, 1.2].map(function(v) {
+          return '<button class="rv-go ' + (Math.abs(cur - v) < 0.001 ? '' : 'secondary') + '" data-vl-pace="' + v + '">' + v + 'x</button>';
+        }).join('') + '</div>'
+      + '<div class="sp-row" style="font-size:12px;color:var(--content-secondary);"><label><input type="checkbox" id="vl-pace-all" checked> All scenes</label></div>'
+      + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><textarea id="vl-text" rows="3" style="width:100%;box-sizing:border-box;font:13px/1.4 var(--font-sans, inherit);border:1px solid var(--border-tertiary);border-radius:6px;padding:6px;resize:vertical;">' + esc(voiceLineText(p, si)) + '</textarea></div>'
+      + '<div class="sp-row"><button class="rv-go secondary" id="vl-revoice" style="flex:1;">' + (tr.take ? 'Replace my recording with a read of these words' : 'Re-read these words') + '</button></div>'
+      + '<div class="sp-row" id="vl-rec-row"><button class="rv-go secondary" id="vl-rec" style="flex:1;">● Record it yourself</button></div>'
+      + '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Level</span><input type="range" id="vl-vol" min="0" max="100" step="1" value="' + lvl + '" style="flex:1;"><span id="vl-vol-n" style="min-width:38px;text-align:right;">' + lvl + '%</span></div>';
+    pop.innerHTML = h;
+    spkPopPlace(pop, anchorEl);
+    var again = function() { return anchorEl && anchorEl.isConnected ? anchorEl : document.querySelector('.spk-voice'); };
+    document.getElementById('vl-x').addEventListener('click', function() { voiceRecStop(true); camPopClose(); });
+    pop.querySelectorAll('[data-vl-pace]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var all = document.getElementById('vl-pace-all') && document.getElementById('vl-pace-all').checked;
+        pop.querySelectorAll('button').forEach(function(x) { x.disabled = true; });
+        voiceLineRequest(si, { speed: Number(b.getAttribute('data-vl-pace')), all: !!all }, 'Setting the pace' + (all ? ' on every line' : ''))
+          .then(function() { camPopClose(); }, function() { voicePopOpen(si, again()); });
+      });
+    });
+    document.getElementById('vl-revoice').addEventListener('click', function() {
+      var text = document.getElementById('vl-text').value.trim();
+      if (!text) { studioStatus('Write the line first', 'err'); return; }
+      pop.querySelectorAll('button').forEach(function(x) { x.disabled = true; });
+      voiceLineRequest(si, { text: text }, 'Re-reading scene ' + (si + 1))
+        .then(function() { camPopClose(); }, function() { voicePopOpen(si, again()); });
+    });
+    document.getElementById('vl-rec').addEventListener('click', function() { voiceRecStart(si, again); });
+    var vol = document.getElementById('vl-vol'), voln = document.getElementById('vl-vol-n');
+    vol.addEventListener('input', function() { voln.textContent = vol.value + '%'; voiceLinesApplyLevel(parseInt(vol.value, 10) / 100); });
+    vol.addEventListener('change', function() { voiceLinesSaveLevel(p, parseInt(vol.value, 10) / 100); });
+  }
+  // RECORD IT YOURSELF: the microphone, the line on screen to read, Stop
+  // uploads it and it becomes the scene's line (levelled like every line).
+  var voiceRec = null;
+  function voiceRecStop(discard) {
+    if (!voiceRec) return;
+    var r = voiceRec; voiceRec = null;
+    r.discard = !!discard;
+    clearInterval(r.timer);
+    try { if (r.rec.state !== 'inactive') r.rec.stop(); } catch (eS) {}
+    r.stream.getTracks().forEach(function(t) { t.stop(); });
+  }
+  function voiceRecStart(si, anchorFn) {
+    var row = document.getElementById('vl-rec-row');
+    if (!row) return;
+    if (!navigator.mediaDevices || !window.MediaRecorder) { studioStatus('This browser cannot record here', 'err'); return; }
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function(stream) {
+      var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].filter(function(m) { return MediaRecorder.isTypeSupported(m); })[0] || '';
+      var rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      var chunks = [];
+      var t0 = Date.now();
+      voiceRec = { rec: rec, stream: stream, discard: false, timer: 0 };
+      var me = voiceRec;
+      rec.ondataavailable = function(e) { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = function() {
+        if (me.discard) return;
+        var type = rec.mimeType || mime || 'audio/webm';
+        var ext = /mp4/.test(type) ? 'm4a' : 'webm';
+        var blob = new Blob(chunks, { type: type });
+        row.innerHTML = '<span class="sp-region">Attaching your recording…</span>';
+        voiceLineUpload(si, blob, ext).then(function() { camPopClose(); }, function() { voicePopOpen(si, anchorFn()); });
+      };
+      rec.start(250);
+      row.innerHTML = '<button class="rv-go" id="vl-rec-stop" style="flex:1;">■ Stop — <span id="vl-rec-t">0.0s</span></button>';
+      me.timer = setInterval(function() { var el = document.getElementById('vl-rec-t'); if (el) el.textContent = ((Date.now() - t0) / 1000).toFixed(1) + 's'; }, 100);
+      document.getElementById('vl-rec-stop').addEventListener('click', function() { voiceRecStop(false); });
+      studioStatus('Recording — read the line in the box, then Stop.', '');
+    }).catch(function(e) { studioStatus('Microphone: ' + (e.message || e), 'err'); });
   }
   // FRAMING (a recast whose picture is another shape -- a landscape look in
   // a portrait film): how far back the actor sits. Refitted from the kept
