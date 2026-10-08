@@ -5,7 +5,8 @@
  * (Marc, Oct 8: "OpenAI's voice sucks ... we should be using one of the many
  * 11 labs voices ... remove any of that OpenAI voice code"). One path reads a
  * line: `speak` -- the voice resolved, read on the performed-scene model,
- * tempo-changed with pitch kept, levelled to -14 LUFS.
+ * tempo-changed with pitch kept, levelled to -14 LUFS (measured, then one
+ * gain -- see `levelLine`).
  *
  * A voice setting is one of:
  *  - a stock ElevenLabs voice by name ("brian", "sarah" -- STOCK_VOICES);
@@ -19,6 +20,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { measureLoudness } from "../core/take-sanitize.js";
 
 const run = promisify(execFile);
 
@@ -79,6 +81,25 @@ async function elevenRead(text: string, voiceId: string, out: string): Promise<v
   await elevenSpeech(text, voiceId, out, SCRIPT_VOICE_MODEL);
 }
 
+/** The level every line is read at (integrated LUFS). */
+export const LINE_LOUDNESS_LUFS = -14;
+
+/** dB that brings a line measured at `measured` LUFS to LINE_LOUDNESS_LUFS;
+ *  0 when it could not be measured (silence, a probe failure). */
+export function levelGain(measured: number | null): number {
+  return measured == null ? 0 : Math.round((LINE_LOUDNESS_LUFS - measured) * 100) / 100;
+}
+
+/** The line's filter: tempo, ONE gain for the whole line, a peak limiter
+ *  (-1.5 dBTP). Not a single-pass loudnorm: that one rides its gain on a 3 s
+ *  window, so a 2 s line ("It's free. Click to save your spot.") came out
+ *  quieter than the lines around it -- the voice dropped in the last scene
+ *  (Marc, Oct 8, proj_f5c104bb). Measured first, every line lands level
+ *  whatever its length. */
+export function levelFilter(speed: number, gainDb: number): string {
+  return [speed !== 1 ? `atempo=${speed}` : "", `volume=${gainDb}dB`, "alimiter=limit=0.84:level=false"].filter(Boolean).join(",");
+}
+
 /** Read `text` in `voice` into `out` (an mp3). */
 export async function speak(opts: {
   text: string; out: string; voice?: unknown; speed?: number; tenant?: string;
@@ -94,7 +115,8 @@ export async function speak(opts: {
   const raw = `${opts.out}.raw.mp3`;
   await (opts.read || elevenRead)(text, voiceId, raw);
   const speed = voiceSpeed(opts.speed);
-  await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", raw, "-af", `${speed !== 1 ? `atempo=${speed},` : ""}loudnorm=I=-14:TP=-1.5:LRA=11`,
+  const gain = levelGain(await measureLoudness(raw));
+  await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", raw, "-af", levelFilter(speed, gain),
     "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", opts.out]);
   await fs.rm(raw, { force: true });
   console.log(`  Voice: "${text.slice(0, 50)}${text.length > 50 ? "..." : ""}" in ${String(opts.voice || DEFAULT_VOICE)} -> ${path.basename(opts.out)}`);
