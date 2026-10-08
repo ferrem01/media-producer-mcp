@@ -2,7 +2,7 @@
   "type": "cream-ground",
   "label": "Cream Ground (cream-world surface)",
   "category": "effects",
-  "description": "The cream world's full-bleed surface: flat warm cream (#f4efe1, st-statement's editorial canvas) with a soft white glow at the centre. Still, so every scene sits on the same sheet.",
+  "description": "The cream world's full-bleed surface: flat warm cream (#f4efe1, st-statement's editorial canvas) with a soft white glow at the centre. Still, so every scene sits on the same sheet. pattern 'waves' adds the Claude announce email's texture: a faint band of fine contour lines flowing across the sheet.",
   "data": {
     "tone": {
       "type": "string",
@@ -12,6 +12,25 @@
     "glow": {
       "type": "boolean",
       "label": "Soft white glow at the centre (default true)",
+      "optional": true
+    },
+    "pattern": {
+      "type": "string",
+      "label": "Texture on the sheet: 'waves' (fine flowing contour lines) | 'none' (default)",
+      "optional": true,
+      "enum": [
+        "none",
+        "waves"
+      ]
+    },
+    "pattern_color": {
+      "type": "string",
+      "label": "Line colour of the pattern (default warm taupe #b48a6e)",
+      "optional": true
+    },
+    "pattern_opacity": {
+      "type": "number",
+      "label": "Line opacity 0-1 (default 0.32; keep it paper, not a picture)",
       "optional": true
     }
   }

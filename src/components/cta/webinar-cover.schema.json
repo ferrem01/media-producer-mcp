@@ -1,0 +1,92 @@
+{
+  "type": "webinar-cover",
+  "label": "Webinar Cover",
+  "category": "cta",
+  "description": "An event's own cover (the email header, the social card) as a live card, left-aligned like the cover: a pill ('FREE WEBINAR'), a kicker ('A live, 45-minute session'), the big title with one *word* in the accent italic, the line under it, a rule, and the date and time on tinted icon tiles. Open a film on it (still:true: the first frame is the cover) and close on it again with button_text (the same cover with the register button). Leave the speakers off; people-row names them. Type sizes from the box.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "The event title; *word* is set in the accent italic, a newline breaks the line ('Claude for\\nMarketing *Analytics*')",
+      "required": true
+    },
+    "pill": {
+      "type": "string",
+      "label": "Pill above the title (e.g. 'FREE WEBINAR'); omit for none",
+      "optional": true
+    },
+    "kicker": {
+      "type": "string",
+      "label": "Small line above the title (e.g. 'A live, 45-minute session')",
+      "optional": true
+    },
+    "subtitle": {
+      "type": "string",
+      "label": "The line under the title",
+      "optional": true
+    },
+    "date": {
+      "type": "string",
+      "label": "Date on the calendar tile; a newline splits it ('Tuesday\\nOctober 20, 2026')",
+      "optional": true
+    },
+    "time": {
+      "type": "string",
+      "label": "Time on the clock tile ('1:00 – 1:45 PM ET')",
+      "optional": true
+    },
+    "button_text": {
+      "type": "string",
+      "label": "Register button under the cover (the close)",
+      "optional": true
+    },
+    "arrow": {
+      "type": "boolean",
+      "label": "Arrow in the button (default true)",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Accent colour: the pill, the italic word, the tiles, the button (default the cover orange #e0703f)",
+      "optional": true
+    },
+    "ink": {
+      "type": "string",
+      "label": "Text colour (default near-black #141414)",
+      "optional": true
+    },
+    "button_color": {
+      "type": "string",
+      "label": "Button colour (default the accent)",
+      "optional": true
+    },
+    "align": {
+      "type": "string",
+      "label": "left (default, like the cover) | center",
+      "optional": true,
+      "enum": [
+        "left",
+        "center"
+      ]
+    },
+    "still": {
+      "type": "boolean",
+      "label": "Shown whole from the first frame, no entrance (an opener whose first frame is the cover)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Seconds: the lines rise (default 0.2; ignored with still)",
+      "optional": true
+    },
+    "button_at": {
+      "type": "number",
+      "label": "Seconds: the button lands (default right after the lines)",
+      "optional": true
+    },
+    "press_at": {
+      "type": "number",
+      "label": "Seconds: the button presses (pair with a cursor click)",
+      "optional": true
+    }
+  }
+}
