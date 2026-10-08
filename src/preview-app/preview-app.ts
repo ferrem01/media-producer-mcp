@@ -12089,7 +12089,8 @@ ${QUOTIENT_CSS}
       var src = dr.voice_source || perf.voice_source || 'script';
       h += '<div class="pf-row"><label>Voice</label><div class="pf-engines">'
         + '<label class="pf-eng"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="script"' + (src === 'script' ? ' checked' : '') + '> Read the script in ' + escHtml(a.name) + '’s voice</label>'
-        + '<label class="pf-eng' + (s.has_recording ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="take"' + (src === 'take' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> My recording, in their voice' + (s.has_recording ? '' : ' <small>(record the scene first)</small>') + '</label></div></div>';
+        + '<label class="pf-eng' + (s.has_recording ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="take"' + (src === 'take' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> My recording, in their voice' + (s.has_recording ? '' : ' <small>(record the scene first)</small>') + '</label>'
+        + '<label class="pf-eng' + (s.has_recording ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="recording"' + (src === 'recording' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> My recording, my own voice' + (s.has_recording ? '' : ' <small>(record the scene first)</small>') + '</label></div></div>';
       if (src === 'script') {
         var del = dr.delivery != null ? dr.delivery : (perf.delivery || String(s.lines || ''));
         h += '<div class="pf-row top"><label>Delivery</label><div style="flex:1;min-width:0"><textarea data-pf="delivery" rows="3" maxlength="4000" style="' + ta + '">' + escHtml(del) + '</textarea>'
@@ -12124,7 +12125,7 @@ ${QUOTIENT_CSS}
     h += '<table class="pf-sum"><tr><td>Who</td><td><img src="' + escAttr(pfHeadUrl(a)) + '" alt=""> ' + escHtml(a.name) + '</td></tr>'
       + '<tr><td>With</td><td>' + (geng === 'heygen' ? 'HeyGen <small>the look speaks the line in its own room</small>' : 'Seedance') + '</td></tr>'
       + (geng === 'seedance' ? '<tr><td>The shot</td><td>' + (fr2 ? '<img class="pf-sumshot" src="' + escAttr(withToken(fr2)) + '" alt="">' : 'drawn when it is made') + '</td></tr>' : '')
-      + '<tr><td>Voice</td><td>' + ((dr.voice_source || perf.voice_source) === 'take' ? 'your recording, in ' + escHtml(a.name) + '’s voice' : 'the script, read as ' + escHtml(a.voice_id ? String(a.voice_name || 'their voice').split(' - ')[0] : 'the look')) + '</td></tr></table>';
+      + '<tr><td>Voice</td><td>' + ((dr.voice_source || perf.voice_source) === 'recording' ? 'your recording, your own voice' : (dr.voice_source || perf.voice_source) === 'take' ? 'your recording, in ' + escHtml(a.name) + '’s voice' : 'the script, read as ' + escHtml(a.voice_id ? String(a.voice_name || 'their voice').split(' - ')[0] : 'the look')) + '</td></tr></table>';
     h += '<div class="pf-acts pf-make">';
     if (geng === 'heygen') h += '<button class="np-btn primary" data-pf-go="draft">Make it with HeyGen</button><small>HeyGen API credits &#183; one render, no draft</small>';
     else {

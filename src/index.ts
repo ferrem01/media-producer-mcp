@@ -3150,7 +3150,7 @@ Rules:
             if (body.action === "voice") {
               const { previewSceneVoice } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined, voice_id: str(body.voice_id), voice_speed: Number(body.voice_speed) || undefined,
-                voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined }));
+                voice_source: ["script", "take", "recording"].includes(body.voice_source) ? body.voice_source : undefined }));
               return;
             }
             if (body.action === "restore") {
@@ -3172,7 +3172,7 @@ Rules:
             if (body.action === "perform") {
               jsonResponse(res, 202, await startScenePerformance(spTenant, spProject, si, {
                 actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), video_prompt: str(body.video_prompt),
-                voice_source: body.voice_source === "take" ? "take" : body.voice_source === "script" ? "script" : undefined,
+                voice_source: ["script", "take", "recording"].includes(body.voice_source) ? body.voice_source : undefined,
                 quality: body.quality === "final" ? "final" : "draft",
                 force: body.force === true,
                 delivery: typeof body.delivery === "string" ? body.delivery : undefined,

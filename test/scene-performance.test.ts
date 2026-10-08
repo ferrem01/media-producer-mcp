@@ -884,3 +884,50 @@ describe("the read speed", () => {
     expect(sp.voiceSpeedOf({} as any)).toBe(1);
   });
 });
+
+describe("a scene performed from the recording in the speaker's own voice", () => {
+  it("sends the recording as is to Seedance (no voice call); the take keeps Seedance's sound", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_rec"));
+    const P5 = "proj_rec";
+    const pdir = path.join(DATA, T, "projects", P5);
+    await fs.mkdir(path.join(pdir, "assets"), { recursive: true });
+    // The recording: 180 Hz; Seedance's own sound (m.mp4): 300 Hz.
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=270x480:rate=24:duration=3", "-f", "lavfi", "-i", "sine=frequency=180:duration=3",
+      "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", path.join(pdir, "assets", "rec.mp4")]);
+    await fs.writeFile(path.join(pdir, "project.json"), JSON.stringify({
+      project_id: P5, tenant_id: T, name: "Rec", format: "video", status: "generated", canvas: { width: 1080, height: 1920, fps: 30 },
+      created_at: "2026-10-08T00:00:00.000Z", updated_at: "2026-10-08T00:00:00.000Z", treatment: { filmGrammar: "speaker" },
+      storyboard: { scenes: [{ label: "A", voiceover_text: "One line.", components: [] }] },
+      scenes: [{ id: "a", duration_seconds: 3, components: [] }],
+      takes: [{ id: "k0", scene_index: 0, source: `/assets/${T}/projects/${P5}/assets/rec.mp4`, duration: 3, recorded_at: "x" }],
+    }));
+    const calls: string[] = [];
+    let polls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("elevenlabs")) { calls.push("eleven"); throw new Error("no voice calls here"); }
+      if (u.includes("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.includes("api.atlascloud.ai") && init?.method === "POST") { calls.push("seedance"); return new Response(JSON.stringify({ data: { id: "pr1" } })); }
+      if (u.includes("api.atlascloud.ai")) return new Response(JSON.stringify({ data: ++polls > 1 ? { status: "completed", outputs: ["https://cdn/rec.mp4"], draft_id: "dr" } : { status: "processing" } }));
+      if (u === "https://cdn/rec.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    const sp = await import("../src/core/scene-performance.js");
+    const attached: string[] = [];
+    sp.registerSceneAttacher(async (_t, _p, url) => { attached.push(url); return { status: 200, body: { ok: true } }; });
+    await sp.startScenePerformance(T, P5, 0, { actor: "dana", voice_source: "recording", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P5))[0].performance?.status !== "running", 40000);
+    const s0 = (await sp.getScenePerformances(T, P5))[0];
+    expect(s0.performance.error).toBeUndefined();
+    expect(calls).toEqual(["seedance"]);
+    // Sent: the recording's own voice (180 Hz), no clone.
+    const sent = path.join(DATA, s0.performance.voice_url.replace(/^\/assets\//, ""));
+    expect(Math.abs((await sp.voicePitch(sent, path.join(DATA, "_media_rec"))) - 180)).toBeLessThan(20);
+    // Heard: Seedance's own sound (300 Hz), the lips were made to it.
+    const take = path.join(DATA, attached[0].replace(/^\/assets\//, ""));
+    expect(Math.abs((await sp.voicePitch(take, path.join(DATA, "_media_rec"))) - 300)).toBeLessThan(30);
+    // Not made in the actor's ElevenLabs voice.
+    expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance" });
+  }, 90000);
+});
