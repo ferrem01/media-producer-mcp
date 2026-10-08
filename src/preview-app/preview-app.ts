@@ -8395,6 +8395,10 @@ ${QUOTIENT_CSS}
   // One reload path for every speaker edit: swap in the returned project,
   // invalidate everything derived from the narration, reload.
   function afterSpeakerEdit(r, seekTo) {
+    // The reload swaps the take's file under the playhead: a playing preview
+    // froze on the old element (Marc, Oct 8: pace 1.15 on all scenes, "it
+    // basically died and froze after my first few words").
+    if (state.playing) stopPlayback();
     wordCutClear();
     camPopClose();
     state.currentProject = r.project;
@@ -8540,13 +8544,15 @@ ${QUOTIENT_CSS}
     });
     return src - removed;
   }
-  function takeEditRequest(si, body, verb) {
+  // quiet: one of several edits in a row -- the caller reloads once at the end.
+  function takeEditRequest(si, body, verb, quiet) {
     var p = state.currentProject;
     if (!p) return Promise.resolve();
     body.scene_index = si;
     studioStatus(verb + '…', '');
     return api('POST', '/take-edit/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body).then(function(r) {
       state._takeEditN = (state._takeEditN || 0) + 1;
+      if (quiet) { state.currentProject = r.project; return r; }
       var d = r.shortened || 0;
       studioStatus('Scene ' + (si + 1) + ' take: ' + r.seconds.toFixed(2) + 's' + (Math.abs(d) >= 0.01 ? ' (' + (d > 0 ? d.toFixed(2) + 's shorter' : (-d).toFixed(2) + 's longer') + ')' : '') + '.', 'ok');
       afterSpeakerEdit(r, Math.max(0, sceneStartFor(si) - 0.5));
@@ -8650,9 +8656,26 @@ ${QUOTIENT_CSS}
         var all = document.getElementById('tk-pace-all') && document.getElementById('tk-pace-all').checked;
         pop.querySelectorAll('[data-tk-pace]').forEach(function(x) { x.disabled = true; });
         var scenes = all ? (p.speaker_track && p.speaker_track.clips || []).map(function(c) { return c.scene_index; }).filter(function(x, i, a) { return x != null && a.indexOf(x) === i; }) : [si];
-        var chain = Promise.resolve();
-        scenes.forEach(function(sx) { chain = chain.then(function() { return takeEditRequest(sx, { op: 'speed', speed: sp }, 'Setting the pace' + (all ? ' (scene ' + (sx + 1) + ')' : '')); }); });
-        chain.then(function() { camPopClose(); }, function() { pop.querySelectorAll('[data-tk-pace]').forEach(function(x) { x.disabled = false; }); });
+        // One reload at the end, not one per scene: each reload mid-playback
+        // swapped a take under the playhead and froze the preview. Play
+        // waits until every scene is paced.
+        if (state.playing) stopPlayback();
+        els.playBtn.disabled = true;
+        var chain = Promise.resolve(), last = null;
+        scenes.forEach(function(sx) { chain = chain.then(function() { return takeEditRequest(sx, { op: 'speed', speed: sp }, 'Setting the pace' + (all ? ' (scene ' + (sx + 1) + ' of ' + scenes.length + ')' : ''), true).then(function(r) { last = r; }); }); });
+        chain.then(function() {
+          els.playBtn.disabled = false;
+          camPopClose();
+          if (!last) return;
+          studioStatus('Pace ' + sp + 'x' + (all ? ' on every scene' : ' on scene ' + (si + 1)) + '.', 'ok');
+          afterSpeakerEdit(last, all ? 0 : Math.max(0, sceneStartFor(si) - 0.5));
+          loadTranscript();
+        }, function() {
+          els.playBtn.disabled = false;
+          pop.querySelectorAll('[data-tk-pace]').forEach(function(x) { x.disabled = false; });
+          // Scenes already paced before the failure: show them.
+          if (last) { afterSpeakerEdit(last, 0); loadTranscript(); }
+        });
       });
     });
     pop.querySelectorAll('[data-tk-frame]').forEach(function(b) {

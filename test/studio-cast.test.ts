@@ -86,6 +86,15 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(html).not.toContain("Cutaways over this scene");
   });
 
+  it("pace on all scenes: Play waits, the edits run quietly, ONE reload at the start -- a reload mid-playback froze the preview", () => {
+    const html = getPreviewHtml();
+    // Any reload after a take edit stops playback first.
+    expect(html).toMatch(/function afterSpeakerEdit\(r, seekTo\) \{[\s\S]{0,400}if \(state\.playing\) stopPlayback\(\);/);
+    expect(html).toContain("if (quiet) { state.currentProject = r.project; return r; }");
+    expect(html).toContain("els.playBtn.disabled = true;");
+    expect(html).toContain("afterSpeakerEdit(last, all ? 0 : Math.max(0, sceneStartFor(si) - 0.5));");
+  });
+
   it("the take popover has one way out to a new take: Replace this take, opening the take dialog on what made it", () => {
     const html = getPreviewHtml();
     expect(html).toContain('id="tk-replace" style="flex:1;">Replace this take&#8230;</button>');

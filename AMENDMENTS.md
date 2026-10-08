@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Studio: pacing every scene no longer freezes the preview
+
+Marc set Pace 1.15x on all scenes of proj_14b6c070 and replayed: "it basically
+died and froze after my first few words". "All scenes" ran one take edit per
+scene in a row, each reloading the preview as it landed -- a reload mid-playback
+swapped the take's file under the playhead and stalled it (reproduced in a
+browser on a copy). Now Play is disabled while the pace runs, the edits go
+quietly (`takeEditRequest(..., quiet)`), and the preview reloads ONCE at the
+start (or at the scene, for one scene); `afterSpeakerEdit` also stops playback
+before any reload, so a trim or cut can't do the same.
+
 ## 2026-10-08 — A voice-only film's lines are edited like a take
 
 Marc on proj_f5c104bb: "when you have a speaker track that's voice only ...
