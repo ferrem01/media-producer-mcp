@@ -1,0 +1,97 @@
+<template>
+  <div class="ppl"></div>
+</template>
+
+<style scoped>
+  /* ── people-row: the people on the bill (hosts, speakers, guests), each a
+     round headshot and a name card that flows in on the word that names
+     them. Fills its box: a stack shares the height, a row shares the width.
+     Sizes are container units so the box alone sets the scale. All motion
+     lives on the gsap timeline (seek-safe). ── */
+  .ppl { position: absolute; inset: 0; pointer-events: none; container-type: size;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    --ppl-accent: var(--mp-color-primary, #4f6df5);
+    display: flex; flex-direction: column; justify-content: center; gap: 4cqh;
+    padding: 2.5cqmin; box-sizing: border-box; }
+  .ppl-row-layout { flex-direction: row; align-items: center; justify-content: center; gap: 4cqw; }
+  .ppl-item { display: flex; align-items: center; gap: 3cqw; min-height: 0; will-change: transform; }
+  .ppl-row-layout .ppl-item { flex-direction: column; text-align: center; gap: 2cqh; flex: 1 1 0; min-width: 0; }
+  .ppl-photo { flex: none; border-radius: 50%; overflow: hidden; background: #d9dbe3 center / cover no-repeat;
+    box-shadow: 0 0 0 0.9cqmin #fff, 0 0 0 1.7cqmin var(--ppl-accent), 0 2cqmin 5cqmin rgba(10, 14, 22, 0.35);
+    will-change: transform; }
+  .ppl-card { background: #fff; border-radius: 1.6cqmin; padding: 1.6cqmin 3cqmin;
+    box-shadow: 0 1.5cqmin 4cqmin rgba(10, 14, 22, 0.28); min-width: 0; will-change: transform; }
+  .ppl-name { font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; color: #10131a; white-space: nowrap; }
+  .ppl-title { font-weight: 500; line-height: 1.25; color: #5c6577; margin-top: 0.4em; white-space: nowrap; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.ppl');
+    if (!root) return tl;
+    var people = (data && Array.isArray(data.people) ? data.people : []).filter(function (p) { return p && (p.name || p.src); }).slice(0, 4);
+    if (!people.length) return tl;
+    var row = (data && data.layout) === 'row';
+    if (row) root.classList.add('ppl-row-layout');
+    if (data && data.accent) root.style.setProperty('--ppl-accent', data.accent);
+    var dur = (ctx && ctx.duration) || 6;
+    var n = people.length;
+
+    // SIZE FROM THE BOX: a stack gives each person an equal share of the
+    // height; a row an equal share of the width.
+    var W = root.clientWidth || el.clientWidth || 1000, H = root.clientHeight || el.clientHeight || 400;
+    var pad = Math.min(W, H) * 0.05; W -= pad; H -= pad;   // the padding that keeps the ring inside the box
+    var share = row ? Math.min(W / n * 0.62, H * 0.6) : Math.min((H - (n - 1) * H * 0.04) / n, W * 0.32);
+    var photo = Math.max(24, share * 0.92);
+    var nameSize = Math.max(14, photo * (row ? 0.2 : 0.3));
+
+    people.forEach(function (p, i) {
+      var item = document.createElement('div'); item.className = 'ppl-item';
+      var ph = document.createElement('div'); ph.className = 'ppl-photo';
+      ph.style.width = ph.style.height = photo + 'px';
+      if (p.src) {
+        ph.style.backgroundImage = 'url(' + p.src + ')';
+        // CROP: a face cut from a bigger picture (a flyer, a team photo) --
+        // {x, y, w, h} as fractions of the source.
+        var c = p.crop;
+        if (c && c.w > 0 && c.h > 0 && c.w <= 1 && c.h <= 1) {
+          ph.style.backgroundSize = (100 / c.w) + '% ' + (100 / c.h) + '%';
+          ph.style.backgroundPosition = (c.w < 1 ? (c.x / (1 - c.w)) * 100 : 0) + '% ' + (c.h < 1 ? (c.y / (1 - c.h)) * 100 : 0) + '%';
+        }
+      }
+      item.appendChild(ph);
+      var card = null;
+      if (p.name) {
+        card = document.createElement('div'); card.className = 'ppl-card';
+        var nm = document.createElement('div'); nm.className = 'ppl-name'; nm.textContent = p.name;
+        nm.style.fontSize = nameSize + 'px';
+        card.appendChild(nm);
+        if (p.title) {
+          var tt = document.createElement('div'); tt.className = 'ppl-title'; tt.textContent = p.title;
+          tt.style.fontSize = (nameSize * 0.58) + 'px';
+          card.appendChild(tt);
+        }
+        item.appendChild(card);
+      }
+      root.appendChild(item);
+
+      // ON THEIR WORD: each person arrives at their own `at` (a word anchor
+      // in practice); without one they follow the first by 0.5 s each.
+      var base = (data && data.at != null) ? Number(data.at) || 0 : 0.3;
+      var at = (p.at != null && isFinite(Number(p.at))) ? Math.max(0, Number(p.at)) : base + i * 0.5;
+      gsap.set(ph, { scale: 0.2, autoAlpha: 0 });
+      tl.to(ph, { scale: 1, autoAlpha: 1, duration: 0.5, ease: 'back.out(1.8)' }, at);
+      if (card) {
+        gsap.set(card, row ? { y: 30, autoAlpha: 0 } : { x: -60, autoAlpha: 0 });
+        tl.to(card, { x: 0, y: 0, autoAlpha: 1, duration: 0.55, ease: 'power3.out' }, at + 0.12);
+      }
+    });
+
+    var exitAt = (data && data.exit_at != null && isFinite(Number(data.exit_at))) ? Number(data.exit_at) : null;
+    if (exitAt != null && exitAt < dur) {
+      tl.to(root, { autoAlpha: 0, y: 20, duration: 0.3, ease: 'power2.in' }, exitAt);
+    }
+    return tl;
+  }
+</script>

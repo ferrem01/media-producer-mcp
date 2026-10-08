@@ -1,0 +1,34 @@
+{
+  "type": "people-row",
+  "label": "People on the Bill (headshots + names)",
+  "category": "titles",
+  "description": "The people a film names -- webinar hosts, speakers, guests, a team -- each a round headshot (brand ring) and a white name card that flows in on the word that names them. Give every person an `at` and anchor it to their name ({\"people[0].at\": {\"word\": \"Scott\"}}). layout 'stack' (default: one under another, photo left of the card -- a lower band on a tall frame) or 'row' (side by side, card under the photo). Fills its box: a stack shares the height, a row the width. A face cut from a bigger picture (a flyer, a team photo) takes crop {x, y, w, h} as fractions of the source. Up to 4 people. Over footage keep it off the face. Example: {\"people\":[{\"name\":\"Scott Murtaugh\",\"title\":\"Founder, Growth Process Automation\",\"src\":\"/assets/.../scott.jpg\",\"at\":1.3},{\"name\":\"Max Davish\",\"title\":\"Co-Founder & CTO, Quotient\",\"src\":\"/assets/.../max.jpg\",\"at\":2.2}]}.",
+  "data": {
+    "people": {
+      "type": "array",
+      "label": "[{ name, title?, src?, at?, crop?: {x, y, w, h} }] -- one per person, in the order they are named",
+      "required": true
+    },
+    "layout": {
+      "type": "string",
+      "label": "stack (default) | row",
+      "optional": true,
+      "enum": ["stack", "row"]
+    },
+    "at": {
+      "type": "number",
+      "label": "When the first person arrives if they have no `at` (s, default 0.3); the rest follow 0.5 s apart",
+      "optional": true
+    },
+    "exit_at": {
+      "type": "number",
+      "label": "When they leave (s; omitted: they hold to the cut)",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Ring colour (default brand primary)",
+      "optional": true
+    }
+  }
+}

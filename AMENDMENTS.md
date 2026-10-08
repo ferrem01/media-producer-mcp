@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — people-row: the hosts' faces on their names
+
+Marc on Five Tools: "When we mention scott and max ... I would love to show a
+head shot of each of them flowing and their names as i say them." No component
+showed a person's photo with their name (lower-third is type only).
+
+- `people-row` (src/components/titles): up to 4 people, each a round headshot
+  with a brand ring and a white name card, arriving on its own `at` (anchor it
+  to the name: `people[0].at` -> {word:"Scott"}). layout stack (default) or
+  row; sized from its box (container units).
+- `crop {x, y, w, h}` (fractions of the source) cuts a face out of a bigger
+  picture -- the Quotient library had the two hosts only on webinar flyers.
+
 ## 2026-10-08 — Generated music: each film its own bed (ElevenLabs music)
 
 Marc, on the hand-fixed Five Tools: "we need to find some new music ... it's
