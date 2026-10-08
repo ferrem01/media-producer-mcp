@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { frameFilter, frameFileFor, wideFileFor, asRecastFrame } from "../src/core/recast.js";
 import { softenCastPunchIns, PUNCH_ON_PERSON, PUNCH_ON_CAST } from "../src/core/speaker-layer.js";
-import { creatorCutCameraMoves } from "../src/llm/scene-generator.js";
+import { personCameraMoves } from "../src/llm/scene-generator.js";
 
 // HOW FAR BACK A RECAST SITS (Marc, Oct 6: "when I recast it puts the camera
 // so close ... I want to be further back and I have the footage"). His twin
@@ -54,7 +54,7 @@ describe("gentler punch-ins where a cast actor performs", () => {
   });
   it("a scene planned for a cast actor is built with the gentler punch-in", () => {
     const o = { grammar: "creator-cut", duration: 8, takeover: false };
-    expect(creatorCutCameraMoves([], o)![0].scale).toBe(PUNCH_ON_PERSON);
-    expect(creatorCutCameraMoves([], { ...o, cast: true })![0].scale).toBe(PUNCH_ON_CAST);
+    expect(personCameraMoves([], o)![0].scale).toBe(PUNCH_ON_PERSON);
+    expect(personCameraMoves([], { ...o, cast: true })![0].scale).toBe(PUNCH_ON_CAST);
   });
 });

@@ -85,7 +85,7 @@ import { speak, VOICE_DESCRIBE } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
 import { generateSfx } from "./audio/sfx-generate.js";
-import { generateMusic } from "./audio/music-generate.js";
+import { generateMusic, placeMusicBed, MUSIC_BED_ID } from "./audio/music-generate.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
@@ -3186,7 +3186,7 @@ export function createMcpServer(): McpServer {
     {
       tenant_id: z.string().optional(),
       project_id: z.string(),
-      action: z.enum(["add", "update", "remove", "search", "search_sfx", "generate_sfx", "generate_music", "fit_voiceover"]).describe("Action to perform. 'fit_voiceover' (a narrated film): each scene re-cut to its voice line (vo_scene_<i>) plus a breath -- shorter or longer -- the line's words measured as the scene's spine so anything anchored to a word ({word} anchors) re-times, the lines placed at their scenes' starts and the music trimmed to the film; run it after re-voicing. 'generate_music' MAKES the film's own music bed from `prompt` with ElevenLabs music (genre, tempo, energy, where it builds; instrumental unless `instrumental:false`), `seconds` long (default: the film's length + 1 s), and places it as the music track (`track.id`, default 'music', replaced if it exists; `track.volume` default 0.14 under a voice) -- prefer it to search, whose library repeats. 'search' searches the Jamendo music library; 'search_sfx' lists SOUND EFFECTS -- the house set (made here or found free: whooshes, ticks, thuds, dings, a riser, camera flash, right/wrong, boom, bass impact; always there), the GENERATED shelf, and, where a free FREESOUND_API_KEY is set, Creative-Commons-0 matches for `query`. 'generate_sfx' MAKES a sound from `prompt` with ElevenLabs sound effects (optional `seconds`, `name`) and adds it to the generated shelf as gen-<name>-<hash> -- for a sound no library has (a voice, a meme-style hit). Place one with action='add' and track.sfx, or as a scene cue / palette entry."),
+      action: z.enum(["add", "update", "remove", "search", "search_sfx", "generate_sfx", "generate_music", "fit_voiceover"]).describe("Action to perform. 'fit_voiceover' (a narrated film): each scene re-cut to its voice line (vo_scene_<i>) plus a breath -- shorter or longer -- the line's words measured as the scene's spine so anything anchored to a word ({word} anchors) re-times, the lines placed at their scenes' starts and the music trimmed to the film; run it after re-voicing. 'generate_music' MAKES the film's own music bed from `prompt` with ElevenLabs music (genre, tempo, energy, where it builds; instrumental unless `instrumental:false`), `seconds` long (default: the film's length + 1 s), and places it as the film's ONE music track ('music_bed', replacing any other; `track.volume` default 0.14 under a voice) -- prefer it to search, whose library repeats. 'search' searches the Jamendo music library; 'search_sfx' lists SOUND EFFECTS -- the house set (made here or found free: whooshes, ticks, thuds, dings, a riser, camera flash, right/wrong, boom, bass impact; always there), the GENERATED shelf, and, where a free FREESOUND_API_KEY is set, Creative-Commons-0 matches for `query`. 'generate_sfx' MAKES a sound from `prompt` with ElevenLabs sound effects (optional `seconds`, `name`) and adds it to the generated shelf as gen-<name>-<hash> -- for a sound no library has (a voice, a meme-style hit). Place one with action='add' and track.sfx, or as a scene cue / palette entry."),
       prompt: z.string().optional().describe("generate_sfx: the sound in words, e.g. 'a man yelling FAHHH, loud and drawn out, comedic meme exclamation, dry, no music'. generate_music: the music in words, e.g. 'driving electronic, 120 BPM, punchy drums, confident and modern, builds at 15 s'"),
       seconds: z.number().min(0.5).max(600).optional().describe("generate_sfx: length in seconds, up to 22 (omit to let the model choose). generate_music: 3-600 (default the film's length + 1 s)"),
       instrumental: z.boolean().optional().describe("generate_music: false allows vocals (default true: a bed under a voice)"),
@@ -3250,19 +3250,16 @@ export function createMcpServer(): McpServer {
         } catch (e: any) {
           return err(`Music generation failed: ${e.message}`);
         }
-        if (!project.audio) project.audio = { tracks: [] };
-        const id = params.track?.id || "music";
-        const track = {
-          id, type: "music" as const, source: made.file,
+        const track = placeMusicBed(project as any, {
+          source: made.file,
           volume: params.track?.volume ?? 0.14,
           start_time: params.track?.start_time ?? 0,
           ...(made.seconds ? { duration: made.seconds } : {}),
           fade_in: params.track?.fade_in ?? 0.2,
           fade_out: params.track?.fade_out ?? 0.8,
-        };
-        project.audio.tracks = [...project.audio.tracks.filter((t) => t.id !== id), track];
+        });
         await saveProject(project);
-        return ok({ generated: made, track, note: `The film's music is now "${id}". Change its level with action='update', or make another with a new prompt.` });
+        return ok({ generated: made, track, note: `The film's music is now "${MUSIC_BED_ID}" (any earlier music track replaced). Change its level with action='update', or make another with a new prompt.` });
       }
 
       if (params.action === "fit_voiceover") {

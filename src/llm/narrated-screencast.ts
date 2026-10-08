@@ -523,7 +523,7 @@ export async function attachBoothNarration(opts: {
     ...(startsAt > 0 ? { start_time: startsAt } : {}),
   });
   let musicTitle: string | null = null;
-  const hasBed = audio.tracks.some((t: any) => t.id === "music_bed");
+  const hasBed = audio.tracks.some((t: any) => t.type === "music");
   if (opts.music !== false && !hasBed) {
     try {
       const { selectMusic } = await import("../audio/music.js");

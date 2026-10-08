@@ -20,6 +20,7 @@ import type { Treatment } from "./creative-director.js";
 import { loadAssetIntel } from "../core/asset-intel.js";
 import { recoverAssetUrl, resolveVideoPath } from "../core/video-path.js";
 import { isProofSurface } from "../core/asset-needs.js";
+import { personCarries } from "../core/take-needs.js";
 import { readsOnTallFrame } from "../core/fit-box.js";
 import { PUNCH_ON_PERSON, PUNCH_ON_CAST } from "../core/speaker-layer.js";
 import { hexIsLight, worldBackground } from "./world.js";
@@ -520,7 +521,8 @@ export function frameAnchorFor(type: string, data: Record<string, unknown> | und
 }
 
 /**
- * THE CAMERA MOVES ON THE PERSON (SPEC-creator-cut.md), by rule. A claim
+ * THE CAMERA MOVES ON THE PERSON (SPEC-creator-cut.md), by rule, on every
+ * film a person carries (speaker as well as creator-cut). A claim
  * with no authored moves gets a punch-in on the claim aimed at the face
  * (calm: a slow push); every cutaway gets an anchored zoom on the mock's
  * performing region while it is up (a desktop mock at full frame on a
@@ -530,11 +532,11 @@ export function frameAnchorFor(type: string, data: Record<string, unknown> | und
  * still author its own moves, which win. Measured live on proj_6b42ee1c:
  * six scenes, none with a move, while the contract asked for them.
  */
-export function creatorCutCameraMoves(
+export function personCameraMoves(
   components: Array<{ id?: string; type: string; data?: Record<string, unknown>; enter?: any; exit?: any; position?: any }>,
   o: CreatorCutCameraOpts,
 ): Array<Record<string, unknown>> | null {
-  if (o.grammar !== "creator-cut" || o.takeover) return null;
+  if (!personCarries(o.grammar) || o.takeover) return null;
   var dur = Number(o.duration) || 0;
   if (dur <= 0) return null;
   var punchy = String(o.motion || "") !== "calm";
@@ -1425,14 +1427,14 @@ export function buildAuthoredCompositionScene(
   // marketer's line set tight on the built scene, back to a white
   // dissolve on the next build).
   var acTransition: SceneTransition | undefined = boardTransition(draft);
-  // The camera: the storyboard's own moves, else creator-cut's rule.
+  // The camera: the storyboard's own moves, else the person rule.
   var cameraMoves: any[] | undefined = (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined;
   // A list of nothing but resets is a camera that never moved (measured
   // live, proj_b04fb594: four scenes authored "@3.3s reset" and nothing
   // else) -- the rule applies as if none were written.
   if (cameraMoves && cameraMoves.every((m: any) => !m || m.type === "reset")) cameraMoves = undefined;
   if (!cameraMoves && !(draft as any).camera_fixed) {
-    var autoCam = creatorCutCameraMoves(components as any, {
+    var autoCam = personCameraMoves(components as any, {
       grammar: (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar,
       motion: (opts.treatment as any)?.visualSystem?.motion,
       face: (draft as any).take_face,
@@ -1442,7 +1444,7 @@ export function buildAuthoredCompositionScene(
     });
     if (autoCam && autoCam.length) {
       cameraMoves = autoCam;
-      console.log(`    camera by rule (creator-cut): ${autoCam.map((m: any) => `${m.type}${m.anchor ? "->" + m.anchor : m.scale ? " x" + m.scale : ""}@${m.at}s`).join(", ")}`);
+      console.log(`    camera by rule (on the person): ${autoCam.map((m: any) => `${m.type}${m.anchor ? "->" + m.anchor : m.scale ? " x" + m.scale : ""}@${m.at}s`).join(", ")}`);
     }
   }
   var scene: Scene = {
