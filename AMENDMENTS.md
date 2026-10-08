@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Generated music: each film its own bed (ElevenLabs music)
+
+Marc, on the hand-fixed Five Tools: "we need to find some new music ... it's
+the same fucking song. Every time." The Jamendo search returns a handful of
+songs and every film landed on one of them.
+
+- `audio action:"generate_music"` (src/audio/music-generate.ts): a prompt
+  (genre, tempo, energy, where it builds) to ElevenLabs `POST /v1/music`,
+  instrumental by default, `seconds` long (default the film's length + 1 s,
+  clamped 3-600). The mp3 is written into the project's `assets/audio` and
+  placed as the music track (`track.id`, default "music", replacing one of
+  that id; volume 0.14 under a voice, fades 0.2/0.8).
+- The same ElevenLabs key as voices and effects; `MP_ELEVENLABS_MUSIC_MODEL`
+  picks the model (default `music_v1`).
+
 ## 2026-10-07 — Cast photos: upright, HEIC named, uploads never left behind
 
 Marc added himself from his phone: the Photos & sheet panel showed blank
