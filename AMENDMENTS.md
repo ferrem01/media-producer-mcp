@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The narration is the clock (voice-only films)
+
+Six Tabs, re-voiced in Marc's clone at 1.2x, held dead air: the build only
+ever LENGTHENED a scene to fit its voice line, never shortened it, and a
+narrated film had no word timings, so its overlays were timed by hand.
+
+- `core/narration-fit.ts`: `fitScenesToNarration` -- each narrated scene runs
+  its line plus a 0.45 s breath (floor 1.5 s; bar-aligned on a beat grid),
+  shorter or longer; the line's words (whisper, aligned to the script) become
+  the scene's spine and everything anchored to a word re-times; each
+  `vo_scene_<i>` sits at its scene's start; a music bed is trimmed to the film.
+- The build uses it in place of the lengthen-only block (deleted).
+- `audio action:"fit_voiceover"` runs it on a built film -- after re-voicing.
+
 ## 2026-10-08 — Every narration is ElevenLabs; the OpenAI voices are gone
 
 Marc: "OpenAI's voice sucks ... we should be using one of the many 11 labs
