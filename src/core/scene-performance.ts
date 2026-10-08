@@ -353,6 +353,20 @@ export function otherSceneFrame(project: any, si: number, url: string, actorId?:
   return null;
 }
 
+/** The start frame another scene of the film uses for this actor in this
+ *  shot and location (the earliest such scene), or null. */
+export function sharedStartFrame(project: any, si: number, actorId: string, shot: string, location: string): { url: string; scene: number; location?: string } | null {
+  const scenes = project?.storyboard?.scenes || [];
+  for (let j = 0; j < scenes.length; j++) {
+    if (j === si) continue;
+    const perf = scenes[j]?.performance;
+    if (!perf?.frame || perf.actor !== actorId || perf.shot !== shot) continue;
+    if ((perf.location || "") !== (location || "")) continue;
+    return { url: perf.frame, scene: j, ...(perf.location ? { location: perf.location } : {}) };
+  }
+  return null;
+}
+
 /** The scene's latest RECORDING (not a performance): the clip's take when it
  *  is one, else the newest recorded take for the scene -- a performance
  *  attached on top leaves the recording in the film's takes. */
@@ -574,6 +588,18 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     // The first frame is drawn for the shot: a new shot draws a new one (the
     // panel no longer shows frames -- Marc: "just go create the first frame").
     if (p.shot !== shot && p.frame && !(p.frames || []).some((f) => f.url === p.frame && f.from_scene != null)) delete p.frame;
+    // ONE START FRAME FOR THE FILM: a scene with none starts from the frame
+    // another scene of this actor already has in the same shot and place,
+    // so the person does not change between cuts (Five Tools, Oct 8: three
+    // scenes redrawn from scene 1's frame by hand). A custom frame prompt
+    // still draws its own.
+    if (!p.frame && opts.frame_prompt === undefined) {
+      const shared = sharedStartFrame(project, si, actor.id, shot, finishingDraft ? (p.location || "") : where);
+      if (shared) {
+        p.frames = [...(p.frames || []), { url: shared.url, shot, ...(shared.location ? { location: shared.location } : {}), from_scene: shared.scene, from_kind: "start" as const, made_at: new Date().toISOString() }].slice(-6);
+        p.frame = shared.url;
+      }
+    }
     setPrompt(p, "frame_prompt", opts.frame_prompt);
     // A new video prompt is a new shot: the draft no longer stands.
     if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;

@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — One start frame for the film
+
+Five Tools: each performed scene drew its own start frame, so Marc looked
+different from cut to cut, and three scenes were redrawn from scene 1's frame
+by hand. A scene performed with no frame now starts from the frame another
+scene of the same actor already has in the same shot and location
+(`sharedStartFrame`, the earliest such scene); a custom frame prompt still
+draws its own. Overlays over the person needed nothing new in the build:
+`castSpeakerLayer` already lifts the cast above the speaker; only the add
+path was wrong (fixed in #1143).
+
 ## 2026-10-08 — Person films are captioned and punched in; every film gets its own music
 
 The three webinar films were all fixed by hand the same way. Two of those
