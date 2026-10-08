@@ -72,8 +72,8 @@ export interface AudioSystem {
   /** Music bed mood -- drives the track search. 'none' = no music even if
    *  background_music was set. */
   music_mood?: "driving" | "jazzy" | "ambient" | "playful" | "cinematic" | "warm" | "none";
-  /** TTS voice for narration (same values as the legacy voice param). */
-  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
+  /** The narrator: an ElevenLabs stock name, cast actor id or voice id (audio/tts.ts). */
+  voice?: string;
 }
 
 export interface ConceptDirectorOpts {

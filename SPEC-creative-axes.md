@@ -123,7 +123,7 @@ stickers carry the film); assets REQUIRED in v1 — the pipeline resolves
 | Subfield | Values | Status |
 | --- | --- | --- |
 | `music_mood` | driving, jazzy, ambient, playful, cinematic, warm, none | LIVE (drives track search; `none` suppresses the bed) |
-| `voice` | alloy, echo, fable, onyx, nova, shimmer | LIVE (wins over legacy flat param) |
+| `voice` | an ElevenLabs voice: stock name (brian default, roger, george, sarah ...), cast actor id, or voice id (audio/tts.ts) | LIVE (the only voice param; the flat one is gone) |
 | `sfx` | typewriter clacks, clicks, whooshes synced to motion | FUTURE — requires an SFX engine first (rule 2); reference: HeyGen's sfx-music-launch composition |
 
 ## Named styles (presets, not concepts)

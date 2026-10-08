@@ -115,7 +115,7 @@ export interface PipelineOpts {
   /** The SOUND axis: music mood + narration voice. */
   audio_system?: import("./creative-director.js").AudioSystem;
   voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
-  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
+  voice?: string;  // the narrator (audio/tts.ts): stock name, cast actor id or ElevenLabs id
   backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
   /** Streams fine-grained generation progress (phase + percent + per-scene detail
    *  + rough ETA) so a caller can surface a live status instead of a frozen bar. */
@@ -2298,7 +2298,7 @@ function storyboardToSaved(
       // Single source of truth: the treatment's committed audio system.
       // "corporate" was a hardcoded legacy default that contradicted it.
       music_mood: musicMood || "corporate",
-      voice: voice || "nova",
+      ...(voice ? { voice } : {}),
       pacing: "moderate",
     },
     estimated_duration: storyboard.scenes.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0),
@@ -4194,19 +4194,17 @@ async function runUnifiedPipeline(
         duration_seconds: s.duration_seconds,
       }));
 
-      // Map the storyboard's pacing to a TTS speed. The model's default (1.0)
-      // runs brisk -- especially on short, punchy lines -- so a "moderate" read
-      // is intentionally a touch under 1.0 for a more measured delivery.
+      // The storyboard's pacing as a read speed (ElevenLabs reads at a
+      // natural pace; "fast" is the creator pace a performed scene uses).
       const pacing = (project.storyboard?.audio?.pacing || "moderate") as string;
-      const voSpeed = pacing === "fast" ? 1.0 : pacing === "slow" ? 0.85 : 0.92;
+      const voSpeed = pacing === "fast" ? 1.15 : pacing === "slow" ? 0.92 : 1.05;
 
       const voicePaths = await generateSceneVoiceovers({
         scenes: voiceoverInputs,
-        voice: opts.voice || project.brand_kit?.voice || "nova",
-        model: "tts-1-hd",
+        voice: opts.voice || project.brand_kit?.voice,
         speed: voSpeed,
         outputDir: voDir,
-        apiKey: process.env.OPENAI_API_KEY || "",
+        tenant: opts.tenant_id,
       });
 
       // Add voiceover tracks to project audio

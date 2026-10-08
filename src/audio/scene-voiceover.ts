@@ -1,12 +1,11 @@
 /**
  * Scene Voiceover Generator
  *
- * Generate voiceover audio for each scene based on scene labels or voiceover text.
+ * Read each scene's voiceover_text in the film's ElevenLabs voice (audio/tts.ts).
  */
 
-import fs from "node:fs/promises";
 import path from "node:path";
-import { generateTTS } from "./tts.js";
+import { speak } from "./tts.js";
 
 export interface SceneVoiceoverInput {
   label?: string;
@@ -16,53 +15,37 @@ export interface SceneVoiceoverInput {
 
 export interface SceneVoiceoverOptions {
   scenes: SceneVoiceoverInput[];
-  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
-  model?: "tts-1" | "tts-1-hd";
-  speed?: number; // 0.25-4.0; <1 is a more measured delivery
+  /** A stock name, a cast actor id or an ElevenLabs voice id (tts.ts). */
+  voice?: string;
+  /** 0.8-1.25; tempo with the pitch kept. */
+  speed?: number;
   outputDir: string;
-  apiKey: string;
+  tenant?: string;
 }
 
 /**
- * Generate voiceover audio for each scene that has voiceover_text or a label.
+ * Generate voiceover audio for each scene that has voiceover_text.
  * Returns array of audio file paths (empty string for scenes with no text).
  */
 export async function generateSceneVoiceovers(
   opts: SceneVoiceoverOptions,
 ): Promise<string[]> {
-  await fs.mkdir(opts.outputDir, { recursive: true });
-
   const results: string[] = [];
 
   for (let i = 0; i < opts.scenes.length; i++) {
-    const scene = opts.scenes[i];
     // Narrate ONLY explicit script text. Never fall back to the scene label --
     // a label is an editorial name ("Visual Pause", "Scene 5 — Logo + CTA"),
     // not narration, and an auto-inserted pause scene has no script by design.
-    const text = scene.voiceover_text;
-
+    const text = opts.scenes[i].voiceover_text;
     if (!text || !text.trim()) {
       results.push("");
       continue;
     }
-
-    const outputPath = path.join(opts.outputDir, `voiceover_scene_${i}.mp3`);
-
-    await generateTTS({
-      text,
-      voice: opts.voice,
-      model: opts.model,
-      speed: opts.speed,
-      outputPath,
-      apiKey: opts.apiKey,
-    });
-
-    results.push(outputPath);
+    const out = path.join(opts.outputDir, `voiceover_scene_${i}.mp3`);
+    await speak({ text, out, voice: opts.voice, speed: opts.speed, tenant: opts.tenant });
+    results.push(out);
   }
 
-  console.log(
-    `  Scene voiceovers: generated ${results.filter(r => r).length}/${opts.scenes.length} clips`,
-  );
-
+  console.log(`  Scene voiceovers: generated ${results.filter(r => r).length}/${opts.scenes.length} clips`);
   return results;
 }

@@ -18,7 +18,7 @@ light-brand color discipline, component embedding, voiceover + music.
   "mode": "full",
   "voiceover": true,
   "background_music": true,
-  "voice": "nova"
+  "audio_system": { "voice": "brian" }
 }
 ```
 
@@ -36,7 +36,7 @@ chart components, the single-caption-motif rule, CTA close.
   "mode": "full",
   "voiceover": true,
   "background_music": true,
-  "voice": "nova"
+  "audio_system": { "voice": "brian" }
 }
 ```
 
