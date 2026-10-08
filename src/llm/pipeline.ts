@@ -35,6 +35,7 @@ import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
 import { getRecipe, recipeForFormat, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces, holdSettingToRecipe, holdUseToRecipe } from "../core/recipes.js";
 import { recipeWantsVoice } from "./storyboard-builder.js";
+import { enforceBoard } from "./board-enforce.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -371,12 +372,18 @@ async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineRes
         chosenMusic = await resolveMusicChoice(choice, path.join(projectDir(opts.tenant_id, opts.project_id), "assets")).catch((e: any) => { console.warn(`  Music: the chosen bed could not be read (${e?.message || e}); picking by mood`); return undefined; });
       }
     } catch { /* no existing project -- fresh build */ }
+    // The chosen bed is the one grammar prep attaches (it was resolved here
+    // and never handed on, so a board's chosen track was ignored on rebuild).
+    if (chosenMusic && opts.chosenMusic === undefined) opts.chosenMusic = chosenMusic;
   }
   if (pipelineHasNarration && (opts.voiceover || opts.backgroundMusic)) {
     console.log("  Narration rule: speaker track present -> auto-TTS and auto-music disabled (the recording is the soundtrack).");
     opts.voiceover = false;
     opts.backgroundMusic = false;
   }
+  // A NAMED NARRATOR IS A NARRATED FILM: the caller pinning audio_system.voice
+  // ("marc") with voiceover unset means "voice this", on any grammar.
+  if (!pipelineHasNarration && opts.voiceover === undefined && opts.audio_system?.voice) opts.voiceover = true;
   var brandKit = opts.brandKit || DEFAULT_BRAND_KIT;
   var canvas = opts.canvas || DEFAULT_CANVAS;
 
@@ -2709,6 +2716,7 @@ async function runUnifiedPipeline(
       filmGrammar,
       world,
       recipe: recipeObj,
+      voiced: !!opts.voiceover || recipeWantsVoice(recipeObj),
     });
   }
   trace?.endEvent({ scenes: storyboard.scenes.length });
@@ -2808,6 +2816,15 @@ async function runUnifiedPipeline(
       if (d.audio_hints?.voiceover_text) d.audio_hints.voiceover_text = undefined;
       if (Array.isArray(d.beats)) for (const b of d.beats) if (b?.voiceover_text) b.voiceover_text = undefined;
     }
+  }
+
+  // ── THE BOARD IS ENFORCED, NOT WARNED ABOUT (llm/board-enforce.ts) ──
+  // The brief's numbered lines on their beats, each voiced scene sized to its
+  // line (the cast's times scaled with it), one quiet sound a scene. Not on a
+  // build-from-board: the approved board is the edit.
+  if (!opts.presetStoryboard && format === "video") {
+    const fixes = enforceBoard(storyboard.scenes as any[], { brief: opts.brief || opts.prompt, voiced: !!opts.voiceover || recipeVoice, personCarries: personCarries(filmGrammar) || filmGrammar === "screencast", recipe: !!recipeObj });
+    for (const f of fixes) console.log(`  Board enforced: ${f}`);
   }
 
   // ── Speaker films: resolve WORD ANCHORS against the scene's spine ──

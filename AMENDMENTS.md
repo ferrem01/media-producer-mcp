@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The board is enforced, not warned about
+
+Marc: "generate in the mcp is really not good ... I don't know how a system
+that is using the same LLM that you use produces such bad videos." The Six
+Tabs relay board (proj_2e79b8e2) came back with all six of the brief's lines
+missing (it only WARNED "the brief locks this line"), 41 s against "~22 s",
+and fifteen sound cues (a FAHHH, a buzzer, a click per click). Every fix made
+by hand was deterministic, so it is now code:
+
+- Root cause of the silence: the relay contract tells the writer "no
+  narrator, voiceover_text stays empty", and nothing told it this film had a
+  voice. The writer's `narratorBlock` now overrides any grammar's no-narrator
+  rule when the film is voiced (it was the recipe's voice only), and a named
+  narrator (`audio_system.voice`) with `voiceover` unset means voiceover on.
+- `llm/board-enforce.ts` `enforceBoard`, run on every fresh board (never on a
+  build-from-board -- the approved board is the edit):
+  - the brief's numbered lines (`1. "..."`) go on their beats word for word
+    when the count matches (voiced and person films);
+  - a voiced scene runs as long as its line (2.8 words/s + the 0.45 s
+    breath), its cast's times scaled with it (anchors and geometry untouched);
+    an unvoiced film is scaled to the length the brief asks for; a recipe's
+    seconds and a person's take keep their own length;
+  - one sound cue a scene, the strongest job winning, at 0.3 (payoff 0.35),
+    no meme stings (attention / comedy / monkey / boom) unless the brief asks.
+- The writer's sound guidance now says the same (at most one a scene, one or
+  two jobs a film, no FAHHH); the update tool keeps every job for hand use.
+- Audit fix in passing: a board's chosen music bed was resolved and never
+  handed to grammar prep, so a rebuild ignored it; it is handed on now.
+
 ## 2026-10-08 — The narration is the clock (voice-only films)
 
 Six Tabs, re-voiced in Marc's clone at 1.2x, held dead air: the build only
