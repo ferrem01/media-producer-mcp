@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Real rooms: the stock places are photographs, and a room photo comes first
+
+The CEO sit-down test (proj_14b6c070) settled it: Marc, "honestly, if anything,
+the background is what looks the most AI created", and the boundary between
+him and a drawn room is where it reads fake. Drawn into a phone photo of a real
+living room, the same actor and prompt held up.
+
+- The stock places (core/stock-locations.ts) are now real photographs from
+  Pexels (free to use; each keeps its photographer and page in `credit`),
+  chosen by eye: no renders, nobody in them. Two added for the sit-down look:
+  Executive office and Dark study. Eleven in all.
+- `STOCK_REV` (2): a library copy of the old drawn set takes the photo in place
+  (`refreshStockLocations`, run when locations are listed or a stock one is
+  picked) -- same id, so its scenes follow; the tenant's name for it is kept.
+- Studio's shot step: "+ Use a photo of a room" is the first place -- the photo
+  is uploaded and added as it is (`clean: false`, nothing redrawn).
+
 ## 2026-10-08 — The first build of the cold Six Tabs board: own music, the voice's pace, no bar rounding
 
 Building proj_bd43e545 (the fourth cold board) shipped a Jamendo bed and ran
