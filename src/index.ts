@@ -43,7 +43,7 @@ import { laneClips, laneWords, lanePeaks } from "./core/speaker-lane.js";
 import { ensureTakePoster } from "./core/take-poster.js";
 import { queueTakeMatte, blurPreviewFrame } from "./core/take-matte.js";
 import { takeJobsFor, takeErrors } from "./core/take-jobs.js";
-import { queueTakeGrade } from "./core/take-grade.js";
+import { queueTakeGrade, markLookPending } from "./core/take-grade.js";
 import { DEFAULT_SOFT_STRENGTH } from "./core/take-sanitize.js";
 import { castSpeakerLayer, setSpeakerBackground, asSpeakerBackground, sceneSpeakerBackground, syncSpeakerClips, missingSpeakerCopies, takeCopies, takeForClip, takeOwns } from "./core/speaker-layer.js";
 import { wordsThroughCuts, speedOf } from "./core/take-clock.js";
@@ -3856,6 +3856,10 @@ Rules:
         const tlCorrect = typeof tlBody.correct === "boolean" ? tlBody.correct : undefined;
         const tlFillN = tlBody.fill === undefined || tlBody.fill === null ? undefined : Number(tlBody.fill);
         if (tlFillN !== undefined && !(tlFillN >= 0 && tlFillN <= 1)) { jsonResponse(res, 400, { error: "fill must be 0-1" }); return; }
+        // THE ASKED-FOR LOOK, AT ONCE: the grade takes about a minute and saved
+        // the look only when it landed, so the inspector re-opened on the old
+        // one ("it claims to have removed it ... it is checked again").
+        await markLookPending(tlTenant, tlProject, tlRaw, tlLook, tlLook === "soft" ? tlStrength : undefined);
         queueTakeGrade({
           tenantId: tlTenant, projectId: tlProject, rawUrl: tlRaw, look: tlLook, strength: tlLook === "soft" ? tlStrength : undefined, correct: tlCorrect, fill: tlFillN, dataDir: config.dataDir,
           resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject, saveProject,
