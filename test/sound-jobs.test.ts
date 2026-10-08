@@ -66,10 +66,10 @@ describe("the sound jobs", () => {
     expect(tracks.map((t) => t.startTime)).toEqual([14.5, 16]);
   });
 
-  it("the writer and the update tool are told the jobs and the two-or-three rule; Studio plays a landing cue early", async () => {
+  it("the writer is told one cue a scene and no meme jobs, the update tool keeps every job; Studio plays a landing cue early", async () => {
     const sb = await fs.readFile("src/llm/storyboard-builder.ts", "utf-8");
-    expect(sb).toMatch(/Pick TWO OR THREE jobs for the whole film and use each the same way every time/);
-    expect(sb).toMatch(/role: \{ type: "string", enum: \["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"\]/);
+    expect(sb).toMatch(/SOUND CUES -- AT MOST ONE per scene/);
+    expect(sb).toMatch(/role: \{ type: "string", enum: \["transition", "tension", "payoff", "right", "wrong"\]/);
     const server = await fs.readFile("src/server.ts", "utf-8");
     expect(server).toMatch(/role: z\.enum\(\["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"\]\)/);
     const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf-8");

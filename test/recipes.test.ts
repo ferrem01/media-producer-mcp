@@ -251,7 +251,7 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(builder).toMatch(/\$\{opts\.recipe \? recipeBlock\(opts\.recipe, /);
     const pipeline = await read("src/llm/pipeline.ts");
     expect(pipeline).toMatch(/const recipeObj = getRecipe\(opts\.recipe\) \|\| getRecipe\(\(treatment as any\)\?\.recipe\);/);
-    expect(pipeline).toMatch(/recipe: recipeObj,\n\s*\}\);/);
+    expect(pipeline).toMatch(/recipe: recipeObj,\n\s*voiced: /);
     expect(pipeline).toMatch(/const off = checkBoardAgainstRecipe\(project\.storyboard as any, recipeObj\);/);
     expect(pipeline).toMatch(/touched \+= applyRecipeMotion\(d, recipeObj, roleOfLabel\(d\.label, recipeObj\)\);/);
     expect(await read("src/llm/scene-generator.ts")).toMatch(/if \(!cameraMoves && !\(draft as any\)\.camera_fixed\) \{/);
@@ -343,7 +343,7 @@ describe("the recipe: the measured cut of a film with the content removed", () =
     expect(recipeWantsVoice(getRecipe("story-ad-idea-beats"))).toBe(false); // type is the voice there
     expect(recipeWantsVoice(undefined)).toBe(false);
     const builder = await read("src/llm/storyboard-builder.ts");
-    expect(builder).toMatch(/\$\{recipeVoiceBlock\(opts\.recipe\)\}/);
+    expect(builder).toMatch(/\$\{narratorBlock\(opts\.recipe, opts\.voiced\)\}/);
     expect(builder).toMatch(/THE RECIPE'S VOICE -- A NARRATOR \(overrides the grammar's "text is the voiceover" rule\)/);
     expect(builder).toMatch(/THE VOICE IS THE CLOCK: a beat runs as long as its line takes to say/);
     const pipeline = await read("src/llm/pipeline.ts");
