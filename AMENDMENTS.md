@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Studio on a phone: every voice line started at once
+
+Marc on the Six Tabs mobile preview: "the first scene has multiple audio
+tracks playing over themselves, like my voice tracks", and audio problems
+on other films. Studio's play() starts EVERY audio element inside the tap
+(a phone only plays what a gesture started) and relied on syncMedia pausing
+the out-of-window ones on the same tick; on a phone the pause lost the race
+and all six lines played together. Now a clip not yet due (`audioDueAt`)
+unlocks muted and is paused when its play() lands; syncMedia starts it in
+its window as before.
+
 ## 2026-10-08 — A tall voiced frame: one stage above the words
 
 On the fresh Six Tabs build every surface was a strip: the tall-frame

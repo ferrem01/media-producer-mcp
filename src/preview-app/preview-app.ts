@@ -2781,17 +2781,41 @@ ${QUOTIENT_CSS}
       } else {
         audio.volume = effVolume(audio);
       }
-      // Unlock the element within the gesture; syncMedia pauses out-of-window
-      // clips synchronously on the same tick, so nothing overlaps audibly.
-      if (audio.paused) audio.play().catch(function(eP) {
-        if (!audio._playFailLogged) {
-          audio._playFailLogged = true;
-          console.warn('[play-fail] audio', (audio.src || '?').split('/').pop().split('?')[0].slice(0, 40), eP && eP.name, String((eP && eP.message) || '').slice(0, 100));
-        }
-      });
+      // Unlock the element within the gesture (a phone plays only what the
+      // tap started). A clip that is not due yet unlocks MUTED and is paused
+      // once play() lands: the old "syncMedia pauses it on the same tick"
+      // lost the race on a phone, and every voice line of the film started
+      // together over scene 1 (Marc, Oct 8, the Six Tabs mobile preview:
+      // "multiple audio tracks playing over themselves").
+      if (audio.paused) {
+        var due = audioDueAt(audio, state.masterTime || 0);
+        if (!due) audio.muted = true;
+        audio.play().then(function() {
+          if (!due && !audioDueAt(audio, state.masterTime || 0)) audio.pause();
+          audio.muted = false;
+        }).catch(function(eP) {
+          audio.muted = false;
+          if (!audio._playFailLogged) {
+            audio._playFailLogged = true;
+            console.warn('[play-fail] audio', (audio.src || '?').split('/').pop().split('?')[0].slice(0, 40), eP && eP.name, String((eP && eP.message) || '').slice(0, 100));
+          }
+        });
+      }
     });
     state.musicStarted = true;
     startDucking();
+  }
+
+  // Is this audio track inside its window at film time t? Looping music
+  // always is; a cue or a line only from its start for its length.
+  function audioDueAt(audio, t) {
+    if (audio.loop) return true;
+    var local = t - (audio._startTime || 0);
+    if (local < 0) return false;
+    var dur = audio.duration;
+    var trim = audio._trimStart || 0;
+    var span = (dur && isFinite(dur)) ? (audio._clipDur > 0 ? Math.min(audio._clipDur, dur - trim) : dur - trim) : (audio._clipDur > 0 ? audio._clipDur : Infinity);
+    return local < span;
   }
 
   function pauseAudio() {
