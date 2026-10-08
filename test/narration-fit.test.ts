@@ -6,11 +6,10 @@ import path from "node:path";
 // scene to its line (Marc, Oct 8: "make them compelling and viral"). The
 // narration is the clock now -- both ways -- and its words are the spine.
 describe("the narration is the clock", () => {
-  it("a scene runs its line plus a breath, shorter or longer, on the bar when there is a grid", async () => {
+  it("a scene runs its line plus a breath, shorter or longer -- never rounded up to a bar", async () => {
     const { sceneLengthForLine, NARRATION_TAIL_S, NARRATION_MIN_S } = await import("../src/core/narration-fit.js");
     expect(sceneLengthForLine(3.2)).toBe(Math.round((3.2 + NARRATION_TAIL_S) * 100) / 100);
     expect(sceneLengthForLine(0.4)).toBe(NARRATION_MIN_S);
-    expect(sceneLengthForLine(3.2, { barSec: 2, transitionSec: 0.3 })).toBe(3.7);   // 2 bars - 0.3
   });
 
   it("fits every narrated scene, re-times anchored words, places the lines, trims the music", async () => {
