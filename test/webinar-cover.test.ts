@@ -81,3 +81,10 @@ describe("webinar cover, waves, co-brand lockup", () => {
     } finally { await done(); }
   }, 60000);
 });
+
+describe("the co-brand lockup holds still", () => {
+  it("is pinned to the frame, not the camera rig", async () => {
+    const { isFixedToFrame } = await import("../src/core/scene-assembler.js");
+    expect(isFixedToFrame("cobrand-lockup")).toBe(true);
+  });
+});
