@@ -107,7 +107,7 @@ const positionSchema = z.object({
 }).optional();
 
 export const animationSchema = z.object({
-  effect: z.string().describe("slide-left | slide-right | slide-up | slide-down | rise | pop | fade | cut; on enter also morph (needs from)"),
+  effect: z.string().describe("slide-left | slide-right | slide-up | slide-down | rise | pop | fade | cut | collapse (exit: folds to nothing) | expand (enter: opens out of nothing); on enter also morph (needs from)"),
   // Scene-local start time (seconds). Enter defaults to 0; exit defaults to
   // scene end minus duration. The assembler has always honored this -- the
   // schema just used to strip it. A word ("@acts") lands it on the script:

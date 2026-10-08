@@ -19,11 +19,11 @@ const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 const BRAND = { colors: { primary: "#393bf5", background: "#f5f4f0", text: "#17171c" }, fonts: [] } as any;
 const IMG = (w: number, h: number, c: string) => "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="${c}"/></svg>`);
 
-type Comp = { id: string; type: string; dir: string; data: unknown; position: unknown; enter?: unknown };
+type Comp = { id: string; type: string; dir: string; data: unknown; position: unknown; enter?: unknown; exit?: unknown };
 async function still(comps: Comp[], duration: number, run: (page: Page, seek: (t: number) => Promise<void>) => Promise<void>) {
   const srcs: Array<{ type: string; source: string }> = [];
   for (const c of comps) if (!srcs.some((s) => s.type === c.type)) srcs.push({ type: c.type, source: await read(`../src/components/${c.dir}/${c.type}.component.html`) });
-  const scene = { id: "s", label: "s", duration_seconds: duration, background: "#f5f4f0", components: comps.map((c, i) => ({ id: c.id, type: c.type, data: c.data, position: c.position, z_index: 10 + i, ...(c.enter ? { enter: c.enter } : {}) })) };
+  const scene = { id: "s", label: "s", duration_seconds: duration, background: "#f5f4f0", components: comps.map((c, i) => ({ id: c.id, type: c.type, data: c.data, position: c.position, z_index: 10 + i, ...(c.enter ? { enter: c.enter } : {}), ...(c.exit ? { exit: c.exit } : {}) })) };
   const html = await assembleScene({ scene: scene as any, components: srcs, brandKit: BRAND, canvas: { width: W, height: H } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap") } as any);
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "relay-collapse-"));
   await fs.writeFile(path.join(tmp, "s.html"), html);
@@ -108,6 +108,31 @@ describe("relay collapses", () => {
       expect((await box(page, '[data-cid="next"]'))!.w).toBeGreaterThan(W * 0.7);
       await seek(1.0);
       expect(await visibleCount(page, '[data-cid="cs"] .cks-piece')).toBeGreaterThan(0);
+    });
+  }, 60000);
+
+  it("collapse folds a piece to nothing about its centre; expand opens the next out of nothing", async () => {
+    await still([
+      { id: "a", ...STAT, position: TARGET, exit: { effect: "collapse", at: 1, duration: 0.4 } } as any,
+      { id: "b", ...STAT, position: TARGET, enter: { effect: "expand", at: 1.5, duration: 0.5 } },
+    ], 3, async (page, seek) => {
+      await seek(0.9);
+      const a0 = (await box(page, '[data-cid="a"]'))!;
+      expect(a0.vis).toBe(true);
+      await seek(1.32);   // power3.in: most of the fold is at the end
+      const a1 = (await box(page, '[data-cid="a"]'))!;
+      expect(a1.w).toBeLessThan(a0.w * 0.8);
+      expect(Math.abs(a1.x - a0.x)).toBeLessThan(40);  // about its centre (the ambient push drifts both)
+      await seek(1.45);
+      expect((await box(page, '[data-cid="a"]'))!.vis).toBe(false);
+      expect((await box(page, '[data-cid="b"]'))!.vis).toBe(false);
+      await seek(1.53);
+      const b1 = (await box(page, '[data-cid="b"]'))!;
+      expect(b1.w).toBeLessThan(a0.w * 0.6);
+      await seek(2.5);
+      const b2 = (await box(page, '[data-cid="b"]'))!;
+      expect(b2.vis).toBe(true);
+      expect(Math.abs(b2.w - a0.w)).toBeLessThan(a0.w * 0.03);  // home (the ambient push breathes)
     });
   }, 60000);
 });

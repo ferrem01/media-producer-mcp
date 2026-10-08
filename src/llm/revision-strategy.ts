@@ -146,7 +146,7 @@ function buildRevisionSystemPrompt(
   let brandAssetsSection = "";
   const backgrounds = (brandKit.assets || []).filter(a => a.type === "background");
   if (backgrounds.length) {
-    brandAssetsSection += `\n\nBrand Background Images:\n`;
+    brandAssetsSection += `\n\nBrand Background Images (use only when the person asks for the brand background):\n`;
     for (const bg of backgrounds) {
       brandAssetsSection += `- "${bg.name}": ${bg.url}${bg.tags?.length ? ` [tags: ${bg.tags.join(", ")}]` : ""}\n`;
     }

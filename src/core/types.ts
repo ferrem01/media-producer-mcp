@@ -149,7 +149,8 @@ export interface ComponentPosition {
 
 export interface ComponentAnimation {
   /** slide-left | slide-right | slide-up | slide-down | fade | rise | pop |
-   *  cut, and on an ENTRANCE, morph (needs `from`). */
+   *  cut | collapse (folds to nothing) | expand (opens out of nothing), and
+   *  on an ENTRANCE, morph (needs `from`). */
   effect: string;
   /** morph only: the component this one is born from, by id (a type names
    *  its first instance) or "id.anchor" for a [data-anchor] part inside it.

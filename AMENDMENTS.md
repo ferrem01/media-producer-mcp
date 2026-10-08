@@ -6,6 +6,27 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The brand background image is demoted; collapse / expand
+
+Marc on the 16:9 Six Tabs: "the backdrop is that annoying background that we
+have as part of our brand, which I freaking hate ... I almost never want you
+to use that." Any scene without its own background got a random brand-kit
+"background" image painted under it (generateBrandCSS -> pickBrandBackground),
+the cream world notwithstanding.
+
+- Removed: the auto-pick, `--mp-bg-image`, the `mp-page-bg` layer in the scene
+  and Studio assemblers, the `.bg-brand-image` layer in 34 templates, and a
+  stale `scene-assembler.ts.bak`. A scene with no background sits on the brand
+  colour (and the world).
+- The writer's "Brand Background Images (MANDATORY) ... PREFER these" became
+  "only when the brief asks for them"; the revision prompt says the same; the
+  walkthrough matte no longer picks the background asset.
+- New wrapper effects for relay handoffs: exit `collapse` (folds to nothing
+  about its centre) and enter `expand` (opens out of nothing) -- "have that
+  component collapse to zero and then have it open back up into Scott and
+  Max". Tests: `test/brand-background-demoted.test.ts`,
+  `test/relay-collapse.test.ts`.
+
 ## 2026-10-08 — Relay collapses: logos fold into a dot, the stream smashes into one
 
 Marc, for the 16:9 Six Tabs: "if we show a bunch of logos, those logos

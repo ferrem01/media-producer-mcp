@@ -48,13 +48,11 @@ export interface NarratedScreencastResult {
   narration_duration: number;
 }
 
-/** Best brand backdrop for the walkthrough matte: an explicit background
- *  asset first, then an abstract/atmospheric harvested image. Null -> the
- *  caller falls back to a brand gradient. */
+/** Best brand backdrop for the walkthrough matte: an abstract/atmospheric
+ *  harvested image. Never the brand kit's "background" asset (demoted: Marc
+ *  almost never wants it). Null -> the caller falls back to a brand gradient. */
 function pickBrandBackdrop(brandKit: Project["brand_kit"] | undefined): string | null {
   const assets = (brandKit?.assets || []) as BrandAsset[];
-  const bg = assets.find((a) => a.type === "background" && a.url);
-  if (bg) return bg.url;
   const atmospheric = assets.find(
     (a) =>
       a.type === "image" && a.url &&

@@ -121,7 +121,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
 
   // Generate brand kit CSS (use first scene's background as fallback)
   const firstScene = sceneInputs[0]?.scene;
-  const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(brandKit, firstScene?.background, true);
+  const { css: brandCSS, theme: sceneTheme } = generateBrandCSS(brandKit, firstScene?.background, true);
 
   // Collect font links from brand kit
   const fontLinks = generateFontLinks(brandKit);
@@ -154,7 +154,6 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
     const isTransparent = speakerUrl
       ? sceneCompositesOverSpeaker(scene, true)
       : scene.transparent_background === true;
-    const sceneBgCSS = generateBrandCSS(brandKit, scene.background, true);
 
     // Build component blocks for this scene
     const componentBlocks: string[] = [];
@@ -304,9 +303,6 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       `overflow:hidden;background:${sceneBg};visibility:hidden;opacity:0;">\n` +
       ((isTransparent && options.speakerRefs && options.speakerRefs[scene.id] && scene.camera_moves && scene.camera_moves.length)
         ? `    ${speakerRigVideoHtml(options.speakerRefs[scene.id].url, options.speakerRefs[scene.id].offset, false)}\n`
-        : '') +
-      ((!isTransparent && sceneBgCSS.hasBgImage)
-        ? `    <div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>\n`
         : '') +
       `${contentRegion}\n` +
       `  </div>`
