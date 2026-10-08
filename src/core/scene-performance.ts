@@ -30,7 +30,7 @@ import { getActor, listCast, portraitPath, type CastActor } from "./cast.js";
 import { resolvePlan, planState, planLine, planField, writePlan, applyPlanEdit, defaultEngine, type ResolvedPlan } from "./cast-plan.js";
 import { getPerformer } from "./performers/index.js";
 import { getHeygenLook } from "./actor-test.js";
-import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
+import { ffmpeg, download, durationOf, convertVoice, NO_JEWELRY } from "./actor-test.js";
 import { elevenSpeech, heygenSpeech, spokenParts, DEFAULT_MOTION } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, playClock, cutFileFor } from "./take-clock.js";
@@ -151,7 +151,8 @@ export function framePrompt(shot: string, vertical: boolean, sheet: boolean, loc
     `A ${vertical ? "vertical" : "horizontal"} photograph from a real camera, framed exactly as described, the face clearly visible. ` +
     // Marc, Oct 8: "it does look like AI ... the texture, the quality of the picture".
     "Shot on a cinema camera with a 35-50mm lens: true-to-life skin with pores, fine lines and natural imperfections, not airbrushed, no plastic sheen, not CGI; " +
-    "motivated natural light, real contrast, subtle film grain. No text, no logos.";
+    "motivated natural light, real contrast, subtle film grain. No text, no logos. " +
+    NO_JEWELRY;
 }
 
 /** A written prompt: undefined keeps what the scene has, "" goes back to the

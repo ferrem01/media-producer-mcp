@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — No invented jewelry in drawn frames or recasts
+
+Marc on the Genjutsu test (proj_20a19f8f): "it's putting a wedding ring on my
+hand randomly". Checked every input: his 4K recordings, the start frames and
+the model sheet are all ringless. The model invented it (Seedance did the same
+in the CEO test's scene 3). `NO_JEWELRY` (actor-test.ts) now ends both
+`framePrompt` and `genjutsuShotPrompt`: jewelry only if a reference shows it.
+Unlike the lav mic (in the recording, which Genjutsu copies), nothing pulls
+the other way. Test: `test/scene-performance.test.ts`.
+
 ## 2026-10-08 — The caption lane's emphasis ink is settable
 
 Prerna on the Six Tabs 16:9: "FREE WEBINAR IN ORANGE". reel-caption-lane takes

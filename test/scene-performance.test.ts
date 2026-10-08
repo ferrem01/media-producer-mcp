@@ -122,6 +122,9 @@ describe("a scene performed by a cast actor", () => {
     expect(real).toMatch(/^The exact same person as in the first two reference images \(their portrait and their character sheet\)/);
     expect(real).not.toMatch(/real photos of them/);
     expect(real).toMatch(/true-to-life skin with pores.*not airbrushed.*subtle film grain/);
+    // No invented wedding ring (Marc, Oct 8): jewelry only if a reference shows it.
+    const { genjutsuShotPrompt } = await import("../src/core/actor-test.js");
+    for (const p of [real, genjutsuShotPrompt("Seated in an armchair", true)]) expect(p).toMatch(/no rings, watches or bracelets\.$/);
     expect(s0.performance.frames).toHaveLength(1);
     expect(s0.performance.frame).toMatch(/^\/assets\/t\/projects\/proj_perf\/assets\/frame-dana-.*\.jpg$/);
     const probe = await run("ffmpeg", ["-hide_banner", "-i", path.join(DATA, s0.performance.frame.replace(/^\/assets\//, ""))]).then(() => "", (e: any) => String(e.stderr));
