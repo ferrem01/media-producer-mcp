@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The brief's beats are the scenes (the cold Six Tabs test)
+
+The first cold test of the enforced board (proj_84048b0d, same prompt) came
+back voiced, 22.5 s and with three cues -- and still wrong: the writer packed
+beats 1-4 into one relay oner, invented two scenes (a date card, a
+checklist), and enforcement then stamped the numbered lines by index, so
+every line sat on the wrong picture. Also a payoff hit on three scenes, and
+invented names ("Scott Murtaugh", "Max Davish").
+
+- The writer: a brief that numbers its beats gets `briefBeatsBlock` -- exactly
+  N scenes, scene i is beat i (line and picture), no merging, no added scenes;
+  it overrides the grammar's scene shape. People carry the brief's names and
+  titles only; a phonetic spelling stays in the line as written.
+- Enforcement stamps the lines only on a board whose scenes read as the beats
+  (`sceneReadsBeat`: each writer line carries its own beat's words and no
+  other's); otherwise it leaves the board and says so on the board's warnings.
+- One payoff hit a film: the last one.
+
 ## 2026-10-08 — One start frame for the film
 
 Five Tools: each performed scene drew its own start frame, so Marc looked
