@@ -78,3 +78,68 @@ export async function generateMusic(opts: {
     ...(songId ? { song_id: songId } : {}),
   };
 }
+
+/** The film's one music track id. Every writer replaces the film's music
+ *  track by TYPE and names it this, so a film never carries two beds (the
+ *  pipeline wrote "music_bed", its fallback "bgm" and generate_music
+ *  "music" -- a generated bed on a built film sat on top of the old one). */
+export const MUSIC_BED_ID = "music_bed";
+
+type AudioHolder = { audio?: { tracks: any[]; ducking?: { duck_track?: string } & Record<string, unknown> } };
+
+/** Put `track` in as the film's music bed: every music track goes, the bed
+ *  takes MUSIC_BED_ID, and ducking follows it. */
+export function placeMusicBed(project: AudioHolder, track: Record<string, unknown>): Record<string, unknown> {
+  if (!project.audio) project.audio = { tracks: [] };
+  const bed = { ...track, id: MUSIC_BED_ID, type: "music" };
+  project.audio.tracks = [...project.audio.tracks.filter((t) => t?.type !== "music"), bed];
+  if (project.audio.ducking) project.audio.ducking.duck_track = MUSIC_BED_ID;
+  return bed;
+}
+
+const MOOD_MUSIC: Record<string, string> = {
+  driving: "driving modern electronic, punchy drums, confident bass, forward momentum",
+  jazzy: "light modern jazz, brushed drums, upright bass, warm keys",
+  ambient: "airy ambient electronic, soft pads, gentle pulse",
+  playful: "playful bouncy pop, plucked synths, claps, light and upbeat",
+  cinematic: "cinematic hybrid score, pulsing strings, big drums building",
+  warm: "warm acoustic pop, guitar and soft percussion, optimistic",
+};
+
+/** A prompt for a film's own bed: its mood, its tempo when the cut follows
+ *  one, a build into the close, under a voice when there is one. */
+export function filmMusicPrompt(o: { mood?: string; bpm?: number; seconds: number; voiced?: boolean }): string {
+  const base = MOOD_MUSIC[String(o.mood || "")] || MOOD_MUSIC.driving;
+  const parts = [base];
+  if (o.bpm && o.bpm > 40 && o.bpm < 220) parts.push(`${Math.round(o.bpm)} BPM`);
+  parts.push(`a short ad bed, ${Math.round(o.seconds)} seconds, starts immediately with energy, builds into the last ${Math.max(3, Math.round(o.seconds * 0.2))} seconds and ends cleanly`);
+  if (o.voiced) parts.push("mixed to sit under a voice, no lead melody fighting the words");
+  parts.push("instrumental, no vocals");
+  return parts.join(", ");
+}
+
+/**
+ * THE FILM'S OWN MUSIC: a bed the library picked is replaced by one made for
+ * this film at its length (Marc, Oct 8: "it's the same fucking song"). Kept as
+ * picked when the film has no music, when generation fails, or when the caller
+ * says the bed is someone's choice. Returns the new bed, or null.
+ */
+export async function ownMusicBed(project: AudioHolder & { scenes?: any[]; name?: string }, o: {
+  mood?: string; bpm?: number; voiced?: boolean; outDir: string;
+  make?: typeof generateMusic;
+}): Promise<Record<string, unknown> | null> {
+  const old = (project.audio?.tracks || []).find((t) => t?.type === "music");
+  if (!old) return null;
+  const film = (project.scenes || []).reduce((a, s) => a + (Number(s?.duration_seconds) || 0), 0);
+  if (!(film > 0)) return null;
+  const seconds = Math.ceil(film + 1);
+  const made = await (o.make || generateMusic)({ prompt: filmMusicPrompt({ mood: o.mood, bpm: o.bpm, seconds, voiced: o.voiced }), seconds, name: project.name || "film", outDir: o.outDir });
+  return placeMusicBed(project, {
+    source: made.file,
+    volume: Number(old.volume) || (o.voiced ? 0.14 : 0.4),
+    start_time: 0,
+    duration: Math.round(film * 100) / 100,
+    fade_in: 0.2,
+    fade_out: 0.8,
+  });
+}

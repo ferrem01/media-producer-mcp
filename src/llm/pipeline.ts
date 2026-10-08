@@ -36,6 +36,7 @@ import { castBoardStandIns } from "../core/board-standins.js";
 import { getRecipe, recipeForFormat, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces, holdSettingToRecipe, holdUseToRecipe } from "../core/recipes.js";
 import { recipeWantsVoice } from "./storyboard-builder.js";
 import { enforceBoard } from "./board-enforce.js";
+import { ownMusicBed, MUSIC_BED_ID } from "../audio/music-generate.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -2246,10 +2247,11 @@ function buildCritiqueFeedback(critique: CritiqueResult): string {
  * is recorded on the project for inspection and iteration. Used by both the
  * storyboard-only and full generation paths so project.storyboard is always populated.
  */
-/** The tracks a person put on the film by hand: not the bed the build
- *  picks (music_bed) and not the narration it generates (vo_*). */
+/** The tracks a person put on the film by hand: not the music bed (the
+ *  build makes the film's one bed; a person's chosen bed rides through as
+ *  the board's music choice) and not the narration it generates (vo_*). */
 export function handAddedTracks(tracks: AudioTrack[] | undefined): AudioTrack[] {
-  return (tracks || []).filter((t) => t && t.id !== "music_bed" && !/^(vo|voiceover|narration)[_-]/i.test(String(t.id)));
+  return (tracks || []).filter((t) => t && t.type !== "music" && !/^(vo|voiceover|narration)[_-]/i.test(String(t.id)));
 }
 
 function storyboardToSaved(
@@ -2980,7 +2982,11 @@ async function runUnifiedPipeline(
             if (firstCut !== undefined && c.exit === undefined) { c.exit = { effect: "cut", at: firstCut }; c.data.hold = 0; }
           }
         }
-        // THE WORDS ARE ON SCREEN THE WHOLE TIME (all four reference films;
+      }
+      if (d.transparent_background !== false && !d.hand_set) {
+        // THE WORDS ARE ON SCREEN THE WHOLE TIME, on every film a person
+        // carries (speaker too: Five Tools and Spread Everywhere, Oct 8,
+        // shipped uncaptioned and were captioned by hand) (all four reference films;
         // Marc: "I don't like chapter labels as a default"): the scene's
         // captions come from its spine -- asserted from the script now,
         // measured from the take when it lands -- as the EXISTING
@@ -3001,7 +3007,7 @@ async function runUnifiedPipeline(
         const castLane = (d.components as any[]).find((c) => c && typeof c === "object" && c.type === "reel-caption-lane" && c.id === "captions");
         if (castLane && String(castLane.data?.mode || "") !== wantMode) {
           d.components = (d.components as any[]).filter((c) => c !== castLane);
-          console.log(`  Creator-cut: scene ${i + 1} -- the cast lane is ${wantMode === "none" ? "dropped: the recipe carries no captions" : `recast as ${wantMode || "plated"} (the recipe's style)`}`);
+          console.log(`  Captions: scene ${i + 1} -- the cast lane is ${wantMode === "none" ? "dropped: the recipe carries no captions" : `recast as ${wantMode || "plated"} (the recipe's style)`}`);
         }
         const hasLane = (d.components as any[]).some((c) => c && typeof c === "object" && c.type === "reel-caption-lane");
         // A recipe with no captions (the Grade film) casts no lane at all.
@@ -3010,7 +3016,7 @@ async function runUnifiedPipeline(
           if (lane) {
             d.components.push(lane);
             const marked = (lane.data.phrases as any[]).filter((p) => /\*/.test(String(p.text))).length;
-            console.log(`  Creator-cut: scene ${i + 1} -- captions from the ${spine.source} words: ${(lane.data.phrases as any[]).length} phrases, ${marked} with an emphasis${lane.data.mode ? ` (${lane.data.mode})` : ""}`);
+            console.log(`  Captions: scene ${i + 1} -- from the ${spine.source} words: ${(lane.data.phrases as any[]).length} phrases, ${marked} with an emphasis${lane.data.mode ? ` (${lane.data.mode})` : ""}`);
           }
         }
       }
@@ -3026,9 +3032,9 @@ async function runUnifiedPipeline(
         d.components.push(cut);
         console.log(`  Proof: scene ${i + 1} ${(cut as any).type} cut in from ${src.split("/").pop()}${before !== d.components.length - 1 ? " (replacing the mock in that window)" : ""}`);
       }
-      // THE CAMERA MOVES ON THE PERSON (creator-cut) by rule -- authored in
-      // the scene generator once the cut windows are resolved to seconds
-      // (creatorCutCameraMoves), so a punch-in lands on the claim and an
+      // THE CAMERA MOVES ON THE PERSON (any person film) by rule -- authored
+      // in the scene generator once the cut windows are resolved to seconds
+      // (personCameraMoves), so a punch-in lands on the claim and an
       // anchored zoom frames each cutaway's performing region.
       if (spine.source === "measured" && spine.duration > 0 && Math.abs(spine.duration - (Number(d.duration_seconds) || 0)) > 0.05) {
         console.log(`  Spine: scene ${i + 1} ${d.duration_seconds}s -> ${spine.duration}s (the take is the clock)`);
@@ -4289,7 +4295,7 @@ async function runUnifiedPipeline(
             console.log(`  Background music: "${track.title}" by ${track.artist} [${track.source}] (${track.duration}s)`);
 
             project.audio.tracks.push({
-              id: "bgm",
+              id: MUSIC_BED_ID,
               type: "music" as const,
               source: track.path,
               volume: 0.12,
@@ -4370,6 +4376,28 @@ async function runUnifiedPipeline(
       // v2, the continuous take: scene joins land on identical frames, so no
       // ambient drift may move the frame between one scene's end and the next's start.
       sc.locked_camera = true;
+    }
+  }
+  // THE FILM'S OWN MUSIC (audio/music-generate.ts ownMusicBed): the bed the
+  // library picked is replaced by one ElevenLabs makes for this film at its
+  // final length (Marc, Oct 8: "it's the same fucking song. Every time").
+  // Kept as picked when it is the board's chosen bed or the brand kit's, and
+  // on a music-first cut (the cuts sit on THAT track's bars). A failed or
+  // unconfigured generation keeps the picked bed.
+  {
+    const musicFirstCut = !!beatMap && !opts.voiceover && !personCarries(filmGrammar);
+    if ((format === "video" || format === "slideshow") && !opts.chosenMusic && musicTrack?.source !== "brand-kit" && !musicFirstCut && process.env.ELEVENLABS_API_KEY) {
+      try {
+        const bed = await ownMusicBed(project as any, {
+          mood: treatment?.audioSystem?.music_mood as string | undefined,
+          bpm: beatMap?.bpm,
+          voiced: !!opts.voiceover || personCarries(filmGrammar),
+          outDir: path.join(projectDir(opts.tenant_id, project.project_id), "assets", "audio"),
+        });
+        if (bed) console.log(`  Music: the film's own bed made (${bed.duration}s) -- replaces the library pick`);
+      } catch (e: any) {
+        console.warn(`  Music: own bed not made (${e?.message || e}) -- the library pick stays`);
+      }
     }
   }
   // The person's own tracks ride through (see keptAudioTracks).

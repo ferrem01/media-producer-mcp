@@ -6,6 +6,31 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Person films are captioned and punched in; every film gets its own music
+
+The three webinar films were all fixed by hand the same way. Two of those
+fixes are now the build's defaults:
+
+- **Captions + punch-ins on every film a person carries** (speaker as well as
+  creator-cut). The caption lane (`captionLane`, reel-caption-lane from the
+  spine) was inside creator-cut's cutaway defaults; it now runs for any person
+  film on a transparent scene, and the speaker writer is told the build
+  captions and punches in (never cast captions, star the emphasis word). The
+  punch-in rule is `personCameraMoves` (was `creatorCutCameraMoves`), gated on
+  `personCarries`.
+- **The film's own music** (`audio/music-generate.ts` `ownMusicBed`): at the
+  end of a build the library's bed is replaced by an ElevenLabs track made for
+  the film at its final length (mood, tempo when known, under the voice, a
+  build into the close). Kept as picked for a board's chosen bed, a brand-kit
+  bed, a music-first cut (the cuts sit on that track's bars), or when
+  generation fails.
+- **One bed per film** (audit bug): the bed went by three ids (`music_bed`,
+  `bgm`, `music`) and `generate_music` replaced by id, so a built film could
+  carry two beds. `placeMusicBed` replaces every music track by TYPE as
+  `music_bed` and points ducking at it; the pipeline fallback, `generate_music`
+  and the booth's bed check all use it or match by type, and
+  `handAddedTracks` no longer carries an old bed through a rebuild.
+
 ## 2026-10-08 — The board is enforced, not warned about
 
 Marc: "generate in the mcp is really not good ... I don't know how a system

@@ -334,8 +334,8 @@ describe("THE SLICE UNDER THE SCREEN: the rig slides the person under the split,
     expect(splitSlide(undefined)).toEqual({ dy: 0, scale: 1 });
   });
   it("the creator-cut camera slides on a split cut (instead of resetting) and comes back to the face after", async () => {
-    const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
-    const moves = creatorCutCameraMoves([
+    const { personCameraMoves } = await import("../src/llm/scene-generator.js");
+    const moves = personCameraMoves([
       { type: "quotient-campaign", data: { use: "split" }, enter: { effect: "cut", at: 4 }, exit: { effect: "cut", at: 12 } },
     ] as any, { grammar: "creator-cut", face: { cx: 0.5, cy: 0.5, size: 0.39 }, duration: 16, takeover: false })!;
     const slide = moves.find((m) => m.type === "slide") as any;

@@ -392,12 +392,12 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(gen).toMatch(/var ownsWidth = !speakerBase && Number\.isFinite\(slotW\) && slotW >= 80;/);
     expect(gen).toMatch(/tallFrame && !fitReads && isProofSurface\(c\.type\) && \(isCutaway\(c as any\) \|\| ownsWidth\) \? frameAnchorFor\(c\.type, data\) : null;/);
     // The camera rule never emits the same move twice (a label and a mock cut in on one word did).
-    const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
+    const { personCameraMoves } = await import("../src/llm/scene-generator.js");
     const twice: any[] = [
       { id: "kinetic-text", type: "kinetic-text", data: {}, enter: { effect: "cut", at: 1.2 }, exit: { effect: "cut", at: 3.4 } },
       { id: "quotient-campaign", type: "quotient-campaign", data: {}, enter: { effect: "cut", at: 1.2 }, exit: { effect: "cut", at: 3.4 } },
     ];
-    const moves = creatorCutCameraMoves(twice, { grammar: "creator-cut", motion: "punchy", duration: 6, takeover: false })!;
+    const moves = personCameraMoves(twice, { grammar: "creator-cut", motion: "punchy", duration: 6, takeover: false })!;
     expect(moves.map((m) => `${m.at}|${m.type}`)).toEqual(["0.2|zoom", "1.2|reset", "3.4|zoom", "4.9|reset"]);
     // The pipeline: the last claim's proof cuts out 1.5s before the end; a cut with no time lands at 30%.
     const pipeline = await read("../src/llm/pipeline.ts");
@@ -489,13 +489,13 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
   });
 
   it("the camera moves on the person by rule: a punch-in on the claim, a zoom on each cutaway's region, back to the person, a pull-back on the turn", async () => {
-    const { creatorCutCameraMoves } = await import("../src/llm/scene-generator.js");
+    const { personCameraMoves } = await import("../src/llm/scene-generator.js");
     const face = { cx: 0.48, cy: 0.36, size: 0.3, confidence: 0.9 } as any;
     const comps: any[] = [
       { id: "sticker-prop", type: "sticker-prop", data: { kind: "pill", text: "THE PLAN" } },
       { id: "quotient-campaign", type: "quotient-campaign", data: { script: [{ action: "switch-tab", at: 0.2, tab: "tasks" }] }, enter: { effect: "cut", at: 1.4 }, exit: { effect: "cut", at: 3.6 } },
     ];
-    const punchy = creatorCutCameraMoves(comps, { grammar: "creator-cut", motion: "punchy", face, duration: 6, takeover: false })!;
+    const punchy = personCameraMoves(comps, { grammar: "creator-cut", motion: "punchy", face, duration: 6, takeover: false })!;
     expect(punchy.map((m) => [m.at, m.type, m.scale])).toEqual([
       [0.2, "zoom", 1.22],        // punch-in on the claim, at the face
       [1.4, "reset", undefined],  // the cutaway: the camera rests (the wrapper frames the mock)
@@ -504,12 +504,13 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     ]);
     expect(punchy[0]).toMatchObject({ x: 48, y: 36 });
     // Calm: one slow push, no pull-back; a cutaway with no anchors (a provided still) rests the camera.
-    const calm = creatorCutCameraMoves([{ id: "image", type: "image", data: { src: "/x.png" }, enter: { effect: "cut", at: 2 }, position: { x: "0%", y: "0%", width: "100%", height: "100%" } }],
+    const calm = personCameraMoves([{ id: "image", type: "image", data: { src: "/x.png" }, enter: { effect: "cut", at: 2 }, position: { x: "0%", y: "0%", width: "100%", height: "100%" } }],
       { grammar: "creator-cut", motion: "calm", duration: 6, takeover: false })!;
     expect(calm.map((m) => [m.at, m.type, m.scale])).toEqual([[0.3, "zoom", 1.1], [2, "reset", undefined]]);
     // Not for speaker films, not for takeovers; and a storyboard's own moves win (the generator only asks when there are none).
-    expect(creatorCutCameraMoves(comps, { grammar: "speaker", duration: 6, takeover: false })).toBeNull();
-    expect(creatorCutCameraMoves(comps, { grammar: "creator-cut", duration: 6, takeover: true })).toBeNull();
+    expect(personCameraMoves(comps, { grammar: "speaker", duration: 6, takeover: false })?.[0]).toMatchObject({ type: "zoom" });
+    expect(personCameraMoves(comps, { grammar: "relay", duration: 6, takeover: false })).toBeNull();
+    expect(personCameraMoves(comps, { grammar: "creator-cut", duration: 6, takeover: true })).toBeNull();
     const gen = await read("../src/llm/scene-generator.ts");
     expect(gen).toMatch(/var cameraMoves: any\[\] \| undefined = \(draft as any\)\.camera_moves\?\.length \? \(draft as any\)\.camera_moves : undefined;/);
     // A storyboard that wrote nothing but resets wrote no camera (measured: four scenes of "@3.3s reset").
