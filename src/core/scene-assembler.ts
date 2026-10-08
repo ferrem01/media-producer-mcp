@@ -41,7 +41,11 @@ const FIXED_TO_FRAME = new Set(["reel-caption-lane", "stack-list",
   // The creator formats' frames (SPEC-creator-formats.md): the proof beside
   // the person, the index reel's pinned headline and window, the tier list
   // -- they hold still while the camera punches in on the person.
-  "proof-frame", "index-reel", "tier-list"]);
+  "proof-frame", "index-reel", "tier-list",
+  // A corner logo bug is the frame's, not the world's: inside the rig the
+  // zoom into the Claude session flung the Claude + Quotient lockup off the
+  // top-left (measured, Six Tabs 16:9 proj_fedfa77c, 12.9-13.5 s).
+  "cobrand-lockup"]);
 export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
 /** The scatter caption lane (core/captions.ts, the Air cut): words around
  *  the person that stay; over a cutaway the choreography flags the window
