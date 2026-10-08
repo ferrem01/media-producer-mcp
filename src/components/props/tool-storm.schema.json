@@ -2,7 +2,7 @@
   "type": "tool-storm",
   "label": "Tool Storm",
   "category": "props",
-  "description": "The five tools as window cards multiplying over the person: five that read as a hundred. mode 'fly': the windows arrive one by one from the sides and stack loosely (the first beat, readable). mode 'ring': they circle the frame, the same five coming round again, near cards big and bright, far ones small and dim (the second beat). mode 'storm': a blizzard of cards crossing the frame on their own lines with a spin, too fast to read, with white flashes (the third beat). Lightweight cards (the tool's colour, mark and the shape of its surface; no cursors, no figures) -- or style 'logo': each piece is a white app tile holding the tool's real logo (`logos`: image srcs), no window and no name, recognised at a glance. Sized to its box; every position is a function of the card's index so the frames are the same on every seek. Meant to ride over a live-action clip of the person.",
+  "description": "The five tools as window cards multiplying over the person: five that read as a hundred. mode 'fly': the windows arrive one by one from the sides and stack loosely (the first beat, readable). mode 'ring': they circle the frame, the same five coming round again, near cards big and bright, far ones small and dim (the second beat). mode 'storm': a blizzard of cards crossing the frame on their own lines with a spin, too fast to read, with white flashes (the third beat). Lightweight cards (the tool's colour, mark and the shape of its surface; no cursors, no figures) -- or style 'logo': each piece is a white app tile holding the tool's real logo (`logos`: image srcs), no window and no name, recognised at a glance. Sized to its box; every position is a function of the card's index so the frames are the same on every seek. Meant to ride over a live-action clip of the person. COLLAPSE (relay): collapse_at folds every piece into one point (collapse_to [x, y], default the centre) over collapse_duration and leaves a glowing dot published as the anchor `core` -- the next piece is born from it with enter {effect: \"morph\", from: \"<this id>.core\"}.",
   "data": {
     "mode": {
       "type": "string",
@@ -86,6 +86,11 @@
       "label": "Duration (s)",
       "optional": true,
       "description": "Defaults to the scene's"
-    }
+    },
+    "collapse_at": { "type": "number", "label": "When every piece zings into one point and the storm folds away (s); omit to keep it", "optional": true },
+    "collapse_duration": { "type": "number", "label": "Seconds the collapse takes (default 0.5)", "optional": true },
+    "collapse_to": { "type": "array", "label": "Where it collapses, [x, y] fractions of the box (default [0.5, 0.5])", "optional": true },
+    "core_size": { "type": "number", "label": "The dot left behind, a fraction of the box's shorter side (default 0.05)", "optional": true },
+    "core_color": { "type": "string", "label": "The dot's colour (default the brand primary)", "optional": true }
   }
 }

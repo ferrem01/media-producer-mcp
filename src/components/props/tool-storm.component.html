@@ -100,6 +100,14 @@
     var slots = [];
     for (var i = 0; i < count; i++) slots.push(card(i));
     var t0 = at, tEnd = at + span;
+    // COLLAPSE (relay, Marc Oct 8: "the logos should collapse and then expand
+    // into an analytics screen"): at collapse_at every piece zings into one
+    // point and the stage shrinks into it, leaving a glowing dot -- the
+    // `core` anchor the next piece is born from
+    // (enter {effect: "morph", from: "<this id>.core"}).
+    var cAt = Number(data.collapse_at);
+    var collapse = isFinite(cAt) && cAt > t0;
+    var zoomSpan = collapse ? Math.max(0.1, cAt - t0) : span;
 
     if (mode === 'fly') {
       // One by one from alternating sides, landing in a loose stack that
@@ -112,7 +120,7 @@
         var when = t0 + step * i;
         tl.to(sl, { x: x, y: y, rotation: rot, autoAlpha: 1, scale: 1, duration: Math.min(0.55, step * 1.4) / speed, ease: 'back.out(1.4)' }, when);
       });
-      tl.to(stage, { scale: 1.03, duration: span, ease: 'none' }, t0);
+      tl.to(stage, { scale: 1.03, duration: zoomSpan, ease: 'none' }, t0);
     } else if (mode === 'ring') {
       stage.classList.add('ring');
       var R = Math.round(Math.min(boxW, boxH * 0.75) * 0.42);
@@ -148,7 +156,33 @@
         var n = Math.max(2, Math.round(span * 2.2 * speed));
         for (var f = 0; f < n; f++) { var fa = t0 + span * (f + 0.5) / n; tl.to(fl, { autoAlpha: 0.35, duration: 0.05 }, fa).to(fl, { autoAlpha: 0, duration: 0.14 }, fa + 0.05); }
       }
-      tl.to(stage, { scale: 1.06, duration: span, ease: 'none' }, t0);
+      tl.to(stage, { scale: 1.06, duration: zoomSpan, ease: 'none' }, t0);
+    }
+    if (collapse) {
+      var cDur = Number(data.collapse_duration) > 0 ? Number(data.collapse_duration) : 0.5;
+      var cto = Array.isArray(data.collapse_to) && data.collapse_to.length === 2 ? data.collapse_to.map(Number) : [0.5, 0.5];
+      var cx = (cto[0] - 0.5) * boxW, cy = (cto[1] - 0.5) * boxH;
+      // The zing: the pieces fly in one after another (fly mode places them
+      // itself; ring and storm are carried in by the stage).
+      var lead = 0;
+      if (mode === 'fly') {
+        var gap = Math.min(0.06, (cDur * 0.4) / Math.max(1, count));
+        slots.forEach(function(sl, i) {
+          tl.to(sl, { x: cx, y: cy, rotation: 0, scale: 0.3, duration: cDur * 0.7, ease: 'power3.in' }, cAt + i * gap);
+        });
+        lead = cDur * 0.45;
+      }
+      tl.to(stage, { scale: 0.02, transformOrigin: (cto[0] * 100) + '% ' + (cto[1] * 100) + '%', duration: cDur, ease: 'power3.in' }, cAt + lead);
+      tl.set(stage, { autoAlpha: 0 }, cAt + lead + cDur);
+      var cs = Math.max(8, Math.round(Math.min(boxW, boxH) * (Number(data.core_size) > 0 ? Number(data.core_size) : 0.05)));
+      var cc = String(data.core_color || 'var(--mp-color-primary, #393bf5)');
+      var core = document.createElement('div');
+      core.className = 'tsm-core';
+      core.setAttribute('data-anchor', 'core');
+      core.style.cssText = 'position:absolute;left:' + (cto[0] * 100) + '%;top:' + (cto[1] * 100) + '%;width:' + cs + 'px;height:' + cs + 'px;margin:' + (-cs / 2) + 'px 0 0 ' + (-cs / 2) + 'px;border-radius:50%;background:' + cc + ';box-shadow:0 0 ' + cs + 'px ' + Math.round(cs / 3) + 'px rgba(57,59,245,0.45);';
+      root.appendChild(core);
+      gsap.set(core, { scale: 0, autoAlpha: 0 });
+      tl.to(core, { scale: 1, autoAlpha: 1, duration: 0.2, ease: 'back.out(3)' }, cAt + lead + cDur * 0.8);
     }
     return tl;
   }
