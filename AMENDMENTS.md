@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — An overlay added to a speaker scene goes over the person
+
+Five Tools' tool-storm "just flashes for like a second" in Studio while
+`get target:'motion'` said it was visible from 1.6 s to the cut. Added by
+hand with no z, it sat at z 0 under the speaker component at z 1; the scene
+draws the person inside it (camera moves), so the windows were under him.
+The motion/layout probe renders no person, so it could not see it --
+reproduced on the composite with a stand-in take: captions over the video,
+the windows under it.
+
+- `zOverSpeaker` (core/speaker-layer.ts), applied in `addComponent`: a
+  component added without a z to a scene with a speaker gets one over the
+  highest speaker layer. Its own z, a speaker, a backdrop, or no speaker:
+  unchanged.
+- Still open: the probes should draw a stand-in for the person so a buried
+  overlay reads as hidden.
+
 ## 2026-10-08 — people-row: the hosts' faces on their names
 
 Marc on Five Tools: "When we mention scott and max ... I would love to show a
