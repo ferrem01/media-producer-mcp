@@ -617,9 +617,10 @@ export interface ScenePerformance {
    *  camera down a bright office hallway, medium-wide"). */
   shot: string;
   /** Where the voice comes from: the scene's line read in the actor's
-   *  voice ("script"), or the scene's recorded take converted to it
-   *  ("take": the delivery kept). */
-  voice_source: "script" | "take";
+   *  voice ("script"), the scene's recorded take converted to it ("take":
+   *  the delivery kept), or the recording as it is ("recording": the
+   *  speaker's own voice, no clone). */
+  voice_source: "script" | "take" | "recording";
   /** How the line is SAID when the voice reads the script: the line with
    *  delivery marks for ElevenLabs v4 -- tags in brackets ([excited],
    *  [whispers], [sighs], [laughs]), "..." and dashes for pauses, CAPITALS
@@ -668,7 +669,7 @@ export interface ScenePerformance {
   voice_url?: string;
   /** The voice last heard for the scene ("Hear the voice"): what Seedance
    *  will be given unless the line, delivery or actor change. */
-  voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take"; line?: string; delivery?: string; speed?: number; made_at: string };
+  voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take" | "recording"; line?: string; delivery?: string; speed?: number; made_at: string };
   /** What the scene's current take was made with (the plan it answers). */
   made_with?: { actor: string; engine: string; voice_id?: string; location?: string };
   /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */

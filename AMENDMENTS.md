@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Seedance performs a scene from the speaker's own voice
+
+Marc's levels of effort: no recording (the clone reads the script), a voice
+recording, a recording recast (Genjutsu), the recording as is. The second
+was missing: a recording always went through the actor's ElevenLabs clone.
+`voice_source: "recording"` (perform_scene, Studio "My recording, my own
+voice") sends the recording's voice as is; the take keeps Seedance's own
+sound. Tested by hand on proj_20a19f8f scene 2 (Higgsfield, 1080p): Seedance
+re-timed the line 0.9 s longer, so the raw voice laid under the picture
+drifts off the lips -- Marc: "a recipe for disaster"; its own re-voicing
+kept his tone and pace. Test: `test/scene-performance.test.ts`.
+
 ## 2026-10-08 — The webinar cover opens a 9:16 speaker film
 
 Marc: "can you add a 9:16 version of the email cover opener" (Dana,

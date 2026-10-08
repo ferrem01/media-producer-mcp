@@ -40,6 +40,7 @@ import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRati
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import { PERFORMER_SETTINGS, shotForSetting } from "./performer-settings.js";
 import type { ScenePerformance, CastPlan } from "./types.js";
+type VoiceSource = ScenePerformance["voice_source"];
 
 /** Where an actor stands when no shot is given. */
 export const DEFAULT_SHOT = "A selfie-style medium close-up in a bright modern office, the person talking straight to the camera";
@@ -477,16 +478,18 @@ export function deliveryText(line: string, delivery?: string): string {
 }
 
 /** The scene's voice as an MP3 at -14 LUFS (what the proven run sent). */
-async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: "script" | "take", workDir: string): Promise<{ file: string; seconds: number }> {
-  if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
-  if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice (cast update_actor voice_id)`);
+async function sceneVoice(tenant: string, projectId: string, si: number, actor: CastActor, source: VoiceSource, workDir: string): Promise<{ file: string; seconds: number }> {
+  if (source !== "recording") {
+    if (!process.env.ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not set");
+    if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice (cast update_actor voice_id)`);
+  }
   const w = (n: string) => path.join(workDir, n);
-  const said = w("said.mp3");
+  let src = w("said.mp3");
   if (source === "script") {
     const { scene } = await loadScene(tenant, projectId, si);
     const text = deliveryText(String(scene.voiceover_text || ""), scene.performance?.delivery);
     if (!text) throw new Error(`Scene ${si + 1} has no lines to read`);
-    await elevenSpeech(text, actor.voice_id, said, SCRIPT_VOICE_MODEL);
+    await elevenSpeech(text, actor.voice_id!, src, SCRIPT_VOICE_MODEL);
   } else {
     const project = await loadProject(tenant, projectId);
     const take = sceneRecording(project, si);
@@ -500,9 +503,10 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
     const end = onCut ? playClock(take, win.end) : win.end;
     await ffmpeg(["-ss", String(start), ...(end > start ? ["-to", String(end)] : []), "-i", resolveVideoPath(onCut ? cut! : raw, config.dataDir),
       "-vn", "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("take.wav")]);
-    await convertVoice(w("take.wav"), said, actor.voice_id);
+    // Marc, Oct 8: "use my real voice, not the clone" -- the recording as is.
+    if (source === "recording") src = w("take.wav");
+    else await convertVoice(w("take.wav"), src, actor.voice_id!);
   }
-  const src = said;
   const file = w("voice.mp3");
   // The scene's pace: a tempo change (pitch kept) before anyone hears it.
   const speed = voiceSpeedOf((await loadScene(tenant, projectId, si)).scene.performance);
@@ -546,7 +550,7 @@ async function useHeard(vp: NonNullable<ScenePerformance["voice_preview"]>, work
  *  first (480p); `quality: "final"` renders the draft's shot at 1080p.
  *  Returns at once; the work runs on (poll getScenePerformances). */
 export async function startScenePerformance(tenant: string, projectId: string, si: number, opts: {
-  actor?: string; shot?: string; voice_source?: "script" | "take"; quality?: "draft" | "final";
+  actor?: string; shot?: string; voice_source?: VoiceSource; quality?: "draft" | "final";
   /** Full prompts in place of the defaults ("" back to the default). */
   frame_prompt?: string; video_prompt?: string;
   /** Make it even when the pitch check would stop it. */
@@ -575,12 +579,12 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   if (engine === "heygen") return startSceneHeygen(tenant, projectId, si, actor, plan, opts);
   if (engine !== "seedance") throw new Error(`${engine} cannot perform a scene from its line (seedance or heygen)`);
   if (!process.env.ATLASCLOUD_API_KEY) throw new Error("Seedance is not set up on this server (ATLASCLOUD_API_KEY)");
-  if (!actor.voice_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice first`);
+  const source = opts.voice_source || prev?.voice_source || "script";
+  if (!actor.voice_id && source !== "recording") throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice first`);
   const quality = opts.quality === "final" ? "final" : "draft";
   const key = `${tenant}/${projectId}/${si}`;
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
   const shot = sceneShot(opts.shot, prev?.shot, scene.performer?.setting);
-  const source = opts.voice_source || prev?.voice_source || "script";
   // The location the take is made in (asked for, else the plan's), checked
   // before anything is spent. A final finishing its draft keeps the draft's.
   const finishingDraft = quality === "final" && !!prev?.draft?.draft_id && opts.location === undefined;
@@ -632,7 +636,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
  *  under HeyGen's picture (its own copy is re-encoded). No draft: HeyGen's
  *  one render is the take. Returns at once. */
 async function startSceneHeygen(tenant: string, projectId: string, si: number, actor: CastActor, plan: ResolvedPlan, opts: {
-  voice_source?: "script" | "take"; delivery?: string; motion?: string;
+  voice_source?: VoiceSource; delivery?: string; motion?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -641,7 +645,7 @@ async function startSceneHeygen(tenant: string, projectId: string, si: number, a
   const prev: ScenePerformance | undefined = scene.performance;
   const source = opts.voice_source || prev?.voice_source || "script";
   let lookVoice = "";
-  if (!actor.voice_id) {
+  if (!actor.voice_id && source !== "recording") {
     if (!actor.heygen_look_id) throw new Error(`${actor.name} has no voice: give the actor an ElevenLabs voice first`);
     if (source === "take") throw new Error(`${actor.name} has no ElevenLabs voice to convert your recording to: give the actor one, or read the script`);
     lookVoice = (await getHeygenLook(actor.heygen_look_id)).default_voice_id || "";
@@ -665,7 +669,7 @@ async function startSceneHeygen(tenant: string, projectId: string, si: number, a
     const voiceDir = path.join(projectDir(tenant, projectId), "_work", `heygen-s${si + 1}`);
     await fs.mkdir(voiceDir, { recursive: true });
     let voice: { file: string; seconds: number };
-    if (actor.voice_id) voice = await sceneVoice(tenant, projectId, si, actor, source, voiceDir);
+    if (actor.voice_id || source === "recording") voice = await sceneVoice(tenant, projectId, si, actor, source, voiceDir);
     else {
       const line = spokenParts(String((await loadScene(tenant, projectId, si)).scene.voiceover_text || "")).map((x) => x.join(" ")).join(" ... ");
       if (!line) throw new Error(`Scene ${si + 1} has no lines to read`);
@@ -700,7 +704,7 @@ async function startSceneHeygen(tenant: string, projectId: string, si: number, a
       const now = new Date().toISOString();
       p.final = { url, made_at: now };
       p.voice_url = voiceUrl;
-      p.made_with = { actor: actor.id, engine: "heygen", ...(actor.voice_id ? { voice_id: actor.voice_id } : {}) };
+      p.made_with = { actor: actor.id, engine: "heygen", ...(actor.voice_id && source !== "recording" ? { voice_id: actor.voice_id } : {}) };
       p.status = "done"; delete p.stage; p.finished_at = now;
     });
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
@@ -755,7 +759,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
       await patch(tenant, projectId, si, (p) => { p.pitch_check = check; });
       const pct = Math.round((hz / reference - 1) * 100);
       throw new Error(`Pitch check: the voice is ${hz} Hz, ${Math.abs(pct)}% ${pct < 0 ? "lower" : "higher"} than ${actor.name}'s other scenes (${reference} Hz)` +
-        `${recHz ? `; your recording is ${recHz} Hz` : ""}. Nothing was sent to Seedance. ${perf.voice_source === "take" ? "Re-record the scene in your usual voice, or make it anyway." : "Make it anyway, or change the line."}`);
+        `${recHz ? `; your recording is ${recHz} Hz` : ""}. Nothing was sent to Seedance. ${perf.voice_source !== "script" ? "Re-record the scene in your usual voice, or make it anyway." : "Make it anyway, or change the line."}`);
     }
     // The voice kept beside the take: heard, checked.
     const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
@@ -793,6 +797,9 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
   await download(result.url, path.join(assetsDir(tenant, projectId), raw));
   // The take is Seedance's own video and sound: the lips were made to it.
+  // From the recording as is, its sound is the speaker's voice re-performed
+  // -- never the recording laid under it: Seedance re-times the line (Oct 8,
+  // proj_20a19f8f scene 2: 0.9 s longer), so the raw voice drifts off the lips.
   const url = assetUrl(tenant, projectId, raw);
   const out = await attach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "seedance", quality } });
   if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
@@ -804,7 +811,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     if (quality === "draft") p.draft = { url, ...(result.draftId ? { draft_id: result.draftId } : {}), inputs, made_at: now };
     else p.final = { url, made_at: now };
     if (voiceUrl) p.voice_url = voiceUrl; else delete p.voice_url;
-    p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id ? { voice_id: actor.voice_id } : {}), ...(p.location ? { location: p.location } : {}) };
+    p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id && perf.voice_source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(p.location ? { location: p.location } : {}) };
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
 }
@@ -843,7 +850,7 @@ export async function restoreSceneTake(tenant: string, projectId: string, si: nu
  *  (cents, seconds) -- the delivery read by the script voice, or the
  *  recording converted -- kept as an asset, with its pitch. `delivery`
  *  given is kept on the scene. */
-export async function previewSceneVoice(tenant: string, projectId: string, si: number, opts: { actor?: string; voice_source?: "script" | "take"; delivery?: string;
+export async function previewSceneVoice(tenant: string, projectId: string, si: number, opts: { actor?: string; voice_source?: VoiceSource; delivery?: string;
   /** Hear the line in ANOTHER voice (the voice picker): nothing on the scene
    *  or the actor changes. */
   voice_id?: string;
