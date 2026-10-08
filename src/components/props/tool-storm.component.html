@@ -35,6 +35,8 @@
   .tsm-slide::before { content: ''; position: absolute; left: 10%; top: 12%; width: 55%; height: 10%; background: #374151; border-radius: 2px; }
   .tsm-slide::after { content: ''; position: absolute; left: 10%; right: 10%; top: 34%; bottom: 14%; border: 2px dashed #c8c6c4; }
   .tsm-body.dark { background: #f4f5f4; }
+  /* style 'logo': the tool's own logo on a white app tile -- recognised at a glance. */
+  .tsm-tile { position: absolute; inset: 0; border-radius: 22%; background: #fff center / 64% auto no-repeat; box-shadow: 0 18px 44px rgba(0,0,0,0.38), 0 1px 3px rgba(0,0,0,0.25); }
 </style>
 
 <script>
@@ -57,9 +59,14 @@
     };
     var tools = (Array.isArray(data.tools) && data.tools.length ? data.tools : ['meta-ads', 'klaviyo', 'ga4', 'sheets', 'powerpoint']).filter(function(t) { return TOOLS[t]; });
     if (!tools.length) tools = ['meta-ads'];
-    var count = Math.max(1, Math.min(80, Number(data.count) > 0 ? Math.round(Number(data.count)) : (mode === 'storm' ? 40 : mode === 'ring' ? 15 : 5)));
+    // STYLE 'logo' (Marc, Oct 8: "should they be showing the logos? ... just
+    // the logo is fine"): each piece is a white app tile with the tool's real
+    // logo, an image src -- no window, no name.
+    var logos = (Array.isArray(data.logos) ? data.logos : []).map(function(l) { return typeof l === 'string' ? l : (l && l.src); }).filter(Boolean);
+    var logoStyle = data.style === 'logo' && logos.length > 0;
+    var count = Math.max(1, Math.min(80, Number(data.count) > 0 ? Math.round(Number(data.count)) : (logoStyle && mode === 'fly' ? logos.length : mode === 'storm' ? 40 : mode === 'ring' ? 15 : 5)));
     var cwPct = Number(data.card_width) > 0 ? Number(data.card_width) : (mode === 'storm' ? 26 : mode === 'ring' ? 30 : 40);
-    var cw = Math.round(boxW * cwPct / 100), chh = Math.round(cw * 0.64);
+    var cw = Math.round(boxW * cwPct / 100), chh = Math.round(cw * (logoStyle ? 1 : 0.64));
     stage.style.setProperty('--st-cw', cw + 'px'); stage.style.setProperty('--st-ch', chh + 'px'); stage.style.setProperty('--st-fs', Math.max(9, Math.round(cw * 0.042)) + 'px');
     // A deterministic spread: the golden angle, so no two cards share a place.
     function frac(x) { return x - Math.floor(x); }
@@ -67,6 +74,13 @@
     function h2(i) { return frac((i + 1) * 0.7548776662); }
     function h3(i) { return frac((i + 1) * 0.5698402910); }
     function card(i) {
+      if (logoStyle) {
+        var ls = document.createElement('div'); ls.className = 'tsm-slot';
+        var tile = document.createElement('div'); tile.className = 'tsm-tile';
+        tile.style.backgroundImage = 'url(' + logos[i % logos.length] + ')';
+        ls.appendChild(tile); stage.appendChild(ls);
+        return ls;
+      }
       var id = tools[i % tools.length], t = TOOLS[id];
       var slot = document.createElement('div'); slot.className = 'tsm-slot';
       var c = document.createElement('div'); c.className = 'tsm-card'; c.style.setProperty('--st-acc', t.acc);
