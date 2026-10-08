@@ -22,12 +22,13 @@ describe("a start picture from another scene", () => {
     expect(otherSceneFrame(project, 0, "/a/f1.jpg", "marc")).toBeNull();     // not from the scene itself
     expect(otherSceneFrame(project, 2, "/a/none.jpg")).toBeNull();
   });
-  it("Studio offers them in the shot step, with the last frame of the scene before", async () => {
+  it("Studio offers them in the Pick one row: Start of scene N, End of the scene before, Drawn -- picked, never copied", async () => {
     const { getPreviewHtml } = await import("../src/preview-app/preview-app.js");
     const html = getPreviewHtml();
-    expect(html).toContain('<div class="pf-sub">Same as another scene</div>');
+    expect(html).not.toContain('<div class="pf-sub">Same as another scene</div>');
     expect(html).toContain("[op.actor === a.id ? op.frame : '', o.cast === a.id ? o.recast_start_frame : '']");
+    expect(html).toContain("label: f.from_scene == null ? 'Drawn' : (end ? 'End' : 'Start') + ' of scene ' + (f.from_scene + 1)");
+    expect(html).toContain("if (si > 0 && !endOf[si - 1]) picks.push({ label: 'End of scene ' + si, order: 1, end: true });");
     expect(html).toContain("{ action: 'pick', url: t.getAttribute('data-pf-adopt'), actor: actor }");
-    expect(html).toContain("'>Last frame of scene ' + si + '</button>'");
   });
 });

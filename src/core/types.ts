@@ -624,6 +624,12 @@ export interface ScenePerformance {
     /** Not drawn: the last frame of this scene's take (0-based), so the
      *  scene picks up exactly where that one ended. */
     from_scene?: number;
+    /** With from_scene: "start" -- that scene's start picture, taken as this
+     *  one's (the same place and framing); "end" (or absent) -- its last frame. */
+    from_kind?: "start" | "end";
+    /** An end frame's source: the take file and where it ends, so asking for
+     *  it again picks the same frame instead of cutting another copy. */
+    from_key?: string;
     /** The location it was drawn in. */
     location?: string }>;
   frame?: string;
