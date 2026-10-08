@@ -4212,48 +4212,15 @@ async function runUnifiedPipeline(
         project.audio = { tracks: [] };
       }
 
-      // Probe each clip duration and extend scenes if narration is longer
-      const { execFile: execFileCb } = await import("node:child_process");
-      const { promisify: promisifyFn } = await import("node:util");
-      const execFileVo = promisifyFn(execFileCb);
-
-      const voDurations: number[] = [];
-      for (let i = 0; i < project.scenes.length; i++) {
-        if (voicePaths[i]) {
-          try {
-            const probe = await execFileVo("ffprobe", [
-              "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", voicePaths[i]
-            ]);
-            const clipDur = parseFloat(probe.stdout.trim()) || 0;
-            voDurations[i] = clipDur;
-
-            // Extend scene duration if voiceover is longer (add 0.5s buffer).
-            // When a beat grid exists, extend to the next BAR boundary of the
-            // (transition + scene) segment so later cuts stay on the grid.
-            if (clipDur > project.scenes[i].duration_seconds) {
-              const oldDur = project.scenes[i].duration_seconds;
-              const needed = clipDur + 0.5;
-              if (beatMap) {
-                const trans = segmentTransitionSeconds(project.scenes[i], i);
-                const bars = Math.max(1, Math.ceil((needed + trans) / beatMap.barSec - 1e-6));
-                project.scenes[i].duration_seconds = Math.round((bars * beatMap.barSec - trans) * 100) / 100;
-              } else {
-                project.scenes[i].duration_seconds = Math.ceil(needed);
-              }
-              console.log(`  Voiceover: extended scene ${i} from ${oldDur}s to ${project.scenes[i].duration_seconds}s (clip: ${clipDur.toFixed(1)}s${beatMap ? ", bar-aligned" : ""})`);
-              // Beats follow the scene: stretch the beat timeline to the new length.
-              const sb = project.scenes[i].beats;
-              if (Array.isArray(sb) && sb.length >= 2) rescaleBeats(sb, project.scenes[i].duration_seconds);
-            }
-          } catch {
-            voDurations[i] = 0;
-          }
-        } else {
-          voDurations[i] = 0;
-        }
-      }
-
-      // Calculate cumulative start times using (potentially extended) scene durations
+      // THE NARRATION IS THE CLOCK (core/narration-fit.ts): each scene runs
+      // its line plus a breath -- shortened as well as lengthened (a scene
+      // that only grew held dead air after a short line) -- its words become
+      // the spine, and each line sits at its scene's start.
+      const { measureNarration, fitScenesToNarration } = await import("../core/narration-fit.js");
+      const lines = await Promise.all(project.scenes.map(async (s: any, i: number) =>
+        voicePaths[i] ? measureNarration(voicePaths[i], String(s.audio_hints?.voiceover_text || ""), voDir).catch(() => undefined) : undefined));
+      const fitted = fitScenesToNarration(project, lines, beatMap ? { barSec: beatMap.barSec, transitionSecOf: (i) => segmentTransitionSeconds(project.scenes[i], i) } : {});
+      for (const f of fitted) console.log(`  Voiceover: scene ${f.scene} ${f.from}s -> ${f.to}s (its line${beatMap ? ", bar-aligned" : ""})`);
       let cumulativeTime = 0;
       for (let i = 0; i < project.scenes.length; i++) {
         if (voicePaths[i]) {
@@ -4262,7 +4229,7 @@ async function runUnifiedPipeline(
             type: "voiceover" as const,
             source: voicePaths[i],
             volume: 1.0,
-            start_time: cumulativeTime,
+            start_time: Math.round(cumulativeTime * 100) / 100,
             loop: false,
           });
         }
