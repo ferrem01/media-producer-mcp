@@ -136,8 +136,11 @@
     var tall = H > W * 1.2;
     if (tall) root.classList.add('tall');
     var pad = Math.round(Math.min(W, H) * (tall ? 0.09 : 0.04));
-    var u = Math.min(W / 900, H / 820);
-    for (var i = 0; i < 40; i++) {
+    // Start large and shrink until the block fits: the measure depends on
+    // the font (Inter is far narrower than a fallback sans), so no fixed
+    // starting ratio is right for every box.
+    var u = Math.max(W, H) / 300;
+    for (var i = 0; i < 90; i++) {
       root.style.setProperty('--u', u.toFixed(3) + 'px');
       if (block.scrollHeight <= H - 2 * pad && block.scrollWidth <= W - 2 * pad) break;
       u *= 0.95;

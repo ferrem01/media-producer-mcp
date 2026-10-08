@@ -112,3 +112,22 @@ describe("the cover as a speaker film's opener", () => {
     } finally { await done(); }
   }, 60000);
 });
+
+describe("a short title card", () => {
+  it("fills its box instead of sitting tiny in the middle", async () => {
+    const { page, done } = await boot([
+      { id: "title", type: "webinar-cover", position: { x: "6%", y: "44%", width: "88%", height: "16%" }, z_index: 40,
+        data: { title: "Claude for Marketing *Analytics*", pill: "FREE LIVE WEBINAR", ground: "cream", still: true } },
+    ], process.env.MP_SHOT ? `${process.env.MP_SHOT}-card.png` : undefined, 1080, 1920);
+    try {
+      await page.evaluate(() => { (window as any).__MP_TIMELINE.time(0); });
+      const m = await page.evaluate(() => {
+        const b = document.querySelector(".wc-block")!.getBoundingClientRect();
+        const s = document.querySelector("[data-cid='title']")!.getBoundingClientRect();
+        return { bh: b.height, bw: b.width, sh: s.height, sw: s.width };
+      });
+      expect(m.bh).toBeLessThanOrEqual(m.sh);
+      expect(Math.max(m.bh / m.sh, m.bw / m.sw)).toBeGreaterThan(0.8);
+    } finally { await done(); }
+  }, 60000);
+});
