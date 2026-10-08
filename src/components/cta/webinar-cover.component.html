@@ -139,8 +139,8 @@
     // Start large and shrink until the block fits: the measure depends on
     // the font (Inter is far narrower than a fallback sans), so no fixed
     // starting ratio is right for every box.
-    var u = Math.min(W / 560, H / 560);
-    for (var i = 0; i < 60; i++) {
+    var u = Math.max(W, H) / 300;
+    for (var i = 0; i < 90; i++) {
       root.style.setProperty('--u', u.toFixed(3) + 'px');
       if (block.scrollHeight <= H - 2 * pad && block.scrollWidth <= W - 2 * pad) break;
       u *= 0.95;
