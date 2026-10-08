@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — A declined screen need casts no slate
+
+The fourth cold Six Tabs board (proj_bd43e545) was right except scene 2: the
+writer listed a screen_recording need described "not used; real stills
+only", and the board cast a full-frame "Screen recording needed" slate over
+the click-stream of real emails. `needDeclined` (core/board-standins.ts)
+drops a screen need the writer declined (n/a, "not used/needed"), and -- on
+a film no person carries -- one on a scene whose cast already shows real
+pictures; the slate cast for it goes too. A person film's needs stay: they
+are the proof the board asks the team for.
+
+## 2026-10-08 — The start frame copies the face from real photos
 ## 2026-10-08 — The start frame asks for real skin (the sheet stays the face)
 
 Marc on the CEO sit-down drafts (proj_14b6c070): "it does look like AI, not
