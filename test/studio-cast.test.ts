@@ -93,6 +93,10 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(html).toContain("if (quiet) { state.currentProject = r.project; return r; }");
     expect(html).toContain("els.playBtn.disabled = true;");
     expect(html).toContain("afterSpeakerEdit(last, all ? 0 : Math.max(0, sceneStartFor(si) - 0.5));");
+    // A scene's pace is that scene's by default; the whole film is the opt-in.
+    expect(html).toContain('<label><input type="checkbox" id="tk-pace-all"> All scenes</label>');
+    expect(html).toContain('<label><input type="checkbox" id="vl-pace-all"> All scenes</label>');
+    expect(html).not.toContain('pace-all" checked');
   });
 
   it("the take popover has one way out to a new take: Replace this take, opening the take dialog on what made it", () => {
