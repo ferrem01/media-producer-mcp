@@ -34,6 +34,8 @@ export interface Location {
   made_from: "prompt" | "frame" | "upload";
   /** Copied from a stock location (core/stock-locations.ts): its id. */
   stock?: string;
+  /** The stock set it was copied from (STOCK_REV); absent = the first, drawn set. */
+  stock_rev?: number;
   status?: "drawing" | "failed";
   error?: string;
   created_at: string;
@@ -180,17 +182,33 @@ export async function addStockLocation(tenant: string, stockId: string): Promise
   const { getStockLocation, stockLocationFile } = await import("./stock-locations.js");
   const st = getStockLocation(stockId);
   if (!st) throw new Error(`No stock location "${stockId}"`);
+  await refreshStockLocations(tenant);
   const have = (await listLocations(tenant)).find((l) => l.stock === st.id && l.image);
   if (have) return have;
+  const { STOCK_REV } = await import("./stock-locations.js");
   const loc = await edit(tenant, (list) => {
     let lid = slug(st.name);
     while (list.some((l) => l.id === lid)) lid = `${slug(st.name)}-${crypto.randomBytes(2).toString("hex")}`;
-    const made: Location = { id: lid, name: st.name, prompt: st.prompt, made_from: "upload", stock: st.id, created_at: new Date().toISOString() };
+    const made: Location = { id: lid, name: st.name, prompt: st.prompt, made_from: "upload", stock: st.id, stock_rev: STOCK_REV, created_at: new Date().toISOString() };
     list.push(made);
     return made;
   });
   const image = await savePlate(tenant, loc.id, stockLocationFile(st.id));
   return edit(tenant, (list) => { const l = list.find((x) => x.id === loc.id)!; l.image = image; return l; });
+}
+
+/** Library copies of an older stock set (the drawn plates) take the current
+ *  photo in place -- same id, so every scene that names it follows; the
+ *  tenant's name for it is kept. Cheap once done: nothing is stale. */
+export async function refreshStockLocations(tenant: string): Promise<number> {
+  const { getStockLocation, stockLocationFile, STOCK_REV } = await import("./stock-locations.js");
+  const stale = (await listLocations(tenant)).filter((l) => l.stock && l.image && (l.stock_rev || 1) < STOCK_REV && getStockLocation(l.stock));
+  for (const l of stale) {
+    const st = getStockLocation(l.stock)!;
+    const image = await savePlate(tenant, l.id, stockLocationFile(st.id));
+    await edit(tenant, (list) => { const x = list.find((y) => y.id === l.id); if (x) { x.image = image; x.prompt = st.prompt; x.stock_rev = STOCK_REV; } return x; });
+  }
+  return stale.length;
 }
 
 export async function renameLocation(tenant: string, id: string, name: string): Promise<Location> {

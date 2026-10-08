@@ -2946,7 +2946,7 @@ Rules:
         const lcTenant = decodeURIComponent(locApi[1]);
         const lcId = locApi[2];
         try {
-          const { listLocations, addLocation, addStockLocation, renameLocation, removeLocation, locationImage } = await import("./core/locations.js");
+          const { listLocations, addLocation, addStockLocation, refreshStockLocations, renameLocation, removeLocation, locationImage } = await import("./core/locations.js");
           const { STOCK_LOCATIONS, getStockLocation, stockLocationFile } = await import("./core/stock-locations.js");
           // A stock plate (core/stock-locations.ts): .../stock-<id>/image.
           if (locApi[3] && lcId && lcId.startsWith("stock-") && method === "GET") {
@@ -2964,7 +2964,10 @@ Rules:
             res.end(img);
             return;
           }
-          if (!lcId && method === "GET") { jsonResponse(res, 200, { locations: await listLocations(lcTenant), stock: STOCK_LOCATIONS.map((s) => ({ id: s.id, name: s.name })) }); return; }
+          if (!lcId && method === "GET") {
+            await refreshStockLocations(lcTenant).catch(() => 0);
+            jsonResponse(res, 200, { locations: await listLocations(lcTenant), stock: STOCK_LOCATIONS.map((s) => ({ id: s.id, name: s.name })) }); return;
+          }
           if (!lcId && method === "POST") {
             const body = await parseBody(req).catch(() => ({} as any));
             // {stock: id}: a stock place into the library (once).

@@ -52,6 +52,9 @@ describe("Studio: the Cast card", () => {
     expect(html).toContain("api('POST', '/locations/' + pfT(), { stock: t.getAttribute('data-pf-stock') })");
     expect(html).toContain("api('POST', '/locations/' + pfT(), { name: pname, prompt: pp, shape: tall ? 'tall' : 'wide' })");
     expect(html).toContain("var PF_PLACE_EXAMPLES = [");
+    // A real room photo comes first (Marc, Oct 8): uploaded, then kept as it is.
+    expect(html.indexOf('data-pf-go="roomphoto"')).toBeLessThan(html.indexOf('data-pf-place=""><span>No set place'));
+    expect(html).toContain("api('POST', '/locations/' + pfT(), { name: rname, image: up.url, clean: false })");
     expect(html).toContain("var PF_FRAMINGS = [");
     expect(html).toContain("{ action: 'frame', actor: actor, shot: rs, location: pfWhere(d, s.plan || {}, perf) }");
     // Recast and Generate keep their own place in the wizard.

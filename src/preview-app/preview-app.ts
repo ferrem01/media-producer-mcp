@@ -11755,6 +11755,10 @@ ${QUOTIENT_CSS}
         });
       });
       h += '<div class="pf-sub">1 &#183; Where</div><div class="pf-places">';
+      // A REAL room first (Marc, Oct 8: "the background is what looks the most
+      // AI created"): a phone photo of any room, kept as it is, is what made
+      // the CEO sit-down hold up.
+      h += '<button class="pf-place add photo" data-pf-go="roomphoto"><span>+ Use a photo of a room<small>a real room looks real</small></span></button>';
       h += '<button class="pf-place none' + (!where ? ' sel' : '') + '" data-pf-place=""><span>No set place<small>the words say where</small></span></button>';
       locs.forEach(function(l) {
         var img = l.image ? '<img loading="lazy" src="' + escAttr(withToken('/api/locations/' + pfT() + '/' + encodeURIComponent(l.id) + '/image')) + '" alt="">' : '<i>' + (l.status === 'failed' ? 'failed' : 'drawing&#8230;') + '</i>';
@@ -12035,6 +12039,29 @@ ${QUOTIENT_CSS}
       }
       if (go === 'rcamera') { d.rcamera = !d.rcamera; pfRender(project, panel, kind, si); return; }
       if (go === 'newplace') { d.newPlace = !d.newPlace; pfRender(project, panel, kind, si); return; }
+      if (go === 'roomphoto') {
+        // Upload the photo, then add it to the library as it is (clean: false
+        // keeps every real pixel; nothing is drawn).
+        var fin = document.createElement('input');
+        fin.type = 'file'; fin.accept = 'image/*';
+        fin.onchange = function() {
+          var f = fin.files && fin.files[0];
+          if (!f) return;
+          var base = String(f.name || '').replace(/[.][^.]+$/, '').replace(/[-_]+/g, ' ').trim();
+          var rname = !base || /^(img|pxl|dsc|dji|photo|image|screenshot)?[ 0-9]*$/i.test(base) || /^(img|pxl|dsc) ?[0-9]/i.test(base) ? 'My room' : base.slice(0, 40);
+          var ext = (String(f.name || '').match(/[.]([a-z0-9]+)$/i) || [])[1] || 'jpg';
+          pfSay(panel, 'Uploading the photo…');
+          fetch(withToken('/api/upload-asset/' + pfT() + '/' + pfP(project) + '?name=' + encodeURIComponent('room-' + Date.now() + '.' + ext.toLowerCase())), { method: 'POST', body: f })
+            .then(function(r) { return r.json().then(function(j) { if (!r.ok || !j.url) throw new Error(j.error || ('upload failed (' + r.status + ')')); return j; }); })
+            .then(function(up) { return api('POST', '/locations/' + pfT(), { name: rname, image: up.url, clean: false }); })
+            .then(function(loc) {
+              d.loc = loc.id; d.newPlace = false;
+              return pfLoad(project, true).then(function() { pfRender(project, panel, kind, si); pfSay(panel, loc.name + ' is in your locations: rename it there any time.'); });
+            }).catch(function(e) { pfSay(panel, e.message || String(e), true); });
+        };
+        fin.click();
+        return;
+      }
       if (go === 'drawplace') {
         var pp = (d.place_prompt || '').trim();
         if (!pp) { pfSay(panel, 'Describe the place first, or pick an example.', true); return; }

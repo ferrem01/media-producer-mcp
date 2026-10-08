@@ -1921,7 +1921,7 @@ export function createMcpServer(): McpServer {
       shot: z.string().optional().describe("start_frame / perform_scene / actor_clip: where the actor is and what they do ('walks toward the camera down a bright office hallway, medium-wide'). recast with Higgsfield: the shot the recording is performed in ('seated at a table in a bright office, medium-wide') -- a start picture of the actor is drawn for it and only the performance comes from the recording; omitted, the last recast's shot or the scene's setting; '' = the recording's own camera. Other vendors ignore it (HeyGen: the look is the setting; Kling / Runway: the recording's camera)."),
       voice_source: z.enum(["script", "take"]).optional().describe("perform_scene: the scene's line read in the actor's voice (script, default), or the scene's recording converted to it (take)."),
       quality: z.enum(["draft", "final"]).optional().describe("perform_scene: draft (480p preview, default) or final (the draft's shot at 1080p)."),
-      stock: z.string().optional().describe("add_location: a STOCK place's id (action='locations' lists them: bright-office, home-office, living-room, kitchen, podcast-studio, cafe, meeting-room, park, studio) -- copied into the library once, no drawing."),
+      stock: z.string().optional().describe("add_location: a STOCK place's id (action='locations' lists them: living-room, home-office, bright-office, executive-office, dark-studio, kitchen, podcast-studio, cafe, meeting-room, studio, park -- real photos of real rooms) -- copied into the library once, no drawing."),
       frame_url: z.string().optional().describe("pick_frame: which drawn frame the scene uses (from action='scenes'). recast with Higgsfield and a shot: the drawn start picture to perform in (start_frame first, look at it, then recast with its url) -- else one is drawn."),
       frame_prompt: z.string().optional().describe("start_frame / perform_scene: the WHOLE prompt GPT Image draws the start frame from, in place of the default built from the shot (action='scenes' shows the default). '' goes back to the default."),
       video_prompt: z.string().optional().describe("perform_scene: the WHOLE prompt Seedance gets, in place of the default built from the shot (action='scenes' shows it). Name the references @Image1 (the first frame), @Image2 (the sheet), @Audio1 (the voice), or they are named for you. '' goes back to the default."),
@@ -2051,9 +2051,10 @@ export function createMcpServer(): McpServer {
             return ok({ scenes: await setSceneCast(t, pid, [si], c === "film" ? undefined : c === "recording" ? null : c) });
           }
           case "locations": {
-            const { listLocations } = await import("./core/locations.js");
+            const { listLocations, refreshStockLocations } = await import("./core/locations.js");
             const { STOCK_LOCATIONS } = await import("./core/stock-locations.js");
             // The stock places too: add_location with stock:<id> copies one in.
+            await refreshStockLocations(t).catch(() => 0);
             return ok({ locations: await listLocations(t), stock: STOCK_LOCATIONS.map((s) => ({ id: s.id, name: s.name, prompt: s.prompt })) });
           }
           case "add_location": {
