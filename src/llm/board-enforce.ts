@@ -40,6 +40,20 @@ export function briefTargetSeconds(brief: string | undefined | null): number | u
   return n >= 5 && n <= 180 ? n : undefined;
 }
 
+/** The pace a brief asks for ("fast-paced", "punchy" / "calm", "slow"). */
+export function briefPacing(brief: string | undefined | null): "slow" | "moderate" | "fast" {
+  const b = String(brief || "").toLowerCase();
+  if (/\bfast(?:[- ]paced| pace)?\b|\bquick\b|\bpunchy\b|\brapid\b|\bhigh[- ]energy\b/.test(b)) return "fast";
+  if (/\bslow(?:[- ]paced)?\b|\bcalm\b|\bunhurried\b/.test(b)) return "slow";
+  return "moderate";
+}
+
+/** The narrator's read speed for a pace. Marc, Oct 8: the default read "was
+ *  a little slow ... one sixty words per minute"; his clone at 1.2 was right. */
+export function narrationSpeed(pacing: string | undefined): number {
+  return pacing === "fast" ? 1.2 : pacing === "slow" ? 0.95 : 1.1;
+}
+
 const spokenWords = (line: string) => line.replace(/\*/g, "").replace(/\(pause\)/gi, " ").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
 /** How long a scene runs for a line before the voice exists. */

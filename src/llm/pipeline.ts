@@ -35,7 +35,7 @@ import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
 import { getRecipe, recipeForFormat, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces, holdSettingToRecipe, holdUseToRecipe } from "../core/recipes.js";
 import { recipeWantsVoice } from "./storyboard-builder.js";
-import { enforceBoard, captionVoicedBoard } from "./board-enforce.js";
+import { enforceBoard, captionVoicedBoard, briefPacing, narrationSpeed } from "./board-enforce.js";
 import { ownMusicBed, MUSIC_BED_ID } from "../audio/music-generate.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane, peopleDisplay } from "../core/captions.js";
@@ -2258,6 +2258,7 @@ function storyboardToSaved(
   storyboard: { name: string; scenes: Array<any> },
   voice?: string,
   musicMood?: string,
+  pacing: "slow" | "moderate" | "fast" = "moderate",
 ): Storyboard {
   return {
     narrative: storyboard.name,
@@ -2308,7 +2309,7 @@ function storyboardToSaved(
       // "corporate" was a hardcoded legacy default that contradicted it.
       music_mood: musicMood || "corporate",
       ...(voice ? { voice } : {}),
-      pacing: "moderate",
+      pacing,
     },
     estimated_duration: storyboard.scenes.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0),
   };
@@ -2821,6 +2822,8 @@ async function runUnifiedPipeline(
   }
 
   const boardWarnings: string[] = [];
+  // THE FILM'S PACE: the approved board's, else what the brief asks for.
+  const filmPacing = ((opts.presetStoryboard as any)?.audio?.pacing as "slow" | "moderate" | "fast" | undefined) || briefPacing(opts.brief || opts.prompt);
   // ── THE BOARD IS ENFORCED, NOT WARNED ABOUT (llm/board-enforce.ts) ──
   // The brief's numbered lines on their beats, each voiced scene sized to its
   // line (the cast's times scaled with it), one quiet sound a scene. Not on a
@@ -3286,7 +3289,7 @@ async function runUnifiedPipeline(
   if (opts.storyboardOnly) {
     // The board's own none outlives the redraft (see the music choice above).
     const keptMood = opts.boardMusicMood === "none" ? "none" : treatment?.audioSystem?.music_mood;
-    project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood);
+    project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood, filmPacing);
     project.prompt = opts.prompt;
     // THE BRIEF SURVIVES: the first prompt is the brief; a redraft passes it
     // through. The board is then checked against what the brief locked.
@@ -4232,8 +4235,11 @@ async function runUnifiedPipeline(
 
       // The storyboard's pacing as a read speed (ElevenLabs reads at a
       // natural pace; "fast" is the creator pace a performed scene uses).
-      const pacing = (project.storyboard?.audio?.pacing || "moderate") as string;
-      const voSpeed = pacing === "fast" ? 1.15 : pacing === "slow" ? 0.92 : 1.05;
+      // The board's pacing (a build from the board carries it; a fresh one
+      // reads the brief). The working copy has no board yet, so reading
+      // project.storyboard here always gave "moderate" (Six Tabs relay,
+      // proj_bd43e545: "fast pace" in the brief, read at 1.05).
+      const voSpeed = narrationSpeed(filmPacing);
 
       const voicePaths = await generateSceneVoiceovers({
         scenes: voiceoverInputs,
@@ -4255,8 +4261,12 @@ async function runUnifiedPipeline(
       const { measureNarration, fitScenesToNarration } = await import("../core/narration-fit.js");
       const lines = await Promise.all(project.scenes.map(async (s: any, i: number) =>
         voicePaths[i] ? measureNarration(voicePaths[i], String(s.audio_hints?.voiceover_text || ""), voDir).catch(() => undefined) : undefined));
-      const fitted = fitScenesToNarration(project, lines, beatMap ? { barSec: beatMap.barSec, transitionSecOf: (i) => segmentTransitionSeconds(project.scenes[i], i) } : {});
-      for (const f of fitted) console.log(`  Voiceover: scene ${f.scene} ${f.from}s -> ${f.to}s (its line${beatMap ? ", bar-aligned" : ""})`);
+      // THE VOICE CUTS A VOICED FILM, not the music's bars: rounding each scene
+      // up to a bar of the library pick added up to a bar a scene (Six Tabs
+      // relay: 22.5 s of lines built as 30.9 s), and the film's own bed is
+      // made to its length afterwards.
+      const fitted = fitScenesToNarration(project, lines);
+      for (const f of fitted) console.log(`  Voiceover: scene ${f.scene} ${f.from}s -> ${f.to}s (its line)`);
       let cumulativeTime = 0;
       for (let i = 0; i < project.scenes.length; i++) {
         if (voicePaths[i]) {
@@ -4422,7 +4432,7 @@ async function runUnifiedPipeline(
   }
   // The board's own none outlives the build (see the music choice above).
   const keptMood = opts.boardMusicMood === "none" ? "none" : treatment?.audioSystem?.music_mood;
-  project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood);
+  project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood, filmPacing);
   project.prompt = opts.prompt;
   project.brief = opts.brief || project.brief || opts.prompt;
   project.status = "generated";

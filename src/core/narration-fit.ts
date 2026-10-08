@@ -33,15 +33,9 @@ export function narrationTrackScene(id: unknown): number | null {
 }
 
 /** How long a scene runs for a line: the line plus the breath, never under
- *  the floor; on a beat grid, rounded up to the bar (with the transition). */
-export function sceneLengthForLine(lineSeconds: number, opts: { barSec?: number; transitionSec?: number } = {}): number {
-  const needed = Math.max(NARRATION_MIN_S, lineSeconds + NARRATION_TAIL_S);
-  if (opts.barSec && opts.barSec > 0) {
-    const trans = opts.transitionSec || 0;
-    const bars = Math.max(1, Math.ceil((needed + trans) / opts.barSec - 1e-6));
-    return Math.round((bars * opts.barSec - trans) * 100) / 100;
-  }
-  return Math.round(needed * 100) / 100;
+ *  the floor. The voice cuts the film; a bar grid does not round it up. */
+export function sceneLengthForLine(lineSeconds: number): number {
+  return Math.round(Math.max(NARRATION_MIN_S, lineSeconds + NARRATION_TAIL_S) * 100) / 100;
 }
 
 /** Measure one line: its length, and its words on the script (whisper where
@@ -73,14 +67,13 @@ export async function measureNarration(file: string, script: string, cacheDir: s
 export function fitScenesToNarration(
   project: Project,
   lines: Array<NarrationLine | undefined>,
-  opts: { barSec?: number; transitionSecOf?: (i: number) => number } = {},
 ): Array<{ scene: number; from: number; to: number }> {
   const changes: Array<{ scene: number; from: number; to: number }> = [];
   project.scenes.forEach((sc: any, i: number) => {
     const line = lines[i];
     if (!line || !(line.duration > 0)) return;
     const from = Number(sc.duration_seconds) || 0;
-    const to = sceneLengthForLine(line.duration, { barSec: opts.barSec, transitionSec: opts.transitionSecOf?.(i) });
+    const to = sceneLengthForLine(line.duration);
     sc.duration_seconds = to;
     if (Array.isArray(sc.beats) && sc.beats.length >= 2) rescaleBeats(sc.beats, to);
     if (line.spine) { sc.spine = { ...line.spine, duration: to }; applySpine(sc, sc.spine); }

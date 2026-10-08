@@ -605,7 +605,13 @@ export async function queueBuildFromStoryboard(
           // bed came back reverted, mix settings and all. Generated
           // VOICEOVER is new every build and must come through; the MUSIC
           // lane is the one the human owns.
-          const priorMusic = (origProject.audio?.tracks || []).filter((t: any) => t.type === "music");
+          // ...but only a bed a PERSON chose (Studio's picker writes
+          // project.music; the audio tool's generate_music marks the track
+          // chosen). The bed the board drafted with is the pipeline's own
+          // pick: kept, it beat the film's generated bed (proj_bd43e545,
+          // Oct 8: the Jamendo pick from the storyboard pass shipped).
+          const personChose = (origProject.music && origProject.music.source !== "auto") || (origProject.audio?.tracks || []).some((t: any) => t.type === "music" && t.chosen);
+          const priorMusic = personChose ? (origProject.audio?.tracks || []).filter((t: any) => t.type === "music") : [];
           // The build ran in a WORKING COPY (a fresh project dir); every
           // reference into it -- b-roll, generated stills, voiceover, the
           // take -- is retargeted to the original, whose files are copied
@@ -3254,6 +3260,7 @@ export function createMcpServer(): McpServer {
         }
         const track = placeMusicBed(project as any, {
           source: made.file,
+          chosen: true,
           volume: params.track?.volume ?? 0.14,
           start_time: params.track?.start_time ?? 0,
           ...(made.seconds ? { duration: made.seconds } : {}),

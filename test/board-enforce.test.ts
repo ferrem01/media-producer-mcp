@@ -174,3 +174,20 @@ describe("captions show the name, the voice says it", () => {
     expect(scenes[0].components.map((c: any) => c.type)).toEqual(["cta-card", "reel-caption-lane"]);
   });
 });
+
+describe("the pace the brief asks for", () => {
+  it("reads fast / slow from the brief, and the narrator reads at that pace", async () => {
+    const { briefPacing, narrationSpeed } = await import("../src/llm/board-enforce.js");
+    expect(briefPacing("a ~22 s vertical ad. Fast pace, ONE continuous take")).toBe("fast");
+    expect(briefPacing("a calm 60 s tutorial")).toBe("slow");
+    expect(briefPacing("a webinar promo")).toBe("moderate");
+    expect(narrationSpeed("fast")).toBe(1.2);
+    expect(narrationSpeed("moderate")).toBe(1.1);
+    const fs = await import("node:fs/promises");
+    const p = await fs.readFile("src/llm/pipeline.ts", "utf8");
+    expect(p).toMatch(/const voSpeed = narrationSpeed\(filmPacing\);/);
+    expect(p).toMatch(/const fitted = fitScenesToNarration\(project, lines\);/);
+    const srv = await fs.readFile("src/server.ts", "utf8");
+    expect(srv).toMatch(/const priorMusic = personChose \?/);
+  });
+});

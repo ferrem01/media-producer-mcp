@@ -459,6 +459,9 @@ export interface AudioTrack {
   loop?: boolean;
   fade_in?: number;
   fade_out?: number;
+  /** A music bed a person chose or made for this film (the audio tool's
+   *  generate_music, Studio's music picker): a rebuild keeps it. */
+  chosen?: boolean;
 }
 
 export interface AudioDucking {

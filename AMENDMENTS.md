@@ -6,6 +6,39 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The first build of the cold Six Tabs board: own music, the voice's pace, no bar rounding
+
+Building proj_bd43e545 (the fourth cold board) shipped a Jamendo bed and ran
+30.9 s for 22.5 s of lines. Three causes, all fixed:
+
+- **The board's auto-pick beat the film's own bed.** The storyboard pass
+  attaches the pipeline's music pick to the project; the build-from-board
+  path kept "the project's own music bed" over the rebuild -- a rule meant
+  for a bed a person chose -- so the generated bed was thrown away. It now
+  keeps a prior bed only when a person chose it (Studio's picker writes
+  `project.music`; `generate_music` marks the track `chosen`).
+- **Bar rounding on voiced films.** `fitScenesToNarration` rounded each scene
+  up to a bar of the library pick -- up to a bar a scene. The voice cuts a
+  voiced film; the bar option is gone (`sceneLengthForLine(seconds)`).
+- **The pace was always "moderate".** The voice speed read
+  `project.storyboard.audio.pacing` on a working copy that has no board yet,
+  and `storyboardToSaved` hard-coded "moderate". The pace now comes from the
+  approved board, else the brief (`briefPacing`: "fast pace" -> fast), and
+  `narrationSpeed` reads fast 1.2 / moderate 1.1 / slow 0.95 (Marc: the old
+  default read slow; his clone at 1.2 was right).
+
+## 2026-10-08 — A declined screen need casts no slate
+
+The fourth cold Six Tabs board (proj_bd43e545) was right except scene 2: the
+writer listed a screen_recording need described "not used; real stills
+only", and the board cast a full-frame "Screen recording needed" slate over
+the click-stream of real emails. `needDeclined` (core/board-standins.ts)
+drops a screen need the writer declined (n/a, "not used/needed"), and -- on
+a film no person carries -- one on a scene whose cast already shows real
+pictures; the slate cast for it goes too. A person film's needs stay: they
+are the proof the board asks the team for.
+
+## 2026-10-08 — The start frame copies the face from real photos
 ## 2026-10-08 — The start frame asks for real skin (the sheet stays the face)
 
 Marc on the CEO sit-down drafts (proj_14b6c070): "it does look like AI, not
