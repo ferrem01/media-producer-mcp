@@ -6,6 +6,20 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Captions show the name the voice says; the writer's captions go
+
+Third cold Six Tabs run (proj_80559109), with the brand library filled: real
+headshots and names, the real analytics report, a caption lane on every
+scene. Two misses: the writer still cast its own caption-kinetic-slam with
+the whole line on all six scenes, and the lane read "Max DAA-vish".
+
+- `captionVoicedBoard` drops every writer `caption-*` component when it
+  casts the lane.
+- `captionLane` takes `display` (the brand's people with a spoken form,
+  `peopleDisplay(brandKit)`): the caption text shows "Max Davish" while its
+  anchors follow the spoken "DAA-vish". Both caption paths (person films and
+  voiced films) pass it.
+
 ## 2026-10-08 — Silent b-roll asks Seedance for no sound
 
 Marc's CEO sit-down test (proj_14b6c070): the walk-in-and-sit b-roll came back
