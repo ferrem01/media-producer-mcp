@@ -69,6 +69,7 @@ export function fitScenesToNarration(
   lines: Array<NarrationLine | undefined>,
 ): Array<{ scene: number; from: number; to: number }> {
   const changes: Array<{ scene: number; from: number; to: number }> = [];
+  const before = sceneWindows(project);
   project.scenes.forEach((sc: any, i: number) => {
     const line = lines[i];
     if (!line || !(line.duration > 0)) return;
@@ -98,5 +99,32 @@ export function fitScenesToNarration(
     if (si != null && si < starts.length) tr.start_time = starts[si];
     if (tr.type === "music" && Number(tr.duration) > total) tr.duration = total;
   }
+  retimeSoundTracks(project, before);
   return changes;
+}
+
+/** Each scene's [start, length] on the film's content clock. */
+export function sceneWindows(project: Project): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  let t = 0;
+  for (const sc of project.scenes as any[]) { const d = Number(sc.duration_seconds) || 0; out.push([t, d]); t += d; }
+  return out;
+}
+
+/** A sound effect placed at a film time rides with its scene when the scenes
+ *  re-time: it keeps its offset into the scene it sat in (clamped inside the
+ *  scene if the scene got shorter). Without this a re-fit left the whoosh of
+ *  the morph and the hit of the click where the old scenes were. */
+export function retimeSoundTracks(project: Project, before: Array<[number, number]>): void {
+  const after = sceneWindows(project);
+  if (!before.length || before.length !== after.length) return;
+  for (const tr of (project.audio?.tracks || []) as any[]) {
+    if (tr.type !== "sfx" || typeof tr.start_time !== "number") continue;
+    let si = before.findIndex(([s, d], i) => tr.start_time >= s && (tr.start_time < s + d || i === before.length - 1));
+    if (si < 0) si = 0;
+    const local = Math.max(0, tr.start_time - before[si][0]);
+    const [ns, nd] = after[si];
+    const moved = ns + Math.min(local, Math.max(0, nd - 0.05));
+    tr.start_time = Math.round(moved * 100) / 100;
+  }
 }

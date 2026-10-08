@@ -462,6 +462,15 @@ export interface AudioTrack {
   /** A music bed a person chose or made for this film (the audio tool's
    *  generate_music, Studio's music picker): a rebuild keeps it. */
   chosen?: boolean;
+  /** A scene's voice line (`vo_scene_<i>`): the words it reads, the voice
+   *  and pace it was read with -- what Studio's voice card re-reads from
+   *  (core/voice-lines.ts). */
+  text?: string;
+  voice?: string;
+  speed?: number;
+  /** The line is the person's own recording: the file as recorded (what
+   *  plays is made from it, levelled and paced). */
+  take?: string;
 }
 
 export interface AudioDucking {

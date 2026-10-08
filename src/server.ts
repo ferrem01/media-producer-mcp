@@ -81,7 +81,7 @@ function canvasFor(frame: Frame | undefined, w?: number, h?: number): Canvas {
 
 import { normalizeBeats } from "./core/beats.js";
 import { normalizeSpeakerPipRefs } from "./core/scene-assembler.js";
-import { speak, VOICE_DESCRIBE } from "./audio/tts.js";
+import { speak, voiceSpeed, VOICE_DESCRIBE } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
 import { generateSfx } from "./audio/sfx-generate.js";
@@ -3275,17 +3275,9 @@ export function createMcpServer(): McpServer {
       }
 
       if (params.action === "fit_voiceover") {
-        const { measureNarration, fitScenesToNarration, narrationTrackScene } = await import("./core/narration-fit.js");
-        const tracks = (project.audio?.tracks || []) as any[];
-        const cacheDir = path.join(projectAssetsDir(params.tenant_id, params.project_id), "audio");
-        const lines = await Promise.all(project.scenes.map(async (sc: any, i: number) => {
-          const tr = tracks.find((t) => narrationTrackScene(t.id) === i);
-          if (!tr?.source) return undefined;
-          const script = String(sc.audio_hints?.voiceover_text || project.storyboard?.scenes?.[i]?.voiceover_text || "");
-          return measureNarration(resolveVideoPath(tr.source, config.dataDir), script, cacheDir).catch(() => undefined);
-        }));
-        if (!lines.some(Boolean)) return err("No narration to fit: the film has no vo_scene_<i> voice tracks");
-        const changes = fitScenesToNarration(project, lines);
+        const { fitFilmToVoice } = await import("./core/voice-lines.js");
+        const changes = await fitFilmToVoice(project, config.dataDir, path.join(projectAssetsDir(params.tenant_id, params.project_id), "audio"));
+        if (!changes) return err("No narration to fit: the film has no vo_scene_<i> voice tracks");
         await saveProject(project);
         return ok({
           fitted: changes,
@@ -3385,6 +3377,10 @@ export function createMcpServer(): McpServer {
           source,
           volume: params.track.volume ?? 1.0,
           start_time: params.track.start_time,
+          // A read line keeps what it was read from (Studio's voice card re-reads it).
+          ...(params.track.type === "voiceover" && params.track.text && !params.track.source
+            ? { text: params.track.text, ...(params.track.voice || project.brand_kit?.voice ? { voice: params.track.voice || project.brand_kit?.voice } : {}), speed: voiceSpeed(params.track.speed) }
+            : {}),
           ...(params.track.trim_start !== undefined ? { trim_start: params.track.trim_start } : {}),
           ...(params.track.duration !== undefined ? { duration: params.track.duration } : {}),
           loop: params.track.loop,
@@ -3407,6 +3403,11 @@ export function createMcpServer(): McpServer {
             await speak({ text: params.track.text, out: outputPath, voice: params.track.voice || project.brand_kit?.voice, speed: params.track.speed, tenant: params.tenant_id });
           } catch (e: any) { return err(`Voiceover: ${e.message}`); }
           existing.source = outputPath;
+          existing.text = params.track.text;
+          const v = params.track.voice || project.brand_kit?.voice;
+          if (v) existing.voice = v; else delete existing.voice;
+          existing.speed = voiceSpeed(params.track.speed);
+          delete existing.take;
         }
 
         if (params.track.volume !== undefined) existing.volume = params.track.volume;

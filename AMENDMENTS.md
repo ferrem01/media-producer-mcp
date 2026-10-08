@@ -6,6 +6,30 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — A voice-only film's lines are edited like a take
+
+Marc on proj_f5c104bb: "when you have a speaker track that's voice only ...
+you can't change its pacing. And ... there's no re-record. You can't select
+the layer like you can when the speaker is a video." Clicking the voice
+lane, or the voice icon, said "This film has no speaker voice to set."
+
+- Studio draws each scene's `vo_scene_<i>` line as a piece on the speaker
+  lane. Clicking it opens a card like the take card with: Pace (1x-1.2x,
+  All scenes), the words with a Re-read button, Record it yourself (the mic,
+  then Stop uploads it), and Level. The voice icon's card sets the lines'
+  level.
+- `POST /api/voice-line` (`core/voice-lines.ts`) re-reads a line, or takes
+  the recording, then re-fits the film (`fitFilmToVoice`, shared with the
+  audio tool's fit_voiceover). A recording is kept as `take` and re-paced
+  from itself.
+- A voice line remembers what it was read from (`text`, `voice`, `speed` on
+  the track; set by the build and by `audio add`/`update`), so a re-read
+  keeps the voice.
+- A re-fit moves each sound effect with its scene (`retimeSoundTracks`);
+  before, a fit left the whoosh and the click hit where the old scenes were.
+- `/api/speaker-level` sets the voice lines' level on a film with no
+  speaker track.
+
 ## 2026-10-08 — Adding a track with a known id replaces it
 
 Re-voicing vo_scene_2 on proj_f5c104bb with `audio add` stacked three copies

@@ -4275,6 +4275,10 @@ async function runUnifiedPipeline(
             type: "voiceover" as const,
             source: voicePaths[i],
             volume: 1.0,
+            // What the line was read from, so Studio's voice card can re-read it.
+            text: String(voiceoverInputs[i].voiceover_text || "").trim(),
+            ...(opts.voice || project.brand_kit?.voice ? { voice: String(opts.voice || project.brand_kit?.voice) } : {}),
+            speed: voSpeed,
             start_time: Math.round(cumulativeTime * 100) / 100,
             loop: false,
           });
