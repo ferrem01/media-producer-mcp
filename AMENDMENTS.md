@@ -6,16 +6,16 @@ session can pick up mid-thread.
 
 ---
 
-## 2026-10-08 — The start frame copies the face from real photos
+## 2026-10-08 — The start frame asks for real skin (the sheet stays the face)
 
 Marc on the CEO sit-down drafts (proj_14b6c070): "it does look like AI, not
-the movements ... the texture, the quality of the picture". The start frame
-was drawn from the portrait, the model sheet (itself a drawing) and the room,
-so the face came one generation removed and smoothed. `drawFrame` now sends
-the actor's real photos too (portrait, photos, sheet, room), and
-`framePrompt` says the face is copied from the photos while the sheet is used
-only for clothes and angles. Every frame now asks for a cinema-camera look:
-true-to-life skin with pores, not airbrushed, subtle film grain.
+the movements ... the texture, the quality of the picture". `framePrompt` now
+asks every frame for a cinema-camera look: true-to-life skin with pores, not
+airbrushed, subtle film grain. Briefly (#1155) the actor's raw photos were
+sent beside the sheet too; reverted -- "the whole point of creating the model
+sheet is so that that's what gets passed in, not the actual photos". It also
+pulled the wardrobe from the photos. Marc's other note: the dark, backlit set
+is itself a realism risk (a real dark set needs a frontal key on the face).
 
 ## 2026-10-08 — Captions show the name the voice says; the writer's captions go
 
