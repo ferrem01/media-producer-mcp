@@ -117,6 +117,11 @@ describe("a scene performed by a cast actor", () => {
     const { framePrompt } = await import("../src/core/scene-performance.js");
     expect(framePrompt("Sitting on a couch, wide shot", true, true)).toMatch(/Sitting on a couch, wide shot\. A vertical photograph from a real camera, framed exactly as described/);
     expect(framePrompt("x", true, true)).not.toMatch(/head and shoulders/);
+    // Real photos carry the face; the drawn sheet only the clothes and angles.
+    const real = framePrompt("Seated in an armchair, medium shot", false, true, true, 5);
+    expect(real).toMatch(/^The person in the first 6 reference images -- real photos of them: copy the face exactly/);
+    expect(real).toMatch(/The next reference image is their character sheet, a drawing: use it only for their clothes .* never for the skin\. The last reference image is the room/);
+    expect(real).toMatch(/true-to-life skin with pores.*not airbrushed.*subtle film grain/);
     expect(s0.performance.frames).toHaveLength(1);
     expect(s0.performance.frame).toMatch(/^\/assets\/t\/projects\/proj_perf\/assets\/frame-dana-.*\.jpg$/);
     const probe = await run("ffmpeg", ["-hide_banner", "-i", path.join(DATA, s0.performance.frame.replace(/^\/assets\//, ""))]).then(() => "", (e: any) => String(e.stderr));

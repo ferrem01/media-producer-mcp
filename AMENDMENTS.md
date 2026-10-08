@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The start frame copies the face from real photos
+
+Marc on the CEO sit-down drafts (proj_14b6c070): "it does look like AI, not
+the movements ... the texture, the quality of the picture". The start frame
+was drawn from the portrait, the model sheet (itself a drawing) and the room,
+so the face came one generation removed and smoothed. `drawFrame` now sends
+the actor's real photos too (portrait, photos, sheet, room), and
+`framePrompt` says the face is copied from the photos while the sheet is used
+only for clothes and angles. Every frame now asks for a cinema-camera look:
+true-to-life skin with pores, not airbrushed, subtle film grain.
+
 ## 2026-10-08 — Captions show the name the voice says; the writer's captions go
 
 Third cold Six Tabs run (proj_80559109), with the brand library filled: real

@@ -135,18 +135,25 @@ function followPlan(scene: any, project: any, want: Partial<CastPlan>, before: R
 }
 
 /** The start frame prompt: the same person, in this shot, at this shape. */
-export function framePrompt(shot: string, vertical: boolean, sheet: boolean, location = false): string {
-  const refs = location
-    ? (sheet ? "the first two reference images (their portrait and their character sheet)" : "the first reference image")
-    : `the reference image${sheet ? "s (the first is their portrait, the second their character sheet)" : ""}`;
-  return `The exact same person as in ${refs}: ` +
-    "the same face, hair, skin, clothes and accessories. " +
+export function framePrompt(shot: string, vertical: boolean, sheet: boolean, location = false, photos = 0): string {
+  // The face comes from REAL photos when the actor has them (the portrait
+  // and up to five more): the sheet is itself a drawing, and a face copied
+  // from a drawing came out smoothed -- Marc, Oct 8: "it does look like AI
+  // ... the texture, the quality of the picture".
+  const who = photos > 0
+    ? `The person in the first ${photos + 1} reference images -- real photos of them: copy the face exactly from these photos (bone structure, skin, lines, stubble, hair), nothing smoothed or idealised. ` +
+      (sheet ? "The next reference image is their character sheet, a drawing: use it only for their clothes and how they look from other angles, never for the skin. " : "")
+    : `The exact same person as in ${location
+      ? (sheet ? "the first two reference images (their portrait and their character sheet)" : "the first reference image")
+      : `the reference image${sheet ? "s (the first is their portrait, the second their character sheet)" : ""}`}: the same face, hair, skin, clothes and accessories. `;
+  return who +
     (location ? "The last reference image is the room they are in: keep that exact room -- the same walls, furniture, plants, windows, art and light -- seen from where this shot needs. " : "") +
     `${shot.trim().replace(/\.?$/, ".")} ` +
     // Framed as the shot says: a wide couch shot must not be pulled into a
     // close-up (Marc, Oct 4: "further back from camera ... sitting in a couch").
-    `A ${vertical ? "vertical" : "horizontal"} photograph from a real camera, framed exactly as described, the face clearly visible, ` +
-    "realistic skin texture, natural light, no text, no logos.";
+    `A ${vertical ? "vertical" : "horizontal"} photograph from a real camera, framed exactly as described, the face clearly visible. ` +
+    "Shot on a cinema camera with a 35-50mm lens: true-to-life skin with pores, fine lines and natural imperfections, not airbrushed, no plastic sheen, not CGI; " +
+    "motivated natural light, real contrast, subtle film grain. No text, no logos.";
 }
 
 /** A written prompt: undefined keeps what the scene has, "" goes back to the
@@ -174,12 +181,12 @@ function setLocation(p: ScenePerformance, v: string | undefined): boolean {
 }
 
 /** The prompts a scene uses unless it says otherwise: built from the shot. */
-export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, room = false, location = false): { frame_prompt: string; video_prompt: string } {
-  return { frame_prompt: framePrompt(shot, vertical, sheet, location), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot)}` };
+export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, room = false, location = false, photos = 0): { frame_prompt: string; video_prompt: string } {
+  return { frame_prompt: framePrompt(shot, vertical, sheet, location, photos), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot)}` };
 }
 
-/** Draw the actor in a shot (GPT Image from the portrait and sheet, a
- *  location's plate when given), cut to the film's shape; an asset url.
+/** Draw the actor in a shot (GPT Image from the portrait, the actor's real
+ *  photos and the sheet, a location's plate when given), cut to the film's shape; an asset url.
  *  Seedance's start frame, and a Higgsfield recast's (core/recast.ts). */
 export async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string, locationAbs?: string): Promise<string> {
   const vertical = height > width;
@@ -187,7 +194,12 @@ export async function drawFrame(tenant: string, projectId: string, actor: CastAc
   const work = path.join(projectDir(tenant, projectId), "_work");
   await fs.mkdir(work, { recursive: true });
   const drawn = path.join(work, `frame-${stamp()}.png`);
-  await editImage({ prompt: prompt || framePrompt(shot, vertical, !!sheetAbs, !!locationAbs), images: [portraitPath(tenant, actor), ...(sheetAbs ? [sheetAbs] : []), ...(locationAbs ? [locationAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
+  const photos: string[] = [];
+  for (const rel of actor.photos || []) {
+    const abs = path.join(config.dataDir, tenant, rel);
+    if (await fs.access(abs).then(() => true, () => false)) photos.push(abs);
+  }
+  await editImage({ prompt: prompt || framePrompt(shot, vertical, !!sheetAbs, !!locationAbs, photos.length), images: [portraitPath(tenant, actor), ...photos, ...(sheetAbs ? [sheetAbs] : []), ...(locationAbs ? [locationAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
   // Cut to the film's exact shape (2:3 drawn, 9:16 wanted), centred.
   const name = `frame-${actor.id}-${stamp()}.jpg`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
@@ -933,7 +945,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
-    const defaults = defaultPrompts(sceneShot(undefined, s.performance?.shot, s.performer?.setting), vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location);
+    const defaults = defaultPrompts(sceneShot(undefined, s.performance?.shot, s.performer?.setting), vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location, pa?.photos?.length || 0);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;
