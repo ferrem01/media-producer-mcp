@@ -168,7 +168,7 @@ describe("a scene performed by a cast actor", () => {
     expect(atlas[0]).toMatchObject({ draft: false, resolution: "720p", duration: 6 });
     expect(atlas[0].reference_audios).toBeUndefined();
     expect(atlas[0].prompt).toMatch(/move naturally the whole time, from the very first frame/);   // a silent cutaway still moves
-    expect(atlas[0].prompt).toMatch(/no music/);
+    expect(atlas[0].generate_audio).toBe(false); // silent b-roll asks for no sound: the invented audio is what Seedance's copyright filter blocked
     const proj = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P, "project.json"), "utf8"));
     const comp = proj.scenes[1].components.find((c: any) => c.data?.actor_clip === "dana");
     expect(comp).toMatchObject({ type: "video", enter: { effect: "cut", at: 1.5 }, exit: { effect: "cut", at: 7.5 }, data: { object_fit: "cover", at: 1.5, exit_at: 7.5 } });

@@ -52,7 +52,7 @@ export function silentPrompt(shot: string): string {
   return "The person from the first frame and the character sheet (the same face, hair, clothes and accessories). " +
     `${shot.trim().replace(/\.?$/, ".")} ` +
     "They move naturally the whole time, from the very first frame -- gesturing, shifting, reacting, talking if the shot says so; never a held pose. " +
-    "Realistic body movement and weight, natural light, cinematic, no text on screen. Sound: quiet room tone, no music (the clip plays silent under the scene's voice).";
+    "Realistic body movement and weight, natural light, cinematic, no text on screen.";
 }
 
 async function poll(id: string, headers: Record<string, string>): Promise<SeedanceResult> {
@@ -91,7 +91,7 @@ async function submit(body: Record<string, unknown>, what: string): Promise<stri
 
 /** One Seedance 2.5 reference-to-video call. `images` by public URL (the
  *  start frame first, then the sheet); `audio` the voice (omitted: a silent
- *  shot, the model's room tone). */
+ *  shot, no audio made at all). */
 export async function seedanceShot(opts: {
   images: string[]; audio?: string; prompt: string; seconds: number; ratio: string;
   /** The last image is the room reference (labelled so in the prompt). */
@@ -110,7 +110,10 @@ export async function seedanceShot(opts: {
       duration: Math.max(4, Math.min(30, Math.ceil(opts.seconds))),
       ratio: opts.ratio,
       resolution: opts.resolution || (opts.draft === false ? "1080p" : "480p"),
-      generate_audio: true,
+      // Sound only for a speaking shot: a silent shot (b-roll) plays muted
+      // under the scene's voice, and the audio Seedance invents for it was
+      // what its copyright filter blocked (Marc's walk-in, Oct 8).
+      generate_audio: !!opts.audio,
       watermark: false,
       draft: opts.draft !== false,
     }, "seedance submit");
