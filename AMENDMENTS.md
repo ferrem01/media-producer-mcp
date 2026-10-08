@@ -6,6 +6,12 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The caption lane's emphasis ink is settable
+
+Prerna on the Six Tabs 16:9: "FREE WEBINAR IN ORANGE". reel-caption-lane takes
+`accent` (a CSS colour) for its *starred* words; default the brand primary.
+Test: `test/caption-accent.test.ts`.
+
 ## 2026-10-08 — Captions sit in the lower third, never mid-frame
 
 Marc: "I just don't want the caption to be in the dead center of the screen
