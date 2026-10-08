@@ -29,36 +29,7 @@
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       svg.setAttribute('preserveAspectRatio', 'none');
       svg.style.display = 'block';
-      var ink = String(data.pattern_color || '#b48a6e');
-      var op = data.pattern_opacity !== undefined && isFinite(Number(data.pattern_opacity)) ? Number(data.pattern_opacity) : 0.32;
-      var N = 34, STEPS = 90, S = Math.min(W, H);
-      var out = '';
-      // Two families: the main band sweeping down-right through the middle,
-      // and a fainter echo rising into the lower-right corner.
-      var bands = [
-        { n: N, c0: 0.30, c1: 0.80, bow: 0.14, spread0: 0.20, spread1: 0.46, alpha: 1 },
-        { n: Math.round(N * 0.6), c0: 1.08, c1: 0.84, bow: -0.05, spread0: 0.14, spread1: 0.28, alpha: 0.6 },
-      ];
-      for (var b = 0; b < bands.length; b++) {
-        var B = bands[b];
-        for (var i = 0; i < B.n; i++) {
-          var t = B.n > 1 ? i / (B.n - 1) : 0.5;
-          var d = '';
-          for (var k = 0; k <= STEPS; k++) {
-            var u = k / STEPS;
-            var centre = H * (B.c0 + (B.c1 - B.c0) * u) + H * B.bow * Math.sin(u * Math.PI * 1.7 + 0.4);
-            var spread = H * (B.spread0 + (B.spread1 - B.spread0) * (0.5 - 0.5 * Math.cos(u * Math.PI)));
-            var ripple = S * 0.012 * Math.sin(u * 7.5 + t * 2.6);
-            var y = centre + (t - 0.5) * spread + ripple;
-            d += (k ? 'L' : 'M') + (u * W).toFixed(1) + ' ' + y.toFixed(1);
-          }
-          // Lines thin out toward the band's edges, so it reads as one form.
-          var edge = 1 - Math.pow(Math.abs(t - 0.5) * 2, 2.2) * 0.75;
-          out += '<path d="' + d + '" fill="none" stroke="' + ink + '" stroke-width="' + (S / 1080 * 1.1).toFixed(2) +
-            '" stroke-opacity="' + (op * B.alpha * edge).toFixed(3) + '"/>';
-        }
-      }
-      svg.innerHTML = out;
+      svg.innerHTML = window.mpWavesSvg ? mpWavesSvg(W, H, { color: data.pattern_color, opacity: data.pattern_opacity }) : '';
     }
     return gsap.timeline();
   }

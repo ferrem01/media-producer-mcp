@@ -13,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LIB = path.resolve(__dirname, "../src/components");
 const src = (cat: string, type: string) => fs.readFile(path.join(LIB, cat, `${type}.component.html`), "utf-8");
 
-async function boot(components: any[], shot?: string) {
+async function boot(components: any[], shot?: string, W = 1920, H = 1080) {
   const scene = { id: "s", label: "s", duration_seconds: 4, background: "#f4efe1", components };
   const html = await assembleScene({ scene: scene as any,
     components: [
@@ -22,11 +22,11 @@ async function boot(components: any[], shot?: string) {
       { type: "cobrand-lockup", source: await src("media", "cobrand-lockup") },
     ],
     brandKit: { colors: { primary: "#393bf5", background: "#ffffff", text: "#17171c" }, fonts: [] } as any,
-    canvas: { width: 1920, height: 1080 } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap") } as any);
+    canvas: { width: W, height: H } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap") } as any);
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "wcover-"));
   await fs.writeFile(path.join(tmp, "s.html"), html);
   const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const page = await browser.newPage({ viewport: { width: W, height: H } });
   await page.goto(`file://${path.join(tmp, "s.html")}`);
   await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 30000 });
   return { page, done: async () => { if (shot) await page.screenshot({ path: shot }); await browser.close(); await fs.rm(tmp, { recursive: true, force: true }); } };
@@ -87,4 +87,28 @@ describe("the co-brand lockup holds still", () => {
     const { isFixedToFrame } = await import("../src/core/scene-assembler.js");
     expect(isFixedToFrame("cobrand-lockup")).toBe(true);
   });
+});
+
+describe("the cover as a speaker film's opener", () => {
+  it("brings its own cream sheet with the waves and fits a tall frame", async () => {
+    const { page, done } = await boot([
+      { id: "cover", type: "webinar-cover", position: { x: 0, y: 0, width: "100%", height: "100%" }, z_index: 50,
+        data: { ...COVER, title: "Claude for\nMarketing\n*Analytics*", ground: "waves", still: true } },
+    ], process.env.MP_SHOT ? `${process.env.MP_SHOT}-tall.png` : undefined, 1080, 1920);
+    try {
+      await page.evaluate(() => { (window as any).__MP_TIMELINE.time(0); });
+      const m = await page.evaluate(() => {
+        const g = document.querySelector(".wc-ground") as HTMLElement;
+        const b = document.querySelector(".wc-block")!.getBoundingClientRect();
+        return { ground: getComputedStyle(g).display, bg: getComputedStyle(g).backgroundColor,
+          waves: document.querySelectorAll(".wc-waves path").length, l: b.left, r: b.right, t: b.top, bt: b.bottom, w: b.width };
+      });
+      expect(m.ground).toBe("block");
+      expect(m.bg).toBe("rgb(244, 239, 225)");
+      expect(m.waves).toBeGreaterThan(20);
+      expect(m.l).toBeGreaterThanOrEqual(0);
+      expect(m.r).toBeLessThanOrEqual(1080);
+      expect(m.w).toBeGreaterThan(1080 * 0.6);   // the cover owns the frame, not a postage stamp
+    } finally { await done(); }
+  }, 60000);
 });

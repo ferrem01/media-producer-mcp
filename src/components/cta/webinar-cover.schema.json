@@ -2,7 +2,7 @@
   "type": "webinar-cover",
   "label": "Webinar Cover",
   "category": "cta",
-  "description": "An event's own cover (the email header, the social card) as a live card, left-aligned like the cover: a pill ('FREE WEBINAR'), a kicker ('A live, 45-minute session'), the big title with one *word* in the accent italic, the line under it, a rule, and the date and time on tinted icon tiles. Open a film on it (still:true: the first frame is the cover) and close on it again with button_text (the same cover with the register button). Leave the speakers off; people-row names them. Type sizes from the box.",
+  "description": "An event's own cover (the email header, the social card) as a live card, left-aligned like the cover: a pill ('FREE WEBINAR'), a kicker ('A live, 45-minute session'), the big title with one *word* in the accent italic, the line under it, a rule, and the date and time on tinted icon tiles. Open a film on it (still:true: the first frame is the cover) and close on it again with button_text (the same cover with the register button). ground 'waves' gives the card its own cream sheet with the announce email's waves, so it stands full-frame over footage (the opener of a speaker film: exit slide-up on a word to reveal the person). Leave the speakers off; people-row names them. Type sizes from the box.",
   "data": {
     "title": {
       "type": "string",
@@ -67,6 +67,21 @@
         "left",
         "center"
       ]
+    },
+    "ground": {
+      "type": "string",
+      "label": "The card's own sheet: 'none' (default, the scene's ground shows) | 'cream' | 'waves' (cream with the announce email's waves) -- use over footage",
+      "optional": true,
+      "enum": [
+        "none",
+        "cream",
+        "waves"
+      ]
+    },
+    "ground_tone": {
+      "type": "string",
+      "label": "Sheet colour with ground (default cream #f4efe1)",
+      "optional": true
     },
     "still": {
       "type": "boolean",
