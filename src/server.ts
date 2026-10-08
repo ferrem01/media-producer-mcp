@@ -2257,13 +2257,14 @@ export function createMcpServer(): McpServer {
       if (params.action === "look") {
         const { activeTake } = await import("./core/take-needs.js");
         const { takeCopies } = await import("./core/speaker-layer.js");
-        const { queueTakeGrade } = await import("./core/take-grade.js");
+        const { queueTakeGrade, markLookPending } = await import("./core/take-grade.js");
         const lk = params.look || "soft";
         const take = activeTake(project, Number(params.scene_index ?? 0));
         if (!take) return err(`Scene ${Number(params.scene_index ?? 0) + 1} has no take`);
         const raw = takeCopies(take).raw;
         if (!raw.startsWith(`/assets/${project.tenant_id}/projects/${project.project_id}/assets/`)) return err("The take is not a file of this project");
         const strength = lk === "soft" ? (params.strength ?? 0.5) : undefined;
+        await markLookPending(project.tenant_id, project.project_id, raw, lk, strength);
         queueTakeGrade({
           tenantId: project.tenant_id, projectId: project.project_id, rawUrl: raw, look: lk, strength, correct: params.correct, fill: params.fill, dataDir: config.dataDir,
           resolvePath: (u) => resolveVideoPath(u, config.dataDir), loadProject: (t, p) => loadProject(t, p), saveProject,

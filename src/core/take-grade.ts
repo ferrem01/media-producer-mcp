@@ -35,6 +35,7 @@ import { queueTakeMatte } from "./take-matte.js";
 import { takeCopies, syncSpeakerClips, missingSpeakerCopies } from "./speaker-layer.js";
 import { ensureSpeakerNeeds } from "./take-needs.js";
 import { takeJobSet, takeJobDone, markTakeJobError } from "./take-jobs.js";
+import { withProjectLock } from "./project-lock.js";
 
 export interface TakeGradeJob {
   tenantId: string;
@@ -68,6 +69,23 @@ export function takeGradeRunning(tenantId: string, projectId: string, rawUrl: st
   return running.has(key) || waiting.has(key);
 }
 
+/** Record the look a person asked for on every take cut from `rawUrl`,
+ *  before its grade lands: Studio's inspector shows it (with "applying")
+ *  instead of the look the file still has. The grade clears it. */
+export async function markLookPending(tenantId: string, projectId: string, rawUrl: string, look: TakeLook, strength?: number): Promise<void> {
+  const { loadProject, saveProject } = await import("../persistence/project.js");
+  await withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return;
+    for (const t of (project.takes || []) as any[]) {
+      if (takeCopies(t).raw !== rawUrl) continue;
+      t.look_pending = look === "soft" ? { look, strength } : { look };
+    }
+    project.updated_at = new Date().toISOString();
+    await saveProject(project);
+  });
+}
+
 export function queueTakeGrade(job: TakeGradeJob): void {
   const key = `${job.tenantId}/${job.projectId}/${job.rawUrl}`;
   const what = [job.look === "soft" ? `soft ${Math.round((job.strength ?? 0.5) * 100)}` : "natural", ...(typeof job.fill === "number" ? [`fill ${Math.round(job.fill * 100)}`] : [])];
@@ -85,52 +103,59 @@ export function queueTakeGrade(job: TakeGradeJob): void {
         look: job.look, strength: job.strength, currentLook, correct, fill,
         stats: owner?.grade?.measured, face: owner?.face,
       });
-      const project = await job.loadProject(job.tenantId, job.projectId);
-      if (!project) return;
-      const ungradedUrl = job.rawUrl.replace(/[^/]+$/, path.basename(g.ungraded));
-      const stamp = new Date().toISOString();
+      // Applied under the film's lock, on a fresh read: only this take's
+      // fields change, whatever else saved while the grade ran.
       const rematte = { blur: false, alpha: false };
       let owned = 0;
-      for (const t of project.takes || []) {
-        if (takeCopies(t).raw !== job.rawUrl) continue;
-        t.look = g.look;
-        if (g.look === "soft") t.soft_strength = g.strength; else delete t.soft_strength;
-        t.ungraded = ungradedUrl;
-        if (g.baseSoft) t.ungraded_soft = true;
-        t.graded_at = stamp;
-        if (g.correct) delete t.correct; else t.correct = false;
-        // The dial as set (0 = off); a take that had no face to fill keeps
-        // the setting, and `fill_applied` says what the encode did.
-        if (typeof job.fill === "number") t.fill = job.fill;
-        t.fill_applied = g.fill;
-        // What the correction measured (kept either way: a later "on" reuses
-        // it) and what it applied.
-        const measured = g.studio?.measured || t.grade?.measured;
-        if (g.studio) {
-          const { notes, ...applied } = g.studio.applied;
-          t.grade = { measured, ...applied, notes };
-        } else if (measured) t.grade = { measured, off: true };
-        else delete t.grade;
-        // The copies were cut from the old grade: drop them; the matte
-        // makes them again from this one. A clip playing a dropped copy goes
-        // back to the raw take first (left on the copy, no take owned it).
-        for (const c of project.speaker_track?.clips || []) {
-          if (c.source && (c.source === t.blur || c.source === t.alpha)) c.source = job.rawUrl;
+      const saved = await withProjectLock(job.tenantId, job.projectId, async () => {
+        const project = await job.loadProject(job.tenantId, job.projectId);
+        if (!project) return false;
+        const ungradedUrl = job.rawUrl.replace(/[^/]+$/, path.basename(g.ungraded));
+        const stamp = new Date().toISOString();
+        for (const t of project.takes || []) {
+          if (takeCopies(t).raw !== job.rawUrl) continue;
+          t.look = g.look;
+          delete t.look_pending;
+          if (g.look === "soft") t.soft_strength = g.strength; else delete t.soft_strength;
+          t.ungraded = ungradedUrl;
+          if (g.baseSoft) t.ungraded_soft = true;
+          t.graded_at = stamp;
+          if (g.correct) delete t.correct; else t.correct = false;
+          // The dial as set (0 = off); a take that had no face to fill keeps
+          // the setting, and `fill_applied` says what the encode did.
+          if (typeof job.fill === "number") t.fill = job.fill;
+          t.fill_applied = g.fill;
+          // What the correction measured (kept either way: a later "on" reuses
+          // it) and what it applied.
+          const measured = g.studio?.measured || t.grade?.measured;
+          if (g.studio) {
+            const { notes, ...applied } = g.studio.applied;
+            t.grade = { measured, ...applied, notes };
+          } else if (measured) t.grade = { measured, off: true };
+          else delete t.grade;
+          // The copies were cut from the old grade: drop them; the matte
+          // makes them again from this one. A clip playing a dropped copy goes
+          // back to the raw take first (left on the copy, no take owned it).
+          for (const c of project.speaker_track?.clips || []) {
+            if (c.source && (c.source === t.blur || c.source === t.alpha)) c.source = job.rawUrl;
+          }
+          if (t.blur) { delete t.blur; }
+          if (t.alpha) { delete t.alpha; }
+          owned++;
         }
-        if (t.blur) { delete t.blur; }
-        if (t.alpha) { delete t.alpha; }
-        owned++;
-      }
-      syncSpeakerClips(project);
-      ensureSpeakerNeeds(project);
-      markTakeJobError(project, job.rawUrl, "grade", null, (t) => takeCopies(t).raw);
-      for (const t of project.takes || []) {
-        if (takeCopies(t).raw !== job.rawUrl) continue;
-        const m = missingSpeakerCopies(project, t);
-        rematte.blur = rematte.blur || m.blur; rematte.alpha = rematte.alpha || m.alpha;
-      }
-      project.updated_at = stamp;
-      await job.saveProject(project);
+        syncSpeakerClips(project);
+        ensureSpeakerNeeds(project);
+        markTakeJobError(project, job.rawUrl, "grade", null, (t) => takeCopies(t).raw);
+        for (const t of project.takes || []) {
+          if (takeCopies(t).raw !== job.rawUrl) continue;
+          const m = missingSpeakerCopies(project, t);
+          rematte.blur = rematte.blur || m.blur; rematte.alpha = rematte.alpha || m.alpha;
+        }
+        project.updated_at = stamp;
+        await job.saveProject(project);
+        return true;
+      });
+      if (!saved) return;
       // A take cut by hand plays cut copies of the old grade: cut the new one.
       await recutProjectTakes(job.tenantId, job.projectId, job.dataDir).catch((e) => console.warn(`  take grade: re-cutting failed: ${e?.message || e}`));
       const studioNote = g.studio ? `, studio ${g.studio.applied.filter === "null" ? "clean (nothing to correct)" : `wb ${g.studio.applied.wb.join("/")} skin ${g.studio.applied.skin} ev ${g.studio.applied.ev} curve ${g.studio.applied.contrast}`}` : g.correct ? ", studio skipped" : ", studio off";
@@ -146,11 +171,17 @@ export function queueTakeGrade(job: TakeGradeJob): void {
     } catch (e: any) {
       console.warn(`  take grade failed for ${path.basename(job.rawUrl)}: ${e?.message || e}`);
       try {
-        const project = await job.loadProject(job.tenantId, job.projectId);
-        if (project && markTakeJobError(project, job.rawUrl, "grade", String(e?.message || e), (t) => takeCopies(t).raw)) {
-          project.updated_at = new Date().toISOString();
-          await job.saveProject(project);
-        }
+        await withProjectLock(job.tenantId, job.projectId, async () => {
+          const project = await job.loadProject(job.tenantId, job.projectId);
+          if (!project) return;
+          // The asked-for look never landed: the inspector shows the take as it is.
+          let changed = false;
+          for (const t of project.takes || []) if (takeCopies(t).raw === job.rawUrl && t.look_pending) { delete t.look_pending; changed = true; }
+          if (markTakeJobError(project, job.rawUrl, "grade", String(e?.message || e), (t) => takeCopies(t).raw) || changed) {
+            project.updated_at = new Date().toISOString();
+            await job.saveProject(project);
+          }
+        });
       } catch { /* the log line above is the record */ }
     } finally {
       running.delete(key);

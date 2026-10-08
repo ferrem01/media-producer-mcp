@@ -982,6 +982,10 @@ export interface Take {
   look?: "natural" | "soft";
   /** The soft look's skin smoothing, 0-1 (0: the mild base alone). */
   soft_strength?: number;
+  /** The look a person asked for while its grade runs (about a minute):
+   *  Studio shows it, with "applying", instead of the look the file still
+   *  has. The grade clears it when it lands (or fails). */
+  look_pending?: { look: "natural" | "soft"; strength?: number };
   /** The ungraded original, kept beside the take so a re-grade starts clean. */
   ungraded?: string;
   /** The kept original already carries the soft base (a take graded before

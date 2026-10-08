@@ -4444,10 +4444,21 @@ ${QUOTIENT_CSS}
       // THE SOFT LOOK, ON A DIAL (core/take-grade.ts): the take behind this
       // scene, re-graded from its kept original in the background.
       var lookTake = sceneTakeFor(state.currentSceneIndex);
-      if (lookTake) {
-        var lookOn = lookTake.look === 'soft';
-        var lookS = typeof lookTake.soft_strength === 'number' ? lookTake.soft_strength : (lookOn ? 0 : 0.5);
-        html += '<div class="prop-row"><label class="prop-label" title="Skin smoothing and warmth on the take. Re-graded from the original in about a minute; every scene cut from the same recording follows.">soft look</label>' +
+      // A RECAST plays a vendor's drawing of the actor (HeyGen draws the
+      // whole person from the voice), not the recording: the soft look and
+      // the fill light grade the recording, so on a recast they did nothing
+      // (Marc, Oct 8, proj_3bd9cad6). Say so instead of offering them.
+      var lookClip = ((project.speaker_track && project.speaker_track.clips) || []).filter(function(c) { return c.scene_index === state.currentSceneIndex; })[0];
+      var lookRecast = !!(lookTake && lookClip && /\\.actor-/.test(String(lookClip.source || '')));
+      if (lookTake && lookRecast) {
+        html += '<div class="prop-row"><label class="prop-label">soft look</label><span style="font-size:12px;color:var(--content-secondary);">This scene plays a recast — the soft look and fill light grade your recording, so they don’t apply here.</span></div>';
+      } else if (lookTake) {
+        // THE ASKED-FOR LOOK while its grade runs (look_pending): the box
+        // shows what was clicked, with "applying", not the file's old look.
+        var lookPend = lookTake.look_pending;
+        var lookOn = (lookPend ? lookPend.look : lookTake.look) === 'soft';
+        var lookS = lookPend && typeof lookPend.strength === 'number' ? lookPend.strength : typeof lookTake.soft_strength === 'number' ? lookTake.soft_strength : (lookOn ? 0 : 0.5);
+        html += '<div class="prop-row"><label class="prop-label" title="Skin smoothing and warmth on the take. Re-graded from the original in about a minute; every scene cut from the same recording follows.">soft look' + (lookPend ? ' <span class="prop-soft-pend" style="font-weight:400;color:var(--content-tertiary);">applying…</span>' : '') + '</label>' +
           '<input type="checkbox" class="prop-soft-on"' + (lookOn ? ' checked' : '') + ' style="flex:0 0 auto;margin-right:8px;">' +
           '<input type="range" class="prop-soft" min="0" max="1" step="0.05" value="' + lookS + '"' + (lookOn ? '' : ' disabled') + ' style="flex:1;min-width:0;" title="light \u2194 strong smoothing">' +
           '<span class="prop-soft-val" style="flex:0 0 34px;text-align:right;font-size:11px;color:var(--content-secondary);">' + Math.round(lookS * 100) + '</span></div>';
@@ -4538,6 +4549,10 @@ ${QUOTIENT_CSS}
         softDial.disabled = !on;
         api('POST', '/take-look/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id), on ? { scene_index: siL, look: 'soft', strength: st } : { scene_index: siL, look: 'natural' })
           .then(function(r) {
+            // Held here at once too (the server keeps it as look_pending): the
+            // inspector re-opens on what was clicked, not the file's old look.
+            var tkL = sceneTakeFor(siL);
+            if (tkL) tkL.look_pending = on ? { look: 'soft', strength: st } : { look: 'natural' };
             var sc = (r.scenes || []).length > 1 ? 'Scenes ' + r.scenes.join(', ') : 'Scene ' + (siL + 1);
             studioStatus(sc + ': ' + (on ? 'smoothing at ' + Math.round(st * 100) : 'soft look off') + ' \u2014 about a minute; the preview refreshes when it lands.', 'ok');
           })

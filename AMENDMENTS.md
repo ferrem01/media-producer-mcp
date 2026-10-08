@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The soft look sticks; a recast says it isn't graded
+
+Marc on proj_3bd9cad6: "I tried to unclick [the soft look] and it claims to
+have removed it ... when I open the inspector again it is checked again."
+- The look was saved only when its grade landed (~a minute): re-opened before
+  then, the inspector showed the old look. Now the asked-for look is saved at
+  once as `look_pending` (Studio endpoint and edit_speaker look), the
+  inspector shows it with "applying…", and the grade clears it (or a failure
+  does).
+- Each grade saved the WHOLE project: two at once on one film, the later save
+  undid the earlier. A per-film lock (`core/project-lock.ts`) now serializes
+  the grade's apply step and the pending write, on a fresh read.
+- A scene that plays a RECAST (a vendor's drawing of the actor) is not
+  touched by the grade of the recording: the inspector says so instead of
+  offering the soft look and fill light.
+Test: `test/take-look-sticks.test.ts`.
+
 ## 2026-10-08 — The caption lane's emphasis ink is settable
 
 Prerna on the Six Tabs 16:9: "FREE WEBINAR IN ORANGE". reel-caption-lane takes
