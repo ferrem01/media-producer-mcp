@@ -254,7 +254,7 @@ export function ensureStoryboardScene(project: Project, sceneIndex: number): Sto
     project.storyboard = {
       narrative: "",
       scenes: [],
-      audio: { music_mood: "", voice: "nova", pacing: "moderate" },
+      audio: { music_mood: "", pacing: "moderate" },
       estimated_duration: project.scenes.reduce((s, sc) => s + (sc.duration_seconds || 0), 0),
     } as Storyboard;
   }

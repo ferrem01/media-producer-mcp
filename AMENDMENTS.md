@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Every narration is ElevenLabs; the OpenAI voices are gone
+
+Marc: "OpenAI's voice sucks ... we should be using one of the many 11 labs
+voices ... remove any of that OpenAI voice code" and "pick a standard
+elevenlabs as the default."
+
+- `audio/tts.ts` is now the one narration path: `speak` reads a line in an
+  ElevenLabs voice -- a stock name (`STOCK_VOICES`, default `brian`), a cast
+  actor id (their clone) or a voice id -- on the performed-scene model, with
+  a read speed and -14 LUFS. The OpenAI TTS call, its model/apiKey options and
+  `generateTTS` are deleted, and so is yesterday's `audio/clone-voice.ts`
+  (folded in: `track.voice` takes an actor now; `voice_id`/`actor` are gone).
+- Scene narration (`generateSceneVoiceovers`), the audio tool, `generate`'s
+  `audio_system.voice` and the brand kit's voice all take that one setting.
+  The flat `generate.voice` param is removed (audio_system.voice was already
+  the axis); no "nova" default is written anywhere -- unset means the brand
+  kit's voice, else `brian`.
+- Saved films and kits that still say alloy/echo/fable/onyx/nova/shimmer read
+  as a stock voice (`LEGACY_VOICES`); the brand page picker lists the stock
+  voices.
+- CLAUDE.md gains the clean-up rule: a replacement deletes the old path in
+  the same PR.
+
 ## 2026-10-08 — A voiceover in a cloned voice
 
 Marc: "voice six tabs with my clone." A film's narration could only be read

@@ -30,6 +30,15 @@ the **environment gotchas** that will otherwise cost you an hour.
   `add`, `delete`, or the board's `sfx` edit. The board alone does not
   change the film.
 
+## Keep the codebase clean (hard rule)
+
+When something replaces an old path, the SAME PR deletes the old one: every
+caller, schema option, UI control, test and doc line that pointed at it. No
+"kept for compatibility" code unless saved data still needs it, and then only
+a small converter where the old data is read (e.g. `LEGACY_VOICES` in
+`audio/tts.ts`). Marc, Oct 8: "we start things and then we don't ... go clean
+up all the places that they are ... and then we never delete the old stuff."
+
 ## What this is
 
 An MCP server that generates videos/images/decks from a text prompt. Stack:

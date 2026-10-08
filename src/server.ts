@@ -81,13 +81,11 @@ function canvasFor(frame: Frame | undefined, w?: number, h?: number): Canvas {
 
 import { normalizeBeats } from "./core/beats.js";
 import { normalizeSpeakerPipRefs } from "./core/scene-assembler.js";
-import { generateTTS } from "./audio/tts.js";
+import { speak, VOICE_DESCRIBE } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
 import { generateSfx } from "./audio/sfx-generate.js";
 import { generateMusic } from "./audio/music-generate.js";
-import { speakInVoice, resolveCloneVoice } from "./audio/clone-voice.js";
-import { getActor } from "./core/cast.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
@@ -581,7 +579,7 @@ export async function queueBuildFromStoryboard(
         project_id: project.project_id,
         voiceover: wantVoiceover,
         backgroundMusic: wantMusic,
-        voice: (opts.voice as any) || (project.storyboard!.audio.voice as any),
+        voice: opts.voice || project.storyboard!.audio.voice,
         sceneCount: project.storyboard!.scenes.length,
         // BUILD THE BOARD, DON'T REDRAFT IT: the approved storyboard goes in
         // verbatim, and the saved full treatment replaces a fresh concept
@@ -754,7 +752,7 @@ export async function queueStoryboardGeneration(params: {
   audio_system?: import("./llm/creative-director.js").AudioSystem;
   max_revisions?: number;
   voiceover?: boolean;
-  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
+  voice?: string;
 }): Promise<{ job: { id: string } } | { error: string }> {
   let llmConfig;
   try {
@@ -861,7 +859,6 @@ export async function queueStoryboardGeneration(params: {
       maxRevisions: params.max_revisions,
       project_id: params.project_id,
       voiceover: params.voiceover,
-      voice: params.voice,
       storyboardOnly: true,
       brief: redraftBrief,
     });
@@ -1484,7 +1481,7 @@ export function createMcpServer(): McpServer {
               scenes: [],
               audio: {
                 music_mood: params.storyboard.audio?.music_mood || "corporate",
-                voice: params.storyboard.audio?.voice || "nova",
+                ...(params.storyboard.audio?.voice ? { voice: params.storyboard.audio.voice } : {}),
                 pacing: (params.storyboard.audio?.pacing as any) || "moderate",
               },
               estimated_duration: params.storyboard.estimated_duration || 0,
@@ -3208,10 +3205,8 @@ export function createMcpServer(): McpServer {
         source: z.string().optional().describe("Audio file path. Omit for voiceover with text."),
         sfx: z.string().optional().describe("A sound effect id from action='search_sfx' (e.g. 'house-whoosh-soft', 'freesound-12345'). The file is copied into the project and becomes this track's source -- pass type 'sfx' and a start_time."),
         text: z.string().optional().describe("Text to generate TTS voiceover from (type must be voiceover)"),
-        voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice (default: nova)"),
-        voice_id: z.string().optional().describe("Voiceover with text: read it in this ElevenLabs voice (a clone) instead of the stock TTS voice"),
-        actor: z.string().optional().describe("Voiceover with text: read it in this cast actor's ElevenLabs voice (e.g. 'marc' -- the person's own clone)"),
-        speed: z.number().min(0.8).max(1.25).optional().describe("Voiceover read in a voice_id/actor voice: tempo, pitch kept (1.1-1.25 is a fast creator pace)"),
+        voice: z.string().optional().describe(`Voiceover with text: who reads it. ${VOICE_DESCRIBE} Unset: the brand kit's voice, else the default.`),
+        speed: z.number().min(0.8).max(1.25).optional().describe("Voiceover with text: read speed, pitch kept (1.1-1.25 is a fast creator pace)"),
         volume: z.number().min(0).max(1).optional(),
         start_time: z.number().optional(),
         trim_start: z.number().min(0).optional().describe("Skip this many seconds of the source before it plays -- land a song's drop on the film's beat (music: the drop at source 17.0 s on film 11.25 s = trim_start 5.75)."),
@@ -3318,18 +3313,9 @@ export function createMcpServer(): McpServer {
           await fs.mkdir(audioDir, { recursive: true });
 
           const outputPath = path.join(audioDir, `${params.track.id}.mp3`);
-          if (params.track.voice_id || params.track.actor) {
-            try {
-              const voiceId = await resolveCloneVoice(params.tenant_id, params.track, getActor);
-              await speakInVoice({ text: params.track.text, voiceId, out: outputPath, speed: params.track.speed });
-            } catch (e: any) { return err(`Voiceover: ${e.message}`); }
-          } else {
-            await generateTTS({
-              text: params.track.text,
-              voice: params.track.voice || "nova",
-              outputPath,
-            });
-          }
+          try {
+            await speak({ text: params.track.text, out: outputPath, voice: params.track.voice || project.brand_kit?.voice, speed: params.track.speed, tenant: params.tenant_id });
+          } catch (e: any) { return err(`Voiceover: ${e.message}`); }
           source = outputPath;
         }
 
@@ -3388,18 +3374,9 @@ export function createMcpServer(): McpServer {
 
           // A fresh file name: the player and render must not keep the old read.
           const outputPath = path.join(audioDir, `${existing.id}-${Date.now().toString(36)}.mp3`);
-          if (params.track.voice_id || params.track.actor) {
-            try {
-              const voiceId = await resolveCloneVoice(params.tenant_id, params.track, getActor);
-              await speakInVoice({ text: params.track.text, voiceId, out: outputPath, speed: params.track.speed });
-            } catch (e: any) { return err(`Voiceover: ${e.message}`); }
-          } else {
-            await generateTTS({
-              text: params.track.text,
-              voice: params.track.voice || "nova",
-              outputPath,
-            });
-          }
+          try {
+            await speak({ text: params.track.text, out: outputPath, voice: params.track.voice || project.brand_kit?.voice, speed: params.track.speed, tenant: params.tenant_id });
+          } catch (e: any) { return err(`Voiceover: ${e.message}`); }
           existing.source = outputPath;
         }
 
@@ -3488,7 +3465,7 @@ export function createMcpServer(): McpServer {
       })).optional().describe("The LOOK axis (film-craft triad: film_grammar = rhythm, visual_system = look, audio_system = sound). Omit any subfield and the creative director infers it from the prompt; provide it and it is pinned. Accepts an object or a JSON string."),
       audio_system: jsonish(z.object({
         music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
-        voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
+        voice: z.string().optional().describe(`The narrator. ${VOICE_DESCRIBE}`),
       })).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc. Accepts an object or a JSON string."),
       film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. relay: every beat carried by an OBJECT -- a handoff (the thing ending one beat becomes the start of the next: point -> logo -> dot -> search bar) or a through-line (one object stays while the beats change around it); by default ONE continuous take -- scenes join on identical frames (a black flood that contracts into the next shape, or the same full-frame photo), a cursor drives every change, a beat on every beat, the last frame = the first; or 1-3 long oners with hard-cut type punctuation between them. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its proof (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry, and nothing else. 16x9 (default): embeds, landing pages, YouTube. 9x16: Reels, TikTok, Shorts, Stories (top 12% / bottom 18% are platform UI). 4x5: Instagram or LinkedIn feed post (shown whole). 1x1: square. Omit to let the director infer it from where the prompt says the film ships; pass to pin. Explicit canvas_width/canvas_height override it. A frame never changes the grammar."),
@@ -3496,9 +3473,8 @@ export function createMcpServer(): McpServer {
       creator_format: z.enum(FORMAT_IDS as [string, ...string[]]).optional().describe("The VIRAL FORMAT (SPEC-creator-formats.md): talking-head | screen-share | listicle | ranking | reaction | clone | split-screen | green-screen | voiceover-broll | yap. Picks the format's default recipe (for the frame when one is proven there) when no recipe is pinned; recipe wins. list target='vocabulary' shows every format's recipes."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
-      voiceover: z.boolean().optional().describe("Generate TTS voiceover narration for each scene (default: false)"),
+      voiceover: z.boolean().optional().describe("Narrate each scene's voiceover_text in an ElevenLabs voice -- audio_system.voice, else the brand kit's, else the default (default: false)"),
       background_music: z.boolean().optional().describe("Add royalty-free background music with voiceover ducking (requires JAMENDO_CLIENT_ID)"),
-      voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice for voiceover (default: nova)"),
       speaker_source: z.string().optional().describe("Path or URL to speaker video. When provided, uses speaker track mode: speaker video plays full-screen as base layer with content overlaid on top."),
       screencast_source: z.string().optional().describe("Path or URL to a SCREEN RECORDING to feature. Providing this selects the deterministic film_grammar:'screencast' path (NO LLM storyboard, NO codegen): the recording's dead 'waiting' stretches are auto-time-lapsed and fit to the narration length, bookended by the brand intro/outro. Pair with speaker_source as the narration (audio-only narration = no camera; a camera+voice recording = talking head). The fast, reliable path for a narrated product walkthrough."),
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
@@ -3586,7 +3562,7 @@ export function createMcpServer(): McpServer {
             audio_system: params.audio_system as any,
             max_revisions: params.max_revisions,
             voiceover: params.voiceover,
-            voice: params.voice,
+            voice: (params.audio_system as any)?.voice,
           });
           if ("error" in sbRes) return err(sbRes.error);
           return ok({
@@ -3613,7 +3589,7 @@ export function createMcpServer(): McpServer {
             max_revisions: params.max_revisions,
             voiceover: params.voiceover,
             background_music: params.background_music,
-            voice: params.voice,
+            voice: (params.audio_system as any)?.voice,
           });
           if (sbBuild) {
             if ("error" in sbBuild) return err(sbBuild.error);
@@ -3718,7 +3694,7 @@ export function createMcpServer(): McpServer {
               sceneId: revisionSceneId,
               voiceover: params.voiceover,
               backgroundMusic: params.background_music,
-              voice: params.voice,
+              voice: (params.audio_system as any)?.voice,
               speaker_source: params.speaker_source,
               speaker_start: params.speaker_start,
               speaker_trim_start: params.speaker_trim_start,

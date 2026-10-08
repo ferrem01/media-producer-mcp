@@ -127,7 +127,7 @@ export interface BrandKit {
     motion?: "minimal" | "punchy" | "cinematic";
   };
   guidelines?: string;    // free-form brand rules injected into storyboard builder/generator prompts
-  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // preferred TTS voice
+  voice?: string;  // the narrator: an ElevenLabs stock name, cast actor id or voice id (audio/tts.ts)
   design_system?: DesignSystem;
 }
 
@@ -567,7 +567,8 @@ export interface CastPlan {
 
 export interface StoryboardAudioDirection {
   music_mood: string;
-  voice: string;
+  /** The narrator (audio/tts.ts); unset reads as the brand kit's, else the default. */
+  voice?: string;
   pacing: "slow" | "moderate" | "fast";
 }
 

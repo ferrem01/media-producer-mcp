@@ -1,4 +1,5 @@
 import { SHELL_TOKENS, RAIL_CSS, RAIL_JS, railHtml } from "./home-shell.js";
+import { STOCK_VOICES, DEFAULT_VOICE, LEGACY_VOICES } from "../audio/tts.js";
 
 /**
  * THE BRAND PAGE. This was a tray that slid out of Studio, which meant the
@@ -105,6 +106,10 @@ ${railHtml("brand")}
 </div>
 <div class="toast" id="toast"></div>
 <script>
+  var VOICE_NAMES = ${JSON.stringify(Object.keys(STOCK_VOICES))};
+  var VOICE_WHAT = ${JSON.stringify(Object.fromEntries(Object.entries(STOCK_VOICES).map(([k, v]) => [k, v.what])))};
+  var LEGACY_VOICES = ${JSON.stringify(LEGACY_VOICES)};
+  var DEFAULT_VOICE = ${JSON.stringify(DEFAULT_VOICE)};
 (function () {
 ${RAIL_JS}
   var TENANT = '';
@@ -154,9 +159,10 @@ ${RAIL_JS}
         return '<option value="' + m + '"' + ((style.motion || '') === m ? ' selected' : '') + '>' + (m || '(unset)') + '</option>';
       }).join('') + '</select></div>' +
       '<div class="bk-row"><label>border radius</label><input type="text" id="bk-radius" value="' + escAttr(style.border_radius || '') + '" placeholder="e.g. 12px"></div>' +
-      '<div class="bk-row"><label>TTS voice</label><select id="bk-voice">' +
-      ['', 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map(function (v) {
-        return '<option value="' + v + '"' + ((kit.voice || '') === v ? ' selected' : '') + '>' + (v || '(unset)') + '</option>';
+      '<div class="bk-row"><label>Narrator voice</label><select id="bk-voice">' +
+      [''].concat(VOICE_NAMES).map(function (v) {
+        var cur = LEGACY_VOICES[kit.voice] || kit.voice || '';
+        return '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + (v ? v + ' \u2014 ' + VOICE_WHAT[v] : '(default: ' + DEFAULT_VOICE + ')') + '</option>';
       }).join('') + '</select></div></div></div>';
 
     h += '<div class="bk-section"><h4>Guidelines</h4>' +
