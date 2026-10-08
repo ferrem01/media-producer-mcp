@@ -21,6 +21,7 @@ describe("the narration is the clock", () => {
         { id: "s2", duration_seconds: 7, components: [] },
         { id: "s3", duration_seconds: 4, components: [] },
       ],
+      storyboard: { scenes: [{ duration_seconds: 5, sfx: [{ at: 1.16, id: "whoosh", anchor: { word: "six" } }], spine: { source: "asserted", words: [{ text: "six", start: 1.16, end: 1.4 }], duration: 5 } }] },
       audio: { tracks: [
         { id: "vo_scene_0", type: "voiceover", source: "a.mp3", start_time: 0 },
         { id: "vo_scene_1", type: "voiceover", source: "b.mp3", start_time: 6 },
@@ -35,6 +36,9 @@ describe("the narration is the clock", () => {
     expect(project.scenes[0].spine.duration).toBe(2.55);
     expect(project.audio.tracks[1].start_time).toBe(2.55);               // line 2 at scene 2's start
     expect(project.audio.tracks[2].duration).toBe(11);                    // the music trimmed to the film
+    expect(project.storyboard.scenes[0].spine.source).toBe("measured");  // the board on the same clock
+    expect(project.storyboard.scenes[0].duration_seconds).toBe(2.55);
+    expect(project.storyboard.scenes[0].sfx[0].at).toBe(0.9);
   });
 
   it("the build and the audio tool share it; the build no longer only lengthens", async () => {
