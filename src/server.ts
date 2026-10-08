@@ -86,6 +86,7 @@ import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
 import { generateSfx } from "./audio/sfx-generate.js";
 import { generateMusic, placeMusicBed, duckUnderVoice, MUSIC_BED_ID } from "./audio/music-generate.js";
+import { putTrack } from "./audio/tracks.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
@@ -3378,7 +3379,7 @@ export function createMcpServer(): McpServer {
           return err("Track source or text (for voiceover) required for add");
         }
 
-        project.audio.tracks.push({
+        project.audio.tracks = putTrack(project.audio.tracks, {
           id: params.track.id,
           type: params.track.type,
           source,
