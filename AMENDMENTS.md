@@ -6,6 +6,27 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The brand library reaches the writer; voiced films are captioned
+
+The second cold Six Tabs run (proj_37f3593b) followed the beats, but every
+scene repeated its whole line as big kinetic text (voice-only films had no
+captions, so the writer improvised them), and the hosts came out as name
+cards with no faces and "Max Dāavish".
+
+- `captionVoicedBoard` (llm/board-enforce.ts): a voiced film no person
+  carries gets a caption lane on every voiced scene (pinned above the
+  platform UI, anchored to the words so the measured narration re-times it),
+  and display type that only repeats the line is dropped; key words stay. The
+  writer is told the build captions the voice and never to put the line on
+  screen.
+- The brand library: product / screenshot / image assets were stored (brand
+  tool, website harvest) but never shown to the storyboard writer. They are
+  now listed as "The Brand Library (REAL surfaces)", and an asset with a
+  `person` ({name, title, say}) and a `crop` is listed under "The Brand's
+  People" as a ready people-row entry -- the on-screen name and title, the
+  headshot cut from a flyer, and how the voice says the name ("Max Davish",
+  said "Max DAA-vish").
+
 ## 2026-10-08 — The brief's beats are the scenes (the cold Six Tabs test)
 
 The first cold test of the enforced board (proj_84048b0d, same prompt) came

@@ -454,7 +454,7 @@ This recipe was measured from a film WITH A VOICE. Every scene carries voiceover
 `;
   if (!voiced) return "";
   return `## THIS FILM HAS A NARRATOR (overrides the grammar's "text is the voiceover, no narrator" rule)
-The film is voiced. EVERY scene carries voiceover_text: the one sentence the narrator says on that beat, plain spoken language, no stage directions. When the brief gives the lines, they are the lines, word for word, one per beat in the brief's order. THE VOICE IS THE CLOCK: a beat runs as long as its line takes to say (about 2.8 words a second, plus half a second of breath) -- size duration_seconds to the line, never longer. On-screen type shows the line's KEY WORDS, never the whole sentence; the build captions the voice. The grammar's "no narrator / voiceover_text stays empty" line does NOT apply to this film.
+The film is voiced. EVERY scene carries voiceover_text: the one sentence the narrator says on that beat, plain spoken language, no stage directions. When the brief gives the lines, they are the lines, word for word, one per beat in the brief's order. THE VOICE IS THE CLOCK: a beat runs as long as its line takes to say (about 2.8 words a second, plus half a second of breath) -- size duration_seconds to the line, never longer. The build captions the voice on every scene: never cast captions and never put the line on screen as type; on-screen type, when a beat needs any, is two or three KEY WORDS the picture does not already say. The grammar's "no narrator / voiceover_text stays empty" line does NOT apply to this film.
 
 `;
 }
@@ -982,6 +982,26 @@ Durations will be snapped to the bar grid after you submit -- authoring on-grid 
     brandAssetsSection += `\n\n## Brand Music\nAvailable music tracks for audio.\n`;
     for (var m of brandMusic) {
       brandAssetsSection += `- "${m.name}": ${m.url} (${m.duration ? m.duration.toFixed(1) + "s" : "unknown duration"}${m.tags?.length ? `, tags: ${m.tags.join(", ")}` : ""})\n`;
+    }
+  }
+  // THE BRAND LIBRARY: the brand's real surfaces (emails, landing pages, ads,
+  // tool logos) and its people. Stored by the brand tool and the website
+  // harvest but never shown to the writer, so a film asked for "the real
+  // emails" got grey stand-ins and hosts as initials (proj_37f3593b, Oct 8).
+  var library = brandAssets.filter(a => a.type === "image" || a.type === "product" || a.type === "screenshot");
+  var brandPeople = library.filter(a => a.person && a.person.name);
+  var surfaces = library.filter(a => !a.person);
+  if (brandPeople.length) {
+    brandAssetsSection += `\n\n## The Brand's People\nCast a person by EXACTLY this name and title, with this picture as their headshot (people-row: name, title, src, crop). In voiceover_text write the name the way the voice says it.\n`;
+    for (var pa of brandPeople) {
+      var pe = pa.person!;
+      brandAssetsSection += `- ${pe.name}${pe.title ? ` -- ${pe.title}` : ""}${pe.say && pe.say !== pe.name ? ` (the voice says "${pe.say}")` : ""}: ${JSON.stringify({ name: pe.name, ...(pe.title ? { title: pe.title } : {}), src: pa.url, ...(pa.crop ? { crop: pa.crop } : {}) })}\n`;
+    }
+  }
+  if (surfaces.length) {
+    brandAssetsSection += `\n\n## The Brand Library (REAL surfaces -- reach for these before a plain text card or an invented mock)\nUse by exact url: an image component, a click-stream stop, a tool-storm logo tile, a card in a fan.\n`;
+    for (var sa of surfaces.slice(0, 60)) {
+      brandAssetsSection += `- "${sa.name}" [${sa.type}${sa.tags?.length ? `; ${sa.tags.join(", ")}` : ""}${sa.width && sa.height ? `; ${sa.width}x${sa.height}` : ""}]${sa.description ? `: ${sa.description}` : ""} -- ${sa.url}\n`;
     }
   }
   if (opts.brandKit.logos?.length) {

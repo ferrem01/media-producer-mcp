@@ -119,3 +119,35 @@ describe("the board is enforced, not warned about", () => {
     expect(builder).not.toMatch(/FAHHH/);
   });
 });
+
+describe("a voiced film no person carries is captioned too", () => {
+  it("casts a pinned lane per voiced scene and drops type that only repeats the line; key words stay", async () => {
+    const { captionVoicedBoard } = await import("../src/llm/board-enforce.js");
+    const { captionLane } = await import("../src/core/captions.js");
+    const { assertedSpine } = await import("../src/core/word-anchors.js");
+    const scenes: any[] = [
+      { duration_seconds: 2.2, voiceover_text: "Analytics, email, social, CRM, spreadsheet...", components: [{ type: "click-stream", data: {} }, { type: "kinetic-text", data: { text: "Analytics, email, social, CRM, spreadsheet..." } }] },
+      { duration_seconds: 3.3, voiceover_text: "Still opening six tabs to answer one question?", components: [{ type: "kinetic-text", data: { text: "*Six* tabs." } }] },
+      { duration_seconds: 2, voiceover_text: "", components: [] },
+      { duration_seconds: 2, voiceover_text: "Mine.", hand_set: true, components: [] },
+    ];
+    const r = captionVoicedBoard(scenes, { tall: true, spineOf: assertedSpine, lane: captionLane });
+    expect(r).toEqual({ captioned: 2, dropped: 1 });
+    expect(scenes[0].components.map((c: any) => c.type)).toEqual(["click-stream", "reel-caption-lane"]);
+    expect(scenes[1].components.map((c: any) => c.type)).toEqual(["kinetic-text", "reel-caption-lane"]);
+    const lane = scenes[1].components[1];
+    expect(lane.position).toEqual({ x: "5%", y: "66%", width: "90%", height: "11%" });
+    expect(Object.keys(lane.anchors).length).toBeGreaterThan(0);   // the measured voice re-times it
+    expect(scenes[2].components).toEqual([]);
+    expect(scenes[3].components).toEqual([]);
+  });
+
+  it("the writer sees the brand library and the brand's people", async () => {
+    const fs = await import("node:fs/promises");
+    const b = await fs.readFile("src/llm/storyboard-builder.ts", "utf8");
+    expect(b).toMatch(/## The Brand's People/);
+    expect(b).toMatch(/## The Brand Library \(REAL surfaces/);
+    const p = await fs.readFile("src/llm/pipeline.ts", "utf8");
+    expect(p).toMatch(/captionVoicedBoard\(storyboard\.scenes/);
+  });
+});

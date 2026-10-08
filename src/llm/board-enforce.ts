@@ -194,3 +194,37 @@ export function enforceBoard(scenes: any[], opts: { brief?: string; voiced?: boo
   if (dropped) log.push(`${dropped} sound cue(s) dropped (one a scene, one payoff a film, no meme stings)`);
   return { log, warnings };
 }
+
+/** Types the writer uses to put a line on screen as display text. */
+const LINE_TYPE = new Set(["kinetic-text", "typewriter", "annotation", "text-list"]);
+
+/**
+ * Caption a voiced board no person carries: each scene with a line and no
+ * caption lane gets one (cast as `lane(spine, emphasis)`), pinned above the
+ * platform UI, and display type that only repeats the line goes (key words
+ * stay). Hand-set scenes are left alone.
+ */
+export function captionVoicedBoard(scenes: any[], o: {
+  tall: boolean;
+  spineOf: (script: string, duration: number) => any;
+  lane: (spine: any, emphasis: string[]) => any;
+}): { captioned: number; dropped: number } {
+  let captioned = 0, dropped = 0;
+  for (const d of scenes) {
+    if (!d || d.hand_set) continue;
+    const script = String(d.voiceover_text || "").trim();
+    if (!script) continue;
+    if (!Array.isArray(d.components)) d.components = [];
+    if (d.components.some((c: any) => c?.type === "reel-caption-lane")) continue;
+    const lane = o.lane(o.spineOf(script, Number(d.duration_seconds) || boardLengthForLine(script)), Array.isArray(d.emphasis) ? d.emphasis.map(String) : []);
+    if (!lane) continue;
+    const before = d.components.length;
+    d.components = d.components.filter((c: any) => !(c && LINE_TYPE.has(c.type) && recall(script, String(c.data?.text ?? (Array.isArray(c.data?.lines) ? c.data.lines.map((l: any) => (typeof l === "string" ? l : l?.text || "")).join(" ") : ""))) >= 0.7));
+    dropped += before - d.components.length;
+    lane.position = o.tall ? { x: "5%", y: "66%", width: "90%", height: "11%" } : { x: "10%", y: "78%", width: "80%", height: "12%" };
+    lane.z_index = 41;
+    d.components.push(lane);
+    captioned++;
+  }
+  return { captioned, dropped };
+}

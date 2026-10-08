@@ -2393,7 +2393,9 @@ export function createMcpServer(): McpServer {
         width: z.number().optional(),
         height: z.number().optional(),
         duration: z.number().optional().describe("Duration in seconds (video/audio assets)"),
-      })).optional().describe("Brand assets (backgrounds, intros, outros, watermarks, music, and harvested product/screenshot/image assets)"),
+        person: z.object({ name: z.string(), title: z.string().optional(), say: z.string().optional().describe("How the voice says the name when it differs, e.g. 'Max DAA-vish'") }).optional().describe("A person in the picture (a host, a founder): the writer casts them by this name and title, with this picture as their headshot"),
+        crop: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().gt(0).max(1), h: z.number().gt(0).max(1) }).optional().describe("The part of the picture to show, as fractions (a face cut from a flyer or team photo)"),
+      })).optional().describe("Brand assets (backgrounds, intros, outros, watermarks, music, and the brand library: product/screenshot/image surfaces -- real emails, landing pages, ads, tool logos, people's headshots -- that the storyboard writer reaches for before a plain card)"),
       style: z.object({
         border_radius: z.string().optional(),
         motion: z.enum(["minimal", "punchy", "cinematic"]).optional(),

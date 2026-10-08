@@ -35,12 +35,12 @@ import { drawPrompt } from "../core/need-sources.js";
 import { castBoardStandIns } from "../core/board-standins.js";
 import { getRecipe, recipeForFormat, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces, holdSettingToRecipe, holdUseToRecipe } from "../core/recipes.js";
 import { recipeWantsVoice } from "./storyboard-builder.js";
-import { enforceBoard } from "./board-enforce.js";
+import { enforceBoard, captionVoicedBoard } from "./board-enforce.js";
 import { ownMusicBed, MUSIC_BED_ID } from "../audio/music-generate.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
-import { applySpine, extractAnchors, resolveComponent } from "../core/word-anchors.js";
+import { applySpine, extractAnchors, resolveComponent, assertedSpine } from "../core/word-anchors.js";
 import { generateImage } from "../media/image-gen.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
@@ -2830,6 +2830,15 @@ async function runUnifiedPipeline(
     for (const f of enforced.log) console.log(`  Board enforced: ${f}`);
     for (const w of enforced.warnings) console.warn(`  Board: ${w}`);
     boardWarnings.push(...enforced.warnings);
+  }
+  // THE WORDS ARE ON SCREEN on a voiced film no person carries too (the
+  // person films get theirs in the take pass below): a caption lane per
+  // voiced scene, anchored to its words so the measured narration re-times
+  // it, and the writer's own full-line type that only repeats the voice
+  // dropped (proj_37f3593b: every scene's line as big kinetic text).
+  if (format === "video" && (!!opts.voiceover || recipeVoice) && !personCarries(filmGrammar)) {
+    const cap = captionVoicedBoard(storyboard.scenes as any[], { tall: canvas.height > canvas.width, spineOf: (script, dur) => assertedSpine(script, dur), lane: captionLane });
+    if (cap.captioned) console.log(`  Captions: ${cap.captioned} voiced scene(s) captioned${cap.dropped ? `; ${cap.dropped} line-repeating type dropped` : ""}`);
   }
 
   // ── Speaker films: resolve WORD ANCHORS against the scene's spine ──

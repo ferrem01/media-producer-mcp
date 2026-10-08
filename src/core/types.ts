@@ -115,6 +115,13 @@ export interface BrandAsset {
   width?: number;
   height?: number;
   duration?: number;      // seconds, for video/audio assets
+  /** A PERSON in the picture (a host, a founder): their name and title as
+   *  they appear on screen, and how the voice says the name when it differs
+   *  ("Max Davish" said "Max DAA-vish"). */
+  person?: { name: string; title?: string; say?: string };
+  /** The part of the picture to show, as fractions of it (a face cut from a
+   *  flyer or team photo): people-row's `crop`. */
+  crop?: { x: number; y: number; w: number; h: number };
 }
 
 export interface BrandKit {
