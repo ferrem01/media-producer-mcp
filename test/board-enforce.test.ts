@@ -191,3 +191,24 @@ describe("the pace the brief asks for", () => {
     expect(srv).toMatch(/const priorMusic = personChose \?/);
   });
 });
+
+describe("the Six Tabs build's open (proj_27c1233f)", () => {
+  it("an empty pill sticker is dropped; a ring or a worded pill stays", async () => {
+    const { enforceBoard } = await import("../src/llm/board-enforce.js");
+    const scenes: any[] = [{ duration_seconds: 3, components: [
+      { type: "sticker-prop", data: { kind: "pill", text: "" } },
+      { type: "sticker-prop", data: { kind: "pill", text: "6 TABS" } },
+      { type: "sticker-prop", data: { kind: "ring" } },
+    ] }];
+    const { log } = enforceBoard(scenes, {});
+    expect(scenes[0].components.map((c: any) => c.data.kind + ":" + (c.data.text || ""))).toEqual(["pill:6 TABS", "ring:"]);
+    expect(log.join(" ")).toMatch(/1 empty sticker/);
+  });
+
+  it("a flood is the whole frame and the caption lane rides above it", async () => {
+    const fs = await import("node:fs/promises");
+    const g = await fs.readFile("src/llm/scene-generator.ts", "utf8");
+    expect(g).toMatch(/\} else if \(t === "color-flood"\) \{[\s\S]{0,400}?slots\[i\] = \{ position: \{ \.\.\.FULL_STAGE \}, z_index: 30 \};/);
+    expect(g).toMatch(/\} else if \(t === "reel-caption-lane" && !speaker\) \{[\s\S]{0,500}?z_index: 41 \};/);
+  });
+});

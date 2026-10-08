@@ -98,7 +98,7 @@ export function placeMusicBed(project: AudioHolder, track: Record<string, unknow
 }
 
 const MOOD_MUSIC: Record<string, string> = {
-  driving: "driving modern electronic, punchy drums, confident bass, forward momentum",
+  driving: "upbeat modern pop-electronic, light punchy drums, warm bass, forward momentum",
   jazzy: "light modern jazz, brushed drums, upright bass, warm keys",
   ambient: "airy ambient electronic, soft pads, gentle pulse",
   playful: "playful bouncy pop, plucked synths, claps, light and upbeat",
@@ -110,10 +110,13 @@ const MOOD_MUSIC: Record<string, string> = {
  *  one, a build into the close, under a voice when there is one. */
 export function filmMusicPrompt(o: { mood?: string; bpm?: number; seconds: number; voiced?: boolean }): string {
   const base = MOOD_MUSIC[String(o.mood || "")] || MOOD_MUSIC.driving;
-  const parts = [base];
+  // UNDER A VOICE THE BED STAYS OUT OF THE WAY (Marc on the Six Tabs build:
+  // "multiple audio tracks playing over the very techno music"): sparse,
+  // no lead line, no four-on-the-floor kick.
+  const parts = o.voiced ? [base, "kept sparse and low-key: soft pads and light percussion, no lead melody, no heavy techno kick, no busy arpeggios"] : [base];
   if (o.bpm && o.bpm > 40 && o.bpm < 220) parts.push(`${Math.round(o.bpm)} BPM`);
   parts.push(`a short ad bed, ${Math.round(o.seconds)} seconds, starts immediately with energy, builds into the last ${Math.max(3, Math.round(o.seconds * 0.2))} seconds and ends cleanly`);
-  if (o.voiced) parts.push("mixed to sit under a voice, no lead melody fighting the words");
+  if (o.voiced) parts.push("mixed to sit under a voice");
   parts.push("instrumental, no vocals");
   return parts.join(", ");
 }
@@ -142,4 +145,16 @@ export async function ownMusicBed(project: AudioHolder & { scenes?: any[]; name?
     fade_in: 0.2,
     fade_out: 0.8,
   });
+}
+
+/** THE BED DIPS UNDER THE VOICE: a film with voice tracks and a music bed
+ *  gets ducking pointed at the bed (the Six Tabs build had none -- the bed
+ *  played flat at 0.18 under every line). Returns true when it set it. */
+export function duckUnderVoice(project: AudioHolder): boolean {
+  const tracks = project.audio?.tracks || [];
+  const bed = tracks.find((t) => t?.type === "music");
+  if (!bed || !tracks.some((t) => t?.type === "voiceover")) return false;
+  if (project.audio!.ducking && (project.audio!.ducking as any).enabled !== false) { project.audio!.ducking!.duck_track = bed.id; return false; }
+  (project.audio as any).ducking = { enabled: true, duck_track: bed.id, trigger_track: "voiceover", ducked_volume: 0.35, attack: 0.3, release: 1.4 };
+  return true;
 }

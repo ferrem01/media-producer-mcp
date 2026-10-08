@@ -785,6 +785,16 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     var t = c.type;
     if (STAGE_OVERLAY_TYPES.indexOf(t) !== -1) {
       slots[i] = { position: { ...FULL_STAGE }, z_index: 45 };
+    } else if (t === "color-flood") {
+      // A FLOOD IS THE WHOLE FRAME (relay's join to black): slotted as a
+      // surface it filled a band -- a black rectangle across the middle of
+      // the Six Tabs open (proj_27c1233f). Under the words and the cursor.
+      slots[i] = { position: { ...FULL_STAGE }, z_index: 30 };
+    } else if (t === "reel-caption-lane" && !speaker) {
+      // THE WORDS RIDE OVER EVERYTHING on a voiced film too: its own band
+      // (cast above the platform UI), never under a surface or a flood.
+      var lanePos = (c as any).position;
+      slots[i] = { position: lanePos && lanePos.y != null ? { ...lanePos } : pct(5, vertical ? 66 : 78, 90, vertical ? 11 : 12), z_index: 41 };
     } else if (isCutaway(c as any)) {
       // The proof at 36; a label or a word cut in WITH the proof rides above
       // it at 39 (measured: "THE BRIEF" cut in with the campaign screen and

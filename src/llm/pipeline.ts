@@ -36,7 +36,7 @@ import { castBoardStandIns } from "../core/board-standins.js";
 import { getRecipe, recipeForFormat, checkBoardAgainstRecipe, applyRecipeMotion, roleOfLabel, pruneNeedsByRecipe, holdShotToRecipe, holdMadeToRecipe, castChapterKickers, holdGroundToRecipe, castWordmarkCards, holdLogoBandToBrief, holdEmptySurfaces, holdSettingToRecipe, holdUseToRecipe } from "../core/recipes.js";
 import { recipeWantsVoice } from "./storyboard-builder.js";
 import { enforceBoard, captionVoicedBoard, briefPacing, narrationSpeed } from "./board-enforce.js";
-import { ownMusicBed, MUSIC_BED_ID } from "../audio/music-generate.js";
+import { ownMusicBed, duckUnderVoice, MUSIC_BED_ID } from "../audio/music-generate.js";
 import { extractBriefLocks, missingLocks } from "./brief-locks.js";
 import { captionLane, peopleDisplay } from "../core/captions.js";
 import { speakingEstimate } from "../core/script-lines.js";
@@ -4423,6 +4423,7 @@ async function runUnifiedPipeline(
       }
     }
   }
+  if (duckUnderVoice(project as any)) console.log("  Music: the bed ducks under the voice");
   // The person's own tracks ride through (see keptAudioTracks).
   if (opts.keptAudioTracks?.length) {
     if (!project.audio) project.audio = { tracks: [] };

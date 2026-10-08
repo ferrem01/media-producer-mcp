@@ -56,7 +56,7 @@ describe("generated music", () => {
 
   it("the build makes the film its own bed at its length, under the voice, keeping the level; no bed -> nothing made", async () => {
     const { ownMusicBed, filmMusicPrompt } = await import("../src/audio/music-generate.js");
-    expect(filmMusicPrompt({ mood: "driving", bpm: 118, seconds: 26, voiced: true })).toMatch(/driving modern electronic.*118 BPM.*26 seconds.*under a voice.*no vocals/);
+    expect(filmMusicPrompt({ mood: "driving", bpm: 118, seconds: 26, voiced: true })).toMatch(/pop-electronic.*sparse and low-key.*no heavy techno kick.*118 BPM.*26 seconds.*under a voice.*no vocals/);
     const asked: any[] = [];
     const make = async (o: any) => { asked.push(o); return { file: "/tmp/own.mp3", prompt: o.prompt, seconds: o.seconds, model: "music_v1", instrumental: true }; };
     const p: any = { name: "Six Tabs", scenes: [{ duration_seconds: 4 }, { duration_seconds: 21.3 }], audio: { tracks: [{ id: "music_bed", type: "music", source: "/lib/same-song.mp3", volume: 0.18, loop: true, trim_start: 2 }] } };
@@ -74,5 +74,15 @@ describe("generated music", () => {
     expect(pipe).toMatch(/!opts\.chosenMusic && musicTrack\?\.source !== "brand-kit" && !musicFirstCut && process\.env\.ELEVENLABS_API_KEY/);
     expect(pipe).toMatch(/const bed = await ownMusicBed\(project as any/);
     expect(pipe).not.toMatch(/id: "bgm"/);
+  });
+
+  it("the bed ducks under the voice once there is a voice", async () => {
+    const { duckUnderVoice } = await import("../src/audio/music-generate.js");
+    const p: any = { audio: { tracks: [{ id: "music_bed", type: "music" }, { id: "vo_scene_0", type: "voiceover" }] } };
+    expect(duckUnderVoice(p)).toBe(true);
+    expect(p.audio.ducking).toMatchObject({ enabled: true, duck_track: "music_bed", trigger_track: "voiceover" });
+    expect(duckUnderVoice({ audio: { tracks: [{ id: "music_bed", type: "music" }] } } as any)).toBe(false);
+    const pipe = await fs.readFile(path.join(process.cwd(), "src/llm/pipeline.ts"), "utf8");
+    expect(pipe).toMatch(/if \(duckUnderVoice\(project as any\)\)/);
   });
 });

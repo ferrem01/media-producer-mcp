@@ -203,7 +203,19 @@ export function enforceBoard(scenes: any[], opts: { brief?: string; voiced?: boo
   const now = total();
   if (Math.abs(now - was) > 0.5) log.push(`length ${was.toFixed(1)}s -> ${now.toFixed(1)}s (${opts.voiced ? "each scene sized to its line" : "the brief's length"})`);
 
-  // 3. THE SOUND: one quiet cue a scene, no meme stings.
+  // 3. NO EMPTY SHAPES: a pill or badge sticker with no words is a blank
+  //    shape on the frame (the auto-fix then inked it black: a black block
+  //    top-right of the Six Tabs open, proj_27c1233f).
+  let blanks = 0;
+  for (const sc of scenes) {
+    if (!Array.isArray(sc?.components)) continue;
+    const n = sc.components.length;
+    sc.components = sc.components.filter((c: any) => !(c?.type === "sticker-prop" && !["image", "ring", "logo", "gesture"].includes(String(c.data?.kind || "pill")) && !String(c.data?.text ?? "").trim() && !c.data?.src && !c.data?.emoji));
+    blanks += n - sc.components.length;
+  }
+  if (blanks) log.push(`${blanks} empty sticker(s) dropped`);
+
+  // 4. THE SOUND: one quiet cue a scene, no meme stings.
   const dropped = capSceneSounds(scenes, { memes: /\b(meme|fahh+|sting|vine boom)\b/i.test(String(opts.brief || "")) });
   if (dropped) log.push(`${dropped} sound cue(s) dropped (one a scene, one payoff a film, no meme stings)`);
   return { log, warnings };
