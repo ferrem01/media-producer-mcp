@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — The fresh Six Tabs build: a black block, flat loud music
+
+Marc on proj_27c1233f: "multiple audio tracks playing over the very techno
+music" and "a black rectangle in the middle of scene 1". Causes:
+
+- The color-flood had no slot rule, so the layout placed it as a surface in
+  a band (y 18%, h 33.5%) -- the flood to black filled a rectangle. A flood
+  is now the whole stage (z 30, under the words and the cursor).
+- The writer's chip was a sticker pill with no text; the auto-fix inked it
+  near-black -- a black block top-right. `enforceBoard` drops worded-kind
+  stickers with no words.
+- The voiced film's caption lane was slotted as editorial copy at z 11,
+  under the flood. On a non-speaker scene it now keeps its band at z 41.
+- No ducking: the bed played flat at 0.18 under every line. `duckUnderVoice`
+  sets ducking whenever a film has voice tracks and a bed (the build and
+  generate_music).
+- The generated bed was busy ("driving modern electronic, punchy drums"):
+  under a voice it is now asked to stay sparse -- no lead, no techno kick.
+
 ## 2026-10-08 — Real rooms: the stock places are photographs, and a room photo comes first
 
 The CEO sit-down test (proj_14b6c070) settled it: Marc, "honestly, if anything,

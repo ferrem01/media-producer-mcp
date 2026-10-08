@@ -85,7 +85,7 @@ import { speak, VOICE_DESCRIBE } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
 import { generateSfx } from "./audio/sfx-generate.js";
-import { generateMusic, placeMusicBed, MUSIC_BED_ID } from "./audio/music-generate.js";
+import { generateMusic, placeMusicBed, duckUnderVoice, MUSIC_BED_ID } from "./audio/music-generate.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
@@ -3268,6 +3268,7 @@ export function createMcpServer(): McpServer {
           fade_in: params.track?.fade_in ?? 0.2,
           fade_out: params.track?.fade_out ?? 0.8,
         });
+        duckUnderVoice(project as any);
         await saveProject(project);
         return ok({ generated: made, track, note: `The film's music is now "${MUSIC_BED_ID}" (any earlier music track replaced). Change its level with action='update', or make another with a new prompt.` });
       }
