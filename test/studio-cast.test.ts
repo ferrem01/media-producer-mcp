@@ -128,4 +128,15 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     // A recast copies a video performance: a voice alone says so.
     expect(html).toContain("You recorded <b>your voice only</b> for this scene.");
   });
+
+  it("a voice line among camera takes still gets its piece on the speaker lane, and its card leads to the picture", () => {
+    const html = getPreviewHtml();
+    // Not only in an all-voice film: any scene whose line plays and has no take.
+    expect(html).toContain("if (!hasSpeaker && total > 0 && y.speaker >= 0) {");
+    expect(html).toContain("if (!sc2 || takeScenes[vl.si]) return;");
+    // Not drawn twice: the dashed take-needed piece yields to the voice piece.
+    expect(html).toContain("n.need.use !== 'clip' && !voicePieces[n.si]");
+    // The voice card opens the take dialog on Generate in a person-carried film.
+    expect(html).toContain("openNeedPicker(p, si, pictureNeed, { start: 'generate' });");
+  });
 });

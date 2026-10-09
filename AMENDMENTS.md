@@ -40,9 +40,11 @@ back and say, oh no, only use the voice ... I'll just record the voice."
   Generate makes one from the voice (Marc: "if there is a recording only
   sitting on the speaker layer ... recasting is not an option").
 
-Not done: the remote booth (big screen + phone camera) has no Voice only, and
-a speaker film's lane shows no piece for a voice-only scene among camera
-takes (its open need still invites Generate).
+Not done: the remote booth (big screen + phone camera) has no Voice only.
+The speaker lane draws a voice piece for every scene whose line plays and
+has no take, camera takes elsewhere or not (it used to need an all-voice
+film); the dashed take-needed piece yields to it, and its card's "Put a
+picture on it…" opens the take dialog on Generate.
 Tests: `test/take-page.test.ts` (browser: no camera asked, the voice route),
 `test/voice-lines.test.ts`, `test/scene-performance.test.ts`, `test/studio-cast.test.ts`.
 

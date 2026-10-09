@@ -8275,17 +8275,22 @@ ${QUOTIENT_CSS}
         track.insertBefore(blk, document.getElementById('wave-strip'));
       });
     }
-    // A VOICE-ONLY film: each scene's line is a piece on the speaker lane,
-    // selectable like a take -- pace, re-read, record it yourself, level
-    // (Marc, Oct 8: "making that line clickable as if it was a video speaker
-    // track").
-    if (!hasSpeaker && !(p.speaker_track && p.speaker_track.clips && p.speaker_track.clips.length) && total > 0 && y.speaker >= 0) {
+    // A VOICE LINE is a piece on the speaker lane, selectable like a take --
+    // pace, re-read, record it yourself, level (Marc, Oct 8: "making that
+    // line clickable as if it was a video speaker track"). Every scene whose
+    // line plays gets one, camera takes on other scenes or not: a Voice only
+    // scene among camera takes showed only a dashed "take needed" piece.
+    var voicePieces = {};
+    if (!hasSpeaker && total > 0 && y.speaker >= 0) {
+      var takeScenes = {};
+      ((p.speaker_track && p.speaker_track.clips) || []).forEach(function(c) { if (c.scene_index != null) takeScenes[c.scene_index] = true; });
       voiceLines(p).forEach(function(vl) {
-        var sc2 = p.scenes[vl.si]; if (!sc2) return;
+        var sc2 = p.scenes[vl.si]; if (!sc2 || takeScenes[vl.si]) return;
         var f2 = sceneStartFor(vl.si), d2 = sc2.duration_seconds || 0;
         if (!(d2 > 0.05)) return;
         var vb = document.createElement('div');
         vb.className = 'spk-clip spk-voice';
+        voicePieces[vl.si] = true;
         vb.style.top = (y.speaker + 3) + 'px';
         vb.style.left = ((f2 / total) * 100).toFixed(2) + '%';
         vb.style.width = ((Math.min(total - f2, d2) / total) * 100).toFixed(2) + '%';
@@ -8300,7 +8305,8 @@ ${QUOTIENT_CSS}
     }
     // Takes still needed: a dashed piece at the scene, on the speaker lane.
     if (y.speaker >= 0 && total > 0) {
-      openNeedsOf(p).filter(function(n) { return n.need.type === 'camera_video' && n.need.use !== 'clip'; }).forEach(function(n) {
+      // A scene with its voice piece is not drawn twice: its voice card leads to the picture.
+      openNeedsOf(p).filter(function(n) { return n.need.type === 'camera_video' && n.need.use !== 'clip' && !voicePieces[n.si]; }).forEach(function(n) {
         var sc1 = p.scenes[n.si]; if (!sc1) return;
         var f1 = sceneStartFor(n.si), d1 = sc1.duration_seconds || 0;
         if (!(d1 > 0.05)) return;
@@ -8797,6 +8803,11 @@ ${QUOTIENT_CSS}
     var tr = vl.track;
     var cur = tr.speed || 1;
     var lvl = Math.round(voiceLinesLevel(p) * 100);
+    // In a film a person carries, the voice is a scene still waiting for its
+    // picture: the take dialog, on Generate (made from this voice).
+    var sbV = ((p.storyboard || {}).scenes || [])[si] || {};
+    var gV = (p.treatment && p.treatment.filmGrammar) || '';
+    var pictureNeed = (gV === 'speaker' || gV === 'creator-cut') ? (sbV.assets || []).findIndex(function(a) { return a && a.type === 'camera_video' && a.use !== 'clip'; }) : -1;
     var esc = function(x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
     var h = '<div class="sp-head"><span class="sp-title"><b>Scene ' + (si + 1) + ' voice</b> — ' + Number(sc.duration_seconds || 0).toFixed(2) + 's</span><button class="sp-x" id="vl-x">✕</button></div>'
       + '<div class="sp-region" style="margin-bottom:8px;">' + (tr.take ? 'Your recording.' : 'A generated read' + (tr.voice ? ' (' + esc(tr.voice) + ')' : '') + '.') + ' Any change re-fits the film: the scene runs to the line, and word-timed graphics and sounds follow.</div>'
@@ -8807,6 +8818,7 @@ ${QUOTIENT_CSS}
       + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><textarea id="vl-text" rows="3" style="width:100%;box-sizing:border-box;font:13px/1.4 var(--font-sans, inherit);border:1px solid var(--border-tertiary);border-radius:6px;padding:6px;resize:vertical;">' + esc(voiceLineText(p, si)) + '</textarea></div>'
       + '<div class="sp-row"><button class="rv-go secondary" id="vl-revoice" style="flex:1;">' + (tr.take ? 'Replace my recording with a read of these words' : 'Re-read these words') + '</button></div>'
       + '<div class="sp-row" id="vl-rec-row"><button class="rv-go secondary" id="vl-rec" style="flex:1;">● Record it yourself</button></div>'
+      + (pictureNeed >= 0 ? '<div class="sp-row"><button class="rv-go secondary" id="vl-picture" style="flex:1;" title="A performance of you made from this voice, or a camera take">Put a picture on it&#8230;</button></div>' : '')
       + '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Level</span><input type="range" id="vl-vol" min="0" max="100" step="1" value="' + lvl + '" style="flex:1;"><span id="vl-vol-n" style="min-width:38px;text-align:right;">' + lvl + '%</span></div>';
     pop.innerHTML = h;
     spkPopPlace(pop, anchorEl);
@@ -8828,6 +8840,8 @@ ${QUOTIENT_CSS}
         .then(function() { camPopClose(); }, function() { voicePopOpen(si, again()); });
     });
     document.getElementById('vl-rec').addEventListener('click', function() { voiceRecStart(si, again); });
+    var picBtn = document.getElementById('vl-picture');
+    if (picBtn) picBtn.addEventListener('click', function() { camPopClose(); openNeedPicker(p, si, pictureNeed, { start: 'generate' }); });
     var vol = document.getElementById('vl-vol'), voln = document.getElementById('vl-vol-n');
     vol.addEventListener('input', function() { voln.textContent = vol.value + '%'; voiceLinesApplyLevel(parseInt(vol.value, 10) / 100); });
     vol.addEventListener('change', function() { voiceLinesSaveLevel(p, parseInt(vol.value, 10) / 100); });
