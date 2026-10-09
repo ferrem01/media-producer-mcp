@@ -26,6 +26,12 @@ describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
     expect(js).toMatch(/scene_index: i, capture: 'upload'/);
   });
 
+  it("a film made from components with no board lists its built scenes and hides Rebuild (Marc: a built film showed no scenes)", () => {
+    expect(js).toMatch(/var boardless = !board\.length && \(P\.scenes \|\| \[\]\)\.length > 0;/);
+    expect(js).toMatch(/var scenes = boardless \? P\.scenes : board;/);
+    expect(js).toMatch(/if \(boardless\) build\.style\.display = 'none';/);
+  });
+
   it("lists the proof each claim asked for, with Upload per piece (SPEC-creator-cut.md)", () => {
     expect(js).toMatch(/g === 'speaker' \|\| g === 'creator-cut'/);   // the booth serves both person grammars
     expect(js).toMatch(/x\.type !== 'camera_video'/);                   // every non-take need on the scene is proof

@@ -371,7 +371,12 @@ ${QUOTIENT_CSS}
   }
 
   function render() {
-    var scenes = (P.storyboard && P.storyboard.scenes) || [];
+    // A film made straight from components (add / update, no generate) has
+    // no board: its built scenes are the list, and there is nothing to
+    // rebuild from -- a rebuild would make scenes from an empty board.
+    var board = (P.storyboard && P.storyboard.scenes) || [];
+    var boardless = !board.length && (P.scenes || []).length > 0;
+    var scenes = boardless ? P.scenes : board;
     var g = (P.treatment && P.treatment.filmGrammar) || '';
     var frame = (P.canvas && P.canvas.frame) || '';
     var speaker = g === 'speaker' || g === 'creator-cut';
@@ -553,6 +558,7 @@ ${QUOTIENT_CSS}
     build.disabled = open.length > 0 || !!jobTimer; build.onclick = function () { startJob('build'); };
     var rend = document.createElement('button'); rend.className = 'btn' + (built ? '' : ' ghost'); rend.textContent = 'Render';
     rend.disabled = !built || !!jobTimer; rend.onclick = function () { startJob('render'); };
+    if (boardless) build.style.display = 'none';
     if (built) {
       // PREVIEW: the built film played live, no render -- the Studio's own
       // player in watch mode (full screen, nothing to edit).
