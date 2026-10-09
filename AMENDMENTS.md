@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — Seedance is told hard: no text in the frame
+
+Dana's scene 3 (proj_d37c96fe) came back from Seedance with the spoken line
+burned in as a garbled subtitle ("New Ono Teuith / Scot Murıs dashord"),
+under the prompt's soft "no text on screen". Every Seedance prompt (speaking,
+silent, and the Higgsfield performance prompt) now ends with `NO_TEXT`: no
+subtitles, captions, words, letters, lower thirds or titles. The scene was
+regenerated with it. `NO_TEXT` lives in `core/actor-test.ts` because
+`seedance.ts` already imports that module (the other way would be a cycle).
+
 ## 2026-10-09 — Revise can remove the component it is pointed at
 
 Marc selected the title card on Dana's scene 2, hit Revise and typed "delete
