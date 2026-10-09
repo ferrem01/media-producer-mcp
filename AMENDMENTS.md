@@ -6,6 +6,31 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — A house library for email, social and blog, and the motions to show it
+
+Marc: "We work in 3 areas. Email, social and blog. Would be great if we had a
+group of brilliant and beautiful emails we could reference for all of our
+films. Same with social posts from multiple platforms to blogs."
+
+- **36 new house pieces** (`src/sample-work/`, GPT Image 2.5 through
+  Higgsfield): 12 full-length emails (launch, newsletter, promo, welcome,
+  event, product, win-back, webinar, seasonal guide, year-in-review, recipes,
+  changelog), 14 social posts tagged by platform (LinkedIn carousel cover,
+  stat post and announcement; Instagram feed and story; TikTok covers; X
+  cards; a YouTube thumbnail; a Pinterest pin), 10 blog pages (eight articles,
+  two blog home pages). Four new made-up brands carry part of it: Kiln
+  Coffee, Atlas Trips, Penny, Fern & Co. Fictional names only, no real people.
+  The manifest gains `platform` (social) and `page` (blog: post | index), and
+  `pick` filters by `platforms`.
+- **asset-wall `scroll`**: full-length emails or blog pages in columns on a
+  plane turned in 3D, each column scrolling the other way from the next,
+  dealt row by row so neighbours never repeat. **`feed`**: social posts in
+  their platform's frame, drawn generic in the component (the brand's
+  avatar and name, LinkedIn's Like/Comment/Repost/Send, Instagram's likes, an
+  X post's counts, a YouTube title row, a Pinterest Save, a story's progress
+  bars, TikTok's side controls), rising in columns at different depths. Over
+  both, the headline sits in a band at the top on a fade of the ground.
+
 ## 2026-10-09 — The phone Studio lists a film with no board
 
 Marc: the design showcase film (proj_f9443521) "won't show up in Mobile

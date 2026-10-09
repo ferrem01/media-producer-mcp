@@ -10,7 +10,9 @@
      film's own pieces (items). The Moda launch film's moves: a deck that
      flips past like a rolodex, work flying at the camera out of depth, a
      wall drifting in space with the far and near cards out of focus, a
-     collage round a speaker, a grid of personalised versions. */
+     collage round a speaker, a grid of personalised versions -- and for
+     Quotient's three areas, full-length emails and blog pages scrolling in
+     tilted columns, social posts rising in their platform frames. */
   .aw-root, .aw-root * { box-sizing: border-box; max-width: none; }
   .aw-root { position: absolute; inset: 0; overflow: hidden; }
   .aw-ground { position: absolute; inset: 0; }
@@ -22,6 +24,17 @@
     font-family: 'Inter', system-ui, sans-serif; font-weight: 500; letter-spacing: -0.03em; color: #ffffff; padding: 0 6%;
     text-shadow: 0 0.06em 0.4em rgba(60, 0, 30, 0.35); line-height: 1.05; z-index: 5; }
   .aw-head:empty { display: none; }
+  .aw-col { position: absolute; left: 0; top: 0; transform-style: preserve-3d; }
+  .aw-post { background: #ffffff; color: #111114; font-family: 'Inter', system-ui, sans-serif; }
+  .aw-post img { inset: auto; }
+  .aw-post .aw-pu { position: absolute; display: flex; align-items: center; white-space: nowrap; }
+  .aw-post .aw-av { flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+  .aw-post .aw-nm { font-weight: 600; line-height: 1.15; }
+  .aw-post .aw-sb { color: #6b6b76; font-weight: 400; line-height: 1.2; }
+  .aw-post svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .aw-post.aw-over { color: #ffffff; background: #000000; }
+  .aw-post.aw-over .aw-sb { color: rgba(255, 255, 255, 0.85); }
+  .aw-fade { position: absolute; left: 0; right: 0; top: 0; height: 34%; pointer-events: none; z-index: 4; }
   .aw-glow { position: absolute; left: 50%; top: 50%; width: 70%; height: 46%; transform: translate(-50%, -50%); pointer-events: none; z-index: 4;
     background: radial-gradient(closest-side, var(--aw-glow, rgba(255, 45, 135, 0.85)), transparent); filter: blur(10px); }
 </style>
@@ -40,10 +53,10 @@
     var AT = Math.max(0, num(data.at, 0));
     var SPAN = Math.max(1, DUR - AT);
     var SPEED = clamp(num(data.speed, 1), 0, 4);
-    var LAYOUTS = ['wall', 'rolodex', 'fly', 'orbit', 'fan', 'grid'];
+    var LAYOUTS = ['wall', 'rolodex', 'fly', 'orbit', 'fan', 'grid', 'scroll', 'feed'];
     var layout = LAYOUTS.indexOf(data.layout) >= 0 ? data.layout : 'wall';
     var seed = num(data.seed, 7);
-    var opts = { kinds: Array.isArray(data.kinds) ? data.kinds : null, brands: Array.isArray(data.brands) ? data.brands : null, items: Array.isArray(data.items) ? data.items : null, seed: seed };
+    var opts = { kinds: Array.isArray(data.kinds) ? data.kinds : null, brands: Array.isArray(data.brands) ? data.brands : null, platforms: Array.isArray(data.platforms) ? data.platforms : null, items: Array.isArray(data.items) ? data.items : null, seed: seed };
     root.style.perspective = Math.round(W * 1.15) + 'px';
 
     // The ground: a brand gradient (default the reference's magenta to red);
@@ -59,14 +72,96 @@
     var rnd = (function (s) { s = (s >>> 0) || 1; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })(seed * 7919 + 13);
     // A card: the piece as an image, centred on (0, 0) of the plane so the
     // layouts place it with transforms alone.
-    function card(p, w) {
+    function card(p, w, parent) {
       var ratio = p.ratio > 0 ? p.ratio : 0.75;
       var h = w * ratio, c = document.createElement('div');
       c.className = 'aw-card';
       c.style.cssText = 'width:' + w + 'px;height:' + h + 'px;margin-left:' + (-w / 2) + 'px;margin-top:' + (-h / 2) + 'px;border-radius:' + Math.max(6, w * 0.014) + 'px;font-size:' + (w / 100) + 'px;';
       var im = document.createElement('img'); im.src = String(p.src); im.alt = '';
       c.appendChild(im);
-      plane.appendChild(c);
+      (parent || plane).appendChild(c);
+      return { el: c, w: w, h: h };
+    }
+    // A SOCIAL POST IN ITS PLATFORM'S FRAME, so it reads as LinkedIn or
+    // Instagram at a glance: the brand's avatar and name over the creative,
+    // the platform's actions under it; a story or a TikTok is the creative
+    // full-bleed with the app's controls over it. Drawn here, generic --
+    // never a screenshot of the app.
+    var ICON = {
+      heart: '<path d="M12 20s-7.5-4.6-9.2-9.1C1.7 7.8 3.6 4.6 6.9 4.6c2.2 0 3.6 1.3 5.1 3.1 1.5-1.8 2.9-3.1 5.1-3.1 3.3 0 5.2 3.2 4.1 6.3C19.5 15.4 12 20 12 20z"/>',
+      chat: '<path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.5L3.5 20.5l1.1-4.3A8.5 8.5 0 1 1 20.5 12z"/>',
+      send: '<path d="M21.5 3 10.2 14.3M21.5 3l-7 18.5-4.3-7.2L3 10z"/>',
+      mark: '<path d="M6 3.5h12v17l-6-4.3-6 4.3z"/>',
+      repost: '<path d="M4 9.5V7.8a2.3 2.3 0 0 1 2.3-2.3H19m0 0-3-3m3 3-3 3M20 14.5v1.7a2.3 2.3 0 0 1-2.3 2.3H5m0 0 3 3m-3-3 3-3"/>',
+      thumb: '<path d="M7 10.5v10H3.5v-10zM7 10.5 11 3c1.6 0 2.6 1.2 2.3 2.8l-.6 3.2h6.1c1.4 0 2.4 1.3 2 2.6l-2 6.8c-.3 1.2-1.4 2-2.6 2H7"/>',
+      views: '<path d="M4 20V11M10 20V5M16 20v-7M22 20V8"/>',
+      play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/>',
+      note: '<path d="M9 18.5V5.5l10-2v13M9 18.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zm10-2a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>',
+    };
+    var icon = function (n, sz, col) { return '<svg viewBox="0 0 24 24" style="width:' + sz + 'px;height:' + sz + 'px' + (col ? ';color:' + col : '') + '">' + ICON[n] + '</svg>'; };
+    var BADGE = {
+      linkedin: function (u) { return '<span style="flex:none;width:' + 6 * u + 'px;height:' + 6 * u + 'px;border-radius:' + 1.2 * u + 'px;background:#0a66c2;color:#fff;font-weight:700;font-size:' + 3.9 * u + 'px;display:flex;align-items:center;justify-content:center;letter-spacing:-0.04em">in</span>'; },
+      x: function (u) { return '<span style="flex:none;font-weight:700;font-size:' + 5.4 * u + 'px;line-height:1">\ud835\udd4f</span>'; },
+      youtube: function (u) { return '<span style="flex:none;width:' + 8 * u + 'px;height:' + 5.6 * u + 'px;border-radius:' + 1.6 * u + 'px;background:#ff0033;color:#fff;display:flex;align-items:center;justify-content:center">' + icon('play', 4.4 * u) + '</span>'; },
+      pinterest: function (u) { return '<span style="flex:none;padding:' + 1.6 * u + 'px ' + 3.4 * u + 'px;border-radius:' + 5 * u + 'px;background:#e60023;color:#fff;font-weight:700;font-size:' + 3.4 * u + 'px">Save</span>'; },
+    };
+    function post(p, w, parent) {
+      var plat = p.platform || 'instagram', ratio = p.ratio > 0 ? p.ratio : 1, u = w / 100;
+      var b = S.brand(p.brand), name = (p.brand && b) ? b.name : (p.name || 'Your brand');
+      var handle = '@' + name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      var avBg = b && p.brand ? (b.accent === b.bg ? b.bg2 : b.accent) : '#393bf5';
+      var n = function (k) { return (1 + ((p.src.length * 7919 + k * 104729) % 97) / 10).toFixed(1) + 'K'; };
+      var over = plat === 'story' || plat === 'tiktok' || ratio > 1.5;
+      var c = document.createElement('div'); c.className = 'aw-card aw-post' + (over ? ' aw-over' : '');
+      var av = function (sz, ring) { return '<span class="aw-av" style="width:' + sz + 'px;height:' + sz + 'px;font-size:' + sz * 0.46 + 'px;background:' + avBg + ';' + (ring ? 'box-shadow:0 0 0 ' + 0.5 * u + 'px #fff,0 0 0 ' + 1.1 * u + 'px #d62976' : '') + '">' + name.charAt(0) + '</span>'; };
+      var row = function (style, html) { return '<div class="aw-pu" style="' + style + '">' + html + '</div>'; };
+      var imgH = w * ratio, hh = 0, fh = 0, html = '';
+      if (over) {
+        // Story / TikTok: the creative full-bleed, the controls over it.
+        html += '<img src="' + String(p.src) + '" alt="" style="left:0;top:0;width:100%;height:100%;object-fit:cover">';
+        html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),transparent 18%,transparent 70%,rgba(0,0,0,.45))"></div>';
+        if (plat === 'tiktok') {
+          html += row('right:' + 3 * u + 'px;bottom:' + 22 * u + 'px;flex-direction:column;gap:' + 4.5 * u + 'px;font-size:' + 3 * u + 'px;font-weight:600',
+            av(10 * u) + ['heart', 'chat', 'mark', 'send'].map(function (k, i) { return '<span style="display:flex;flex-direction:column;align-items:center;gap:' + u + 'px">' + icon(k, 8 * u) + n(i) + '</span>'; }).join(''));
+          html += row('left:' + 4 * u + 'px;bottom:' + 6 * u + 'px;right:' + 20 * u + 'px;flex-direction:column;align-items:flex-start;gap:' + 1.6 * u + 'px',
+            '<span class="aw-nm" style="font-size:' + 4.2 * u + 'px">' + handle + '</span><span class="aw-sb" style="font-size:' + 3.4 * u + 'px;display:flex;align-items:center;gap:' + 1.4 * u + 'px">' + icon('note', 3.8 * u) + 'original sound \u00b7 ' + name + '</span>');
+        } else {
+          html += '<div style="position:absolute;left:' + 3 * u + 'px;right:' + 3 * u + 'px;top:' + 3 * u + 'px;display:flex;gap:' + u + 'px">' + [1, 0.4, 0].map(function (f) { return '<span style="flex:1;height:' + 0.8 * u + 'px;border-radius:' + u + 'px;background:rgba(255,255,255,.4);overflow:hidden"><span style="display:block;height:100%;width:' + f * 100 + '%;background:#fff"></span></span>'; }).join('') + '</div>';
+          html += row('left:' + 4 * u + 'px;top:' + 7 * u + 'px;gap:' + 2.4 * u + 'px', av(8 * u, true) + '<span class="aw-nm" style="font-size:' + 3.8 * u + 'px">' + handle.slice(1) + '</span><span class="aw-sb" style="font-size:' + 3.4 * u + 'px">Sponsored</span>');
+          html += row('left:' + 4 * u + 'px;right:' + 4 * u + 'px;bottom:' + 4 * u + 'px;gap:' + 3 * u + 'px', '<span style="flex:1;border:' + 0.35 * u + 'px solid rgba(255,255,255,.7);border-radius:' + 6 * u + 'px;padding:' + 2.2 * u + 'px ' + 4 * u + 'px;font-size:' + 3.4 * u + 'px">Send message</span>' + icon('heart', 7 * u) + icon('send', 7 * u));
+        }
+      } else if (plat === 'youtube') {
+        // A video in the grid: the thumbnail, then the title row.
+        fh = 24 * u;
+        html += '<img src="' + String(p.src) + '" alt="" style="left:0;top:0;width:100%;height:' + imgH + 'px;object-fit:cover">';
+        html += '<span style="position:absolute;right:' + 2.4 * u + 'px;top:' + (imgH - 7.4 * u) + 'px;background:rgba(0,0,0,.8);color:#fff;font-size:' + 3 * u + 'px;font-weight:600;padding:' + 0.6 * u + 'px ' + 1.4 * u + 'px;border-radius:' + u + 'px">12:48</span>';
+        html += row('left:' + 3.5 * u + 'px;right:' + 3.5 * u + 'px;top:' + (imgH + 4 * u) + 'px;align-items:flex-start;gap:' + 3 * u + 'px', av(8.5 * u) + '<span style="display:flex;flex-direction:column;gap:' + 1.2 * u + 'px;flex:1;overflow:hidden"><span class="aw-nm" style="font-size:' + 4.2 * u + 'px">' + name + ' \u2014 new video</span><span class="aw-sb" style="font-size:' + 3.4 * u + 'px">' + name + ' \u00b7 ' + n(1) + ' views \u00b7 2 days ago</span></span>' + BADGE.youtube(u));
+      } else if (plat === 'pinterest') {
+        fh = 12 * u;
+        html += '<img src="' + String(p.src) + '" alt="" style="left:0;top:0;width:100%;height:' + imgH + 'px;object-fit:cover;border-radius:' + 4 * u + 'px">';
+        html += '<span style="position:absolute;right:' + 3 * u + 'px;top:' + 3 * u + 'px;display:flex">' + BADGE.pinterest(u) + '</span>';
+        html += row('left:' + 3 * u + 'px;right:' + 3 * u + 'px;top:' + (imgH + 2.5 * u) + 'px;gap:' + 2.4 * u + 'px', av(6.5 * u) + '<span class="aw-nm" style="font-size:' + 3.8 * u + 'px">' + name + '</span>');
+      } else {
+        // A feed post: header, the creative, the platform's actions.
+        hh = 15 * u; fh = plat === 'instagram' ? 19 * u : 14 * u;
+        var sub = plat === 'linkedin' ? n(3) + ' followers \u00b7 Promoted' : plat === 'x' ? handle + ' \u00b7 2h' : 'Sponsored';
+        var badge = BADGE[plat] ? BADGE[plat](u) : '<span style="flex:none;font-size:' + 5 * u + 'px;letter-spacing:.1em;color:#111">\u2022\u2022\u2022</span>';
+        html += row('left:' + 3.5 * u + 'px;right:' + 3.5 * u + 'px;top:0;height:' + hh + 'px;gap:' + 2.6 * u + 'px', av(9 * u, plat === 'instagram') + '<span style="display:flex;flex-direction:column;gap:' + 0.6 * u + 'px;flex:1;overflow:hidden"><span class="aw-nm" style="font-size:' + 4 * u + 'px">' + name + '</span><span class="aw-sb" style="font-size:' + 3.2 * u + 'px">' + sub + '</span></span>' + badge);
+        html += '<img src="' + String(p.src) + '" alt="" style="left:0;top:' + hh + 'px;width:100%;height:' + imgH + 'px;object-fit:cover' + (plat === 'x' ? ';border-radius:' + 3 * u + 'px;left:' + 3.5 * u + 'px;width:' + (w - 7 * u) + 'px;height:' + (imgH - 7 * u * ratio) + 'px' : '') + '">';
+        var fy = hh + imgH, isz = 6.4 * u, gap = 4.5 * u, fs = 3.3 * u;
+        if (plat === 'instagram') {
+          html += row('left:' + 3.5 * u + 'px;right:' + 3.5 * u + 'px;top:' + (fy + 3 * u) + 'px;gap:' + gap + 'px', icon('heart', isz, '#ed2a4a') + icon('chat', isz) + icon('send', isz) + '<span style="flex:1"></span>' + icon('mark', isz));
+          html += row('left:' + 3.5 * u + 'px;top:' + (fy + 12 * u) + 'px', '<span class="aw-nm" style="font-size:' + 3.5 * u + 'px">' + (1 + (p.src.length * 37) % 9) + ',' + (100 + (p.src.length * 131) % 900) + ' likes</span>');
+        } else if (plat === 'linkedin') {
+          html += row('left:' + 3.5 * u + 'px;right:' + 3.5 * u + 'px;top:' + (fy + 3.6 * u) + 'px;justify-content:space-between;font-size:' + fs + 'px;font-weight:600;color:#56565f', [['thumb', 'Like'], ['chat', 'Comment'], ['repost', 'Repost'], ['send', 'Send']].map(function (a) { return '<span style="display:flex;align-items:center;gap:' + 1.2 * u + 'px">' + icon(a[0], 5.2 * u) + a[1] + '</span>'; }).join(''));
+        } else {
+          html += row('left:' + 3.5 * u + 'px;right:' + 3.5 * u + 'px;top:' + (fy + 3.6 * u) + 'px;justify-content:space-between;font-size:' + fs + 'px;color:#56565f', [['chat', 0], ['repost', 1], ['heart', 2], ['views', 3]].map(function (a) { return '<span style="display:flex;align-items:center;gap:' + 1.2 * u + 'px">' + icon(a[0], 5.2 * u) + n(a[1]) + '</span>'; }).join(''));
+        }
+      }
+      var h = over ? imgH : hh + imgH + fh;
+      c.style.cssText = 'width:' + w + 'px;height:' + h + 'px;margin-left:' + (-w / 2) + 'px;margin-top:' + (-h / 2) + 'px;border-radius:' + Math.max(8, w * (over ? 0.05 : 0.03)) + 'px;';
+      c.innerHTML = html;
+      (parent || plane).appendChild(c);
       return { el: c, w: w, h: h };
     }
     var at = function (x, y) { return { left: x + 'px', top: y + 'px' }; };
@@ -74,7 +169,7 @@
     var dof = function (dz, k) { var b = Math.max(0, Math.abs(dz) - (k || 140)) / 90; return b > 0.15 ? 'blur(' + Math.min(7, b).toFixed(2) + 'px)' : 'blur(0px)'; };
 
     // HEADLINE over the wall, the fly-through or the grid.
-    if (data.headline && (layout === 'wall' || layout === 'grid' || layout === 'fly')) {
+    if (data.headline && layout !== 'rolodex' && layout !== 'orbit' && layout !== 'fan') {
       head.textContent = String(data.headline);
       // As big as the frame allows on one line: measured (fonts are loaded
       // before the build), shrinking until the line fits 86% of the width.
@@ -88,7 +183,14 @@
     var headBox = head.textContent ? { t: H * 0.5 - M * 0.1, b: H * 0.5 + M * 0.1 } : null;
     // A soft pool of the ground's colour under a centred headline, so the
     // words never sit on a busy card.
-    if (headBox && layout !== 'grid') {
+    var topHead = layout === 'scroll' || layout === 'feed';
+    if (headBox && topHead) {
+      // Over a scroll or a feed the line sits in a band at the top, the
+      // ground's colour fading in behind it; the work runs underneath.
+      head.style.top = (H * (tall ? 0.1 : 0.12)) + 'px';
+      headBox = { t: 0, b: H * 0.24 };
+      if (groundOn) { var fade = document.createElement('div'); fade.className = 'aw-fade'; fade.style.background = 'linear-gradient(180deg, ' + colors[0] + ' 30%, transparent)'; root.insertBefore(fade, head); }
+    } else if (headBox && layout !== 'grid') {
       var glow = document.createElement('div'); glow.className = 'aw-glow';
       glow.style.setProperty('--aw-glow', colors[0]);
       root.insertBefore(glow, head);
@@ -214,6 +316,45 @@
         tl.to(c.el, { rotationY: -18, rotationX: 6, x: off * wf * (tall ? 0.08 : 0.16), y: off * -wf * 0.03, z: -Math.abs(off) * wf * 0.12, duration: 1.2, ease: 'power3.inOut' }, AT + 0.35);
         tl.to(c.el, { rotationY: -10, duration: Math.max(1, SPAN - 1.6), ease: 'sine.inOut' }, AT + 1.55);
       });
+    } else if (layout === 'scroll' || layout === 'feed') {
+      // SCROLL: full-length emails and blog pages standing in columns on a
+      // plane turned in 3D, each column scrolling at its own pace, the next
+      // one the other way -- the whole piece read top to bottom, many at
+      // once. FEED: social posts in their platform frames rising in columns,
+      // each at its own depth, near and far ones out of focus.
+      var feed = layout === 'feed';
+      var nc = clamp(Math.round(num(data.count, feed ? (tall ? 2 : 4) : (tall ? 3 : 5))), 1, 8);
+      var spread = W * (feed ? (tall ? 1.2 : 1.25) : (tall ? 1.5 : 1.45)), gapS = M * 0.035;
+      var colW = spread / nc - gapS, need = H * 2.6;
+      var pool = S.pick(nc * 10, Object.assign({}, opts, { kinds: opts.kinds || (feed ? ['social'] : ['email', 'blog']) })), pi = 0;
+      var travel = H * (feed ? 0.75 : 0.6) * (SPEED || 1);
+      var cols2 = [];
+      for (var ci = 0; ci < nc; ci++) {
+        var off = ci - (nc - 1) / 2, col = document.createElement('div'); col.className = 'aw-col'; plane.appendChild(col);
+        cols2.push({ el: col, off: off, z: feed ? 0 : -Math.abs(off) * M * 0.16 + M * 0.04, y: -H * 0.75 + (ci % 2) * colW * 0.45, made: 0 });
+      }
+      // Dealt row by row across the columns, so neighbours never show the
+      // same piece side by side.
+      for (var busy = true; busy;) {
+        busy = false;
+        cols2.forEach(function (cl) {
+          if (cl.y >= need - H * 0.75 || cl.made >= 12) return;
+          busy = true;
+          var pc = pool[pi++ % pool.length], wc = colW * (feed ? 0.9 + rnd() * 0.1 : 1);
+          var it = feed && pc.kind === 'social' ? post(pc, wc, cl.el) : card(pc, wc, cl.el);
+          var pz = feed ? (rnd() - 0.6) * M * 0.45 : 0;
+          gsap.set(it.el, Object.assign(at(0, cl.y + it.h / 2), { z: pz, rotation: feed ? (rnd() - 0.5) * 4 : 0, filter: dof(feed ? pz : cl.z, feed ? 120 : 140) }));
+          cl.y += it.h + gapS * (feed ? 1.6 : 1); cl.made++;
+        });
+      }
+      cols2.forEach(function (cl, ci) {
+        var dir = feed ? -1 : (ci % 2 ? 1 : -1), pace = 0.82 + rnd() * 0.36;
+        gsap.set(cl.el, { x: W / 2 + cl.off * (colW + gapS), y: dir > 0 ? -travel * pace : 0, z: cl.z });
+        tl.to(cl.el, { y: dir > 0 ? 0 : -travel * pace, duration: SPAN, ease: 'none' }, AT);
+      });
+      gsap.set(plane, feed ? { rotationX: 14, rotationY: 12, rotation: 3, z: -M * 0.12, transformOrigin: '50% 50%' }
+        : { rotationX: 18, rotationY: -16, rotation: -5, z: -M * 0.15, transformOrigin: '50% 50%' });
+      tl.to(plane, feed ? { rotationY: 6, z: M * 0.04, duration: SPAN, ease: 'sine.inOut' } : { rotationY: -9, z: M * 0.04, duration: SPAN, ease: 'sine.inOut' }, AT);
     } else {
       // GRID: the same piece for many brands -- "50 personalised decks" --
       // each card flipping in edge-on, in a wave, the plane leaning back.

@@ -47,13 +47,22 @@ describe("the house sample work (shared/samples.js + src/sample-work)", () => {
     const win: any = {};
     new Function("window", code)(win);
     const S = win.mpSamples;
-    expect(S.brands.length).toBe(8);
-    expect(S.work.length).toBeGreaterThanOrEqual(16);
+    expect(S.brands.length).toBe(12);
+    expect(S.work.length).toBeGreaterThanOrEqual(59);
     for (const w of S.work) {
-      expect(w.src).toMatch(/^\/assets\/_system\/sample-work\/[a-z]+-[a-z]+(-\d)?\.webp$/);
+      expect(w.src).toMatch(/^\/assets\/_system\/sample-work\/[a-z]+-[a-z]+(-[a-z0-9]+)?\.webp$/);
       await fs.access(path.resolve(__dirname, "../src/sample-work", path.basename(w.src)));
       expect(w.ratio).toBeGreaterThan(0.4);
     }
+    // Quotient's three areas, each a set worth showing: full-length emails,
+    // social posts for each platform, blog articles and blog home pages.
+    const by = (k: string) => S.work.filter((w: any) => w.kind === k);
+    expect(by("email").length).toBeGreaterThanOrEqual(12);
+    expect(by("social").length).toBeGreaterThanOrEqual(14);
+    expect(new Set(by("social").map((w: any) => w.platform)).size).toBeGreaterThanOrEqual(6);
+    expect(by("blog").length).toBeGreaterThanOrEqual(10);
+    for (const w of S.pick(12, { platforms: ["linkedin"] })) expect(w.platform).toBe("linkedin");
+    for (const w of S.work) if (w.brand) expect(S.brand(w.brand).id).toBe(w.brand);
     const picks = S.pick(60, { seed: 3 });
     for (let i = 1; i < picks.length; i++) expect(picks[i].src).not.toBe(picks[i - 1].src);
     // Filters, the deck in order, and the film's own pieces.
@@ -146,6 +155,40 @@ describe("asset wall", () => {
     } finally { await done(); }
   }, 60000);
 
+  it("scroll: full-length emails in tilted columns, each column scrolling the other way from the next", async () => {
+    const { page, at, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { layout: "scroll", kinds: ["email"], headline: "Emails people open." } }]);
+    try {
+      const ys = async (t: number) => { await at(t); return page.evaluate(() => Array.from(document.querySelectorAll(".aw-col")).map((c) => Number((window as any).gsap.getProperty(c, "y")))); };
+      const a = await ys(0.2), b = await ys(5.5);
+      expect(a.length).toBe(5);
+      const dirs = a.map((y, i) => Math.sign(b[i] - y));
+      for (let i = 1; i < dirs.length; i++) expect(dirs[i]).toBe(-dirs[i - 1]);
+      const srcs = await page.evaluate(() => Array.from(document.querySelectorAll(".aw-card img")).map((i) => i.getAttribute("src") || ""));
+      for (const x of srcs) expect(x).toMatch(/sample-work\/[a-z]+-email/);
+      // The line sits in the band at the top, over the ground's fade.
+      const head = await page.evaluate(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector(".aw-head")!); return r.getBoundingClientRect().bottom; });
+      expect(head).toBeLessThan(1080 * 0.24);
+      expect(await page.locator(".aw-fade").count()).toBe(1);
+    } finally { await done(); }
+  }, 60000);
+
+  it("feed: social posts in their platform frames rise in columns", async () => {
+    const { page, at, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { layout: "feed" } }]);
+    try {
+      const y = async (t: number) => { await at(t); return page.evaluate(() => Array.from(document.querySelectorAll(".aw-col")).map((c) => Number((window as any).gsap.getProperty(c, "y")))); };
+      const a = await y(0.2), b = await y(5.5);
+      a.forEach((v, i) => expect(b[i]).toBeLessThan(v));
+      const posts = await page.evaluate(() => Array.from(document.querySelectorAll(".aw-post")).map((p) => ({ text: (p as HTMLElement).innerText, over: p.classList.contains("aw-over"), img: (p.querySelector("img") as HTMLImageElement).getAttribute("src") || "" })));
+      expect(posts.length).toBeGreaterThan(8);
+      for (const p of posts) expect(p.img).toMatch(/sample-work\/[a-z]+-social/);
+      // Every framed post carries its brand's name; feed posts carry the
+      // platform's actions, stories and TikToks the app's controls over them.
+      expect(posts.some((p) => /Promoted/.test(p.text) && /Repost/.test(p.text))).toBe(true);   // LinkedIn
+      expect(posts.some((p) => /likes/.test(p.text))).toBe(true);                               // Instagram
+      expect(posts.some((p) => p.over)).toBe(true);                                             // story / TikTok
+    } finally { await done(); }
+  }, 60000);
+
   it("grey tone drains the colour (the enemy's work)", async () => {
     const { page, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { tone: "grey" } }]);
     try {
@@ -154,12 +197,14 @@ describe("asset wall", () => {
   }, 60000);
 
   it("the cards are a picture to the gates: cropped at the frame on purpose, never flagged as clipped copy", async () => {
-    const { htmlPath, tmp } = await write([{ id: "wall", type: "asset-wall", position: FULL, data: { headline: "1,000 brands for FREE" } }]);
-    try {
-      const defects = await measureTextContrast({ htmlPath, width: 1920, height: 1080, atTimes: [3, 5] });
-      expect(defects).toEqual([]);
-    } finally { await fs.rm(tmp, { recursive: true, force: true }); }
-  }, 90000);
+    for (const data of [{ headline: "1,000 brands for FREE" }, { layout: "feed", headline: "Posts for every platform." }, { layout: "scroll", kinds: ["blog"], headline: "Blogs worth reading." }]) {
+      const { htmlPath, tmp } = await write([{ id: "wall", type: "asset-wall", position: FULL, data }]);
+      try {
+        const defects = await measureTextContrast({ htmlPath, width: 1920, height: 1080, atTimes: [3, 5] });
+        expect(defects).toEqual([]);
+      } finally { await fs.rm(tmp, { recursive: true, force: true }); }
+    }
+  }, 180000);
 });
 
 describe("agent cursors over the editor building a sample brand's email", () => {
