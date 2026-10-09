@@ -1629,6 +1629,17 @@ export function cameraMovesScript(
         var tw = { scale: to.scale, x: to.x, y: to.y, rotation: to.rotation, duration: dur, ease: ease };
         if (to.rotationY != null) { tw.rotationY = to.rotationY; tw.transformPerspective = to.transformPerspective; delete tw.rotation; }
         if (to.rotationX != null) { tw.rotationX = to.rotationX; tw.transformPerspective = to.transformPerspective; delete tw.rotation; }
+        // A scene that OPENS on a framing (a near-instant move at 0, how a
+        // cut carries the punch-in across) must already hold it on its first
+        // frame: a tween at 0 sits at progress 0 there, so the cut showed the
+        // wide frame and then snapped back in -- for one frame in a render,
+        // for as long as Studio held the scene's first frame (Five Tools,
+        // scene 3 -> 4 at 26.7 s: "zooms out and back in again").
+        if (m.at <= 0.05 && dur <= 0.05) {
+          var opening = {};
+          for (var ok in tw) if (ok !== 'duration' && ok !== 'ease') opening[ok] = tw[ok];
+          gsap.set(rig.el, opening);
+        }
         tl.to(rig.el, tw, m.at);
         st = to;
         if (m['return']) {

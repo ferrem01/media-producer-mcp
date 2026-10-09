@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — A scene that opens punched-in holds it on frame one
+
+Scenes that carry a punch-in across a cut open with a near-instant zoom at
+0 s (duration 0.01). A tween at 0 sits at progress 0 on that exact frame, so
+the cut showed the wide shot first and then snapped back in: one frame in a
+render, as long as Studio held the first frame (Five Tools proj_85782f74,
+scene 3 -> 4 at 26.7 s, Marc: "zooms out and back in again"). The camera
+script now `gsap.set`s an opening framing (at <= 0.05 s, duration <= 0.05 s)
+before the timeline plays; a real zoom from 0 still eases in from the wide
+shot. Test: `test/camera-opening.test.ts`.
+
 ## 2026-10-09 — A crossfade no longer rewinds the outgoing scene's camera
 
 Marc, proj_54cbf8e0 at 9.5 s: "the preview shows me sitting down again". A
