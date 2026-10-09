@@ -384,6 +384,32 @@ export function sceneRecording(project: any, si: number): any | null {
   return takes.length ? takes[takes.length - 1] : null;
 }
 
+/** The scene's voice-only recording (core/voice-lines.ts recordSceneVoice), if any. */
+export function sceneVoiceTake(project: any, si: number): { file: string; recorded_at: string } | null {
+  const vt = project?.storyboard?.scenes?.[si]?.voice_take;
+  return vt?.file ? vt : null;
+}
+
+/** The recording "my recording" means for scene `si`: the voice-only one or
+ *  a video take's sound -- the one asked for, else the newest. */
+export function pickRecording(project: any, si: number, from?: "voice" | "video"):
+  { kind: "voice"; file: string; id: string } | { kind: "video"; take: any; id: string } | null {
+  const voice = sceneVoiceTake(project, si), video = sceneRecording(project, si);
+  const asVoice = voice ? { kind: "voice" as const, file: voice.file, id: voice.file } : null;
+  const asVideo = video ? { kind: "video" as const, take: video, id: String(video.source) } : null;
+  if (from === "voice" && asVoice) return asVoice;
+  if (from === "video" && asVideo) return asVideo;
+  if (asVoice && asVideo) return String(voice!.recorded_at || "") >= String(video.recorded_at || "") ? asVoice : asVideo;
+  return asVoice || asVideo;
+}
+
+/** The recording a scene's voice comes from (made_with.from), or undefined
+ *  when it is read from the script. */
+function voiceFrom(project: any, si: number, perf: ScenePerformance | undefined): string | undefined {
+  if (!perf || (perf.voice_source || "script") === "script") return undefined;
+  return pickRecording(project, si, perf.recording_from)?.id;
+}
+
 /** Put the scene's recording back: re-attached if a performance replaced
  *  it, and the scene cast as the recording (no recast plays). */
 export async function useSceneRecording(tenant: string, projectId: string, si: number): Promise<{ reattached: boolean }> {
@@ -492,17 +518,22 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
     await elevenSpeech(text, actor.voice_id!, src, SCRIPT_VOICE_MODEL);
   } else {
     const project = await loadProject(tenant, projectId);
-    const take = sceneRecording(project, si);
-    if (!take) throw new Error(`Scene ${si + 1} has no recording to convert: record it, or voice the script`);
-    // The take as the scene plays it: its window, through its cuts.
-    const raw = takeCopies(take).raw;
-    const cut = cutFileFor(take, raw);
-    const onCut = !!cut && cut !== raw;
-    const win = takeWindow(take);
-    const start = onCut ? playClock(take, win.start) : win.start;
-    const end = onCut ? playClock(take, win.end) : win.end;
-    await ffmpeg(["-ss", String(start), ...(end > start ? ["-to", String(end)] : []), "-i", resolveVideoPath(onCut ? cut! : raw, config.dataDir),
-      "-vn", "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("take.wav")]);
+    const rec = pickRecording(project, si, (await loadScene(tenant, projectId, si)).scene.performance?.recording_from);
+    if (!rec) throw new Error(`Scene ${si + 1} has no recording: record your voice or the scene, or voice the script`);
+    if (rec.kind === "voice") {
+      await ffmpeg(["-i", resolveVideoPath(rec.file, config.dataDir), "-vn", "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("take.wav")]);
+    } else {
+      // The take as the scene plays it: its window, through its cuts.
+      const take = rec.take;
+      const raw = takeCopies(take).raw;
+      const cut = cutFileFor(take, raw);
+      const onCut = !!cut && cut !== raw;
+      const win = takeWindow(take);
+      const start = onCut ? playClock(take, win.start) : win.start;
+      const end = onCut ? playClock(take, win.end) : win.end;
+      await ffmpeg(["-ss", String(start), ...(end > start ? ["-to", String(end)] : []), "-i", resolveVideoPath(onCut ? cut! : raw, config.dataDir),
+        "-vn", "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", w("take.wav")]);
+    }
     // Marc, Oct 8: "use my real voice, not the clone" -- the recording as is.
     if (source === "recording") src = w("take.wav");
     else await convertVoice(w("take.wav"), src, actor.voice_id!);
@@ -531,9 +562,11 @@ function setSpeed(p: ScenePerformance, v: number | undefined): boolean {
 }
 
 /** The scene's heard voice, when it is still the one to send. */
-function heardVoice(perf: ScenePerformance, actorId: string, line: string, voiceId?: string): NonNullable<ScenePerformance["voice_preview"]> | null {
+function heardVoice(perf: ScenePerformance, actorId: string, line: string, voiceId?: string, from?: string): NonNullable<ScenePerformance["voice_preview"]> | null {
   const vp = perf.voice_preview;
   if (!vp || vp.actor !== actorId || vp.source !== (perf.voice_source || "script")) return null;
+  // Heard from another recording (a new voice take since): not this one.
+  if (vp.source !== "script" && (vp.from || "") !== (from || "")) return null;
   if (voiceId !== undefined && vp.voice_id && vp.voice_id !== voiceId) return null;
   if (vp.line !== undefined && vp.line !== line) return null;
   if (vp.source === "script" && (vp.delivery || "") !== (perf.delivery || "")) return null;
@@ -551,6 +584,8 @@ async function useHeard(vp: NonNullable<ScenePerformance["voice_preview"]>, work
  *  Returns at once; the work runs on (poll getScenePerformances). */
 export async function startScenePerformance(tenant: string, projectId: string, si: number, opts: {
   actor?: string; shot?: string; voice_source?: VoiceSource; quality?: "draft" | "final";
+  /** Which recording "my recording" uses when there are both ("" back to the newest). */
+  recording_from?: "voice" | "video" | "";
   /** Full prompts in place of the defaults ("" back to the default). */
   frame_prompt?: string; video_prompt?: string;
   /** Make it even when the pitch check would stop it. */
@@ -594,6 +629,10 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     if (p.shot !== shot || p.voice_source !== source) delete p.draft;
+    if (opts.recording_from !== undefined && (opts.recording_from || undefined) !== p.recording_from) {
+      if (opts.recording_from) p.recording_from = opts.recording_from; else delete p.recording_from;
+      delete p.draft;
+    }
     // The first frame is drawn for the shot: a new shot draws a new one (the
     // panel no longer shows frames -- Marc: "just go create the first frame").
     if (p.shot !== shot && p.frame && !(p.frames || []).some((f) => f.url === p.frame && f.from_scene != null)) delete p.frame;
@@ -636,7 +675,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
  *  under HeyGen's picture (its own copy is re-encoded). No draft: HeyGen's
  *  one render is the take. Returns at once. */
 async function startSceneHeygen(tenant: string, projectId: string, si: number, actor: CastActor, plan: ResolvedPlan, opts: {
-  voice_source?: VoiceSource; delivery?: string; motion?: string;
+  voice_source?: VoiceSource; delivery?: string; motion?: string; recording_from?: "voice" | "video" | "";
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -659,6 +698,7 @@ async function startSceneHeygen(tenant: string, projectId: string, si: number, a
   const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     p.actor = actor.id; p.voice_source = source;
+    if (opts.recording_from !== undefined) { if (opts.recording_from) p.recording_from = opts.recording_from; else delete p.recording_from; }
     if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
     followPlan(sc, project, { actor: actor.id, how: "generate", engine: "heygen" }, plan);
@@ -669,6 +709,7 @@ async function startSceneHeygen(tenant: string, projectId: string, si: number, a
     const voiceDir = path.join(projectDir(tenant, projectId), "_work", `heygen-s${si + 1}`);
     await fs.mkdir(voiceDir, { recursive: true });
     let voice: { file: string; seconds: number };
+    const from = voiceFrom(await loadProject(tenant, projectId), si, perf);
     if (actor.voice_id || source === "recording") voice = await sceneVoice(tenant, projectId, si, actor, source, voiceDir);
     else {
       const line = spokenParts(String((await loadScene(tenant, projectId, si)).scene.voiceover_text || "")).map((x) => x.join(" ")).join(" ... ");
@@ -704,7 +745,7 @@ async function startSceneHeygen(tenant: string, projectId: string, si: number, a
       const now = new Date().toISOString();
       p.final = { url, made_at: now };
       p.voice_url = voiceUrl;
-      p.made_with = { actor: actor.id, engine: "heygen", ...(actor.voice_id && source !== "recording" ? { voice_id: actor.voice_id } : {}) };
+      p.made_with = { actor: actor.id, engine: "heygen", ...(actor.voice_id && source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(from ? { from } : {}) };
       p.status = "done"; delete p.stage; p.finished_at = now;
     });
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
@@ -729,6 +770,8 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   let frame = perf.frame;
   let voice: { file: string; seconds: number } | null = null;
   let voiceUrl = perf.voice_url;
+  // The recording the voice comes from; a final finishing its draft keeps the draft's.
+  let from = perf.made_with?.from;
   let inputs = `final:${perf.draft?.draft_id || ""}`;
   // The location's plate: the room the frame is drawn in and Seedance keeps.
   const locationAbs = !finishing && perf.location ? await locationImage(tenant, perf.location) : undefined;
@@ -745,7 +788,8 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     // The voice heard is the voice sent: a scene whose heard read still
     // matches (actor, source, delivery, line) gives Seedance that very file,
     // not a fresh render with its own intonation.
-    const heard = heardVoice(perf, actor.id, String(scene.voiceover_text || ""), actor.voice_id);
+    from = voiceFrom(project, si, perf);
+    const heard = heardVoice(perf, actor.id, String(scene.voiceover_text || ""), actor.voice_id, from);
     voice = heard ? await useHeard(heard, workDir) : await sceneVoice(tenant, projectId, si, actor, perf.voice_source, workDir);
     // THE PITCH CHECK, before Seedance is paid: the voice against the
     // actor's other scenes in this film. A line spoken low converts low
@@ -811,7 +855,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     if (quality === "draft") p.draft = { url, ...(result.draftId ? { draft_id: result.draftId } : {}), inputs, made_at: now };
     else p.final = { url, made_at: now };
     if (voiceUrl) p.voice_url = voiceUrl; else delete p.voice_url;
-    p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id && perf.voice_source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(p.location ? { location: p.location } : {}) };
+    p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id && perf.voice_source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(from ? { from } : {}), ...(p.location ? { location: p.location } : {}) };
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
 }
@@ -851,6 +895,8 @@ export async function restoreSceneTake(tenant: string, projectId: string, si: nu
  *  recording converted -- kept as an asset, with its pitch. `delivery`
  *  given is kept on the scene. */
 export async function previewSceneVoice(tenant: string, projectId: string, si: number, opts: { actor?: string; voice_source?: VoiceSource; delivery?: string;
+  /** Which recording "my recording" uses (kept on the scene; "" back to the newest). */
+  recording_from?: "voice" | "video" | "";
   /** Hear the line in ANOTHER voice (the voice picker): nothing on the scene
    *  or the actor changes. */
   voice_id?: string;
@@ -860,9 +906,10 @@ export async function previewSceneVoice(tenant: string, projectId: string, si: n
   const prev: ScenePerformance | undefined = scene.performance;
   const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || prev?.actor);
   const source = opts.voice_source || prev?.voice_source || "script";
-  if (opts.delivery !== undefined || opts.voice_speed !== undefined || !prev?.actor) {
+  if (opts.delivery !== undefined || opts.voice_speed !== undefined || opts.recording_from !== undefined || !prev?.actor) {
     await patch(tenant, projectId, si, (p) => {
       if (!p.actor) p.actor = actor.id;
+      if (opts.recording_from !== undefined) { if (opts.recording_from) p.recording_from = opts.recording_from; else delete p.recording_from; }
       setSpeed(p, opts.voice_speed);
       if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
     });
@@ -873,6 +920,7 @@ export async function previewSceneVoice(tenant: string, projectId: string, si: n
   const workDir = path.join(projectDir(tenant, projectId), "_work", `voice-preview-s${si + 1}${trying ? "-try" : ""}`);
   await fs.mkdir(workDir, { recursive: true });
   const voice = await sceneVoice(tenant, projectId, si, speaker, source, workDir);
+  const from = source === "script" ? undefined : pickRecording(project, si, opts.recording_from !== undefined ? (opts.recording_from || undefined) : prev?.recording_from)?.id;
   const name = `voice-preview-${actor.id}-s${si + 1}${trying ? "-try" : ""}-${stamp()}.mp3`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
   await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), name));
@@ -883,7 +931,7 @@ export async function previewSceneVoice(tenant: string, projectId: string, si: n
   // Kept on the scene: the take panel shows the voice is ready (Marc: "it
   // doesn't seem to acknowledge that there was already voice generated").
   const after = await patch(tenant, projectId, si, (p) => {
-    p.voice_preview = { url, seconds, hz, actor: actor.id, voice_id: actor.voice_id, source, line: String(scene.voiceover_text || ""), ...(p.delivery ? { delivery: p.delivery } : {}), ...(voiceSpeedOf(p) !== 1 ? { speed: voiceSpeedOf(p) } : {}), made_at: new Date().toISOString() };
+    p.voice_preview = { url, seconds, hz, actor: actor.id, voice_id: actor.voice_id, source, ...(from ? { from } : {}), line: String(scene.voiceover_text || ""), ...(p.delivery ? { delivery: p.delivery } : {}), ...(voiceSpeedOf(p) !== 1 ? { speed: voiceSpeedOf(p) } : {}), made_at: new Date().toISOString() };
   });
   return { url, seconds, hz, voice_id: String(actor.voice_id || ""), ...(after?.delivery ? { delivery: after.delivery } : {}) };
 }
@@ -955,10 +1003,20 @@ export async function getScenePerformances(tenant: string, projectId: string) {
     // Made in a voice the actor no longer has: stale, said why.
     const madeVoice = s.performance?.made_with?.voice_id, nowVoice = plan.actor ? actors.find((a) => a.id === plan.actor)?.voice_id : undefined;
     if (st.state === "ready" && plan.how === "generate" && madeVoice && nowVoice && madeVoice !== nowVoice) { st.state = "stale"; st.why = "made in another voice"; }
+    // Made from a recording since replaced (a new voice take): stale too.
+    const madeFrom = s.performance?.made_with?.from, nowFrom = voiceFrom(project, i, s.performance);
+    if (st.state === "ready" && plan.how === "generate" && madeFrom && nowFrom && madeFrom !== nowFrom) { st.state = "stale"; st.why = "made from an earlier recording"; }
+    const vt = sceneVoiceTake(project, i);
+    const using = pickRecording(project, i, s.performance?.recording_from);
     return {
       scene_index: i, label: s.label, lines: String(s.voiceover_text || ""),
       take: take ? { performed_by: take.performed_by || null, recast_by: Object.keys(take.actors || {}) } : null,
+      // A VIDEO recording (what a recast performs); a voice-only one is
+      // `voice_take`. Either can voice a performed scene (has_voice).
       has_recording: hasRec,
+      voice_take: vt ? { recorded_at: vt.recorded_at } : null,
+      has_voice: hasRec || !!vt,
+      recording_used: using ? using.kind : null,
       // The plan (core/cast-plan.ts): what the scene should be, and whether its take is it.
       plan, plan_line: planLine(plan, actors, locations), state: st.state, ...(st.why ? { why: st.why } : {}),
       performer: s.performer || null,

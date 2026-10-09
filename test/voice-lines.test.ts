@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { retimeSoundTracks, sceneWindows } from "../src/core/narration-fit.js";
-import { revoiceLine, attachRecordedLine, paceRecordedLine, fitFilmToVoice, lineText } from "../src/core/voice-lines.js";
+import { revoiceLine, attachRecordedLine, paceRecordedLine, fitFilmToVoice, lineText, recordSceneVoice } from "../src/core/voice-lines.js";
 
 const run = promisify(execFile);
 const tone = (out: string, seconds: number) =>
@@ -71,6 +71,27 @@ describe("voice lines", () => {
     await paceRecordedLine(p, 1, 1.2, { audioDir: dir });
     expect(tr.speed).toBe(1.2);
     expect(await probe(tr.source)).toBeCloseTo(2.5, 0);
+    await fs.rm(dir, { recursive: true, force: true });
+  }, 30000);
+
+  it("a voice-only recording is kept on the board scene; it plays as the line unless a take plays there", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "vl-voice-"));
+    const p = film();
+    p.storyboard = { scenes: [{ label: "A", voiceover_text: "Line one." }, { label: "B", voiceover_text: "Line two is longer." }] };
+    // Scene 1 already has a take playing (a performance, say).
+    p.takes = [{ id: "take_0", scene_index: 0, source: "/x/take.mp4", recorded_at: "x" }];
+    p.speaker_track = { clips: [{ source: "/x/take.mp4", start: 0, scene_index: 0 }] };
+    const rec = path.join(dir, "voice.wav");
+    await tone(rec, 3);
+    // Scene 2: no take -- kept, and it plays.
+    expect(await recordSceneVoice(p, 1, rec, { audioDir: dir })).toBe(true);
+    expect(p.storyboard.scenes[1].voice_take.file).toBe(rec);
+    expect(p.audio.tracks.find((t: any) => t.id === "vo_scene_1").take).toBe(rec);
+    // Scene 1: the take keeps the scene; the voice waits for a performance.
+    const before = JSON.stringify(p.audio.tracks.find((t: any) => t.id === "vo_scene_0"));
+    expect(await recordSceneVoice(p, 0, rec, { audioDir: dir })).toBe(false);
+    expect(p.storyboard.scenes[0].voice_take.file).toBe(rec);
+    expect(JSON.stringify(p.audio.tracks.find((t: any) => t.id === "vo_scene_0"))).toBe(before);
     await fs.rm(dir, { recursive: true, force: true });
   }, 30000);
 });

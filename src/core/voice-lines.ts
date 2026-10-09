@@ -19,6 +19,7 @@ import { measureNarration, fitScenesToNarration, narrationTrackScene } from "./n
 import { resolveVideoPath } from "./video-path.js";
 import { measureLoudness } from "./take-sanitize.js";
 import { speak, levelGain, levelFilter, voiceSpeed } from "../audio/tts.js";
+import { activeTake } from "./take-needs.js";
 
 const run = promisify(execFile);
 
@@ -96,6 +97,22 @@ export async function attachRecordedLine(project: Project, si: number, file: str
   delete tr.voice;
   await renderRecordedLine(tr, 1, ctx.audioDir);
   return tr;
+}
+
+/** A VOICE-ONLY RECORDING of scene `si` lands: kept on the board scene as
+ *  its voice take (what a performance is made from), and played as the
+ *  scene's line unless a take already plays there -- then the take keeps
+ *  the scene, and the recording waits for a performance made from it (Marc,
+ *  Oct 8: "I'll just record the voice ... then when I go through the options
+ *  ... the appropriate visuals would be presented to me"). Returns whether
+ *  it now plays (the film then re-fits to its lines). */
+export async function recordSceneVoice(project: Project, si: number, file: string, ctx: { audioDir: string }): Promise<boolean> {
+  if (!project.scenes[si]) throw new Error(`No scene ${si}`);
+  const bs = (project as any).storyboard?.scenes?.[si];
+  if (bs) bs.voice_take = { file, recorded_at: new Date().toISOString() };
+  if (activeTake(project, si)) return false;
+  await attachRecordedLine(project, si, file, ctx);
+  return true;
 }
 
 /** Re-pace a recorded line from the recording itself (pitch kept). */

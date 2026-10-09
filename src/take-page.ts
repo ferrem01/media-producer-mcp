@@ -113,6 +113,7 @@ ${QUOTIENT_CSS}
   a.link { color: var(--muted-foreground); font-size: 14px; text-decoration: none; }
   .toggle { display: flex; gap: 10px; align-items: flex-start; color: var(--content-primary); font-size: 14px; margin: 10px 0 14px; white-space: nowrap; }
   .toggle .hint { white-space: normal; }
+  .vhide { display: none !important; }
   /* A choice row wraps: its hint takes a full line of its own instead of a
      one-word-wide column beside the options. */
   #bgChoice { flex-wrap: wrap; align-items: center; }
@@ -190,6 +191,8 @@ ${QUOTIENT_CSS}
      camera and the count-in: the light check speaks there, never during
      the take. FRAMING (preroll + count-in) shows where the face goes. */
   #guide { position:absolute; inset:0; pointer-events:none; display:none; }
+  /* VOICE ONLY: no camera -- the prompter, the timer and the meter on black. */
+  #stage.voice #live, #stage.voice #cap, #stage.voice #guide, #stage.voice #lightBadge, #stage.voice #lightCard { display:none !important; }
   #stage.framing #guide { display:block; }
   #oval { position:absolute; box-sizing:border-box; border:2px dashed rgba(255,255,255,.38); border-radius:50%; }
   #eyes { position:absolute; height:0; border-top:1px solid rgba(255,255,255,.3); }
@@ -243,6 +246,8 @@ ${QUOTIENT_CSS}
     <label><input type="radio" name="takeAs" value="speaker" checked> Take A (you)</label>
     <label><input type="radio" name="takeAs" value="clone"> Take B (your clone)</label></div>
   <div id="formatNotes"></div>
+  <label class="toggle" id="voiceRow" style="display:none"><input type="checkbox" id="voiceOnly"> Voice only <span class="hint">(no camera: your voice for this scene, read off the prompter. In Studio it can voice a generated performance of you, or play under graphics.)</span></label>
+  <div class="toggle" id="voiceUploadRow" style="display:none"><button type="button" class="btn ghost" id="voiceUploadBtn">Upload an audio file</button><input type="file" id="voiceFile" accept="audio/*,video/*" hidden></div>
   <div class="rec-dock"><button class="btn" id="recordBtn" disabled>Record</button></div>
 </section>
 
@@ -319,6 +324,11 @@ ${QUOTIENT_CSS}
   // it), and the attached take is announced to the parent so the picker
   // closes and the film reloads with the take in its slot.
   var embedded = qp.get('embed') === '1';
+  // VOICE ONLY (?voice=1, or the ready screen's toggle): one scene's voice,
+  // no camera -- recorded here or uploaded, it lands as the scene's voice
+  // recording (POST /api/voice-line). Marc, Oct 8: "I'll just record the
+  // voice ... from my device, from my phone, upload it".
+  var voiceMode = qp.get('voice') === '1', voiceAllowed = false;
   // In Studio's dialog the page sizes to its content and says how tall it
   // is, so the whole ready screen (lines, choices, Record) fits without a
   // scroll inside a scroll (Marc: "make this entire screen fit").
@@ -440,6 +450,7 @@ ${QUOTIENT_CSS}
         var grammarP = (p.treatment && p.treatment.filmGrammar) || '';
         var clipNeed = !!(sbSc && (sbSc.assets || []).some(function (a0) { return a0 && a0.type === 'camera_video' && a0.use === 'clip'; }))
           || (sceneIndex >= 0 && grammarP && grammarP !== 'speaker' && grammarP !== 'creator-cut');
+        clipNeedNow = clipNeed;
         if (clipNeed) {
           var bgc = $('bgChoice'); if (bgc) bgc.style.display = 'none';
           var clipNote = document.createElement('div'); clipNote.className = 'hint'; clipNote.id = 'clipNote';
@@ -499,10 +510,34 @@ ${QUOTIENT_CSS}
         d.appendChild(document.createTextNode(t.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { l = l.trim(); return PAUSE_LINE.test(l) ? PAUSE_GLYPH : l; }).filter(Boolean).join('\\n')));
         sc.appendChild(d);
       });
+      voiceAllowed = sceneIndex >= 0 && !clipNeedNow;
+      applyVoiceMode();
       $('recordBtn').disabled = false;
     })
     .catch(function (e) { fail(e.message || String(e)); });
   }
+  // A voice is one scene's, and never a clip's (a clip is a picture).
+  var clipNeedNow = false;
+  function applyVoiceMode() {
+    if (!voiceAllowed) voiceMode = false;
+    $('voiceRow').style.display = voiceAllowed ? '' : 'none';
+    $('voiceOnly').checked = voiceMode;
+    $('voiceUploadRow').style.display = voiceMode ? '' : 'none';
+    ['bgChoice', 'softDial'].forEach(function (id) { var el = $(id); if (el) el.classList.toggle('vhide', voiceMode); });
+    var soft = $('softLook') && $('softLook').parentNode; if (soft) soft.classList.toggle('vhide', voiceMode);
+    var cl = $('cloneChoice'); if (cl) cl.classList.toggle('vhide', voiceMode);
+    $('recordBtn').textContent = voiceMode ? 'Record my voice' : 'Record';
+    if (voiceMode) $('readyNote').textContent = 'Voice only: no camera. Tap Record my voice for a 3-second count-in, then read your lines as they show, at your own pace. Or upload an audio file of this scene.';
+    postSize();
+  }
+  $('voiceOnly').addEventListener('change', function () { voiceMode = this.checked; releaseCamera(); applyVoiceMode(); });
+  $('voiceUploadBtn').addEventListener('click', function () { $('voiceFile').click(); });
+  $('voiceFile').addEventListener('change', function () {
+    var f = this.files && this.files[0]; this.value = '';
+    if (!f) return;
+    blob = f; blobDuration = 0;
+    uploadVoice(f, (f.name.split('.').pop() || 'webm').toLowerCase());
+  });
   loadFilm();
 
   // ── recording ──────────────────────────────────────────────────────────
@@ -511,9 +546,11 @@ ${QUOTIENT_CSS}
   var blob = null, blobDuration = 0, trackW = 0, trackH = 0;
 
   var CANDS = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  var VOICE_CANDS = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
   function pickMime() {
     if (!window.MediaRecorder) return '';
-    for (var i = 0; i < CANDS.length; i++) { try { if (MediaRecorder.isTypeSupported(CANDS[i])) return CANDS[i]; } catch (e) {} }
+    var cands = voiceMode ? VOICE_CANDS : CANDS;
+    for (var i = 0; i < cands.length; i++) { try { if (MediaRecorder.isTypeSupported(cands[i])) return cands[i]; } catch (e) {} }
     return '';
   }
 
@@ -726,6 +763,24 @@ ${QUOTIENT_CSS}
   $('softLook').addEventListener('change', function () { $('softDial').classList.toggle('off', !this.checked); });
   $('recordBtn').addEventListener('click', function () {
     $('recordBtn').disabled = true;
+    $('stage').classList.toggle('voice', voiceMode);
+    if (voiceMode) {
+      // The mic alone; a camera left open from a video take goes first.
+      if (stream && stream.getVideoTracks().length) releaseCamera();
+      var liveV = stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; });
+      (liveV ? Promise.resolve(stream) : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } })).then(function (s) {
+        stream = s; trackW = 0; trackH = 0;
+        show('stage');
+        $('timer').textContent = '0:00'; $('timer').classList.remove('rec');
+        startMeter(s);
+        if (navigator.wakeLock && navigator.wakeLock.request) { navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); }
+        roll(s);
+      }).catch(function (e) {
+        $('recordBtn').disabled = false;
+        fail('The microphone was not allowed (' + (e.name || e) + '). Allow it for this site and try again.');
+      });
+      return;
+    }
     var constraints = {
       video: { facingMode: 'user', width: { ideal: capW }, height: { ideal: capH }, frameRate: { ideal: 30 } },
       // Mirrors the recorder extension so a take behaves the same on every device.
@@ -760,13 +815,13 @@ ${QUOTIENT_CSS}
   function roll(s) {
       // The guide stays up through the count-in (last chance to frame), and
       // the count-in is when the camera's auto exposure/white balance lock.
-      $('stage').classList.add('framing'); placeGuide(); maybeLock();
+      if (!voiceMode) { $('stage').classList.add('framing'); placeGuide(); maybeLock(); }
       var n = 3; $('count').style.display = 'flex'; $('count').textContent = String(n);
       var cd = countTimer = setInterval(function () {
         n -= 1;
         if (n > 0) { $('count').textContent = String(n); return; }
         clearInterval(cd); countTimer = null; $('count').style.display = 'none';
-        mime = pickMime(); ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+        mime = pickMime(); ext = mime.indexOf('mp4') >= 0 ? (voiceMode ? 'm4a' : 'mp4') : 'webm';
         chunks = [];
         // Record the PICTURE ON SCREEN, not the camera track. iOS hands the
         // recorder the sensor's landscape frame with a rotation tag (the
@@ -776,9 +831,9 @@ ${QUOTIENT_CSS}
         // pixels at full size and no tag. Falls back to the raw track where
         // captureStream is missing; the server sanitizer handles that file.
         var src = s;
-        capture = 'raw';
+        capture = voiceMode ? 'voice' : 'raw';
         var cv = $('cap');
-        if (cv.captureStream || cv.mozCaptureStream) {
+        if (!voiceMode && (cv.captureStream || cv.mozCaptureStream)) {
           try {
             var cs = (cv.captureStream ? cv.captureStream(30) : cv.mozCaptureStream(30));
             src = new MediaStream();
@@ -795,6 +850,7 @@ ${QUOTIENT_CSS}
         // plain wall, and the steps show once the take is graded and
         // re-encoded. 12 keeps them smooth, for ~90 MB a minute.
         var recOpts = { videoBitsPerSecond: 12000000, audioBitsPerSecond: 128000 };
+        if (voiceMode) delete recOpts.videoBitsPerSecond;
         if (mime) recOpts.mimeType = mime;
         try { rec = new MediaRecorder(src, recOpts); }
         catch (e1) {
@@ -848,21 +904,47 @@ ${QUOTIENT_CSS}
   });
 
   function onStopped() {
-    blob = new Blob(chunks, { type: mime || 'video/webm' });
+    blob = new Blob(chunks, { type: mime || (voiceMode ? 'audio/webm' : 'video/webm') });
     stopAll();
     if (!blob.size) { fail('The recording came back empty. Try again.'); return; }
     var url = URL.createObjectURL(blob);
     var v = $('play'); v.src = url; v.load();
     $('reviewMeta').textContent = fmt(blobDuration) + (total ? ' recorded · script is ' + fmt(total) : '') + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB'
-      + (capture === 'canvas' ? ' · ' + capW + '×' + capH : (trackW && trackH ? ' · ' + trackW + '×' + trackH : '')) + ' · ' + ext;
+      + (voiceMode ? ' · voice only' : capture === 'canvas' ? ' · ' + capW + '×' + capH : (trackW && trackH ? ' · ' + trackW + '×' + trackH : '')) + ' · ' + ext;
     show('review');
   }
 
   $('retakeBtn').addEventListener('click', function () { blob = null; chunks = []; $('play').src = ''; show('ready'); $('recordBtn').disabled = false; });
 
   // ── upload + attach ────────────────────────────────────────────────────
+  // A voice: straight to the scene's voice recording (no take, no camera).
+  function uploadVoice(b, e) {
+    show('upload');
+    $('uploadMeta').textContent = 'Your voice · ' + (b.size / 1048576).toFixed(1) + ' MB';
+    $('uploadFill').style.width = '0%';
+    $('uploadNote').textContent = 'Sending your voice to the project.';
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', withToken('/api/voice-line/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + '?scene=' + sceneIndex + '&name=' + encodeURIComponent('voice.' + e)));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = function (ev) { if (ev.lengthComputable) $('uploadFill').style.width = Math.round((ev.loaded / ev.total) * 100) + '%'; };
+    xhr.onerror = function () { fail('Upload failed (network). Check the connection and try again.'); };
+    xhr.onload = function () {
+      var j = {}; try { j = JSON.parse(xhr.responseText); } catch (eJ) {}
+      if (xhr.status < 200 || xhr.status >= 300) { fail('Could not attach your voice (' + xhr.status + '): ' + (j.error || xhr.responseText || '').slice(0, 200)); return; }
+      $('doneMeta').textContent = projectName + (blobDuration ? ' · ' + fmt(blobDuration) : '') + ' · voice';
+      $('studioLink').href = studioHref;
+      showNext();
+      $('doneNote').textContent = 'Your voice is in for this scene. In Studio, pick what the scene shows: a performance made from your voice, or graphics over it.';
+      show('done');
+      releaseCamera();
+      if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: sceneIndex, project: project, voice: true }, window.location.origin); } catch (eP) {} }
+    };
+    xhr.send(b);
+  }
+
   $('useBtn').addEventListener('click', function () {
     if (!blob) return;
+    if (voiceMode) { uploadVoice(blob, ext); return; }
     var name = 'take-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
     show('upload');
     $('uploadMeta').textContent = name + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB';

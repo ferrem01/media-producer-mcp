@@ -669,9 +669,14 @@ export interface ScenePerformance {
   voice_url?: string;
   /** The voice last heard for the scene ("Hear the voice"): what Seedance
    *  will be given unless the line, delivery or actor change. */
-  voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take" | "recording"; line?: string; delivery?: string; speed?: number; made_at: string };
+  voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take" | "recording"; from?: string; line?: string; delivery?: string; speed?: number; made_at: string };
   /** What the scene's current take was made with (the plan it answers). */
-  made_with?: { actor: string; engine: string; voice_id?: string; location?: string };
+  made_with?: { actor: string; engine: string; voice_id?: string; location?: string;
+    /** The recording the voice came from (a voice take's file, a video take's source). */
+    from?: string };
+  /** Which recording "my recording" uses when the scene has both: the
+   *  voice-only one or the video take's sound. Absent: the newest. */
+  recording_from?: "voice" | "video";
   /** The 480p draft: Atlas's draft id finishes the same shot at 1080p. */
   draft?: { url: string; draft_id?: string; inputs: string; made_at: string };
   final?: { url: string; made_at: string };
@@ -698,6 +703,11 @@ export interface StoryboardScene {
   cast?: string | null;
   /** Who performs this scene, how and where (core/cast-plan.ts). */
   performer?: CastPlan;
+  /** The person's latest VOICE-ONLY recording of this scene (the take page's
+   *  Voice only, or Studio's record / upload): kept here, apart from the line
+   *  that plays, so a performance can be made from it again after a take
+   *  lands on the scene and drops that line (take-needs.ts dropVoiceUnderTakes). */
+  voice_take?: { file: string; recorded_at: string };
   /** A cast actor performing the scene without a recording (Seedance). */
   performance?: ScenePerformance;
   /** Every b-roll clip on the scene, by start time (a montage holds several). */

@@ -3117,7 +3117,8 @@ Rules:
       //                                                           {action:"continue", from_scene?}
       //                                                           {action:"restore", url, draft_id?}  (an earlier performance of the scene back as its take)
       //                                                           {action:"voice", delivery?, voice_source?}  (hear the voice alone before Seedance: url, pitch)  (the start frame = that scene's last frame; default the scene before)
-      //                                                           {action:"perform", actor?, shot?, voice_source?, quality?, frame_prompt?, video_prompt?}
+      //                                                           {action:"perform", actor?, shot?, voice_source?, recording_from?, quality?, frame_prompt?, video_prompt?}
+      //                                                           (recording_from: "voice" | "video" -- which recording "my recording" uses when there are both)
       //                                                           (a prompt replaces the default built from the shot; "" goes back to it)
       //                                                           {action:"clip", actor?, shot, seconds?}  (b-roll, no speech)
       //                                                           {action:"cast", cast: actor id | null | "film"}
@@ -3150,7 +3151,8 @@ Rules:
             if (body.action === "voice") {
               const { previewSceneVoice } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined, voice_id: str(body.voice_id), voice_speed: Number(body.voice_speed) || undefined,
-                voice_source: ["script", "take", "recording"].includes(body.voice_source) ? body.voice_source : undefined }));
+                voice_source: ["script", "take", "recording"].includes(body.voice_source) ? body.voice_source : undefined,
+                recording_from: ["voice", "video", ""].includes(body.recording_from) ? body.recording_from : undefined }));
               return;
             }
             if (body.action === "restore") {
@@ -3173,6 +3175,7 @@ Rules:
               jsonResponse(res, 202, await startScenePerformance(spTenant, spProject, si, {
                 actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), video_prompt: str(body.video_prompt),
                 voice_source: ["script", "take", "recording"].includes(body.voice_source) ? body.voice_source : undefined,
+                recording_from: ["voice", "video", ""].includes(body.recording_from) ? body.recording_from : undefined,
                 quality: body.quality === "final" ? "final" : "draft",
                 force: body.force === true,
                 delivery: typeof body.delivery === "string" ? body.delivery : undefined,
@@ -3772,7 +3775,7 @@ Rules:
       }
 
       // ── API: THE PHONE CODE -- the take link for one scene as a QR (SVG) ──
-      // GET /api/take-qr/{tenant}/{project}?scene=N  (drawn here: the link carries the token)
+      // GET /api/take-qr/{tenant}/{project}?scene=N[&voice=1]  (drawn here: the link carries the token; voice=1 opens Voice only)
       //     /api/take-qr/{tenant}/{project}?session=rb_...  (the remote booth's camera link)
       const takeQrMatch = urlPath.match(/^\/api\/take-qr\/([^/]+)\/([^/]+)$/);
       if (takeQrMatch && method === "GET") {
@@ -3791,7 +3794,7 @@ Rules:
         if (session && !/^rb_[A-Za-z0-9_-]{16,64}$/.test(session)) { jsonResponse(res, 400, { error: "bad session id" }); return; }
         const link = session
           ? `${proto}://${host}/remote-camera?tenant=${encodeURIComponent(tqTenant)}&session=${encodeURIComponent(session)}${token ? `&token=${encodeURIComponent(token)}` : ""}`
-          : `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+          : `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${q.get("voice") === "1" ? "&voice=1" : ""}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
         try {
           const svg = qrSvg(link, { size: 360 });
           res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });
@@ -4393,7 +4396,8 @@ Rules:
       // POST /api/voice-line/{tenant}/{project}
       //   JSON {scene_index, text?, speed?, voice?, all?}  re-read the line (all: the
       //        pace on every scene's line); a recorded line re-paces from the recording
-      //   raw audio ?scene=<i>&name=<file>                  the person's own recording
+      //   raw audio ?scene=<i>&name=<file>                  the person's own recording: kept as the scene's
+      //        voice take (what a performance is made from); played as its line unless a take plays there
       //   Then the film re-fits to its lines. Answers {ok, project}.
       const voiceLineMatch = urlPath.match(/^\/api\/voice-line\/([^/]+)\/([^/]+)$/);
       if (voiceLineMatch && method === "POST") {
@@ -4423,8 +4427,8 @@ Rules:
             await fs.writeFile(file, buf);
             const { remuxMediaRecorderFile } = await import("./core/video-normalize.js");
             await remuxMediaRecorderFile(file);
-            await vl.attachRecordedLine(project, si, file, { audioDir });
-            console.log(`  voice-line: ${vlProject} scene ${si + 1} recorded`);
+            const plays = await vl.recordSceneVoice(project, si, file, { audioDir });
+            console.log(`  voice-line: ${vlProject} scene ${si + 1} recorded${plays ? "" : " (kept for a performance: a take plays there)"}`);
           } else {
             const body = await parseBody(req) as Record<string, any>;
             const si = Number(body.scene_index);

@@ -425,4 +425,66 @@ describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
       expect(errors).toEqual([]);
     } finally { await browser.close(); for (const c of closers) await c(); }
   }, 90000);
+
+  it("Voice only: the mic alone (no camera), the prompter, and the voice lands as the scene's voice recording", async () => {
+    const closers: Array<() => Promise<void>> = [];
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined, args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+    try {
+      const ctx = await browser.newContext({ permissions: ["microphone"] });
+      const page = await ctx.newPage();
+      const errors: string[] = []; page.on("pageerror", (e) => errors.push(e.message));
+      // Every getUserMedia ask, recorded: Voice only never asks for video.
+      await page.addInitScript(() => {
+        const asks: any[] = (window as any).__asks = [];
+        const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (c: any) => { asks.push(c); return orig(c); };
+      });
+      const proj = { name: "T", canvas: { width: 1920, height: 1080 }, treatment: { filmGrammar: "speaker" }, scenes: [],
+        storyboard: { scenes: [{ label: "Hook", duration_seconds: 3, voiceover_text: "One." }, { label: "Two", duration_seconds: 3, voiceover_text: "Two." }] } };
+      const voices: Array<{ url: string; bytes: number }> = [];
+      let takes = 0;
+      const http = await import("node:http");
+      const server = http.createServer((req, res) => {
+        const u = req.url || "";
+        const chunks: Buffer[] = []; req.on("data", (c) => { chunks.push(c); });
+        req.on("end", () => {
+          if (u.startsWith("/api/projects/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(proj)); return; }
+          if (u.startsWith("/api/voice-line/")) { voices.push({ url: u, bytes: Buffer.concat(chunks).length }); res.writeHead(200, { "content-type": "application/json" }); res.end("{\"ok\":true}"); return; }
+          if (u.startsWith("/api/take/") || u.startsWith("/api/upload-asset/")) { takes++; res.writeHead(500); res.end(); return; }
+          res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+        });
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+      closers.push(() => new Promise<void>((r) => server.close(() => r())));
+      const port = (server.address() as any).port;
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=0&voice=1`);
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      expect(await page.textContent("#recordBtn")).toBe("Record my voice");
+      expect(await page.isChecked("#voiceOnly")).toBe(true);
+      expect(await page.isVisible("#bgChoice")).toBe(false);                  // a camera's choices go
+      await page.click("#recordBtn");
+      await page.waitForSelector("#stopBtn", { state: "visible", timeout: 8000 });   // no light check: straight to the count-in
+      await page.waitForTimeout(4500);
+      await page.click("#stopBtn");
+      await page.waitForSelector("#useBtn", { state: "visible", timeout: 8000 });
+      expect(await page.textContent("#reviewMeta")).toContain("voice only");
+      await page.click("#useBtn");
+      await page.waitForSelector("#done.on", { timeout: 10000 });
+      expect(voices).toHaveLength(1);
+      expect(voices[0].url).toMatch(/^\/api\/voice-line\/t\/p\?scene=0&name=voice\.(webm|m4a)&token=x$/);
+      expect(voices[0].bytes).toBeGreaterThan(1024);
+      expect(takes).toBe(0);
+      const asks = await page.evaluate(() => (window as any).__asks);
+      expect(asks.length).toBe(1);
+      expect(asks[0].video).toBeUndefined();
+      expect(await page.textContent("#doneNote")).toContain("Your voice is in");
+      // A whole-board link offers no Voice only (a voice is one scene's).
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=all&voice=1`);
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      expect(await page.isVisible("#voiceRow")).toBe(false);
+      expect(await page.textContent("#recordBtn")).toBe("Record");
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); for (const c of closers) await c(); }
+  }, 90000);
 });
