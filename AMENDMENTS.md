@@ -13,7 +13,10 @@ burned in as a garbled subtitle ("New Ono Teuith / Scot Murıs dashord"),
 under the prompt's soft "no text on screen". Every Seedance prompt (speaking,
 silent, and the Higgsfield performance prompt) now ends with `NO_TEXT`: no
 subtitles, captions, words, letters, lower thirds or titles. The scene was
-regenerated with it. `NO_TEXT` lives in `core/actor-test.ts` because
+regenerated with it -- and came back mumbling gibberish instead of the line:
+the first wording said "no words, no letters", and Seedance took "no words"
+to cover speech. `NO_TEXT` now bans WRITTEN text only and says the person
+still speaks every word of the audio; a test forbids "no words". `NO_TEXT` lives in `core/actor-test.ts` because
 `seedance.ts` already imports that module (the other way would be a cycle).
 
 ## 2026-10-09 — Revise can remove the component it is pointed at

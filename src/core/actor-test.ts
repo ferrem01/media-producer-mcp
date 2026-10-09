@@ -404,8 +404,11 @@ export async function runAtlasSeedance25(video: string | null, img: string[], se
 
 /** Seedance draws the spoken words as fake subtitles unless told hard not to:
  *  "no text on screen" alone let a garbled caption ("New Ono Teuith / Scot
- *  Murıs dashord") burn into Dana's scene 3 (proj_d37c96fe, Oct 8). */
-export const NO_TEXT = "ABSOLUTELY NO TEXT ANYWHERE IN THE FRAME: no subtitles, no captions, no words, no letters, no lower thirds, no titles -- a clean camera image only.";
+ *  Murıs dashord") burn into Dana's scene 3 (proj_d37c96fe, Oct 8). Never
+ *  say "no words": the first wording ("no words, no letters") made Seedance
+ *  mumble gibberish instead of the reference audio -- the ban is on WRITTEN
+ *  text only, and the prompt says so. */
+export const NO_TEXT = "Nothing written on the picture: no subtitles, no captions, no on-screen lettering, no lower thirds, no titles. (They still say every word of the reference audio.)";
 
 /** Seedance 2.5 reference-to-video through HIGGSFIELD's API (not fal): the
  *  same recast idea as runSeedance25Recast -- the motion from @Video1, the

@@ -1008,6 +1008,8 @@ describe("Seedance prompts ban on-screen text", () => {
     for (const p of [speakingPrompt("A seated medium shot"), silentPrompt("Walks to the window")]) {
       expect(p).toContain(NO_TEXT);
       expect(p).toMatch(/no subtitles/);
+      // "no words" made Seedance mumble instead of speaking the audio.
+      expect(p).not.toMatch(/no words/i);
     }
   });
 });
