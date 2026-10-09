@@ -37,6 +37,7 @@
     "card_size": { "type": "number", "label": "Wall: card size as a share of the frame's short side (default 0.3 wide, 0.42 tall)", "optional": true },
     "speed": { "type": "number", "label": "Wall drift speed multiplier (default 1; 0 holds still)", "optional": true },
     "tilt": { "type": "number", "label": "Wall: degrees the plane is turned (default -8)", "optional": true },
+    "photos": { "type": "object", "label": "Photos for the brands' picture slots: {flowpath: url, oliva: url, ...} (an uploaded or generated image per brand; without one the slot is drawn)", "optional": true },
     "tone": { "type": "string", "label": "'color' (default) | 'grey': the colour drained and the light down on a dark ground -- generic 'AI slop', the contrast to your own work", "optional": true, "enum": ["color", "grey"] },
     "seed": { "type": "number", "label": "Shuffles which piece lands where (default 7)", "optional": true },
     "at": { "type": "number", "label": "Seconds: the cards arrive (default 0)", "optional": true }
