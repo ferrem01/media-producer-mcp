@@ -56,6 +56,11 @@ describe("designed sample work (shared/samples.js)", () => {
     const picks = S.pick(60, { seed: 3 });
     for (let i = 1; i < picks.length; i++) expect(`${picks[i].kind}/${picks[i].brand}`).not.toBe(`${picks[i - 1].kind}/${picks[i - 1].brand}`);
     expect(new Set(picks.slice(0, 48).map((p: any) => `${p.kind}/${p.brand}`)).size).toBe(48);
+    // A brand's photo fills its picture slots and becomes its email's hero.
+    S.setPhotos({ oliva: "/assets/t/projects/p/assets/oliva.png", nobody: "/x.png" });
+    expect(S.asset("social", "oliva")).toContain("url('/assets/t/projects/p/assets/oliva.png')");
+    expect(S.emailBlocks("oliva").blocks[1]).toMatchObject({ kind: "hero", image: "/assets/t/projects/p/assets/oliva.png" });
+    expect(S.emailBlocks("flowpath").blocks[1].steps).toHaveLength(3);
     const em = S.emailBlocks("oliva");
     expect(em.brand.name).toBe("Oliva Terra");
     expect(em.blocks.map((b: any) => b.kind)).toEqual(["logo", "hero", "eyebrow", "headline", "text", "button", "footer"]);

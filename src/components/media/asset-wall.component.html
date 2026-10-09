@@ -58,6 +58,7 @@
       plane.appendChild(c);
       return { el: c, w: w, h: h, x: x, y: y };
     }
+    S.setPhotos(data.photos);
     var kinds = Array.isArray(data.kinds) ? data.kinds : null, brands = Array.isArray(data.brands) ? data.brands : null;
 
     // HEADLINE over the wall or the grid.

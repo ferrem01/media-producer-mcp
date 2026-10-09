@@ -224,6 +224,7 @@
     var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
 
     // ── a designed sample brand (shared/samples.js): its email, its colours ──
+    if (data.sample && window.mpSamples) mpSamples.setPhotos(data.photos);
     var sample = data.sample && window.mpSamples ? mpSamples.emailBlocks(String(data.sample)) : null;
     if (sample) data = Object.assign({}, data, { brand: data.brand || sample.brand, blocks: Array.isArray(data.blocks) && data.blocks.length ? data.blocks : sample.blocks });
 

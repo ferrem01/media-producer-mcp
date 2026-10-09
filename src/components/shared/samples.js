@@ -14,6 +14,7 @@
 //   mpSamples.ratio(kind)               height / width of a kind
 //   mpSamples.pick(n, opts)             n varied {kind, brand} picks (seeded)
 //   mpSamples.emailBlocks(brandId)      a quotient-email-editor email for the brand
+//   mpSamples.setPhotos({id: url})      photos for the brands' picture slots
 //   Fonts: a component that shows them @imports Anton, Instrument Serif and
 //   Inter (see media/asset-wall).
 (function () {
@@ -115,8 +116,13 @@
     return '<div style="width:' + w + 'em;height:' + w + 'em;border-radius:50%;background:radial-gradient(circle at 35% 30%,' + b.bg2 + ',' + b.accent + ');position:relative;overflow:hidden">' +
       '<svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%"><circle cx="50" cy="40" r="17" fill="rgba(255,255,255,0.88)"/><path d="M14 100 C16 72 32 62 50 62 C68 62 84 72 86 100 Z" fill="rgba(255,255,255,0.88)"/></svg></div>';
   }
+  // PHOTOS: a brand's own picture for the photo slot (generated images,
+  // uploaded to the film) -- set by a component from its data (setPhotos).
+  var PHOTOS = {};
   function scene(b, w, h) {
-    // A still-life panel: a sun, two hills and a stem -- the "photo" slot.
+    var ph = PHOTOS[b.id];
+    if (ph) return '<div style="width:' + w + 'em;height:' + h + 'em;border-radius:1.2em;overflow:hidden;background:' + b.bg2 + ' url(\'' + String(ph).replace(/'/g, '%27') + '\') center/cover no-repeat"></div>';
+    // No photo: a drawn still life -- a sun, two hills and a stem.
     return '<div style="width:' + w + 'em;height:' + h + 'em;border-radius:1.2em;overflow:hidden;position:relative;background:linear-gradient(180deg,' + b.bg2 + ',' + b.bg + ')">' +
       '<svg viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%">' +
       '<circle cx="70" cy="24" r="12" fill="' + b.accent + '" opacity="0.9"/>' +
@@ -225,6 +231,11 @@
     kinds: KINDS,
     ratio: function (kind) { return RATIO[kind] || 1; },
     brand: function (id) { return BY_ID[id] || BRANDS[0]; },
+    // {brandId: imageUrl}: photos for the brands' picture slots.
+    setPhotos: function (map) {
+      if (!map || typeof map !== 'object') return;
+      Object.keys(map).forEach(function (id) { if (BY_ID[id] && typeof map[id] === 'string' && map[id]) PHOTOS[id] = map[id]; });
+    },
     asset: function (kind, brandId) {
       var b = BY_ID[brandId] || BRANDS[0], fn = RENDER[kind] || slide;
       return '<div class="mps mps-' + kind + '" style="position:absolute;inset:0;overflow:hidden;-webkit-font-smoothing:antialiased">' + fn(b) + '</div>';
@@ -253,7 +264,7 @@
         brand: { name: b.name, color: accent, color_2: b.bg2 === accent ? b.bg : b.bg2 },
         blocks: [
           { kind: 'logo', text: b.name, layer: 'Logo' },
-          { kind: 'hero', label: c.eyebrow, layer: 'Hero', steps: [
+          PHOTOS[b.id] ? { kind: 'hero', label: c.eyebrow, layer: 'Hero', image: PHOTOS[b.id] } : { kind: 'hero', label: c.eyebrow, layer: 'Hero', steps: [
             { icon: 'pen', title: 'Draft', sub: 'from your brief' },
             { icon: 'zap', title: 'Design', sub: 'on brand' },
             { icon: 'send', title: 'Send', sub: 'to every list' }] },

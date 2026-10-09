@@ -9,6 +9,11 @@
       "label": "A designed sample brand's email in place of a real one: flowpath | oliva | lumen | bloom | volt | nimbus | mare | bonsai (its name, colours and copy; brand / blocks still override). Shows the editor making something beautiful with no customer assets.",
       "optional": true
     },
+    "photos": {
+      "type": "object",
+      "label": "With sample: the sample brands' photos ({flowpath: url, ...}); the brand's photo becomes the hero image",
+      "optional": true
+    },
     "brand": {
       "type": "object",
       "label": "{name: 'Quotient', color: '#393bf5' (buttons, eyebrow, icons, hero gradient), color_2?: gradient partner, logo?: URL (default the Quotient app icon)}",

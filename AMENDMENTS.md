@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — Sample brands take photos
+
+The sample brands' picture slots were drawn (a sun, hills, a stem). Marc
+asked for generated images to make them pop, so there are now 8 photos, one
+per brand, generated with GPT Image through Higgsfield: a phone on a teal
+desk, olive oil on linen, red light trails, a design studio, a lime running
+shoe, clouds with glossy spheres, a skincare bottle on pink sand, and a
+bonsai. `asset-wall` and `quotient-email-editor` (with `sample`) take
+`photos: {brandId: url}`. A brand's photo fills its picture slots and
+becomes its email's hero image. Without a photo, the slot is drawn as
+before. Nested `/assets/` paths already resolve at the HTML level.
+
 ## 2026-10-09 — Colourful work on screen: the asset wall, agent cursors, the founder-launch recipe
 
 Marc loved the Moda launch film (X, @anvisha) for two things: a colourful,
