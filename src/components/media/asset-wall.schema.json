@@ -1,0 +1,44 @@
+{
+  "type": "asset-wall",
+  "label": "Asset Wall",
+  "category": "media",
+  "description": "Beautiful, colourful marketing work moving through the frame: deck slides, social posts, emails, landing pages, event cards and stat cards for designed sample brands (Flowpath, Oliva Terra, Lumen AI, Studio Bloom, Volt Run, Nimbus, Maré, Bonsai). Four layouts. 'wall': cards at different depths drifting across a brand gradient, with an optional headline in an open band ('1,000 brands for FREE'), for a finale or the 'look what it makes' beat. 'orbit': cards float in the side columns around a speaker, clear of the face (ground none, so the person shows), for 'slide decks, marketing assets, animations and more'. 'fan': a stack of slides fans open in 3D. 'grid': the same piece made for many brands, landing in a wave ('50 personalised decks'). Full frame for wall and grid; orbit over the speaker. Everything is drawn, with no images to supply.",
+  "data": {
+    "layout": {
+      "type": "string",
+      "label": "wall (default) | orbit | fan | grid",
+      "optional": true,
+      "enum": ["wall", "orbit", "fan", "grid"]
+    },
+    "headline": {
+      "type": "string",
+      "label": "Big line over the wall or above the grid (e.g. '1,000 brands for FREE')",
+      "optional": true
+    },
+    "headline_color": { "type": "string", "label": "Headline colour (default white)", "optional": true },
+    "headline_at": { "type": "number", "label": "Seconds after `at` the headline rises (default 0.35)", "optional": true },
+    "kinds": {
+      "type": "array",
+      "label": "Which pieces: slide | social | email | landing | event | stat (default all; fan and grid use the first, default slide)",
+      "optional": true
+    },
+    "brands": {
+      "type": "array",
+      "label": "Which sample brands: flowpath | oliva | lumen | bloom | volt | nimbus | mare | bonsai (default all)",
+      "optional": true
+    },
+    "count": { "type": "number", "label": "How many cards (orbit 2-10, default 6 wide / 4 tall; fan 3-7, default 5; grid 4-16, default 9 / 8 tall). Wall fills the frame.", "optional": true },
+    "colors": {
+      "type": "array",
+      "label": "The ground gradient [from, to, glow?] (default magenta to red: ['#ff2d87', '#ff4a1c'])",
+      "optional": true
+    },
+    "ground": { "type": "string", "label": "'gradient' (default on wall and grid) | 'none' (default on orbit and fan: the scene shows through)", "optional": true, "enum": ["gradient", "none"] },
+    "card_size": { "type": "number", "label": "Wall: card size as a share of the frame's short side (default 0.3 wide, 0.42 tall)", "optional": true },
+    "speed": { "type": "number", "label": "Wall drift speed multiplier (default 1; 0 holds still)", "optional": true },
+    "tilt": { "type": "number", "label": "Wall: degrees the plane is turned (default -8)", "optional": true },
+    "tone": { "type": "string", "label": "'color' (default) | 'grey': the colour drained and the light down on a dark ground -- generic 'AI slop', the contrast to your own work", "optional": true, "enum": ["color", "grey"] },
+    "seed": { "type": "number", "label": "Shuffles which piece lands where (default 7)", "optional": true },
+    "at": { "type": "number", "label": "Seconds: the cards arrive (default 0)", "optional": true }
+  }
+}

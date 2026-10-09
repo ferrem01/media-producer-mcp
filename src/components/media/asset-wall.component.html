@@ -1,0 +1,176 @@
+<template>
+  <div class="aw-root"><div class="aw-ground"></div><div class="aw-plane" data-mp-texture></div><div class="aw-head"></div></div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Anton&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap');
+  /* ASSET WALL: beautiful, colourful marketing work drifting past -- deck
+     slides, social posts, emails, landing pages, event and stat cards for
+     made-up brands (shared/samples.js). The Moda launch film's move: work
+     that floats in depth on a brand gradient (wall), orbits the speaker
+     (orbit), fans open in 3D (fan) or lands as a grid of personalised
+     versions (grid). */
+  .aw-root, .aw-root * { box-sizing: border-box; max-width: none; }
+  .aw-root { position: absolute; inset: 0; overflow: hidden; }
+  .aw-ground { position: absolute; inset: 0; }
+  .aw-plane { position: absolute; inset: 0; transform-style: preserve-3d; }
+  .aw-card { position: absolute; border-radius: 0.9em; overflow: hidden; will-change: transform;
+    box-shadow: 0 1.2em 3em rgba(20, 10, 30, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.08); }
+  .aw-card > .aw-in { position: absolute; inset: 0; }
+  .aw-head { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; pointer-events: none;
+    font-family: 'Inter', system-ui, sans-serif; font-weight: 500; letter-spacing: -0.03em; color: #ffffff; padding: 0 6%;
+    text-shadow: 0 0.06em 0.4em rgba(60, 0, 30, 0.35); line-height: 1.05; }
+  .aw-head:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var S = window.mpSamples;
+    if (!S) return tl;
+    var root = el.querySelector('.aw-root'), ground = el.querySelector('.aw-ground');
+    var plane = el.querySelector('.aw-plane'), head = el.querySelector('.aw-head');
+    var W = el.clientWidth || 1920, H = el.clientHeight || 1080, tall = H > W * 1.15;
+    var DUR = (ctx && ctx.duration) || 8;
+    var num = function (v, d) { var n = Number(v); return v !== undefined && v !== null && v !== '' && isFinite(n) ? n : d; };
+    var AT = Math.max(0, num(data.at, 0));
+    var SPEED = Math.max(0, Math.min(4, num(data.speed, 1)));
+    var layout = ['wall', 'orbit', 'fan', 'grid'].indexOf(data.layout) >= 0 ? data.layout : 'wall';
+    var seed = num(data.seed, 7);
+
+    // The ground: the brand gradient (default the magenta-to-red of the
+    // reference) -- 'none' lets the scene show through (orbit over a person).
+    var colors = Array.isArray(data.colors) && data.colors.length ? data.colors : ['#ff2d87', '#ff4a1c'];
+    var groundOn = data.ground ? data.ground !== 'none' : (layout === 'wall' || layout === 'grid');
+    // tone 'grey': the colour gone and the light down -- the enemy's work
+    // ("every other AI tool makes AI slop"), the contrast to ours.
+    var grey = data.tone === 'grey';
+    if (grey) { plane.style.filter = 'grayscale(1) brightness(0.62) contrast(0.9)'; if (!Array.isArray(data.colors)) colors = ['#141416', '#2a2a2e']; }
+    if (groundOn) ground.style.background = 'radial-gradient(120% 90% at 20% 15%, ' + (colors[2] || colors[0]) + ' 0%, transparent 55%), linear-gradient(135deg, ' + colors[0] + ', ' + (colors[1] || colors[0]) + ')';
+
+    var rnd = (function (s) { s = (s >>> 0) || 1; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })(seed * 7919 + 13);
+    function card(kind, brand, w, x, y, z) {
+      var c = document.createElement('div');
+      c.className = 'aw-card';
+      var h = w * S.ratio(kind);
+      c.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;font-size:' + (w / 100) + 'px;' + (z ? 'z-index:' + z + ';' : '');
+      c.innerHTML = '<div class="aw-in">' + S.asset(kind, brand) + '</div>';
+      plane.appendChild(c);
+      return { el: c, w: w, h: h, x: x, y: y };
+    }
+    var kinds = Array.isArray(data.kinds) ? data.kinds : null, brands = Array.isArray(data.brands) ? data.brands : null;
+
+    // HEADLINE over the wall or the grid.
+    if (data.headline && (layout === 'wall' || layout === 'grid')) {
+      head.textContent = String(data.headline);
+      // As big as the frame allows on one line: measured (fonts are loaded
+      // before the build), shrinking until the line fits 86% of the width.
+      var fsz = Math.round(Math.min(W, H) * (tall ? 0.085 : 0.075));
+      head.style.whiteSpace = 'nowrap'; head.style.padding = '0'; head.style.left = '0'; head.style.right = 'auto';
+      head.style.fontSize = fsz + 'px';
+      for (var tries = 0; tries < 40 && head.scrollWidth > W * 0.86; tries++) { fsz = Math.floor(fsz * 0.95); head.style.fontSize = fsz + 'px'; }
+      head.style.right = '0'; head.style.whiteSpace = '';
+      if (data.headline_color) head.style.color = String(data.headline_color);
+    }
+    var headBox = head.textContent ? { t: H * 0.5 - Math.min(W, H) * 0.09, b: H * 0.5 + Math.min(W, H) * 0.09 } : null;
+
+    if (layout === 'wall') {
+      // Cards scattered at depths across an area bigger than the frame; each
+      // drifts up-left at its depth's speed (near = bigger, faster), so the
+      // wall reads as space. A band behind the headline stays open.
+      var base = Math.min(W, H) * Math.max(0.12, Math.min(0.7, num(data.card_size, tall ? 0.42 : 0.3)));
+      var cols = Math.max(3, Math.round(W / (base * 1.05)) + 2), rows = Math.max(3, Math.round(H / (base * 0.75)) + 2);
+      var picks = S.pick(cols * rows, { kinds: kinds, brands: brands, seed: seed });
+      var cw = (W * 1.4) / cols, ch = (H * 1.5) / rows, k = 0;
+      for (var j = 0; j < rows; j++) for (var i = 0; i < cols; i++) {
+        var p = picks[k++], depth = 0.62 + rnd() * 0.5;
+        var w = base * depth * (p.kind === 'slide' || p.kind === 'landing' ? 1.25 : 0.82);
+        var x = -W * 0.15 + i * cw + (j % 2 ? cw * 0.5 : 0) + (rnd() - 0.5) * cw * 0.3;
+        var y = -H * 0.2 + j * ch + (rnd() - 0.5) * ch * 0.3;
+        var hgt = w * S.ratio(p.kind);
+        if (headBox && y < headBox.b + H * 0.05 && y + hgt > headBox.t - H * 0.05 && x + w > W * 0.24 && x < W * 0.76) continue;
+        var c = card(p.kind, p.brand, w, x, y, Math.round(depth * 10));
+        var drift = Math.min(W, H) * 0.22 * SPEED * depth;
+        gsap.set(c.el, { rotation: (rnd() - 0.5) * 6, autoAlpha: 0, scale: 0.92 });
+        tl.to(c.el, { autoAlpha: 1, scale: 1, duration: 0.6, ease: 'power3.out' }, AT + rnd() * 0.5);
+        tl.to(c.el, { x: -drift, y: -drift * 0.6, duration: Math.max(1, DUR - AT), ease: 'none' }, AT);
+      }
+    } else if (layout === 'orbit') {
+      // Around a person: cards in the side columns (or top and bottom bands
+      // on a tall frame), clear of the middle where the face is. Each bobs
+      // gently, out of phase, so the collage breathes.
+      var n = Math.max(2, Math.min(10, num(data.count, tall ? 4 : 6)));
+      var picksO = S.pick(n, { kinds: kinds || ['social', 'event', 'slide', 'email', 'stat', 'landing'], brands: brands, seed: seed });
+      // Slots: wide = a column each side of the face, cards stacked with a
+      // little overlap and stagger; tall = a band above and below.
+      var slots = [];
+      if (tall) {
+        var perBand = Math.ceil(n / 2);
+        for (var a = 0; a < n; a++) {
+          var top = a < perBand, idxT = top ? a : a - perBand, cnt = top ? perBand : n - perBand;
+          var wT = Math.min(W * 0.46, (W * 0.94) / cnt);
+          slots.push({ x: W * 0.03 + idxT * (W * 0.94 - wT) / Math.max(1, cnt - 1), y: top ? H * 0.04 : H * 0.66, w: wT, h: H * 0.28 });
+        }
+      } else {
+        var left = Math.ceil(n / 2), right = n - left;
+        [[left, 0.02], [right, 0.76]].forEach(function (side, si) {
+          var cnt = side[0];
+          for (var q = 0; q < cnt; q++) slots.push({ x: W * (side[1] + (q % 2 ? 0.035 : 0)), y: H * 0.04 + q * (H * 0.92 / cnt), w: W * 0.2, h: (H * 0.92 / cnt) * 1.12 });
+        });
+      }
+      picksO.forEach(function (p, q) {
+        // Fit the card inside its slot: as wide as the slot allows, no taller.
+        var s = slots[q], wq = Math.min(s.w, s.h / S.ratio(p.kind)), c = card(p.kind, p.brand, wq, s.x + (s.w - wq) / 2, s.y, q + 1);
+        gsap.set(c.el, { autoAlpha: 0, y: H * 0.04, rotation: (q % 2 ? 1 : -1) * (2 + rnd() * 3) });
+        tl.to(c.el, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out' }, AT + q * 0.12);
+        var bob = Math.max(1.6, 2.4 + rnd());
+        var reps = Math.max(0, Math.floor((DUR - AT - 0.8) / bob) - 1);
+        if (reps > 0) tl.to(c.el, { y: -H * 0.012, duration: bob, ease: 'sine.inOut', yoyo: true, repeat: reps }, AT + 0.8 + rnd() * 0.4);
+      });
+    } else if (layout === 'fan') {
+      // A stack of one kind (deck slides by default) that fans open in 3D.
+      var nf = Math.max(3, Math.min(7, num(data.count, 5)));
+      var kindF = (kinds && kinds[0]) || 'slide';
+      var brandF = (brands && brands[0]) || 'flowpath';
+      var wf = W * (tall ? 0.8 : 0.5);
+      root.style.perspective = Math.round(W * 1.6) + 'px';
+      for (var f = 0; f < nf; f++) {
+        var cf = card(kindF, brands && brands.length > 1 ? brands[f % brands.length] : brandF, wf, (W - wf) / 2, (H - wf * S.ratio(kindF)) / 2, nf - f);
+        var off = f - (nf - 1) / 2;
+        gsap.set(cf.el, { autoAlpha: 0, z: -f * 40 });
+        tl.to(cf.el, { autoAlpha: 1, duration: 0.3 }, AT + f * 0.05);
+        tl.to(cf.el, { rotationY: -18, rotationX: 6, x: off * wf * (tall ? 0.08 : 0.16), y: off * -wf * 0.03, z: -Math.abs(off) * wf * 0.12, duration: 1.2, ease: 'power3.inOut' }, AT + 0.35);
+        tl.to(cf.el, { rotationY: -12, duration: Math.max(1, DUR - AT - 1.6), ease: 'sine.inOut' }, AT + 1.55);
+      }
+    } else {
+      // GRID: the same piece made for many brands -- "50 personalised decks".
+      var kindG = (kinds && kinds[0]) || 'slide';
+      var ng = Math.max(4, Math.min(16, num(data.count, tall ? 8 : 9)));
+      var colsG = tall ? 2 : (ng > 9 ? 4 : 3), rowsG = Math.ceil(ng / colsG);
+      // A headline takes a band at the top; the grid fills the rest.
+      var gap = Math.min(W, H) * 0.025, pad = Math.min(W, H) * 0.06, band = headBox ? H * (tall ? 0.12 : 0.17) : 0;
+      var wg = Math.min((W - 2 * pad - (colsG - 1) * gap) / colsG, ((H - band - 2 * pad - (rowsG - 1) * gap) / rowsG) / S.ratio(kindG));
+      var hg = wg * S.ratio(kindG), x0 = (W - (colsG * wg + (colsG - 1) * gap)) / 2, y0 = band + (H - band - (rowsG * hg + (rowsG - 1) * gap)) / 2;
+      var bl = (brands && brands.length ? brands : S.brands.map(function (bb) { return bb.id; }));
+      for (var g2 = 0; g2 < ng; g2++) {
+        var cx = g2 % colsG, cy = Math.floor(g2 / colsG);
+        var cg = card(kindG, bl[g2 % bl.length], wg, x0 + cx * (wg + gap), y0 + cy * (hg + gap));
+        gsap.set(cg.el, { autoAlpha: 0, scale: 0.86 });
+        tl.to(cg.el, { autoAlpha: 1, scale: 1, duration: 0.5, ease: 'back.out(1.6)' }, AT + (cx + cy) * 0.09);
+      }
+      if (headBox) { head.style.top = (band * 0.55 + pad * 0.3) + 'px'; head.style.fontSize = Math.round(Math.min(band * 0.5, Math.min(W, H) * 0.065)) + 'px'; }
+    }
+
+    if (head.textContent) {
+      gsap.set(head, { autoAlpha: 0, y: H * 0.02 });
+      tl.to(head, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out' }, AT + num(data.headline_at, 0.35));
+    }
+    if (layout === 'wall') {
+      // The whole plane tilts back a little and keeps drifting: a camera
+      // gliding past a wall of work.
+      gsap.set(plane, { rotation: Math.max(-30, Math.min(30, num(data.tilt, -8))), scale: 1.08, transformOrigin: '50% 50%' });
+      tl.to(plane, { scale: 1.16, duration: Math.max(1, DUR - AT), ease: 'none' }, AT);
+    }
+    return tl;
+  }
+</script>

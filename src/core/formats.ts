@@ -15,7 +15,7 @@ export interface ViralFormat {
 }
 
 export const VIRAL_FORMATS: ViralFormat[] = [
-  { id: "talking-head", name: "Talking Head", what: "a person to camera, graphics over them", recipes: ["speaker-kinetic-claims", "speaker-one-take-cards", "founder-selfie-punch-cards", "presenter-location-hop", "founder-bookends-chapters"] },
+  { id: "talking-head", name: "Talking Head", what: "a person to camera, graphics over them", recipes: ["speaker-kinetic-claims", "speaker-one-take-cards", "founder-selfie-punch-cards", "presenter-location-hop", "founder-bookends-chapters", "founder-launch"] },
   { id: "screen-share", name: "Screen Share", what: "the screen carries it (the screencast grammar with a real recording is the deep version)", recipes: ["ask-work-result"] },
   { id: "listicle", name: "Listicle", what: "N things, counted", recipes: ["presenter-n-things", "index-reel-host", "index-reel-page"] },
   { id: "ranking", name: "Ranking", what: "items placed on a tier list, one by one", recipes: ["ranking-tier-list"] },

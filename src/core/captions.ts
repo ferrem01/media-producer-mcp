@@ -141,8 +141,9 @@ export interface CaptionLaneOpts {
    *  until the cut, three words at most, no plate; over a cutaway the
    *  running phrase sits in the bottom band. "tiered" (the Scale Army
    *  cut): the running words small, the starred phrase big on a brush
-   *  plate, the tail small beneath. Anything else: the plated chest-band
-   *  lane, phrases replacing each other. */
+   *  plate, the tail small beneath. "quiet" (the founder-launch cut): the
+   *  plated lane at a small size, sentence case. Anything else: the plated
+   *  chest-band lane, phrases replacing each other. */
   style?: string;
   /** How a spoken word is SHOWN when the line spells it for the voice:
    *  the brand's people ({say: "Max DAA-vish", name: "Max Davish"}). The
@@ -187,6 +188,9 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
   if (!words.length) return null;
   const em = emphasis.length ? emphasis : fallbackEmphasis(words, opts.brandWords || []);
   const scatter = opts.style === "scatter";
+  // "quiet" (the founder-launch cut): small sentence-case lines on a dark
+  // plate -- premium, never shouting.
+  const quiet = opts.style === "quiet";
   const tiered = opts.style === "tiered";
   const phrases = captionPhrases(spine, em, { maxWords: scatter ? SCATTER_MAX_WORDS : tiered ? TIERED_MAX_WORDS : MAX_WORDS });
   if (!phrases.length) return null;
@@ -222,7 +226,7 @@ export function captionLane(spine: Spine, emphasis: string[] = [], opts: Caption
       ? { phrases, mode: "scatter", scrim: "shadow", align: "left", max_font: opts.maxFont || 72, min_font: 34 }
       : tiered
         ? { phrases, mode: "tiered", scrim: "shadow", align: "center", max_font: opts.maxFont || 96, min_font: 40 }
-        : { phrases, scrim: "plate", align: "center", max_font: opts.maxFont || 84, min_font: 40 },
+        : { phrases, scrim: "plate", align: "center", max_font: opts.maxFont || (quiet ? 40 : 84), min_font: quiet ? 26 : 40 },
     anchors,
   };
 }

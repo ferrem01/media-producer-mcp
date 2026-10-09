@@ -223,6 +223,10 @@
     var num = function (v, d) { var n = Number(v); return isFinite(n) ? n : d; };
     var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
 
+    // ── a designed sample brand (shared/samples.js): its email, its colours ──
+    var sample = data.sample && window.mpSamples ? mpSamples.emailBlocks(String(data.sample)) : null;
+    if (sample) data = Object.assign({}, data, { brand: data.brand || sample.brand, blocks: Array.isArray(data.blocks) && data.blocks.length ? data.blocks : sample.blocks });
+
     // ── brand + colours ──
     var brand = data.brand || {};
     var B = /^#[0-9a-f]{6}$/i.test(brand.color || data.accent || '') ? (brand.color || data.accent) : '#393bf5';

@@ -1,0 +1,92 @@
+<template>
+  <div class="ac-root"></div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap');
+  /* AGENT CURSOR: AI agents shown as teammates' cursors -- the arrow and a
+     coloured name tag, the way Figma shows who else is in the file. The
+     Moda launch film's device (Brand Agent, Research Agent, Design Agent
+     flying over the work as each piece lands): an abstract "agents are
+     working" becomes something you watch. */
+  .ac-root, .ac-root * { max-width: none; box-sizing: border-box; }
+  .ac-root { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .ac-cur { position: absolute; left: 0; top: 0; will-change: transform; }
+  .ac-arrow { position: absolute; left: 0; top: 0; filter: drop-shadow(0 0.15em 0.3em rgba(0, 0, 0, 0.25)); }
+  .ac-tag { position: absolute; white-space: nowrap; font-family: 'Inter', system-ui, sans-serif; font-weight: 600; color: #ffffff;
+    letter-spacing: -0.01em; border-radius: 999px; box-shadow: 0 0.25em 0.8em rgba(0, 0, 0, 0.22), inset 0 0.06em 0 rgba(255, 255, 255, 0.35); }
+  .ac-ring { position: absolute; border-radius: 50%; border: 0.12em solid currentColor; opacity: 0; transform: translate(-50%, -50%); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.ac-root');
+    var W = el.clientWidth || 1920, H = el.clientHeight || 1080;
+    var CW = (ctx && ctx.canvas && ctx.canvas.width) || W, CH = (ctx && ctx.canvas && ctx.canvas.height) || H;
+    var num = function (v, d) { var n = Number(v); return v !== undefined && v !== null && v !== '' && isFinite(n) ? n : d; };
+    var AT = num(data.at, 0);
+    // Sized from the frame, not the box: a tag reads the same in any slot.
+    var u = Math.min(CW, CH) / 1080 * num(data.size, 1);
+    root.style.fontSize = (24 * u) + 'px';
+    var PALETTE = ['#2f80ff', '#e2187b', '#16b364', '#ff7a1a', '#8b5cf6', '#0ea5b7'];
+
+    // A waypoint's point in this box: x/y in % of the box, or a target --
+    // 'componentId' or 'componentId.anchor' ([data-anchor]) -- found where it
+    // is at that moment (it may be moving, typing, scrolling).
+    function pointOf(wp) {
+      if (wp.target) {
+        var t = String(wp.target), dot = t.indexOf('.'), cid = dot > 0 ? t.slice(0, dot) : t, an = dot > 0 ? t.slice(dot + 1) : '';
+        var host = document.querySelector('[data-cid="' + cid + '"]');
+        var node = host && an ? host.querySelector('[data-anchor="' + an + '"]') : host;
+        if (node) {
+          var r = node.getBoundingClientRect(), b = el.getBoundingClientRect();
+          var sx = b.width / W || 1, sy = b.height / H || 1;
+          // Land on the target's top-left third (where a hand would point),
+          // nudged by the waypoint's own dx/dy (% of the target).
+          var fx = 0.3 + num(wp.dx, 0) / 100, fy = 0.35 + num(wp.dy, 0) / 100;
+          return { x: (r.left - b.left + r.width * fx) / sx, y: (r.top - b.top + r.height * fy) / sy };
+        }
+      }
+      return { x: num(wp.x, 50) / 100 * W, y: num(wp.y, 50) / 100 * H };
+    }
+
+    var list = Array.isArray(data.cursors) && data.cursors.length ? data.cursors
+      : [{ label: 'Design Agent', path: [{ at: 0.2, x: 30, y: 40 }, { at: 1.4, x: 60, y: 55 }] }];
+    list.forEach(function (c, i) {
+      var path = (Array.isArray(c.path) ? c.path : []).filter(Boolean).slice().sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+      if (!path.length) return;
+      var color = String(c.color || PALETTE[i % PALETTE.length]), color2 = String(c.color_2 || color);
+      var cur = document.createElement('div');
+      cur.className = 'ac-cur';
+      var A = 1.5; // arrow size, em
+      cur.innerHTML = '<svg class="ac-arrow" viewBox="0 0 24 24" style="width:' + A + 'em;height:' + A + 'em">' +
+        '<path d="M3 2 L21 10.5 L12.6 12.8 L9.4 21 Z" fill="' + color + '" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
+        '<div class="ac-tag" style="left:' + (A * 0.75) + 'em;top:' + (A * 0.85) + 'em;padding:0.32em 0.8em;background:linear-gradient(135deg,' + color + ',' + color2 + ')">' + String(c.label || 'Agent').replace(/</g, '&lt;') + '</div>' +
+        '<div class="ac-ring" style="color:' + color + ';left:0.25em;top:0.2em;width:2.6em;height:2.6em"></div>';
+      root.appendChild(cur);
+      var ring = cur.querySelector('.ac-ring');
+      var t0 = AT + num(path[0].at, 0);
+      var p0 = pointOf(path[0]);
+      // Arrives from a little off its first point, already moving.
+      gsap.set(cur, { x: p0.x - W * 0.04, y: p0.y + H * 0.05, autoAlpha: 0, scale: 0.7, transformOrigin: '0 0' });
+      tl.to(cur, { autoAlpha: 1, scale: 1, x: function () { return pointOf(path[0]).x; }, y: function () { return pointOf(path[0]).y; },
+        duration: 0.5, ease: 'power3.out' }, Math.max(0, t0 - 0.5));
+      for (var k = 1; k < path.length; k++) {
+        (function (wp, prev) {
+          var tEnd = AT + num(wp.at, 0), tPrev = AT + num(prev.at, 0);
+          var travel = Math.max(0.25, Math.min(num(wp.travel, 0.75), tEnd - tPrev));
+          tl.to(cur, { x: function () { return pointOf(wp).x; }, y: function () { return pointOf(wp).y; },
+            duration: travel, ease: 'power3.inOut' }, tEnd - travel);
+          if (wp.click) {
+            tl.fromTo(ring, { opacity: 0.9, scale: 0.3 }, { opacity: 0, scale: 1.4, duration: 0.45, ease: 'power2.out', immediateRender: false }, tEnd);
+            tl.to(cur.querySelector('.ac-arrow'), { scale: 0.82, duration: 0.08, yoyo: true, repeat: 1, transformOrigin: '20% 15%' }, tEnd);
+          }
+        })(path[k], path[k - 1]);
+      }
+      if (path[0].click) tl.fromTo(ring, { opacity: 0.9, scale: 0.3 }, { opacity: 0, scale: 1.4, duration: 0.45, ease: 'power2.out', immediateRender: false }, t0);
+      if (c.out !== undefined) tl.to(cur, { autoAlpha: 0, scale: 0.8, duration: 0.3, ease: 'power2.in' }, AT + num(c.out, 0));
+    });
+    return tl;
+  }
+</script>

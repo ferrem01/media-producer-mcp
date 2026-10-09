@@ -1,0 +1,15 @@
+{
+  "type": "agent-cursor",
+  "label": "Agent Cursor",
+  "category": "effects",
+  "description": "AI agents shown as teammates' cursors: an arrow with a coloured name tag ('Brand Agent', 'Research Agent', 'Design Agent'), the way Figma shows who else is in the file. Each cursor flies a path of waypoints and can click. A waypoint is a point in the box (x, y in %) or a TARGET: another component's id, or 'id.anchor' for a [data-anchor] part inside it (for example 'email.headline' or 'email.button' on quotient-email-editor). The cursor goes to where the target is at that moment, even while it is still being written or scrolled. Use it over an editor building a piece (each agent visits the block it just placed) or over an asset wall. Put it full frame, above what it points at.",
+  "data": {
+    "cursors": {
+      "type": "array",
+      "label": "[{label, color?, color_2? (tag gradient partner), path: [{at (s), x?, y? (% of the box) | target? ('id' or 'id.anchor'), dx?, dy? (nudge, % of the target), click?, travel? (s to fly in, default 0.75)}], out? (s it leaves)}]. Default colours blue, magenta, green, orange, violet, teal.",
+      "required": true
+    },
+    "size": { "type": "number", "label": "Scale of arrow and tag (default 1 = a 24px tag on a 1080 frame)", "optional": true },
+    "at": { "type": "number", "label": "Shift every waypoint by this many seconds", "optional": true }
+  }
+}
