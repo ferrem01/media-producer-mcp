@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — The asset wall shows real work, and moves in 3D like the Moda film
+
+Marc on the first showcase film: the examples "look like our basic web shapes
+in a pattern" -- they "need to look like really nice assets" -- and the wall
+missed the reference's 3D: "all the examples flying around the screen or
+looking like a rolodex".
+
+- **House sample work** (`src/sample-work/`, `core/sample-work.ts`): 23
+  finished pieces generated with GPT Image 2.5 through Higgsfield -- a
+  six-slide Flowpath deck, landing pages, social posts, emails and event
+  cards for the eight sample brands -- committed as webp (2 MB) and served
+  straight from the build at `/assets/_system/sample-work/` (index.ts for the
+  preview, `resolveAssetPath` for the render). `shared/samples.js` is now the
+  manifest plus `pick` (kind / brand filters, the film's own `items`); the
+  HTML-drawn cards are gone. A keynote card that put a real actor's name on
+  a generated face was dropped.
+- **asset-wall** draws images and gains two layouts: `rolodex` (one deck
+  flipping past card by card, the front slide square to the camera, the rest
+  leaning back above and folding away below, out of focus) and `fly` (work
+  coming out of the deep at angles and rushing past the lens, already in
+  flight on frame one). `wall` is now a 3D plane with depth of field and a
+  camera push, an open centre and a soft colour pool under the headline;
+  `grid` flips its cards in edge-on; `items` takes a film's own pieces. The
+  `photos` option (photos for drawn picture slots) is gone with the drawn
+  cards; `quotient-email-editor`'s `photos` (its hero) stays.
+
 ## 2026-10-09 — Sample brands take photos
 
 The sample brands' picture slots were drawn (a sun, hills, a stem). Marc
