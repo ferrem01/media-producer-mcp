@@ -139,4 +139,12 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     // The voice card opens the take dialog on Generate in a person-carried film.
     expect(html).toContain("openNeedPicker(p, si, pictureNeed, { start: 'generate' });");
   });
+
+  it("a take per scene: through a crossfade the outgoing scene's camera keeps ITS take's clock, not the incoming one's", () => {
+    const html = getPreviewHtml();
+    // Its own trim + scene-local time, held at the end of its own take window.
+    expect(html).toContain("if (clip.isSpeaker && speakerTrackIsPerScene()) {");
+    expect(html).toContain("target = clip.offset + localTime;");
+    expect(html).toContain("var ownEnd = speakerTrimEndForScene(clip.sceneId);");
+  });
 });

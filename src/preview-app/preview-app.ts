@@ -2324,7 +2324,17 @@ ${QUOTIENT_CSS}
           }
         }
         var target;
-        if (clip.isSpeaker) {
+        if (clip.isSpeaker && speakerTrackIsPerScene()) {
+          // A TAKE PER SCENE: this scene's speaker video plays ITS OWN take
+          // from its own trim (data-start-at), held on its last frame. The
+          // shared speaker clock is the scene the playhead is in, so through
+          // a crossfade the OUTGOING scene's camera read the incoming take's
+          // clock -- 0.15 s -- and showed its own opening frame (Marc,
+          // proj_54cbf8e0 at 9.5 s: "showing me sitting down again").
+          target = clip.offset + localTime;
+          var ownEnd = speakerTrimEndForScene(clip.sceneId);
+          if (target > ownEnd) target = ownEnd;
+        } else if (clip.isSpeaker) {
           // Speaker-sourced video: sync to speaker track timeline
           // Uses same trim values as the speaker bg -- single source of truth
           target = speakerSourceTime(time);
@@ -6868,6 +6878,13 @@ ${QUOTIENT_CSS}
       trimEnd: c.trim_end != null ? c.trim_end : Infinity,
       sceneStart: sceneStart
     };
+  }
+  // The end of a scene's own take window (per-scene speaker track), by scene id.
+  function speakerTrimEndForScene(sceneId) {
+    var project = state.currentProject;
+    var si = ((project && project.scenes) || []).findIndex(function(s) { return s.id === sceneId; });
+    var c = (((project && project.speaker_track && project.speaker_track.clips) || []).filter(function(x) { return x.scene_index === si; }))[0];
+    return c && c.trim_end != null ? c.trim_end : Infinity;
   }
   function speakerTrackIsPerScene() {
     var project = state.currentProject;
