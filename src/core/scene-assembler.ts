@@ -46,7 +46,11 @@ const FIXED_TO_FRAME = new Set(["reel-caption-lane", "stack-list",
   // A corner logo bug is the frame's, not the world's: inside the rig the
   // zoom into the Claude session flung the Claude + Quotient lockup off the
   // top-left (measured, Six Tabs 16:9 proj_fedfa77c, 12.9-13.5 s).
-  "cobrand-lockup"]);
+  "cobrand-lockup",
+  // A name lower third is broadcast chrome too: inside the rig the 1.2x
+  // punch-in on "AEO" grew Marc's nametag into the caption band (seen live,
+  // Five Tools proj_85782f74, scene 2 at 4.3 s).
+  "lower-third"]);
 export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
 /** The scatter caption lane (core/captions.ts, the Air cut): words around
  *  the person that stay; over a cutaway the choreography flags the window

@@ -6,6 +6,14 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — The name lower third is pinned to the frame
+
+A `lower-third` rode the camera rig, so a punch-in grew the nametag with
+the person (Five Tools proj_85782f74, scene 2: the 1.2x zoom pushed Marc's
+name into the caption band). It joins the caption lane and the co-brand
+lockup in `FIXED_TO_FRAME` (`scene-assembler.ts`): the camera moves the
+person, the name holds still.
+
 ## 2026-10-09 — Captions step aside for a full-screen cover
 
 The caption lane is pinned to the frame, so it drew over the webinar cover's
