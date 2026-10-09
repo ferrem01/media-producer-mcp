@@ -458,10 +458,12 @@ describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
       await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
       closers.push(() => new Promise<void>((r) => server.close(() => r())));
       const port = (server.address() as any).port;
-      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=0&voice=1`);
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=0`);
       await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      // The same take screen, one switch: the prompter stays, the camera goes.
+      expect(await page.isVisible("#bgChoice")).toBe(true);
+      await page.check("#voiceOnly");
       expect(await page.textContent("#recordBtn")).toBe("Record my voice");
-      expect(await page.isChecked("#voiceOnly")).toBe(true);
       expect(await page.isVisible("#bgChoice")).toBe(false);                  // a camera's choices go
       await page.click("#recordBtn");
       await page.waitForSelector("#stopBtn", { state: "visible", timeout: 8000 });   // no light check: straight to the count-in
@@ -480,7 +482,7 @@ describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
       expect(asks[0].video).toBeUndefined();
       expect(await page.textContent("#doneNote")).toContain("Your voice is in");
       // A whole-board link offers no Voice only (a voice is one scene's).
-      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=all&voice=1`);
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=all`);
       await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
       expect(await page.isVisible("#voiceRow")).toBe(false);
       expect(await page.textContent("#recordBtn")).toBe("Record");

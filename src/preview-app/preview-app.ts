@@ -5284,17 +5284,6 @@ ${QUOTIENT_CSS}
         '<div class="np-hint" style="margin-top:6px">Your camera and mic, the lines as a prompter. Stop, and the take lands in this scene. <a href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '" target="_blank">Open it in its own tab</a> if you prefer.</div>';
       return;
     }
-    if (src === 'voice') {
-      // RECORD MY VOICE: the take page in Voice only -- no camera; here, on
-      // the phone by its code, or an uploaded file. It lands as the scene's
-      // voice recording (a performance is made from it; recast needs video).
-      var vUrl = '/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si + '&voice=1';
-      var vQr = withToken('/api/take-qr/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '?scene=' + si + '&voice=1');
-      panel.innerHTML = '<iframe class="np-booth" src="' + escAttr(withToken(vUrl + '&embed=1')) + '" allow="microphone; autoplay" title="Record your voice for scene ' + (si + 1) + '"></iframe>' +
-        '<div class="np-phone" style="margin-top:8px"><img src="' + escAttr(vQr) + '" alt="Scan to record your voice for scene ' + (si + 1) + ' on your phone" width="120" height="120">' +
-        '<div class="np-hint">Just your voice, read off the prompter, or upload an audio file. Or scan to record it on your phone. It becomes this scene\u2019s voice: Generate makes a performance of you from it (a recast needs a video recording). <a href="' + escAttr(withToken(vUrl)) + '" target="_blank">Open it in its own tab</a>.</div></div>';
-      return;
-    }
     if (src === 'phone') {
       // ON YOUR PHONE: the same take link as a code, drawn on this server.
       var qrUrl = withToken('/api/take-qr/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '?scene=' + si);
@@ -12461,9 +12450,6 @@ ${QUOTIENT_CSS}
       var tk = (project.takes || []).filter(function(t) { return t.scene_index === si; }).slice(-1)[0];
       var tkDur = tk && tk.duration ? Math.round(tk.duration * 10) / 10 + ' s' : '';
       var pfStart = (opts && opts.start) || pfDefaultSource(project, si);
-      // A voice is the person's, one scene's: a person-carried film, never a clip need.
-      var gNp = (project.treatment && project.treatment.filmGrammar) || '';
-      var voiceTakes = (gNp === 'speaker' || gNp === 'creator-cut') && a.use !== 'clip';
       studioModalOpen('<h3 class="sm-title">Camera take \u00b7 Scene ' + (si + 1) + (lbl ? ' \u00b7 ' + escHtml(lbl) : '') + '</h3>' +
         '<p class="sm-desc">' + (have ? 'A take is on this scene' + (tkDur ? ' (' + tkDur + ')' : '') + '; a new one replaces it.' : 'No take on this scene yet.') + ' Soft look and the background are set in the recorder and apply to the take you make.</p>' +
         // WHO PERFORMS IT: me (record, phone, room, upload) or a cast member
@@ -12473,7 +12459,6 @@ ${QUOTIENT_CSS}
           '<button class="np-btn" data-np-src="phone" data-np-scene="' + si + '" data-np-asset="' + ai + '">On your phone</button>' +
           '<button class="np-btn" data-np-src="room" data-np-scene="' + si + '" data-np-asset="' + ai + '">Across the room</button>' +
           '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="camera_video">Upload a file</button>' +
-          (voiceTakes ? '<button class="np-btn' + (pfStart === 'voice' ? ' active' : '') + '" data-np-src="voice" data-np-scene="' + si + '" data-np-asset="' + ai + '">Record my voice</button>' : '') +
           '<button class="np-btn' + (pfStart === 'recast' ? ' active' : '') + '" data-np-src="recast" data-np-scene="' + si + '" data-np-asset="' + ai + '">Recast my recording</button>' +
           '<button class="np-btn' + (pfStart === 'generate' ? ' active' : '') + '" data-np-src="generate" data-np-scene="' + si + '" data-np-asset="' + ai + '">Generate</button>' +
         '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div>' +

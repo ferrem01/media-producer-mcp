@@ -21,7 +21,8 @@ copies of the preview re-assembly in that file are now one `previewHtml`.
 
 Marc: "most cases, we're not going to ... record something and then come
 back and say, oh no, only use the voice ... I'll just record the voice."
-- The take page has **Voice only** (`?voice=1`, or the ready-screen toggle):
+- The take page has a **Voice only** switch on the same screen (Marc: "a flag
+  on the existing take screen ... so that we can still use the teleprompter"):
   the mic alone, the prompter, or an uploaded audio file, on a laptop or by
   the phone code. One scene at a time; never a clip need.
 - The voice goes to `POST /api/voice-line`. `recordSceneVoice` keeps it on the
@@ -38,8 +39,6 @@ back and say, oh no, only use the voice ... I'll just record the voice."
   only a voice, the recast panel says a recast copies a video performance and
   Generate makes one from the voice (Marc: "if there is a recording only
   sitting on the speaker layer ... recasting is not an option").
-- Studio's take dialog has a **Record my voice** tab (the take page in Voice
-  only, plus its phone code).
 
 Not done: the remote booth (big screen + phone camera) has no Voice only, and
 a speaker film's lane shows no piece for a voice-only scene among camera

@@ -3775,7 +3775,7 @@ Rules:
       }
 
       // ── API: THE PHONE CODE -- the take link for one scene as a QR (SVG) ──
-      // GET /api/take-qr/{tenant}/{project}?scene=N[&voice=1]  (drawn here: the link carries the token; voice=1 opens Voice only)
+      // GET /api/take-qr/{tenant}/{project}?scene=N  (drawn here: the link carries the token)
       //     /api/take-qr/{tenant}/{project}?session=rb_...  (the remote booth's camera link)
       const takeQrMatch = urlPath.match(/^\/api\/take-qr\/([^/]+)\/([^/]+)$/);
       if (takeQrMatch && method === "GET") {
@@ -3794,7 +3794,7 @@ Rules:
         if (session && !/^rb_[A-Za-z0-9_-]{16,64}$/.test(session)) { jsonResponse(res, 400, { error: "bad session id" }); return; }
         const link = session
           ? `${proto}://${host}/remote-camera?tenant=${encodeURIComponent(tqTenant)}&session=${encodeURIComponent(session)}${token ? `&token=${encodeURIComponent(token)}` : ""}`
-          : `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${q.get("voice") === "1" ? "&voice=1" : ""}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+          : `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
         try {
           const svg = qrSvg(link, { size: 360 });
           res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });
