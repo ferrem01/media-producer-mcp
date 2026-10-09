@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — A crossfade no longer rewinds the outgoing scene's camera
+
+Marc, proj_54cbf8e0 at 9.5 s: "the preview shows me sitting down again". A
+scene with a camera move draws its take inside the scene (the rig video).
+With a take per scene, every rig video took its time from the shared speaker
+clock, which is the scene the playhead is in. Through scene 2's crossfade the
+outgoing scene 1 read scene 2's clock (0.14 s) and showed its own opening
+frame: the walk-in. Each rig video now plays its own take from its own trim,
+held at the end of its own window. Studio only; measured in the browser on
+the film (scene 1's camera at 0.14 s before, 9.56 s to 9.82 s after).
+
 ## 2026-10-09 — The name lower third is pinned to the frame
 
 A `lower-third` rode the camera rig, so a punch-in grew the nametag with
