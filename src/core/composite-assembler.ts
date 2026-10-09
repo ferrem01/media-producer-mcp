@@ -12,6 +12,7 @@
  * - Transport clock driven playback (GSAP as puppet)
  */
 
+import { captionsYieldToCover } from "./caption-yield.js";
 import { fitBoxFor, wrapInFitBox } from "./fit-box.js";
 import { stickerData, ensureStickerFiles } from "./sticker-library.js";
 import { bindSpeakerLayerData, isSpeakerLayer, speakerRendersInside } from "./speaker-layer.js";
@@ -77,7 +78,9 @@ export interface CompositeOptions {
  * Assemble all project scenes into a single composite HTML document.
  */
 export async function assembleComposite(options: CompositeOptions): Promise<string> {
-  const { scenes: sceneInputs, canvas, speakerUrl } = options;
+  const { canvas, speakerUrl } = options;
+  // Captions step aside while a full-screen cover is up (caption-yield.ts).
+  const sceneInputs = options.scenes.map((si) => ({ ...si, scene: captionsYieldToCover(si.scene) }));
   // Resolve brand fonts FIRST so links and --mp-font-family agree on a
   // family that actually exists (see font-resolve.ts).
   const brandKit = await resolveBrandKitFonts(options.brandKit);

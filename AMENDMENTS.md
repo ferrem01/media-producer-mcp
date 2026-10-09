@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — Captions step aside for a full-screen cover
+
+The caption lane is pinned to the frame, so it drew over the webinar cover's
+date and time on Dana's opener (Marc: "the caption sort of is like covering
+up the details of the webinar"). That was hand-timed on Dana; now
+`core/caption-yield.ts` does it for every film: while a `webinar-cover` with
+its own sheet (`ground` cream/waves) fills the frame, the lane's phrases are
+trimmed out of its window (dropped if wholly under it, cut at the edge if
+they straddle it). Both assemblers play the trimmed copy; saved data is
+untouched. A cover card in a box (not full-frame) does not count.
+
 ## 2026-10-09 — Seedance is told hard: no text in the frame
 
 Dana's scene 3 (proj_d37c96fe) came back from Seedance with the spoken line
