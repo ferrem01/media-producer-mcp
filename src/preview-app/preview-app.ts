@@ -5284,6 +5284,17 @@ ${QUOTIENT_CSS}
         '<div class="np-hint" style="margin-top:6px">Your camera and mic, the lines as a prompter. Stop, and the take lands in this scene. <a href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '" target="_blank">Open it in its own tab</a> if you prefer.</div>';
       return;
     }
+    if (src === 'voice') {
+      // RECORD MY VOICE: the take page in Voice only -- no camera; here, on
+      // the phone by its code, or an uploaded file. It lands as the scene's
+      // voice recording (a performance is made from it; recast needs video).
+      var vUrl = '/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si + '&voice=1';
+      var vQr = withToken('/api/take-qr/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '?scene=' + si + '&voice=1');
+      panel.innerHTML = '<iframe class="np-booth" src="' + escAttr(withToken(vUrl + '&embed=1')) + '" allow="microphone; autoplay" title="Record your voice for scene ' + (si + 1) + '"></iframe>' +
+        '<div class="np-phone" style="margin-top:8px"><img src="' + escAttr(vQr) + '" alt="Scan to record your voice for scene ' + (si + 1) + ' on your phone" width="120" height="120">' +
+        '<div class="np-hint">Just your voice, read off the prompter, or upload an audio file. Or scan to record it on your phone. It becomes this scene\u2019s voice: Generate makes a performance of you from it (a recast needs a video recording). <a href="' + escAttr(withToken(vUrl)) + '" target="_blank">Open it in its own tab</a>.</div></div>';
+      return;
+    }
     if (src === 'phone') {
       // ON YOUR PHONE: the same take link as a code, drawn on this server.
       var qrUrl = withToken('/api/take-qr/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '?scene=' + si);
@@ -12089,8 +12100,18 @@ ${QUOTIENT_CSS}
       var src = dr.voice_source || perf.voice_source || 'script';
       h += '<div class="pf-row"><label>Voice</label><div class="pf-engines">'
         + '<label class="pf-eng"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="script"' + (src === 'script' ? ' checked' : '') + '> Read the script in ' + escHtml(a.name) + '’s voice</label>'
-        + '<label class="pf-eng' + (s.has_recording ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="take"' + (src === 'take' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> My recording, in their voice' + (s.has_recording ? '' : ' <small>(record the scene first)</small>') + '</label>'
-        + '<label class="pf-eng' + (s.has_recording ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="recording"' + (src === 'recording' ? ' checked' : '') + (s.has_recording ? '' : ' disabled') + '> My recording, my own voice' + (s.has_recording ? '' : ' <small>(record the scene first)</small>') + '</label></div></div>';
+        + '<label class="pf-eng' + (s.has_voice ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="take"' + (src === 'take' ? ' checked' : '') + (s.has_voice ? '' : ' disabled') + '> My recording, in their voice' + (s.has_voice ? '' : ' <small>(record your voice or the scene first)</small>') + '</label>'
+        + '<label class="pf-eng' + (s.has_voice ? '' : ' dis') + '"><input type="radio" name="pf-vs-' + si + '" data-pf="voice_source" value="recording"' + (src === 'recording' ? ' checked' : '') + (s.has_voice ? '' : ' disabled') + '> My recording, my own voice' + (s.has_voice ? '' : ' <small>(record your voice or the scene first)</small>') + '</label></div></div>';
+      // WHICH RECORDING: a voice-only one and a video take's sound can both
+      // voice the scene (Marc: "I could pick the one I recorded. I could pick
+      // the one from the video"); the newest unless one is picked.
+      if (src !== 'script' && s.has_voice) {
+        var rfrom = dr.recording_from || perf.recording_from || s.recording_used;
+        if (s.voice_take && s.has_recording) h += '<div class="pf-row"><label>From</label><div class="pf-engines">'
+          + '<label class="pf-eng"><input type="radio" name="pf-rf-' + si + '" data-pf="recording_from" value="voice"' + (rfrom === 'voice' ? ' checked' : '') + '> My voice recording</label>'
+          + '<label class="pf-eng"><input type="radio" name="pf-rf-' + si + '" data-pf="recording_from" value="video"' + (rfrom === 'video' ? ' checked' : '') + '> My video take&#8217;s sound</label></div></div>';
+        else h += '<div class="pf-row"><label>From</label><div class="pf-acts"><small>' + (s.voice_take ? 'your voice recording' : 'your video take&#8217;s sound') + '</small></div></div>';
+      }
       if (src === 'script') {
         var del = dr.delivery != null ? dr.delivery : (perf.delivery || String(s.lines || ''));
         h += '<div class="pf-row top"><label>Delivery</label><div style="flex:1;min-width:0"><textarea data-pf="delivery" rows="3" maxlength="4000" style="' + ta + '">' + escHtml(del) + '</textarea>'
@@ -12113,7 +12134,8 @@ ${QUOTIENT_CSS}
         + '<tr><td>With</td><td>' + escHtml(pfEngLabel(kind, eng)) + (p.framedBy && !p.takesShot ? ' <small>' + escHtml(p.framedBy) + '</small>' : '') + '</td></tr>'
         + (p.takesShot ? '<tr><td>The shot</td><td>' + (dr.rcamera || !fr2 ? 'your recording’s camera' : '<img class="pf-sumshot" src="' + escAttr(withToken(fr2)) + '" alt=""> <small>' + escHtml(String(perf.shot || '').slice(0, 140)) + '</small>') + '</td></tr>' : '')
         + '<tr><td>Voice</td><td>' + (dr.rvoice === 'actor' && a.voice_id ? escHtml(a.name) + '’s voice' : 'your recording’s voice') + '</td></tr></table>';
-      if (!s.has_recording) h += '<div class="np-note">A recast performs <b>your recording</b> of this scene: record it first (Record here, On your phone, Across the room), then recast it.</div>';
+      if (!s.has_recording && s.voice_take) h += '<div class="np-note">You recorded <b>your voice only</b> for this scene. A recast copies a video performance, so it needs the scene on camera (Record here, On your phone, Across the room). Generate makes a performance of you from your voice.</div>';
+      else if (!s.has_recording) h += '<div class="np-note">A recast performs <b>your recording</b> of this scene: record it first (Record here, On your phone, Across the room), then recast it.</div>';
       else if (rc) h += '<div class="np-armed"><span></span>Recasting' + (rc.scenes ? ' scene ' + rc.scenes.map(function(x) { return x + 1; }).join(', ') : '') + ' as ' + escHtml((pfActor(rc.actor) || {}).name || rc.actor) + '&#8230; ' + (rc.files && rc.files[0] && rc.files[0].stage === 'frame' ? 'drawing the shot' : 'usually ~' + mins + ' min') + '</div>';
       else h += '<div class="pf-acts pf-make"><button class="np-btn primary" data-pf-go="recast">Recast scene ' + (si + 1) + ' as ' + escHtml(a.name) + '</button><small>' + escHtml(pfEngLabel(kind, eng)) + ' credits &#183; ~' + mins + ' min</small></div>'
         + '<div class="np-hint">Your words, timing and cuts stay; only the person changes. Your recording is kept: Record here puts you back.</div>';
@@ -12213,6 +12235,7 @@ ${QUOTIENT_CSS}
       if (k === 'engine') { pickEngine(t.value); return; }
       if (k === 'location') { d.location = t.value; pfPost(project, panel, kind, si, { action: 'location', location: t.value }, t.value ? 'Set: the frame is drawn there, and every take keeps the room.' : 'No location.'); return; }
       if (k === 'voice_source') { d.voice_source = t.value; pfRender(project, panel, kind, si); return; }
+      if (k === 'recording_from') { d.recording_from = t.value; pfRender(project, panel, kind, si); return; }
       if (k === 'rvoice') { d.rvoice = t.value; return; }
       if (k === 'cut_show' || k === 'cut_where') { d[k] = t.value; return; }
       if (k === 'vgender' || k === 'vuse') { d[k] = t.value; pfLoadVoices(project, panel, kind, si, true); return; }
@@ -12363,7 +12386,7 @@ ${QUOTIENT_CSS}
       if (go === 'continue') { pfPost(project, panel, kind, si, { action: 'continue', actor: actor, from_scene: si - 1, shot: kind === 'recast' ? (d.rshot != null ? d.rshot : undefined) : shot }, 'Taking scene ' + si + '’s last frame…').then(takeOn); return; }
       if (go === 'hear') {
         pfSay(panel, 'Making the voice…');
-        api('POST', '/scene-performance/' + pfT() + '/' + pfP(project) + '/' + si, { action: 'voice', actor: actor, voice_source: d.voice_source || undefined, delivery: d.delivery != null ? d.delivery : undefined }).then(function(r) {
+        api('POST', '/scene-performance/' + pfT() + '/' + pfP(project) + '/' + si, { action: 'voice', actor: actor, voice_source: d.voice_source || undefined, recording_from: d.recording_from || undefined, delivery: d.delivery != null ? d.delivery : undefined }).then(function(r) {
           return pfLoad(project, true).then(function() {
             pfRender(project, panel, kind, si);
             try { if (pf.audio) pf.audio.pause(); pf.audio = new Audio(withToken(r.url)); pf.audio.play(); } catch (e) {}
@@ -12376,7 +12399,7 @@ ${QUOTIENT_CSS}
         engine = gEng;
         pf.making[si] = { what: go === 'final' ? 'final' : gEng === 'heygen' ? 'heygen' : 'draft', at: Date.now() };
         delete pf.stageAt[si];
-        pfPost(project, panel, kind, si, { action: 'perform', actor: actor, engine: engine, shot: shot, voice_source: d.voice_source || undefined,
+        pfPost(project, panel, kind, si, { action: 'perform', actor: actor, engine: engine, shot: shot, voice_source: d.voice_source || undefined, recording_from: d.recording_from || undefined,
           delivery: d.delivery != null ? d.delivery : undefined, quality: go === 'final' ? 'final' : 'draft', force: go === 'force' || undefined },
           go === 'final' ? 'Making the 1080p final…' : engine === 'heygen' ? 'HeyGen is performing it (a few minutes)…' : 'Making the draft (2-4 minutes)…');
         return;
@@ -12438,6 +12461,9 @@ ${QUOTIENT_CSS}
       var tk = (project.takes || []).filter(function(t) { return t.scene_index === si; }).slice(-1)[0];
       var tkDur = tk && tk.duration ? Math.round(tk.duration * 10) / 10 + ' s' : '';
       var pfStart = (opts && opts.start) || pfDefaultSource(project, si);
+      // A voice is the person's, one scene's: a person-carried film, never a clip need.
+      var gNp = (project.treatment && project.treatment.filmGrammar) || '';
+      var voiceTakes = (gNp === 'speaker' || gNp === 'creator-cut') && a.use !== 'clip';
       studioModalOpen('<h3 class="sm-title">Camera take \u00b7 Scene ' + (si + 1) + (lbl ? ' \u00b7 ' + escHtml(lbl) : '') + '</h3>' +
         '<p class="sm-desc">' + (have ? 'A take is on this scene' + (tkDur ? ' (' + tkDur + ')' : '') + '; a new one replaces it.' : 'No take on this scene yet.') + ' Soft look and the background are set in the recorder and apply to the take you make.</p>' +
         // WHO PERFORMS IT: me (record, phone, room, upload) or a cast member
@@ -12447,6 +12473,7 @@ ${QUOTIENT_CSS}
           '<button class="np-btn" data-np-src="phone" data-np-scene="' + si + '" data-np-asset="' + ai + '">On your phone</button>' +
           '<button class="np-btn" data-np-src="room" data-np-scene="' + si + '" data-np-asset="' + ai + '">Across the room</button>' +
           '<button class="np-btn" data-np-scene="' + si + '" data-np-asset="' + ai + '" data-np-type="camera_video">Upload a file</button>' +
+          (voiceTakes ? '<button class="np-btn' + (pfStart === 'voice' ? ' active' : '') + '" data-np-src="voice" data-np-scene="' + si + '" data-np-asset="' + ai + '">Record my voice</button>' : '') +
           '<button class="np-btn' + (pfStart === 'recast' ? ' active' : '') + '" data-np-src="recast" data-np-scene="' + si + '" data-np-asset="' + ai + '">Recast my recording</button>' +
           '<button class="np-btn' + (pfStart === 'generate' ? ' active' : '') + '" data-np-src="generate" data-np-scene="' + si + '" data-np-asset="' + ai + '">Generate</button>' +
         '</div><div class="np-panel" data-np-panel="' + si + '-' + ai + '" style="display:none"></div>' +

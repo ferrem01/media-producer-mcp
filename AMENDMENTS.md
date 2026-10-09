@@ -6,6 +6,36 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-08 — Record just your voice for a scene
+
+Marc: "most cases, we're not going to ... record something and then come
+back and say, oh no, only use the voice ... I'll just record the voice."
+- The take page has **Voice only** (`?voice=1`, or the ready-screen toggle):
+  the mic alone, the prompter, or an uploaded audio file, on a laptop or by
+  the phone code. One scene at a time; never a clip need.
+- The voice goes to `POST /api/voice-line`. `recordSceneVoice` keeps it on the
+  board scene as `voice_take` and plays it as the scene's line, unless a take
+  already plays there. Kept apart from the line because a take landing drops
+  the line (`dropVoiceUnderTakes`), and a Seedance take would otherwise
+  delete the very voice it was made from.
+- "My recording" (in their voice, or my own) is now the voice take or a video
+  take's sound. `pickRecording` takes the newest, or `recording_from`
+  (Studio's From row when both exist). `made_with.from` names the recording;
+  a newer one marks the performance stale ("made from an earlier recording").
+  A heard voice from another recording is not reused.
+- Recast stays video-only: `has_recording` still means a camera take. With
+  only a voice, the recast panel says a recast copies a video performance and
+  Generate makes one from the voice (Marc: "if there is a recording only
+  sitting on the speaker layer ... recasting is not an option").
+- Studio's take dialog has a **Record my voice** tab (the take page in Voice
+  only, plus its phone code).
+
+Not done: the remote booth (big screen + phone camera) has no Voice only, and
+a speaker film's lane shows no piece for a voice-only scene among camera
+takes (its open need still invites Generate).
+Tests: `test/take-page.test.ts` (browser: no camera asked, the voice route),
+`test/voice-lines.test.ts`, `test/scene-performance.test.ts`, `test/studio-cast.test.ts`.
+
 ## 2026-10-08 — Seedance performs a scene from the speaker's own voice
 
 Marc's levels of effort: no recording (the clone reads the script), a voice

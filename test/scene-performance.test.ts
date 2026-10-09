@@ -928,6 +928,74 @@ describe("a scene performed from the recording in the speaker's own voice", () =
     const take = path.join(DATA, attached[0].replace(/^\/assets\//, ""));
     expect(Math.abs((await sp.voicePitch(take, path.join(DATA, "_media_rec"))) - 300)).toBeLessThan(30);
     // Not made in the actor's ElevenLabs voice.
-    expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance" });
+    expect(s0.performance.made_with).toEqual({ actor: "dana", engine: "seedance", from: `/assets/${T}/projects/${P5}/assets/rec.mp4` });
+  }, 90000);
+});
+
+describe("a scene performed from a voice-only recording", () => {
+  it("picks the newest recording (or the one asked for), performs from the voice take, and goes stale when a new voice lands", async () => {
+    process.env.ATLASCLOUD_API_KEY = "ak"; process.env.OPENAI_API_KEY = "ok"; process.env.ELEVENLABS_API_KEY = "ek";
+    const m = await media(path.join(DATA, "_media_vt"));
+    const P6 = "proj_vt";
+    const pdir = path.join(DATA, T, "projects", P6);
+    await fs.mkdir(path.join(pdir, "assets", "audio"), { recursive: true });
+    // A video take at 300 Hz (m.mp4) and a voice-only recording at 180 Hz.
+    await fs.writeFile(path.join(pdir, "assets", "vid.mp4"), m.mp4);
+    const voice = path.join(pdir, "assets", "audio", "voice.wav");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=180:duration=3", voice]);
+    const project = {
+      project_id: P6, tenant_id: T, name: "VT", format: "video", status: "generated", canvas: { width: 1080, height: 1920, fps: 30 },
+      created_at: "2026-10-08T00:00:00.000Z", updated_at: "2026-10-08T00:00:00.000Z", treatment: { filmGrammar: "speaker" },
+      storyboard: { scenes: [
+        { label: "A", voiceover_text: "One line.", components: [], voice_take: { file: voice, recorded_at: "2026-10-08T02:00:00.000Z" } },
+        { label: "B", voiceover_text: "Two line.", components: [], voice_take: { file: voice, recorded_at: "2026-10-08T02:00:00.000Z" } },
+      ] },
+      scenes: [{ id: "a", duration_seconds: 3, components: [] }, { id: "b", duration_seconds: 3, components: [] }],
+      // Scene 2 also has a video take, recorded AFTER its voice.
+      takes: [{ id: "k1", scene_index: 1, source: `/assets/${T}/projects/${P6}/assets/vid.mp4`, duration: 4, recorded_at: "2026-10-08T03:00:00.000Z" }],
+    };
+    await fs.writeFile(path.join(pdir, "project.json"), JSON.stringify(project));
+    const sp = await import("../src/core/scene-performance.js");
+    expect(sp.pickRecording(project, 0)?.kind).toBe("voice");
+    expect(sp.pickRecording(project, 1)?.kind).toBe("video");                  // the newest
+    expect(sp.pickRecording(project, 1, "voice")?.kind).toBe("voice");         // asked for
+    let rows = await sp.getScenePerformances(T, P6);
+    // Voice only: it can voice a performance, but there is nothing to recast.
+    expect(rows[0]).toMatchObject({ has_recording: false, has_voice: true, recording_used: "voice", plan: { how: "record" } });
+    expect(rows[1]).toMatchObject({ has_recording: true, has_voice: true, recording_used: "video" });
+
+    const calls: string[] = [];
+    let polls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("elevenlabs")) { calls.push("eleven"); throw new Error("no voice calls here"); }
+      if (u.includes("/images/edits")) return new Response(JSON.stringify({ data: [{ b64_json: m.png.toString("base64") }] }));
+      if (u.includes("api.atlascloud.ai") && init?.method === "POST") { calls.push("seedance"); return new Response(JSON.stringify({ data: { id: `pv${calls.length}` } })); }
+      if (u.includes("api.atlascloud.ai")) return new Response(JSON.stringify({ data: ++polls % 2 ? { status: "processing" } : { status: "completed", outputs: ["https://cdn/vt.mp4"], draft_id: "dv" } }));
+      if (u === "https://cdn/vt.mp4") return new Response(m.mp4);
+      throw new Error("unexpected fetch " + u);
+    }));
+    sp.registerSceneAttacher(async () => ({ status: 200, body: { ok: true } }));
+    await sp.startScenePerformance(T, P6, 0, { actor: "dana", voice_source: "recording", force: true });
+    await until(async () => (await sp.getScenePerformances(T, P6))[0].performance?.status !== "running", 40000);
+    rows = await sp.getScenePerformances(T, P6);
+    expect(rows[0].performance.error).toBeUndefined();
+    expect(calls).toEqual(["seedance"]);
+    const sent = path.join(DATA, rows[0].performance.voice_url.replace(/^\/assets\//, ""));
+    expect(Math.abs((await sp.voicePitch(sent, path.join(DATA, "_media_vt"))) - 180)).toBeLessThan(20);
+    expect(rows[0].performance.made_with.from).toBe(voice);
+
+    // A new voice recording of scene 1: its performance is stale, said why.
+    const disk = JSON.parse(await fs.readFile(path.join(pdir, "project.json"), "utf8"));
+    const voice2 = path.join(pdir, "assets", "audio", "voice2.wav");
+    await fs.copyFile(voice, voice2);
+    disk.storyboard.scenes[0].voice_take = { file: voice2, recorded_at: "2026-10-08T04:00:00.000Z" };
+    disk.storyboard.scenes[0].performer = { actor: "dana", how: "generate", engine: "seedance" };
+    // The performance is scene 1's take (what index.ts's attacher does).
+    disk.takes.push({ id: "k2", scene_index: 0, source: rows[0].performance.draft.url, recorded_at: "x", performed_by: { actor: "dana", engine: "seedance", quality: "draft" } });
+    disk.speaker_track = { clips: [{ source: rows[0].performance.draft.url, start: 0, scene_index: 0 }] };
+    await fs.writeFile(path.join(pdir, "project.json"), JSON.stringify(disk));
+    rows = await sp.getScenePerformances(T, P6);
+    expect(rows[0]).toMatchObject({ state: "stale", why: "made from an earlier recording" });
   }, 90000);
 });
