@@ -1033,6 +1033,20 @@ describe("the voice is exactly the clip (no slack for Seedance to stretch the li
     const fb = await sp.fitVoiceToClip(b, await fs.mkdtemp(path.join(dir, "b-")));
     expect(fb.clip).toBe(9);
     expect(Math.abs((await dur(fb.file)) - 9)).toBeLessThan(0.06);
+    // Speech ending just past a second (0.76 s lead, to 9.10 s): 0.25 s of the
+    // lead goes and the clip is 9 s, not 10 with 0.9 s of slack.
+    const d = path.join(dir, "d.wav");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=0.76", "-f", "lavfi", "-i", "sine=f=180:d=8.34", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=0.38",
+      "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", d]);
+    const fd = await sp.fitVoiceToClip(d, await fs.mkdtemp(path.join(dir, "d-")));
+    expect(fd.clip).toBe(9);
+    expect(fd.trimmed).toBeGreaterThan(0.2); expect(fd.trimmed).toBeLessThan(0.3);
+    // ...but never below 0.3 s of lead: speech at 0.3 s to 9.1 s keeps its 10 s clip.
+    const e = path.join(dir, "e.wav");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=0.3", "-f", "lavfi", "-i", "sine=f=180:d=8.8", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=0.4",
+      "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", e]);
+    const fe = await sp.fitVoiceToClip(e, await fs.mkdtemp(path.join(dir, "e-")));
+    expect(fe).toMatchObject({ clip: 10, trimmed: 0 });
     // Short: Seedance's four-second floor.
     const c = path.join(dir, "c.wav");
     await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=180:d=2", c]);

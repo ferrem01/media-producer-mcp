@@ -550,16 +550,24 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
 
 /** A voice made exactly as long as the Seedance clip it drives: the whole
  *  second that holds its speech (and the breath after it), trailing silence
- *  trimmed or padded to it. Leading silence stays (a walk-in before the line). */
-export async function fitVoiceToClip(file: string, workDir: string): Promise<{ file: string; seconds: number; clip: number }> {
+ *  trimmed or padded to it. Clips are whole seconds, so speech ending just
+ *  past one (9.10 s -> a 10 s clip) still left most of a second to stretch
+ *  into (scene 3 came back 10% slow); then just enough of the silence BEFORE
+ *  the line goes to fit the second below, never leaving under 0.3 s of it --
+ *  a walk-in before the line keeps nearly all of its time. */
+export async function fitVoiceToClip(file: string, workDir: string): Promise<{ file: string; seconds: number; clip: number; trimmed: number }> {
   const seconds = (await durationOf(file)) || 0;
-  const trailing = (await detectSilence(file, { noiseDb: -35, minSeconds: 0.25 }))
-    .find((r) => r.to === Number.POSITIVE_INFINITY || r.to >= seconds - 0.05);
+  const silences = await detectSilence(file, { noiseDb: -35, minSeconds: 0.25 });
+  const trailing = silences.find((r) => r.to === Number.POSITIVE_INFINITY || r.to >= seconds - 0.05);
+  const leading = silences.find((r) => r.from <= 0.05 && r !== trailing);
   const speechEnd = trailing ? Math.min(trailing.from, seconds) : seconds;
-  const clip = Math.max(4, Math.min(30, Math.ceil(speechEnd + 0.15)));
+  let clip = Math.max(4, Math.min(30, Math.ceil(speechEnd + 0.15)));
+  let trimmed = 0;
+  const need = speechEnd + 0.15 - (clip - 1);
+  if (leading && clip - 1 >= 4 && need > 0 && need <= leading.to - 0.3) { trimmed = Math.round(need * 1000) / 1000; clip -= 1; }
   const out = path.join(workDir, "voice-fit.mp3");
-  await ffmpeg(["-i", file, "-af", `apad,atrim=0:${clip}`, "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", out]);
-  return { file: out, seconds: clip, clip };
+  await ffmpeg(["-i", file, "-af", `${trimmed ? `atrim=start=${trimmed},asetpts=PTS-STARTPTS,` : ""}apad,atrim=0:${clip}`, "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", out]);
+  return { file: out, seconds: clip, clip, trimmed };
 }
 
 function perfDelivery(scene: any): string | undefined { return scene?.performance?.delivery || undefined; }
