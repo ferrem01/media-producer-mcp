@@ -134,7 +134,8 @@ describe("a scene performed by a cast actor", () => {
     expect(calls.tts[0]).toBe("Someone fills out your form. Then what?");
     expect(calls.atlas[0].reference_images).toHaveLength(2);
     expect(calls.atlas[0].reference_images[0]).toMatch(/^https:\/\/mm\.example\/output\/t\/projects\/proj_perf\/_perform\/.*frame-dana-/);
-    expect(calls.atlas[0].reference_audios[0]).toMatch(/_perform\/.*voice\.mp3$/);
+    // The voice fitted to the clip (fitVoiceToClip): exactly the clip's 4 s.
+    expect(calls.atlas[0].reference_audios[0]).toMatch(/_perform\/.*voice-fit\.mp3$/);
     expect(calls.atlas[0]).toMatchObject({ draft: true, resolution: "480p", ratio: "9:16", duration: 4 });
     expect(calls.atlas[0].prompt).toMatch(/Walks toward the camera down a bright office hallway, medium-wide\./);
     expect(attached[0]).toMatchObject({ si: 0, extra: { performed_by: { actor: "dana", engine: "seedance", quality: "draft" } } });
@@ -1012,4 +1013,29 @@ describe("Seedance prompts ban on-screen text", () => {
       expect(p).not.toMatch(/no words/i);
     }
   });
+});
+
+describe("the voice is exactly the clip (no slack for Seedance to stretch the line)", () => {
+  it("trims or pads the voice to the whole second that holds its speech; leading silence stays", async () => {
+    const dir = path.join(DATA, "_fit"); await fs.mkdir(dir, { recursive: true });
+    const sp = await import("../src/core/scene-performance.js");
+    const dur = async (f: string) => parseFloat(String((await run("ffprobe", ["-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", f])).stdout));
+    // 0.7 s silence, 6.7 s of speech, 0.66 s of air: 8.06 s -> an 8 s clip (was 9: 0.94 s of slack).
+    const a = path.join(dir, "a.wav");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=0.7", "-f", "lavfi", "-i", "sine=f=180:d=6.7", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=0.66",
+      "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", a]);
+    const fa = await sp.fitVoiceToClip(a, dir);
+    expect(fa.clip).toBe(8);
+    expect(Math.abs((await dur(fa.file)) - 8)).toBeLessThan(0.06);
+    // Speech to the very end: padded up to the next whole second, never cut.
+    const b = path.join(dir, "b.wav");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=180:d=8.06", b]);
+    const fb = await sp.fitVoiceToClip(b, await fs.mkdtemp(path.join(dir, "b-")));
+    expect(fb.clip).toBe(9);
+    expect(Math.abs((await dur(fb.file)) - 9)).toBeLessThan(0.06);
+    // Short: Seedance's four-second floor.
+    const c = path.join(dir, "c.wav");
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=180:d=2", c]);
+    expect((await sp.fitVoiceToClip(c, await fs.mkdtemp(path.join(dir, "c-")))).clip).toBe(4);
+  }, 30000);
 });
