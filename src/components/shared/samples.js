@@ -1,16 +1,22 @@
 // ── shared/samples.js ──
 // SAMPLE BRANDS AND THEIR WORK: made-up brands (Flowpath, Oliva Terra, Lumen
-// AI, Studio Bloom, Volt Run, Nimbus, Maré, Bonsai) and the house sample
-// work made for them -- finished deck slides, landing pages, social posts,
-// emails and event cards, generated once with the image model and committed
-// (core/sample-work.ts serves them). The Moda launch film (Mar 2026) sold its
+// AI, Studio Bloom, Volt Run, Nimbus, Maré, Bonsai, Kiln Coffee, Atlas Trips,
+// Penny, Fern & Co) and the house sample work made for them -- finished deck
+// slides, landing pages, full-length emails, social posts for each platform
+// (LinkedIn, Instagram feed and story, TikTok, X, YouTube, Pinterest), blog
+// articles and blog home pages, event cards -- generated once with the image
+// model and committed (core/sample-work.ts serves them). Quotient's three
+// areas are email, social and blog: every film can show beautiful work in
+// each. The Moda launch film (Mar 2026) sold its
 // product with a wall of beautiful work drifting past; Marc (Oct 9): "the
 // color and design makes any video pop" -- and, of the first HTML-drawn
 // cards, "they need to look like really nice assets".
 //
-//   mpSamples.work                      the house pieces: {src, kind, brand, ratio}
+//   mpSamples.work                      the house pieces: {src, kind, brand, ratio,
+//                                       platform (social), page (blog: post | index)}
 //   mpSamples.pick(n, opts)             n pieces, shuffled (seeded); opts.kinds,
-//                                       opts.brands filter, opts.items replaces the house set
+//                                       opts.brands, opts.platforms filter, opts.items
+//                                       replaces the house set
 //   mpSamples.brands                    the brands (name, colours, email copy)
 //   mpSamples.emailBlocks(brandId)      a quotient-email-editor email for the brand
 //   mpSamples.setPhotos({id: url})      a brand's photo, for its email's hero
@@ -32,6 +38,14 @@
       copy: { email: 'Meet the summer edit', sub: 'Clean skincare made with marine botanicals.', eyebrow: 'Summer edit', button: 'Discover the edit' } },
     { id: 'bonsai', name: 'Bonsai', bg: '#2a241d', bg2: '#4a3d2e', accent: '#7f9a52',
       copy: { email: 'Your tree needs you this week', sub: 'Hand-shaped trees and the tools to keep them.', eyebrow: 'Workshop', button: 'Book a seat' } },
+    { id: 'kiln', name: 'Kiln Coffee', bg: '#f4ece0', bg2: '#3b2418', accent: '#d9622b',
+      copy: { email: 'The Roast Report, No. 14', sub: 'Small-batch coffee, roasted every Monday.', eyebrow: 'Bean of the month', button: 'Shop the roast' } },
+    { id: 'atlas', name: 'Atlas Trips', bg: '#ffd23f', bg2: '#0b4f8a', accent: '#0b4f8a',
+      copy: { email: '48-hour sale: Lisbon from $399', sub: 'Real places, brighter days.', eyebrow: 'Flash sale', button: 'Grab a seat' } },
+    { id: 'penny', name: 'Penny', bg: '#d9f7e6', bg2: '#0f3d2e', accent: '#0f3d2e',
+      copy: { email: 'Your money, on autopilot', sub: 'Round-ups, smart goals and zero fees.', eyebrow: 'New in Penny', button: 'Start saving' } },
+    { id: 'fern', name: 'Fern & Co', bg: '#eef0e4', bg2: '#7d8f69', accent: '#c4673f',
+      copy: { email: 'We miss you (and so do your plants)', sub: 'Hard to kill. Easy to love.', eyebrow: 'Come back', button: 'Shop plants' } },
   ];
   var BY_ID = {};
   BRANDS.forEach(function (b) { BY_ID[b.id] = b; });
@@ -40,29 +54,65 @@
   // every /assets/... string in the page to its file.
   // @@WORK@@
   var WORK = [
+    {src: '/assets/_system/sample-work/atlas-blog-post.webp', kind: 'blog', brand: 'atlas', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/atlas-email-promo.webp', kind: 'email', brand: 'atlas', ratio: 1.7872},
+    {src: '/assets/_system/sample-work/atlas-social-instagram.webp', kind: 'social', brand: 'atlas', ratio: 1.0, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/bloom-blog-post.webp', kind: 'blog', brand: 'bloom', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/bloom-email-event.webp', kind: 'email', brand: 'bloom', ratio: 1.7872},
     {src: '/assets/_system/sample-work/bloom-landing.webp', kind: 'landing', brand: 'bloom', ratio: 0.5595},
-    {src: '/assets/_system/sample-work/bloom-social.webp', kind: 'social', brand: 'bloom', ratio: 1.25},
+    {src: '/assets/_system/sample-work/bloom-social-tiktok.webp', kind: 'social', brand: 'bloom', ratio: 1.7872, platform: 'tiktok'},
+    {src: '/assets/_system/sample-work/bloom-social.webp', kind: 'social', brand: 'bloom', ratio: 1.25, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/bonsai-email-newsletter.webp', kind: 'email', brand: 'bonsai', ratio: 1.7872},
     {src: '/assets/_system/sample-work/bonsai-slide.webp', kind: 'slide', brand: 'bonsai', ratio: 0.5595},
-    {src: '/assets/_system/sample-work/bonsai-social.webp', kind: 'social', brand: 'bonsai', ratio: 1.25},
+    {src: '/assets/_system/sample-work/bonsai-social-youtube.webp', kind: 'social', brand: 'bonsai', ratio: 0.5595, platform: 'youtube'},
+    {src: '/assets/_system/sample-work/bonsai-social.webp', kind: 'social', brand: 'bonsai', ratio: 1.25, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/fern-blog-post.webp', kind: 'blog', brand: 'fern', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/fern-email-winback.webp', kind: 'email', brand: 'fern', ratio: 1.7872},
+    {src: '/assets/_system/sample-work/fern-social-instagram.webp', kind: 'social', brand: 'fern', ratio: 1.25, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/flowpath-blog-post.webp', kind: 'blog', brand: 'flowpath', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/flowpath-email-launch.webp', kind: 'email', brand: 'flowpath', ratio: 1.7872},
     {src: '/assets/_system/sample-work/flowpath-slide-1.webp', kind: 'slide', brand: 'flowpath', ratio: 0.5595},
     {src: '/assets/_system/sample-work/flowpath-slide-2.webp', kind: 'slide', brand: 'flowpath', ratio: 0.5595},
     {src: '/assets/_system/sample-work/flowpath-slide-3.webp', kind: 'slide', brand: 'flowpath', ratio: 0.5595},
     {src: '/assets/_system/sample-work/flowpath-slide-4.webp', kind: 'slide', brand: 'flowpath', ratio: 0.5595},
     {src: '/assets/_system/sample-work/flowpath-slide-5.webp', kind: 'slide', brand: 'flowpath', ratio: 0.5595},
     {src: '/assets/_system/sample-work/flowpath-slide-6.webp', kind: 'slide', brand: 'flowpath', ratio: 0.5595},
+    {src: '/assets/_system/sample-work/flowpath-social-linkedin.webp', kind: 'social', brand: 'flowpath', ratio: 1.25, platform: 'linkedin'},
+    {src: '/assets/_system/sample-work/kiln-blog-post.webp', kind: 'blog', brand: 'kiln', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/kiln-email-newsletter.webp', kind: 'email', brand: 'kiln', ratio: 1.7872},
+    {src: '/assets/_system/sample-work/kiln-social-instagram.webp', kind: 'social', brand: 'kiln', ratio: 1.25, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/kiln-social-tiktok.webp', kind: 'social', brand: 'kiln', ratio: 1.7872, platform: 'tiktok'},
+    {src: '/assets/_system/sample-work/lumen-blog-post.webp', kind: 'blog', brand: 'lumen', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/lumen-email-webinar.webp', kind: 'email', brand: 'lumen', ratio: 1.7872},
     {src: '/assets/_system/sample-work/lumen-slide.webp', kind: 'slide', brand: 'lumen', ratio: 0.5595},
-    {src: '/assets/_system/sample-work/lumen-social.webp', kind: 'social', brand: 'lumen', ratio: 1.25},
+    {src: '/assets/_system/sample-work/lumen-social-x.webp', kind: 'social', brand: 'lumen', ratio: 0.5595, platform: 'x'},
+    {src: '/assets/_system/sample-work/lumen-social.webp', kind: 'social', brand: 'lumen', ratio: 1.25, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/mare-blog-post.webp', kind: 'blog', brand: 'mare', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/mare-email-welcome.webp', kind: 'email', brand: 'mare', ratio: 1.7872},
     {src: '/assets/_system/sample-work/mare-landing.webp', kind: 'landing', brand: 'mare', ratio: 0.5595},
-    {src: '/assets/_system/sample-work/mare-social.webp', kind: 'social', brand: 'mare', ratio: 1.25},
+    {src: '/assets/_system/sample-work/mare-social-story.webp', kind: 'social', brand: 'mare', ratio: 1.7872, platform: 'story'},
+    {src: '/assets/_system/sample-work/mare-social.webp', kind: 'social', brand: 'mare', ratio: 1.25, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/nimbus-blog-index.webp', kind: 'blog', brand: 'nimbus', ratio: 0.5595, page: 'index'},
+    {src: '/assets/_system/sample-work/nimbus-email-changelog.webp', kind: 'email', brand: 'nimbus', ratio: 1.7872},
     {src: '/assets/_system/sample-work/nimbus-email.webp', kind: 'email', brand: 'nimbus', ratio: 1.4884},
     {src: '/assets/_system/sample-work/nimbus-event.webp', kind: 'event', brand: 'nimbus', ratio: 1.25},
     {src: '/assets/_system/sample-work/nimbus-landing.webp', kind: 'landing', brand: 'nimbus', ratio: 0.5595},
+    {src: '/assets/_system/sample-work/nimbus-social-linkedin.webp', kind: 'social', brand: 'nimbus', ratio: 0.5595, platform: 'linkedin'},
+    {src: '/assets/_system/sample-work/oliva-email-recipes.webp', kind: 'email', brand: 'oliva', ratio: 1.7872},
     {src: '/assets/_system/sample-work/oliva-email.webp', kind: 'email', brand: 'oliva', ratio: 1.4884},
     {src: '/assets/_system/sample-work/oliva-landing.webp', kind: 'landing', brand: 'oliva', ratio: 0.5595},
-    {src: '/assets/_system/sample-work/oliva-social.webp', kind: 'social', brand: 'oliva', ratio: 1.25},
+    {src: '/assets/_system/sample-work/oliva-social-pinterest.webp', kind: 'social', brand: 'oliva', ratio: 1.4884, platform: 'pinterest'},
+    {src: '/assets/_system/sample-work/oliva-social-x.webp', kind: 'social', brand: 'oliva', ratio: 0.5595, platform: 'x'},
+    {src: '/assets/_system/sample-work/oliva-social.webp', kind: 'social', brand: 'oliva', ratio: 1.25, platform: 'instagram'},
+    {src: '/assets/_system/sample-work/penny-blog-post.webp', kind: 'blog', brand: 'penny', ratio: 1.7872, page: 'post'},
+    {src: '/assets/_system/sample-work/penny-email-product.webp', kind: 'email', brand: 'penny', ratio: 1.7872},
+    {src: '/assets/_system/sample-work/penny-social-linkedin.webp', kind: 'social', brand: 'penny', ratio: 1.0, platform: 'linkedin'},
+    {src: '/assets/_system/sample-work/volt-blog-index.webp', kind: 'blog', brand: 'volt', ratio: 0.5595, page: 'index'},
+    {src: '/assets/_system/sample-work/volt-email-recap.webp', kind: 'email', brand: 'volt', ratio: 1.7872},
     {src: '/assets/_system/sample-work/volt-email.webp', kind: 'email', brand: 'volt', ratio: 1.4884},
     {src: '/assets/_system/sample-work/volt-landing.webp', kind: 'landing', brand: 'volt', ratio: 0.5595},
-    {src: '/assets/_system/sample-work/volt-social.webp', kind: 'social', brand: 'volt', ratio: 1.25},
+    {src: '/assets/_system/sample-work/volt-social-story.webp', kind: 'social', brand: 'volt', ratio: 1.7872, platform: 'story'},
+    {src: '/assets/_system/sample-work/volt-social.webp', kind: 'social', brand: 'volt', ratio: 1.25, platform: 'instagram'},
   ];
   // @@END@@
 
@@ -80,7 +130,8 @@
       var pool = Array.isArray(opts.items) && opts.items.length ? opts.items.map(function (it) {
         return typeof it === 'string' ? { src: it, kind: 'piece', brand: '', ratio: 0 } : it;
       }).filter(function (it) { return it && it.src; }) : WORK.filter(function (w) {
-        return (!opts.kinds || !opts.kinds.length || opts.kinds.indexOf(w.kind) >= 0) && (!opts.brands || !opts.brands.length || opts.brands.indexOf(w.brand) >= 0);
+        return (!opts.kinds || !opts.kinds.length || opts.kinds.indexOf(w.kind) >= 0) && (!opts.brands || !opts.brands.length || opts.brands.indexOf(w.brand) >= 0)
+          && (!opts.platforms || !opts.platforms.length || opts.platforms.indexOf(w.platform) >= 0);
       });
       if (!pool.length) pool = WORK.slice();
       if (!pool.length) return [];

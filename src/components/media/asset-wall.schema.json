@@ -2,37 +2,42 @@
   "type": "asset-wall",
   "label": "Asset Wall",
   "category": "media",
-  "description": "Finished marketing work moving through the frame in 3D, the way the Moda launch film shows it. The work is real images: either the house sample work (generated deck slides, landing pages, social posts, emails and event cards for made-up brands: Flowpath, Oliva Terra, Lumen AI, Studio Bloom, Volt Run, Nimbus, Maré, Bonsai) or the film's own pieces passed as items. Six layouts. 'rolodex': one deck flipping past card by card; the front slide faces the camera, the next ones lean back above it, the ones gone fold away below, out of focus. Use it for 'it builds the whole deck'. 'fly': pieces fly at the camera out of the deep at angles, sharpen and rush past. Use it for 'decks, emails, posts, pages and more'. 'wall': a wall of work in space, the plane turned in 3D, near and far cards out of focus, the camera pushing in, with an open centre for a headline ('1,000 brands for FREE'). 'orbit': pieces float in the side columns round a speaker, clear of the face (ground none). 'fan': a stack fanning open. 'grid': the same piece for many brands flipping in edge-on in a wave ('50 personalised decks'). Full frame. tone 'grey' drains the colour, for the 'AI slop' contrast.",
+  "description": "Finished marketing work moving through the frame in 3D, the way the Moda launch film shows it. The work is real images: either the house sample work (generated for made-up brands: Flowpath, Oliva Terra, Lumen AI, Studio Bloom, Volt Run, Nimbus, Maré, Bonsai, Kiln Coffee, Atlas Trips, Penny, Fern & Co -- deck slides, landing pages, full-length emails, social posts for each platform, blog articles and blog home pages, event cards) or the film's own pieces passed as items. Quotient's three areas each have a layout: 'scroll' with kinds ['email'] for emails, 'feed' for social, 'scroll' with kinds ['blog'] for blogs. Eight layouts. 'scroll': full-length emails and blog pages standing in columns on a plane turned in 3D, each column scrolling the other way from the next ('Emails people open'). 'feed': social posts in their platform's frame (LinkedIn, Instagram, story, TikTok, X, YouTube, Pinterest: the brand's avatar and name, the platform's actions) rising in columns at different depths ('Posts for every platform'). Over scroll and feed the headline sits in a band at the top. 'rolodex': one deck flipping past card by card; the front slide faces the camera, the next ones lean back above it, the ones gone fold away below, out of focus. Use it for 'it builds the whole deck'. 'fly': pieces fly at the camera out of the deep at angles, sharpen and rush past. Use it for 'decks, emails, posts, pages and more'. 'wall': a wall of work in space, the plane turned in 3D, near and far cards out of focus, the camera pushing in, with an open centre for a headline ('1,000 brands for FREE'). 'orbit': pieces float in the side columns round a speaker, clear of the face (ground none). 'fan': a stack fanning open. 'grid': the same piece for many brands flipping in edge-on in a wave ('50 personalised decks'). Full frame. tone 'grey' drains the colour, for the 'AI slop' contrast.",
   "data": {
     "layout": {
       "type": "string",
-      "label": "wall (default) | rolodex | fly | orbit | fan | grid",
+      "label": "wall (default) | rolodex | fly | scroll | feed | orbit | fan | grid",
       "optional": true,
-      "enum": ["wall", "rolodex", "fly", "orbit", "fan", "grid"]
+      "enum": ["wall", "rolodex", "fly", "scroll", "feed", "orbit", "fan", "grid"]
     },
     "items": {
       "type": "array",
-      "label": "The film's own pieces in place of the house sample work: image URLs, or {src, ratio (height / width)}. Rolodex plays them in order.",
+      "label": "The film's own pieces in place of the house sample work: image URLs, or {src, ratio (height / width), kind, platform, brand}. Rolodex plays them in order; feed frames a social piece for its platform.",
       "optional": true
     },
     "headline": {
       "type": "string",
-      "label": "Big line over the wall, the fly-through or the grid (e.g. '1,000 brands for FREE')",
+      "label": "Big line over the wall, the fly-through, the grid (centred) or a scroll or feed (top band) (e.g. '1,000 brands for FREE')",
       "optional": true
     },
     "headline_color": { "type": "string", "label": "Headline colour (default white)", "optional": true },
     "headline_at": { "type": "number", "label": "Seconds after `at` the headline rises (default 0.35)", "optional": true },
     "kinds": {
       "type": "array",
-      "label": "House work by kind: slide | landing | social | email | event (default all; rolodex default slide, grid slide and landing)",
+      "label": "House work by kind: slide | landing | email | social | blog | event (default all; rolodex default slide, grid slide and landing, scroll email and blog, feed social)",
       "optional": true
     },
     "brands": {
       "type": "array",
-      "label": "House work by brand: flowpath | oliva | lumen | bloom | volt | nimbus | mare | bonsai (default all; rolodex default flowpath, the six-slide deck)",
+      "label": "House work by brand: flowpath | oliva | lumen | bloom | volt | nimbus | mare | bonsai | kiln | atlas | penny | fern (default all; rolodex default flowpath, the six-slide deck)",
       "optional": true
     },
-    "count": { "type": "number", "label": "How many pieces: rolodex 3-12 (default 6), fly 4-48 (default 24), orbit 2-10 (default 6 wide, 4 tall), fan 3-7 (default 5), grid 4-16 (default 9, 8 tall). The wall fills the frame.", "optional": true },
+    "platforms": {
+      "type": "array",
+      "label": "House social posts by platform: linkedin | instagram | story | tiktok | x | youtube | pinterest (default all)",
+      "optional": true
+    },
+    "count": { "type": "number", "label": "How many pieces: rolodex 3-12 (default 6), fly 4-48 (default 24), scroll and feed: columns 1-8 (scroll default 5 wide, 3 tall; feed 4 wide, 2 tall), orbit 2-10 (default 6 wide, 4 tall), fan 3-7 (default 5), grid 4-16 (default 9, 8 tall). The wall fills the frame.", "optional": true },
     "travel": { "type": "number", "label": "Fly: seconds a piece takes from the deep to past the camera (default 3.2)", "optional": true },
     "colors": {
       "type": "array",
