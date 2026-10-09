@@ -233,7 +233,9 @@ ${QUOTIENT_CSS}
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
   <div class="toggle" id="speedRow" style="display:none">Prompter speed <button type="button" class="spd" id="slowerBtn" aria-label="Slower">−</button><b id="speedWpm"></b><button type="button" class="spd" id="fasterBtn" aria-label="Faster">+</button></div>
-  <div class="spacer"></div>
+  <label class="toggle" id="voiceRow" style="display:none"><input type="checkbox" id="voiceOnly"> Voice only <span class="hint">(no camera: your voice for this scene, read off the prompter. In Studio it can voice a generated performance of you, or play under graphics.)</span></label>
+  <div class="toggle" id="voiceUploadRow" style="display:none"><button type="button" class="btn ghost" id="voiceUploadBtn">Upload an audio file</button><input type="file" id="voiceFile" accept="audio/*,video/*" hidden></div>
+    <div class="spacer"></div>
   <p class="note" id="readyNote">Hold your phone upright. Tap Record: the camera opens with a quick light check. Tap Start recording for a 3-second count-in, then the script shows one line at a time at speaking pace. Tap the screen to jump to the next line.</p>
   <label class="toggle"><input type="checkbox" id="softLook"> Soft look <span class="hint">(skin smoothing and warmth, applied when the take is processed; change it later in Studio)</span></label>
   <div class="toggle off" id="softDial">Smoothing <span class="hint">light</span><input type="range" id="softStrength" min="0" max="1" step="0.05" value="0.5" aria-label="Skin smoothing"><span class="hint">strong</span></div>
@@ -246,9 +248,7 @@ ${QUOTIENT_CSS}
     <label><input type="radio" name="takeAs" value="speaker" checked> Take A (you)</label>
     <label><input type="radio" name="takeAs" value="clone"> Take B (your clone)</label></div>
   <div id="formatNotes"></div>
-  <label class="toggle" id="voiceRow" style="display:none"><input type="checkbox" id="voiceOnly"> Voice only <span class="hint">(no camera: your voice for this scene, read off the prompter. In Studio it can voice a generated performance of you, or play under graphics.)</span></label>
-  <div class="toggle" id="voiceUploadRow" style="display:none"><button type="button" class="btn ghost" id="voiceUploadBtn">Upload an audio file</button><input type="file" id="voiceFile" accept="audio/*,video/*" hidden></div>
-  <div class="rec-dock"><button class="btn" id="recordBtn" disabled>Record</button></div>
+<div class="rec-dock"><button class="btn" id="recordBtn" disabled>Record</button></div>
 </section>
 
 <section id="stage">
@@ -324,11 +324,11 @@ ${QUOTIENT_CSS}
   // it), and the attached take is announced to the parent so the picker
   // closes and the film reloads with the take in its slot.
   var embedded = qp.get('embed') === '1';
-  // VOICE ONLY (?voice=1, or the ready screen's toggle): one scene's voice,
-  // no camera -- recorded here or uploaded, it lands as the scene's voice
-  // recording (POST /api/voice-line). Marc, Oct 8: "I'll just record the
-  // voice ... from my device, from my phone, upload it".
-  var voiceMode = qp.get('voice') === '1', voiceAllowed = false;
+  // VOICE ONLY (the ready screen's switch): one scene's voice, no camera,
+  // the same prompter -- recorded here or uploaded, it lands as the scene's
+  // voice recording (POST /api/voice-line). Marc, Oct 8: "I'll just record
+  // the voice ... from my device, from my phone, upload it".
+  var voiceMode = false, voiceAllowed = false;
   // In Studio's dialog the page sizes to its content and says how tall it
   // is, so the whole ready screen (lines, choices, Record) fits without a
   // scroll inside a scroll (Marc: "make this entire screen fit").
@@ -490,6 +490,7 @@ ${QUOTIENT_CSS}
       if (embedded) postSize();
       // The copy speaks to the device: a laptop is not held upright.
       var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+      cameraNote = null;
       if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Click Record: the camera opens with a quick light check; Start recording gives a 3-second count-in, then your lines one at a time at speaking pace. Click anywhere to jump to the next line.';
       var g = (p.treatment && p.treatment.filmGrammar) || '';
       var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
@@ -517,17 +518,19 @@ ${QUOTIENT_CSS}
     .catch(function (e) { fail(e.message || String(e)); });
   }
   // A voice is one scene's, and never a clip's (a clip is a picture).
-  var clipNeedNow = false;
+  var clipNeedNow = false, cameraNote = null;
   function applyVoiceMode() {
     if (!voiceAllowed) voiceMode = false;
     $('voiceRow').style.display = voiceAllowed ? '' : 'none';
     $('voiceOnly').checked = voiceMode;
     $('voiceUploadRow').style.display = voiceMode ? '' : 'none';
-    ['bgChoice', 'softDial'].forEach(function (id) { var el = $(id); if (el) el.classList.toggle('vhide', voiceMode); });
+    ['bgChoice', 'softDial', 'formatNotes'].forEach(function (id) { var el = $(id); if (el) el.classList.toggle('vhide', voiceMode); });
     var soft = $('softLook') && $('softLook').parentNode; if (soft) soft.classList.toggle('vhide', voiceMode);
     var cl = $('cloneChoice'); if (cl) cl.classList.toggle('vhide', voiceMode);
     $('recordBtn').textContent = voiceMode ? 'Record my voice' : 'Record';
-    if (voiceMode) $('readyNote').textContent = 'Voice only: no camera. Tap Record my voice for a 3-second count-in, then read your lines as they show, at your own pace. Or upload an audio file of this scene.';
+    if (cameraNote == null) cameraNote = $('readyNote').textContent;
+    if (!voiceMode) $('readyNote').textContent = cameraNote;
+    else $('readyNote').textContent = 'Voice only: no camera. Tap Record my voice for a 3-second count-in, then read your lines as they show, at your own pace. Or upload an audio file of this scene.';
     postSize();
   }
   $('voiceOnly').addEventListener('change', function () { voiceMode = this.checked; releaseCamera(); applyVoiceMode(); });

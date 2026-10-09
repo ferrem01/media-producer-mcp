@@ -117,12 +117,10 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(html).toContain("'?library=1&gender='");
   });
 
-  it("a voice-only recording: Record my voice in the take dialog, the recording a performance uses, and no recast from a voice", () => {
+  it("a voice-only recording: the take screen's Voice only (no tab of its own), the recording a performance uses, and no recast from a voice", () => {
     const html = getPreviewHtml();
-    // The tab, on a person-carried film and never a clip need; the take page in Voice only.
-    expect(html).toContain("var voiceTakes = (gNp === 'speaker' || gNp === 'creator-cut') && a.use !== 'clip';");
-    expect(html).toContain('data-np-src="voice"');
-    expect(html).toContain("'&scene=' + si + '&voice=1'");
+    // Recorded on the same take screen (Marc: "a flag on the existing take screen"), not a tab.
+    expect(html).not.toContain('data-np-src="voice"');
     // Either recording voices a performed scene; with both, which one.
     expect(html).toContain("(s.has_voice ? '' : ' disabled') + '> My recording, my own voice'");
     expect(html).toContain('data-pf="recording_from" value="voice"');
