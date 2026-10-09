@@ -477,29 +477,12 @@ async function reviseTemplateSlots(
   tplComp.data = data;
   await saveProject(project);
 
-  // Re-assemble for the Studio preview (best-effort; the data is already saved).
-  let sceneHtml: string | undefined;
-  try {
-    const sources: { type: string; source: string }[] = [];
-    for (const c of scene.components as any[]) {
-      if (sources.some((s) => s.type === c.type)) continue;
-      const src = await loadSource(c.type, opts.tenantId, opts.projectId);
-      if (src != null) sources.push({ type: c.type, source: src });
-    }
-    sceneHtml = await assembleSceneAuto({
-      scene, components: sources, brandKit: project.brand_kit, canvas: project.canvas,
-      gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true,
-    });
-  } catch (e: any) {
-    console.warn(`  [revise] template preview assembly failed: ${e?.message || e}`);
-  }
-
   return {
     ok: true,
     componentType: tplComp.type,
     blocksApplied: 1,
     fullRewrite: false,
-    sceneHtml,
+    sceneHtml: await previewHtml(opts, project, scene, "template"),
     defects: [],
     layout_warnings: note ? [`template slots: ${note}`] : [],
   };
@@ -511,12 +494,63 @@ async function reviseTemplateSlots(
  * This is the only revise primitive speaker films have: their scenes are
  * library-component compositions with no codegen source to patch.
  */
+/** Re-assemble a component-composed scene for the Studio preview
+ *  (best-effort: the change is already saved). */
+async function previewHtml(opts: ReviseSceneOpts, project: any, scene: any, what: string): Promise<string | undefined> {
+  try {
+    const sources: { type: string; source: string }[] = [];
+    for (const c of scene.components as any[]) {
+      if (sources.some((s) => s.type === c.type)) continue;
+      const src = await loadSource(c.type, opts.tenantId, opts.projectId);
+      if (src != null) sources.push({ type: c.type, source: src });
+    }
+    return await assembleSceneAuto({
+      scene, components: sources, brandKit: project.brand_kit, canvas: project.canvas,
+      gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true,
+    });
+  } catch (e: any) {
+    console.warn(`  [revise] ${what} preview assembly failed: ${e?.message || e}`);
+    return undefined;
+  }
+}
+
+/** "delete this", "remove it", "get rid of the card": a revise that asks for
+ *  the selected component to go. Marc, Oct 8 (Dana, scene 2): he selected the
+ *  title card, typed "delete this component" and Revise answered that deleting
+ *  "isn't a data or box change this editor can express". */
+export function wantsRemoval(instruction: string): boolean {
+  const s = String(instruction || "").trim().toLowerCase();
+  if (!s || s.length > 80) return false;
+  // Only when the thing named IS the component ("this", "it", "the card"):
+  // "remove the shadow" is an edit, not a removal.
+  return /^(please\s+)?(delete|remove|get rid of|take out|drop|kill|lose|cut)(\s+(this|that|it|the))?(\s+(whole\s+)?(component|element|card|thing|box|one|graphic|title|overlay|layer))?\s*(please)?[.!]*$/.test(s);
+}
+
 async function reviseLibraryComponentData(
   opts: ReviseSceneOpts,
   project: any,
   scene: any,
   comp: any,
 ): Promise<ReviseSceneResult> {
+  // REMOVAL is a revise too: the selected component leaves the scene. The
+  // person (a video playing the speaker take) is never removed this way --
+  // that is the film's picture, changed from the take card.
+  if (wantsRemoval(opts.instruction)) {
+    if (comp.type === "video" && String(comp.data?.src || "") === "speaker") {
+      return { ok: false, error: "That is the person on camera -- change the speaker from the take card, not Revise." };
+    }
+    scene.components = (scene.components || []).filter((c: any) => c !== comp);
+    await saveProject(project);
+    return {
+      ok: true,
+      componentType: comp.type,
+      blocksApplied: 1,
+      fullRewrite: false,
+      sceneHtml: await previewHtml(opts, project, scene, "component removal"),
+      defects: [],
+      layout_warnings: [],
+    };
+  }
   // Find the component's schema for field context (category dir is unknown;
   // scan like the catalog does). Optional -- the revise works without it.
   let fieldLines = "";
@@ -559,29 +593,12 @@ async function reviseLibraryComponentData(
   if (sanitized.box) comp.position = { ...(comp.position || {}), ...sanitized.box };
   await saveProject(project);
 
-  // Re-assemble for the Studio preview (best-effort; the data is already saved).
-  let sceneHtml: string | undefined;
-  try {
-    const sources: { type: string; source: string }[] = [];
-    for (const c of scene.components as any[]) {
-      if (sources.some((s) => s.type === c.type)) continue;
-      const src = await loadSource(c.type, opts.tenantId, opts.projectId);
-      if (src != null) sources.push({ type: c.type, source: src });
-    }
-    sceneHtml = await assembleSceneAuto({
-      scene, components: sources, brandKit: project.brand_kit, canvas: project.canvas,
-      gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true,
-    });
-  } catch (e: any) {
-    console.warn(`  [revise] component-data preview assembly failed: ${e?.message || e}`);
-  }
-
   return {
     ok: true,
     componentType: comp.type,
     blocksApplied: 1,
     fullRewrite: false,
-    sceneHtml,
+    sceneHtml: await previewHtml(opts, project, scene, "component-data"),
     defects: [],
     layout_warnings: sanitized.note ? [`component data: ${sanitized.note}`] : [],
   };
