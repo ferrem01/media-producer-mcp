@@ -13,6 +13,7 @@
  * - window.__MP_TIMELINE and window.__MP_READY for the capture loop
  */
 
+import { sampleWorkDir } from "./sample-work.js";
 import { captionsYieldToCover } from "./caption-yield.js";
 import { fitBoxFor, wrapInFitBox } from "./fit-box.js";
 import { stickerData, ensureStickerFiles } from "./sticker-library.js";
@@ -2266,6 +2267,11 @@ function resolveAssetPath(urlPath: string, preview?: boolean): string {
   const stickerMatch = urlPath.match(/^\/assets\/_system\/stickers\/([^/]+)$/);
   if (stickerMatch) {
     return `file://${path.resolve(config.dataDir, "_system", "stickers", stickerMatch[1])}`;
+  }
+  // /assets/_system/sample-work/{file} -> the committed house sample work
+  const workMatch = urlPath.match(/^\/assets\/_system\/sample-work\/([^/]+)$/);
+  if (workMatch) {
+    return `file://${path.join(sampleWorkDir(), workMatch[1])}`;
   }
   // /assets/{tenant}/brand-kit/{rest} -> {dataDir}/{tenant}/brand-kit/assets/{rest}
   const brandMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);

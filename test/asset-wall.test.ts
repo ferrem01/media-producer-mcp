@@ -41,24 +41,27 @@ async function boot(components: any[], W = 1920, H = 1080) {
 }
 const FULL = { x: 0, y: 0, width: "100%", height: "100%" };
 
-describe("designed sample work (shared/samples.js)", () => {
-  it("every brand draws every kind, and a pick never puts the same card next to itself", async () => {
+describe("the house sample work (shared/samples.js + src/sample-work)", () => {
+  it("every piece in the manifest is a committed image, and a pick never puts the same piece next to itself", async () => {
     const code = await fs.readFile(path.join(LIB, "shared", "samples.js"), "utf-8");
     const win: any = {};
     new Function("window", code)(win);
     const S = win.mpSamples;
     expect(S.brands.length).toBe(8);
-    for (const b of S.brands) for (const k of S.kinds) {
-      const html = S.asset(k, b.id);
-      expect(html).toContain(`mps-${k}`);
-      expect(html.length).toBeGreaterThan(400);
+    expect(S.work.length).toBeGreaterThanOrEqual(16);
+    for (const w of S.work) {
+      expect(w.src).toMatch(/^\/assets\/_system\/sample-work\/[a-z]+-[a-z]+(-\d)?\.webp$/);
+      await fs.access(path.resolve(__dirname, "../src/sample-work", path.basename(w.src)));
+      expect(w.ratio).toBeGreaterThan(0.4);
     }
     const picks = S.pick(60, { seed: 3 });
-    for (let i = 1; i < picks.length; i++) expect(`${picks[i].kind}/${picks[i].brand}`).not.toBe(`${picks[i - 1].kind}/${picks[i - 1].brand}`);
-    expect(new Set(picks.slice(0, 48).map((p: any) => `${p.kind}/${p.brand}`)).size).toBe(48);
-    // A brand's photo fills its picture slots and becomes its email's hero.
+    for (let i = 1; i < picks.length; i++) expect(picks[i].src).not.toBe(picks[i - 1].src);
+    // Filters, the deck in order, and the film's own pieces.
+    expect(S.pick(6, { kinds: ["slide"], brands: ["flowpath"], shuffle: false }).map((w: any) => path.basename(w.src)))
+      .toEqual(["flowpath-slide-1.webp", "flowpath-slide-2.webp", "flowpath-slide-3.webp", "flowpath-slide-4.webp", "flowpath-slide-5.webp", "flowpath-slide-6.webp"]);
+    expect(S.pick(2, { items: ["/a.png", { src: "/b.png", ratio: 1.25 }], shuffle: false }).map((w: any) => w.src)).toEqual(["/a.png", "/b.png"]);
+    // A brand's photo becomes its email's hero.
     S.setPhotos({ oliva: "/assets/t/projects/p/assets/oliva.png", nobody: "/x.png" });
-    expect(S.asset("social", "oliva")).toContain("url('/assets/t/projects/p/assets/oliva.png')");
     expect(S.emailBlocks("oliva").blocks[1]).toMatchObject({ kind: "hero", image: "/assets/t/projects/p/assets/oliva.png" });
     expect(S.emailBlocks("flowpath").blocks[1].steps).toHaveLength(3);
     const em = S.emailBlocks("oliva");
@@ -96,9 +99,9 @@ describe("asset wall", () => {
     const { page, at, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { layout: "grid", count: 9, headline: "50 personalized sales decks" } }]);
     try {
       await at(3);
-      const r = await page.evaluate(() => Array.from(document.querySelectorAll(".aw-card")).map((c) => { const b = c.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, slide: !!c.querySelector(".mps-slide") }; }));
+      const r = await page.evaluate(() => Array.from(document.querySelectorAll(".aw-card")).map((c) => { const b = c.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, src: c.querySelector("img")!.getAttribute("src") || "", done: (c.querySelector("img") as HTMLImageElement).naturalWidth }; }));
       expect(r.length).toBe(9);
-      for (const c of r) { expect(c.slide).toBe(true); expect(c.l).toBeGreaterThanOrEqual(0); expect(c.t).toBeGreaterThan(80); expect(c.r).toBeLessThanOrEqual(1920); expect(c.b).toBeLessThanOrEqual(1080); }
+      for (const c of r) { expect(c.src).toMatch(/sample-work\/[a-z]+-(slide|landing)/); expect(c.done).toBeGreaterThan(0); expect(c.l).toBeGreaterThanOrEqual(0); expect(c.t).toBeGreaterThan(80); expect(c.r).toBeLessThanOrEqual(1920); expect(c.b).toBeLessThanOrEqual(1100); }
     } finally { await done(); }
   }, 60000);
 
@@ -112,6 +115,37 @@ describe("asset wall", () => {
     } finally { await done(); }
   }, 60000);
 
+  it("rolodex: one deck flips past in order, the front slide square to the camera", async () => {
+    const { page, at, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { layout: "rolodex" } }]);
+    try {
+      const front = async (t: number) => { await at(t); return page.evaluate(() => {
+        // The card nearest the camera: the one with no tilt.
+        const cards = Array.from(document.querySelectorAll(".aw-card")) as HTMLElement[];
+        const g = (window as any).gsap;
+        const f = cards.map((c, i) => ({ i, rx: Math.abs(Number(g.getProperty(c, "rotationX"))), z: Number(g.getProperty(c, "z")) })).sort((a, b) => b.z - a.z)[0];
+        return { n: cards.length, i: f.i, rx: f.rx, src: cards[f.i].querySelector("img")!.getAttribute("src") };
+      }); };
+      const a = await front(1.0), b = await front(5.8);
+      expect(a.n).toBe(6);
+      expect(a.src).toContain("flowpath-slide-1");
+      expect(a.rx).toBeLessThan(3);
+      expect(b.i).toBeGreaterThan(a.i);
+      expect(b.src).toContain("flowpath-slide-6");
+    } finally { await done(); }
+  }, 60000);
+
+  it("fly: pieces come out of the deep and rush past the camera, the stream already moving on frame one", async () => {
+    const { page, at, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { layout: "fly", count: 20 } }]);
+    try {
+      const zs = async (t: number) => { await at(t); return page.evaluate(() => Array.from(document.querySelectorAll(".aw-card")).map((c) => ({ z: Number((window as any).gsap.getProperty(c, "z")), o: Number(getComputedStyle(c).opacity) }))); };
+      const a = await zs(0), b = await zs(2);
+      expect(a.filter((c) => c.o > 0.5).length).toBeGreaterThan(4);
+      // Each card only ever moves towards the camera.
+      a.forEach((c, i) => expect(b[i].z).toBeGreaterThanOrEqual(c.z));
+      expect(b.some((c) => c.z > 0)).toBe(true);
+    } finally { await done(); }
+  }, 60000);
+
   it("grey tone drains the colour (the enemy's work)", async () => {
     const { page, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { tone: "grey" } }]);
     try {
@@ -119,7 +153,7 @@ describe("asset wall", () => {
     } finally { await done(); }
   }, 60000);
 
-  it("the drawn cards are a picture to the gates: cropped at the frame on purpose, never flagged as clipped copy", async () => {
+  it("the cards are a picture to the gates: cropped at the frame on purpose, never flagged as clipped copy", async () => {
     const { htmlPath, tmp } = await write([{ id: "wall", type: "asset-wall", position: FULL, data: { headline: "1,000 brands for FREE" } }]);
     try {
       const defects = await measureTextContrast({ htmlPath, width: 1920, height: 1080, atTimes: [3, 5] });

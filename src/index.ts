@@ -9,6 +9,7 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ensureStickerLibrary, stickerDir } from "./core/sticker-library.js";
+import { sampleWorkDir } from "./core/sample-work.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID, createHash } from "node:crypto";
 import http from "node:http";
@@ -1068,6 +1069,17 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         if (f.includes("..") || !/\.(webp|png)$/i.test(f)) { res.writeHead(403); res.end("Forbidden"); return; }
         try { await ensureStickerLibrary(config.dataDir); } catch { /* serve whatever is there */ }
         try { await streamFile(req, res, path.join(stickerDir(config.dataDir), f)); }
+        catch { res.writeHead(404); res.end("Asset not found"); }
+        return;
+      }
+
+      // The house sample work (core/sample-work.ts): committed images,
+      // served straight from the build.
+      const sampleWorkMatch = urlPath.match(/^\/assets\/_system\/sample-work\/([^/]+)$/);
+      if (sampleWorkMatch && (method === "GET" || method === "HEAD")) {
+        const f = decodeURIComponent(sampleWorkMatch[1]);
+        if (f.includes("..") || !/\.webp$/i.test(f)) { res.writeHead(403); res.end("Forbidden"); return; }
+        try { await streamFile(req, res, path.join(sampleWorkDir(), f)); }
         catch { res.writeHead(404); res.end("Asset not found"); }
         return;
       }
