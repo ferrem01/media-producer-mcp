@@ -19,6 +19,12 @@ test on scene 2 (Higgsfield's Seedance 2.5, 8.0 s voice, 8 s clip) came back
 at 0.68-4.11 and 5.16-7.59 s, against the recording's 0.70-4.18 and
 5.04-7.43. Test: `test/scene-performance.test.ts`.
 
+Then: clips are whole seconds, so speech ending just past one (scene 3, to
+9.10 s) still meant a 10 s clip and came back 10% slow. Just enough of the
+silence before the line now goes to fit the second below (scene 3: 0.25 s of
+a 0.76 s lead), never leaving under 0.3 s of it, so a walk-in keeps nearly
+all of its time.
+
 ## 2026-10-09 — A scene that opens punched-in holds it on frame one
 
 Scenes that carry a punch-in across a cut open with a near-instant zoom at
