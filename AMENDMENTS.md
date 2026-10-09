@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — The phone Studio lists a film with no board
+
+Marc: the design showcase film (proj_f9443521) "won't show up in Mobile
+Studio ... it doesn't show any scenes". It was made straight from components
+(`add` / `update`, no `generate`), so it has scenes but no storyboard, and the
+phone Studio (`studio-phone.ts`) drew its cards from the board only. A
+boardless built film now lists its built scenes (label, length), and the
+Rebuild button is hidden, since a rebuild would make scenes from an empty
+board. Preview and Render work as before.
+
 ## 2026-10-09 — The asset wall shows real work, and moves in 3D like the Moda film
 
 Marc on the first showcase film: the examples "look like our basic web shapes
