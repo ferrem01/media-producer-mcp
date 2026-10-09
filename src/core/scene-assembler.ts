@@ -13,6 +13,7 @@
  * - window.__MP_TIMELINE and window.__MP_READY for the capture loop
  */
 
+import { captionsYieldToCover } from "./caption-yield.js";
 import { fitBoxFor, wrapInFitBox } from "./fit-box.js";
 import { stickerData, ensureStickerFiles } from "./sticker-library.js";
 import { bindSpeakerLayerData, isSpeakerLayer, speakerRendersInside } from "./speaker-layer.js";
@@ -268,7 +269,9 @@ export function hoistCssImports(html: string): string {
 }
 
 export async function assembleScene(options: AssembleOptions): Promise<string> {
-  const { scene, components, canvas, preview, speakerUrl } = options;
+  const { components, canvas, preview, speakerUrl } = options;
+  // Captions step aside while a full-screen cover is up (caption-yield.ts).
+  const scene = captionsYieldToCover(options.scene);
   // Resolve brand fonts FIRST so the font links and --mp-font-family agree
   // on a family that actually exists (see font-resolve.ts).
   const brandKit = await resolveBrandKitFonts(options.brandKit);
