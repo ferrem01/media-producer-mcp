@@ -87,6 +87,10 @@ describe("the co-brand lockup holds still", () => {
     const { isFixedToFrame } = await import("../src/core/scene-assembler.js");
     expect(isFixedToFrame("cobrand-lockup")).toBe(true);
   });
+  it("so is a name lower third", async () => {
+    const { isFixedToFrame } = await import("../src/core/scene-assembler.js");
+    expect(isFixedToFrame("lower-third")).toBe(true);
+  });
 });
 
 describe("the cover as a speaker film's opener", () => {
