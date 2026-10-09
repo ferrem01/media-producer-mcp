@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — Revise can remove the component it is pointed at
+
+Marc selected the title card on Dana's scene 2, hit Revise and typed "delete
+this component"; Studio answered "Deleting the component isn't a data or box
+change this editor can express". On a component-composed scene Revise edited
+only data and box. Now a short removal ("delete this", "remove it", "get rid
+of the card") takes the component out of the scene, with no LLM call
+(`wantsRemoval` in `llm/scene-revise.ts`). It fires only when the thing named
+is the component itself: "remove the shadow" stays an edit. The person (a
+`video` playing the speaker take) is never removed this way. The three
+copies of the preview re-assembly in that file are now one `previewHtml`.
 ## 2026-10-08 — Record just your voice for a scene
 
 Marc: "most cases, we're not going to ... record something and then come

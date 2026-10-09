@@ -280,6 +280,31 @@ describe("reviseScene on a speaker film", () => {
     expect(comp.data.pip_size).toBe(15);
   });
 
+  // Marc, Oct 8 (Dana, scene 2): "delete this component" on the selected
+  // title card answered that deleting "isn't a data or box change".
+  it("'delete this component' removes the selected component, with no LLM call", async () => {
+    await freshProject();
+    mockLLM.mockClear();
+    const res = await reviseScene({
+      tenantId: TENANT, projectId: PROJECT, sceneId: "screencast",
+      instruction: "delete this component",
+      element: { compId: "narration_overlay" },
+      llmConfig,
+    });
+    expect(res.ok).toBe(true);
+    expect(mockLLM).not.toHaveBeenCalled();
+    const saved = await loadProject(TENANT, PROJECT);
+    const ids = saved!.scenes[0].components.map((c: any) => c.id);
+    expect(ids).not.toContain("narration_overlay");
+    expect(ids).toContain("screencast_frame");
+  });
+
+  it("knows a removal from an edit", async () => {
+    const { wantsRemoval } = await import("../src/llm/scene-revise.js");
+    for (const s of ["delete this component", "remove it", "Please remove the card", "get rid of this"]) expect(wantsRemoval(s)).toBe(true);
+    for (const s of ["make it smaller", "remove the shadow and make it bigger", "move it up", "delete the second line then recolor", "remove the shadow", "cut the subtitle"]) expect(wantsRemoval(s)).toBe(false);
+  });
+
   it("garbage LLM output is refused without touching the project", async () => {
     await freshProject();
     mockLLM.mockResolvedValueOnce("I refuse to answer in JSON today.");
