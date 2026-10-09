@@ -1,0 +1,308 @@
+{
+  "id": "founder-launch",
+  "name": "Founder launch: the money, the product making beautiful work, the enemy, the offer",
+  "grammar": "creator-cut",
+  "format": "talking-head",
+  "variant": "launch announcement",
+  "frames_proven": [
+    "16x9"
+  ],
+  "suits": [
+    "a launch or funding announcement told by the founder",
+    "a product that MAKES things (decks, emails, posts, pages): show the work being made",
+    "AI agents that do the work, shown as teammates in the file",
+    "a giveaway or offer to close (comment to get one, sign up free)"
+  ],
+  "length_s": [
+    80,
+    110
+  ],
+  "spine": [
+    {
+      "role": "money",
+      "shot": "person+card",
+      "made": "take",
+      "dur": [
+        8,
+        11,
+        13
+      ],
+      "enters": [
+        "stamp:counter",
+        "cutaway:backer-logo",
+        "split:product-card"
+      ],
+      "note": "The founder to camera, the news in the first sentence ('We just raised $7.5M from ...'). The number rolls up big over them (a number-ticker or stamp across the lower half) while they say it; a backer's logo cuts in full-frame on its name for one beat (logo on white); then the founder steps to the right half and a piece of the product's work is edited live on the left (the asset-wall's first card, or a mockup being changed)."
+    },
+    {
+      "role": "what",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        3,
+        4,
+        5
+      ],
+      "enters": [
+        "prompt:types"
+      ],
+      "note": "'All it takes is one prompt': the product's prompt box ALONE on a soft ground, the prompt typing in, a cursor clicking Create. No window chrome."
+    },
+    {
+      "role": "range",
+      "shot": "person+card",
+      "made": "take",
+      "dur": [
+        3,
+        4,
+        6
+      ],
+      "enters": [
+        "asset-wall:orbit"
+      ],
+      "note": "Back on the founder naming what it makes ('slide decks, marketing assets, animations and more'), finished work floating in the side columns around them: asset-wall layout 'orbit' (ground none, kinds named in the line), clear of the face."
+    },
+    {
+      "role": "problem",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        6,
+        8,
+        10
+      ],
+      "enters": [
+        "editor:drab",
+        "prompt:types"
+      ],
+      "note": "'Let's say you built X, but it needs a lot of work': the drab before-version in the editor, tilted back in 3D on a light grid (pose rotate_x ~20, arriving flat), then the ask typed into the prompt ('make this look better and on brand')."
+    },
+    {
+      "role": "agents",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        14,
+        20,
+        24
+      ],
+      "enters": [
+        "flash:brand-gradient",
+        "agent-cursor:by-name",
+        "editor:builds"
+      ],
+      "note": "THE SIGNATURE BEAT. A brand-gradient flash, then the product's agents as named cursors (agent-cursor: one colour each, 'Brand Agent', 'Research Agent', 'Design Agent') working as the voice names each one. The piece BUILDS in the editor (quotient-email-editor with sample or the real brand: blocks arrive, headline types, button pops) over a colourful asset-wall ground (layout wall, speed ~0.4), each cursor flying to the block its agent just made (targets 'email.logo', 'email.hero', 'email.headline', 'email.button', with a click). Name the agents in the order they work."
+    },
+    {
+      "role": "difference",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        7,
+        10,
+        12
+      ],
+      "enters": [
+        "editor:layers",
+        "cursor:clicks"
+      ],
+      "note": "'Here's what makes it different': the real editor with its layers panel; a cursor selects a layer and changes it (colour, text), the change landing on the piece. Say the comparison the audience knows ('fully editable, just like Canva or Figma')."
+    },
+    {
+      "role": "scale",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        6,
+        8,
+        10
+      ],
+      "enters": [
+        "asset-wall:grid"
+      ],
+      "note": "'Now turn it into 50 personalised versions': the same piece made for many brands landing in a wave (asset-wall layout 'grid' with a headline, kinds [the piece's kind])."
+    },
+    {
+      "role": "range_2",
+      "shot": "person+split",
+      "made": "motion",
+      "dur": [
+        5,
+        8,
+        10
+      ],
+      "enters": [
+        "editor:builds"
+      ],
+      "note": "One more kind of output ('an animated post for LinkedIn'): founder on the left half, the piece generated and edited on the right (quotient-social or the editor)."
+    },
+    {
+      "role": "enemy",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        3,
+        5,
+        6
+      ],
+      "enters": [
+        "asset-wall:grey"
+      ],
+      "note": "'Every other AI tool makes AI slop': a grey, dim wall of generic work (asset-wall layout wall, tone 'grey'), the colour gone. The contrast is the argument: their world is grey, ours is colour."
+    },
+    {
+      "role": "belief",
+      "shot": "type_card",
+      "made": "type",
+      "dur": [
+        8,
+        11,
+        13
+      ],
+      "enters": [
+        "keyword:fade",
+        "type:specimen"
+      ],
+      "note": "What the team believes, in short lines ('Not a wrapper.' 'We built the canvas first.' 'We taught them taste.'): big type on white, one line at a time, a typography specimen (Aa) or the agents on the canvas between lines. The last line in a big serif."
+    },
+    {
+      "role": "offer",
+      "shot": "screen",
+      "made": "motion",
+      "dur": [
+        7,
+        10,
+        12
+      ],
+      "enters": [
+        "asset-wall:wall",
+        "headline",
+        "end_card"
+      ],
+      "note": "The offer over the colourful wall (asset-wall layout wall with the headline: '1,000 brands for FREE'), then how to take it acted out (the reply typed, the sign-up button clicked) and the logo with its URL."
+    }
+  ],
+  "rhythm": {
+    "cut_cadence_s": 5,
+    "max_hold_s": 8,
+    "wpm": 150,
+    "first_cut_by_s": 3,
+    "end_card_s": 4
+  },
+  "layers": {
+    "captions": {
+      "style": "quiet",
+      "words": 6,
+      "pos": "bottom-center",
+      "through_cutaways": true,
+      "note": "small, sentence case, on a dark plate: premium, never shouting"
+    },
+    "stamps": {
+      "on": "money",
+      "pos": "lower half",
+      "note": "the raise as a rolling number"
+    },
+    "agents": {
+      "on": "agents",
+      "component": "agent-cursor",
+      "note": "one colour per agent, the same colour every time it appears"
+    },
+    "work": {
+      "component": "asset-wall",
+      "note": "orbit around the founder (range), wall behind the build (agents), grid (scale), grey (enemy), wall + headline (offer)"
+    },
+    "camera": "slow pushes on the screens; fixed on the founder",
+    "music": {
+      "bed": true,
+      "duck": true
+    }
+  },
+  "motion": {
+    "elements": {
+      "card": {
+        "in": "rise",
+        "in_s": 0.6,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "cursor": {
+        "in": "fade",
+        "in_s": 0.5
+      },
+      "stamp": {
+        "in": "pop",
+        "in_s": 0.3,
+        "out": "fade",
+        "out_s": 0.3
+      },
+      "headline": {
+        "in": "rise",
+        "in_s": 0.7
+      },
+      "end_card": {
+        "in": "fade",
+        "in_s": 0.4
+      }
+    },
+    "transitions": {
+      "default": "cut",
+      "agents": "brand-gradient flash"
+    },
+    "camera": {
+      "money": "fixed",
+      "range": "fixed",
+      "problem": "slow push",
+      "agents": "slow push",
+      "difference": "slow push",
+      "scale": "fixed",
+      "offer": "slow push"
+    },
+    "physics": "calm"
+  },
+  "asks": {
+    "take": "the founder's lines for money, range, range_2 and offer (one recording split by lines)",
+    "screens": "0 -- every screen beat is motion graphics: the product's editor mockups, the asset wall's designed sample work and the agent cursors; a real recording may replace a beat",
+    "broll": 0,
+    "images": "a backer's logo for the money beat, optional"
+  },
+  "latitude": {
+    "optional": [
+      "range_2",
+      "enemy",
+      "belief"
+    ],
+    "fixed": [
+      "money",
+      "agents",
+      "offer"
+    ],
+    "may_double": [
+      "agents"
+    ]
+  },
+  "source": {
+    "film": "moda_launch_x_anvisha",
+    "length_s": 104,
+    "frame": "16x9",
+    "cuts_s": [
+      3.13,
+      6.47,
+      7.93,
+      11.6,
+      15.17,
+      19.47,
+      28.9,
+      31.43,
+      41.23,
+      49.2,
+      59.7,
+      67.5,
+      76.5,
+      80.9,
+      90.23,
+      92.9,
+      97.57
+    ],
+    "measured": "2026-10-09"
+  }
+}

@@ -70,7 +70,7 @@ longer name.)
 
 | Format | What it is | Grammar | Recipes (default first) |
 |---|---|---|---|
-| Talking Head | a person to camera, graphics over them | speaker | speaker-kinetic-claims, speaker-one-take-cards, founder-selfie-punch-cards, presenter-location-hop, founder-bookends-chapters |
+| Talking Head | a person to camera, graphics over them | speaker | speaker-kinetic-claims, speaker-one-take-cards, founder-selfie-punch-cards, presenter-location-hop, founder-bookends-chapters, founder-launch |
 | Screen Share | the screen carries it | screencast / canvas-tour | ask-work-result (and the `screencast` grammar itself, with a real recording via `screencast_source`) |
 | Listicle | N things, counted | creator-cut / tempo-cut | presenter-n-things (deep), index-reel-host (the 9x16 pick), index-reel-page |
 | Ranking | items placed on a tier list, one by one | creator-cut | ranking-tier-list |

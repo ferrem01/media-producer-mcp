@@ -6,6 +6,37 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — Colourful work on screen: the asset wall, agent cursors, the founder-launch recipe
+
+Marc loved the Moda launch film (X, @anvisha) for two things: a colourful,
+moving wall of beautiful work, and something pretty being made in an
+editor. "The color and design makes any video pop." We had faithful copies of
+our editors but grey and plain, and no examples as good as theirs, so he
+chose designed samples.
+
+- `shared/samples.js`: eight made-up brands (Flowpath, Oliva Terra, Lumen AI,
+  Studio Bloom, Volt Run, Nimbus, Maré, Bonsai) and six drawn pieces each
+  (deck slide, social post, email, landing page, event card, stat card).
+  No network images; sized in em so they are crisp at any size.
+- `media/asset-wall`: that work in four layouts. `wall` drifts in depth
+  across a brand gradient with an open band for a headline; `orbit` floats
+  in the side columns around a speaker; `fan` opens a stack in 3D; `grid`
+  shows the same piece for many brands, landing in a wave. `tone: grey` is
+  the "AI slop" contrast.
+- `effects/agent-cursor`: agents as teammates' cursors (arrow plus a
+  coloured name tag) flying to points or to another component's anchors
+  (`email.headline`, `email.button`) where they are at that moment.
+- `quotient-email-editor` takes `sample: <brand>`: the editor writes that
+  brand's email, so the agents have something beautiful to build.
+- Recipe `founder-launch` (creator-cut, talking-head), measured from the
+  Moda film: money, what, range, problem, agents, difference, scale,
+  range_2, enemy, belief, offer. It uses the new `quiet` caption style,
+  which is the plated lane at 40px, in sentence case.
+- Gates: the wall's cards are cropped by the frame on purpose. The plane is
+  marked `data-mp-texture`, and the capture probes (`capture.ts`) skip text
+  and layout checks inside it. The headline and the ground are still
+  measured. Certification sweep is clean for both new components.
+
 ## 2026-10-09 — Seedance gets a voice exactly as long as the clip
 
 Marc, on proj_54cbf8e0: "my pace of speech is so much higher than what it

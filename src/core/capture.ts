@@ -921,6 +921,10 @@ export async function captureSingleFrame(options: {
             .map((n) => n.textContent || "")
             .join("").trim();
           if (txt.length < 2) return;
+          // Drawn PICTURE content (data-mp-texture: the asset wall's sample
+          // work) is judged as a picture, not as copy the viewer must read --
+          // its cards are cropped by the frame on purpose.
+          if (el.closest && el.closest("[data-mp-texture]")) return;
           const cs = getComputedStyle(el);
           if (cs.visibility === "hidden" || cs.display === "none") return;
           const fs = parseFloat(cs.fontSize) || 0;
@@ -1036,7 +1040,12 @@ export async function captureSingleFrame(options: {
         }
 
 
-        const els = Array.from(document.querySelectorAll("body *"));
+        // A texture root (data-mp-texture) is measured as one filled layer;
+        // the drawn cards inside it are a picture, not layout to police.
+        const els = Array.from(document.querySelectorAll("body *")).filter((e) => {
+          const tex = e.closest ? e.closest("[data-mp-texture]") : null;
+          return !tex || tex === e;
+        });
         let hasRichFullBleedBg = false;
         const surfaces: any[] = [];
         const contentBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];

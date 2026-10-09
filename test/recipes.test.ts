@@ -8,7 +8,7 @@ describe("the recipe: the measured cut of a film with the content removed", () =
   it("the library loads its valid recipes, each under one grammar with proven frames and a measured source", async () => {
     const { loadRecipes, validateRecipe, recipeSceneBand } = await import("../src/core/recipes.js");
     const rs = loadRecipes();
-    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-selfie-punch-cards", "founder-story-broll", "launch-what-if-features", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats",
+    expect(rs.map((r) => r.id).sort()).toEqual(["ask-work-result", "founder-bookends-chapters", "founder-launch", "founder-selfie-punch-cards", "founder-story-broll", "launch-what-if-features", "presenter-location-hop", "presenter-n-things", "presenter-split-tour", "speaker-kinetic-claims", "speaker-one-take-cards", "story-ad-idea-beats",
       // The creator formats (SPEC-creator-formats.md).
       "clone-dialogue", "green-screen-explainer", "index-reel-host", "index-reel-page", "ranking-tier-list", "reaction-split", "voiceover-broll-story", "yap-one-take"].sort());
     for (const r of rs) {
