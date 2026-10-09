@@ -34,6 +34,7 @@ import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
 import { elevenSpeech, heygenSpeech, spokenParts, DEFAULT_MOTION } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, playClock, cutFileFor } from "./take-clock.js";
+import { detectSilence } from "./idle-silence.js";
 import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
@@ -547,6 +548,20 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
   return { file, seconds };
 }
 
+/** A voice made exactly as long as the Seedance clip it drives: the whole
+ *  second that holds its speech (and the breath after it), trailing silence
+ *  trimmed or padded to it. Leading silence stays (a walk-in before the line). */
+export async function fitVoiceToClip(file: string, workDir: string): Promise<{ file: string; seconds: number; clip: number }> {
+  const seconds = (await durationOf(file)) || 0;
+  const trailing = (await detectSilence(file, { noiseDb: -35, minSeconds: 0.25 }))
+    .find((r) => r.to === Number.POSITIVE_INFINITY || r.to >= seconds - 0.05);
+  const speechEnd = trailing ? Math.min(trailing.from, seconds) : seconds;
+  const clip = Math.max(4, Math.min(30, Math.ceil(speechEnd + 0.15)));
+  const out = path.join(workDir, "voice-fit.mp3");
+  await ffmpeg(["-i", file, "-af", `apad,atrim=0:${clip}`, "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", out]);
+  return { file: out, seconds: clip, clip };
+}
+
 function perfDelivery(scene: any): string | undefined { return scene?.performance?.delivery || undefined; }
 /** A scene's read speed, clamped to what still sounds like a person. */
 export function voiceSpeedOf(perf: ScenePerformance | undefined): number {
@@ -768,7 +783,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   // frame, prompt, voice and seed -- nothing is made or sent again.
   const finishing = quality === "final" && !!perf.draft?.draft_id;
   let frame = perf.frame;
-  let voice: { file: string; seconds: number } | null = null;
+  let voice: { file: string; seconds: number; clip?: number } | null = null;
   let voiceUrl = perf.voice_url;
   // The recording the voice comes from; a final finishing its draft keeps the draft's.
   let from = perf.made_with?.from;
@@ -805,6 +820,13 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
       throw new Error(`Pitch check: the voice is ${hz} Hz, ${Math.abs(pct)}% ${pct < 0 ? "lower" : "higher"} than ${actor.name}'s other scenes (${reference} Hz)` +
         `${recHz ? `; your recording is ${recHz} Hz` : ""}. Nothing was sent to Seedance. ${perf.voice_source !== "script" ? "Re-record the scene in your usual voice, or make it anyway." : "Make it anyway, or change the line."}`);
     }
+    // THE VOICE IS EXACTLY THE CLIP: Seedance spreads a line across every
+    // second it is given -- an 8.06 s line in a 9 s clip came back 0.97 s
+    // longer, 14-22% slower across a film (Marc, proj_54cbf8e0: "it seems
+    // like I'm in slow motion"). Trimmed or padded to the whole second that
+    // holds the speech, the same line came back on its own clock (0.68-4.11
+    // and 5.16-7.59 s against 0.70-4.18 and 5.04-7.43).
+    voice = await fitVoiceToClip(voice.file, workDir);
     // The voice kept beside the take: heard, checked.
     const voiceName = `voice-${actor.id}-s${si + 1}-${stamp()}.mp3`;
     await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
@@ -829,9 +851,8 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     if (roomAbs) images.push(await publicUrl(tenant, projectId, roomAbs));
     return seedanceShot({
       images, audio: await publicUrl(tenant, projectId, voice!.file), prompt: videoPrompt, room: !!roomAbs,
-      // A breath of room past the voice (the proven run gave 10.03 s of voice
-      // 10 s and held sync: headroom is not what keeps the lips on).
-      seconds: voice!.seconds + 0.3, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
+      // The clip is the voice's own length: no slack for the line to fill.
+      seconds: voice!.clip!, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
     });
   });
 

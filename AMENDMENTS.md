@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-09 — Seedance gets a voice exactly as long as the clip
+
+Marc, on proj_54cbf8e0: "my pace of speech is so much higher than what it
+turned into. It seems like I'm in slow motion." The clip was the voice plus
+0.3 s, rounded up to whole seconds, and Seedance spread the line across every
+second it was given. Each scene came back longer by almost exactly the slack:
++1.07 s of 1.12, +0.97 of 0.94, +0.57 of 0.52 (14-22% slower).
+`fitVoiceToClip` now trims or pads the voice to the whole second that holds
+its speech (leading silence stays), and the clip is that length. The hand
+test on scene 2 (Higgsfield's Seedance 2.5, 8.0 s voice, 8 s clip) came back
+at 0.68-4.11 and 5.16-7.59 s, against the recording's 0.70-4.18 and
+5.04-7.43. Test: `test/scene-performance.test.ts`.
+
 ## 2026-10-09 — A scene that opens punched-in holds it on frame one
 
 Scenes that carry a punch-in across a cut open with a near-instant zoom at
