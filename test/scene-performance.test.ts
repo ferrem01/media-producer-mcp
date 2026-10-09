@@ -999,3 +999,15 @@ describe("a scene performed from a voice-only recording", () => {
     expect(rows[0]).toMatchObject({ state: "stale", why: "made from an earlier recording" });
   }, 90000);
 });
+
+// Seedance burned a garbled subtitle into Dana's scene 3 (Oct 8) under the
+// soft "no text on screen": every Seedance prompt carries the hard ban.
+describe("Seedance prompts ban on-screen text", () => {
+  it("speaking and silent shots both say no subtitles, captions or letters", async () => {
+    const { speakingPrompt, silentPrompt, NO_TEXT } = await import("../src/core/seedance.js");
+    for (const p of [speakingPrompt("A seated medium shot"), silentPrompt("Walks to the window")]) {
+      expect(p).toContain(NO_TEXT);
+      expect(p).toMatch(/no subtitles/);
+    }
+  });
+});

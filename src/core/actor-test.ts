@@ -402,6 +402,11 @@ export async function runAtlasSeedance25(video: string | null, img: string[], se
   }
 }
 
+/** Seedance draws the spoken words as fake subtitles unless told hard not to:
+ *  "no text on screen" alone let a garbled caption ("New Ono Teuith / Scot
+ *  Murıs dashord") burn into Dana's scene 3 (proj_d37c96fe, Oct 8). */
+export const NO_TEXT = "ABSOLUTELY NO TEXT ANYWHERE IN THE FRAME: no subtitles, no captions, no words, no letters, no lower thirds, no titles -- a clean camera image only.";
+
 /** Seedance 2.5 reference-to-video through HIGGSFIELD's API (not fal): the
  *  same recast idea as runSeedance25Recast -- the motion from @Video1, the
  *  person from @Image1. Our fal call was refused on a photoreal face; this
@@ -414,7 +419,7 @@ export const HF_PERFORMANCE_PROMPT = "The person from the first reference image 
   "in a vertical selfie-style medium close-up in a bright modern office. They perform exactly like the person in the reference video: " +
   "copy the head movements, hand gestures, timing and energy. Do not copy that person's face, hair or clothes. " +
   "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
-  "Sound: their voice as it really sounds in that office, not a dry studio voiceover. No music. Soft natural window light, realistic skin texture, no text on screen.";
+  "Sound: their voice as it really sounds in that office, not a dry studio voiceover. No music. Soft natural window light, realistic skin texture. " + NO_TEXT;
 export async function runHiggsfieldSeedance25(video: string | null, img: string | string[], seconds: number, aspect: string, opts: { prompt?: string; resolution?: string; audio?: string; duration?: number; onSubmit?: (statusUrl: string) => Promise<void> | void } = {}): Promise<string> {
   const id = process.env.HF_API_KEY_ID, secret = process.env.HF_API_KEY_SECRET;
   if (!id || !secret) throw new Error("HF_API_KEY_ID / HF_API_KEY_SECRET are not set");

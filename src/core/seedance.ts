@@ -14,7 +14,8 @@
  * Every job's prediction id is written by `onSubmit` the moment Atlas takes
  * it, and `resume` polls a kept id instead of paying again.
  */
-import { okJson } from "./actor-test.js";
+import { okJson, NO_TEXT } from "./actor-test.js";
+export { NO_TEXT };
 import { reportVendor } from "./vendor-status.js";
 
 const API = "https://api.atlascloud.ai/api/v1/model";
@@ -44,7 +45,7 @@ export function speakingPrompt(shot: string): string {
     "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
     "Sound: their voice as it really sounds where they are in this shot -- the acoustics of that place " +
     "(a room sounds like a room, outdoors like outdoors, a car like a car), and if they hold a microphone, close and clear like that mic; " +
-    "not a dry studio voiceover. No music. Realistic, natural light, no text on screen.";
+    "not a dry studio voiceover. No music. Realistic, natural light. " + NO_TEXT;
 }
 
 /** A shot with no speech (b-roll): the person in the action asked for. */
@@ -52,7 +53,7 @@ export function silentPrompt(shot: string): string {
   return "The person from the first frame and the character sheet (the same face, hair, clothes and accessories). " +
     `${shot.trim().replace(/\.?$/, ".")} ` +
     "They move naturally the whole time, from the very first frame -- gesturing, shifting, reacting, talking if the shot says so; never a held pose. " +
-    "Realistic body movement and weight, natural light, cinematic, no text on screen.";
+    "Realistic body movement and weight, natural light, cinematic. " + NO_TEXT;
 }
 
 async function poll(id: string, headers: Record<string, string>): Promise<SeedanceResult> {
