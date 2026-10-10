@@ -1,0 +1,163 @@
+<template>
+  <div class="aia">
+    <div class="aia-card aia-chat">
+      <div class="aia-tag"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.1 6.4 6.4 2.1-6.4 2.1L12 19.5l-2.1-6.4-6.4-2.1 6.4-2.1z"/></svg><span>AI answer</span></div>
+      <div class="aia-q"><span class="aia-qt"></span></div>
+      <div class="aia-a"></div>
+      <div class="aia-src-h">Sources</div>
+      <div class="aia-srcs"></div>
+    </div>
+    <div class="aia-card aia-serp">
+      <div class="aia-bar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span class="aia-query"></span></div>
+      <div class="aia-rows"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  /* AI ANSWER: the proof that AEO / SEO work -- a question asked of an AI
+     assistant, the answer written out, and YOUR article lit up as the source
+     it cites; beside it, a search for the same question with your result
+     climbing to the top. Generic surfaces: no assistant's or search
+     engine's brand. */
+  .aia, .aia * { box-sizing: border-box; max-width: none; }
+  .aia { position: absolute; inset: 0; padding: 0.6em 1.4em 1.8em; display: flex; gap: 2.2em; align-items: stretch; font-family: 'Inter', system-ui, sans-serif; color: #17171c; }
+  .aia-card { position: relative; background: #ffffff; border: 2px solid #e2e0ea; border-radius: 1.4em; padding: 1.8em 2em;
+    box-shadow: 0 2px 6px rgba(23, 23, 28, 0.06), 0 0.5em 1.3em rgba(23, 23, 28, 0.12); overflow: hidden; }
+  .aia-chat { flex: 1.35; display: flex; flex-direction: column; }
+  .aia-serp { flex: 1; display: flex; flex-direction: column; }
+  .aia.no-serp .aia-serp { display: none; }
+  .aia-tag { display: flex; align-items: center; gap: 0.5em; font-size: 0.8em; font-weight: 600; color: #6b6b76; letter-spacing: 0.02em; text-transform: uppercase; }
+  .aia-tag svg { width: 1.3em; height: 1.3em; fill: var(--aia-accent, #393bf5); }
+  .aia-q { align-self: flex-end; margin: 1em 0 1.1em; background: #f1f0f6; border-radius: 1.2em 1.2em 0.3em 1.2em; padding: 0.8em 1.1em; font-size: 1.15em; font-weight: 500; line-height: 1.35; max-width: 82%; min-height: 2.9em; }
+  .aia-a { font-size: 1.1em; line-height: 1.55; color: #26262e; min-height: 6em; }
+  .aia-a .aia-w { display: none; }
+  .aia-a .aia-wc { white-space: nowrap; }
+  .aia-cite { display: inline-flex; align-items: center; justify-content: center; min-width: 1.45em; height: 1.45em; padding: 0 0.35em; margin: 0 0.15em; border-radius: 0.5em;
+    background: var(--aia-accent, #393bf5); color: #fff; font-size: 0.72em; font-weight: 700; vertical-align: 0.2em; }
+  .aia-src-h { margin-top: auto; padding-top: 1em; font-size: 0.8em; font-weight: 600; color: #6b6b76; text-transform: uppercase; letter-spacing: 0.02em; }
+  .aia-srcs { display: flex; gap: 0.9em; margin-top: 0.6em; }
+  .aia-src { position: relative; flex: 1; min-width: 0; border: 2px solid #e8e6ef; border-radius: 1em; padding: 0.8em; background: #fafafc; display: flex; gap: 0.75em; align-items: center; }
+  .aia-src.is-ours { flex: 1.7; border-color: var(--aia-accent, #393bf5); background: #ffffff; }
+  .aia-src img { flex: none; width: 3em; height: 3.8em; object-fit: cover; object-position: top; border-radius: 0.5em; }
+  .aia-fav { flex: none; width: 2.2em; height: 2.2em; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.9em; }
+  .aia-st { min-width: 0; display: flex; flex-direction: column; gap: 0.25em; }
+  .aia-st b { font-size: 0.78em; font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .aia-st span { font-size: 0.72em; color: #6b6b76; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .aia-badge { position: absolute; top: -0.95em; right: 0.8em; background: var(--aia-accent, #393bf5); color: #fff; font-size: 0.72em; font-weight: 700; padding: 0.35em 0.75em; border-radius: 1em; white-space: nowrap; }
+  .aia-ring { position: absolute; inset: -0.45em; border-radius: 1.3em; border: 0.25em solid var(--aia-accent, #393bf5); opacity: 0; pointer-events: none; }
+  .aia-bar { display: flex; align-items: center; gap: 0.7em; border: 2px solid #e2e0ea; border-radius: 2em; padding: 0.7em 1.1em; font-size: 1em; font-weight: 500; }
+  .aia-bar svg { flex: none; width: 1.3em; height: 1.3em; fill: none; stroke: #6b6b76; stroke-width: 2; stroke-linecap: round; }
+  .aia-rows { position: relative; flex: 1; margin-top: 1.1em; }
+  .aia-row { position: absolute; left: 0; right: 0; display: flex; gap: 0.8em; padding: 0.75em 0.8em; border-radius: 0.9em; }
+  .aia-row.is-ours { background: color-mix(in srgb, var(--aia-accent, #393bf5) 8%, #ffffff); border: 2px solid var(--aia-accent, #393bf5); }
+  .aia-rank { flex: none; width: 1.9em; font-size: 1.05em; font-weight: 700; color: #6b6b76; }
+  .aia-row.is-ours .aia-rank { color: var(--aia-accent, #393bf5); }
+  .aia-rt { min-width: 0; display: flex; flex-direction: column; gap: 0.22em; }
+  .aia-rt span { font-size: 0.72em; color: #2e6a33; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .aia-rt b { font-size: 0.95em; font-weight: 600; color: #2f3fbf; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .aia-rt i { font-style: normal; font-size: 0.75em; color: #5b5b66; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.aia');
+    var W = el.clientWidth || 1600, H = el.clientHeight || 800;
+    var num = function (v, d) { var n = Number(v); return v !== undefined && v !== null && v !== '' && isFinite(n) ? n : d; };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var search = data.search && typeof data.search === 'object' && Array.isArray(data.search.results) && data.search.results.length ? data.search : null;
+    if (!search) root.classList.add('no-serp');
+    // One type scale for the whole prop, from the box it was given.
+    root.style.fontSize = Math.max(11, Math.min(30, Math.min(W / (search ? 62 : 40), H / 30))) + 'px';
+    if (data.accent) root.style.setProperty('--aia-accent', String(data.accent));
+    var AT = Math.max(0, num(data.at, 0.3));
+    var chat = el.querySelector('.aia-chat'), serp = el.querySelector('.aia-serp');
+
+    // The cards arrive.
+    gsap.set(chat, { autoAlpha: 0, y: H * 0.04 });
+    tl.to(chat, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, AT);
+
+    // The question, typed.
+    var qt = el.querySelector('.aia-qt'), q = String(data.question || 'What is the best way to do this?');
+    var qs = Math.max(0.012, num(data.type_speed, 0.03)), qAt = AT + 0.35;
+    q.split('').forEach(function (ch, i) {
+      var s = document.createElement('span'); s.textContent = ch; s.style.display = 'none'; qt.appendChild(s);
+      tl.set(s, { display: 'inline' }, qAt + i * qs);
+    });
+    var qEnd = qAt + q.length * qs;
+
+    // The answer, written out word by word; [1] becomes a citation chip.
+    var ans = el.querySelector('.aia-a'), words = String(data.answer || '').split(/\s+/).filter(Boolean);
+    var ws = Math.max(0.015, num(data.word_speed, 0.045)), aAt = qEnd + 0.35;
+    words.forEach(function (w, i) {
+      var m = w.match(/^\[(\d+)\]([.,;:!?]*)$/), s = document.createElement('span'); s.className = 'aia-w';
+      if (m) { s.className += ' aia-wc'; s.innerHTML = '<span class="aia-cite">' + m[1] + '</span>' + esc(m[2]) + ' '; }
+      else s.textContent = w + ' ';
+      ans.appendChild(s);
+      tl.set(s, { display: 'inline' }, aAt + i * ws);
+    });
+    var aEnd = aAt + words.length * ws;
+
+    // The sources: the cited one is yours -- ringed, labelled.
+    var srcs = Array.isArray(data.sources) && data.sources.length ? data.sources.slice(0, 3) : [{ domain: 'yourbrand.com', title: 'Your article' }];
+    var cite = Math.max(0, Math.min(srcs.length - 1, Math.round(num(data.cite, 0))));
+    var box = el.querySelector('.aia-srcs'), FAV = ['#393bf5', '#16b364', '#e2187b', '#f59e0b'];
+    var ours = null;
+    srcs.forEach(function (s, i) {
+      var d = document.createElement('div'); d.className = 'aia-src' + (i === cite ? ' is-ours' : '');
+      d.innerHTML = (s.image ? '<img src="' + esc(s.image) + '" alt="">' : '<span class="aia-fav" style="background:' + FAV[i % FAV.length] + '">' + esc(String(s.domain || '?').charAt(0).toUpperCase()) + '</span>')
+        + '<div class="aia-st"><b>' + esc(s.title) + '</b><span>' + esc(s.domain) + '</span></div>';
+      box.appendChild(d);
+      gsap.set(d, { autoAlpha: 0, y: 12 });
+      tl.to(d, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, aEnd + 0.1 + i * 0.1);
+      if (i === cite) ours = d;
+    });
+    var litAt = aEnd + 0.1 + srcs.length * 0.1 + 0.2;
+    if (ours) {
+      var ring = document.createElement('div'); ring.className = 'aia-ring'; ours.appendChild(ring);
+      var badge = document.createElement('div'); badge.className = 'aia-badge'; badge.textContent = String(data.highlight_label || 'Your post'); ours.appendChild(badge);
+      gsap.set(badge, { autoAlpha: 0, scale: 0.6 });
+      tl.to(ring, { opacity: 1, duration: 0.25 }, litAt);
+      tl.to(ring, { scale: 1.06, opacity: 0, duration: 0.7, ease: 'power2.out' }, litAt + 0.25);
+      tl.to(ours, { scale: 1.04, duration: 0.25, ease: 'back.out(3)' }, litAt);
+      tl.to(badge, { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2.5)' }, litAt + 0.05);
+    }
+
+    // The search: the same question, your result climbing to the top.
+    if (search) {
+      el.querySelector('.aia-query').textContent = String(search.query || q);
+      var rows = el.querySelector('.aia-rows'), res = search.results.slice(0, 5);
+      var mine = Math.max(0, Math.min(res.length - 1, Math.round(num(search.ours, 0))));
+      var start = Math.max(1, Math.min(res.length - 1, Math.round(num(search.from, res.length - 1))));
+      // The order before: yours at `start`, the others in theirs.
+      var others = res.filter(function (_, i) { return i !== mine; });
+      var before = others.slice(0, start).concat([res[mine]]).concat(others.slice(start));
+      var rh = 4.9, els = [];
+      before.forEach(function (r, k) {
+        var d = document.createElement('div'); d.className = 'aia-row' + (r === res[mine] ? ' is-ours' : '');
+        d.innerHTML = '<span class="aia-rank">' + (k + 1) + '</span><div class="aia-rt"><span>' + esc(r.domain) + '</span><b>' + esc(r.title) + '</b><i>' + esc(r.snippet || '') + '</i></div>';
+        d.style.top = (k * rh) + 'em';
+        rows.appendChild(d); els.push({ el: d, r: r });
+      });
+      var sAt = num(search.at, NaN); if (!isFinite(sAt)) sAt = AT + 0.4;
+      gsap.set(serp, { autoAlpha: 0, y: H * 0.04 });
+      tl.to(serp, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, sAt);
+      var climb = num(search.climb_at, NaN); if (!isFinite(climb)) climb = litAt + 0.2;
+      els.forEach(function (o, k) {
+        var to = o.r === res[mine] ? 0 : (k < start ? k + 1 : k);
+        if (to === k) return;
+        tl.to(o.el, { top: (to * rh) + 'em', duration: 0.8, ease: 'power3.inOut' }, climb);
+        // The new rank swaps in mid-move (two numbers, toggled: scrub-safe).
+        var rk = o.el.querySelector('.aia-rank');
+        rk.innerHTML = '<span class="aia-r0">' + (k + 1) + '</span><span class="aia-r1" style="display:none">' + (to + 1) + '</span>';
+        tl.set(rk.querySelector('.aia-r0'), { display: 'none' }, climb + 0.4);
+        tl.set(rk.querySelector('.aia-r1'), { display: 'inline' }, climb + 0.4);
+      });
+      var mineEl = els.filter(function (o) { return o.r === res[mine]; })[0];
+      if (mineEl) tl.to(mineEl.el, { scale: 1.03, duration: 0.25, yoyo: true, repeat: 1, ease: 'power2.out' }, climb + 0.8);
+    }
+    return tl;
+  }
+</script>

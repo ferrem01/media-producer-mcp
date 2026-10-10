@@ -1,0 +1,27 @@
+{
+  "type": "ai-answer",
+  "label": "AI Answer (AEO / SEO proof)",
+  "category": "mockups",
+  "description": "The proof that AEO and SEO work, made visible: a question asked of an AI assistant (typed), the answer written out word by word with citation chips ([1]), and the sources under it -- YOUR article ringed and labelled ('Your post'), with its page as a thumbnail. Optional beside it: a search for the same question, your result climbing from lower down to #1. Generic surfaces, no assistant's or search engine's brand. Use it for 'found by AI', 'cited in the answer', 'rank for what your buyers ask'. Size it wide (about 88% x 70%); without search it can be narrower.",
+  "data": {
+    "question": { "type": "string", "label": "The question asked", "required": true },
+    "answer": { "type": "string", "label": "The answer, 2-3 sentences; put [1] after the claim your article backs (the chip)", "required": true },
+    "sources": {
+      "type": "array",
+      "label": "Up to 3 sources: {domain, title, image?}. image = the page as a thumbnail (e.g. a house blog page '/assets/_system/sample-work/fern-blog-post.webp')",
+      "optional": true
+    },
+    "cite": { "type": "number", "label": "Which source is yours, 0-based (default 0)", "optional": true },
+    "highlight_label": { "type": "string", "label": "The label on your source (default 'Your post')", "optional": true },
+    "search": {
+      "type": "object",
+      "label": "Optional search card beside the answer: {query?, results: [{domain, title, snippet}] (3-5), ours (index of yours in results, default 0), from (the rank it starts at, 0-based, default last), at?, climb_at?}",
+      "optional": true
+    },
+    "accent": { "type": "string", "label": "Highlight colour (default #393bf5)", "optional": true },
+    "at": { "type": "number", "label": "Seconds: the card arrives (default 0.3)", "optional": true },
+    "type_speed": { "type": "number", "label": "Seconds per character of the question (default 0.03)", "optional": true },
+    "word_speed": { "type": "number", "label": "Seconds per word of the answer (default 0.045)", "optional": true }
+  },
+  "tier": "animated-prop"
+}
