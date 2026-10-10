@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-10 — Campaigns, events and AEO in the design story
+
+Marc: "We don't do decks ... what else should we do besides email, social,
+and blogs? We also do marketing events ... AEO SEO ... they're not very
+visual." The answer: show events through the pieces they produce, show AEO
+as its payoff, and show the campaign as one prompt becoming every channel.
+
+- **12 more house pieces**: event collateral (a registration page, a speaker
+  badge, a trade-show booth graphic, a dinner menu, a webinar title slide, a
+  countdown post, a recap email, a speaker card, a race bib, a pop-up story)
+  and Kiln Coffee's landing page and event invite, so one brand carries a full
+  campaign kit (email, Instagram, TikTok, blog, landing page, event).
+- **asset-wall `burst`**: one brand's pieces burst out of the middle (where a
+  composer types the ask) to a ring round it, turned towards the centre, then
+  float; the headline lands in the centre after the ask, fitted to half the
+  width so it sits clear of the pieces.
+- **`ai-answer`** (mockups): the question typed to an AI assistant, the answer
+  written out with a citation chip, your article ringed and labelled as the
+  source (its page as a thumbnail); beside it, a search for the same question
+  with your result climbing to #1. Generic surfaces, no assistant's or search
+  engine's brand.
+
 ## 2026-10-09 — A house library for email, social and blog, and the motions to show it
 
 Marc: "We work in 3 areas. Email, social and blog. Would be great if we had a

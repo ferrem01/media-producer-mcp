@@ -53,7 +53,7 @@
     var AT = Math.max(0, num(data.at, 0));
     var SPAN = Math.max(1, DUR - AT);
     var SPEED = clamp(num(data.speed, 1), 0, 4);
-    var LAYOUTS = ['wall', 'rolodex', 'fly', 'orbit', 'fan', 'grid', 'scroll', 'feed'];
+    var LAYOUTS = ['wall', 'rolodex', 'fly', 'orbit', 'fan', 'grid', 'scroll', 'feed', 'burst'];
     var layout = LAYOUTS.indexOf(data.layout) >= 0 ? data.layout : 'wall';
     var seed = num(data.seed, 7);
     var opts = { kinds: Array.isArray(data.kinds) ? data.kinds : null, brands: Array.isArray(data.brands) ? data.brands : null, platforms: Array.isArray(data.platforms) ? data.platforms : null, items: Array.isArray(data.items) ? data.items : null, seed: seed };
@@ -176,7 +176,7 @@
       var fsz = Math.round(M * (tall ? 0.085 : 0.075));
       head.style.whiteSpace = 'nowrap'; head.style.padding = '0'; head.style.left = '0'; head.style.right = 'auto';
       head.style.fontSize = fsz + 'px';
-      for (var tries = 0; tries < 40 && head.scrollWidth > W * 0.86; tries++) { fsz = Math.floor(fsz * 0.95); head.style.fontSize = fsz + 'px'; }
+      for (var tries = 0, fitW = W * (layout === 'burst' ? 0.5 : 0.86); tries < 40 && head.scrollWidth > fitW; tries++) { fsz = Math.floor(fsz * 0.95); head.style.fontSize = fsz + 'px'; }
       head.style.right = '0'; head.style.whiteSpace = '';
       if (data.headline_color) head.style.color = String(data.headline_color);
     }
@@ -316,6 +316,28 @@
         tl.to(c.el, { rotationY: -18, rotationX: 6, x: off * wf * (tall ? 0.08 : 0.16), y: off * -wf * 0.03, z: -Math.abs(off) * wf * 0.12, duration: 1.2, ease: 'power3.inOut' }, AT + 0.35);
         tl.to(c.el, { rotationY: -10, duration: Math.max(1, SPAN - 1.6), ease: 'sine.inOut' }, AT + 1.55);
       });
+    } else if (layout === 'burst') {
+      // ONE CAMPAIGN, EVERY CHANNEL: one brand's pieces -- the email, the
+      // posts, the blog, the landing page, the event invite -- burst out of
+      // the middle (where the prompt was typed) to their places round it,
+      // turned towards the centre, at two depths, then float.
+      var nb = clamp(Math.round(num(data.count, 7)), 3, 10);
+      var kit = S.pick(nb, opts), rx = W * (tall ? 0.31 : 0.36), ry = H * (tall ? 0.36 : 0.29);
+      kit.forEach(function (p, b) {
+        var ang = -Math.PI / 2 + (b + 0.5) * (Math.PI * 2 / kit.length);
+        var sx = W / 2 + Math.cos(ang) * rx, sy = H / 2 + Math.sin(ang) * ry;
+        var ratio = p.ratio > 0 ? p.ratio : 0.75, wb = Math.min(W * (tall ? 0.36 : 0.22), H * 0.36 / ratio);
+        var c = p.kind === 'social' ? post(p, wb * (ratio > 1.5 ? 1 : 0.85)) : card(p, wb);
+        var zb = b % 2 ? -M * 0.16 : M * 0.02, t0 = AT + b * 0.07;
+        gsap.set(c.el, Object.assign(at(W / 2, H / 2), { scale: 0.12, z: -M * 0.5, autoAlpha: 0, rotation: (rnd() - 0.5) * 30, zIndex: b % 2 ? 1 : 2 }));
+        tl.to(c.el, { autoAlpha: 1, duration: 0.2 }, t0);
+        tl.to(c.el, { x: sx - W / 2, y: sy - H / 2, scale: 1, z: zb, rotation: (rnd() - 0.5) * 6, rotationY: -(sx - W / 2) / W * 34, rotationX: (sy - H / 2) / H * 18,
+          filter: dof(zb, 120), duration: 1.1, ease: 'expo.out' }, t0);
+        var bob = 2 + rnd(), reps = Math.max(0, Math.floor((SPAN - 1.4 - b * 0.07) / bob) - 1);
+        if (reps > 0) tl.to(c.el, { y: '-=' + H * 0.012, duration: bob, ease: 'sine.inOut', yoyo: true, repeat: reps }, t0 + 1.15);
+      });
+      gsap.set(plane, { z: -M * 0.04, transformOrigin: '50% 50%' });
+      tl.to(plane, { z: M * 0.03, duration: SPAN, ease: 'sine.inOut' }, AT);
     } else if (layout === 'scroll' || layout === 'feed') {
       // SCROLL: full-length emails and blog pages standing in columns on a
       // plane turned in 3D, each column scrolling at its own pace, the next

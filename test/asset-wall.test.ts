@@ -22,6 +22,7 @@ async function write(components: any[], W = 1920, H = 1080, dur = 6) {
       { type: "asset-wall", source: await src("media", "asset-wall") },
       { type: "agent-cursor", source: await src("effects", "agent-cursor") },
       { type: "quotient-email-editor", source: await src("mockups", "quotient-email-editor") },
+      { type: "ai-answer", source: await src("mockups", "ai-answer") },
     ],
     brandKit: { colors: { primary: "#393bf5", background: "#ffffff", text: "#17171c" }, fonts: [] } as any,
     canvas: { width: W, height: H, fps: 30 } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap") } as any);
@@ -61,6 +62,9 @@ describe("the house sample work (shared/samples.js + src/sample-work)", () => {
     expect(by("social").length).toBeGreaterThanOrEqual(14);
     expect(new Set(by("social").map((w: any) => w.platform)).size).toBeGreaterThanOrEqual(6);
     expect(by("blog").length).toBeGreaterThanOrEqual(10);
+    expect(by("event").length).toBeGreaterThanOrEqual(12);
+    // One brand carries a whole campaign, for 'burst'.
+    expect(new Set(S.work.filter((w: any) => w.brand === "kiln").map((w: any) => w.kind))).toEqual(new Set(["email", "social", "blog", "landing", "event"]));
     for (const w of S.pick(12, { platforms: ["linkedin"] })) expect(w.platform).toBe("linkedin");
     for (const w of S.work) if (w.brand) expect(S.brand(w.brand).id).toBe(w.brand);
     const picks = S.pick(60, { seed: 3 });
@@ -189,6 +193,21 @@ describe("asset wall", () => {
     } finally { await done(); }
   }, 60000);
 
+  it("burst: one brand's campaign bursts out of the middle to a ring round it, the centre left for the ask", async () => {
+    const { page, at, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { layout: "burst", brands: ["kiln"], count: 6, at: 0.5 } }]);
+    try {
+      const boxes = async (t: number) => { await at(t); return page.evaluate(() => Array.from(document.querySelectorAll(".aw-card")).map((c) => { const b = c.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, o: Number(getComputedStyle(c).opacity), src: (c.querySelector("img") as HTMLImageElement).getAttribute("src") || "" }; })); };
+      const a = await boxes(0.2), b = await boxes(5.5);
+      expect(b.length).toBe(6);
+      for (const c of a) expect(c.o).toBeLessThan(0.05);                 // nothing before the burst
+      for (const c of b) {
+        expect(c.src).toMatch(/sample-work\/kiln-/);                    // one brand: the campaign
+        expect(Math.hypot((c.x - 960) / 960, (c.y - 540) / 540)).toBeGreaterThan(0.35); // round the centre, not on it
+      }
+      expect(new Set(b.map((c) => c.src)).size).toBe(6);                // every channel once
+    } finally { await done(); }
+  }, 60000);
+
   it("grey tone drains the colour (the enemy's work)", async () => {
     const { page, done } = await boot([{ id: "wall", type: "asset-wall", position: FULL, data: { tone: "grey" } }]);
     try {
@@ -249,4 +268,42 @@ describe("the founder-launch recipe", () => {
     expect(lane.data.max_font).toBe(40);
     expect(lane.data.scrim).toBe("plate");
   });
+});
+
+describe("ai-answer: AEO and SEO made visible", () => {
+  const AI = { id: "ai", type: "ai-answer", position: { x: "5%", y: "17%", width: "90%", height: "76%" }, data: {
+    question: "What are the easiest houseplants to keep alive?",
+    answer: "Snake plants, ZZ plants and pothos are the hardest to kill: they handle low light and need water only every few weeks [1].",
+    sources: [{ domain: "fernandco.com", title: "10 plants that survive anything", image: "/assets/_system/sample-work/fern-blog-post.webp" }, { domain: "gardenjournal.org", title: "The low-light plant guide" }],
+    search: { results: [{ domain: "fernandco.com", title: "10 plants that survive anything" }, { domain: "a.org", title: "A" }, { domain: "b.com", title: "B" }, { domain: "c.net", title: "C" }], ours: 0, from: 3 } } };
+
+  it("types the question, writes the answer with a citation chip, rings your source, and your search result climbs to #1", async () => {
+    const { page, at, done } = await boot([AI]);
+    try {
+      const state = () => page.evaluate(() => {
+        const q = Array.from(document.querySelectorAll(".aia-qt span")).filter((s) => getComputedStyle(s).display !== "none").length;
+        const words = Array.from(document.querySelectorAll(".aia-w")).filter((s) => getComputedStyle(s).display !== "none").length;
+        const ours = document.querySelector(".aia-row.is-ours") as HTMLElement;
+        const rank = Array.from(ours.querySelectorAll(".aia-rank span")).filter((s) => getComputedStyle(s).display !== "none").map((s) => s.textContent)[0] || ours.querySelector(".aia-rank")!.textContent;
+        return { q, words, top: ours.getBoundingClientRect().top, rank, badge: Number(getComputedStyle(document.querySelector(".aia-badge")!).opacity), cite: document.querySelectorAll(".aia-cite").length };
+      });
+      await at(0.5); const a = await state();
+      await at(6.5); const b = await state();
+      expect(a.q).toBeLessThan(b.q);
+      expect(b.q).toBe("What are the easiest houseplants to keep alive?".length);
+      expect(b.words).toBeGreaterThan(15);
+      expect(b.cite).toBe(1);
+      expect(b.badge).toBeGreaterThan(0.9);
+      expect(a.rank).toBe("4");
+      expect(b.rank).toBe("1");
+      expect(b.top).toBeLessThan(a.top);
+    } finally { await done(); }
+  }, 60000);
+
+  it("is clean to the gates (legible, nothing clipped)", async () => {
+    const { htmlPath, tmp } = await write([AI], 1920, 1080, 7);
+    try {
+      expect(await measureTextContrast({ htmlPath, width: 1920, height: 1080, atTimes: [3, 6.5] })).toEqual([]);
+    } finally { await fs.rm(tmp, { recursive: true, force: true }); }
+  }, 90000);
 });
