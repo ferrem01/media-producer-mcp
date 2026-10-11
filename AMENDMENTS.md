@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-11 — signal-pool: height is the lead score
+
+Marc, on the marketing-system explainer: "every time there's an interaction
+with the brand ... a little mini version of our activity log ... it makes the
+lead taller. And then eventually some of the leads are just taller than the
+others and they kind of stick out." And: "they're all signals."
+
+- **`signal-pool`** (props): a pool of leads, each a sticker standing on a
+  column of signal slips (one activity-log row per interaction: a dot in the
+  brand guide's family colour, the signal in real words, a time). A landing
+  signal slides in under the lead and lifts him; `peel` takes his newest
+  signals off (back to the pool), `badge` sticks a sticker on him (the MQL
+  seal), `moves` carries him out and back, `count` keeps an "N signals" tally.
+  Every row in the pool reads at one type size (the longest line sets it).
+  A signal with `at <= 0` is already there, so the next scene picks the pool up
+  where the last left it. Built by hand because the storyboard writer could
+  only describe this mechanic, not perform it.
+
+---
+
 ## 2026-10-10 — Campaigns, events and AEO in the design story
 
 Marc: "We don't do decks ... what else should we do besides email, social,

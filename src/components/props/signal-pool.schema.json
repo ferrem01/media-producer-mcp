@@ -1,0 +1,75 @@
+{
+  "type": "signal-pool",
+  "label": "Signal Pool (leads that grow taller with every signal)",
+  "category": "props",
+  "description": "A POOL OF LEADS where height is the score: each lead is a sticker standing on a column of SIGNAL slips -- one activity-log row per brand interaction (a coloured dot, the signal in real words, a time). A signal landing at its `at` slides in under the lead and lifts him, so the more signals, the taller he stands and the more he sticks out of the crowd. `peel` takes his newest signals off again (he shrinks back into the pool), `badge` sticks a sticker on him (an MQL seal), `moves` carries him out of the pool and back, `count` keeps a running 'N signals' tally over his head. Each lead publishes data-anchor 'lead-<id>' for camera moves. A signal with at <= 0 is already in his log at frame 0, so the next scene can pick the pool up exactly where the last one left it. Example: {\"leads\":[{\"id\":\"star\",\"sticker\":\"q-lead-warm\",\"label\":\"the lead\",\"count\":true,\"signals\":[{\"at\":1.2,\"kind\":\"email\",\"text\":\"Opened email: Q4 playbook\",\"time\":\"Mon\"},{\"at\":2.4,\"kind\":\"web\",\"text\":\"Landed on /pricing\",\"time\":\"Tue\"}]},{\"id\":\"p2\",\"sticker\":\"q-prospect-2\",\"signals\":[{\"at\":3,\"kind\":\"social\",\"text\":\"Liked a LinkedIn post\"}]}]}.",
+  "data": {
+    "leads": {
+      "type": "array",
+      "label": "The leads, left to right",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "label": "Id (anchor 'lead-<id>')" },
+          "sticker": { "type": "string", "label": "Sticker name from the library (e.g. q-lead-warm)" },
+          "src": { "type": "string", "label": "Or a transparent image URL" },
+          "label": { "type": "string", "label": "Typed label under him (e.g. 'the lead')" },
+          "label_at": { "type": "number", "label": "Label appears at (s)" },
+          "enter_at": { "type": "number", "label": "Drops into the pool at (s); 0 = already there" },
+          "rotation": { "type": "number", "label": "Sticker tilt in degrees" },
+          "count": { "type": "boolean", "label": "Show a running 'N signals' tally over him" },
+          "count_word": { "type": "string", "label": "Tally word", "placeholder": "signals" },
+          "signals": {
+            "type": "array",
+            "label": "His signals, in landing order",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": { "type": "number", "label": "Lands at (s); <= 0 = already in his log" },
+                "text": { "type": "string", "label": "The signal in real words" },
+                "kind": { "type": "string", "label": "Dot colour family", "enum": ["email", "web", "social", "event", "campaign", "sales", "flow"] },
+                "time": { "type": "string", "label": "Time stamp (Mon, 2d ago ...)" },
+                "color": { "type": "string", "label": "Dot colour override" }
+              }
+            }
+          },
+          "peel": {
+            "type": "object",
+            "label": "Newest signals peel off and flutter away",
+            "properties": {
+              "at": { "type": "number", "label": "Starts at (s)" },
+              "count": { "type": "number", "label": "How many come off" }
+            }
+          },
+          "badge": {
+            "type": "object",
+            "label": "A sticker that sticks on him (e.g. q-mql-badge)",
+            "properties": {
+              "sticker": { "type": "string", "label": "Sticker name" },
+              "src": { "type": "string", "label": "Or an image URL" },
+              "at": { "type": "number", "label": "Sticks on at (s)" }
+            }
+          },
+          "moves": {
+            "type": "array",
+            "label": "Moves of the whole lead (column and all), in box fractions",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": { "type": "number", "label": "Starts at (s)" },
+                "dx": { "type": "number", "label": "Offset x (fraction of the box width, from where he stands)" },
+                "dy": { "type": "number", "label": "Offset y (fraction of the box height)" },
+                "duration": { "type": "number", "label": "Seconds", "placeholder": "0.8" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pool": { "type": "boolean", "label": "Draw the pool under them (default true)", "optional": true },
+    "pool_at": { "type": "number", "label": "Pool appears at (s)", "optional": true },
+    "water": { "type": "string", "label": "Pool water colour", "optional": true },
+    "ink": { "type": "string", "label": "Ink colour", "optional": true }
+  }
+}
