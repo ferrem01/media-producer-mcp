@@ -114,6 +114,9 @@ ${QUOTIENT_CSS}
   .toggle { display: flex; gap: 10px; align-items: flex-start; color: var(--content-primary); font-size: 14px; margin: 10px 0 14px; white-space: nowrap; }
   .toggle .hint { white-space: normal; }
   .vhide { display: none !important; }
+  #micRow { flex-wrap: wrap; align-items: center; }
+  #micRow select { max-width: 100%; font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border, #ccc); background: transparent; color: inherit; }
+  #micRow .hint { flex: 1 0 100%; }
   /* A choice row wraps: its hint takes a full line of its own instead of a
      one-word-wide column beside the options. */
   #bgChoice { flex-wrap: wrap; align-items: center; }
@@ -233,6 +236,7 @@ ${QUOTIENT_CSS}
   <p class="sub" id="subtitle"></p>
   <div class="card" id="script"></div>
   <div class="toggle" id="speedRow" style="display:none">Prompter speed <button type="button" class="spd" id="slowerBtn" aria-label="Slower">−</button><b id="speedWpm"></b><button type="button" class="spd" id="fasterBtn" aria-label="Faster">+</button></div>
+  <div class="toggle" id="micRow" style="display:none"><label for="micSel">Microphone</label> <select id="micSel" aria-label="Microphone"></select> <span class="hint" id="micHint"></span></div>
   <label class="toggle" id="voiceRow" style="display:none"><input type="checkbox" id="voiceOnly"> Voice only <span class="hint">(no camera: your voice for this scene, read off the prompter. In Studio it can voice a generated performance of you, or play under graphics.)</span></label>
   <div class="toggle" id="voiceUploadRow" style="display:none"><button type="button" class="btn ghost" id="voiceUploadBtn">Upload an audio file</button><input type="file" id="voiceFile" accept="audio/*,video/*" hidden></div>
     <div class="spacer"></div>
@@ -774,8 +778,9 @@ ${QUOTIENT_CSS}
       // The mic alone; a camera left open from a video take goes first.
       if (stream && stream.getVideoTracks().length) releaseCamera();
       var liveV = stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; });
-      (liveV ? Promise.resolve(stream) : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } })).then(function (s) {
+      (liveV ? Promise.resolve(stream) : openMedia({ audio: micAudio() })).then(function (s) {
         stream = s; trackW = 0; trackH = 0;
+        micInUse(s);
         show('stage');
         $('timer').textContent = '0:00'; $('timer').classList.remove('rec');
         startMeter(s);
@@ -790,15 +795,16 @@ ${QUOTIENT_CSS}
     var constraints = {
       video: { facingMode: 'user', width: { ideal: capW }, height: { ideal: capH }, frameRate: { ideal: 30 } },
       // Mirrors the recorder extension so a take behaves the same on every device.
-      audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true },
+      audio: micAudio(),
     };
     // Ask for the camera ONCE per visit: the stream stays open across
     // review, retake and record-again (the browser asked again on every
     // take -- Marc: "I've already said yes"). Released when the page hides.
     var live = stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; });
-    (live ? Promise.resolve(stream) : navigator.mediaDevices.getUserMedia(constraints)).then(function (s) {
+    (live ? Promise.resolve(stream) : openMedia(constraints)).then(function (s) {
       if (s !== stream) camLiveAt = performance.now();
       stream = s;
+      micInUse(s);
       var vt = s.getVideoTracks()[0]; var st = vt && vt.getSettings ? vt.getSettings() : {};
       trackW = st.width || 0; trackH = st.height || 0;
       $('live').srcObject = s;
@@ -901,6 +907,53 @@ ${QUOTIENT_CSS}
   function releaseCamera() {
     if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
   }
+
+  // WHICH MICROPHONE (Marc, Oct 12: the laptop was set to the monitor's mic,
+  // not the good one he had plugged in, and the take came out thin). The
+  // booth lists the inputs, says which one it is recording from, and keeps
+  // the pick for the next visit. A pick that is gone falls back to default.
+  var MIC_KEY = 'mp_take_mic';
+  function micPick() { try { return localStorage.getItem(MIC_KEY) || ''; } catch (e) { return ''; } }
+  function micAudio() {
+    // Mirrors the recorder extension so a take behaves the same on every device.
+    var a = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
+    var id = micPick(); if (id) a.deviceId = { exact: id };
+    return a;
+  }
+  function openMedia(c) {
+    return navigator.mediaDevices.getUserMedia(c).catch(function (e) {
+      if (!micPick() || !(e && (e.name === 'OverconstrainedError' || e.name === 'NotFoundError'))) throw e;
+      try { localStorage.removeItem(MIC_KEY); } catch (x) {}
+      delete c.audio.deviceId;
+      return navigator.mediaDevices.getUserMedia(c);
+    });
+  }
+  function micInUse(s) {
+    var t = s && s.getAudioTracks ? s.getAudioTracks()[0] : null;
+    $('micHint').textContent = t && t.label ? 'Recording from: ' + t.label : '';
+    listMics();
+  }
+  function listMics() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    navigator.mediaDevices.enumerateDevices().then(function (ds) {
+      var mics = ds.filter(function (d) { return d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default'; });
+      var sel = $('micSel'), cur = micPick();
+      sel.innerHTML = '';
+      var def = document.createElement('option'); def.value = ''; def.textContent = 'System default'; sel.appendChild(def);
+      // Names show once the browser has been allowed the mic.
+      mics.forEach(function (d, i) { var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || ('Microphone ' + (i + 1)); sel.appendChild(o); });
+      sel.value = cur; if (sel.value !== cur) sel.value = '';
+      $('micRow').style.display = mics.length ? '' : 'none';
+    }).catch(function () {});
+  }
+  $('micSel').addEventListener('change', function () {
+    try { if (this.value) localStorage.setItem(MIC_KEY, this.value); else localStorage.removeItem(MIC_KEY); } catch (e) {}
+    // The open stream holds the old mic: the next Record opens the new one.
+    if (!(rec && rec.state === 'recording')) releaseCamera();
+    $('micHint').textContent = '';
+  });
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', listMics);
+  listMics();
   window.addEventListener('pagehide', releaseCamera);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && !(rec && rec.state === 'recording')) releaseCamera(); });
 
