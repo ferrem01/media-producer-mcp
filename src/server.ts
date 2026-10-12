@@ -48,6 +48,7 @@ import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { ensureSpeakerNeeds, openTakeNeeds, waitForTake, personCarries, ensureClipNeed } from "./core/take-needs.js";
+import { pinFilmAxes } from "./core/film-axes.js";
 import { planMarkdown, removeBoardScenes, reorderBoard } from "./core/film-plan.js";
 import { normalizeSoundCues, normalizeSoundId, ensureSoundFiles } from "./core/scene-sfx.js";
 import { pruneDeadAnchors } from "./core/word-anchors.js";
@@ -1063,6 +1064,7 @@ export function createMcpServer(): McpServer {
       include_output: z.boolean().optional().describe("copy_of only: also copy the original's rendered mp4 (an archive copy). Default false."),
       format: z.enum(["video", "image", "slideshow", "presentation", "one-pager", "gif", "social", "email-header", "thumbnail"]).optional().describe("Output format"),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry (default: 16x9). 9x16 for Reels/TikTok/Shorts, 4x5 for feed posts, 1x1 square."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("The FILM GRAMMAR, pinned on a board you write yourself (generate sets it from the brief): what carries the argument. speaker / creator-cut = a person carries the film, so the booth records the takes as the speaker (voice-only included) and the board asks for one take per spoken scene; any other grammar makes a camera take a clip on one scene. A recipe implies its grammar."),
       recipe: z.string().optional().describe(RECIPE_DESCRIBE),
       fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
@@ -1083,6 +1085,11 @@ export function createMcpServer(): McpServer {
         frame: params.frame,
         fps: params.fps,
       });
+      if (params.film_grammar || params.recipe) {
+        const bad = pinFilmAxes(project, { film_grammar: params.film_grammar, recipe: params.recipe });
+        if (bad) return err(bad);
+        await saveProject(project);
+      }
       return ok(withStudio(project));
     },
   );
@@ -1332,6 +1339,7 @@ export function createMcpServer(): McpServer {
         fps: z.number().optional(),
         background: z.string().optional(),
       }).optional(),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("The FILM GRAMMAR, pinned on a board you write yourself (generate sets it from the brief): what carries the argument. speaker / creator-cut = a person carries the film, so the booth records the takes as the speaker (voice-only included) and the board asks for one take per spoken scene; any other grammar makes a camera take a clip on one scene. A recipe implies its grammar."),
       status: z.enum(["draft", "storyboard", "generated", "rendering", "rendered", "failed"]).optional(),
       world: z.enum(["light", "dark", "paper", "plain", "sky", "cream"]).optional().describe("Re-derive and store the film's WORLD (the continuous ground every scene sits on): light (airy mesh), dark (cinematic), paper (print sheet), plain (FLAT brand-white, no backdrop at all), sky (cumulus clouds drifting on the brand color; type floats, the product sits on white cards), cream (flat warm editorial cream with a soft centre glow -- the st-statement canvas under every scene). Project-level; storyboard cards re-photograph on the new world, and builds inherit it."),
 
@@ -1674,9 +1682,17 @@ export function createMcpServer(): McpServer {
           await applyWorldPin(project, params.tenant_id, params.world);
           updated = true;
         }
+        // The grammar and the recipe are the film's, not the canvas's: they
+        // live on the treatment, where every reader looks.
+        if (params.film_grammar !== undefined || params.canvas?.recipe !== undefined) {
+          const bad = pinFilmAxes(project, { film_grammar: params.film_grammar, recipe: params.canvas?.recipe });
+          if (bad) return err(bad);
+          updated = true;
+        }
         if (params.canvas !== undefined) {
-          const c = params.canvas as { width?: number; height?: number; frame?: Frame };
-          Object.assign(project.canvas, params.canvas);
+          const { recipe: _recipe, ...dims } = params.canvas as { recipe?: string; width?: number; height?: number; frame?: Frame };
+          const c = dims;
+          Object.assign(project.canvas, dims);
           // Frame and dimensions are one fact: a frame with no explicit size
           // sets the size; a size with no explicit frame re-derives it.
           if (c.frame && !(c.width || c.height)) {

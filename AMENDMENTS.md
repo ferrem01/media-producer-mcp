@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-12 — Hand-built boards can say a person carries them; the booth picks the mic
+
+Marc opened the booth on The First Five Minutes, a board written by hand
+with create + update (no generate), and got "This is a clip on the scene,
+not the speaker" with no Voice only. Every take path keys off
+`treatment.filmGrammar` (`personCarries`), and only the creative director
+sets it. A hand-built board had none, so the take tool defaulted to
+`as: "clip"` and put a clip need and its slate on scene 1. The `recipe`
+params were dead too: `create` never passed its on, and `update` wrote
+`canvas.recipe` where nothing reads it.
+
+`core/film-axes.ts` `pinFilmAxes` sets the grammar, or a recipe that
+implies it, on the treatment. On a person film it drops the clip needs the
+take tool added (only unfilled ones) with their slates, and adds the
+speaker needs. On any other grammar a camera ask becomes a clip.
+`create` and `update` take `film_grammar`, and `recipe` now lands on the
+treatment.
+
+The booth also gets a microphone picker. Marc's laptop had recorded from
+the monitor's mic, not the one he'd plugged in. It lists the inputs, says
+"Recording from: <mic>", keeps the pick per browser, and falls back to the
+default when the picked mic is gone.
+
 ## 2026-10-12 — First and last words snap to the voice's edges
 
 DTW (below) fixed the middle of a take; the ends still drifted. On the ten

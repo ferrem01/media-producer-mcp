@@ -133,7 +133,7 @@ describe("what the booth does", () => {
 
   it("asks for the camera once per visit: the stream survives review, retake and record-again, released when the page hides", () => {
     expect(html).toMatch(/var live = stream && stream\.getTracks\(\)\.some\(function \(t\) \{ return t\.readyState === 'live'; \}\);/);
-    expect(html).toMatch(/\(live \? Promise\.resolve\(stream\) : navigator\.mediaDevices\.getUserMedia\(constraints\)\)/);
+    expect(html).toMatch(/\(live \? Promise\.resolve\(stream\) : openMedia\(constraints\)\)/);
     expect(html).toMatch(/window\.addEventListener\('pagehide', releaseCamera\);/);
     // stopAll no longer kills the tracks.
     const stopAll = html.slice(html.indexOf("function stopAll()"), html.indexOf("function releaseCamera()"));
