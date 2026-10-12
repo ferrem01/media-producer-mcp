@@ -35,6 +35,7 @@ import { resolveVideoPath } from "./video-path.js";
 import { takeCopies, syncSpeakerClips } from "./speaker-layer.js";
 import { probeMediaDuration } from "./auto-compress.js";
 import { loadProject, saveProject } from "../persistence/project.js";
+import { withProjectLock } from "./project-lock.js";
 
 /** The shortest piece a take may be trimmed or cut down to. */
 export const MIN_TAKE_SECONDS = 0.5;
@@ -285,7 +286,14 @@ export interface TakeEditResult {
  * what is left, so word anchors, captions and sound cues re-resolve). One
  * path for Studio and the MCP tool.
  */
-export async function editSceneTake(tenant: string, projectId: string, sceneIndex: number, edit: TakeEditOp, dataDir?: string): Promise<TakeEditResult> {
+/** One edit at a time per film, from its first read to its save: edits fired
+ *  together (parallel trims across scenes, Studio beside the MCP tool) each
+ *  start from the last one's result instead of saving over it. */
+export function editSceneTake(tenant: string, projectId: string, sceneIndex: number, edit: TakeEditOp, dataDir?: string): Promise<TakeEditResult> {
+  return withProjectLock(tenant, projectId, () => editSceneTakeLocked(tenant, projectId, sceneIndex, edit, dataDir));
+}
+
+async function editSceneTakeLocked(tenant: string, projectId: string, sceneIndex: number, edit: TakeEditOp, dataDir?: string): Promise<TakeEditResult> {
   const first = await loadProject(tenant, projectId);
   if (!first) throw new Error("Project not found");
   const take0 = activeTake(first, sceneIndex);
