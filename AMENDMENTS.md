@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-12 — Take edits on one film take turns
+
+The pacing pass on Marc's six content films fired head/tail trims at
+several scenes of one film at once, and some trims vanished. Each edit
+(`editSceneTake`) loaded the project, encoded and re-timed the scene --
+seconds, with a re-transcribe -- then saved the whole file back, so the
+last save won. The edit now holds the film's lock (`core/project-lock.ts`,
+which take grades already used) from its first read to its save, so edits
+queue and each starts from the last one's result. A relative trim has to
+see the previous trim, so the lock covers the whole edit, encode included.
+
+The talk-track cut/restore of a recorder film had the same read-edit-save
+copied into four places (two Studio routes, two branches of the MCP
+`edit_speaker` tool). They now share `cutSpeakerAndSave` /
+`restoreSpeakerAndSave` in `core/speaker-edl.ts`, under the same lock.
+
+Still open: plain `update`/`add` and Studio's scene saves don't take the
+lock, so one of them landing during a take edit can still lose to it.
+
 ## 2026-10-12 — Word times from whisper's DTW alignment
 
 On Marc's lead-scoring film (proj_9f5caa73) the measured spine of three
