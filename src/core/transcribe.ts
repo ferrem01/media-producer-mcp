@@ -253,24 +253,41 @@ export function snapWordsOutOfSilences(
   return out;
 }
 
-/** Whisper anchors the opening word(s) at t=0 even when the recording
- *  starts with silence. Given the waveform's speech onset, pack the words
- *  that "start" clearly inside the leading silence into the ~0.3s/word
- *  window just before the first aligned word. */
-export function snapLeadingWords(
+/** Snap the first and last word onto where speech starts and stops
+ *  (core/speech-edges.ts). Three repairs, each bounded so a cough or a
+ *  breath can't drag a word far:
+ *  - words whisper anchored at t=0 inside a silent lead-in (offset-only
+ *    output) are packed ~0.3 s apart just before the first aligned word;
+ *  - a first word starting after the onset starts at the onset;
+ *  - a last word running past the offset ends at the offset.
+ *  Only the ends move: every inner word keeps its time. */
+const EDGE_SLOP = 0.04;
+const MAX_HEAD_SNAP = 0.6;
+const MAX_TAIL_SNAP = 1.0;
+const MIN_WORD = 0.15;
+const r2 = (x: number) => Math.round(x * 100) / 100;
+
+export function snapToSpeechEdges(
   segments: TranscriptSegment[],
-  onsetSeconds: number,
+  edges: { onset: number; offset: number },
 ): TranscriptSegment[] {
-  if (!segments.length || onsetSeconds <= 0.3) return segments;
+  if (!segments.length) return segments;
+  const out = segments.map((w) => ({ ...w }));
+  const { onset, offset } = edges;
   let n = 0;
-  while (n < segments.length && segments[n].start < onsetSeconds - 0.25) n++;
-  if (n === 0 || n > 8 || n >= segments.length) return segments; // nothing, or globally off -- don't guess
-  const out = segments.slice();
-  const anchor = Math.max(out[n].start, onsetSeconds);
-  for (let i = 0; i < n; i++) {
-    const start = Math.max(0, anchor - (n - i) * 0.3);
-    out[i] = { ...out[i], start, end: Math.max(start + 0.2, i + 1 < n ? anchor - (n - i - 1) * 0.3 : anchor) };
+  while (n < out.length && out[n].start < onset - 0.25) n++;
+  if (n > 0 && n <= 8 && n < out.length && onset > 0.3) {
+    const anchor = Math.max(out[n].start, onset);
+    for (let i = 0; i < n; i++) {
+      const start = Math.max(0, r2(anchor - (n - i) * 0.3));
+      out[i].start = start;
+      out[i].end = Math.max(r2(start + 0.2), i + 1 < n ? r2(anchor - (n - i - 1) * 0.3) : anchor);
+    }
   }
+  const first = out[0];
+  if (first.start > onset + EDGE_SLOP && first.start - onset <= MAX_HEAD_SNAP) first.start = r2(onset);
+  const last = out[out.length - 1];
+  if (last.end > offset + EDGE_SLOP && last.end - offset <= MAX_TAIL_SNAP && offset >= last.start + MIN_WORD) last.end = r2(offset);
   return out;
 }
 

@@ -12,8 +12,8 @@
  * film time; callers offset into scene-local time where needed.
  */
 
-import { getTranscript, whisperAvailable, snapLeadingWords, snapWordsOutOfSilences, type TranscriptSegment } from "./transcribe.js";
-import { getWaveformPeaks } from "./waveform.js";
+import { getTranscript, whisperAvailable, snapToSpeechEdges, snapWordsOutOfSilences, type TranscriptSegment } from "./transcribe.js";
+import { getSpeechEdges } from "./speech-edges.js";
 import { detectSilence } from "./idle-silence.js";
 
 export interface SpineSentence {
@@ -122,13 +122,12 @@ export async function getSentenceSpine(
   try {
     const { segments } = await getTranscript(audioPath, cacheDir);
     let words = segments;
-    // Same leading-silence correction the Studio words lane applies: whisper
-    // anchors the first words at t=0 even when the take opens with silence.
+    // Same edge repair the Studio words lane applies: the first and last
+    // word land where the voice starts and stops.
     try {
-      const wf = await getWaveformPeaks(audioPath, cacheDir);
-      const onsetIdx = wf.peaks.findIndex((pk) => pk > 0.08);
-      if (onsetIdx > 0) words = snapLeadingWords(words, onsetIdx / wf.bucketsPerSecond);
-    } catch { /* waveform optional */ }
+      const edges = await getSpeechEdges(audioPath, cacheDir);
+      if (edges) words = snapToSpeechEdges(words, edges);
+    } catch { /* ffmpeg optional */ }
     // Whisper smears words across long mid-take pauses; the waveform's
     // silence spans are ground truth. Without this, captions promise
     // speech over dead air and word-anchored edits aim at the wrong times.

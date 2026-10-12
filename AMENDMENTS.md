@@ -6,6 +6,33 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-12 — First and last words snap to the voice's edges
+
+DTW (below) fixed the middle of a take; the ends still drifted. On the ten
+lead-scoring takes (proj_9f5caa73) the last word ran to the end of the
+file every time, 0.15-0.63 s past where Marc's voice had decayed, and s1's
+"Everyone" sat at 0.76 s after a sharp onset at 0.44 s (his booth take of
+the same line: 1.04 s against 0.74 s). Captions popped in late and de-air
+trims kept a sliver of dead air.
+
+`core/speech-edges.ts` measures where speech starts and stops: 10 ms RMS
+frames, a frame is voice above max(room + 15 dB, peak - 30 dB) -- the room
+is the quietest 5% of frames -- and a run counts once it lasts 50 ms, so a
+click or a breath doesn't. Cached per file as `speech-edges.json` beside
+the transcript. `snapToSpeechEdges` (transcribe.ts) moves only the two
+ends: a first word starting late starts at the onset (up to 0.6 s), a last
+word running past the offset ends there (up to 1 s, never shorter than
+0.15 s). It also keeps the old lead-in packing for words whisper pins to 0
+when DTW is off. It replaces `snapLeadingWords`, which found the onset on
+the Studio waveform (6 buckets a second) and only handled words starting
+too EARLY; all three callers (measured spine, sentence spine, Studio's
+words lane) moved over.
+
+Measured on the 10 takes after the change: every first word within 0.05 s
+of the onset, every last word ending on the offset, no inner word moved.
+Built films keep their stored spines until a scene is re-timed (a take
+edit, a board edit on a scene with a take).
+
 ## 2026-10-12 — Take edits on one film take turns
 
 The pacing pass on Marc's six content films fired head/tail trims at

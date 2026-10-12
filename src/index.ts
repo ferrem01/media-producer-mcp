@@ -78,7 +78,8 @@ import { assembleSceneAuto, loadSharedUtilities, generateBrandCSS, generateFontL
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
 import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
-import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
+import { getTranscript, whisperAvailable, snapToSpeechEdges } from "./core/transcribe.js";
+import { getSpeechEdges } from "./core/speech-edges.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import { startGeneratedTake, getGeneratedTakeStatus, registerTakeAttacher } from "./core/generated-take.js";
 import { registerSceneAttacher, startSceneFrame, pickSceneFrame, startScenePerformance, getScenePerformances } from "./core/scene-performance.js";
@@ -5206,13 +5207,12 @@ Rules:
         try {
           const cacheDir2 = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
           const tr = await getTranscript(resolveVideoPath(audioSrc2), cacheDir2);
-          // Correct whisper's leading-silence anchor using the waveform onset.
+          // The first and last word land where the voice starts and stops.
           let segs2 = tr.segments;
           try {
-            const wf2 = await getWaveformPeaks(resolveVideoPath(audioSrc2), cacheDir2);
-            const onsetIdx = wf2.peaks.findIndex((pk) => pk > 0.08);
-            if (onsetIdx > 0) segs2 = snapLeadingWords(segs2, onsetIdx / wf2.bucketsPerSecond);
-          } catch { /* waveform optional */ }
+            const edges2 = await getSpeechEdges(resolveVideoPath(audioSrc2), cacheDir2);
+            if (edges2) segs2 = snapToSpeechEdges(segs2, edges2);
+          } catch { /* ffmpeg optional */ }
           // Whisper smears words across long mid-take pauses; snap them back
           // to real speech so the lane shows the gap the listener hears (and
           // word-anchored pins/cuts aim at actual speech).

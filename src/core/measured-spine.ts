@@ -9,8 +9,8 @@ import { recaptionIfStale } from "./captions.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { Project, Take } from "./types.js";
-import { getTranscript, whisperAvailable, snapLeadingWords, snapWordsOutOfSilences } from "./transcribe.js";
-import { getWaveformPeaks } from "./waveform.js";
+import { getTranscript, whisperAvailable, snapToSpeechEdges, snapWordsOutOfSilences } from "./transcribe.js";
+import { getSpeechEdges } from "./speech-edges.js";
 import { detectSilence } from "./idle-silence.js";
 import { resolveVideoPath } from "./video-path.js";
 import { activeTake, attachTake } from "./take-needs.js";
@@ -30,10 +30,9 @@ export async function wordsForTake(project: Project, take: Take, dataDir?: strin
   const tr = await getTranscript(file, cacheDir);
   let segs = tr.segments;
   try {
-    const wf = await getWaveformPeaks(file, cacheDir);
-    const onsetIdx = wf.peaks.findIndex((pk) => pk > 0.08);
-    if (onsetIdx > 0) segs = snapLeadingWords(segs, onsetIdx / wf.bucketsPerSecond);
-  } catch { /* waveform optional */ }
+    const edges = await getSpeechEdges(file, cacheDir);
+    if (edges) segs = snapToSpeechEdges(segs, edges);
+  } catch { /* ffmpeg optional */ }
   try {
     // The silences are measured once per file (an ffmpeg pass per take on
     // every lane load made Studio wait ~1 s a take).
