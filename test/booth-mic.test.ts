@@ -54,11 +54,12 @@ describe("the booth's microphone picker", () => {
       // It says which mic it is recording from.
       await page.click("#stopBtn");
       await page.waitForFunction(() => /Recording from: /.test(document.getElementById("micHint")!.textContent || ""), null, { timeout: 8000 });
-      // A pick is kept and used on the next take.
-      const real = options[1];
+      // A pick is kept and used on the next take. (Device ids are read on
+      // this page: a browser may hand out new ones after a reload.)
       await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=0`);
       await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
-      await page.waitForSelector("#micRow", { state: "visible", timeout: 8000 });
+      await page.waitForFunction(() => (document.getElementById("micSel") as HTMLSelectElement).options.length > 1, null, { timeout: 8000 });
+      const real = await page.$eval("#micSel", (el) => (el as HTMLSelectElement).options[1].value);
       await page.selectOption("#micSel", real);
       expect(await page.evaluate(() => localStorage.getItem("mp_take_mic"))).toBe(real);
       await page.evaluate(() => { (window as any).__asks.length = 0; });
