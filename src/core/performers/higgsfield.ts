@@ -27,6 +27,7 @@ export const higgsfield: Performer = {
   key: "HF_API_KEY_ID",
   minutesPer30s: 6,
   maxSeconds: 30,
+  minSeconds: 4,
 
   async fromVideo(video: string, tag: string, ctx: PerformContext): Promise<string> {
     const w = (n: string) => path.join(ctx.workDir, n);
