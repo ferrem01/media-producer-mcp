@@ -6,6 +6,31 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-12 — Word times from whisper's DTW alignment
+
+On Marc's lead-scoring film (proj_9f5caa73) the measured spine of three
+Seedance-performed scenes was stretched: the first words squeezed to 0 s
+over ~0.7–0.9 s of lead-in air, the last words running past the take (scene
+7: "have." ending at 11.70 s in a 10.04 s take), so captions, word-anchored
+pills and sound cues missed; after a head/tail trim the overrun words piled
+up on the scene's end. Reproduced with whisper.cpp base.en on the real
+takes: the cause is whisper's segment offsets (its timestamp tokens), which
+are unreliable at a short clip's ends -- not the spine code.
+
+- **`getTranscript` runs whisper with `-dtw <preset>`** (and `-nfa` where the
+  build defaults flash attention on, which leaves `t_dtw` empty), and
+  `parseWhisperJson` takes each word's start from its first token's DTW time
+  (less a measured 0.1 s lag) and its end from the next word's start, the
+  last word ending just after its last token, everything clamped to the
+  audio's length. On the three takes every word lands within ~0.1 s of the
+  hand-timed truth. Offsets stay as the fallback for a build without `-dtw`
+  or a model with no DTW preset (the flags are detected from `whisper-cli -h`).
+- The transcript cache key gains `-dtw`, so every take re-transcribes once.
+  Scenes keep their resolved times until something re-times them (a take, a
+  trim, a build); proj_9f5caa73 scenes 5/7/10 carry hand offsets that were
+  computed against the old spine and need zeroing when they re-time.
+- Test: `test/whisper-dtw.test.ts` (the real scene-10 output).
+
 ## 2026-10-12 — the take page's Next scene works for voice-only runs, and in Studio's dialog
 
 Marc, after voicing a film scene by scene: "I just finished the take and I
