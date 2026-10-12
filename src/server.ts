@@ -2308,8 +2308,7 @@ export function createMcpServer(): McpServer {
           return ok({ status: "edited", scene_index: r.scene_index, plays_seconds: r.seconds, shortened: r.shortened, window: r.window, cuts: r.cuts, studio_url: previewUrl(project.tenant_id, project.project_id) });
         } catch (e: any) { return err(e?.message || String(e)); }
       }
-      const { applySpeakerCut, applySpeakerRestore, maintainTranscriptCacheAfterCut, dropTranscriptCache } =
-        await import("./core/speaker-edl.js");
+      const { cutSpeakerAndSave, restoreSpeakerAndSave } = await import("./core/speaker-edl.js");
 
       if (params.action === "list") {
         const clips = (project as any).speaker?.clips || [];
@@ -2332,10 +2331,9 @@ export function createMcpServer(): McpServer {
 
       if (params.action === "cut") {
         if (params.from == null || params.to == null) return err("cut requires from and to (film seconds)");
-        const oldNarr = (project as any).audio?.tracks?.find((t: { id: string }) => t.id === "narration")?.source as string | undefined;
-        const result = await applySpeakerCut(project, params.from, params.to, config.dataDir);
-        await saveProject(project);
-        await maintainTranscriptCacheAfterCut(params.tenant_id, params.project_id, oldNarr, result, config.dataDir);
+        const done = await cutSpeakerAndSave(project.tenant_id, project.project_id, params.from, params.to, config.dataDir);
+        if (!done) return err("Project not found");
+        const { result } = done;
         return ok({
           status: "cut",
           removed_seconds: result.removed_seconds,
@@ -2345,9 +2343,9 @@ export function createMcpServer(): McpServer {
       }
 
       if (params.src_start == null || params.src_end == null) return err("restore requires src_start and src_end -- run action='list' first");
-      const result = await applySpeakerRestore(project, params.src_start, params.src_end, config.dataDir);
-      await saveProject(project);
-      await dropTranscriptCache(params.tenant_id, params.project_id, config.dataDir);
+      const done = await restoreSpeakerAndSave(project.tenant_id, project.project_id, params.src_start, params.src_end, config.dataDir);
+      if (!done) return err("Project not found");
+      const { result } = done;
       return ok({ status: "restored", restored_seconds: result.restored_seconds });
     },
   );

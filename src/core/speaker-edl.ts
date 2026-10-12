@@ -19,6 +19,7 @@ import { complementRanges, cutAudioTo, cutAudioToWithGaps } from "./idle-silence
 import { probeMediaDuration } from "./auto-compress.js";
 import { mapSourceTime, solveMediaEdits } from "./media-edl.js";
 import { resolveVideoPath } from "./video-path.js";
+import { withProjectLock } from "./project-lock.js";
 import type { Project, Scene } from "./types.js";
 
 export type SpeakerClip = NonNullable<Project["speaker"]>["clips"][number];
@@ -519,6 +520,40 @@ export async function applySpeakerRestore(
     narration_url: narrationUrl,
     bake_seam: Math.round(bakeSeam * 100) / 100,
   };
+}
+
+// ── The saved edits (the HTTP routes and the MCP edit_speaker tool) ──────
+// Read, edit and save under the film's lock: two cuts fired together, or a
+// cut beside a Studio save that also locks, each start from the other's
+// result instead of saving over it. null = no such project.
+
+export async function cutSpeakerAndSave(
+  tenantId: string, projectId: string, from: number, to: number, dataDir?: string,
+): Promise<{ project: Project; result: SpeakerCutResult } | null> {
+  const { loadProject, saveProject } = await import("../persistence/project.js");
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
+    const oldNarr = (project as any).audio?.tracks?.find((t: { id: string }) => t.id === "narration")?.source as string | undefined;
+    const result = await applySpeakerCut(project, from, to, dataDir);
+    await saveProject(project);
+    await maintainTranscriptCacheAfterCut(tenantId, projectId, oldNarr, result, dataDir);
+    return { project, result };
+  });
+}
+
+export async function restoreSpeakerAndSave(
+  tenantId: string, projectId: string, srcStart: number, srcEnd: number, dataDir?: string,
+): Promise<{ project: Project; result: SpeakerRestoreResult } | null> {
+  const { loadProject, saveProject } = await import("../persistence/project.js");
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
+    const result = await applySpeakerRestore(project, srcStart, srcEnd, dataDir);
+    await saveProject(project);
+    await dropTranscriptCache(tenantId, projectId, dataDir);
+    return { project, result };
+  });
 }
 
 // ── Timelapse beats (Marc's "the AI takes so long" scenario) ─────────────

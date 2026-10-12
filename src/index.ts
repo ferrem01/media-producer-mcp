@@ -4510,13 +4510,10 @@ Rules:
             jsonResponse(res, 400, { error: "from and to (film seconds) required" });
             return;
           }
-          const project = await loadProject(scTenant, scProject);
-          if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-          const oldNarrSrc = (project as any).audio?.tracks?.find((t: any) => t.id === "narration")?.source as string | undefined;
-          const { applySpeakerCut, maintainTranscriptCacheAfterCut } = await import("./core/speaker-edl.js");
-          const result = await applySpeakerCut(project, from, to, config.dataDir);
-          await saveProject(project);
-          await maintainTranscriptCacheAfterCut(scTenant, scProject, oldNarrSrc, result, config.dataDir);
+          const { cutSpeakerAndSave } = await import("./core/speaker-edl.js");
+          const done = await cutSpeakerAndSave(scTenant, scProject, from, to, config.dataDir);
+          if (!done) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          const { project, result } = done;
           console.log(`  speaker-cut: ${scProject} -- removed ${result.removed_seconds}s of film at ${from}s`);
           jsonResponse(res, 200, { ok: true, ...result, project });
         } catch (e: any) {
@@ -4540,12 +4537,10 @@ Rules:
             jsonResponse(res, 400, { error: "src_start and src_end (speaker source seconds) required" });
             return;
           }
-          const project = await loadProject(srTenant, srProject);
-          if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-          const { applySpeakerRestore, dropTranscriptCache } = await import("./core/speaker-edl.js");
-          const result = await applySpeakerRestore(project, s0, s1, config.dataDir);
-          await saveProject(project);
-          await dropTranscriptCache(srTenant, srProject, config.dataDir);
+          const { restoreSpeakerAndSave } = await import("./core/speaker-edl.js");
+          const done = await restoreSpeakerAndSave(srTenant, srProject, s0, s1, config.dataDir);
+          if (!done) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          const { project, result } = done;
           console.log(`  speaker-restore: ${srProject} -- restored ${result.restored_seconds}s of film`);
           jsonResponse(res, 200, { ok: true, ...result, project });
         } catch (e: any) {
