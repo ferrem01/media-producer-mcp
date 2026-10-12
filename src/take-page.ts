@@ -291,7 +291,7 @@ ${QUOTIENT_CSS}
   <p class="note" id="doneNote">The take is now this scene's speaker base. Go on to the next scene, or record this one again.</p>
   <div class="spacer"></div>
   <button class="btn" id="nextBtn" style="display:none">Next scene</button>
-  <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Back to Studio</a></div>
+  <div class="row"><button class="btn ghost" id="againBtn">Record again</button><a class="btn ghost" id="studioLink" href="#">Back to Studio</a><button class="btn ghost" id="closeBtn" style="display:none">Done</button></div>
 </section>
 
 <section id="err" class="pad">
@@ -438,7 +438,10 @@ ${QUOTIENT_CSS}
       } catch (eBg) {}
       var allScenes = (p.storyboard && p.storyboard.scenes) || [];
       filmScenes = allScenes.map(function (s0) { return { label: s0.label || '', lines: !!String(s0.voiceover_text || '').trim() }; });
+      // Recorded = a take OR a voice-only recording (Marc, Oct 12: after a
+      // run of voice-only scenes, Next must not offer one he just voiced).
       takenScenes = (p.takes || []).map(function (t0) { return t0.scene_index; }).filter(function (x) { return typeof x === 'number'; });
+      allScenes.forEach(function (s0, i0) { if (s0 && s0.voice_take && takenScenes.indexOf(i0) < 0) takenScenes.push(i0); });
       // A CLIP, NOT THE SPEAKER: a scene whose camera need is a clip (or a
       // film no person carries) records a live-action moment that lands as
       // a video on the scene -- room/blur/alpha do not apply.
@@ -936,11 +939,12 @@ ${QUOTIENT_CSS}
       if (xhr.status < 200 || xhr.status >= 300) { fail('Could not attach your voice (' + xhr.status + '): ' + (j.error || xhr.responseText || '').slice(0, 200)); return; }
       $('doneMeta').textContent = projectName + (blobDuration ? ' · ' + fmt(blobDuration) : '') + ' · voice';
       $('studioLink').href = studioHref;
-      showNext();
-      $('doneNote').textContent = 'Your voice is in for this scene. In Studio, pick what the scene shows: a performance made from your voice, or graphics over it.';
+      var nv = showNext();
+      $('doneNote').textContent = nv >= 0 ? 'Your voice is in for this scene. Go on to the next scene (still voice only), or record this one again.'
+        : 'Your voice is in for this scene. In Studio, pick what the scene shows: a performance made from your voice, or graphics over it.';
       show('done');
       releaseCamera();
-      if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: sceneIndex, project: project, voice: true }, window.location.origin); } catch (eP) {} }
+      if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: sceneIndex, project: project, voice: true, next: nv >= 0 }, window.location.origin); } catch (eP) {} }
     };
     xhr.send(b);
   }
@@ -975,12 +979,12 @@ ${QUOTIENT_CSS}
         .then(function (j) {
           $('doneMeta').textContent = projectName + ' · ' + fmt(blobDuration) + ' take';
           $('studioLink').href = studioHref;
-          showNext();
+          var nt = showNext();
           show('done');
           // The take is in: the camera goes off (it stayed lit in the dialog
           // after "Use this take" -- measured live on a laptop).
           releaseCamera();
-          if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: recordAll ? 'all' : sceneIndex, project: project }, window.location.origin); } catch (e) {} }
+          if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: recordAll ? 'all' : sceneIndex, project: project, next: nt >= 0 }, window.location.origin); } catch (e) {} }
         })
         .catch(function (e) { fail(e.message || String(e)); });
     };
@@ -988,21 +992,27 @@ ${QUOTIENT_CSS}
   });
 
   $('againBtn').addEventListener('click', function () { blob = null; chunks = []; show('ready'); $('recordBtn').disabled = false; });
-  // Next scene: the next one with lines and no take, straight onto its ready
-  // screen -- no trip back through Studio. Not in Studio's dialog (it closes
-  // on attach) and not for a whole-film take.
+  // Next scene: the next one with lines and no take or voice yet, straight
+  // onto its ready screen in the same mode (Voice only stays on) -- no trip
+  // back through Studio. In Studio's dialog too: the dialog stays open while
+  // there is a next scene (Done closes it). Not for a whole-film take.
+  // Returns the next scene's index, -1 for none.
   function showNext() {
     var nb = $('nextBtn');
     if (sceneIndex >= 0 && takenScenes.indexOf(sceneIndex) < 0) takenScenes.push(sceneIndex);
-    var n = (embedded || recordAll) ? -1 : nextOpenScene(filmScenes, takenScenes, sceneIndex);
+    var n = recordAll ? -1 : nextOpenScene(filmScenes, takenScenes, sceneIndex);
     nb.dataset.scene = String(n);
     nb.style.display = n >= 0 ? '' : 'none';
     if (n >= 0) nb.textContent = 'Next: Scene ' + (n + 1) + (filmScenes[n] && filmScenes[n].label ? ' \u00b7 ' + filmScenes[n].label : '');
     // With no next scene, Back to Studio is the way on.
     $('studioLink').className = n >= 0 ? 'btn ghost' : 'btn';
     $('doneNote').textContent = n >= 0 ? 'The take is in. Go on to the next scene you have not recorded, or record this one again.'
-      : (recordAll || embedded ? 'The take is in.' : 'The take is in, and every scene now has one.');
+      : (recordAll ? 'The take is in.' : 'The take is in, and every scene now has one.');
+    $('closeBtn').style.display = embedded ? '' : 'none';
+    $('closeBtn').className = n >= 0 ? 'btn ghost' : 'btn';
+    return n;
   }
+  $('closeBtn').addEventListener('click', function () { try { window.parent.postMessage({ type: 'mp-take-close', project: project }, window.location.origin); } catch (eC) {} });
   $('nextBtn').addEventListener('click', function () {
     var n = Number($('nextBtn').dataset.scene);
     if (!(n >= 0)) return;

@@ -5580,9 +5580,16 @@ ${QUOTIENT_CSS}
   window.addEventListener('message', function(ev) {
     if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-attached') return;
     var p = state.currentProject; if (!p || (ev.data.project && ev.data.project !== p.project_id)) return;
-    studioStatus('Take attached' + (typeof ev.data.scene_index === 'number' ? ' to scene ' + (ev.data.scene_index + 1) : '') + '.', 'ok');
-    studioModalClose();
+    studioStatus((ev.data.voice ? 'Voice attached' : 'Take attached') + (typeof ev.data.scene_index === 'number' ? ' to scene ' + (ev.data.scene_index + 1) : '') + '.', 'ok');
+    // A next scene still to record: the booth stays open on its done
+    // screen (Next scene / Done); the film reloads behind it.
+    if (!ev.data.next) studioModalClose();
     loadProject(p.project_id);
+  });
+  // The booth's Done: close the dialog.
+  window.addEventListener('message', function(ev) {
+    if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-close') return;
+    studioModalClose();
   });
   (function bindNeedsUpload() {
     var f = document.getElementById('np-file');
