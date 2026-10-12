@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-12 — the take page's Next scene works for voice-only runs, and in Studio's dialog
+
+Marc, after voicing a film scene by scene: "I just finished the take and I
+upload the take, it should come back and be like, you want to go to scene two?
+... I experienced it a bunch of times and that was all on the voice only take."
+
+- **Studio's dialog (embed=1) now offers Next.** It used to hide Next and close
+  the dialog on attach. Now, while a scene is still open, the dialog stays on
+  the done screen (`mp-take-attached` carries `next: true`; Studio reloads the
+  film behind it); a new **Done** button posts `mp-take-close`. With nothing
+  left to record it closes as before.
+- **A voice-only recording counts as recorded.** `takenScenes` was takes only,
+  so Next kept offering scenes already voiced; a board scene's `voice_take`
+  now counts too.
+- **The mode carries.** Next keeps Voice only on (it always did on the page;
+  the done note now says so).
+
 ## 2026-10-11 — signal-pool: height is the lead score
 
 Marc, on the marketing-system explainer: "every time there's an interaction
