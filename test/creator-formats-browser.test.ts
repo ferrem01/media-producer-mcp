@@ -115,6 +115,28 @@ describe("index-reel", () => {
   });
 });
 
+describe("index-reel with pictures", () => {
+  it("a house email fills the phone's WIDTH under its mail-app header, never cropped at the sides (Marc, Oct 13)", async () => {
+    const pics = ["welcome", "activation", "first-win"].map((f, i) => ({ title: f, subject: "Subject " + i, src: `/assets/_system/sample-work/flowpath-email-${f}.webp` }));
+    await open("ir-pics", [{ type: "index-reel", data: { mode: "host", headline: "3 emails", items: pics, from: "Flowpath", start_at: 0.5 } }], async (page, seek) => {
+      await seek(0.7);
+      const m = await page.evaluate(() => {
+        const sc = document.querySelector(".ir-screen")!.getBoundingClientRect();
+        const shot = [...document.querySelectorAll(".ir-shot")].find((e) => getComputedStyle(e).visibility === "visible")!;
+        const img = shot.querySelector("img") as HTMLImageElement, hd = shot.querySelector(".ir-hd")!;
+        const ir = img.getBoundingClientRect(), hr = hd.getBoundingClientRect();
+        return { sw: sc.width, iw: ir.width, il: ir.left - sc.left, top: ir.top - hr.bottom, loaded: img.naturalWidth, from: hd.querySelector("b")!.textContent, subj: hd.querySelector(".subj")!.textContent };
+      });
+      expect(m.loaded).toBeGreaterThan(0);
+      expect(Math.abs(m.iw - m.sw)).toBeLessThan(1.5);   // the whole width of the email, no side crop
+      expect(Math.abs(m.il)).toBeLessThan(1.5);
+      expect(m.top).toBeGreaterThanOrEqual(-0.5);        // the email starts under the header
+      expect(m.from).toBe("Flowpath");
+      expect(m.subj).toBe("Subject 0");
+    });
+  });
+});
+
 describe("tier-list", () => {
   it("drops each item into its row on its time, the latest ringed", async () => {
     await open("tier", [{ type: "tier-list", data: { title: "Lifecycle emails, ranked", items: [{ label: "Win-back", tier: "S", at: 0 }, { label: "Welcome", tier: "A", at: 0 }, { label: "Newsletter", tier: "D", at: 2 }] }, position: { x: "6%", y: "4%", width: "88%", height: "40%" } }], async (page, seek) => {
