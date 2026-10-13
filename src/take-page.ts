@@ -487,7 +487,8 @@ ${QUOTIENT_CSS}
   function loadFilm() {
   var want = project + '/' + sceneIndex;
   $('recordBtn').disabled = true;
-  return fetch(withToken('/api/projects/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)))
+  loadedAt = Date.now();
+  return fetch(withToken('/api/projects/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project)), { cache: 'no-store' })
     .then(function (r) { if (!r.ok) throw new Error('Could not load the project (' + r.status + '). Is the link still valid?'); return r.json(); })
     .then(function (p) {
       if (want !== project + '/' + sceneIndex) return; // switched again meanwhile
@@ -1030,6 +1031,17 @@ ${QUOTIENT_CSS}
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', listMics);
   listMics();
   window.addEventListener('pagehide', releaseCamera);
+  // FRESH LINES (Marc, Oct 13: lines saved on the board did not reach the
+  // take). The script is read when a scene opens; coming back to the page
+  // (from Studio's tab, a phone woken up) reads it again, while the ready
+  // screen is up -- never under a take in progress or one being reviewed.
+  var loadedAt; // set by loadFilm (which runs before this line)
+  function refreshLines() {
+    if (!$('ready').classList.contains('on') || (rec && rec.state === 'recording') || Date.now() - (loadedAt || 0) < 3000) return;
+    loadFilm();
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshLines(); });
+  window.addEventListener('focus', refreshLines);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && !(rec && rec.state === 'recording')) releaseCamera(); });
 
   $('stopBtn').addEventListener('click', function () {

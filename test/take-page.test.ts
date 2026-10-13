@@ -362,6 +362,41 @@ describe("the booth keeps to one scene: films are chosen in Studio (SPEC-remote-
   });
 });
 
+describe("the lines are fresh (Marc, Oct 13: lines saved on the board did not reach the take)", () => {
+  it("reads the script uncached, and again when the page comes back to the ready screen", () => {
+    const html = getTakeHtml();
+    expect(html).toMatch(/encodeURIComponent\(project\)\), \{ cache: 'no-store' \}\)/);
+    expect(html).toMatch(/function refreshLines\(\) \{\n\s*if \(!\$\('ready'\)\.classList\.contains\('on'\) \|\| \(rec && rec\.state === 'recording'\)/);
+    expect(html).toMatch(/document\.addEventListener\('visibilitychange', function \(\) \{ if \(document\.visibilityState === 'visible'\) refreshLines\(\); \}\);/);
+    expect(html).toMatch(/window\.addEventListener\('focus', refreshLines\);/);
+  });
+
+  it("an edit saved while the recorder is open shows when the recorder is back in front", async () => {
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+    const http = await import("node:http");
+    const proj: any = { name: "T", canvas: { width: 1080, height: 1920 }, treatment: { filmGrammar: "speaker" }, scenes: [], takes: [],
+      storyboard: { scenes: [{ label: "Hook", duration_seconds: 3, voiceover_text: "Old line." }] } };
+    const server = http.createServer((req, res) => {
+      req.on("data", () => {});
+      req.on("end", () => {
+        if ((req.url || "").startsWith("/api/projects/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(proj)); return; }
+        res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    try {
+      const page = await (await browser.newContext()).newPage();
+      await page.goto(`http://127.0.0.1:${(server.address() as any).port}/take?tenant=t&project=p&token=x&scene=0`);
+      await page.waitForFunction(() => /Old line/.test(document.getElementById("script")!.textContent || ""), null, { timeout: 10000 });
+      proj.storyboard.scenes[0].voiceover_text = "New line.";        // saved on the board meanwhile
+      await page.waitForTimeout(3100);
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await page.waitForFunction(() => /New line/.test(document.getElementById("script")!.textContent || ""), null, { timeout: 10000 });
+    } finally { await browser.close(); await new Promise<void>((r) => server.close(() => r())); }
+  }, 60000);
+});
+
 describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
   it("picks the next scene with lines and no take, wrapping round; none when all are done", async () => {
     const { NEXT_SCENE_JS } = await import("../src/take-page.js");
