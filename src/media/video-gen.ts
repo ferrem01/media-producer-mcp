@@ -14,6 +14,7 @@
  * any short b-roll.
  */
 
+import { moveLine, getMove } from "../core/shot-camera.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -383,11 +384,9 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
     // scale pop at the FIRST seam only (measured live on quotient_pitch_v2:
     // seam 1 blipped, seam 2-3 was invisible, and both later takes were
     // already static). A single-take clip keeps the push-in; it has no seam
-    // to betray.
+    // to betray. The words are the move list's (core/shot-camera.ts).
     const multiTake = lines.length > 1;
-    const cameraNote = multiTake
-      ? "Locked-off static camera: no zoom, no push-in, no camera movement, constant framing and shot size."
-      : "Static camera with a very slight slow push-in.";
+    const cameraNote = moveLine(getMove(multiTake ? "static" : "push-in"));
     const prompt = i === 0
       ? `${presenter}. They look directly into the camera and say, warmly and naturally: '${lines[i]}' ${cameraNote} Shallow depth of field.`
       : `The exact same presenter as the reference image -- identical appearance, clothing, voice, tone, framing, shot size and lighting, continuing the same take from exactly this pose. They keep speaking directly to camera and say: '${lines[i]}' ${cameraNote} Shallow depth of field.`;

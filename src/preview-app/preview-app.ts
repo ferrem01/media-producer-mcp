@@ -7,6 +7,7 @@
 
 import { QUOTIENT_CSS } from "../quotient-theme.js";
 import { DEFAULT_MOTION } from "../core/generated-take.js";
+import { FILM_CAMERAS, SHOT_MOVES } from "../core/shot-camera.js";
 
 export function getPreviewHtml(): string {
   return `<!DOCTYPE html>
@@ -11993,6 +11994,10 @@ ${QUOTIENT_CSS}
     if (kind === 'recast') bits.push(dr.rvoice === 'actor' && a.voice_id ? escHtml(a.name) + '’s voice' : 'your voice');
     return '<div class="pf-chosen"><img src="' + escAttr(pfHeadUrl(a)) + '" alt="">' + (fr && !(kind === 'recast' && dr.rcamera) ? '<img src="' + escAttr(withToken(fr)) + '" alt="">' : '') + '<span>' + bits.join(' &#183; ') + '</span></div>';
   }
+  // THE CAMERA (SPEC-shot-camera.md): what the film is shot on, how the
+  // camera moves in a shot -- the server's own lists.
+  var PF_CAMERAS = ${JSON.stringify(FILM_CAMERAS.map((c) => ({ id: c.id, name: c.name, film: c.film })))};
+  var PF_MOVES = ${JSON.stringify(SHOT_MOVES.map((m) => ({ id: m.id, name: m.name, speaking: m.speaking })))};
   // HOW FAR BACK: one click fills the shot's words (the place is picked apart).
   var PF_FRAMINGS = [
     ['Close-up', 'A close-up, head and shoulders, talking straight to the camera'],
@@ -12088,6 +12093,17 @@ ${QUOTIENT_CSS}
       h += '<div class="pf-chips">' + PF_FRAMINGS.map(function(p, k) { return '<button class="np-btn" data-pf-preset="' + k + '">' + p[0] + '</button>'; }).join('') + '</div>';
       var words = dr[SKEY] != null ? dr[SKEY] : (perf.actor === a.id && perf.shot ? perf.shot : (kind === 'recast' ? (s.recast_shot || s.setting_shot || '') : ''));
       h += '<textarea data-pf="' + SKEY + '" rows="2" maxlength="1000" style="' + ta + '" placeholder="Seated at a table, a medium-wide shot, upper body and the tabletop in frame">' + escHtml(words) + '</textarea>';
+      // THE CAMERA: the film's look (every scene) and this shot's move --
+      // a speaking shot takes only the gentle moves.
+      if (kind !== 'recast') {
+        var setMove = (PF_MOVES.filter(function(m) { return m.id === s.move && !s.shot_move; })[0] || {}).name;
+        h += '<div class="pf-row"><label>Camera</label><div class="pf-acts">'
+          + '<select data-pf="film_camera" title="What the whole film is shot on">' + PF_CAMERAS.filter(function(c) { return c.film; }).map(function(c) { return pfOpt(c.id, c.name, s.film_camera || 'cinema'); }).join('') + '</select>'
+          + ' <select data-pf="move" title="How the camera moves in this shot">' + pfOpt('', setMove ? 'Move: the setting’s (' + setMove.toLowerCase() + ')' : 'Move: none', s.shot_move || '')
+          + PF_MOVES.filter(function(m) { return m.speaking; }).map(function(m) { return pfOpt(m.id, 'Move: ' + m.name.toLowerCase(), s.shot_move || ''); }).join('') + '</select>'
+          + '<small>the camera is the whole film’s; the move is this shot’s</small></div></div>';
+        if (s.move_note) h += '<div class="np-hint">' + escHtml(s.move_note) + '</div>';
+      }
       h += '<div class="pf-sub">3 &#183; See ' + escHtml(a.name) + ' there</div>';
       var waitPlace = place && !place.image;
       h += '<div class="pf-acts"><button class="np-btn' + (fr ? '' : ' primary') + '" data-pf-go="' + (kind === 'recast' ? 'rdraw' : 'frame') + '"' + (drawing || waitPlace ? ' disabled' : '') + '>' + (drawing ? 'Drawing…' : (fr ? 'Draw it again' : 'Draw ' + escHtml(a.name) + ' here')) + '</button>'
@@ -12202,6 +12218,8 @@ ${QUOTIENT_CSS}
     h += '<div class="pf-row top"><label>Add one</label><div style="flex:1;min-width:0"><input data-pf="cut_shot" class="np-search" style="width:100%" maxlength="1000" placeholder="Talks into her phone while driving" value="' + escAttr(dr.cut_shot || '') + '">'
       + '<div class="pf-acts">Starts at <input data-pf="cut_at" type="number" step="0.1" min="0" value="' + escAttr(dr.cut_at != null ? dr.cut_at : 0) + '" style="width:64px"> s, on screen for <select data-pf="cut_show">' + [0.8, 1.2, 1.6, 2, 3, 4].map(function(n) { return pfOpt(String(n), n + ' s', String(dr.cut_show || 2)); }).join('') + '</select>'
       + ' <select data-pf="cut_where">' + pfOpt('scene', 'In this scene’s location', dr.cut_where || 'scene') + pfOpt('elsewhere', 'Somewhere else (the description says where)', dr.cut_where || 'scene') + '</select>'
+      + ' <select data-pf="cut_move" title="How the camera moves">' + pfOpt('', 'No camera move', dr.cut_move || '') + PF_MOVES.map(function(m) { return pfOpt(m.id, m.name, dr.cut_move || ''); }).join('') + '</select>'
+      + ' <select data-pf="cut_camera" title="What it is shot on">' + pfOpt('', 'The film’s camera', dr.cut_camera || '') + PF_CAMERAS.map(function(c) { return pfOpt(c.id, c.name, dr.cut_camera || ''); }).join('') + '</select>'
       + '<button class="np-btn" data-pf-go="cut">Add it &#183; ~$0.80</button></div></div></div></details>';
     return h;
   }
@@ -12266,6 +12284,9 @@ ${QUOTIENT_CSS}
       var d = dr();
       if (k === 'actor') { pickActor(t.value); return; }
       if (k === 'engine') { pickEngine(t.value); return; }
+      if (k === 'move') { pfPost(project, panel, kind, si, { action: 'move', move: t.value }, t.value ? 'Set: the camera ' + t.options[t.selectedIndex].text.replace(/^Move: /, '') + '. Draw the frame again so it starts right.' : 'The setting’s move.'); return; }
+      if (k === 'film_camera') { pfPost(project, panel, kind, si, { action: 'film_camera', film_camera: t.value }, 'The whole film is shot on ' + t.options[t.selectedIndex].text + ': the next frames are drawn in that look.'); return; }
+      if (k === 'cut_move' || k === 'cut_camera') { d[k] = t.value; return; }
       if (k === 'location') { d.location = t.value; pfPost(project, panel, kind, si, { action: 'location', location: t.value }, t.value ? 'Set: the frame is drawn there, and every take keeps the room.' : 'No location.'); return; }
       if (k === 'voice_source') { d.voice_source = t.value; pfRender(project, panel, kind, si); return; }
       if (k === 'recording_from') { d.recording_from = t.value; pfRender(project, panel, kind, si); return; }
@@ -12441,7 +12462,7 @@ ${QUOTIENT_CSS}
         var cs = (d.cut_shot || '').trim();
         if (!cs) { pfSay(panel, 'Say what ' + ((pfActor(actor) || {}).name || 'the actor') + ' does in the cutaway.', true); return; }
         d.cutOpen = true;
-        pfPost(project, panel, kind, si, { action: 'clip', actor: actor, shot: cs, at: Number(d.cut_at) || 0, show: Number(d.cut_show) || 2, location: d.cut_where === 'elsewhere' ? '' : undefined }, 'Making the cutaway (a frame, then Seedance)…')
+        pfPost(project, panel, kind, si, { action: 'clip', actor: actor, shot: cs, at: Number(d.cut_at) || 0, show: Number(d.cut_show) || 2, location: d.cut_where === 'elsewhere' ? '' : undefined, move: d.cut_move || undefined, camera: d.cut_camera || undefined }, 'Making the cutaway (a frame, then Seedance)…')
           .then(function() { d.cut_shot = ''; });
         return;
       }

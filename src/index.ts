@@ -3160,7 +3160,7 @@ Rules:
             const si = Number(spApi[3]);
             const body = await parseBody(req).catch(() => ({} as any));
             const str = (v: unknown) => typeof v === "string" ? v : undefined;
-            if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), location: str(body.location) })); return; }
+            if (body.action === "frame") { jsonResponse(res, 202, await startSceneFrame(spTenant, spProject, si, { actor: str(body.actor), shot: str(body.shot), frame_prompt: str(body.frame_prompt), location: str(body.location), move: str(body.move) })); return; }
             if (body.action === "voice") {
               const { previewSceneVoice } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await previewSceneVoice(spTenant, spProject, si, { actor: str(body.actor), delivery: typeof body.delivery === "string" ? body.delivery : undefined, voice_id: str(body.voice_id), voice_speed: Number(body.voice_speed) || undefined,
@@ -3179,6 +3179,17 @@ Rules:
               return;
             }
             if (body.action === "pick") { jsonResponse(res, 200, await pickSceneFrame(spTenant, spProject, si, String(body.url || ""), str(body.actor))); return; }
+            // The camera (SPEC-shot-camera.md): the scene's move, the film's camera.
+            if (body.action === "move") {
+              const { setSceneMove } = await import("./core/scene-performance.js");
+              jsonResponse(res, 200, await setSceneMove(spTenant, spProject, si, String(body.move || "")));
+              return;
+            }
+            if (body.action === "film_camera") {
+              const { setFilmCamera } = await import("./core/scene-performance.js");
+              jsonResponse(res, 200, await setFilmCamera(spTenant, spProject, String(body.film_camera || "")));
+              return;
+            }
             if (body.action === "location") {
               const { setSceneLocation } = await import("./core/scene-performance.js");
               jsonResponse(res, 200, await setSceneLocation(spTenant, spProject, si, String(body.location || "")));
@@ -3196,6 +3207,7 @@ Rules:
                 engine: body.engine === "heygen" ? "heygen" : body.engine === "seedance" ? "seedance" : undefined,
                 voice_speed: Number(body.voice_speed) || undefined,
                 motion: str(body.motion),
+                move: str(body.move),
               }));
               return;
             }
@@ -3212,7 +3224,7 @@ Rules:
             }
             if (body.action === "clip") {
               const { startActorClip } = await import("./core/scene-performance.js");
-              jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined, at: Number(body.at) || undefined, show: Number(body.show) || undefined, location: str(body.location) , clip_in: Number.isFinite(Number(body.clip_in)) && body.clip_in !== undefined && body.clip_in !== null ? Number(body.clip_in) : undefined}));
+              jsonResponse(res, 202, await startActorClip(spTenant, spProject, si, { actor: str(body.actor), shot: String(body.shot || ""), seconds: Number(body.seconds) || undefined, at: Number(body.at) || undefined, show: Number(body.show) || undefined, location: str(body.location), move: str(body.move) || undefined, camera: str(body.camera) || undefined, clip_in: Number.isFinite(Number(body.clip_in)) && body.clip_in !== undefined && body.clip_in !== null ? Number(body.clip_in) : undefined}));
               return;
             }
             jsonResponse(res, 400, { error: 'action must be "frame", "continue", "pick", "location", "voice", "perform", "restore", "clip", "cast" or "recording"' });

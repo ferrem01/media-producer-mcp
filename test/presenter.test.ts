@@ -97,8 +97,12 @@ describe("generate_presenter wiring (source guards)", () => {
     const vg = await read("../src/media/video-gen.ts");
     expect(vg).toMatch(/CAMERA LOCK on multi-take/);
     expect(vg).toMatch(/const multiTake = lines\.length > 1/);
-    expect(vg).toMatch(/Locked-off static camera: no zoom, no push-in/);
-    expect(vg).toMatch(/very slight slow push-in/);        // still there for single takes
+    // The words are the move list's (core/shot-camera.ts): static on a
+    // stitched speech, a push-in on a single take.
+    expect(vg).toMatch(/const cameraNote = moveLine\(getMove\(multiTake \? "static" : "push-in"\)\);/);
+    const { moveLine, getMove } = await import("../src/core/shot-camera.js");
+    expect(moveLine(getMove("static"))).toMatch(/locked-off static camera on a tripod: no zoom, no push-in, no camera movement/);
+    expect(moveLine(getMove("push-in"))).toMatch(/slow dolly push-in/);
     expect(vg).toMatch(/seams\.push/);
     const s = await read("../src/server.ts");
     expect(s).toMatch(/seam_seconds: result\.seams/);

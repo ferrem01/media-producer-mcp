@@ -10,6 +10,7 @@
  * the decision.
  */
 
+import { getMove, getCamera, moveLine } from "../core/shot-camera.js";
 import { normalizeSoundCues } from "../core/scene-sfx.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -150,6 +151,9 @@ export interface PipelineOpts {
   frame?: import("../core/types.js").Frame;
   /** THE RECIPE axis (SPEC-recipes.md): a library id to pin the cut to. */
   recipe?: string;
+  /** THE FILM CAMERA (SPEC-shot-camera.md): what generated shots are "shot
+   *  on". Omitted -> the director picks. */
+  film_camera?: string;
 
   // Storyboard-only mode: run concept director + storyboard builder, save storyboard, stop before scene generation
   storyboardOnly?: boolean;
@@ -2297,6 +2301,8 @@ function storyboardToSaved(
       assets: Array.isArray(s.assets) ? s.assets : [],
       visual_notes: s.visual_notes || "",
       ...(typeof s.shot === "string" && s.shot.trim() ? { shot: s.shot.trim() } : {}),
+      // The camera move of its generated shot (core/shot-camera.ts), carried.
+      ...(getMove((s as any).shot_move) ? { shot_move: getMove((s as any).shot_move)!.id } : {}),
       // The sounds, carried: planned on the board, re-timed with the words.
       ...(Array.isArray(s.sfx) && s.sfx.length ? { sfx: normalizeSoundCues(s.sfx) } : {}),
       components: s.components || [],
@@ -2512,6 +2518,7 @@ async function runUnifiedPipeline(
         hasSpeaker: !!opts.speaker_source || pipelineHasNarration,
         frame: opts.frame,
         recipe: opts.recipe,
+        filmCamera: opts.film_camera,
       });
       // FRAME: caller pin > director's inference > the canvas as given.
       // Explicit pixel dimensions from the caller always win over both.
@@ -3619,8 +3626,12 @@ async function runUnifiedPipeline(
           continue;
         }
         const filename = `genvid_scene_${si}.mp4`;
+        // The writer's shot, its camera move first and the film's camera
+        // last (SPEC-shot-camera.md): the words the models were tested with.
+        const move = moveLine(getMove(d.shot_move));
+        const camera = getCamera(treatment?.filmCamera)?.video;
         const clip = await generateVideoClip({
-          prompt: d.gen_video, aspectRatio, outputDir: assetsDir, filename,
+          prompt: [move, d.gen_video, camera].filter(Boolean).join(" "), aspectRatio, outputDir: assetsDir, filename,
         });
         if (clip) {
           brollUrlMap.set(si, `/assets/${opts.tenant_id}/projects/${projectId}/assets/${filename}`);
