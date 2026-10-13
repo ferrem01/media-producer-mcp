@@ -150,8 +150,11 @@ ${QUOTIENT_CSS}
   #meterWrap { flex:1; height:6px; border-radius:3px; background:rgba(255,255,255,.18); overflow:hidden; }
   #meter { height:100%; width:0%; background:var(--ok); transition:width .08s linear; }
   #meterWrap.silent #meter { background:var(--err); }
-  #silent { position:absolute; left:16px; right:16px; top: calc(44px + env(safe-area-inset-top)); font-size:13px; color:#fff; background:rgba(239,68,68,.9);
-    padding:8px 12px; border-radius:10px; display:none; }
+  /* The no-sound warning sits at the BOTTOM, above the progress bar, as a
+     small pill: across the top it covered the prompter's first line (Marc,
+     Oct 13). The meter by the timer turns red too. */
+  #silent { position:absolute; left:50%; transform:translateX(-50%); bottom: calc(98px + env(safe-area-inset-bottom)); max-width:calc(100% - 32px); width:max-content;
+    font-size:13px; line-height:18px; color:#fff; background:rgba(239,68,68,.9); padding:6px 12px; border-radius:9999px; text-align:center; display:none; }
   #count { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:140px; font-weight:700; color:#fff; text-shadow:0 8px 40px rgba(0,0,0,.6); }
   /* The prompter sits at the TOP, under the timer, next to the lens: read
      from the bottom, the eyes look down in every take (Marc). */
