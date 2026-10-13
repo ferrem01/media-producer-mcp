@@ -112,6 +112,16 @@ describe("Studio on a phone (SPEC-take-flow.md, phase 3)", () => {
     expect(html).not.toMatch(/<title>Board/);
   });
 
+  // Marc, Oct 13 (Your Old Leads Aren't Dead): a voice-only recording on
+  // the board still showed the take of the lines as needed.
+  it("a voice-only recording shows as half the take (voice in, video next), on the phone and the desktop", async () => {
+    expect(js).toMatch(/function voicedOf\(scene\)/);
+    expect(js).toMatch(/'Voice in · video next'/);
+    const desktop = await read("../src/preview-app/preview-app.ts");
+    expect(desktop).toMatch(/var voiced = function\(a\) \{ return !!s\.voice_take && a\.type === 'camera_video' && a\.use !== 'clip'/);
+    expect(desktop).toMatch(/voice in<\/b> · <b>video next/);
+  });
+
   it("says what the film still needs from you before a single card; the desktop Studio puts each scene's needs in its own card", async () => {
     expect(js).toMatch(/'Needed from you'/);
     expect(js).toMatch(/' to go'/);
