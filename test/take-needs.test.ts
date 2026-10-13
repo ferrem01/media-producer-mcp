@@ -272,7 +272,7 @@ describe("a continuous speaker track keeps no scene markers", () => {
   it("a second click on the source already open keeps it (the picker opens the booth itself; the button must not toggle it away)", async () => {
     const fs = await import("node:fs/promises");
     const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
-    expect(studio).toMatch(/if \(panel\.style\.display !== 'none' && panel\.dataset\.src === src\) \{\n\s*if \(src === 'view'\) \{[^\n]*\}\n\s*try \{ panel\.scrollIntoView/);
+    expect(studio).toMatch(/if \(panel\.style\.display !== 'none' && panel\.dataset\.src === src\) \{\n\s*if \(src === 'view'\) \{[^\n]*\}\n\s*if \(src === 'booth' && launch\) openTakeStudio\(project, si\);\n\s*try \{ panel\.scrollIntoView/);
     expect(studio).not.toMatch(/panel\.dataset\.src === src\) \{ panel\.style\.display = 'none'; return; \}/);
   });
 
@@ -297,6 +297,6 @@ describe("a continuous speaker track keeps no scene markers", () => {
     const take = await fs.readFile("src/take-page.ts", "utf8");
     expect(take).toMatch(/show\('done'\);\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*releaseCamera\(\);/);
     const studio = await fs.readFile("src/preview-app/preview-app.ts", "utf8");
-    expect(studio).toMatch(/#studio-modal-card iframe\.np-booth'\)\.forEach\(function\(f\) \{ try \{ f\.src = 'about:blank'; \}/);
+    expect(studio).toMatch(/function closeTakeStudio\(\) \{\n\s*var f = document\.getElementById\('take-studio'\);\n\s*if \(f\) \{ try \{ f\.src = 'about:blank'; \} catch \(e\) \{\} f\.remove\(\); \}/);
   });
 });

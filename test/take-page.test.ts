@@ -113,7 +113,7 @@ describe("what the booth does", () => {
     // Karaoke: the line's words light at pace; the next TWO lines show under it.
     expect(html).toMatch(/sp\.className = 'w' \+ \(k\.emph \? ' em' : ''\)/);
     expect(html).toMatch(/if \(el >= toks\[k\]\.start\) spans\[k\]\.classList\.add\('on'\);/);
-    expect(html).toMatch(/<div id="prompt"><div id="cue"><\/div><div id="next"><\/div><div id="next2"><\/div><\/div>/);
+    expect(html).toMatch(/<div id="prompt"><div id="track"><div id="past"><\/div><div id="cue"><\/div><div id="next"><\/div><div id="next2"><\/div><div id="rest"><\/div><\/div><\/div>/);
     expect(html).toMatch(/function advanceCue\(\) \{ if \(rec && rec\.state === 'recording' && cueIdx >= 0 && cueIdx < cues\.length\) showCue\(cueIdx \+ 1\); \}/);
     expect(html).toMatch(/\$\('stage'\)\.addEventListener\('click'/);
     expect(html).toMatch(/Tap the screen to jump to the next line\./);
@@ -542,6 +542,76 @@ describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
       expect(await page.isVisible("#nextBtn")).toBe(false);
       expect(await page.getAttribute("#closeBtn", "class")).toBe("btn");
       await page.click("#closeBtn");
+      await page.waitForFunction(() => (window as any).__msgs.some((m: any) => m && m.type === "mp-take-close"));
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); for (const c of closers) await c(); }
+  }, 90000);
+
+  it("the laptop studio (Marc, Oct 13): one window, no scroll, the whole script rolls, the keyboard drives it, Keep & next lands on the next scene", async () => {
+    const closers: Array<() => Promise<void>> = [];
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined, args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+    try {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 760 }, permissions: ["microphone"] });
+      const page = await ctx.newPage();
+      const errors: string[] = []; page.on("pageerror", (e) => errors.push(e.message));
+      await page.addInitScript(() => { const m: any[] = (window as any).__msgs = []; window.addEventListener("message", (e) => m.push(e.data)); });
+      const proj = { name: "T", canvas: { width: 1920, height: 1080 }, treatment: { filmGrammar: "speaker" }, scenes: [], takes: [],
+        storyboard: { scenes: [
+          { label: "Hook", duration_seconds: 9, voiceover_text: "One.\nTwo.\nThree.\nFour.\nFive." },
+          { label: "Voiced", duration_seconds: 3, voiceover_text: "Six.", voice_take: { file: "v.webm", recorded_at: "x" } },
+          { label: "Close", duration_seconds: 3, voiceover_text: "Seven." } ] } };
+      const voices: string[] = [];
+      const http = await import("node:http");
+      const server = http.createServer((req, res) => {
+        const u = req.url || "";
+        req.on("data", () => {});
+        req.on("end", () => {
+          if (u.startsWith("/api/projects/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(proj)); return; }
+          if (u.startsWith("/api/voice-line/")) { voices.push(u); (proj.storyboard.scenes[Number(new URL(u, "http://x").searchParams.get("scene"))] as any).voice_take = { file: "v", recorded_at: "x" }; res.writeHead(200, { "content-type": "application/json" }); res.end("{\"ok\":true}"); return; }
+          res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+        });
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+      closers.push(() => new Promise<void>((r) => server.close(() => r())));
+      const port = (server.address() as any).port;
+      await page.goto(`http://127.0.0.1:${port}/take?tenant=t&project=p&token=x&scene=0&embed=1`);
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      expect(await page.evaluate(() => document.body.classList.contains("studio"))).toBe(true);
+      // The scenes across the top; the one already voiced is ticked.
+      expect(await page.$$eval("#sceneStrip .sdot", (b) => b.map((x) => x.className))).toEqual(["sdot now", "sdot done", "sdot"]);
+      // Every control in the one bar; the window never scrolls and Record is on screen.
+      expect(await page.$$eval("#sdock #speedRow, #sdock #voiceRow, #sdock #recordBtn", (e) => e.length)).toBe(3);
+      const fit = await page.evaluate(() => ({ sh: document.documentElement.scrollHeight, ih: innerHeight, rb: document.getElementById("recordBtn")!.getBoundingClientRect().bottom }));
+      expect(fit.sh).toBeLessThanOrEqual(fit.ih);
+      expect(fit.rb).toBeLessThanOrEqual(fit.ih);
+      // V: voice only. Space: record.
+      await page.keyboard.press("v");
+      expect(await page.isChecked("#voiceOnly")).toBe(true);
+      await page.keyboard.press(" ");
+      await page.waitForFunction(() => document.querySelectorAll("#cue .w").length > 0, null, { timeout: 8000 });
+      // The whole scene: the live line, the next two, and the rest below.
+      expect(await page.textContent("#cue")).toBe("One.");
+      expect(await page.$$eval("#rest .rl", (e) => e.map((x) => x.textContent))).toEqual(["Four.", "Five."]);
+      await page.keyboard.press("ArrowRight");
+      await page.waitForFunction(() => (document.getElementById("cue")!.textContent || "") === "Two.", null, { timeout: 4000 });
+      expect(await page.$$eval("#past .rl", (e) => e.map((x) => x.textContent))).toEqual(["One."]);
+      await page.waitForTimeout(1500);                                        // a beat of sound in the take
+      await page.keyboard.press(" ");
+      await page.waitForSelector("#review.on", { timeout: 8000 });
+      // Scene 2 is voiced: Keep & next offers scene 3, and Enter takes it.
+      expect(await page.textContent("#keepNextBtn")).toContain("Keep & next: Scene 3 · Close");
+      await page.keyboard.press("Enter");
+      await page.waitForFunction(() => document.getElementById("ready")!.classList.contains("on") && /Scene 3/.test(document.getElementById("title")!.textContent || "") && !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      expect(voices.map((u) => new URL(u, "http://x").searchParams.get("scene"))).toEqual(["0"]);
+      expect(await page.textContent("#kept")).toBe("✓ Scene 1 kept");
+      expect(await page.isChecked("#voiceOnly")).toBe(true);                 // the mode carries
+      expect(await page.$$eval("#sceneStrip .sdot", (b) => b.map((x) => x.className))).toEqual(["sdot done", "sdot done", "sdot now"]);
+      expect((await page.evaluate(() => (window as any).__msgs)).find((m: any) => m && m.type === "mp-take-attached")).toMatchObject({ scene_index: 0, voice: true });
+      // ← goes back a scene; Esc goes back to the board.
+      await page.keyboard.press("ArrowLeft");
+      await page.waitForFunction(() => /Scene 2/.test(document.getElementById("title")!.textContent || ""), null, { timeout: 8000 });
+      await page.keyboard.press("Escape");
       await page.waitForFunction(() => (window as any).__msgs.some((m: any) => m && m.type === "mp-take-close"));
       expect(errors).toEqual([]);
     } finally { await browser.close(); for (const c of closers) await c(); }

@@ -125,7 +125,7 @@ export const PROMPTER_VIEW_JS = `
     if (cueTimer) clearTimeout(cueTimer); cueTimer = null;
     stopKaraoke();
     cueIdx = i;
-    if (i >= cues.length) { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; $('next2').textContent = ''; return; }
+    if (i >= cues.length) { $('cue').textContent = ''; $('next').textContent = 'That’s the script. Stop when you’re done.'; $('next2').textContent = ''; paintRoll(i); return; }
     var c = cues[i];
     // The line's words, each lit when its own precomputed turn begins
     // (timeLine: length share, emphasis hold, punctuation beats).
@@ -146,13 +146,34 @@ export const PROMPTER_VIEW_JS = `
     })();
     $('next').textContent = cues[i + 1] ? cues[i + 1].text : '';
     $('next2').textContent = cues[i + 2] ? cues[i + 2].text : '';
+    paintRoll(i);
     cueTimer = setTimeout(function () { showCue(i + 1); }, c.dur * 1000);
+  }
+  // THE ROLL (the laptop studio, src/take-page.ts): a page that also has
+  // #past and #rest around #cue/#next/#next2 shows the scene's WHOLE script
+  // -- lines read dim above, every line to come readable below -- and keeps
+  // the live line a third of the way down its box (Marc: "if I don't know
+  // what the next word is or the next line is, it becomes very hard to read
+  // the script with any sort of emphasis"). A page without them (the phone,
+  // the remote booth) shows the live line and the next two, as before.
+  function paintRoll(i) {
+    var past = document.getElementById('past'), rest = document.getElementById('rest');
+    if (!past || !rest) return;
+    var track = past.parentNode, box = track.parentNode;
+    if (i < 0) { past.textContent = ''; rest.textContent = ''; track.style.transform = ''; return; }
+    var fill = function (el, list) {
+      el.textContent = '';
+      list.forEach(function (c) { var d = document.createElement('div'); d.className = 'rl'; d.textContent = c.text; el.appendChild(d); });
+    };
+    fill(past, cues.slice(0, Math.max(0, Math.min(i, cues.length))));
+    fill(rest, cues.slice(i + 3));
+    track.style.transform = 'translateY(' + (-Math.max(0, $('cue').offsetTop - box.clientHeight * 0.3)) + 'px)';
   }
   // The reader's speed, remembered per film on this device; the last speed
   // set anywhere is the start for a film not read yet.
   function loadSpeed(project) { try { return clampSpeed(localStorage.getItem('mp.prompter.speed.' + project) || localStorage.getItem('mp.prompter.speed') || 1); } catch (e) { return 1; } }
   function saveSpeed(project, v) { try { localStorage.setItem('mp.prompter.speed.' + project, String(v)); localStorage.setItem('mp.prompter.speed', String(v)); } catch (e) {} }
-  function clearPrompter() { if (cueTimer) clearTimeout(cueTimer); cueTimer = null; stopKaraoke(); cueIdx = -1; $('cue').textContent = ''; $('next').textContent = ''; $('next2').textContent = ''; }
+  function clearPrompter() { if (cueTimer) clearTimeout(cueTimer); cueTimer = null; stopKaraoke(); cueIdx = -1; $('cue').textContent = ''; $('next').textContent = ''; $('next2').textContent = ''; paintRoll(-1); }
 `;
 
 interface PrompterApi {
