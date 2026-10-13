@@ -41,7 +41,7 @@ describe("the vocabulary: every option of the four hard concepts, printable", ()
 
   it("the MCP lists it and takes creator_format; the recipe param names the library itself", async () => {
     const server = await read("src/server.ts");
-    expect(server).toMatch(/target: z\.enum\(\["projects", "components", "vocabulary"\]\)/);
+    expect(server).toMatch(/target: z\.enum\(\["projects", "components", "vocabulary", "samples"\]\)/);
     expect(server).toMatch(/if \(target === "vocabulary"\) return ok\(vocabulary\(\)\);/);
     expect(server).toMatch(/creator_format: z\.enum\(FORMAT_IDS/);
     expect(server).toMatch(/if \(!params\.recipe && params\.creator_format\) \{\s*const fr = recipeForFormat\(params\.creator_format, params\.frame\);/);

@@ -8,6 +8,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { vocabulary } from "./core/vocabulary.js";
 import { FILM_CAMERAS, SHOT_MOVES, setShotMove } from "./core/shot-camera.js";
+import { listSamples } from "./core/sample-work.js";
 import { FILL_WHEN_UNSET } from "./core/take-studio.js";
 import { recipeForFormat, loadRecipes } from "./core/recipes.js";
 import { FORMAT_IDS } from "./core/formats.js";
@@ -1182,10 +1183,17 @@ export function createMcpServer(): McpServer {
 
   tool(
     "list",
-    "List projects for a tenant (each with its tags), or available component types. Pass tag to list only the films carrying it. Pass target='components' to see the component catalog. Pass target='vocabulary' for the creator vocabulary (SPEC-creator-formats.md): every option of the four hard concepts -- grammars (film), recipes grouped by viral format (film), settings (scene: where the person is), proof uses (beat: where the proof sits) -- the frames, and the generated shot's camera (film_cameras, shot_moves: SPEC-shot-camera.md).",
+    "List projects for a tenant (each with its tags), or available component types. Pass tag to list only the films carrying it. Pass target='components' to see the component catalog. Pass target='vocabulary' for the creator vocabulary (SPEC-creator-formats.md): every option of the four hard concepts -- grammars (film), recipes grouped by viral format (film), settings (scene: where the person is), proof uses (beat: where the proof sits) -- the frames, and the generated shot's camera (film_cameras, shot_moves: SPEC-shot-camera.md). Pass target='samples' for the Sample library: finished marketing work for made-up brands (full-length emails tagged by lifecycle flow, social posts by platform, blogs, landing pages, event pieces), the same for every tenant, like the music and sound libraries. Use a piece by its src: an image component's data.src, an index-reel item's src, or asset-wall (which picks from the library itself).",
     {
       tenant_id: z.string().optional(),
-      target: z.enum(["projects", "components", "vocabulary"]).optional().describe("What to list (default: projects)"),
+      target: z.enum(["projects", "components", "vocabulary", "samples"]).optional().describe("What to list (default: projects)"),
+      samples: z.object({
+        kind: z.string().optional().describe("email | social | blog | landing | event | slide"),
+        brand: z.string().optional().describe("flowpath | oliva | lumen | bloom | volt | nimbus | mare | bonsai | kiln | atlas | penny | fern"),
+        platform: z.string().optional().describe("social: linkedin | instagram | story | tiktok | x | youtube | pinterest"),
+        flow: z.string().optional().describe("email: the lifecycle step, e.g. welcome, activation, trial-ending, cart, browse, order, shipping, review, win-back"),
+        q: z.string().optional().describe("Words in the title"),
+      }).optional().describe("target='samples': narrow the library"),
       tag: z.union([z.string(), z.array(z.string())]).optional().describe("Projects: only films carrying this tag (or every one of these tags)"),
     },
     async (params) => {
@@ -1196,6 +1204,7 @@ export function createMcpServer(): McpServer {
         return ok(catalog);
       }
       if (target === "vocabulary") return ok(vocabulary());
+      if (target === "samples") return ok(listSamples(params.samples || {}));
 
       const want = normalizeTags(params.tag ?? []);
       const projects = (await listProjects(params.tenant_id)).filter((p) => want.every((t) => normalizeTags(p.tags).includes(t)));

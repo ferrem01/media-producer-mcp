@@ -22,6 +22,7 @@ import { normalizeAssetNeeds } from "../core/asset-needs.js";
 import { emphasisFromLines } from "../core/captions.js";
 import { liftWrapperAnims } from "../core/word-anchors.js";
 import { numberedBriefLines } from "./board-enforce.js";
+import { sampleLibraryPromptSection } from "../core/sample-work.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -1021,6 +1022,11 @@ Durations will be snapped to the bar grid after you submit -- authoring on-grid 
   if (brandAssetsSection) {
     systemPrompt += brandAssetsSection;
   }
+  // The Sample library (house work for made-up brands, every tenant): a beat
+  // that shows an email / post / blog shows a finished one, not a drawn mock.
+  // Marc, Oct 13: "in many cases it's better to show a beautiful email or blog
+  // ... versus a component-based simple thing".
+  systemPrompt += sampleLibraryPromptSection();
 
   // Inject brand guidelines (tenant-defined rules)
   if (opts.brandKit.guidelines) {
