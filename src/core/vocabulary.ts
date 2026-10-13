@@ -1,7 +1,8 @@
 /**
  * THE CREATOR VOCABULARY (SPEC-creator-formats.md): four hard concepts,
  * each a closed list you can print -- grammar (film), recipe and its format
- * (film), setting (scene), proof use (beat) -- plus the frame. One place
+ * (film), setting (scene), proof use (beat) -- plus the frame and the
+ * generated shot's camera (film camera, shot move: SPEC-shot-camera.md). One place
  * that gathers the code's own lists for `list target:"vocabulary"`; never a
  * copy of them.
  */
@@ -10,6 +11,7 @@ import { loadRecipes } from "./recipes.js";
 import { VIRAL_FORMATS } from "./formats.js";
 import { PERFORMER_SETTINGS } from "./performer-settings.js";
 import { PROOF_USES } from "./proof-placement.js";
+import { FILM_CAMERAS, SHOT_MOVES } from "./shot-camera.js";
 
 /** The ten film grammars, in the director's order, with what carries the
  *  argument in each (FILM_GRAMMARS, src/llm/creative-director.ts -- the
@@ -33,9 +35,13 @@ export interface Vocabulary {
   grammars: Array<{ id: string; what: string; recipes: string[] }>;
   formats: Array<{ id: string; name: string; what: string; default_recipe?: string; recipes: Array<{ id: string; grammar: string; variant?: string; frames: string[] }> }>;
   recipes: Array<{ id: string; name: string; grammar: string; format?: string; variant?: string; frames: string[]; length_s: [number, number]; suits: string[] }>;
-  settings: Array<{ id: string; name: string; booth: string; shot: string }>;
+  settings: Array<{ id: string; name: string; booth: string; shot: string; move: string }>;
   proof_uses: Array<{ id: string; name: string; layout: string; booth?: string }>;
   frames: string[];
+  /** SPEC-shot-camera.md: what generated shots are shot on (film), and how
+   *  the camera moves in one (shot). */
+  film_cameras: Array<{ id: string; name: string; film: boolean }>;
+  shot_moves: Array<{ id: string; name: string; speaking: boolean; no_sheet: boolean }>;
   how_they_combine: string;
 }
 
@@ -53,6 +59,8 @@ export function vocabulary(): Vocabulary {
     settings: PERFORMER_SETTINGS.map((s) => ({ ...s })),
     proof_uses: PROOF_USES.map((u) => ({ ...u })),
     frames: FRAMES,
-    how_they_combine: "A film picks a grammar, a recipe (its format follows) and a frame on generate (film_grammar, recipe or creator_format, frame). Each scene's performer plan names a setting (update storyboard.scenes[].performer.setting, or a recipe beat sets it). Each proof need names a use (storyboard.scenes[].assets[].use, or a recipe beat sets it). Example: Listicle -- index-reel-host (creator-cut, 9x16), scenes in Car Talk, proofs on a phone.",
+    film_cameras: FILM_CAMERAS.map((c) => ({ id: c.id, name: c.name, film: c.film })),
+    shot_moves: SHOT_MOVES.map((m) => ({ id: m.id, name: m.name, speaking: m.speaking, no_sheet: !!m.noSheet })),
+    how_they_combine: "A film picks a grammar, a recipe (its format follows) and a frame on generate (film_grammar, recipe or creator_format, frame). Each scene's performer plan names a setting (update storyboard.scenes[].performer.setting, or a recipe beat sets it). Each proof need names a use (storyboard.scenes[].assets[].use, or a recipe beat sets it). A film's generated shots are shot on one camera (film_camera on create / update / generate) and each generated shot names one camera move (storyboard.scenes[].shot_move; an actor clip its own move) -- the setting's move when a performed scene names none. Example: Listicle -- index-reel-host (creator-cut, 9x16), scenes in Car Talk, proofs on a phone, shot on phone-front.",
   };
 }

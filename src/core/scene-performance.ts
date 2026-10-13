@@ -39,7 +39,10 @@ import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
 import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
-import { PERFORMER_SETTINGS, shotForSetting } from "./performer-settings.js";
+import { PERFORMER_SETTINGS, shotForSetting, moveForSetting } from "./performer-settings.js";
+import { getCamera, DEFAULT_CAMERA, CAMERA_IDS, filmCameraOf, getMove, resolveMove, setShotMove, MOVE_IDS } from "./shot-camera.js";
+import type { ShotCamera } from "./seedance.js";
+import { pinFilmAxes } from "./film-axes.js";
 import type { ScenePerformance, CastPlan } from "./types.js";
 type VoiceSource = ScenePerformance["voice_source"];
 
@@ -137,7 +140,7 @@ function followPlan(scene: any, project: any, want: Partial<CastPlan>, before: R
 }
 
 /** The start frame prompt: the same person, in this shot, at this shape. */
-export function framePrompt(shot: string, vertical: boolean, sheet: boolean, location = false): string {
+export function framePrompt(shot: string, vertical: boolean, sheet: boolean, location = false, cam: ShotCamera = {}): string {
   // The face comes from the portrait and the model sheet -- the sheet IS the
   // identity (Marc, Oct 8: "the whole point of creating the model sheet is
   // so that that's what gets passed in, not the actual photos").
@@ -150,10 +153,12 @@ export function framePrompt(shot: string, vertical: boolean, sheet: boolean, loc
     `${shot.trim().replace(/\.?$/, ".")} ` +
     // Framed as the shot says: a wide couch shot must not be pulled into a
     // close-up (Marc, Oct 4: "further back from camera ... sitting in a couch").
+    // The move starts somewhere: a push-in from a little wider, a tilt from the hands.
+    (cam.move?.start ? `${cam.move.start} ` : "") +
     `A ${vertical ? "vertical" : "horizontal"} photograph from a real camera, framed exactly as described, the face clearly visible. ` +
-    // Marc, Oct 8: "it does look like AI ... the texture, the quality of the picture".
-    "Shot on a cinema camera with a 35-50mm lens: true-to-life skin with pores, fine lines and natural imperfections, not airbrushed, no plastic sheen, not CGI; " +
-    "motivated natural light, real contrast, subtle film grain. No text, no logos.";
+    // The film's camera (core/shot-camera.ts); the default is the sentence
+    // every frame got before the list.
+    `${(cam.camera || getCamera(DEFAULT_CAMERA)!).frame} No text, no logos.`;
 }
 
 /** A written prompt: undefined keeps what the scene has, "" goes back to the
@@ -181,20 +186,29 @@ function setLocation(p: ScenePerformance, v: string | undefined): boolean {
 }
 
 /** The prompts a scene uses unless it says otherwise: built from the shot. */
-export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, room = false, location = false): { frame_prompt: string; video_prompt: string } {
-  return { frame_prompt: framePrompt(shot, vertical, sheet, location), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot)}` };
+export function defaultPrompts(shot: string, vertical: boolean, sheet: boolean, room = false, location = false, cam: ShotCamera = {}): { frame_prompt: string; video_prompt: string } {
+  return { frame_prompt: framePrompt(shot, vertical, sheet, location, cam), video_prompt: `${seedanceRefs((sheet ? 2 : 1) + (room ? 1 : 0), true, false, room)} ${speakingPrompt(shot, cam)}` };
+}
+
+/** HOW A PERFORMED SCENE IS FILMED (SPEC-shot-camera.md): the film's camera
+ *  and the scene's move -- its `shot_move`, else its setting's. A speaking
+ *  shot takes only the gentle moves; `note` says when one was set aside. */
+export function sceneCamera(project: any, si: number, speaking = true): ShotCamera & { note?: string } {
+  const scene = project?.storyboard?.scenes?.[si] || {};
+  const { move, note } = resolveMove(scene.shot_move, moveForSetting(planField(project, si, "setting")), speaking);
+  return { camera: filmCameraOf(project), move, ...(note ? { note } : {}) };
 }
 
 /** Draw the actor in a shot (GPT Image from the portrait and sheet, a
  *  location's plate when given), cut to the film's shape; an asset url.
  *  Seedance's start frame, and a Higgsfield recast's (core/recast.ts). */
-export async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string, locationAbs?: string): Promise<string> {
+export async function drawFrame(tenant: string, projectId: string, actor: CastActor, shot: string, width: number, height: number, prompt?: string, locationAbs?: string, cam: ShotCamera = {}): Promise<string> {
   const vertical = height > width;
   const sheetAbs = actor.sheet ? path.join(config.dataDir, tenant, actor.sheet) : undefined;
   const work = path.join(projectDir(tenant, projectId), "_work");
   await fs.mkdir(work, { recursive: true });
   const drawn = path.join(work, `frame-${stamp()}.png`);
-  await editImage({ prompt: prompt || framePrompt(shot, vertical, !!sheetAbs, !!locationAbs), images: [portraitPath(tenant, actor), ...(sheetAbs ? [sheetAbs] : []), ...(locationAbs ? [locationAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
+  await editImage({ prompt: prompt || framePrompt(shot, vertical, !!sheetAbs, !!locationAbs, cam), images: [portraitPath(tenant, actor), ...(sheetAbs ? [sheetAbs] : []), ...(locationAbs ? [locationAbs] : [])], outputPath: drawn, size: vertical ? "1024x1536" : height === width ? "1024x1024" : "1536x1024" });
   // Cut to the film's exact shape (2:3 drawn, 9:16 wanted), centred.
   const name = `frame-${actor.id}-${stamp()}.jpg`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
@@ -206,7 +220,7 @@ export async function drawFrame(tenant: string, projectId: string, actor: CastAc
 
 /** Draw (or redraw) a scene's start frame. Returns at once; the frame lands
  *  on the scene's performance (frames, frame). */
-export async function startSceneFrame(tenant: string, projectId: string, si: number, opts: { actor?: string; shot?: string; frame_prompt?: string; location?: string }): Promise<ScenePerformance> {
+export async function startSceneFrame(tenant: string, projectId: string, si: number, opts: { actor?: string; shot?: string; frame_prompt?: string; location?: string; move?: string }): Promise<ScenePerformance> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
   const plan = await planOf(tenant, project, si);
@@ -219,11 +233,15 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   // The room: the one asked for, else the plan's.
   const where = opts.location !== undefined ? opts.location : (planField(project, si, "location") || "");
   if (where) await locationImage(tenant, where);
+  // A move the shot cannot take is refused before anything starts.
+  setShotMove({}, opts.move, true);
   running.add(key);
   const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
     p.actor = actor.id; p.shot = shot; setPrompt(p, "frame_prompt", opts.frame_prompt);
     setLocation(p, where);
+    // The move frames the start: a push-in starts a little wider.
+    if (setShotMove(sc, opts.move, true)) delete p.draft;
     followPlan(sc, project, { ...(opts.actor && plan.how !== "record" ? { actor: actor.id } : {}), ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
     p.status = "running"; p.stage = "frame"; delete p.error;
     p.started_at = new Date().toISOString(); delete p.finished_at;
@@ -232,7 +250,7 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   const location = perf.location;
   void (async () => {
     try {
-      const url = await drawFrame(tenant, projectId, actor, shot, W, H, prompt, location ? await locationImage(tenant, location) : undefined);
+      const url = await drawFrame(tenant, projectId, actor, shot, W, H, prompt, location ? await locationImage(tenant, location) : undefined, sceneCamera(await loadProject(tenant, projectId), si));
       // Free before "done": a poll that reads done may start the next job at once.
       running.delete(key);
       await patch(tenant, projectId, si, (p) => {
@@ -306,6 +324,30 @@ export async function setSceneLocation(tenant: string, projectId: string, si: nu
     // The scene's plan says where it is set.
     followPlan(sc, project, { location }, { ...plan, location: planField(project, si, "location") || undefined });
   });
+}
+
+/** Set a scene's camera move without drawing or performing (Studio's
+ *  picker): "" back to the setting's. A new move is a new shot -- the draft
+ *  no longer stands. Speaking: gentle moves only. */
+export async function setSceneMove(tenant: string, projectId: string, si: number, move: string): Promise<ScenePerformance> {
+  return patch(tenant, projectId, si, (p, sc) => { if (setShotMove(sc, move, true)) delete p.draft; });
+}
+
+/** Set the film's camera (SPEC-shot-camera.md); "" back to the default.
+ *  Frames already drawn stay; the next one is drawn in the new look. */
+export async function setFilmCamera(tenant: string, projectId: string, camera: string): Promise<{ film_camera: string }> {
+  const k = `${tenant}/${projectId}`;
+  const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+    const project = await loadProject(tenant, projectId);
+    if (!project) throw new Error("Project not found");
+    const bad = pinFilmAxes(project, { film_camera: camera });
+    if (bad) throw new Error(bad);
+    project.updated_at = new Date().toISOString();
+    await saveProject(project);
+    return { film_camera: filmCameraOf(project).id };
+  });
+  chains.set(k, next);
+  return next;
 }
 
 /** Change the cast plan (the film's and/or scenes'), on the film's writer
@@ -624,6 +666,9 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   motion?: string;
   /** The read speed (1 = as voiced, up to 1.25). */
   voice_speed?: number;
+  /** The camera move (core/shot-camera.ts), kept on the scene as its
+   *  `shot_move`; "" back to the setting's. Speaking: gentle moves only. */
+  move?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -648,6 +693,8 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   const finishingDraft = quality === "final" && !!prev?.draft?.draft_id && opts.location === undefined;
   const where = opts.location !== undefined ? opts.location : (planField(project, si, "location") || "");
   if (!finishingDraft && where) await locationImage(tenant, where);
+  // A move the shot cannot take is refused before anything starts.
+  setShotMove({}, opts.move, true);
   running.add(key);
   const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
@@ -679,6 +726,8 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     // A new pace is a new read: the draft no longer stands.
     if (setSpeed(p, opts.voice_speed)) delete p.draft;
     if (!finishingDraft) setLocation(p, where);
+    // A new move is a new shot: the draft no longer stands.
+    if (setShotMove(sc, opts.move, true)) delete p.draft;
     // Performing it IS the choice: the scene's plan is this actor, generated with Seedance.
     followPlan(sc, project, { actor: actor.id, how: "generate", engine: "seedance", ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
@@ -786,6 +835,8 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
   const workDir = path.join(projectDir(tenant, projectId), "_work", `perform-s${si + 1}`);
   await fs.mkdir(workDir, { recursive: true });
+  // The film's camera and the scene's move (a speaking shot: gentle moves only).
+  const cam = sceneCamera(project, si);
 
   // A final finishing a draft: Atlas's draft-complete inherits the draft's
   // frame, prompt, voice and seed -- nothing is made or sent again.
@@ -803,7 +854,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     // The frame: the one picked, else one drawn now.
     if (!frame) {
       await stage("frame");
-      frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt, locationAbs);
+      frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt, locationAbs, cam);
       const made = frame;
       await patch(tenant, projectId, si, (p) => { p.frames = [...(p.frames || []), { url: made, shot: perf.shot, ...(perf.frame_prompt ? { prompt: perf.frame_prompt } : {}), ...(perf.location ? { location: perf.location } : {}), made_at: new Date().toISOString() }].slice(-6); p.frame = made; });
     }
@@ -841,9 +892,9 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
     voiceUrl = assetUrl(tenant, projectId, voiceName);
     const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
-    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.location || ""].join("|");
+    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.location || "", cam.camera?.id || "", cam.move?.id || ""].join("|");
   }
-  const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot);
+  const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot, cam);
 
   await stage(quality === "final" ? "final" : "draft");
   const kept = path.join(workDir, `seedance-${quality}.json`);
@@ -1022,7 +1073,8 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   const vertical = (Number(project.canvas?.height) || 1920) > (Number(project.canvas?.width) || 1080);
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
-    const defaults = defaultPrompts(sceneShot(undefined, s.performance?.shot, s.performer?.setting), vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location);
+    const cam = sceneCamera(project, i);
+    const defaults = defaultPrompts(sceneShot(undefined, s.performance?.shot, s.performer?.setting), vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location, cam);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;
@@ -1058,6 +1110,9 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       // The recast playing here (Studio's "made" step shows it).
       ...(cast && take?.actors?.[cast]?.file ? { recast_file: take.actors[cast].file, recast_engine: take.actors[cast].performer || null } : {}),
       ...(shotForSetting(plan.setting) ? { setting_shot: shotForSetting(plan.setting) } : {}),
+      // How it is filmed (core/shot-camera.ts): the film's camera, the move
+      // asked for and the one it is made with (the setting's when none).
+      film_camera: cam.camera?.id, shot_move: s.shot_move || null, move: cam.move?.id || null, ...(cam.note ? { move_note: cam.note } : {}),
       // What the scene uses when it writes no prompt of its own.
       defaults,
       actor_clips: s.actor_clips || [],
@@ -1084,6 +1139,11 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
    *  when the clip has it to spare -- Seedance eases in, and a cutaway shown
    *  for a second was over before she got going. */
   clip_in?: number;
+  /** The camera move (core/shot-camera.ts); omitted: none, the shot alone. */
+  move?: string;
+  /** The camera it is shot on: the film's when omitted; an insert camera
+   *  (drone) is allowed here and only here. */
+  camera?: string;
 }): Promise<Record<string, unknown>> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || scene.performance?.actor);
@@ -1095,6 +1155,13 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
   const clipWhere = opts.location !== undefined ? (opts.location || undefined) : (planField(project, si, "location") ?? scene.performance?.location);
   if (clipWhere) await locationImage(tenant, clipWhere);
   if (!shot) throw new Error("shot is required: what the actor does (\"sips a coffee at her desk, looking out the window\")");
+  const move = opts.move ? getMove(opts.move) : undefined;
+  if (opts.move && !move) throw new Error(`Unknown camera move "${opts.move}" (${MOVE_IDS.join(", ")})`);
+  const camera = opts.camera ? getCamera(opts.camera) : filmCameraOf(project);
+  if (!camera) throw new Error(`Unknown camera "${opts.camera}" (${CAMERA_IDS.join(", ")})`);
+  // The moves that leave the first frame's view go without the model sheet:
+  // it pins the camera to that view (Oct 13: the orbit barely moved with it).
+  const withSheet = !!actor.sheet && !move?.noSheet;
   const show = Number(opts.show) > 0 ? Math.max(0.3, Math.min(15, Number(opts.show))) : undefined;
   const seconds = Math.max(4, Math.min(15, Math.round(Number(opts.seconds) || (show ? Math.ceil(show) : 5))));
   const onScreen = show ? Math.min(show, seconds) : seconds;
@@ -1123,16 +1190,16 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
     return next;
   };
   running.add(key);
-  const started = await setClip((c) => { for (const k of Object.keys(c)) delete c[k]; Object.assign(c, { actor: actor.id, shot, seconds, ...(show ? { show: onScreen } : {}), ...(clipWhere ? { location: clipWhere } : {}), at, status: "running", started_at: new Date().toISOString() }); });
+  const started = await setClip((c) => { for (const k of Object.keys(c)) delete c[k]; Object.assign(c, { actor: actor.id, shot, ...(move ? { move: move.id } : {}), ...(opts.camera ? { camera: camera.id } : {}), seconds, ...(show ? { show: onScreen } : {}), ...(clipWhere ? { location: clipWhere } : {}), at, status: "running", started_at: new Date().toISOString() }); });
   void (async () => {
     try {
       // In the scene's location when it has one: the cutaway is the same room.
       const loc = clipWhere ? await locationImage(tenant, clipWhere) : undefined;
-      const frame = await drawFrame(tenant, projectId, actor, shot, W, H, undefined, loc);
+      const frame = await drawFrame(tenant, projectId, actor, shot, W, H, undefined, loc, { camera, move });
       const images = [await publicUrl(tenant, projectId, resolveVideoPath(frame, config.dataDir))];
-      if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));
+      if (withSheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet!)));
       if (loc) images.push(await publicUrl(tenant, projectId, loc));
-      const r = await seedanceShot({ images, prompt: silentPrompt(shot), room: !!loc, seconds, ratio: seedanceRatio(W, H), draft: false, resolution: "720p" });
+      const r = await seedanceShot({ images, prompt: silentPrompt(shot, { camera, move, sheet: withSheet }), room: !!loc, seconds, ratio: seedanceRatio(W, H), draft: false, resolution: "720p" });
       const work = path.join(projectDir(tenant, projectId), "_work");
       await fs.mkdir(work, { recursive: true });
       const raw = path.join(work, `clip-${stamp()}.mp4`);

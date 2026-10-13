@@ -7,6 +7,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { vocabulary } from "./core/vocabulary.js";
+import { FILM_CAMERAS, SHOT_MOVES, setShotMove } from "./core/shot-camera.js";
 import { FILL_WHEN_UNSET } from "./core/take-studio.js";
 import { recipeForFormat, loadRecipes } from "./core/recipes.js";
 import { FORMAT_IDS } from "./core/formats.js";
@@ -124,6 +125,7 @@ export const animationSchema = z.object({
 
 /** A cast plan (core/cast-plan.ts): who performs, how, with what, where. */
 /** The recipe param's words, from the library itself (never a stale list). */
+const FILM_CAMERA_DESCRIBE = `The FILM CAMERA (SPEC-shot-camera.md): what the film's GENERATED shots are "shot on" -- an AI presenter's start frames, Seedance takes, b-roll of a cast actor, Veo clips (a recording, stock and motion graphics never change). ${FILM_CAMERAS.filter((c) => c.film).map((c) => c.id).join(" | ")}. Omit and the director picks (phone-front for a person film made for the phone, documentary for one in 16x9, cinema otherwise); "" clears a pin. list target='vocabulary' shows them.`;
 const RECIPE_DESCRIBE = `The RECIPE axis (SPEC-recipes.md): the measured cut the writer fills -- an id from the library (${loadRecipes().map((r) => r.id).join(", ")}). A recipe belongs to one grammar and implies it. Omit to let the director pick one that suits the brief, or none. list target='vocabulary' shows each with its format, grammar and frames.`;
 
 const planSchema = z.object({
@@ -756,6 +758,7 @@ export async function queueStoryboardGeneration(params: {
   creativity?: number;
   film_grammar?: import("./llm/creative-director.js").FilmGrammar;
   recipe?: string;
+  film_camera?: string;
   visual_system?: import("./llm/creative-director.js").VisualSystem;
   audio_system?: import("./llm/creative-director.js").AudioSystem;
   max_revisions?: number;
@@ -860,6 +863,7 @@ export async function queueStoryboardGeneration(params: {
       canvas: canvasFor(params.frame, params.canvas_width, params.canvas_height),
       frame: params.frame,
       recipe: params.recipe,
+      film_camera: params.film_camera,
       creativity: params.creativity,
       film_grammar: params.film_grammar,
       visual_system: params.visual_system,
@@ -1066,6 +1070,7 @@ export function createMcpServer(): McpServer {
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry (default: 16x9). 9x16 for Reels/TikTok/Shorts, 4x5 for feed posts, 1x1 square."),
       film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("The FILM GRAMMAR, pinned on a board you write yourself (generate sets it from the brief): what carries the argument. speaker / creator-cut = a person carries the film, so the booth records the takes as the speaker (voice-only included) and the board asks for one take per spoken scene; any other grammar makes a camera take a clip on one scene. A recipe implies its grammar."),
       recipe: z.string().optional().describe(RECIPE_DESCRIBE),
+      film_camera: z.string().optional().describe(FILM_CAMERA_DESCRIBE),
       fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
     async (params) => {
@@ -1085,8 +1090,8 @@ export function createMcpServer(): McpServer {
         frame: params.frame,
         fps: params.fps,
       });
-      if (params.film_grammar || params.recipe) {
-        const bad = pinFilmAxes(project, { film_grammar: params.film_grammar, recipe: params.recipe });
+      if (params.film_grammar || params.recipe || params.film_camera) {
+        const bad = pinFilmAxes(project, { film_grammar: params.film_grammar, film_camera: params.film_camera, recipe: params.recipe });
         if (bad) return err(bad);
         await saveProject(project);
       }
@@ -1177,7 +1182,7 @@ export function createMcpServer(): McpServer {
 
   tool(
     "list",
-    "List projects for a tenant (each with its tags), or available component types. Pass tag to list only the films carrying it. Pass target='components' to see the component catalog. Pass target='vocabulary' for the creator vocabulary (SPEC-creator-formats.md): every option of the four hard concepts -- grammars (film), recipes grouped by viral format (film), settings (scene: where the person is), proof uses (beat: where the proof sits) -- and the frames.",
+    "List projects for a tenant (each with its tags), or available component types. Pass tag to list only the films carrying it. Pass target='components' to see the component catalog. Pass target='vocabulary' for the creator vocabulary (SPEC-creator-formats.md): every option of the four hard concepts -- grammars (film), recipes grouped by viral format (film), settings (scene: where the person is), proof uses (beat: where the proof sits) -- the frames, and the generated shot's camera (film_cameras, shot_moves: SPEC-shot-camera.md).",
     {
       tenant_id: z.string().optional(),
       target: z.enum(["projects", "components", "vocabulary"]).optional().describe("What to list (default: projects)"),
@@ -1340,6 +1345,7 @@ export function createMcpServer(): McpServer {
         background: z.string().optional(),
       }).optional(),
       film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("The FILM GRAMMAR, pinned on a board you write yourself (generate sets it from the brief): what carries the argument. speaker / creator-cut = a person carries the film, so the booth records the takes as the speaker (voice-only included) and the board asks for one take per spoken scene; any other grammar makes a camera take a clip on one scene. A recipe implies its grammar."),
+      film_camera: z.string().optional().describe(FILM_CAMERA_DESCRIBE),
       status: z.enum(["draft", "storyboard", "generated", "rendering", "rendered", "failed"]).optional(),
       world: z.enum(["light", "dark", "paper", "plain", "sky", "cream"]).optional().describe("Re-derive and store the film's WORLD (the continuous ground every scene sits on): light (airy mesh), dark (cinematic), paper (print sheet), plain (FLAT brand-white, no backdrop at all), sky (cumulus clouds drifting on the brand color; type floats, the product sits on white cards), cream (flat warm editorial cream with a soft centre glow -- the st-statement canvas under every scene). Project-level; storyboard cards re-photograph on the new world, and builds inherit it."),
 
@@ -1424,6 +1430,7 @@ export function createMcpServer(): McpServer {
           duration_seconds: z.number().optional(),
           visual_notes: z.string().optional(),
           shot: z.string().optional().describe("The plan table's one line for this scene: what fills the frame, in plain words. Empty string hands the cell back to the visual notes."),
+          shot_move: z.string().optional().describe(`The CAMERA MOVE of this scene's generated shot (SPEC-shot-camera.md): its AI presenter's take and its gen_video clip. ${SHOT_MOVES.map((m) => m.id + (m.speaking ? "" : "*")).join(" | ")} (* not on a speaking shot: lip sync and the face do not hold). Omitted on a performed scene: its setting's move. "" clears it.`),
           sfx: z.array(z.object({
             at: z.union([z.number(), z.string(), z.object({ word: z.string(), occurrence: z.number().optional(), edge: z.enum(["start", "end"]).optional(), offset: z.number().optional() })]).describe("Scene seconds, or the word it lands on: \"@emails\" / {word, edge, offset}"),
             id: z.string().optional().describe("A sound: a house name (ding, thud, pop, whoosh-soft, whoosh-fast, click, tick, swell, riser, deflate, camera-shutter, keyboard, paper-drop, monkey, attention, camera-flash, riser-metal, right, wrong, boom, bass-impact) or an id from action='search_sfx'. Omit when role is set."),
@@ -1545,6 +1552,11 @@ export function createMcpServer(): McpServer {
                 }
                 if (sceneUpdate.shot !== undefined) {
                   if (sceneUpdate.shot.trim()) existing.shot = sceneUpdate.shot.trim(); else delete existing.shot;
+                }
+                // A person film's scene is spoken: only the gentle moves.
+                if (sceneUpdate.shot_move !== undefined) {
+                  try { setShotMove(existing, sceneUpdate.shot_move, personCarries((project as any).treatment?.filmGrammar)); }
+                  catch (e: any) { return err(e.message); }
                 }
                 // The cast, set directly: the whole list replaces what the
                 // writer put there; a template would cover it, so it goes
@@ -1684,8 +1696,8 @@ export function createMcpServer(): McpServer {
         }
         // The grammar and the recipe are the film's, not the canvas's: they
         // live on the treatment, where every reader looks.
-        if (params.film_grammar !== undefined || params.canvas?.recipe !== undefined) {
-          const bad = pinFilmAxes(project, { film_grammar: params.film_grammar, recipe: params.canvas?.recipe });
+        if (params.film_grammar !== undefined || params.canvas?.recipe !== undefined || params.film_camera !== undefined) {
+          const bad = pinFilmAxes(project, { film_grammar: params.film_grammar, recipe: params.canvas?.recipe, film_camera: params.film_camera });
           if (bad) return err(bad);
           updated = true;
         }
@@ -1926,6 +1938,8 @@ export function createMcpServer(): McpServer {
       photo_index: z.number().int().min(0).optional().describe("remove_photo: which photo (0-based, in the actor's photos list)."),
       voice_speed: z.number().min(0.8).max(1.25).optional().describe("hear_voice / perform_scene: how fast the line is read (1 = as voiced; 1.1-1.2 is a fast creator pace). A tempo change, pitch kept, kept on the scene."),
       engine: z.enum(["seedance", "heygen"]).optional().describe("perform_scene: who makes it -- seedance (a frame, a location, a 480p draft then the 1080p final) or heygen (a HeyGen look speaks the line; the look is the setting; one render, no draft). Omitted: the scene's plan, else the best for the actor (HeyGen for a look)."),
+      move: z.string().optional().describe(`The CAMERA MOVE (SPEC-shot-camera.md). start_frame / perform_scene: the scene's move, kept as its shot_move ('' = its setting's) -- a speaking shot takes only ${SHOT_MOVES.filter((m) => m.speaking).map((m) => m.id).join(" | ")}. actor_clip: this clip's move, any of ${SHOT_MOVES.map((m) => m.id).join(" | ")} (orbit, crane and fpv are made without the model sheet: it pins the camera to the first frame). Omitted on a clip: none.`),
+      camera: z.string().optional().describe(`actor_clip: the camera it is shot on (${FILM_CAMERAS.map((c) => c.id).join(" | ")}); omitted, the film's camera (create / update film_camera). drone is for clips only.`),
       location: z.string().optional().describe("start_frame / perform_scene / scene_location / actor_clip ('' = a one-off place the shot describes): the LOCATION the scene is set in (a location id from action='locations'; '' none) -- the start frame is drawn in that room and its clean plate goes to Seedance as the room reference, so the room holds from scene to scene. remove_location: the location to remove."),
       clean: z.boolean().optional().describe("add_location with image: false keeps the image as it is (default: the person is removed -- a clean plate pins the room, not a pose)."),
       shape: z.enum(["wide", "tall", "square"]).optional().describe("add_location: the plate's shape (default wide from a prompt, the image's own from an image)."),
@@ -2054,13 +2068,13 @@ export function createMcpServer(): McpServer {
             if (params.scene_index === undefined) return err("scene_index is required (0-based)");
             const sp = await import("./core/scene-performance.js");
             const pid = needProject(), si = params.scene_index;
-            if (params.action === "start_frame") return ok({ ...(await sp.startSceneFrame(t, pid, si, { actor: params.actor, shot: params.shot, frame_prompt: params.frame_prompt, location: params.location })), message: "Drawing (~20-60 s). Poll action='scenes'; redraw with another start_frame, or pick_frame an earlier one." });
+            if (params.action === "start_frame") return ok({ ...(await sp.startSceneFrame(t, pid, si, { actor: params.actor, shot: params.shot, frame_prompt: params.frame_prompt, location: params.location, move: params.move })), message: "Drawing (~20-60 s). Poll action='scenes'; redraw with another start_frame, or pick_frame an earlier one." });
             if (params.action === "hear_voice") return ok({ ...(await sp.previewSceneVoice(t, pid, si, { actor: params.actor, voice_source: params.voice_source, delivery: params.delivery, voice_id: params.voice_id, voice_speed: params.voice_speed })), message: "The voice alone (no video made): listen to url. perform_scene when it is right." });
             if (params.action === "continue_from") return ok({ ...(await sp.continueSceneFrom(t, pid, si, { actor: params.actor, from_scene: params.from_scene ?? si - 1, shot: params.shot })), message: "The start frame is that scene's last frame. perform_scene next." });
             if (params.action === "pick_frame") { if (!params.frame_url) return err("frame_url is required"); return ok(await sp.pickSceneFrame(t, pid, si, params.frame_url, params.actor)); }
-            if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, recording_from: params.recording_from, quality: params.quality, frame_prompt: params.frame_prompt, video_prompt: params.video_prompt, force: params.force === true, delivery: params.delivery, location: params.location, engine: params.engine, motion: params.motion, voice_speed: params.voice_speed })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
+            if (params.action === "perform_scene") return ok({ ...(await sp.startScenePerformance(t, pid, si, { actor: params.actor, shot: params.shot, voice_source: params.voice_source, recording_from: params.recording_from, quality: params.quality, frame_prompt: params.frame_prompt, video_prompt: params.video_prompt, force: params.force === true, delivery: params.delivery, location: params.location, engine: params.engine, motion: params.motion, voice_speed: params.voice_speed, move: params.move })), message: params.quality === "final" ? "Rendering the final (1080p). Poll action='scenes'." : "Making the draft (480p, ~2-4 min): frame (if none), voice, Seedance, attach. Poll action='scenes'; when it is right, perform_scene quality='final'." });
             if (params.action === "scene_location") return ok({ ...(await sp.setSceneLocation(t, pid, si, String(params.location ?? ""))), message: params.location ? "Set. The next frame is drawn there and every take sends its plate as the room." : "Cleared." });
-            if (params.action === "actor_clip") return ok({ ...(await sp.startActorClip(t, pid, si, { actor: params.actor, shot: String(params.shot || ""), seconds: params.seconds, at: params.at, show: params.show, location: params.location, clip_in: params.clip_in })), message: "Making the clip (~3-5 min). Poll action='scenes'." });
+            if (params.action === "actor_clip") return ok({ ...(await sp.startActorClip(t, pid, si, { actor: params.actor, shot: String(params.shot || ""), seconds: params.seconds, at: params.at, show: params.show, location: params.location, clip_in: params.clip_in, move: params.move, camera: params.camera })), message: "Making the clip (~3-5 min). Poll action='scenes'." });
             const { setSceneCast } = await import("./core/recast.js");
             const c = params.cast;
             if (!c) return err("cast is required: an actor id, 'recording' or 'film'");
@@ -3516,6 +3530,7 @@ export function createMcpServer(): McpServer {
       film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "editorial", "data-story", "canvas-tour", "relay", "screencast", "speaker", "creator-cut"]).optional().describe("L4 film grammar to commit the whole film to -- WHAT CARRIES THE ARGUMENT. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives. relay: every beat carried by an OBJECT -- a handoff (the thing ending one beat becomes the start of the next: point -> logo -> dot -> search bar) or a through-line (one object stays while the beats change around it); by default ONE continuous take -- scenes join on identical frames (a black flood that contracts into the next shape, or the same full-frame photo), a cursor drives every change, a beat on every beat, the last frame = the first; or 1-3 long oners with hard-cut type punctuation between them. screencast: the screen carries it -- a real screen recording with a narrator driving the clock (selected automatically by screencast_source). speaker: a person carries it -- full-bleed on camera, graphics ride over them, voiceover_text holds the spoken lines; choosable BEFORE a recording exists. creator-cut: a person explains and the screen PROVES it -- every claim names its proof (screenshot, recording, b-roll, mock) that cuts in full-frame and back; the board asks for each piece; punchy ~30s ad or calm 60-90s tutorial. Where the film ships is NOT a grammar -- see frame. Omit to let the creative director choose."),
       frame: z.enum(["16x9", "9x16", "4x5", "1x1"]).optional().describe("The FRAME axis -- the delivery geometry, and nothing else. 16x9 (default): embeds, landing pages, YouTube. 9x16: Reels, TikTok, Shorts, Stories (top 12% / bottom 18% are platform UI). 4x5: Instagram or LinkedIn feed post (shown whole). 1x1: square. Omit to let the director infer it from where the prompt says the film ships; pass to pin. Explicit canvas_width/canvas_height override it. A frame never changes the grammar."),
       recipe: z.string().optional().describe(RECIPE_DESCRIBE),
+      film_camera: z.string().optional().describe(FILM_CAMERA_DESCRIBE),
       creator_format: z.enum(FORMAT_IDS as [string, ...string[]]).optional().describe("The VIRAL FORMAT (SPEC-creator-formats.md): talking-head | screen-share | listicle | ranking | reaction | clone | split-screen | green-screen | voiceover-broll | yap. Picks the format's default recipe (for the frame when one is proven there) when no recipe is pinned; recipe wins. list target='vocabulary' shows every format's recipes."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
@@ -3602,6 +3617,7 @@ export function createMcpServer(): McpServer {
             canvas_height: params.canvas_height,
             frame: params.frame,
             recipe: params.recipe,
+            film_camera: params.film_camera,
             creativity: params.creativity,
             film_grammar: params.film_grammar,
             visual_system: params.visual_system as any,

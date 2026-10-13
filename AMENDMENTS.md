@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-13 — The camera of a generated shot: film camera + shot move
+
+Two creator reels (trypromptwise, "camera movements", "camera types") say
+to name the camera in an AI video prompt. Tested on Dana before building
+(`SPEC-shot-camera.md`, "What the tests showed"): a still per camera
+body (GPT Image, the face held in all 12) and a 5 s silent Seedance clip
+per move. Nine moves worked; orbit and dolly zoom did not. The retry,
+with and without the model sheet, found the cause: **the sheet pins the
+camera to the first frame's view**. Without it the orbit made a real
+half-circle (the face drifted a little); dolly zoom failed both ways.
+
+Built: `src/core/shot-camera.ts`, two closed lists of the tested words.
+`treatment.filmCamera` (six film cameras + drone for clips; the director
+picks, `film_camera` pins; a film made before stays `cinema`, whose words
+ARE the old start-frame sentence) and `storyboard.scenes[i].shot_move`
+(thirteen moves; a speaking shot takes only static / push-in / pull-out /
+handheld / tracking; a performed scene with none gets its setting's;
+orbit, crane and fpv go without the sheet). Read by the start frame,
+Seedance (move first, camera last), actor clips, Veo `gen_video` and the
+Veo presenter (its `cameraNote` now reads the list). MCP: `film_camera`
+on create / update / generate, `shot_move` on the board, `cast move` /
+`camera`; Studio: a Camera row in the shot step, move + camera on extra
+shots. Test: `test/shot-camera.test.ts`, and the orbit clip in
+`test/scene-performance.test.ts`.
+
+Not built: stock b-roll leaning to the camera, move speed, per-setting
+allowed moves, a motion check on drafts, a speaking-shot test of the
+gentle moves (the clips were silent).
+
 ## 2026-10-13 — A narrated film keeps its measured word times through board edits
 
 Adding sound cues to the no-Dana Claude/GPT ad (proj_7d4e0c84) through the

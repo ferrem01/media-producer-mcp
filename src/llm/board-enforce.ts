@@ -14,6 +14,7 @@
  */
 import { NARRATION_MIN_S, NARRATION_TAIL_S } from "../core/narration-fit.js";
 import { rescaleBeats } from "../core/beats.js";
+import { getMove } from "../core/shot-camera.js";
 
 /** Speaking pace the board sizes a line at before the voice exists (the
  *  build re-fits every scene to the measured line). */
@@ -218,6 +219,19 @@ export function enforceBoard(scenes: any[], opts: { brief?: string; voiced?: boo
   // 4. THE SOUND: one quiet cue a scene, no meme stings.
   const dropped = capSceneSounds(scenes, { memes: /\b(meme|fahh+|sting|vine boom)\b/i.test(String(opts.brief || "")) });
   if (dropped) log.push(`${dropped} sound cue(s) dropped (one a scene, one payoff a film, no meme stings)`);
+
+  // 5. THE CAMERA MOVE (SPEC-shot-camera.md): one known move a shot; on a
+  //    film a person carries the scene is spoken, and only the gentle moves
+  //    hold lip sync and the face -- an unknown or unsafe move goes, and the
+  //    scene's setting decides.
+  const movesOut: number[] = [];
+  scenes.forEach((sc, i) => {
+    if (sc?.shot_move === undefined) return;
+    const m = getMove(sc.shot_move);
+    if (m && !(opts.personCarries && !m.speaking)) { sc.shot_move = m.id; return; }
+    delete sc.shot_move; movesOut.push(i + 1);
+  });
+  if (movesOut.length) log.push(`camera move dropped on scene(s) ${movesOut.join(", ")} (unknown, or not made on a speaking shot)`);
   return { log, warnings };
 }
 

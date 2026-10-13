@@ -17,6 +17,7 @@
 import { okJson, NO_TEXT } from "./actor-test.js";
 export { NO_TEXT };
 import { reportVendor } from "./vendor-status.js";
+import { moveLine, getCamera, DEFAULT_CAMERA, type ShotMove, type FilmCamera } from "./shot-camera.js";
 
 const API = "https://api.atlascloud.ai/api/v1/model";
 const POLL_MS = Number(process.env.MP_ACTOR_POLL_MS) || 5000;
@@ -39,21 +40,32 @@ export function seedanceRefs(images: number, audio: boolean, video = false, room
 
 /** A speaking shot: the person from the frame and sheet says the reference
  *  audio's words in the shot the scene asks for. */
-export function speakingPrompt(shot: string): string {
+export function speakingPrompt(shot: string, cam: ShotCamera = {}): string {
   return "The person from the first frame and the character sheet (the same face, hair, clothes and accessories) talks directly to the camera. " +
-    `${shot.trim().replace(/\.?$/, ".")} ` +
+    shotWords(shot, cam) +
     "They speak exactly the words in the reference audio, in that exact voice and timing, with accurate lip sync. " +
     "Sound: their voice as it really sounds where they are in this shot -- the acoustics of that place " +
     "(a room sounds like a room, outdoors like outdoors, a car like a car), and if they hold a microphone, close and clear like that mic; " +
-    "not a dry studio voiceover. No music. Realistic, natural light. " + NO_TEXT;
+    "not a dry studio voiceover. No music. Realistic, natural light. " + (cam.camera ? `${cam.camera.video} ` : "") + NO_TEXT;
 }
 
 /** A shot with no speech (b-roll): the person in the action asked for. */
-export function silentPrompt(shot: string): string {
-  return "The person from the first frame and the character sheet (the same face, hair, clothes and accessories). " +
-    `${shot.trim().replace(/\.?$/, ".")} ` +
+export function silentPrompt(shot: string, cam: ShotCamera = {}): string {
+  return `The person from the first frame${cam.sheet === false ? "" : " and the character sheet"} (the same face, hair, clothes and accessories). ` +
+    shotWords(shot, cam) +
     "They move naturally the whole time, from the very first frame -- gesturing, shifting, reacting, talking if the shot says so; never a held pose. " +
-    "Realistic body movement and weight, natural light, cinematic. " + NO_TEXT;
+    `Realistic body movement and weight, natural light. ${(cam.camera || getCamera(DEFAULT_CAMERA)!).video} ` + NO_TEXT;
+}
+
+/** How a shot is filmed (core/shot-camera.ts): the move made in it, the
+ *  camera it is shot on, and whether the model sheet goes with it. */
+export interface ShotCamera { move?: ShotMove; camera?: FilmCamera; sheet?: boolean }
+
+/** The shot, the camera move first -- the wording the Oct 13 clips were
+ *  made with (SPEC-shot-camera.md). */
+function shotWords(shot: string, cam: ShotCamera): string {
+  const line = moveLine(cam.move);
+  return `${line ? `${line} ` : ""}${shot.trim().replace(/\.?$/, ".")} `;
 }
 
 async function poll(id: string, headers: Record<string, string>): Promise<SeedanceResult> {

@@ -218,6 +218,20 @@ describe("a scene performed by a cast actor", () => {
     expect(remade.anchors).toEqual({ at: { word: "coffee" } });
     expect([remade.data.at, remade.enter.at]).toEqual([2.2, 2.2]);
     expect(p2.storyboard.scenes[1].actor_clip).toBeUndefined();   // one list, no "last one touched" copy
+
+    // THE CAMERA (SPEC-shot-camera.md): an orbit leaves the first frame's
+    // view, so it is made without the sheet (Oct 13: with it the camera
+    // barely moved), its move named first; a drone is a clip's camera.
+    await sp.startActorClip(T, P, 1, { actor: "dana", shot: "Sits in a chair in a bright loft, talking", at: 3, location: "", move: "orbit", camera: "drone" });
+    await until(async () => (await sp.getScenePerformances(T, P))[1].actor_clips.find((c: any) => c.at === 3)?.status === "done");
+    const orbit = atlas[atlas.length - 1];
+    expect(orbit.reference_images).toHaveLength(1);             // the frame alone: no sheet
+    expect(orbit.prompt).toMatch(/^@Image1 is the first frame of the video\. The person from the first frame \(the same face/);
+    expect(orbit.prompt).toMatch(/\)\. CAMERA MOVE: the camera travels a half-circle, 180 degrees, around the person/);
+    expect(orbit.prompt).toMatch(/Aerial DJI drone footage/);
+    expect((await sp.getScenePerformances(T, P))[1].actor_clips.find((c: any) => c.at === 3)).toMatchObject({ move: "orbit", camera: "drone" });
+    // A move that is not on the list (dolly zoom failed both ways) is refused.
+    await expect(sp.startActorClip(T, P, 1, { actor: "dana", shot: "Sits still", at: 9, move: "dolly-zoom" })).rejects.toThrow(/Unknown camera move/);
   }, 60000);
 });
 
@@ -448,7 +462,7 @@ describe("locations: a clean plate per set, the room of every take made there", 
     expect(calls.atlas[0].reference_images).toHaveLength(3);
     expect(calls.atlas[0].reference_images[2]).toMatch(/_perform\/.*loft-lounge\.jpg$/);
     expect(calls.atlas[0].prompt).toMatch(/@Image3 is the room/);
-    expect(done.draft.inputs).toMatch(/\|loft-lounge$/);
+    expect(done.draft.inputs).toMatch(/\|loft-lounge\|cinema\|$/);   // then the camera, then the move (none)
 
     // The same location again keeps the frame; another drops it.
     expect((await sp.setSceneLocation(T, P, 1, "loft-lounge")).frame).toBe(done.frame);

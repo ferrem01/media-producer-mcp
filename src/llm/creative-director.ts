@@ -18,6 +18,7 @@
  *   - Key visual commitments (color mood, typography attitude, motion personality)
  */
 
+import { FILM_CAMERA_IDS, getCamera, inferFilmCamera } from "../core/shot-camera.js";
 import { recipeMenu, getRecipe } from "../core/recipes.js";
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { getStorytellingGuide } from "./design-skills.js";
@@ -98,6 +99,9 @@ export interface ConceptDirectorOpts {
   /** THE RECIPE pin (SPEC-recipes.md): an id from the library; its grammar
    *  is then the film's grammar unless the caller pinned one. */
   recipe?: string;
+  /** THE FILM CAMERA pin (SPEC-shot-camera.md): what its generated shots are
+   *  "shot on". Omitted -> the director picks, else grammar + frame decide. */
+  filmCamera?: string;
 }
 
 export interface Treatment {
@@ -144,6 +148,10 @@ export interface Treatment {
    *  from the library when a recipe suits the brief; absent = the writer
    *  invents the beats (today's generate). */
   recipe?: string;
+  /** THE FILM CAMERA (SPEC-shot-camera.md): what the film's generated shots
+   *  are "shot on" -- a FILM_CAMERAS id. Start frames are drawn in its look
+   *  and Seedance keeps it. Read as DATA by core/shot-camera.ts. */
+  filmCamera?: string;
 }
 
 /**
@@ -254,6 +262,7 @@ as a CONTINUOUS TAKE it holds 3-7 scenes joined on identical frames and nothing 
   "selectionReason": "Why this concept is strongest",
   "filmGrammar": "launch-film | tempo-cut | hype-cut | editorial | data-story | canvas-tour | relay | screencast | speaker | creator-cut",
   "frame": "16x9 | 9x16 | 4x5 | 1x1 -- the DELIVERY GEOMETRY, inferred from where the prompt says the film ships: Reels / TikTok / Shorts / Stories -> 9x16; an Instagram or LinkedIn FEED post -> 4x5; 'square' -> 1x1; anything else or unstated -> 16x9. When the caller pinned it, echo it. A frame is a size and nothing more -- it never changes the grammar.",
+  "filmCamera": "${FILM_CAMERA_IDS.join(" | ")} -- what any GENERATED people and shots in this film are filmed on (an AI presenter, b-roll of them, a generated clip). phone-front for a creator talking to camera on a phone, phone-back for social footage someone films, documentary for an observed, serious film, film-16mm for nostalgia or a founder's story, disposable for party/flash energy, cinema for a polished launch. Pick from where the film ships and its grammar; a brief that names a look wins. When the caller pinned it, echo it.",
   "recipe": "<recipe id> | null -- THE RECIPE (the third axis): a measured cut from the library below that the writer will fill. Pick one when the brief's shape matches a recipe's suits and the recipe's grammar is the grammar you chose; null when none fits (the writer then invents the beats). When the caller pinned it, echo it.",
   "visualSystem": {
     "world": "light | dark | paper -- the film's continuous surface. paper = the print/letterpress world (painted sheet, warm ink): choose it when the prompt asks for a paper/print/zine/letterpress/illustrated-sticker feel. Otherwise omit and the brand decides.",
@@ -286,6 +295,9 @@ as a CONTINUOUS TAKE it holds 3-7 scenes joined on identical frames and nothing 
   // (SPEC-format-and-spine.md -- the asserted spine).
   // FRAME: pinned -> a constraint the concept is designed around; omitted ->
   // the director infers it from where the prompt says the film ships.
+  if (opts.format === "video" && getCamera(opts.filmCamera)?.film) {
+    grammarDirective += `\n\nTHE CALLER HAS FIXED THE FILM CAMERA: "${getCamera(opts.filmCamera)!.id}". Echo it as "filmCamera".`;
+  }
   if (opts.format === "video") {
     if (opts.frame) {
       const fs = FRAME_SPECS[opts.frame];
@@ -377,6 +389,7 @@ as a CONTINUOUS TAKE it holds 3-7 scenes joined on identical frames and nothing 
     filmGrammar: resolveFilmGrammar(opts, result.filmGrammar),
     recipe: resolveRecipe(opts, result.recipe),
     frame: resolveFrame(opts, result.frame),
+    filmCamera: resolveFilmCamera(opts, result.filmCamera, resolveFilmGrammar(opts, result.filmGrammar), resolveFrame(opts, result.frame)),
     visualSystem: resolveVisualSystem(opts, result.visualSystem),
     audioSystem: resolveAudioSystem(opts, result.audioSystem),
   };
@@ -430,6 +443,17 @@ function resolveFilmGrammar(opts: ConceptDirectorOpts, raw: unknown): FilmGramma
     return raw.trim() as FilmGrammar;
   }
   return opts.hasSpeaker ? "speaker" : "launch-film";
+}
+
+/** THE FILM CAMERA: the caller's pin wins; else the director's pick when it
+ *  is a film camera; else what the grammar and frame suggest. Video only. */
+export function resolveFilmCamera(opts: ConceptDirectorOpts, raw: unknown, grammar: string | undefined, frame: string | undefined): string | undefined {
+  if (opts.format !== "video") return undefined;
+  const pinned = getCamera(opts.filmCamera);
+  if (pinned?.film) return pinned.id;
+  const picked = getCamera(raw);
+  if (picked?.film) return picked.id;
+  return inferFilmCamera(grammar, frame);
 }
 
 /** The caller's frame always wins; otherwise validate the director's pick.

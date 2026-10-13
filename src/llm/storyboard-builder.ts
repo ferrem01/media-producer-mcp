@@ -7,6 +7,7 @@
  * and builds the scene HTML.
  */
 
+import { MOVE_IDS } from "../core/shot-camera.js";
 import { recipeBlock, recipeSceneBand } from "../core/recipes.js";
 import { callLLM, callLLMAgentic, type LLMConfig, type LLMContentPart, type LLMMessage, type LLMTool } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
@@ -125,6 +126,7 @@ const SCENE_TOOL_SCHEMA = {
     broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image/gen_video)" },
     hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query/gen_video)" },
     gen_video: { type: "string", description: "AI-generated video clip prompt -- ONLY for moving shots stock footage cannot plausibly contain (mutually exclusive with broll_query/hero_image)" },
+    shot_move: { type: "string", enum: MOVE_IDS, description: "The CAMERA MOVE of the scene's generated shot (its gen_video, or the AI presenter performing it) -- one move, never written into the prose. A spoken presenter scene takes only static | push-in | pull-out | handheld | tracking; omit it there and the scene's setting decides." },
     sfx: {
       type: "array",
       description: "SOUND CUES -- AT MOST ONE per scene, and most scenes need none: the one moment the viewer SEES land hardest (a card slamming in, the hard cut, the payoff click). Tie it to the word it lands on (\"@emails\") or scene seconds. Never a bed or music (those are the film's audio), never a sound per click or per card, never a meme sting. SOUND JOBS: give the cue a role and the film's palette picks the sound, the same one for the same job every time -- transition (camera flash: on a hard cut or a handoff), tension (riser: builds INTO the payoff; its `at` is where it LANDS), payoff (bass impact: the payoff itself, once, near the end), right / wrong (a chime / a buzzer: ONLY where the film stages do vs don't). Pick ONE OR TWO jobs for the whole film. House sounds: ding, thud, pop, click, tick, whoosh-soft, whoosh-fast, swell, riser, deflate, camera-shutter, keyboard, paper-drop, camera-flash, riser-metal, right, wrong, bass-impact.",
@@ -379,6 +381,7 @@ export interface DraftScene {
   voiceover_text?: string;  // Narration script for this scene (TTS)
   broll_query?: string;     // when set, fetch cinematic stock footage as this scene's background
   gen_video?: string;       // when set, DIFFUSION-generate this scene's background clip (Veo) -- shots stock can't contain
+  shot_move?: string;       // the camera move of the scene's generated shot (core/shot-camera.ts)
   /** The scene's internal beat timeline: one persistent world, several thoughts.
    *  Normalized (bars -> seconds, rescaled to fill the scene) after parsing. */
   beats?: SceneBeat[];
@@ -786,7 +789,7 @@ ${opts.world ? worldPromptBlock(opts.world) + "\n\n" : ""}### Background Strateg
 Before writing any background, decide which of FIVE strategies the moment wants. Do this BEFORE reaching for b-roll -- b-roll is ONE option, not the default for every atmospheric beat:
 1. **B-roll video (broll_query)** -- real-world energy, atmosphere, a place, a human moment that should feel ALIVE and MOVING. Opener "set the world", emotional/aspirational/lifestyle beats WITH motion. Must visibly move (see B-Roll below).
 2. **Generated image (hero_image)** -- a calm, composed, contemplative, or singular striking visual; a beat that should feel STILL and intentional. A photograph never reads as "broken" the way a frozen video does, so this -- NOT a slowed/static video -- is the correct tool for quiet/still/atmospheric moments. Use hero_image when you want the cinematic b-roll *feeling* (real, emotional, beautiful) but the scene should HOLD STILL.
-3. **Generated video (gen_video)** -- a MOVING shot that stock search cannot plausibly contain: a specific staged scenario, a branded/surreal moment, an impossible camera path ("a wall of glowing sticky notes collapsing into a single clean card, slow push-in"). Write it as a cinematography direction: subject, action, camera move, light. It is the EXPENSIVE tool -- 0-1 per film, only when neither stock nor a still can deliver the shot. If a generic search phrase would find the shot on a stock site, use broll_query instead. MANDATORY WHEN BRIEFED: if the brief itself describes an impossible/branded shot and asks for it ("generate this shot", "no stock library has this"), that beat MUST carry gen_video -- substituting motion graphics for an explicitly requested generated shot is a dropped_element defect (measured live: proj_cd8a6fb6 ignored a generate-this-shot brief and shipped its centerpiece beat as an empty gradient).
+3. **Generated video (gen_video)** -- a MOVING shot that stock search cannot plausibly contain: a specific staged scenario, a branded/surreal moment, an impossible camera path ("a wall of glowing sticky notes collapsing into a single clean card, slow push-in"). Write it as a cinematography direction: subject, action, light -- and put its ONE camera move in "shot_move" (${MOVE_IDS.join(" | ")}), never in the prose: the move's tested words are added for you. It is the EXPENSIVE tool -- 0-1 per film, only when neither stock nor a still can deliver the shot. If a generic search phrase would find the shot on a stock site, use broll_query instead. MANDATORY WHEN BRIEFED: if the brief itself describes an impossible/branded shot and asks for it ("generate this shot", "no stock library has this"), that beat MUST carry gen_video -- substituting motion graphics for an explicitly requested generated shot is a dropped_element defect (measured live: proj_cd8a6fb6 ignored a generate-this-shot brief and shipped its centerpiece beat as an empty gradient).
 4. **Motion graphics / mesh (animated background, the default)** -- product, UI, data, abstract, branded scenes. HTML/CSS/GSAP gradients, glow orbs, particles.
 5. **Plain gradient** -- when nothing else is earned.
 **DECISION GATE:** Is this beat moving or still? MOVING/kinetic/alive -> b-roll (or gen_video ONLY if stock can't contain the shot). STILL/calm/contemplative/composed -> hero_image. If you catch yourself wanting a "slow", "still", "perfectly calm", "stationary camera", "resting", or "barely moving" video, STOP -- that is a hero_image, not a broll_query. A meditative/dawn/quiet/serene opener is almost always a hero_image, NOT slow b-roll.

@@ -754,6 +754,10 @@ export interface StoryboardScene {
    *  ("the chat typing the ask on top, the speaker below"). Optional -- the
    *  plan falls back to the first sentence of visual_notes (core/film-plan.ts). */
   shot?: string;
+  /** The CAMERA MOVE of the scene's generated shot (core/shot-camera.ts): its
+   *  AI presenter's take and its gen_video clip. Absent on a performed scene:
+   *  its setting's move. */
+  shot_move?: string;
   /** Library components the storyboard builder suggested embedding in this
    *  scene. Plain string = type only. Object = storyboard-authored data; for
    *  performable surfaces data.script is the timed on-screen performance. */

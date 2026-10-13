@@ -35,6 +35,11 @@ list you can print.
 Plus the fifth axis that already existed and is only a size: **frame**
 (`16x9 | 9x16 | 4x5 | 1x1`).
 
+And the camera of any GENERATED shot (`SPEC-shot-camera.md`): the **film
+camera** (film: what it is shot on, `treatment.filmCamera`) and the **shot
+move** (scene: `storyboard.scenes[i].shot_move`). A setting names the move
+a performed scene gets when it names none.
+
 **Print every list:** `list target:"vocabulary"` (MCP) returns all of them,
 with every recipe grouped under its format and grammar. The code is
 `src/core/vocabulary.ts`; the lists are the code's lists, never a copy.
