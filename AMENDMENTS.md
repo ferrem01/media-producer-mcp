@@ -6,6 +6,40 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-13 — The Sample library, and two whole lifecycle email series
+
+Marc: the house examples should be a library "like the music library or the
+sound library" that every film uses: "in many cases it's better to show a
+beautiful email or blog ... versus a component-based simple thing". And the
+lifecycle reel's emails "are crap, just text. Would be great to show real
+ones that are pretty."
+
+- **The Sample library** (`core/sample-work.ts`): the house set as one shared,
+  read-only library, the same for every tenant, beside music and sound. The
+  manifest stays the one the pages read (`components/shared/samples.js`, now
+  with an `id` and a `title` a piece, and `flow` on emails); the server
+  evaluates it once (`loadSampleLibrary`, `listSamples`). The brand kit is
+  untouched: a tenant's own work already lives there.
+  - **Studio:** "Add sample" in the scene and element popovers opens a Samples
+    card (`GET /api/sample-options/{t}/{p}`) -- browse by area, search titles,
+    Add one piece (an image framed to its shape at the playhead) or a Set
+    (asset-wall of that kind behind the scene).
+  - **MCP:** `list target:'samples'` with `samples: {kind, brand, platform,
+    flow, q}`.
+  - **The writer:** the storyboard system prompt lists every piece by title
+    and exact url, and says when to reach for one (a beat that SHOWS an
+    email, a flow, a post, a blog, a landing page, an event piece) and how
+    (image src, index-reel items[].src, asset-wall). Codegen's media rule
+    names sample-work paths as allowed.
+- **24 lifecycle emails**, one brand a series so a flow reads as one company:
+  Flowpath (B2B SaaS: welcome, activation, first win, feature tip, customer
+  story, trial ending, upgrade, check-in, milestone, renewal, win-back,
+  feedback) and Maré (ecommerce: welcome, browse and cart abandonment, order,
+  shipping, review, replenish, back in stock, price drop, VIP, birthday,
+  win-back). `pick` and asset-wall take `flows`.
+
+---
+
 ## 2026-10-13 — The camera of a generated shot: film camera + shot move
 
 Two creator reels (trypromptwise, "camera movements", "camera types") say

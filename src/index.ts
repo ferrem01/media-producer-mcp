@@ -9,7 +9,7 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ensureStickerLibrary, stickerDir } from "./core/sticker-library.js";
-import { sampleWorkDir } from "./core/sample-work.js";
+import { sampleWorkDir, listSamples } from "./core/sample-work.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID, createHash } from "node:crypto";
 import http from "node:http";
@@ -1370,7 +1370,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|music-level|speaker-waveform|speaker-transcript|speaker-level|voice-line|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|music-level|speaker-waveform|speaker-transcript|speaker-level|voice-line|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|sample-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -3690,6 +3690,16 @@ Rules:
             .map((t) => ({ id: t.id, source: t.source, start_time: t.start_time, volume: t.volume }));
           jsonResponse(res, 200, { ok: true, ...options, placed });
         } catch (e: any) { jsonResponse(res, 502, { error: e?.message || String(e) }); }
+        return;
+      }
+
+      // GET /api/sample-options/{tenant}/{project}?kind=&q=  THE SAMPLE LIBRARY:
+      //   the house set of finished marketing work for made-up brands, the
+      //   same for every tenant (core/sample-work.ts) -- Studio's Samples card.
+      const sampleOptionsMatch = urlPath.match(/^\/api\/sample-options\/([^/]+)\/([^/]+)$/);
+      if (sampleOptionsMatch && method === "GET") {
+        const sp = new URL(req.url || "/", "http://localhost").searchParams;
+        jsonResponse(res, 200, { ok: true, samples: listSamples({ kind: sp.get("kind") || undefined, q: sp.get("q") || undefined }) });
         return;
       }
 

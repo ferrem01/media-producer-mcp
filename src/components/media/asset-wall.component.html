@@ -56,7 +56,7 @@
     var LAYOUTS = ['wall', 'rolodex', 'fly', 'orbit', 'fan', 'grid', 'scroll', 'feed', 'burst'];
     var layout = LAYOUTS.indexOf(data.layout) >= 0 ? data.layout : 'wall';
     var seed = num(data.seed, 7);
-    var opts = { kinds: Array.isArray(data.kinds) ? data.kinds : null, brands: Array.isArray(data.brands) ? data.brands : null, platforms: Array.isArray(data.platforms) ? data.platforms : null, items: Array.isArray(data.items) ? data.items : null, seed: seed };
+    var opts = { kinds: Array.isArray(data.kinds) ? data.kinds : null, brands: Array.isArray(data.brands) ? data.brands : null, platforms: Array.isArray(data.platforms) ? data.platforms : null, flows: Array.isArray(data.flows) ? data.flows : null, items: Array.isArray(data.items) ? data.items : null, seed: seed };
     root.style.perspective = Math.round(W * 1.15) + 'px';
 
     // The ground: a brand gradient (default the reference's magenta to red);

@@ -575,7 +575,7 @@ This scene has a real, cinematic AI-generated image that MUST be the full-bleed 
 - This is a STILL beat: a slow, gentle Ken-Burns drift (scale 1.0 -> 1.06 over the full duration) on the image is welcome, but NOTHING should pop, bounce, or rebuild. Animate text gently (fade/slow rise); do not animate a competing background.
 ` : ""}
 ## ASSETS: LOCAL PATHS ONLY (hard rule)
-NEVER reference an external/remote URL (http://, https://) for a video, image, or any media. The ONLY media you may use are the local /assets/... paths explicitly handed to you above (b-roll, hero image, logos). Do NOT invent stock-footage URLs (Pexels, Unsplash, etc.) -- remote media breaks the renderer.
+NEVER reference an external/remote URL (http://, https://) for a video, image, or any media. The ONLY media you may use are the local /assets/... paths explicitly handed to you above (b-roll, hero image, logos, the spec's component data -- including Sample library pieces at /assets/_system/sample-work/...). Do NOT invent stock-footage URLs (Pexels, Unsplash, etc.) -- remote media breaks the renderer.
 
 ## VIDEOS: MARKUP ONLY -- never drive their playback (hard rule)
 The runtime transport owns every <video>'s clock: it seeks, plays, pauses and speed-maps each video to the film timeline (including user edits made later in the studio). Your script must NEVER fight it:

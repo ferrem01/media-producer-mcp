@@ -32,6 +32,11 @@
       "label": "House work by brand: flowpath | oliva | lumen | bloom | volt | nimbus | mare | bonsai | kiln | atlas | penny | fern (default all; rolodex default flowpath, the six-slide deck)",
       "optional": true
     },
+    "flows": {
+      "type": "array",
+      "label": "House emails by lifecycle step, e.g. welcome | activation | trial-ending | cart | browse | order | shipping | review | win-back (Flowpath has the B2B lifecycle, Mare the ecommerce one)",
+      "optional": true
+    },
     "platforms": {
       "type": "array",
       "label": "House social posts by platform: linkedin | instagram | story | tiktok | x | youtube | pinterest (default all)",

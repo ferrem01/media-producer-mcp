@@ -1296,6 +1296,19 @@ ${QUOTIENT_CSS}
   .mu-level label b { width: 110px; font-weight: 500; }
   .mu-level label input { flex: 1; min-width: 0; }
   .mu-level label span { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--content-secondary); }
+  /* THE SAMPLE LIBRARY: finished marketing work for made-up brands, the same
+     for every tenant -- beside the music and sound libraries. */
+  .sa-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+  .sa-chip { height: 28px; padding: 0 12px; border-radius: 14px; border: 1px solid var(--border-secondary); background: var(--surface-primary); color: var(--foreground); font: 500 12px/26px inherit; cursor: pointer; }
+  .sa-chip.on { border-color: var(--accent-blue); color: var(--accent-blue); box-shadow: inset 0 0 0 1px var(--accent-blue); }
+  .sa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; max-height: 52vh; overflow-y: auto; padding: 2px; }
+  .sa-tile { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border-secondary); border-radius: var(--radius); padding: 8px; background: var(--surface-primary); }
+  .sa-tile.busy { opacity: .5; pointer-events: none; }
+  .sa-thumb { height: 170px; border-radius: var(--radius-sm); background: var(--surface-secondary, #f3f3f6) center top / cover no-repeat; }
+  .sa-t { font-size: 12px; line-height: 1.3; min-height: 2.6em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .sa-t small { display: block; color: var(--content-secondary); font-size: 11px; }
+  .sa-act { display: flex; gap: 6px; }
+  .sa-act .np-btn { flex: 1; padding: 0 6px; }
   .mu-level small { display: block; color: var(--content-secondary); font-size: 12px; margin-top: 4px; }
 
   /* ── Storyboard draft view: THE TRUE STORYBOARD, one card at a time ──
@@ -5574,6 +5587,80 @@ ${QUOTIENT_CSS}
         document.getElementById('mu-q').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
       })
       .catch(function(e) { body.innerHTML = '<div class="np-empty">' + escHtml(e.message || String(e)) + '</div>'; });
+  }
+  // THE SAMPLE LIBRARY (core/sample-work.ts): browse the house set by area,
+  // put one piece into the scene at the playhead (an image, framed to its
+  // shape) or a moving set of that area (asset-wall: emails and blogs
+  // scroll, posts rise in their platform frames, event pieces fly).
+  var SA_AREAS = [['', 'All'], ['email', 'Emails'], ['social', 'Social'], ['blog', 'Blogs'], ['event', 'Events'], ['landing', 'Landing pages'], ['slide', 'Slides']];
+  var SA_SET = { email: { layout: 'scroll', kinds: ['email'] }, blog: { layout: 'scroll', kinds: ['blog'] }, social: { layout: 'feed' }, event: { layout: 'fly', kinds: ['event'] }, landing: { layout: 'wall', kinds: ['landing'] }, slide: { layout: 'rolodex' } };
+  function openSamplesCard(project) {
+    studioModalOpen('<h3 class="sm-title">Samples</h3><p class="sm-desc">The Sample library: finished emails, posts, blogs, landing pages and event pieces for made-up brands, shared by every film. Add one piece to this scene at the playhead, or a moving set of its kind.</p><div id="sa-body"><div class="np-empty">Loading\u2026</div></div><div class="sm-actions"><button class="sm-btn" id="sa-close">Close</button></div>');
+    document.getElementById('sa-close').addEventListener('click', studioModalClose);
+    saLoad(project, '', '');
+  }
+  function saLoad(project, kind, q) {
+    var body = document.getElementById('sa-body'); if (!body) return;
+    api('/sample-options/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '?kind=' + encodeURIComponent(kind) + '&q=' + encodeURIComponent(q))
+      .then(function(r) {
+        if (!document.getElementById('sa-body')) return;
+        var list = r.samples || [];
+        var h = '<div class="sa-chips">' + SA_AREAS.map(function(a) { return '<button class="sa-chip' + (a[0] === kind ? ' on' : '') + '" data-k="' + a[0] + '">' + a[1] + '</button>'; }).join('') + '</div>';
+        h += '<div class="mu-search"><input id="sa-q" type="text" placeholder="Search titles (welcome, cart, Kiln, LinkedIn\u2026)" value="' + escAttr(q) + '"><button class="np-btn" id="sa-go">Search</button></div>';
+        h += '<div class="sa-grid">';
+        if (!list.length) h += '<div class="np-empty">Nothing matches.</div>';
+        list.forEach(function(pc, i) {
+          var tag = [pc.flow, pc.platform, pc.page].filter(Boolean).join(' \u00b7 ');
+          h += '<div class="sa-tile" data-i="' + i + '"><div class="sa-thumb" style="background-image:url(' + escAttr(withToken(pc.src)) + ')"></div>' +
+            '<div class="sa-t">' + escHtml(pc.title) + '<small>' + escHtml(pc.kind + (tag ? ' \u00b7 ' + tag : '')) + '</small></div>' +
+            '<div class="sa-act"><button class="np-btn sa-add" title="This piece, framed to its shape, at the playhead">Add</button>' +
+            (SA_SET[pc.kind] ? '<button class="np-btn sa-set" title="A moving set of this kind, full frame behind the scene">Set</button>' : '') + '</div></div>';
+        });
+        h += '</div>';
+        body.innerHTML = h;
+        body.querySelectorAll('.sa-chip').forEach(function(b) { b.addEventListener('click', function() { saLoad(project, b.dataset.k, document.getElementById('sa-q').value.trim()); }); });
+        body.querySelectorAll('.sa-tile').forEach(function(tile) {
+          var pc = list[parseInt(tile.dataset.i, 10)];
+          tile.querySelector('.sa-add').addEventListener('click', function() { saAdd(pc, 'piece', tile); });
+          var sb = tile.querySelector('.sa-set'); if (sb) sb.addEventListener('click', function() { saAdd(pc, 'set', tile); });
+        });
+        function go() { saLoad(project, kind, document.getElementById('sa-q').value.trim()); }
+        document.getElementById('sa-go').addEventListener('click', go);
+        document.getElementById('sa-q').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+      })
+      .catch(function(e) { body.innerHTML = '<div class="np-empty">' + escHtml(e.message || String(e)) + '</div>'; });
+  }
+  function saAdd(pc, mode, tile) {
+    var si = state.currentSceneIndex, scene = currentSceneEntry(), p = state.currentProject;
+    if (!scene || !p) return;
+    var cw = (p.canvas && p.canvas.width) || 1920, ch = (p.canvas && p.canvas.height) || 1080;
+    var dur = scene.duration_seconds || 5;
+    var at = Math.round(Math.max(0, Math.min(dur - 0.5, (state.masterTime || 0) - sceneStartFor(si))) * 10) / 10;
+    var comp;
+    if (mode === 'set') {
+      comp = { id: 'samples_' + Date.now().toString(36), type: 'asset-wall', z_index: 1, position: { x: 0, y: 0, width: '100%', height: '100%' },
+        data: Object.assign({ at: at }, SA_SET[pc.kind]) };
+    } else {
+      // Framed to the piece's own shape: 78% of the frame's height, narrower than 80% of its width.
+      var hPx = ch * 0.78, wPx = hPx / (pc.ratio || 1);
+      if (wPx > cw * 0.8) { wPx = cw * 0.8; hPx = wPx * (pc.ratio || 1); }
+      var wP = Math.round(wPx / cw * 1000) / 10, hP = Math.round(hPx / ch * 1000) / 10;
+      comp = { id: 'sample_' + Date.now().toString(36), type: 'image', z_index: 40,
+        position: { x: Math.round((100 - wP) / 2 * 10) / 10 + '%', y: Math.round((100 - hP) / 2 * 10) / 10 + '%', width: wP + '%', height: hP + '%' },
+        data: { src: pc.src, fit: 'contain', drift: false, at: at } };
+    }
+    if (tile) tile.classList.add('busy');
+    api('POST', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) +
+        '/scenes/' + encodeURIComponent(scene.id) + '/components', { component: comp })
+      .then(function(r) {
+        if (tile) tile.classList.remove('busy');
+        if (!r || r.ok === false) { studioStatus('Add sample failed: ' + ((r && r.error) || 'unknown'), 'err'); return; }
+        if (r.scene) p.scenes[si] = r.scene;
+        studioModalClose();
+        studioStatus(mode === 'set' ? 'A moving set of ' + pc.kind + ' pieces is behind scene ' + (si + 1) + '. Click it to revise or remove.' : '\u201c' + pc.title + '\u201d added at ' + at.toFixed(1) + 's. Drag or click it to place, revise or remove.', 'ok');
+        startCompositePreview(p, { time: state.masterTime, sceneIndex: si });
+      })
+      .catch(function(e) { if (tile) tile.classList.remove('busy'); studioStatus('Add sample failed: ' + e.message, 'err'); });
   }
   // RECORD HERE (Marc, Oct 13: in the card it was "scroll all over the
   // place, and there's like different scroll areas"): the take page over
@@ -12597,7 +12684,8 @@ ${QUOTIENT_CSS}
     if (isScene) {
       camRow = '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1 1 45%;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>' +
         '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pan slides at the camera’s current zoom (zoom in first; a wide camera has nowhere to pan).">↔ Pan (drag)…</button>' +
-        '<button class="rv-go secondary" id="rv-pop-sound" style="flex:1 1 45%;" title="Add a sound effect (ding, thud, whoosh...) at the playhead -- it lands on the Effects lane beside the zooms.">\u{1F514} Add sound</button>';
+        '<button class="rv-go secondary" id="rv-pop-sound" style="flex:1 1 45%;" title="Add a sound effect (ding, thud, whoosh...) at the playhead -- it lands on the Effects lane beside the zooms.">\u{1F514} Add sound</button>' +
+        '<button class="rv-go secondary" id="rv-pop-samples" style="flex:1 1 45%;" title="Open the Sample library: finished emails, posts, blogs and event pieces to drop into this scene">\u{1F5BC} Add sample</button>';
     } else {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1 1 45%;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1 1 45%;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
@@ -12605,7 +12693,8 @@ ${QUOTIENT_CSS}
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-pan-inside" style="flex:1 1 45%;" title="Grab ' + escAttr(videoLabelFor(selVideo)) + '’s footage and drag it within its frame — travel across a magnified recording without moving the frame. Needs a Zoom inside… first.">⊕ Pan inside…</button>' : '') +
         '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1 1 45%;" title="Rotate the camera on this element at the playhead. The block edits angle, AXIS (flat spin / 3D book-turn / tilt) and a sideways shift to clear space.">↻ Rotate</button>' +
         '<button class="rv-go secondary" id="rv-pop-text" style="flex:1 1 45%;" title="Drop type-on brand text at the playhead where you clicked. Click the text afterwards to revise or remove it.">T Add text here</button>' +
-        '<button class="rv-go secondary" id="rv-pop-sound" style="flex:1 1 45%;" title="Add a sound effect (ding, thud, whoosh...) at the playhead -- it lands on the Effects lane beside the zooms.">\u{1F514} Add sound</button>';
+        '<button class="rv-go secondary" id="rv-pop-sound" style="flex:1 1 45%;" title="Add a sound effect (ding, thud, whoosh...) at the playhead -- it lands on the Effects lane beside the zooms.">\u{1F514} Add sound</button>' +
+        '<button class="rv-go secondary" id="rv-pop-samples" style="flex:1 1 45%;" title="Open the Sample library: finished emails, posts, blogs and event pieces to drop into this scene">\u{1F5BC} Add sample</button>';
     }
     // Speaker bubble selected: direct placement beats prose. Corners + sizes
     // write the component position through the PATCH route -- no LLM, instant.
@@ -12676,6 +12765,8 @@ ${QUOTIENT_CSS}
     if (tb) tb.addEventListener('click', addTextAtPlayhead);
     var sndb = document.getElementById('rv-pop-sound');
     if (sndb) sndb.addEventListener('click', function() { rvPopClose(); sfxAddAtPlayhead(sndb); });
+    var smpb = document.getElementById('rv-pop-samples');
+    if (smpb) smpb.addEventListener('click', function() { rvPopClose(); if (state.currentProject) openSamplesCard(state.currentProject); });
     var rmb = document.getElementById('rv-pop-remove');
     if (rmb) rmb.addEventListener('click', removeSelectedComponent);
     var db = document.getElementById('rv-pop-draw');

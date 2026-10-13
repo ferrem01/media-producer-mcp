@@ -51,7 +51,7 @@ describe("the house sample work (shared/samples.js + src/sample-work)", () => {
     expect(S.brands.length).toBe(12);
     expect(S.work.length).toBeGreaterThanOrEqual(59);
     for (const w of S.work) {
-      expect(w.src).toMatch(/^\/assets\/_system\/sample-work\/[a-z]+-[a-z]+(-[a-z0-9]+)?\.webp$/);
+      expect(w.src).toMatch(/^\/assets\/_system\/sample-work\/[a-z]+-[a-z]+(-[a-z0-9-]+)?\.webp$/);
       await fs.access(path.resolve(__dirname, "../src/sample-work", path.basename(w.src)));
       expect(w.ratio).toBeGreaterThan(0.4);
     }
