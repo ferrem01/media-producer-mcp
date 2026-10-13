@@ -21,7 +21,7 @@
     },
     "at": {
       "type": "number",
-      "label": "type-on only: when the first word lands (default 0.3)",
+      "label": "when the line enters, every entrance (line-rise default 0.25; type-on / assemble / focus: when the first word lands, default 0.3)",
       "optional": true
     },
     "word_interval": {

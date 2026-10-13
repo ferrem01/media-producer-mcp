@@ -104,6 +104,33 @@ describe("kinetic-text entrance: assemble (the sentence gathers itself)", () => 
   }, 300_000);
 });
 
+describe("kinetic-text entrance: line-rise honors at", () => {
+  // Measured live (proj_7d4e0c84, Oct 13): three slams in one scene at 0.88,
+  // 4.42 and 6.18 all rose at 0.25 and sat on top of each other -- line-rise
+  // hard-coded its start and ignored `at`.
+  const opacityAt = (html: string, times: number[]) =>
+    probe(html, (page) =>
+      page.evaluate((ts) => {
+        const tl = (window as any).__MP_TIMELINE;
+        const line = document.querySelector(".text-container") as HTMLElement;
+        return ts.map((t) => { tl.pause(t); return parseFloat(getComputedStyle(line).opacity); });
+      }, times));
+
+  it("rises on its at, not at 0.25", async () => {
+    const html = await assemble({ data: { text: "It doesn't *execute.*", at: 2.0, exit_at: 4.5 } }, "kinetic-text", KT);
+    const [before, after] = await opacityAt(html, [1.5, 2.6]);
+    expect(before, "the line rose before its at").toBeLessThan(0.05);
+    expect(after, "the line never rose after its at").toBeGreaterThan(0.95);
+  }, 300_000);
+
+  it("keeps the 0.25 default when at is absent", async () => {
+    const html = await assemble({ data: { text: "Halfway." } }, "kinetic-text", KT);
+    const [early, risen] = await opacityAt(html, [0.1, 0.8]);
+    expect(early).toBeLessThan(0.05);
+    expect(risen).toBeGreaterThan(0.95);
+  }, 300_000);
+});
+
 describe("kinetic-text exit: smear-up (the starred word leads)", () => {
   it("rolls the accent word's letters up first, then scatters the rest upward", async () => {
     const html = await assemble(

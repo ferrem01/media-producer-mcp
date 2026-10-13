@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-13 — kinetic-text line-rise lands on its `at`
+
+On the no-Dana cut of the Claude/GPT ad (proj_7d4e0c84) scene 2 had three
+slams, "Halfway." at 0.88, "It doesn't execute." at 4.42 and "Good luck."
+at 6.18, and all three rose at 0.25 and sat on top of each other. Scene 7
+did the same with its two lines. The default `line-rise` entrance
+hard-coded 0.25 and read `at` only for type-on / assemble / focus, though
+the board writer is told "a performed word is a kinetic-text with
+text/at/exit_at". Line-rise now starts at `data.at` (0.25 when absent), and
+the schema says `at` times every entrance. Strike, mark and ring defaults
+already follow the timeline's length, so they shift with it. Test:
+`test/reference-kinetics.test.ts`, "line-rise honors at".
+
 ## 2026-10-12 — Hand-built boards can say a person carries them; the booth picks the mic
 
 Marc opened the booth on The First Five Minutes, a board written by hand

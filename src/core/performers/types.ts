@@ -76,4 +76,6 @@ export interface Performer extends PerformerInfo {
    *  so its files and job ids stay apart from the others'. */
   fromVideo?(video: string, tag: string, ctx: PerformContext): Promise<string>;
   maxSeconds?: number;
+  /** The shortest stretch the vendor takes; a take is never cut shorter. */
+  minSeconds?: number;
 }

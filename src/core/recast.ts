@@ -119,7 +119,9 @@ async function saveStatus(tenant: string, st: RecastStatus): Promise<void> {
 
 /** Where to cut a take into calls of at most `max` seconds: at the middle of
  *  a pause, as late as fits, never before `min`, and never leaving a sliver
- *  of a call at the end. */
+ *  of a call at the end -- a tail too short to fold back moves the cut before
+ *  it earlier, so no call is shorter than `min` (Higgsfield refuses under 4 s:
+ *  Old Chimp's 32.1 s take cut at 30 s left a 2.1 s call it threw out). */
 export function planChunks(duration: number, silences: Array<[number, number]>, max: number, min: number): Array<[number, number]> {
   const mids = silences.map(([a, b]) => (a + b) / 2).filter((m) => m > 0 && m < duration);
   const out: Array<[number, number]> = [];
@@ -132,8 +134,13 @@ export function planChunks(duration: number, silences: Array<[number, number]>, 
   }
   if (duration - pos > 0.05) {
     // Fold a sliver into the chunk before -- while that chunk still fits a call.
-    if (out.length && duration - pos < 1.2 && duration - out[out.length - 1][0] <= max + 0.5) out[out.length - 1][1] = duration;
-    else out.push([pos, duration]);
+    const prev = out[out.length - 1];
+    if (prev && duration - pos < 1.2 && duration - prev[0] <= max + 0.5) prev[1] = duration;
+    else if (prev && duration - pos < min) {
+      const inWindow = mids.filter((m) => m >= prev[0] + min && m <= duration - min);
+      prev[1] = inWindow.length ? inWindow[inWindow.length - 1] : duration - min;
+      out.push([prev[1], duration]);
+    } else out.push([pos, duration]);
   }
   return out;
 }
@@ -225,7 +232,7 @@ export async function performTakeFile(opts: {
     picture = await performer.fromAudio(audio, ctx);
   } else if (performer.fromVideo) {
     const max = performer.maxSeconds || 30;
-    const chunks = duration <= max ? [[0, duration] as [number, number]] : planChunks(duration, await silencesOf(rawAbs), max, Math.min(3, max / 2));
+    const chunks = duration <= max ? [[0, duration] as [number, number]] : planChunks(duration, await silencesOf(rawAbs), max, Math.max(performer.minSeconds ?? 0, Math.min(3, max / 2)));
     let done = 0;
     opts.onChunk?.(0, chunks.length);
     await pool(chunks, 4, async ([a, b], i) => {

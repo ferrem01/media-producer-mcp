@@ -45,7 +45,12 @@ describe("recast: a take performed by a cast actor", () => {
     expect(planChunks(12, [], 7.5, 2.5)[0]).toEqual([0, 7.5]);               // no pause that fits: a hard cut at the limit
     expect(planChunks(3, [], 7.5, 2.5)).toEqual([[0, 3]]);
     expect(planChunks(15.4, [], 7.5, 2.5)).toEqual([[0, 7.5], [7.5, 15.4]]);   // the sliver folds back
-    expect(planChunks(8.4, [], 7.5, 2.5)).toEqual([[0, 7.5], [7.5, 8.4]]);     // unless that would overrun a call
+    expect(planChunks(8.4, [], 7.5, 2.5)).toEqual([[0, 5.9], [5.9, 8.4]]);     // else the cut moves back: no call under min
+    expect(planChunks(8.4, [[4.6, 5.0]], 7.5, 2.5)).toEqual([[0, 4.8], [4.8, 8.4]]);   // to a pause when one fits
+    // Old Chimp on Higgsfield: 32.1 s, 30 s calls, 4 s minimum -- no 2.1 s tail.
+    const h = planChunks(32.1, [], 30, 4);
+    expect(h[h.length - 1][1] - h[h.length - 1][0]).toBeGreaterThanOrEqual(4 - 1e-9);
+    for (const [a, b] of h) expect(b - a).toBeLessThanOrEqual(30 + 1e-9);
   });
 
   it("the cast actor plays every clip; clearing the cast puts the recording back", async () => {
