@@ -252,11 +252,14 @@
         }
       }
 
+      // `at` times the line like every other entrance: several slams in one
+      // scene each land on their own word instead of all rising at 0.25s.
+      var lAt = data.at !== undefined ? Number(data.at) : 0.25;
       if (window.mpLineRise) {
-        mpLineRise(tl, container, 0.25);
+        mpLineRise(tl, container, lAt);
       } else {
         gsap.set(container, { autoAlpha: 0, y: 10 });
-        tl.to(container, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.25);
+        tl.to(container, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, lAt);
       }
     }
 
