@@ -80,23 +80,14 @@ ${QUOTIENT_CSS}
   #ready .rec-dock { position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom)); z-index: 2; margin: 0 -18px calc(-16px - env(safe-area-inset-bottom));
     padding: 10px 18px calc(12px + env(safe-area-inset-bottom)); background: var(--background, #f8f8fa); box-shadow: 0 -8px 16px -6px rgba(20, 20, 40, 0.10); }
   #ready .rec-dock #recordBtn { width: 100%; }
-  body.embed #ready .rec-dock { position: static; margin: 0; padding: 0; background: none; box-shadow: none; }
-  /* Studio's dialog: the ready screen is as tall as its content, no more. */
-  body.embed { min-height: 0; height: auto; }
-  body.embed section.on { flex: 0 0 auto; }
-  body.embed #ready { height: auto; overflow: visible; }
-  body.embed .spacer { display: none; }
-  body.embed .pad { padding: 8px 16px 14px; }
-  body.embed #script { max-height: 32vh; }
-  body.embed h1 { font-size: 17px; line-height: 24px; }
-  body.embed .sub { margin-bottom: 10px; }
-  body.embed #readyNote { margin: 10px 0 8px; }
   #script { flex:0 1 auto; max-height:44dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .pad { padding: calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom)); }
   h1 { font: 500 20px/28px var(--font-sans); letter-spacing: -0.01em; margin: 0 0 4px; color: var(--foreground); }
   .sub { color: var(--muted-foreground); font-size: 14px; margin: 0 0 16px; }
   .card { background: var(--card); border: 1px solid var(--border-secondary); border-radius: var(--radius); box-shadow: var(--shadow-sub); padding: 18px; }
   .beat { font-size: 18px; line-height: 1.45; margin: 0 0 14px; white-space:pre-line; color: var(--content-primary); letter-spacing: -0.01em; }
+  /* *word* in the lines: lean on it, shown as it will be read. */
+  .beat em { font-style: normal; font-weight: 600; text-decoration: underline; text-decoration-color: #8f91ff; text-decoration-thickness: 3px; text-underline-offset: 5px; }
   .beat b { color: var(--muted-foreground); font: 500 12px/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; display: block; margin-bottom: 4px; }
   .note { color: var(--muted-foreground); font-size: 13px; line-height: 20px; }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border: 1px solid transparent;
@@ -179,6 +170,14 @@ ${QUOTIENT_CSS}
   #cue .w.dash { color: rgba(255,255,255,.42) !important; }
   #next { margin-top:12px; font-size:21px; line-height:1.3; font-weight:500; color:rgba(255,255,255,.78); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
   #next2 { margin-top:8px; font-size:18px; line-height:1.3; color:rgba(255,255,255,.5); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
+  /* THE ROLL (core/prompter.ts paintRoll): the scene's whole script in a
+     box that scrolls itself -- read lines dim above the live one, every
+     line to come below it -- the live line held a third of the way down. */
+  #prompt { height:40dvh; overflow:hidden; -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 10%, #000 84%, transparent 100%); mask-image:linear-gradient(180deg, transparent 0, #000 10%, #000 84%, transparent 100%); }
+  #track { position:relative; transition:transform .45s cubic-bezier(.2,.7,.2,1); }
+  #past .rl { margin-bottom:10px; font-size:20px; line-height:1.3; color:rgba(255,255,255,.32); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
+  #past:not(:empty) { margin-bottom:14px; }
+  #rest .rl { margin-top:8px; font-size:18px; line-height:1.3; color:rgba(255,255,255,.5); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
   #bar { position:absolute; left:0; right:0; bottom: calc(86px + env(safe-area-inset-bottom)); height:3px; background:rgba(255,255,255,.18); }
   #barFill { height:100%; width:0%; background:#fff; }
   #stopWrap { position:absolute; left:18px; right:18px; bottom: calc(18px + env(safe-area-inset-bottom)); display:flex; gap:10px; }
@@ -226,11 +225,64 @@ ${QUOTIENT_CSS}
   a.btn { display: inline-flex; text-align: center; text-decoration: none; }
   .meta { font-size: 12px; color: var(--muted-foreground); margin-top: 10px; font-variant-numeric: tabular-nums; }
 
+  /* ── THE STUDIO: the booth on a laptop (Marc, Oct 13: "I have to scroll
+     all over the place, and there's like different scroll areas"). One
+     window, no page scroll: the scenes across the top, the scene's whole
+     script in the middle, every control in one bar at the bottom, and the
+     keyboard drives it. Studio opens it over the board; a phone keeps its
+     own screen. ── */
+  .studio-only { display:none !important; }
+  body.studio .studio-only { display:revert !important; }
+  body.studio #ready.on { display:grid; grid-template-rows:auto minmax(0, 1fr) auto; height:100dvh; overflow:hidden; padding:0; }
+  body.studio #ready > :not(#shead):not(#smain):not(#sdock) { display:none; }
+  body.studio #shead { display:flex !important; align-items:center; gap:12px; padding:10px 20px; border-bottom:1px solid var(--border-secondary); background:var(--card); }
+  .sbtn { height:34px; padding:0 12px; border-radius:8px; border:1px solid var(--border-secondary); background:var(--surface-primary); color:var(--content-primary); font:500 14px/1 var(--font-sans); cursor:pointer; white-space:nowrap; }
+  .sbtn:hover { background:var(--accent); }
+  .sbtn:disabled { opacity:.4; pointer-events:none; }
+  #sceneStrip { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .sdot { min-width:34px; height:34px; padding:0 8px; border-radius:9999px; border:1px solid var(--border-secondary); background:var(--surface-primary); color:var(--content-primary); font:600 13px/1 var(--font-sans); cursor:pointer; font-variant-numeric:tabular-nums; }
+  .sdot.done { background:color-mix(in srgb, #22c55e 16%, var(--surface-primary)); border-color:color-mix(in srgb, #22c55e 55%, transparent); }
+  .sdot.now { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); }
+  .sdot:disabled { opacity:.35; pointer-events:none; }
+  #kept { color:#15803d; font-size:13px; font-weight:600; opacity:0; transition:opacity .3s; }
+  #kept.on { opacity:1; }
+  #shead .grow { flex:1; }
+  body.studio #smain { display:grid !important; grid-template-columns:minmax(0, 1fr) 300px; gap:28px; padding:20px 28px; min-height:0; }
+  #sleft { display:flex; flex-direction:column; min-height:0; }
+  body.studio #script { flex:1 1 auto; max-height:none; overflow-y:auto; padding:24px 28px; }
+  body.studio .beat { font-size:26px; line-height:1.55; }
+  body.studio h1 { font-size:22px; }
+  #side { overflow-y:auto; min-height:0; display:flex; flex-direction:column; gap:4px; }
+  body.studio #side .toggle { margin:6px 0; }
+  body.studio #readyNote { margin:0 0 8px; }
+  body.studio #sdock { display:flex !important; align-items:center; gap:22px; flex-wrap:wrap; padding:12px 24px; border-top:1px solid var(--border-secondary); background:var(--card); }
+  body.studio #sdock .toggle { margin:0; align-items:center; }
+  body.studio #sdock .hint { display:none; }
+  body.studio #sdock .rec-dock { margin:0 0 0 auto; padding:0; position:static; background:none; box-shadow:none; display:flex; align-items:center; gap:10px; }
+  body.studio #recordBtn { width:auto; min-width:220px; }
+  .kbd { display:inline-block; min-width:18px; padding:2px 6px; border-radius:5px; border:1px solid var(--border-secondary); font:600 11px/14px var(--font-sans); color:var(--muted-foreground); text-align:center; }
+  body.studio section.pad:not(#ready) { width:100%; max-width:760px; margin:0 auto; }
+  /* The stage: the whole script, big, as the prompter. Voice only reads it
+     on black in the middle of the window; on camera it sits at the top,
+     near the lens. */
+  body.studio #prompt { left:50%; right:auto; width:min(980px, calc(100% - 48px)); transform:translateX(-50%); padding:0; height:44vh; }
+  body.studio #cue, body.studio #next, body.studio #next2, body.studio #past .rl, body.studio #rest .rl { font-size:32px; line-height:1.35; font-weight:500; margin:0 0 16px; }
+  body.studio #cue { font-weight:600; }
+  body.studio #next, body.studio #next2, body.studio #rest .rl { color:rgba(255,255,255,.72); }
+  body.studio #past .rl { color:rgba(255,255,255,.3); }
+  body.studio #stage.voice #prompt { top:72px; height:calc(100% - 222px); }
+  body.studio #stopWrap, body.studio #frameWrap { left:50%; right:auto; width:min(560px, calc(100% - 36px)); transform:translateX(-50%); }
+  #keys { position:absolute; left:0; right:0; bottom:calc(70px + env(safe-area-inset-bottom)); text-align:center; font-size:12px; color:rgba(255,255,255,.55); }
+  #stageScene { font-size:13px; color:rgba(255,255,255,.7); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:40%; }
+
 </style>
 </head>
 <body>
 
 <section id="ready" class="pad on">
+  <div id="shead" class="studio-only"><button type="button" class="sbtn" id="backBtn">← Board</button><div id="sceneStrip" role="toolbar" aria-label="Scenes"></div><span id="kept" role="status"></span><span class="grow"></span><button type="button" class="sbtn" id="prevBtn" title="Previous scene (←)">← Prev</button><button type="button" class="sbtn" id="skipBtn" title="Next scene (→)">Next →</button></div>
+  <div id="smain" class="studio-only"><div id="sleft"></div><aside id="side"></aside></div>
+  <div id="sdock" class="studio-only"></div>
   <p><a class="link" id="studioLinkTop" href="#">← Back to Studio</a></p>
   <h1 id="title">Loading…</h1>
   <p class="sub" id="subtitle"></p>
@@ -260,14 +312,15 @@ ${QUOTIENT_CSS}
     <canvas id="cap" width="1080" height="1920"></canvas>
   <div id="veil"></div>
   <div id="guide" aria-hidden="true"><div id="oval"></div><div id="eyes"><span>eyes here</span></div></div>
-  <div id="top"><span id="timer">0:00</span><div id="meterWrap"><div id="meter"></div></div><button id="lightBadge" type="button" title="Show the light check"><i class="ldot"></i><span id="lightBadgeText">Light</span></button></div>
+  <div id="top"><span id="timer">0:00</span><span id="stageScene" class="studio-only"></span><div id="meterWrap"><div id="meter"></div></div><button id="lightBadge" type="button" title="Show the light check"><i class="ldot"></i><span id="lightBadgeText">Light</span></button></div>
   <div id="silent">No sound is reaching the mic — this take is recording nothing.</div>
   <div id="count"></div>
-  <div id="prompt"><div id="cue"></div><div id="next"></div><div id="next2"></div></div>
+  <div id="prompt"><div id="track"><div id="past"></div><div id="cue"></div><div id="next"></div><div id="next2"></div><div id="rest"></div></div></div>
   <div id="bar"><div id="barFill"></div></div>
   <div id="lightCard" class="wait" role="status" aria-live="polite"><div id="lightHead"><i class="ldot"></i><span id="lightTitle">Checking your light…</span><button id="lightHide" type="button" aria-label="Hide the light check" title="Hide the light check for this visit">×</button></div><ul id="lightTips"></ul></div>
   <div id="frameWrap"><button class="btn again" id="frameBack">Back</button><button class="btn stop" id="goBtn">Start recording</button></div>
   <div id="stopWrap"><button class="btn again" id="againRecBtn">Start over</button><button class="btn stop" id="stopBtn">Stop</button></div>
+  <div id="keys" class="studio-only">Space: start / stop · R: start over · →: next line</div>
 </section>
 
 <section id="review" class="pad">
@@ -279,6 +332,8 @@ ${QUOTIENT_CSS}
     <button class="btn ghost" id="retakeBtn">Retake</button>
     <button class="btn" id="useBtn">Use this take</button>
   </div>
+  <button class="btn" id="keepNextBtn" style="display:none;margin-top:10px">Keep &amp; next</button>
+  <p class="note studio-only" style="margin-top:10px">Enter: keep · R: retake · Space: play</p>
 </section>
 
 <section id="upload" class="pad">
@@ -324,31 +379,30 @@ ${QUOTIENT_CSS}
   // a link without a scene prompted all seven scenes and then pinned the
   // whole 49s take to scene 1.
   var recordAll = qp.get('scene') === 'all' || sceneIndex < 0;
-  // Embedded in Studio's picker (embed=1): no "back to Studio" (we are in
-  // it), and the attached take is announced to the parent so the picker
-  // closes and the film reloads with the take in its slot.
+  // Embedded in Studio (embed=1, the full-window recorder over the board):
+  // no "back to Studio" (we are in it), and the attached take is announced
+  // to the parent so the film reloads with the take in its slot.
   var embedded = qp.get('embed') === '1';
+  // THE STUDIO LAYOUT: in Studio, or alone in a laptop's tab (a mouse, a
+  // wide window). A phone keeps its own screen.
+  var studio = embedded || !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches && window.innerWidth >= 760);
   // VOICE ONLY (the ready screen's switch): one scene's voice, no camera,
   // the same prompter -- recorded here or uploaded, it lands as the scene's
   // voice recording (POST /api/voice-line). Marc, Oct 8: "I'll just record
   // the voice ... from my device, from my phone, upload it".
   var voiceMode = false, voiceAllowed = false;
-  // In Studio's dialog the page sizes to its content and says how tall it
-  // is, so the whole ready screen (lines, choices, Record) fits without a
-  // scroll inside a scroll (Marc: "make this entire screen fit").
-  function postSize() {
-    if (!embedded) return;
-    // The VISIBLE section's own height, not the document's: the document
-    // fills whatever frame it is given, which read as "never shrink". The
-    // live camera view is fixed-position and gets a 16:9 preview's worth.
-    var active = document.querySelector('section.on');
-    var h = (!active || active.id === 'stage') ? Math.round(Math.min(window.innerWidth * 9 / 16, 560)) : active.scrollHeight + 4;
-    try { window.parent.postMessage({ type: 'mp-take-size', height: h }, window.location.origin); } catch (e) {}
-  }
-  if (embedded) {
-    document.body.classList.add('embed');
-    try { new ResizeObserver(function () { postSize(); }).observe(document.body); } catch (e) { setInterval(postSize, 600); }
-    window.addEventListener('load', postSize);
+  // The studio's three bands: the ready screen's own pieces, moved once.
+  // Left: the scene and its whole script. Side: the take's options. Dock:
+  // what you touch every take (speed, mic, camera on/off, Record).
+  if (studio) {
+    document.body.classList.add('studio');
+    var mv = function (to, el) { if (el) $(to).appendChild(el); };
+    ['title', 'subtitle', 'script'].forEach(function (id) { mv('sleft', $(id)); });
+    ['readyNote', 'formatNotes', 'cloneChoice', 'bgChoice'].forEach(function (id) { mv('side', $(id)); });
+    mv('side', $('softLook').parentNode); mv('side', $('softDial')); mv('side', $('voiceUploadRow'));
+    ['speedRow', 'micRow', 'voiceRow'].forEach(function (id) { mv('sdock', $(id)); });
+    mv('sdock', $('recordBtn').parentNode);
+    var kb = document.createElement('span'); kb.className = 'kbd'; kb.textContent = 'Space'; kb.title = 'Space records'; $('recordBtn').parentNode.appendChild(kb);
   }
   if (embedded) { ['studioLinkTop'].forEach(function (id) { var el = document.getElementById(id); if (el && el.parentNode) el.parentNode.style.display = 'none'; }); document.querySelectorAll('#studioLink').forEach(function (el) { el.style.display = 'none'; }); }
   ${PROMPTER_TIMING_JS}
@@ -363,14 +417,13 @@ ${QUOTIENT_CSS}
 
   function show(id) {
     ['ready','stage','review','upload','done','err'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
-    setTimeout(postSize, 50);
     document.documentElement.classList.toggle('lock', id === 'stage');
     try { window.scrollTo(0, 0); } catch (eS) {}
   }
   // While the stage is up no touch scrolls the page (the lock above stops
   // the document; this stops the rubber band).
   document.addEventListener('touchmove', function (ev) { if (document.documentElement.classList.contains('lock')) ev.preventDefault(); }, { passive: false });
-  function fail(msg) { $('errMsg').textContent = msg; show('err'); }
+  function fail(msg) { advanceTo = -1; $('errMsg').textContent = msg; show('err'); }
   function withToken(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
   // Studio serves its phone view to a phone; on a laptop this lands in the desktop app.
   var studioHref = '/studio?tenant=' + encodeURIComponent(tenant) + '&project=' + encodeURIComponent(project) + (token ? '&token=' + encodeURIComponent(token) : '');
@@ -493,12 +546,15 @@ ${QUOTIENT_CSS}
       applySpeed();
       // In Studio's dialog the header already names the project and the
       // scene; here only the scene's own label. Alone in a tab, both.
-      $('title').textContent = embedded ? ((sceneLabel ? sceneLabel.replace(/^Scene \\d+ · /, '').replace(/^Scene \\d+\\s*[-–—:·]\\s*/i, '') : projectName)) : (projectName + (sceneLabel ? ' — ' + sceneLabel : ''));
-      if (embedded) postSize();
+      // In Studio the board names the project: here the scene. Alone in a
+      // tab, both.
+      $('title').textContent = embedded ? (sceneLabel || projectName) : (projectName + (sceneLabel ? ' — ' + sceneLabel : ''));
+      $('stageScene').textContent = sceneLabel;
+      renderStrip();
       // The copy speaks to the device: a laptop is not held upright.
       var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
       cameraNote = null;
-      if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Click Record: the camera opens with a quick light check; Start recording gives a 3-second count-in, then your lines one at a time at speaking pace. Click anywhere to jump to the next line.';
+      if (!touch && $('readyNote')) $('readyNote').textContent = 'Sit centered and look at the lens. Record (or Space): the camera opens with a quick light check; Start recording (Space) gives a 3-second count-in, then the scene\u2019s lines roll at speaking pace, the live one lit. Click or press \u2192 to jump to the next line; Space stops.';
       var g = (p.treatment && p.treatment.filmGrammar) || '';
       var beats = scenes.filter(function (s) { return String(s.voiceover_text || '').trim(); }).length;
       paceNote = function () {
@@ -515,7 +571,12 @@ ${QUOTIENT_CSS}
         var d = document.createElement('p'); d.className = 'beat';
         var b = document.createElement('b'); b.textContent = (sceneLabel ? 'Lines' : 'Beat ' + (i + 1)) + (s.duration_seconds ? ' · ' + Number(s.duration_seconds).toFixed(0) + 's' : '');
         d.appendChild(b);
-        d.appendChild(document.createTextNode(t.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { l = l.trim(); return PAUSE_LINE.test(l) ? PAUSE_GLYPH : l; }).filter(Boolean).join('\\n')));
+        var shown = t.split(/\\r?\\n/).reduce(function (a, l) { return a.concat(l.split(/(\\(\\s*pause\\s*\\)[.,!?]*)/i)); }, []).map(function (l) { l = l.trim(); return PAUSE_LINE.test(l) ? PAUSE_GLYPH : l; }).filter(Boolean).join('\\n');
+        // *word* reads as emphasis, not as stars.
+        shown.split(/(\\*[^*\\n]+\\*)/).forEach(function (part) {
+          if (/^\\*[^*\\n]+\\*$/.test(part)) { var em = document.createElement('em'); em.textContent = part.slice(1, -1); d.appendChild(em); }
+          else if (part) d.appendChild(document.createTextNode(part));
+        });
         sc.appendChild(d);
       });
       voiceAllowed = sceneIndex >= 0 && !clipNeedNow;
@@ -537,8 +598,8 @@ ${QUOTIENT_CSS}
     $('recordBtn').textContent = voiceMode ? 'Record my voice' : 'Record';
     if (cameraNote == null) cameraNote = $('readyNote').textContent;
     if (!voiceMode) $('readyNote').textContent = cameraNote;
-    else $('readyNote').textContent = 'Voice only: no camera. Tap Record my voice for a 3-second count-in, then read your lines as they show, at your own pace. Or upload an audio file of this scene.';
-    postSize();
+    else $('readyNote').textContent = studio ? 'Voice only: no camera. Record my voice (or Space) for a 3-second count-in, then read the scene\u2019s lines as they roll; Space stops. Keep & next takes you straight to the next scene. Or upload an audio file of this scene.'
+      : 'Voice only: no camera. Tap Record my voice for a 3-second count-in, then read your lines as they show, at your own pace. Or upload an audio file of this scene.';
   }
   $('voiceOnly').addEventListener('change', function () { voiceMode = this.checked; releaseCamera(); applyVoiceMode(); });
   $('voiceUploadBtn').addEventListener('click', function () { $('voiceFile').click(); });
@@ -970,10 +1031,17 @@ ${QUOTIENT_CSS}
     var v = $('play'); v.src = url; v.load();
     $('reviewMeta').textContent = fmt(blobDuration) + (total ? ' recorded · script is ' + fmt(total) : '') + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB'
       + (voiceMode ? ' · voice only' : capture === 'canvas' ? ' · ' + capW + '×' + capH : (trackW && trackH ? ' · ' + trackW + '×' + trackH : '')) + ' · ' + ext;
+    // In the studio, the next scene still owed a take is one key away.
+    var nx = studio && !recordAll && sceneIndex >= 0 ? nextOpenScene(filmScenes, takenScenes.concat([sceneIndex]), sceneIndex) : -1;
+    $('keepNextBtn').dataset.scene = String(nx);
+    $('keepNextBtn').style.display = nx >= 0 ? '' : 'none';
+    if (nx >= 0) $('keepNextBtn').textContent = 'Keep & next: Scene ' + (nx + 1) + (filmScenes[nx] && filmScenes[nx].label ? ' \u00b7 ' + filmScenes[nx].label : '') + '  \u23ce';
+    $('useBtn').className = nx >= 0 ? 'btn ghost' : 'btn';
+    $('useBtn').textContent = nx >= 0 ? 'Keep, stay here' : 'Use this take';
     show('review');
   }
 
-  $('retakeBtn').addEventListener('click', function () { blob = null; chunks = []; $('play').src = ''; show('ready'); $('recordBtn').disabled = false; });
+  $('retakeBtn').addEventListener('click', function () { advanceTo = -1; blob = null; chunks = []; $('play').src = ''; show('ready'); $('recordBtn').disabled = false; });
 
   // ── upload + attach ────────────────────────────────────────────────────
   // A voice: straight to the scene's voice recording (no take, no camera).
@@ -995,9 +1063,9 @@ ${QUOTIENT_CSS}
       var nv = showNext();
       $('doneNote').textContent = nv >= 0 ? 'Your voice is in for this scene. Go on to the next scene (still voice only), or record this one again.'
         : 'Your voice is in for this scene. In Studio, pick what the scene shows: a performance made from your voice, or graphics over it.';
-      show('done');
       releaseCamera();
       if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: sceneIndex, project: project, voice: true, next: nv >= 0 }, window.location.origin); } catch (eP) {} }
+      if (!advanceAfterKeep()) show('done');
     };
     xhr.send(b);
   }
@@ -1038,6 +1106,7 @@ ${QUOTIENT_CSS}
           // after "Use this take" -- measured live on a laptop).
           releaseCamera();
           if (embedded) { try { window.parent.postMessage({ type: 'mp-take-attached', scene_index: recordAll ? 'all' : sceneIndex, project: project, next: nt >= 0 }, window.location.origin); } catch (e) {} }
+          advanceAfterKeep();
         })
         .catch(function (e) { fail(e.message || String(e)); });
     };
@@ -1066,13 +1135,110 @@ ${QUOTIENT_CSS}
     return n;
   }
   $('closeBtn').addEventListener('click', function () { try { window.parent.postMessage({ type: 'mp-take-close', project: project }, window.location.origin); } catch (eC) {} });
-  $('nextBtn').addEventListener('click', function () {
-    var n = Number($('nextBtn').dataset.scene);
-    if (!(n >= 0)) return;
+  $('nextBtn').addEventListener('click', function () { goScene(Number($('nextBtn').dataset.scene)); });
+  // Onto another scene's ready screen, in the same mode (Voice only stays
+  // on): the done screen's Next, the studio's scene strip, Prev / Next and
+  // Keep & next all land here.
+  function goScene(n) {
+    if (!(n >= 0) || n >= filmScenes.length) return;
     sceneIndex = n; recordAll = false; blob = null; chunks = [];
     try { var u = new URL(location.href); u.searchParams.set('scene', String(n)); history.replaceState(null, '', u.toString()); } catch (eU) {}
     show('ready');
     loadFilm();
+  }
+
+  // ── the studio's scene strip: every scene, recorded ones ticked ───────
+  function renderStrip() {
+    var strip = $('sceneStrip'); strip.innerHTML = '';
+    if (recordAll) { $('prevBtn').disabled = true; $('skipBtn').disabled = true; return; }
+    filmScenes.forEach(function (sc, i) {
+      var b = document.createElement('button'); b.type = 'button';
+      var done = takenScenes.indexOf(i) >= 0;
+      b.className = 'sdot' + (done ? ' done' : '') + (i === sceneIndex ? ' now' : '');
+      b.textContent = done && i !== sceneIndex ? '\u2713 ' + (i + 1) : String(i + 1);
+      b.title = 'Scene ' + (i + 1) + (sc.label ? ' \u00b7 ' + sc.label : '') + (sc.lines ? (done ? ' \u00b7 recorded' : ' \u00b7 not recorded yet') : ' \u00b7 no lines');
+      b.disabled = !sc.lines;
+      b.addEventListener('click', function () { if (i !== sceneIndex) goScene(i); });
+      strip.appendChild(b);
+    });
+    $('prevBtn').disabled = sceneStep(-1) < 0; $('skipBtn').disabled = sceneStep(1) < 0;
+  }
+  // The scene before / after this one that has lines, recorded or not.
+  function sceneStep(dir) {
+    for (var i = sceneIndex + dir; i >= 0 && i < filmScenes.length; i += dir) { if (filmScenes[i] && filmScenes[i].lines) return i; }
+    return -1;
+  }
+  $('prevBtn').addEventListener('click', function () { goScene(sceneStep(-1)); });
+  $('skipBtn').addEventListener('click', function () { goScene(sceneStep(1)); });
+  function closeStudio() {
+    releaseCamera();
+    if (embedded) { try { window.parent.postMessage({ type: 'mp-take-close', project: project }, window.location.origin); } catch (eC) {} }
+    else location.href = studioHref;
+  }
+  $('backBtn').addEventListener('click', closeStudio);
+  var keptTimer = null;
+  function flashKept(i) {
+    $('kept').textContent = '\u2713 Scene ' + (i + 1) + ' kept'; $('kept').classList.add('on');
+    if (keptTimer) clearTimeout(keptTimer);
+    keptTimer = setTimeout(function () { $('kept').classList.remove('on'); }, 3500);
+  }
+
+  // ── KEEP & NEXT: the fast loop (Marc, Oct 13: "I can really rapidly do
+  // these things"). From the review, keep the take and land on the next
+  // scene still owed one, ready to record -- no done screen between.
+  var advanceTo = -1;
+  $('keepNextBtn').addEventListener('click', function () { advanceTo = Number($('keepNextBtn').dataset.scene); $('useBtn').click(); });
+  // After an attach: true when Keep & next took us on (the done screen is skipped).
+  function advanceAfterKeep() {
+    var n = advanceTo, kept = sceneIndex; advanceTo = -1;
+    if (!(n >= 0)) return false;
+    goScene(n); flashKept(kept);
+    return true;
+  }
+
+  // ── THE KEYBOARD: the studio's hands-free loop ─────────────────────────
+  // Ready: Space/Enter records, ←/→ change scene, V flips Voice only.
+  // Light check: Space starts. Recording: Space stops, R starts over, →/↓
+  // jumps a line. Review: Enter keeps (and goes on), R retakes, Space plays.
+  // Done: Enter goes on, R records again. Esc leaves (Studio: back to the board).
+  document.addEventListener('keydown', function (ev) {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.repeat) return;
+    var t = ev.target || {}, tag = t.tagName;
+    if (tag === 'SELECT' || tag === 'TEXTAREA' || (tag === 'INPUT' && t.type !== 'checkbox' && t.type !== 'radio')) return;
+    if (tag === 'INPUT' && t.type === 'radio' && /^Arrow/.test(ev.key)) return;   // arrows pick within a choice
+    var on = (document.querySelector('section.on') || {}).id, k = ev.key, key = String(k).toLowerCase();
+    var vis = function (id) { var el = $(id); return !!el && el.offsetParent !== null && !el.disabled; };
+    var click = function (id) { return function () { if (vis(id)) $(id).click(); }; };
+    var act = null;
+    if (on === 'ready') {
+      if (k === ' ' || k === 'Enter') act = click('recordBtn');
+      else if (k === 'ArrowRight') act = function () { goScene(sceneStep(1)); };
+      else if (k === 'ArrowLeft') act = function () { goScene(sceneStep(-1)); };
+      else if (key === 'v' && voiceAllowed) act = function () { voiceMode = !voiceMode; releaseCamera(); applyVoiceMode(); };
+      else if (k === 'Escape' && studio) act = closeStudio;
+    } else if (on === 'stage') {
+      if ($('stage').classList.contains('preroll')) {
+        if (k === ' ' || k === 'Enter') act = click('goBtn');
+        else if (k === 'Escape') act = click('frameBack');
+      } else if (countTimer) {
+        if (k === 'Escape' || key === 'r' || k === ' ') act = function () {};   // the count-in runs out on its own
+      } else if (k === ' ' || k === 'Escape') act = click('stopBtn');
+      else if (key === 'r') act = click('againRecBtn');
+      else if (k === 'ArrowRight' || k === 'ArrowDown') act = advanceCue;
+    } else if (on === 'review') {
+      if (k === 'Enter') act = vis('keepNextBtn') ? click('keepNextBtn') : click('useBtn');
+      else if (key === 'r') act = click('retakeBtn');
+      else if (k === ' ') act = function () { var v = $('play'); if (v.paused) v.play().catch(function () {}); else v.pause(); };
+    } else if (on === 'done') {
+      if (k === 'Enter' || k === 'ArrowRight') act = vis('nextBtn') ? click('nextBtn') : (embedded ? click('closeBtn') : null);
+      else if (key === 'r') act = click('againBtn');
+      else if (k === 'Escape' && studio) act = closeStudio;
+    }
+    if (!act) return;
+    ev.preventDefault();
+    // A focused button would take the same key as a click of its own.
+    if (document.activeElement && document.activeElement.blur && document.activeElement !== document.body) document.activeElement.blur();
+    act();
   });
   $('errBtn').addEventListener('click', function () { stopAll(); show('ready'); $('recordBtn').disabled = !cues && false; $('recordBtn').disabled = false; });
 })();

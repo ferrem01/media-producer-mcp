@@ -174,10 +174,15 @@ describe("the sources: every need is collected its own way, in the board", () =>
     expect(await read("src/studio-phone.ts")).toMatch(/api\('POST', '\/arm-need\/' \+ encodeURIComponent\(tenant\)/);
   });
 
-  it("the camera picker: record here (the take page in the dialog) or on your phone (a QR of the take link)", async () => {
+  it("the camera picker: record here (the take page over the whole window) or on your phone (a QR of the take link)", async () => {
     const desktop = await read("src/preview-app/preview-app.ts");
-    expect(desktop).toMatch(/if \(src === 'booth'\) \{[\s\S]*?<iframe class="np-booth" src="' \+ escAttr\(takeUrl\) \+ '" allow="camera; microphone; autoplay"/);
+    // A click on Record here opens the recorder over the board; the dialog
+    // opening on it only offers it (the camera never starts on its own).
+    expect(desktop).toMatch(/if \(src === 'booth'\) \{[\s\S]*?np-booth-open[\s\S]*?if \(launch\) openTakeStudio\(project, si\);/);
+    expect(desktop).toMatch(/npOpenPanel\(project, root, btn\.dataset\.npSrc, si, ai, true\)/);
+    expect(desktop).toMatch(/f\.className = 'np-booth'; f\.id = 'take-studio';\n\s*f\.setAttribute\('allow', 'camera; microphone; autoplay'\);/);
     expect(desktop).toMatch(/'&scene=' \+ si \+ '&embed=1'/);
+    expect(desktop).not.toMatch(/mp-take-size/);
     expect(desktop).toMatch(/if \(src === 'phone'\) \{[\s\S]*?\/api\/take-qr\//);
     expect(desktop).toMatch(/ev\.data\.type !== 'mp-take-attached'/);
     const take = await read("src/take-page.ts");

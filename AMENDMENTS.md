@@ -35,6 +35,36 @@ Not built: stock b-roll leaning to the camera, move speed, per-setting
 allowed moves, a motion check on drafts, a speaking-shot test of the
 gentle moves (the clips were silent).
 
+## 2026-10-13 — Record here opens a recording studio over the board
+
+Marc records voice-only on the laptop now (a USB mic, the avatar performs
+it). Each scene meant scrolling: Record here put the take page in a small
+frame inside the scene card, inside the board's scroll, with Voice only and
+Record far below the lines. The prompter showed one line and the next two,
+so he read the script box instead to see where a sentence was going.
+
+- **Record here now opens the take page over the whole window**
+  (`openTakeStudio` in `preview-app.ts`). On a laptop the page uses its
+  studio layout: the scenes across the top with recorded ones ticked, Prev
+  and Next, the scene's whole script in the middle with `*word*` shown as
+  emphasis, the take's options on the side, and speed, mic, Voice only and
+  Record in one bar at the bottom. Nothing scrolls. The dialog opening on
+  Record here no longer starts the camera; only a click does.
+- **The prompter shows the whole scene** (`paintRoll` in `core/prompter.ts`).
+  Lines already read sit dim above the live one, every line still to come
+  stays readable below, and the live line holds a third of the way down.
+  The phone take page has it too. The remote booth still shows the live
+  line and the next two.
+- **Keep & next** on the review saves the take and opens the next scene
+  still missing one, ready to record. Voice only carries over.
+- **Keyboard:** Space records and stops, Enter keeps, R retakes or starts
+  over, → jumps a line (or changes scene on the ready screen), V toggles
+  Voice only, Esc goes back to the board.
+- Removed: the dialog-sized embed (`postSize`, `mp-take-size`, the
+  `body.embed` CSS) and the modal's booth-iframe cleanup. The recorder is
+  no longer inside the dialog. Test: the "laptop studio" case in
+  `test/take-page.test.ts`.
+
 ## 2026-10-13 — A narrated film keeps its measured word times through board edits
 
 Adding sound cues to the no-Dana Claude/GPT ad (proj_7d4e0c84) through the

@@ -1273,7 +1273,9 @@ ${QUOTIENT_CSS}
   .np-hint b { color: var(--foreground); }
   .np-empty { font-size: 12px; color: var(--content-secondary); padding: 6px 0; }
   .rv-go.secondary.active { border-color: var(--accent-blue); color: var(--accent-blue); box-shadow: inset 0 0 0 1px var(--accent-blue); }
-  .np-booth { display: block; width: 100%; height: min(70vh, 720px); border: 0; border-radius: var(--radius-sm); background: #000; }
+  /* THE RECORDER over the board (src/take-page.ts, its studio layout): the
+     whole window, so the lines, the controls and Record fit with no scroll. */
+  .np-booth { position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0; z-index: 10050; background: var(--background, #fff); }
   .np-phone { display: flex; gap: 14px; align-items: center; }
   .np-phone img { flex: 0 0 auto; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: #fff; }
   /* THE MUSIC CHOICE: the film's bed, picked in the dialog. */
@@ -5268,7 +5270,9 @@ ${QUOTIENT_CSS}
     if (rc) return ' — the scene has no slot for it yet; rebuild the scene to cast it.';
     return ' — the build casts it.';
   }
-  function npOpenPanel(project, root, src, si, ai) {
+  // launch: a click on the source's button (not the dialog opening on it)
+  // -- the recorder takes the whole window only when asked.
+  function npOpenPanel(project, root, src, si, ai, launch) {
     var panel = (root || document).querySelector('[data-np-panel="' + si + '-' + ai + '"]');
     if (!panel) return;
     // A second click on the source already open is not "close it": the
@@ -5277,6 +5281,7 @@ ${QUOTIENT_CSS}
     // (Marc, on the speaker lane). Keep it, bring it into view.
     if (panel.style.display !== 'none' && panel.dataset.src === src) {
       if (src === 'view') { panel.style.display = 'none'; panel.dataset.src = ''; panel.innerHTML = ''; return; }
+      if (src === 'booth' && launch) openTakeStudio(project, si);
       try { panel.scrollIntoView({ block: 'nearest' }); } catch (e0) {} return;
     }
     panel.dataset.src = src; panel.style.display = ''; panel.innerHTML = '';
@@ -5294,11 +5299,12 @@ ${QUOTIENT_CSS}
     }
     if (src === 'recast' || src === 'generate') { perfPanel(project, panel, src, si); return; }
     if (src === 'booth') {
-      // RECORD HERE: the take page itself, in the dialog, on this scene. It
-      // tells us when the take is attached (postMessage) and the film reloads.
-      var takeUrl = withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si + '&embed=1');
-      panel.innerHTML = '<iframe class="np-booth" src="' + escAttr(takeUrl) + '" allow="camera; microphone; autoplay" title="Record the take for scene ' + (si + 1) + '"></iframe>' +
-        '<div class="np-hint" style="margin-top:6px">Your camera and mic, the lines as a prompter. Stop, and the take lands in this scene. <a href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '" target="_blank">Open it in its own tab</a> if you prefer.</div>';
+      // RECORD HERE: the take page over the whole window, on this scene
+      // (openTakeStudio). The panel keeps the way back in.
+      panel.innerHTML = '<div class="np-act" style="justify-content:flex-start"><button class="np-btn np-booth-open">Open the recorder</button>' +
+        '<span class="np-hint">Your camera and mic (or your voice only), the scene\u2019s lines as a rolling prompter, the full window. Move between scenes inside it; each take lands in its scene. <a href="' + escAttr(withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si)) + '" target="_blank">Open it in its own tab</a> if you prefer.</span></div>';
+      panel.querySelector('.np-booth-open').addEventListener('click', function() { openTakeStudio(project, si); });
+      if (launch) openTakeStudio(project, si);
       return;
     }
     if (src === 'phone') {
@@ -5389,7 +5395,7 @@ ${QUOTIENT_CSS}
       if (btn.dataset.npBound) return; btn.dataset.npBound = '1';
       btn.addEventListener('click', function() {
         var si = parseInt(btn.dataset.npScene, 10), ai = parseInt(btn.dataset.npAsset, 10);
-        if (btn.dataset.npSrc) { npOpenPanel(project, root, btn.dataset.npSrc, si, ai); return; }
+        if (btn.dataset.npSrc) { npOpenPanel(project, root, btn.dataset.npSrc, si, ai, true); return; }
         npPick = { scene: si, asset: ai, type: btn.dataset.npType, project: project.project_id };
         var f = document.getElementById('np-file');
         f.accept = npPick.type === 'camera_video' ? 'video/*' : 'image/*,video/*';
@@ -5569,21 +5575,29 @@ ${QUOTIENT_CSS}
       })
       .catch(function(e) { body.innerHTML = '<div class="np-empty">' + escHtml(e.message || String(e)) + '</div>'; });
   }
-  // The embedded booth says the take is attached: close the picker, reload
-  // the film (the take is the scene's base now).
-  // ...and how tall it is: the dialog's frame follows, so the whole ready
-  // screen fits (capped to the viewport; the card scrolls past that).
-  window.addEventListener('message', function(ev) {
-    if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-size') return;
-    document.querySelectorAll('iframe.np-booth').forEach(function(f) {
-      if (f.contentWindow !== ev.source) return;
-      // Room for the dialog's own header, tabs, hint and Close (about 260px)
-      // inside its 86vh card, so Close stays in view.
-      var cap = Math.max(320, Math.round(window.innerHeight * 0.86) - 260);
-      var h = Math.max(240, Math.min(Number(ev.data.height) || 0, cap));
-      if (h) f.style.height = h + 'px';
-    });
-  });
+  // RECORD HERE (Marc, Oct 13: in the card it was "scroll all over the
+  // place, and there's like different scroll areas"): the take page over
+  // the whole window -- the scenes across its top, the scene's whole script
+  // as the prompter, every control in one bar, the keyboard driving it. It
+  // moves between scenes itself; the board reloads behind each take.
+  function openTakeStudio(project, si) {
+    closeTakeStudio();
+    var f = document.createElement('iframe');
+    f.className = 'np-booth'; f.id = 'take-studio';
+    f.setAttribute('allow', 'camera; microphone; autoplay');
+    f.title = 'Record the takes, from scene ' + (si + 1);
+    f.src = withToken('/take?tenant=' + encodeURIComponent(state.tenantId) + '&project=' + encodeURIComponent(project.project_id) + '&scene=' + si + '&embed=1');
+    // The keys work from the first press: focus goes into the recorder.
+    f.addEventListener('load', function() { try { f.contentWindow.focus(); } catch (e) {} });
+    document.body.appendChild(f);
+  }
+  // Unloaded, not hidden: a recorder left in the page keeps the camera on.
+  function closeTakeStudio() {
+    var f = document.getElementById('take-studio');
+    if (f) { try { f.src = 'about:blank'; } catch (e) {} f.remove(); }
+  }
+  // The recorder says a take is attached: reload the film (the take is the
+  // scene's now); with no scene left to record, the picker under it closes.
   window.addEventListener('message', function(ev) {
     if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-attached') return;
     var p = state.currentProject; if (!p || (ev.data.project && ev.data.project !== p.project_id)) return;
@@ -5593,9 +5607,10 @@ ${QUOTIENT_CSS}
     if (!ev.data.next) studioModalClose();
     loadProject(p.project_id);
   });
-  // The booth's Done: close the dialog.
+  // The recorder's ← Board / Done: back to the board.
   window.addEventListener('message', function(ev) {
     if (ev.origin !== window.location.origin || !ev.data || ev.data.type !== 'mp-take-close') return;
+    closeTakeStudio();
     studioModalClose();
   });
   (function bindNeedsUpload() {
@@ -13199,8 +13214,6 @@ ${QUOTIENT_CSS}
   function studioModalClose() {
     var back = document.getElementById('studio-modal');
     if (back) back.style.display = 'none';
-    // A booth left in a hidden dialog keeps the camera on: unload it.
-    document.querySelectorAll('#studio-modal-card iframe.np-booth').forEach(function(f) { try { f.src = 'about:blank'; } catch (e) {} f.remove(); });
   }
 
   // Enable/disable every scene-mutating control at once (popover + modal).
