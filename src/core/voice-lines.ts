@@ -104,13 +104,17 @@ export async function attachRecordedLine(project: Project, si: number, file: str
  *  scene's line unless a take already plays there -- then the take keeps
  *  the scene, and the recording waits for a performance made from it (Marc,
  *  Oct 8: "I'll just record the voice ... then when I go through the options
- *  ... the appropriate visuals would be presented to me"). Returns whether
+ *  ... the appropriate visuals would be presented to me"). A board not
+ *  built yet keeps it the same way, on the board scene. Returns whether
  *  it now plays (the film then re-fits to its lines). */
 export async function recordSceneVoice(project: Project, si: number, file: string, ctx: { audioDir: string }): Promise<boolean> {
-  if (!project.scenes[si]) throw new Error(`No scene ${si}`);
   const bs = (project as any).storyboard?.scenes?.[si];
+  if (!project.scenes[si] && !bs) throw new Error(`No scene ${si}`);
   if (bs) bs.voice_take = { file, recorded_at: new Date().toISOString() };
-  if (activeTake(project, si)) return false;
+  // On a board not built yet there is no line to play: the recording waits
+  // on the board scene for the performance (Marc, Oct 13, Your Old Leads
+  // Aren't Dead: "Could not attach your voice (400): scene is required").
+  if (!project.scenes[si] || activeTake(project, si)) return false;
   await attachRecordedLine(project, si, file, ctx);
   return true;
 }

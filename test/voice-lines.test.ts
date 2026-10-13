@@ -94,4 +94,15 @@ describe("voice lines", () => {
     expect(JSON.stringify(p.audio.tracks.find((t: any) => t.id === "vo_scene_0"))).toBe(before);
     await fs.rm(dir, { recursive: true, force: true });
   }, 30000);
+
+  // Marc, Oct 13 (Your Old Leads Aren't Dead): voice only on a board that
+  // has no built scenes yet answered "scene is required".
+  it("a voice recorded on an unbuilt board waits on the board scene", async () => {
+    const p: any = { project_id: "p", tenant_id: "t", scenes: [], audio: { tracks: [] },
+      storyboard: { scenes: [{ voiceover_text: "Quiet isn't no." }] } };
+    expect(await recordSceneVoice(p, 0, "/x/voice.webm", { audioDir: "/nowhere" })).toBe(false);
+    expect(p.storyboard.scenes[0].voice_take.file).toBe("/x/voice.webm");
+    expect(p.audio.tracks).toEqual([]);
+    await expect(recordSceneVoice(p, 3, "/x/voice.webm", { audioDir: "/nowhere" })).rejects.toThrow(/No scene 3/);
+  });
 });
