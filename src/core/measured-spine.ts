@@ -15,7 +15,7 @@ import { detectSilence } from "./idle-silence.js";
 import { resolveVideoPath } from "./video-path.js";
 import { activeTake, attachTake } from "./take-needs.js";
 import { keptSeconds, wordsThroughCuts, bakes, playClock, speedOf } from "./take-clock.js";
-import { assertedSpine, measuredSpine, alignToScript, applySpine, splitByScripts, type Spine, type ResolveReport } from "./word-anchors.js";
+import { assertedSpine, measuredSpine, alignToScript, applySpine, splitByScripts, normalizeToken, type Spine, type ResolveReport } from "./word-anchors.js";
 
 const dataDirOf = (dataDir?: string) => dataDir || process.env.MP_DATA_DIR || "/data/media-producer";
 
@@ -81,9 +81,32 @@ export async function primeTakeWords(project: Project, source: string, dataDir?:
 }
 
 /**
+ * The measured spine a scene already carries, when its words are still the
+ * script's: a narrated film's lines are measured once, at build or by
+ * fit_voiceover (core/narration-fit.ts), and kept on the built scene and the
+ * board. The built scene's clock wins; the board's is the fallback.
+ */
+function keptMeasuredSpine(project: Project | null, sceneIndex: number, script: string): Spine | null {
+  const want = assertedSpine(script, 1).words.map((w) => normalizeToken(w.text)).join(" ");
+  if (!want) return null;
+  const owners = [project?.scenes?.[sceneIndex], (project as any)?.storyboard?.scenes?.[sceneIndex]] as any[];
+  for (const owner of owners) {
+    const sp: Spine | undefined = owner?.spine;
+    if (sp?.source !== "measured" || !sp.words?.length) continue;
+    const aligned = alignToScript(sp, script);
+    if (aligned.words.map((w) => normalizeToken(w.text)).join(" ") === want) return aligned;
+  }
+  return null;
+}
+
+/**
  * The spine a scene should be resolved against right now: MEASURED when
- * the scene has a take and whisper can read it, else ASSERTED from the
- * script over the scene's (or the take's) duration.
+ * the scene has a take and whisper can read it, else the measured spine it
+ * already carries (a narrated film's line), else ASSERTED from the script
+ * over the scene's (or the take's) duration. A measured clock is never
+ * swapped for an estimate: measured live on proj_7d4e0c84, a board sfx edit
+ * re-timed a narrated film against the board's 3.5 s guess for an 8.37 s
+ * line, and every caption and @word cue drifted by seconds.
  */
 export async function spineForScene(
   project: Project | null,
@@ -103,6 +126,10 @@ export async function spineForScene(
     } catch (e: any) {
       console.warn(`  [spine] scene ${sceneIndex + 1}: transcript failed (${e?.message || e}) -- asserting from the script over the take's length`);
     }
+  }
+  if (!take) {
+    const kept = keptMeasuredSpine(project, sceneIndex, script);
+    if (kept) return kept;
   }
   return assertedSpine(script, dur);
 }
