@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-13 — A build keeps the voice recorded on the board
+
+Marc recorded all seven scenes of What an MQL Actually Is (proj_d09387ab)
+voice-only on the board, then built it. The build read the film in the
+stock `nova` voice and his recordings vanished from the board.
+`storyboardToSaved` rebuilds every board scene field by field and had no
+line for `voice_take`, and nothing turned a board recording into the
+scene's line once the scene existed (`recordSceneVoice`: "no line plays
+until the film is built").
+
+- `storyboardToSaved` carries `voice_take`.
+- `playBoardRecordings` (pipeline.ts) runs at the end of a build: each
+  recorded scene's line becomes the recording (`recordSceneVoice`), unless
+  a camera take voices the scene, and the film re-fits to its lines.
+- That film's seven files were still on disk. They went back through
+  `POST /api/voice-line` (the booth's own path); no re-record was needed.
+- Seen while doing it: one `/api/voice-line` upload took about eight
+  minutes to answer on the droplet, far past any client timeout.
+
 ## 2026-10-13 — The index reel shows a picture at the phone's width, under a mail header
 
 Marc, on the lifecycle reel with the new house emails: "these emails are not

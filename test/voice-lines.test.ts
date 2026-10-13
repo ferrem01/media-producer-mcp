@@ -95,6 +95,32 @@ describe("voice lines", () => {
     await fs.rm(dir, { recursive: true, force: true });
   }, 30000);
 
+  // Marc, Oct 13 (proj_d09387ab, What an MQL Actually Is): seven scenes
+  // recorded voice-only on the board, then built -- the build dropped every
+  // recording and read the film in a stock voice.
+  it("a build keeps the board's recordings and plays them as the lines", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "vl-build-"));
+    const rec = path.join(dir, "voice.wav");
+    await tone(rec, 3);
+    const p = film();
+    p.storyboard = { scenes: [
+      { label: "A", voiceover_text: "Line one." },
+      { label: "B", voiceover_text: "Line two is longer.", voice_take: { file: rec, recorded_at: "2026-10-13T17:10:22.152Z" } },
+    ] };
+    const { playBoardRecordings } = await import("../src/llm/pipeline.js");
+    expect(await playBoardRecordings(p, { audioDir: dir, dataDir: dir })).toBe(1);
+    const t1 = p.audio.tracks.find((t: any) => t.id === "vo_scene_1");
+    expect(t1.take).toBe(rec);
+    expect(t1.voice).toBeUndefined();
+    expect(p.audio.tracks.find((t: any) => t.id === "vo_scene_0").take).toBeUndefined();   // no recording: the read stays
+    expect(p.storyboard.scenes[1].voice_take).toEqual({ file: rec, recorded_at: "2026-10-13T17:10:22.152Z" });
+    // The save that ends a build carries the recording on the board.
+    const pipeline = await fs.readFile("src/llm/pipeline.ts", "utf8");
+    expect(pipeline).toMatch(/\.\.\.\(\(s as any\)\.voice_take \? \{ voice_take: \(s as any\)\.voice_take \} : \{\}\),/);
+    expect(pipeline).toMatch(/project\.storyboard = storyboardToSaved\(storyboard, opts\.voice as string, keptMood, filmPacing\);\n  await playBoardRecordings\(project\);/);
+    await fs.rm(dir, { recursive: true, force: true });
+  }, 60000);
+
   // Marc, Oct 13 (Your Old Leads Aren't Dead): voice only on a board that
   // has no built scenes yet answered "scene is required".
   it("a voice recorded on an unbuilt board waits on the board scene", async () => {
