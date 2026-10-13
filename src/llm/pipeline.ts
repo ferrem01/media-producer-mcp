@@ -52,7 +52,7 @@ import { deriveWorld, deriveMotionPhysics, worldPromptBlock, type WorldSpec } fr
 import { enforceFilmContinuity } from "./continuity.js";
 import { assembleNarratedScreencast } from "./narrated-screencast.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
-import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
+import { tenantComponentsDir, projectDir, projectAssetsDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateVideoClip } from "../media/video-gen.js";
@@ -2292,6 +2292,11 @@ function storyboardToSaved(
       // Set by hand, carried: the next build leaves it alone too.
       ...((s as any).hand_set ? { hand_set: true } : {}),
       voiceover_text: s.voiceover_text,
+      // The person's own recording of the line, carried (core/voice-lines.ts
+      // recordSceneVoice). Dropped here, a build threw away every voice-only
+      // take recorded on the board and read the film in a stock voice
+      // (measured live, proj_d09387ab: seven scenes recorded, built as nova).
+      ...((s as any).voice_take ? { voice_take: (s as any).voice_take } : {}),
       // The writer's emphasis words, carried: the captions tint them.
       ...(Array.isArray((s as any).emphasis) && (s as any).emphasis.length ? { emphasis: (s as any).emphasis } : {}),
       duration_seconds: s.duration_seconds,
@@ -4449,6 +4454,7 @@ async function runUnifiedPipeline(
   // The board's own none outlives the build (see the music choice above).
   const keptMood = opts.boardMusicMood === "none" ? "none" : treatment?.audioSystem?.music_mood;
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string, keptMood, filmPacing);
+  await playBoardRecordings(project);
   project.prompt = opts.prompt;
   project.brief = opts.brief || project.brief || opts.prompt;
   project.status = "generated";
@@ -4459,6 +4465,37 @@ async function runUnifiedPipeline(
     target: opts.target,
     project,
   };
+}
+
+/** The voice-only recordings made on the board play once the film is built
+ *  (core/voice-lines.ts recordSceneVoice: "no line plays until the film is
+ *  built"). Each recorded scene's line becomes the recording instead of the
+ *  generated read, unless a camera take already voices the scene; then the
+ *  film re-fits to the lines it now plays. A recording that cannot be read
+ *  leaves that scene on the generated read, and says so. */
+export async function playBoardRecordings(
+  project: Project,
+  dirs: { audioDir: string; dataDir: string } = { audioDir: path.join(projectAssetsDir(project.tenant_id, project.project_id), "audio"), dataDir: config.dataDir },
+): Promise<number> {
+  const board = (project as any).storyboard?.scenes || [];
+  const vl = await import("../core/voice-lines.js");
+  const { audioDir, dataDir } = dirs;
+  let played = 0;
+  for (let i = 0; i < project.scenes.length; i++) {
+    const vt = board[i]?.voice_take;
+    if (!vt?.file) continue;
+    try {
+      if (await vl.recordSceneVoice(project, i, vt.file, { audioDir })) played++;
+      board[i].voice_take = vt; // the recorded time stays the one it was recorded at
+    } catch (e: any) {
+      console.warn(`  Voice: scene ${i + 1}'s recording not played (${e?.message || e}) -- the generated read stays`);
+    }
+  }
+  if (played) {
+    await vl.fitFilmToVoice(project, dataDir, audioDir);
+    console.log(`  Voice: ${played} scene(s) play the recording made on the board`);
+  }
+  return played;
 }
 
 /**
