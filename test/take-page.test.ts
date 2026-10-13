@@ -593,6 +593,14 @@ describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
       // The whole scene: the live line, the next two, and the rest below.
       expect(await page.textContent("#cue")).toBe("One.");
       expect(await page.$$eval("#rest .rl", (e) => e.map((x) => x.textContent))).toEqual(["Four.", "Five."]);
+      // The no-sound warning never covers the prompter (Marc, Oct 13: it sat over the first line).
+      const clash = await page.evaluate(() => {
+        const w = document.getElementById("silent")!; w.style.display = "block";
+        const a = w.getBoundingClientRect(), b = document.getElementById("prompt")!.getBoundingClientRect();
+        w.style.display = "none";
+        return a.top < b.bottom && a.bottom > b.top;
+      });
+      expect(clash).toBe(false);
       await page.keyboard.press("ArrowRight");
       await page.waitForFunction(() => (document.getElementById("cue")!.textContent || "") === "Two.", null, { timeout: 4000 });
       expect(await page.$$eval("#past .rl", (e) => e.map((x) => x.textContent))).toEqual(["One."]);
