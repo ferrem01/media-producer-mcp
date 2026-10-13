@@ -4424,7 +4424,7 @@ Rules:
           const ctype = String(req.headers["content-type"] || "");
           if (q.has("scene") && !/json/i.test(ctype)) {
             const si = Number(q.get("scene"));
-            if (!Number.isInteger(si) || !project.scenes[si]) { jsonResponse(res, 400, { error: "scene is required" }); return; }
+            if (!Number.isInteger(si) || !(project.scenes[si] || project.storyboard?.scenes?.[si])) { jsonResponse(res, 400, { error: "scene is required" }); return; }
             const chunks: Buffer[] = [];
             let got = 0;
             await new Promise<void>((resolve, reject) => {
@@ -4441,7 +4441,7 @@ Rules:
             const { remuxMediaRecorderFile } = await import("./core/video-normalize.js");
             await remuxMediaRecorderFile(file);
             const plays = await vl.recordSceneVoice(project, si, file, { audioDir });
-            console.log(`  voice-line: ${vlProject} scene ${si + 1} recorded${plays ? "" : " (kept for a performance: a take plays there)"}`);
+            console.log(`  voice-line: ${vlProject} scene ${si + 1} recorded${plays ? "" : project.scenes[si] ? " (kept for a performance: a take plays there)" : " (kept on the board for a performance)"}`);
           } else {
             const body = await parseBody(req) as Record<string, any>;
             const si = Number(body.scene_index);

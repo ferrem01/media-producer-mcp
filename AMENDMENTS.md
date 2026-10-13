@@ -10431,3 +10431,14 @@ same row can start in one scene and finish in another.
   layout or not (`is-empty`), and only the rows animate their height.
   Worth keeping as a rule: a component checked by seeking alone is not
   checked -- play it.
+
+## Voice only on an unbuilt board (Oct 13)
+
+Marc recorded voice only on Your Old Leads Aren't Dead, a board with no
+built scenes, and "Use this take" answered "Could not attach your voice
+(400): scene is required": `POST /api/voice-line?scene=` and
+`recordSceneVoice` looked only at built scenes. A board scene is enough
+now: the recording is kept as the board scene's `voice_take` (what a
+performance is made from, `scene-performance.ts` reads it from the board)
+and nothing plays until the film is built, so no line is attached and the
+fit is a no-op.
