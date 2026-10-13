@@ -40,7 +40,19 @@
   .m-page .ir-label { display: none; }
   .ir-phone { position: absolute; background: #0c0c10; border-radius: 12% / 5.6%; box-shadow: 0 1.6em 3.4em rgba(0,0,0,0.38), inset 0 0 0 2px rgba(255,255,255,0.08); }
   .ir-screen { position: absolute; inset: 2.4% 4.2%; border-radius: 9.5% / 4.4%; overflow: hidden; background: #ffffff; }
-  .ir-shot { position: absolute; inset: 0; background-size: cover; background-position: center top; visibility: hidden; }
+  .ir-shot { position: absolute; inset: 0; visibility: hidden; background: #ffffff; display: flex; flex-direction: column; overflow: hidden; }
+  /* The piece at the screen's WIDTH, top first -- the way a phone shows a
+     desktop email or page; a tall one runs off the bottom. Marc, Oct 13: the
+     house emails "are not fitting into the iPhone" when cover cropped their
+     sides. An email reads as one in the mail app: its header (sender, time,
+     subject) above it, which also fills a screen taller than the email. */
+  .ir-shot img { flex: none; width: 100%; height: auto; display: block; }
+  .ir-shot .ir-hd { flex: none; padding: 12% 6% 3.5%; display: flex; flex-direction: column; gap: 0.35em; border-bottom: 1px solid #ececf1; color: #17171c; }
+  .ir-hd .from { display: flex; align-items: center; gap: 0.5em; font-size: 0.66em; color: #5c5e68; }
+  .ir-hd .from i { width: 2em; height: 2em; border-radius: 50%; background: var(--pri); color: #fff; font-style: normal; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .ir-hd .from b { font-weight: 700; color: #17171c; }
+  .ir-hd .from em { margin-left: auto; font-style: normal; }
+  .ir-hd .subj { font-size: 0.8em; font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; }
   .ir-mail { position: absolute; inset: 0; padding: 14% 7% 6%; display: flex; flex-direction: column; gap: 0.55em; color: #17171c; background: #ffffff; visibility: hidden; }
   .ir-mail .tag { align-self: flex-start; font-size: 0.62em; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pri); background: color-mix(in srgb, var(--pri) 12%, #ffffff); padding: 0.25em 0.6em; border-radius: 999px; }
   .ir-mail .from { display: flex; align-items: center; gap: 0.5em; font-size: 0.72em; color: #5c5e68; }
@@ -121,8 +133,16 @@
       var c;
       if (it.src) {
         c = document.createElement('div'); c.className = 'ir-shot';
-        c.style.backgroundImage = 'url("' + String(it.src).replace(/"/g, '%22') + '")';
-        var pre = document.createElement('img'); pre.src = String(it.src); pre.alt = ''; pre.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0'; c.appendChild(pre);
+        // An email (a subject given) opens under its mail-app header.
+        if (it.subject) {
+          var hd = document.createElement('div'); hd.className = 'ir-hd';
+          hd.innerHTML = '<div class="from"><i></i><b></b><em>now</em></div><div class="subj"></div>';
+          hd.querySelector('i').textContent = (it.from || from).charAt(0).toUpperCase();
+          hd.querySelector('b').textContent = it.from || from;
+          hd.querySelector('.subj').textContent = it.subject;
+          c.appendChild(hd);
+        }
+        var shot = document.createElement('img'); shot.src = String(it.src); shot.alt = ''; c.appendChild(shot);
       } else {
         c = document.createElement('div'); c.className = 'ir-mail';
         var tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = it.title || ('Email ' + (i + 1));

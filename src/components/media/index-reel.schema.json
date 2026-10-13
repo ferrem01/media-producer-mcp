@@ -13,10 +13,10 @@
         "type": "object",
         "properties": {
           "title": { "type": "string", "description": "The item's name (the list row, the label under the phone)" },
-          "src": { "type": "string", "description": "A screenshot of the example; omit to draw an email" },
-          "subject": { "type": "string", "description": "Drawn email: the subject line" },
+          "src": { "type": "string", "description": "A picture of the example (a house email from the Sample library, a screenshot), shown at the screen's width, top first; omit to draw an email" },
+          "subject": { "type": "string", "description": "The subject line: the drawn email's, or, with src, the mail-app header (sender, time, subject) over the picture" },
           "preview": { "type": "string", "description": "Drawn email: one or two lines of the body" },
-          "from": { "type": "string", "description": "Drawn email: the sender (default the data's from)" },
+          "from": { "type": "string", "description": "The sender (drawn email, or the header over a src email; default the data's from)" },
           "cta": { "type": "string", "description": "Drawn email: the button" },
           "at": { "type": "number", "description": "Seconds (or a word anchor) this item lands; default start_at + i * per_item_s" }
         }

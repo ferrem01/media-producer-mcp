@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-13 — The index reel shows a picture at the phone's width, under a mail header
+
+Marc, on the lifecycle reel with the new house emails: "these emails are not
+fitting into the iPhone." The reel filled the screen with `background-size:
+cover`, and a desktop email (about 1.8:1) on a phone screen (about 2.25:1)
+lost its sides. Now a picture item is an `<img>` at the screen's width, top
+first -- the way a phone shows a desktop email -- and an item with a
+`subject` opens under a mail-app header (sender, "now", subject) that also
+fills the height the email is short of. No mobile copies of the emails needed.
+
+---
+
 ## 2026-10-13 — The Sample library, and two whole lifecycle email series
 
 Marc: the house examples should be a library "like the music library or the
