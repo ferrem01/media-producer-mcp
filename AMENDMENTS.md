@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-13 — A narrated film keeps its measured word times through board edits
+
+Adding sound cues to the no-Dana Claude/GPT ad (proj_7d4e0c84) through the
+board's `sfx` edit re-timed every scene against a guess. The film is
+narrated (TTS `vo_scene_<i>` lines, no takes), and `spineForScene` only
+measures when a scene has a take. Otherwise it spread the script over the
+BOARD scene's estimated duration: scene 2's measured 8.37 s line became
+words squeezed into 3.5 s. Every anchor re-resolved against that clock.
+"@execute" landed at 2.16 s instead of 4.9 s, and the caption lanes in
+scenes 2, 4, 5 and 6 were re-timed (scene 5's "for every campaign" at
+3.2 s, spoken at 4.9 s).
+
+`spineForScene` now keeps a measured spine the scene already carries (the
+built scene's, then the board's) when its words still match the script,
+re-aligned to it. It estimates only when there is no take and no measured
+words fit. Test: `test/narration-spine-kept.test.ts`.
+
+Not changed here: `recaptionIfStale` still restores a caption lane someone
+trimmed by hand (scene 2's, cut to two phrases so the slams carry the rest)
+whenever a re-time runs, because a trimmed lane looks stale against the
+spine. And `audio action:"fit_voiceover"` timed out at the MCP client's 60 s
+twice on that 8-scene film; it may want to run as a job.
+
 ## 2026-10-13 — kinetic-text line-rise lands on its `at`
 
 On the no-Dana cut of the Claude/GPT ad (proj_7d4e0c84) scene 2 had three
