@@ -10442,3 +10442,12 @@ now: the recording is kept as the board scene's `voice_take` (what a
 performance is made from, `scene-performance.ts` reads it from the board)
 and nothing plays until the film is built, so no line is attached and the
 fit is a no-op.
+
+## A voice-only recording shows on the board (Oct 13)
+
+After the voice landed on the unbuilt board, the scene's "A take of the
+lines" row still read "needed", as if nothing had been recorded. A voice
+is half that take: the video of the person is still to make from it
+(Generate). The row, in the desktop Studio and on the phone, now reads
+"voice in · video next" with a note pointing at Generate; the need stays
+open, because the scene still has no video.

@@ -5190,10 +5190,15 @@ ${QUOTIENT_CSS}
       rows.push({ ai: ai, need: a });
     });
     if (!rows.length) return '';
+    // A voice-only recording (voice_take) is half the scene's take: the
+    // voice is in, the video of the person is still to make from it (Marc,
+    // Oct 13: "it shows that i still 'need' the asset ... we're going to
+    // generate the ... video once we have the audio").
+    var voiced = function(a) { return !!s.voice_take && a.type === 'camera_video' && a.use !== 'clip' && a.status === 'needed'; };
     var open = rows.filter(function(r) { return r.need.status === 'needed'; }).length;
     var h = '<div class="np-block" data-np-block="' + si + '"><div class="np-lead">This scene needs' + (open ? '' : ' · all in') + '</div>';
     rows.forEach(function(r) {
-      var a = r.need, have = a.status === 'provided' && a.path;
+      var a = r.need, have = a.status === 'provided' && a.path, voice = voiced(a);
       var kind = NP_LABELS[a.type] || a.type;
       var what = a.type === 'camera_video' ? (a.use === 'clip' ? 'A live-action clip on this scene' + (a.description && a.description !== 'A live-action clip for this scene (a cameo on camera)' ? ' · ' + escHtml(a.description) : '') : 'A take of the lines') : escHtml(a.description || '');
       var srcs = NP_SOURCES[a.type] || ['upload'];
@@ -5207,17 +5212,18 @@ ${QUOTIENT_CSS}
           var lbl = NP_SOURCE_LABELS[src];
           if (have && src === 'find') lbl = 'Find another';
           if (have && src === 'draw') lbl = 'Redraw';
-          if (have && src === 'booth') lbl = 'Re-record here';
+          if ((have || voice) && src === 'booth') lbl = 'Re-record here';
           acts += '<button class="np-btn" data-np-src="' + src + '" data-np-scene="' + si + '" data-np-asset="' + r.ai + '">' + lbl + '</button>';
         }
       });
       h += '<div class="np-row"><div class="np-what">' + what +
         '<small>' + escHtml(a.use === 'clip' ? 'Camera clip' : kind) + (a.use === 'card' ? ' · card' : (a.use === 'split' ? ' · split' : (a.use === 'clip' ? ' · on the scene' : (a.type !== 'camera_video' ? ' · cutaway' : '')))) +
-        ' · ' + (have ? '<b class="ok">provided</b>' : (a.priority === 'nice_to_have' ? 'optional' : '<b>needed</b>')) + '</small></div>' +
+        ' · ' + (have ? '<b class="ok">provided</b>' : voice ? '<b class="ok">voice in</b> · <b>video next</b>' : (a.priority === 'nice_to_have' ? 'optional' : '<b>needed</b>')) + '</small></div>' +
         '<div class="np-act">' + acts + '</div>' +
         '<div class="np-panel" data-np-panel="' + si + '-' + r.ai + '" style="display:none"></div></div>';
     });
     var built = !!(project.scenes && project.scenes.length);
+    if (rows.some(function(r) { return voiced(r.need); })) h += '<div class="np-note">Your voice is in for this scene. The video is next: Generate makes the video of you speaking it. Or record the scene on camera instead.</div>';
     if (rows.some(function(r) { return r.need.type !== 'camera_video'; })) h += '<div class="np-note">' + (built ? 'A found, drawn or uploaded file takes its slot in the scene right away.' : 'A found, drawn or uploaded file takes its slot at the build. The film builds without it.') + '</div>';
     return h + '</div>';
   }

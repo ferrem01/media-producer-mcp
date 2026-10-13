@@ -324,6 +324,12 @@ ${QUOTIENT_CSS}
     var a = (scene.assets || []).filter(function (x) { return x && x.type === 'camera_video'; });
     return a.length ? a[0] : null;
   }
+  // A voice-only recording is half the take of the lines: the voice is in,
+  // the video is still to make from it (a cameo clip is a picture to shoot).
+  function voicedOf(scene) {
+    var n = needOf(scene);
+    return !!(n && n.status === 'needed' && scene.voice_take && n.use !== 'clip');
+  }
   function takeOf(i) {
     var clip = ((P.speaker_track && P.speaker_track.clips) || []).filter(function (c) { return c.scene_index === i; })[0];
     if (!clip) return null;
@@ -478,7 +484,8 @@ ${QUOTIENT_CSS}
       var need = needOf(s), take = takeOf(i);
       var line = document.createElement('div'); line.className = 'row'; line.style.marginTop = '8px';
       var pill = document.createElement('span'); pill.className = 'pill';
-      if (need && need.status === 'needed') { pill.className += ' need'; pill.textContent = 'Needs a take'; }
+      if (voicedOf(s)) { pill.className += ' ok'; pill.textContent = 'Voice in · video next'; }
+      else if (need && need.status === 'needed') { pill.className += ' need'; pill.textContent = 'Needs a take'; }
       else if (take) { pill.className += ' ok'; pill.textContent = 'Take' + (take.duration ? ' · ' + fmt(take.duration) : '') + (take.capture ? ' · ' + take.capture : ''); }
       else if (speaker && !script) { pill.className += ' na'; pill.textContent = 'No lines'; }
       else { pill.className += ' na'; pill.textContent = 'Motion graphics'; }
