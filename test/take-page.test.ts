@@ -56,13 +56,16 @@ describe("what the booth does", () => {
 
   it("records the front camera at the FILM'S frame with the recorder extension's audio constraints", () => {
     expect(html).toMatch(/facingMode: 'user'/);
-    expect(html).toMatch(/width: \{ ideal: capW \}, height: \{ ideal: capH \}/);
+    // The file is the film's frame (the canvas); a laptop's camera is asked for its own landscape picture.
+    expect(html).toMatch(/width: \{ ideal: studio \? Math\.max\(capW, capH\) : capW \}, height: \{ ideal: studio \? Math\.min\(capW, capH\) : capH \}/);
     // The take follows the film's frame (Marc, on a laptop: "why did it record
     // it as if it was an iPhone?"): 9x16 -> 1080x1920, 16x9 -> 1920x1080.
     expect(html).toMatch(/if \(w >= h\) \{ capH = 1080; capW = Math\.round\(1080 \* w \/ h \/ 2\) \* 2; \}/);
     expect(html).toMatch(/setFrame\(p\.canvas\);/);
     expect(html).toMatch(/width: capture === 'canvas' \? capW : trackW, height: capture === 'canvas' \? capH : trackH/);
-    expect(html).toMatch(/#stage\.wide #live \{[^}]*aspect-ratio: var\(--frame-w, 16\) \/ var\(--frame-h, 9\)/);
+    // The preview is the frame itself on every screen (what you see is what is recorded).
+    expect(html).toMatch(/#live \{[^}]*aspect-ratio: var\(--frame-w, 9\) \/ var\(--frame-h, 16\); object-fit:cover;/);
+    expect(html).not.toMatch(/#stage\.wide/);
     // Echo cancellation OFF: the same choice the extension made after the
     // combined-I/O device nulled the mic. Consistent behaviour on every device.
     expect(html).toMatch(/echoCancellation: false, noiseSuppression: true, autoGainControl: true/);
@@ -543,6 +546,61 @@ describe("the done screen goes on to the next scene (Marc, Oct 6)", () => {
       expect(await page.getAttribute("#closeBtn", "class")).toBe("btn");
       await page.click("#closeBtn");
       await page.waitForFunction(() => (window as any).__msgs.some((m: any) => m && m.type === "mp-take-close"));
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); for (const c of closers) await c(); }
+  }, 90000);
+
+  it("the preview is what is recorded (Marc, Oct 13): a laptop asks for its landscape picture, and every screen shows the film's frame, not its own shape", async () => {
+    const closers: Array<() => Promise<void>> = [];
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined, args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+    try {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 820 }, permissions: ["camera", "microphone"] });
+      const page = await ctx.newPage();
+      const errors: string[] = []; page.on("pageerror", (e) => errors.push(e.message));
+      await page.addInitScript(() => {
+        const asks: any[] = (window as any).__asks = [];
+        const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (c: any) => { asks.push(c); return orig(c); };
+      });
+      const proj = { name: "T", canvas: { width: 1080, height: 1920 }, treatment: { filmGrammar: "speaker" }, scenes: [], takes: [],
+        storyboard: { scenes: [{ label: "Hook", duration_seconds: 3, voiceover_text: "One." }] } };
+      const http = await import("node:http");
+      const server = http.createServer((req, res) => {
+        req.on("data", () => {});
+        req.on("end", () => {
+          if ((req.url || "").startsWith("/api/projects/")) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(proj)); return; }
+          res.writeHead(200, { "content-type": "text/html" }); res.end(getTakeHtml());
+        });
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+      closers.push(() => new Promise<void>((r) => server.close(() => r())));
+      await page.goto(`http://127.0.0.1:${(server.address() as any).port}/take?tenant=t&project=p&token=x&scene=0&embed=1`);
+      await page.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      await page.click("#recordBtn");
+      await page.waitForSelector("#goBtn", { state: "visible", timeout: 8000 });
+      const asks = await page.evaluate(() => (window as any).__asks);
+      expect(asks[0].video.width.ideal).toBe(1920);
+      expect(asks[0].video.height.ideal).toBe(1080);
+      // The stage shows the 9x16 frame at the window's full height, not blown up to its width.
+      const box = await page.evaluate(() => { const r = document.getElementById("live")!.getBoundingClientRect(); return { w: r.width, h: r.height, ih: innerHeight }; });
+      expect(box.h).toBeCloseTo(box.ih, 0);
+      expect(box.w / box.h).toBeCloseTo(9 / 16, 2);
+      // The file is still the film's frame.
+      expect(await page.evaluate(() => [(document.getElementById("cap") as HTMLCanvasElement).width, (document.getElementById("cap") as HTMLCanvasElement).height])).toEqual([1080, 1920]);
+      // On a phone the preview is the frame too, not the screen's shape, so it crops exactly what the take crops.
+      const { devices } = await import("playwright");
+      const ph = await (await browser.newContext({ ...devices["iPhone 13"], permissions: ["camera", "microphone"] })).newPage();
+      ph.on("pageerror", (e) => errors.push(e.message));
+      await ph.goto(`http://127.0.0.1:${(server.address() as any).port}/take?tenant=t&project=p&token=x&scene=0`);
+      await ph.waitForFunction(() => !(document.getElementById("recordBtn") as HTMLButtonElement).disabled, null, { timeout: 10000 });
+      await ph.click("#recordBtn");
+      await ph.waitForSelector("#goBtn", { state: "visible", timeout: 8000 });
+      const pbox = await ph.evaluate(() => { const r = document.getElementById("live")!.getBoundingClientRect(); return { w: r.width, h: r.height, iw: innerWidth, ih: innerHeight }; });
+      expect(pbox.w / pbox.h).toBeCloseTo(9 / 16, 2);
+      expect(pbox.w).toBeLessThanOrEqual(pbox.iw + 0.5);
+      expect(pbox.h).toBeLessThanOrEqual(pbox.ih + 0.5);
+      expect(Math.abs(pbox.w - pbox.iw) < 0.5 || Math.abs(pbox.h - pbox.ih) < 0.5).toBe(true);   // as big as the screen allows
       expect(errors).toEqual([]);
     } finally { await browser.close(); for (const c of closers) await c(); }
   }, 90000);

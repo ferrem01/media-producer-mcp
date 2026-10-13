@@ -136,11 +136,15 @@ ${QUOTIENT_CSS}
   #stage { position:fixed; inset:0; z-index:5; background:#000; touch-action:manipulation; }
   html.lock, html.lock body { overflow:hidden; height:100%; overscroll-behavior:none; }
   html.lock body { position:fixed; width:100%; top:0; left:0; }
-  #live { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
-  /* A WIDE film (16x9, 1x1) on any screen: the stage is the frame itself,
-     centred, so what you see is what the canvas records. A tall film keeps
-     the phone's full-bleed stage. */
-  #stage.wide #live { inset:auto; left:50%; top:50%; width:100%; height:auto; max-height:100%; aspect-ratio: var(--frame-w, 16) / var(--frame-h, 9); transform: translate(-50%, -50%) scaleX(-1); }
+  /* WHAT YOU SEE IS WHAT IS RECORDED (Marc, Oct 13: on the laptop the
+     preview was "so zoomed in", and on the phone what he saw was not the
+     depth or zoom of the take). The take is the film's frame cut from the
+     middle of the camera picture (drawFrame); the preview is that same
+     frame, as big as the screen allows, centred, filled the same way. A
+     full-bleed preview cropped to the SCREEN's shape instead: tighter on a
+     tall phone, blown up to the width of a laptop window. */
+  #live { position:absolute; left:50%; top:50%; width:min(100%, calc(100dvh * var(--frame-w, 9) / var(--frame-h, 16))); height:auto;
+    aspect-ratio: var(--frame-w, 9) / var(--frame-h, 16); object-fit:cover; transform:translate(-50%, -50%) scaleX(-1); }
   #cap { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   #veil { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 26%, rgba(0,0,0,0) 42%, rgba(0,0,0,0) 70%, rgba(0,0,0,.6) 100%); pointer-events:none; }
   #top { position:absolute; left:0; right:0; top:0; padding: calc(12px + env(safe-area-inset-top)) 16px 0; display:flex; align-items:center; gap:10px; }
@@ -176,9 +180,12 @@ ${QUOTIENT_CSS}
   /* THE ROLL (core/prompter.ts paintRoll): the scene's whole script in a
      box that scrolls itself -- read lines dim above the live one, every
      line to come below it -- the live line held a third of the way down. */
-  #prompt { height:40dvh; overflow:hidden; -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 10%, #000 84%, transparent 100%); mask-image:linear-gradient(180deg, transparent 0, #000 10%, #000 84%, transparent 100%); }
+  /* Only the BOTTOM fades: a fade at the top swallowed the first line, the
+     one you start on (Marc, Oct 13: "the talk track is faded into the top of
+     the screen. i cant even read the first line"). */
+  #prompt { height:40dvh; overflow:hidden; -webkit-mask-image:linear-gradient(180deg, #000 0, #000 84%, transparent 100%); mask-image:linear-gradient(180deg, #000 0, #000 84%, transparent 100%); }
   #track { position:relative; transition:transform .45s cubic-bezier(.2,.7,.2,1); }
-  #past .rl { margin-bottom:10px; font-size:20px; line-height:1.3; color:rgba(255,255,255,.32); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
+  #past .rl { margin-bottom:10px; font-size:20px; line-height:1.3; color:rgba(255,255,255,.5); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
   #past:not(:empty) { margin-bottom:14px; }
   #rest .rl { margin-top:8px; font-size:18px; line-height:1.3; color:rgba(255,255,255,.5); text-shadow:0 2px 10px rgba(0,0,0,.6); text-wrap:balance; }
   #bar { position:absolute; left:0; right:0; bottom: calc(86px + env(safe-area-inset-bottom)); height:3px; background:rgba(255,255,255,.18); }
@@ -272,7 +279,8 @@ ${QUOTIENT_CSS}
   body.studio #cue, body.studio #next, body.studio #next2, body.studio #past .rl, body.studio #rest .rl { font-size:32px; line-height:1.35; font-weight:500; margin:0 0 16px; }
   body.studio #cue { font-weight:600; }
   body.studio #next, body.studio #next2, body.studio #rest .rl { color:rgba(255,255,255,.72); }
-  body.studio #past .rl { color:rgba(255,255,255,.3); }
+  body.studio #past .rl { color:rgba(255,255,255,.5); }
+  body.studio #cue .w:not(.on):not(.em) { color:rgba(255,255,255,.62); }
   body.studio #stage.voice #prompt { top:72px; height:calc(100% - 222px); }
   body.studio #stopWrap, body.studio #frameWrap { left:50%; right:auto; width:min(560px, calc(100% - 36px)); transform:translateX(-50%); }
   #keys { position:absolute; left:0; right:0; bottom:calc(70px + env(safe-area-inset-bottom)); text-align:center; font-size:12px; color:rgba(255,255,255,.55); }
@@ -473,7 +481,6 @@ ${QUOTIENT_CSS}
     var cv = $('cap'); cv.width = capW; cv.height = capH;
     var st = $('stage');
     st.style.setProperty('--frame-w', String(w)); st.style.setProperty('--frame-h', String(h));
-    if (w >= h) st.classList.add('wide'); else st.classList.remove('wide');
   }
 
   // One film's script and frame onto the ready screen.
@@ -857,7 +864,11 @@ ${QUOTIENT_CSS}
       return;
     }
     var constraints = {
-      video: { facingMode: 'user', width: { ideal: capW }, height: { ideal: capH }, frameRate: { ideal: 30 } },
+      // A laptop camera is landscape: ask for its own picture and let the
+      // canvas cut the frame out of it. Asking it for portrait made Chrome
+      // crop a strip and scale it up -- a zoom before the take began. A
+      // phone's front camera gives portrait natively.
+      video: { facingMode: 'user', width: { ideal: studio ? Math.max(capW, capH) : capW }, height: { ideal: studio ? Math.min(capW, capH) : capH }, frameRate: { ideal: 30 } },
       // Mirrors the recorder extension so a take behaves the same on every device.
       audio: micAudio(),
     };
