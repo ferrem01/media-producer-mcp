@@ -26,6 +26,7 @@ import { promisify } from "node:util";
 import { config } from "../config.js";
 import { actorTestDir, isActorTestId, getHeygenLook, download } from "./actor-test.js";
 import { uprightInput } from "./image-orient.js";
+import type { ActorFoundation } from "./actor-foundation.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -57,6 +58,10 @@ export interface CastActor {
   sheet_draft?: { file: string; made_at: string };
   /** The sheet being drawn, or the reason it could not be. */
   sheet_job?: { status: "drawing" | "failed"; started_at: string; error?: string };
+  /** A real person's foundation (core/actor-foundation.ts): the three clips
+   *  they recorded, and what is pulled from them. A real person added on the
+   *  guided flow has no portrait file until the close clip lands. */
+  foundation?: ActorFoundation;
   created_at: string;
 }
 
@@ -75,12 +80,27 @@ export async function listCast(tenant: string): Promise<CastActor[]> {
   }
 }
 
+/** Write the cast list. */
+export async function writeCast(tenant: string, cast: CastActor[]): Promise<void> {
+  await fs.mkdir(castDir(tenant), { recursive: true });
+  await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast, null, 2));
+}
+
 export async function getActor(tenant: string, id: string): Promise<CastActor | null> {
   return (await listCast(tenant)).find((a) => a.id === id) || null;
 }
 
 export function portraitPath(tenant: string, actor: CastActor): string {
   return path.join(config.dataDir, tenant, actor.portrait);
+}
+
+/** An actor ready to perform: a real person added on the guided flow has
+ *  no picture until their foundation's close clip lands. */
+export async function needPicture(tenant: string, actor: CastActor): Promise<CastActor> {
+  if (!actor.foundation) return actor;
+  const has = await fs.access(portraitPath(tenant, actor)).then(() => true, () => false);
+  if (!has) throw new Error(`${actor.name} has no picture yet: record their foundation on the Cast page first`);
+  return actor;
 }
 
 function slug(name: string): string {
@@ -103,11 +123,15 @@ export async function addActor(tenant: string, opts: {
   fictional?: boolean;
   /** The model sheet, a tenant file (see CastActor.sheet). */
   sheet?: string;
+  /** A real person added on the guided flow (SPEC-real-person.md): no photo
+   *  -- the portrait is pulled from the foundation they record next. */
+  real?: boolean;
 }): Promise<CastActor> {
   // A portrait can be anyone's face: whoever adds it vouches for it. A
   // HeyGen look already passed HeyGen's own consent (or is a stock presenter).
   // A fictional actor is a generated face: the adder vouches it is nobody's.
   if (!opts.heygen_look_id && opts.consent !== true && opts.fictional !== true) throw new Error("Confirm this is you, or a person who agreed to be cast (consent: true), or a generated person (fictional: true)");
+  if (opts.real) return addRealPerson(tenant, String(opts.name || ""), opts);
   const look = opts.heygen_look_id ? await getHeygenLook(String(opts.heygen_look_id)) : null;
   if (look && look.status && look.status !== "completed") throw new Error(`That HeyGen look is ${look.status}, not ready yet`);
   const name = String(opts.name || look?.name || "").trim().slice(0, 60);
@@ -162,6 +186,26 @@ export async function addActor(tenant: string, opts: {
   return actor;
 }
 
+/** A real person with no picture yet: consented, named, and waiting for the
+ *  foundation recording that makes their portrait. */
+async function addRealPerson(tenant: string, rawName: string, opts: { consent?: boolean; voice_id?: string; voice_name?: string }): Promise<CastActor> {
+  if (opts.consent !== true) throw new Error("Confirm this is you, or a person who agreed to be cast (consent: true)");
+  const name = rawName.trim().slice(0, 60);
+  if (!name) throw new Error("name is required");
+  const cast = await listCast(tenant);
+  let id = slug(name);
+  while (cast.some((a) => a.id === id)) id = `${slug(name)}-${crypto.randomBytes(2).toString("hex")}`;
+  const now = new Date().toISOString();
+  const actor: CastActor = {
+    id, name, portrait: path.join("cast", `${id}.jpg`),
+    ...(opts.voice_id ? { voice_id: String(opts.voice_id), voice_name: String(opts.voice_name || opts.voice_id) } : {}),
+    consent: { at: now }, foundation: { clips: [], stills: [] }, created_at: now,
+  };
+  cast.push(actor);
+  await writeCast(tenant, cast);
+  return actor;
+}
+
 /** A model sheet (a tenant file) as cast/<id>-sheet.jpg, at full detail:
  *  a wide sheet's face is a third of its width. */
 async function saveSheet(tenant: string, id: string, file: string): Promise<string> {
@@ -205,7 +249,9 @@ export async function removeActor(tenant: string, id: string): Promise<boolean> 
   if (!actor) return false;
   await fs.writeFile(path.join(castDir(tenant), "cast.json"), JSON.stringify(cast.filter((a) => a.id !== id), null, 2));
   await fs.rm(portraitPath(tenant, actor), { force: true }).catch(() => {});
-  for (const f of [actor.sheet, actor.sheet_draft?.file, ...(actor.photos || [])]) if (f) await fs.rm(path.join(config.dataDir, tenant, f), { force: true }).catch(() => {});
+  const fd = actor.foundation;
+  const foundation = fd ? [...fd.clips.map((c) => c.file), ...fd.stills.map((x) => x.file), ...(fd.ref_video ? [fd.ref_video] : [])] : [];
+  for (const f of [actor.sheet, actor.sheet_draft?.file, ...(actor.photos || []), ...foundation]) if (f) await fs.rm(path.join(config.dataDir, tenant, f), { force: true }).catch(() => {});
   // And every upload a cast member was made from that is still lying in the
   // library (Marc: "delete all photos we have on the server of that person").
   await sweepIntake(tenant, 0);

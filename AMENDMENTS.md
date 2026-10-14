@@ -10575,3 +10575,31 @@ is half that take: the video of the person is still to make from it
 (Generate). The row, in the desktop Studio and on the phone, now reads
 "voice in · video next" with a note pointing at Generate; the need stays
 open, because the scene still has no video.
+
+## A real person is built from a foundation recording (Oct 14, SPEC-real-person.md phase 1)
+
+Ten Seedance tests on proj_0b19db0e scene 3 (Oct 10-14) settled it: a
+drawn start frame wins over real photos and reads as "a drawing"; a real
+recording of the person as a reference video was "really really real"; and
+the take copies the light in that recording, flaws included. Marc: "There
+is an AI avatar with model sheet and then there is a real person. They are
+kind of not the same thing" -- and the Cast should walk a person through
+recording what the avatar is made from.
+
+The Cast page's "A real person" tab is now a name and consent, no photo
+(`addActor` with `real: true`), then the foundation panel: a QR code to the
+new `/foundation` page, which says the clips are the foundation, coaches
+the light (front-side, never overhead), and records three clips hands-free
+-- far (75 s at ~3 m), close (30 s at ~1 m), a head turn (12 s) -- with a
+countdown to reach the chair, a timer readable from it, and an auto-stop.
+Each clip goes to `POST /api/cast/{t}/{actor}/foundation/{kind}`
+(`core/actor-foundation.ts`): transcoded to 1080p h264, the close clip's
+middle frame becomes the front still and the portrait, the turn clip gives
+the three-quarter stills, the far clip's most-spoken 15 s (Seedance's
+reference limit) becomes the reference video. A clip can be redone or
+uploaded on its own. A real person with no foundation yet has no picture,
+and recast / generate / perform say "record their foundation first"
+(`needPicture`). MCP: `add_actor real: true` returns `foundation_url`; the
+`foundation` action reports the clips. Nothing performs FROM the foundation
+yet -- that is phase 2, which also deletes the photos/sheet path for real
+people.

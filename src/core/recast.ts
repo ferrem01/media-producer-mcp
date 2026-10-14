@@ -27,7 +27,7 @@ import { recutProjectTakes } from "./take-edits.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
 import { takeCopies, takeForClip, syncSpeakerClips, sceneCastOf, softenCastPunchIns } from "./speaker-layer.js";
-import { getActor, portraitPath, type CastActor } from "./cast.js";
+import { getActor, portraitPath, needPicture, type CastActor } from "./cast.js";
 import { ffmpeg, convertVoice, durationOf } from "./actor-test.js";
 import { detectFace } from "./face-band.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
@@ -456,8 +456,9 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
     await saveStatus(tenant, st);
     return st;
   }
-  const actor = await getActor(tenant, actorId);
-  if (!actor) throw new Error(`No cast actor "${actorId}"`);
+  const found = await getActor(tenant, actorId);
+  if (!found) throw new Error(`No cast actor "${actorId}"`);
+  const actor = await needPicture(tenant, found);
   const performer = opts.performer ? getPerformer(opts.performer) : defaultPerformer(actor);
   if (!performer) throw new Error(`No performer "${opts.performer}" (${PERFORMERS.map((p) => p.id).join(", ")})`);
   if (!process.env[performer.key]) throw new Error(`${performer.label} is not set up on this server (${performer.key})`);

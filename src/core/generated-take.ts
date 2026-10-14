@@ -19,7 +19,7 @@ import path from "node:path";
 import { config } from "../config.js";
 import { loadProject } from "../persistence/project.js";
 import { projectDir } from "../persistence/paths.js";
-import { getActor, portraitPath, type CastActor } from "./cast.js";
+import { getActor, portraitPath, needPicture, type CastActor } from "./cast.js";
 import { ffmpeg, download, durationOf, getHeygenLook, listHeygenVoices } from "./actor-test.js";
 import { getPerformer, PERFORMERS, type Performer } from "./performers/index.js";
 
@@ -230,8 +230,9 @@ export async function startGeneratedTake(tenant: string, projectId: string, opts
   if (!project) throw new Error("Project not found");
   const grammar = (project as any).treatment?.filmGrammar;
   if (grammar !== "speaker" && grammar !== "creator-cut") throw new Error("A generated take needs a film a person carries (speaker or creator-cut)");
-  const actor = await getActor(tenant, opts.actor);
-  if (!actor) throw new Error(`No cast actor "${opts.actor}"`);
+  const found = await getActor(tenant, opts.actor);
+  if (!found) throw new Error(`No cast actor "${opts.actor}"`);
+  const actor = await needPicture(tenant, found);
   const performer = getPerformer(opts.performer || "heygen");
   if (!performer) throw new Error(`No performer "${opts.performer}" (${PERFORMERS.map((p) => p.id).join(", ")})`);
   if (!performer.fromAudio) throw new Error(`${performer.label} copies a recording's motion, so it cannot perform a script alone -- use a vendor driven by audio (HeyGen)`);

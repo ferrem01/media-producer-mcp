@@ -5,8 +5,9 @@
  * (Marc, Oct 5: "actors and locations ... should be at the tenant level").
  *
  * Cast: the people who perform -- a generated person (portrait + model
- * sheet), a real person's photo (consent), a HeyGen look or presenter -- and
- * the ElevenLabs voice each speaks with. Locations: clean plates of the sets
+ * sheet), a real person (consent, built from the foundation they record:
+ * SPEC-real-person.md), a HeyGen look or presenter -- and the ElevenLabs
+ * voice each speaks with. Locations: clean plates of the sets
  * Seedance performs in -- drawn from a description, or from a photo (the
  * people removed, or kept as it is).
  *
@@ -32,12 +33,7 @@ const PAGE_CSS = `
   .card .pic { position: relative; background: #111; aspect-ratio: 4 / 5; }
   .card.wide .pic { aspect-ratio: 4 / 3; }
   .card .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .more-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
-  .more-item { position: relative; width: 84px; display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: #666; }
-  .more-item img { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
-  .more-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .more-item button { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.6); color: #fff; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; padding: 0; font-size: 14px; }
-  .more-list small { color: #888; font-size: 12px; }
+  .card .pic .nopic { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; color: #bbb; font-size: 13px; }
   .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
   .ph-item { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 12px; color: #666; }
   .ph-item img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
@@ -154,7 +150,7 @@ export function getCastHtml(): string {
   function load() {
     railApi('/api/cast/' + enc(tenant)).then(function (r) { actors = r.cast || []; render(); }).catch(function (e) { say(e.message || String(e), 'err'); });
   }
-  function kindOf(a) { return a.heygen_look_id ? 'HeyGen look' : a.fictional ? 'Generated' : 'Photo'; }
+  function kindOf(a) { return a.heygen_look_id ? 'HeyGen look' : a.fictional ? 'Generated' : a.foundation ? 'Real person' : 'Photo'; }
   function render() {
     var box = $('actors');
     if (!actors.length) { box.innerHTML = '<div class="empty">No actors yet: add one below.</div>'; return; }
@@ -169,7 +165,7 @@ export function getCastHtml(): string {
         + '<div class="body"><div class="name"><span class="nm"></span><span class="badge">' + kindOf(a) + '</span></div>'
         + '<div class="meta">' + metaOf(a) + '</div>'
         + '<div class="row"><select class="voice" title="The ElevenLabs voice this actor speaks with">' + opts + '</select><button class="quiet hear" title="Hear the voice">&#9654;</button></div>'
-        + '<div class="row">' + (a.sheet ? '<button class="quiet sheet">Model sheet</button>' : '') + (a.heygen_look_id ? '' : '<button class="quiet photos">Photos &amp; sheet</button>') + '<button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
+        + '<div class="row">' + (a.sheet ? '<button class="quiet sheet">Model sheet</button>' : '') + (a.foundation ? '<button class="quiet found">Foundation</button>' : a.heygen_look_id ? '' : '<button class="quiet photos">Photos &amp; sheet</button>') + '<button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
       card.querySelector('.nm').textContent = a.name;
       card.querySelector('.voice').onchange = function (ev) {
         var id = ev.target.value, v = (voices.elevenlabs || []).filter(function (x) { return x.id === id; })[0];
@@ -184,7 +180,10 @@ export function getCastHtml(): string {
       card.querySelector('.pic').style.cursor = 'zoom-in';
       card.querySelector('.pic').onclick = function () { viewActor(a, false); };
       if (a.sheet) card.querySelector('.sheet').onclick = function () { viewActor(a, true); };
-      if (!a.heygen_look_id) card.querySelector('.photos').onclick = function () { photosPanel(a.id); };
+      if (a.foundation) card.querySelector('.found').onclick = function () { foundationPanel(a.id); };
+      else if (!a.heygen_look_id) card.querySelector('.photos').onclick = function () { photosPanel(a.id); };
+      // A real person with no foundation yet has no picture: say so, not a broken image.
+      card.querySelector('.pic img').onerror = function () { this.parentNode.innerHTML = '<div class="nopic">Record the foundation</div>'; };
       card.querySelector('.ren').onclick = function () { var n = prompt('Rename ' + a.name, a.name); if (n && n.trim()) patch(a, { name: n.trim() }, 'Renamed.'); };
       card.querySelector('.del').onclick = function () {
         if (!confirm('Remove ' + a.name + ' from the cast? Takes already made with them stay on their films.')) return;
@@ -196,6 +195,10 @@ export function getCastHtml(): string {
   // What the card says about the pictures behind the person.
   function metaOf(a) {
     if (a.heygen_look_id) return 'HeyGen draws the person';
+    if (a.foundation) {
+      var got = (a.foundation.clips || []).length;
+      return got >= 3 ? 'Foundation recorded ' + new Date(a.foundation.made_at || a.created_at).toLocaleDateString() : 'Foundation: ' + got + ' of 3 clips';
+    }
     var n = (a.photos || []).length;
     var bits = [n ? 'Portrait + ' + n + ' photo' + (n === 1 ? '' : 's') : 'Portrait'];
     if (a.sheet) bits.push('model sheet');
@@ -221,6 +224,70 @@ export function getCastHtml(): string {
           .then(function () { out.added++; }, function (e) { out.failed.push(f.name + ': ' + (e.message || String(e))); });
       });
     }, Promise.resolve()).then(function () { return out; });
+  }
+  // A REAL PERSON (SPEC-real-person.md): not a photo and a drawn sheet -- a
+  // name, consent, then the foundation they record: three clips everything
+  // the avatar looks like is made from.
+  function realForm(body) {
+    body.innerHTML = '<p class="sub" style="margin:0 0 10px">A real person is built from <b>three short clips you record once</b> on your phone: far, close and a head turn. They are the foundation of the avatar: your face, your hair and the way you move all come from them, so the next step coaches the light and the framing. About ten minutes.</p>'
+      + '<div class="field"><span>Name</span><input type="text" id="aName" placeholder="Your name"></div>'
+      + '<label class="field" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="aConsent"> This is me, or a person who agreed to be cast.</label>'
+      + '<button class="btn primary" id="aAdd">Create and record the foundation</button>';
+    $('aAdd').onclick = function () {
+      var name = $('aName').value.trim();
+      if (!name) { say('Give the person a name.', 'err'); return; }
+      if (!$('aConsent').checked) { say('Confirm this is you, or a person who agreed to be cast.', 'err'); return; }
+      say('Adding ' + name + '…');
+      railApi('/api/cast/' + enc(tenant), { method: 'POST', body: JSON.stringify({ name: name, consent: true, real: true }) }).then(function (a) {
+        say(a.name + ' is in the cast: record the foundation next.', 'ok');
+        return railApi('/api/cast/' + enc(tenant)).then(function (r) { actors = r.cast || []; render(); foundationPanel(a.id); });
+      }).catch(function (e) { say(e.message || String(e), 'err'); });
+    };
+  }
+  // THE FOUNDATION PANEL: where the three clips stand, and the way to record
+  // them -- the phone (a QR code to /foundation) or this device's own link.
+  function foundationPanel(id) {
+    var old = document.getElementById('foundationPanel'); if (old) old.remove();
+    var a = actors.filter(function (x) { return x.id === id; })[0];
+    if (!a) return;
+    var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
+    var v = Date.now(), pic = function (u) { return withParam(withToken(u), 'v', v); };
+    var clips = (a.foundation && a.foundation.clips) || [], stills = (a.foundation && a.foundation.stills) || [];
+    var have = function (k) { return clips.filter(function (c) { return c.kind === k; })[0]; };
+    var page = withToken('/foundation?tenant=' + enc(tenant) + '&actor=' + enc(a.id));
+    var rows = [['far', 'Far', 'about three meters back, knees up, 60-90 s'], ['close', 'Close', 'about one meter, chest up, 30 s'], ['turn', 'Turn', 'a slow head turn, 10 s']].map(function (r) {
+      var c = have(r[0]), w = ((a.foundation && a.foundation.work) || []).filter(function (x) { return x.kind === r[0]; })[0];
+      var st = w && w.status === 'processing' ? '<span style="color:#888">making it…</span>'
+        : w && w.status === 'failed' ? '<span style="color:#b42318">could not use it: ' + railEsc(w.error || '') + '</span>'
+        : c ? '<span style="color:#13795b">recorded, ' + c.seconds + ' s</span>' : '<span style="color:#888">to record</span>';
+      return '<li><b>' + r[1] + '</b> -- ' + r[2] + ': ' + st + '</li>';
+    }).join('');
+    var box = document.createElement('div'); box.id = 'foundationPanel';
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:50;background:rgba(10,10,12,0.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;');
+    box.innerHTML = '<div class="box" style="max-width:720px;width:100%;margin:0;background:#fff">'
+      + '<div class="lead" style="display:flex;justify-content:space-between;align-items:center"><span></span><button class="quiet" id="fdClose">Close</button></div>'
+      + '<p class="sub" style="margin:0 0 10px">These three clips are the foundation of the avatar: everything it will look like comes from them, and the light on the face in them is the light in every scene. Record them on a phone: scan the code, and the page walks through the setup and each clip.</p>'
+      + '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">'
+      + '<div style="text-align:center"><img alt="Scan to record on your phone" width="180" height="180" src="' + railEsc(withToken('/api/take-qr/' + enc(tenant) + '/-?actor=' + enc(a.id))) + '"><div class="sub" style="margin:4px 0 0">Scan with your phone</div></div>'
+      + '<div style="flex:1;min-width:240px"><ol style="margin:0 0 10px;padding-left:18px;line-height:1.6">' + rows + '</ol>'
+      + '<a class="btn small" target="_blank" rel="noopener" href="' + railEsc(page) + '">Open the recorder on this device</a>'
+      + (stills.length ? '<div style="display:flex;gap:6px;margin-top:12px">' + stills.map(function (s) { return '<img alt="" style="width:30%;aspect-ratio:3/4;object-fit:cover;border-radius:6px;background:#f2f2f4" src="' + railEsc(pic(base + '/still/' + s.kind)) + '">'; }).join('') + '</div>' : '')
+      + '</div></div></div>';
+    box.querySelector('.lead span').textContent = a.name + ': foundation';
+    document.body.appendChild(box);
+    var timer = setInterval(function () {
+      // The phone records while this panel is open: follow it.
+      railApi('/api/cast/' + enc(tenant)).then(function (r) {
+        var now = (r.cast || []).filter(function (x) { return x.id === id; })[0];
+        var n0 = clips.length, n1 = now && now.foundation ? (now.foundation.clips || []).length : 0;
+        var sig = function (f) { return f ? (f.clips || []).map(function (c) { return c.recorded_at; }).join() + '|' + (f.work || []).map(function (w) { return w.kind + w.status; }).join() : ''; };
+        var t0 = sig(a.foundation), t1 = sig(now && now.foundation);
+        if (n1 !== n0 || t1 !== t0) { clearInterval(timer); actors = r.cast || []; render(); if (document.getElementById('foundationPanel')) foundationPanel(id); }
+      }).catch(function () {});
+    }, 5000);
+    function close() { clearInterval(timer); box.remove(); }
+    box.onclick = function (ev) { if (ev.target === box) close(); };
+    box.querySelector('#fdClose').onclick = close;
   }
   function photosPanel(id) {
     var old = document.getElementById('photosPanel'); if (old) old.remove();
@@ -317,60 +384,23 @@ export function getCastHtml(): string {
     tab = t;
     Array.prototype.forEach.call(document.querySelectorAll('#addTabs button'), function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
     var body = $('addBody');
-    if (t === 'gen' || t === 'real') {
-      body.innerHTML = '<div class="field"><span>Name</span><input type="text" id="aName" placeholder="' + (t === 'gen' ? 'Dana' : 'Your name') + '"></div>'
-        + (t === 'gen'
-          ? '<div class="field"><span>Portrait: the start frame (a generated image, the person facing the camera)</span><input type="file" id="aPhoto" accept="image/*"></div>'
-            + '<div class="field"><span>Model sheet (optional, recommended): the same person from several angles</span><input type="file" id="aSheet" accept="image/*"></div>'
-            + '<p class="sub" style="margin:0 0 10px">A generated person is nobody real: no consent needed. Give them a voice once added.</p>'
-          : '<div class="field"><span>Photo: clear, front-facing</span><input type="file" id="aPhoto" accept="image/*"></div>'
-            + '<div class="field"><span>More photos (optional, up to 5): other angles and light. A model sheet is drawn from all of them, for you to approve.</span><input type="file" id="aMore" accept="image/*" multiple><div id="aMoreList" class="more-list"></div></div>'
-            + '<label class="field" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="aConsent"> This is me, or a person who agreed to be cast.</label>')
+    if (t === 'real') { realForm(body); return; }
+    if (t === 'gen') {
+      body.innerHTML = '<div class="field"><span>Name</span><input type="text" id="aName" placeholder="Dana"></div>'
+        + '<div class="field"><span>Portrait: the start frame (a generated image, the person facing the camera)</span><input type="file" id="aPhoto" accept="image/*"></div>'
+        + '<div class="field"><span>Model sheet (optional, recommended): the same person from several angles</span><input type="file" id="aSheet" accept="image/*"></div>'
+        + '<p class="sub" style="margin:0 0 10px">A generated person is nobody real: no consent needed. Give them a voice once added.</p>'
         + '<button class="btn primary" id="aAdd">Add</button>';
-      // MORE PHOTOS ADD UP (Marc: "it lets you upload one photo"): a file
-      // picker replaces its selection on every pick, so picking one at a time
-      // on a phone kept only the last. Each pick joins the list; x takes one out.
-      var moreFiles = [];
-      var drawMore = function () {
-        var list = $('aMoreList'); if (!list) return;
-        list.innerHTML = moreFiles.map(function (f, i) {
-          return '<div class="more-item"><img alt="" src="' + railEsc(f.url) + '"><span>' + railEsc(f.file.name) + '</span><button type="button" class="quiet" data-more="' + i + '" title="Take it out">&times;</button></div>';
-        }).join('') + (moreFiles.length ? '<small>' + moreFiles.length + ' of 5' + (moreFiles.length < 5 ? ': pick again to add more' : '') + '</small>' : '');
-        Array.prototype.forEach.call(list.querySelectorAll('[data-more]'), function (b) {
-          b.onclick = function () { var k = Number(b.getAttribute('data-more')); URL.revokeObjectURL(moreFiles[k].url); moreFiles.splice(k, 1); drawMore(); };
-        });
-        if ($('aMore')) $('aMore').disabled = moreFiles.length >= 5;
-      };
-      if ($('aMore')) $('aMore').onchange = function () {
-        Array.prototype.forEach.call(this.files || [], function (file) {
-          if (moreFiles.length >= 5 || moreFiles.some(function (m) { return m.file.name === file.name && m.file.size === file.size; })) return;
-          moreFiles.push({ file: file, url: URL.createObjectURL(file) });
-        });
-        this.value = '';
-        drawMore();
-      };
       $('aAdd').onclick = function () {
-        var f = $('aPhoto').files[0], sheet = $('aSheet') && $('aSheet').files[0];
+        var f = $('aPhoto').files[0], sheet = $('aSheet').files[0];
         var name = $('aName').value.trim() || (f ? f.name.replace(/[.][^.]+$/, '') : '');
-        if (!f) { say('Choose the ' + (t === 'gen' ? 'portrait' : 'photo') + '.', 'err'); return; }
-        if (t === 'real' && !$('aConsent').checked) { say('Confirm this is you, or a person who agreed to be cast.', 'err'); return; }
+        if (!f) { say('Choose the portrait.', 'err'); return; }
         say('Uploading…');
         (sheet ? upload(sheet, 'cast-sheet') : Promise.resolve(null)).then(function (sheetRel) {
           return upload(f, 'cast').then(function (rel) {
-            var body = { name: name, image: rel };
-            if (t === 'gen') body.fictional = true; else body.consent = true;
+            var body = { name: name, image: rel, fictional: true };
             if (sheetRel) body.sheet = sheetRel;
-            var more = moreFiles.map(function (m) { return m.file; }).slice(0, 5);
-            if (!more.length) return add(body, name);
-            // A real person with more photos: add them, then draw the sheet
-            // (it waits for approval under Photos & sheet).
-            say('Adding ' + name + '…');
-            return railApi('/api/cast/' + enc(tenant), { method: 'POST', body: JSON.stringify(body) }).then(function (a) {
-              var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
-              return addPhotos(base, more).then(function (r) {
-                return railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'make' }) }).catch(function () {}).then(function () { return r; });
-              }).then(function (r) { say(a.name + ' is in the cast' + (r.failed.length ? ' (not added: ' + r.failed.join(' \u00b7 ') + ')' : '') + '. Their model sheet is drawing: approve it under Photos & sheet.', r.failed.length ? 'err' : 'ok'); load(); });
-            });
+            return add(body, name);
           });
         }).catch(function (e) { say(e.message || String(e), 'err'); });
       };

@@ -316,13 +316,22 @@ async function landAnchorsOnWords(project: Project, sceneId: string): Promise<vo
 }
 
 function previewUrl(tenantId: string, projectId: string, token?: string): string {
-  let url = `${config.publicUrl}/studio?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
+  return withStudioToken(`${config.publicUrl}/studio?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`, tenantId, token);
+}
+
+/** The page a real person records their foundation on (SPEC-real-person.md). */
+function foundationUrl(tenantId: string, actorId: string): string {
+  return withStudioToken(`${config.publicUrl}/foundation?tenant=${encodeURIComponent(tenantId)}&actor=${encodeURIComponent(actorId)}`, tenantId);
+}
+
+/** A page link signed for the tenant, so it opens on a phone with no login. */
+function withStudioToken(url: string, tenantId: string, token?: string): string {
   if (isAuthEnabled()) {
     let t = token;
     if (!t && process.env.SESSION_SECRET) {
       try { t = signToken({ email: "studio@media-producer", tenant_id: tenantId }); } catch { /* leave unauthenticated */ }
     }
-    if (t) url += `&token=${encodeURIComponent(t)}`;
+    if (t) return `${url}&token=${encodeURIComponent(t)}`;
   }
   return url;
 }
@@ -1940,10 +1949,10 @@ export function createMcpServer(): McpServer {
 
   tool(
     "cast",
-    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). SCENE BY SCENE (one film can mix them): perform_scene -- a cast actor performs ONE scene with no recording: a start frame drawn for the shot (start_frame first to see and redraw it -- cheap), the scene's line voiced in the actor's ElevenLabs voice (voice_source script), the scene's recording converted to it (take: the delivery kept), or the recording as is (recording: the speaker's own voice, no clone), Seedance 2.5 performs it, attached as that scene's take (quality draft = 480p preview ~2 min; then final = the same shot at 1080p); recast with scenes:[...] -- only those scenes' recordings, performed one-to-one (Higgsfield) and those scenes cast as the actor; WHERE A RECAST IS FRAMED differs by vendor (list shows each one's framedBy): HeyGen -- the look (pick or new_look another for another room); Higgsfield -- the shot (recast shot, else the scene's setting: the actor drawn there, the recording's performance only); Kling / Runway -- the recording's own camera; hear_voice -- the scene's voice alone, before any video (a delivery with v4 tags, pauses, CAPS, /IPA/); continue_from -- the scene starts from another scene's LAST frame (default the one before), so they link without a jump; scene_cast -- who plays a scene (an actor, 'recording', or 'film' to follow the film); actor_clip -- b-roll of the actor, no speech, over a scene (shot, seconds, at); scenes -- every scene's performer, its PLAN (set with the update tool's storyboard cast_plan / scenes[].performer: who, how, engine, where) and state (ready / todo / stale: made for another plan), and any job. A perform_scene or start_frame with no actor or location uses the plan's; choosing one there writes it into the scene's plan. LOCATIONS (Seedance only; a HeyGen look is its own setting): a tenant library of sets, each a clean plate (the room with nobody in it) -- add_location from a prompt (drawn), or an image (a frame of a take: the person is removed; clean:false keeps it as is), async: it lists as 'drawing' until it lands; locations lists them; scene_location sets a scene's (or pass location on start_frame / perform_scene). Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the actor's ElevenLabs voice, used by generate / perform_scene and by a recast with voice_id 'actor'; '' clears -- or sheet), remove_actor, add_photo / remove_photo (more photos of a person, up to 5 beside the portrait), make_sheet (a model sheet drawn from the portrait + photos, faithful to a real face, ~1 min; lands as sheet_draft) then use_sheet or discard_sheet, voices, recast, generate, status, clear (back to the recording), frame (pull a made recast back or push it in: framing tight / medium / wide). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
+    "CAST: who performs a SPEAKER / CREATOR-CUT film's person. Three ways: the recording itself; RECAST -- the recording performed by a cast actor through a vendor (HeyGen hears the voice and draws the whole person -- the most natural; Kling / Higgsfield / Runway copy the recording's gestures onto a portrait); GENERATE -- no recording: the storyboard's lines voiced (HeyGen or ElevenLabs) and performed by the actor through any vendor (Kling and Runway animate the portrait from the voice), attached as the film's take. Actors are HeyGen looks (the user's own twin and photo looks, or HeyGen stock presenters), portraits (need consent), or generated people (fictional: true -- a start frame as the portrait plus the model sheet it was drawn from; Higgsfield reads both). SCENE BY SCENE (one film can mix them): perform_scene -- a cast actor performs ONE scene with no recording: a start frame drawn for the shot (start_frame first to see and redraw it -- cheap), the scene's line voiced in the actor's ElevenLabs voice (voice_source script), the scene's recording converted to it (take: the delivery kept), or the recording as is (recording: the speaker's own voice, no clone), Seedance 2.5 performs it, attached as that scene's take (quality draft = 480p preview ~2 min; then final = the same shot at 1080p); recast with scenes:[...] -- only those scenes' recordings, performed one-to-one (Higgsfield) and those scenes cast as the actor; WHERE A RECAST IS FRAMED differs by vendor (list shows each one's framedBy): HeyGen -- the look (pick or new_look another for another room); Higgsfield -- the shot (recast shot, else the scene's setting: the actor drawn there, the recording's performance only); Kling / Runway -- the recording's own camera; hear_voice -- the scene's voice alone, before any video (a delivery with v4 tags, pauses, CAPS, /IPA/); continue_from -- the scene starts from another scene's LAST frame (default the one before), so they link without a jump; scene_cast -- who plays a scene (an actor, 'recording', or 'film' to follow the film); actor_clip -- b-roll of the actor, no speech, over a scene (shot, seconds, at); scenes -- every scene's performer, its PLAN (set with the update tool's storyboard cast_plan / scenes[].performer: who, how, engine, where) and state (ready / todo / stale: made for another plan), and any job. A perform_scene or start_frame with no actor or location uses the plan's; choosing one there writes it into the scene's plan. LOCATIONS (Seedance only; a HeyGen look is its own setting): a tenant library of sets, each a clean plate (the room with nobody in it) -- add_location from a prompt (drawn), or an image (a frame of a take: the person is removed; clean:false keeps it as is), async: it lists as 'drawing' until it lands; locations lists them; scene_location sets a scene's (or pass location on start_frame / perform_scene). A REAL PERSON (add_actor real: true, consent: true, no image) is built from a FOUNDATION they record once on their phone -- three clips at foundation_url (far ~3 m, close ~1 m, a head turn); foundation reports which are in. Actions: list (actors + vendors), looks (the user's HeyGen looks, or public:true for stock presenters, paged), new_look (a new HeyGen look from a prompt on one of theirs), look_status, add_actor, update_actor (name, voice_id -- the actor's ElevenLabs voice, used by generate / perform_scene and by a recast with voice_id 'actor'; '' clears -- or sheet), remove_actor, add_photo / remove_photo (more photos of a person, up to 5 beside the portrait), make_sheet (a model sheet drawn from the portrait + photos, faithful to a real face, ~1 min; lands as sheet_draft) then use_sheet or discard_sheet, voices, recast, generate, status, clear (back to the recording), frame (pull a made recast back or push it in: framing tight / medium / wide). Recast and generate are async: poll action='status'. A recast swaps only the picture (the take stays the clock; clear undoes it). GENERATE REPLACES the film's take and re-times its scenes -- duplicate the project first (create copy_of) unless the user asked for it on this film. Neither renders.",
     {
       tenant_id: z.string(),
-      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "update_actor", "remove_actor", "add_photo", "remove_photo", "make_sheet", "use_sheet", "discard_sheet", "voices", "recast", "generate", "status", "clear", "scenes", "start_frame", "continue_from", "pick_frame", "hear_voice", "perform_scene", "scene_cast", "actor_clip", "locations", "add_location", "remove_location", "scene_location", "frame"]),
+      action: z.enum(["list", "looks", "new_look", "look_status", "add_actor", "foundation", "update_actor", "remove_actor", "add_photo", "remove_photo", "make_sheet", "use_sheet", "discard_sheet", "voices", "recast", "generate", "status", "clear", "scenes", "start_frame", "continue_from", "pick_frame", "hear_voice", "perform_scene", "scene_cast", "actor_clip", "locations", "add_location", "remove_location", "scene_location", "frame"]),
       photo_index: z.number().int().min(0).optional().describe("remove_photo: which photo (0-based, in the actor's photos list)."),
       voice_speed: z.number().min(0.8).max(1.25).optional().describe("hear_voice / perform_scene: how fast the line is read (1 = as voiced; 1.1-1.2 is a fast creator pace). A tempo change, pitch kept, kept on the scene."),
       engine: z.enum(["seedance", "heygen"]).optional().describe("perform_scene: who makes it -- seedance (a frame, a location, a 480p draft then the 1080p final) or heygen (a HeyGen look speaks the line; the look is the setting; one render, no draft). Omitted: the scene's plan, else the best for the actor (HeyGen for a look)."),
@@ -1983,6 +1992,7 @@ export function createMcpServer(): McpServer {
       name: z.string().optional().describe("add_actor / new_look / add_location: a name."),
       consent: z.boolean().optional().describe("add_actor with image: the user confirmed this is them, or a person who agreed to be cast."),
       fictional: z.boolean().optional().describe("add_actor with image: instead of consent, a generated person (nobody real), e.g. an image model's start frame."),
+      real: z.boolean().optional().describe("add_actor: a REAL PERSON built from their own recordings (no image; consent: true): returns foundation_url, the page the person records three clips on (far, close, turn) -- the foundation every take of them is made from."),
       sheet: z.string().optional().describe("add_actor / update_actor: the model sheet the portrait was drawn from (tenant-relative image); Higgsfield gets it as a second reference."),
       prompt: z.string().optional().describe("new_look: the setting and clothes ('on a couch in a grey sweater'). add_location: the room to draw ('a bright loft lounge, a grey linen couch, plants by tall windows'), or with image a note on what to keep."),
       look_id: z.string().optional().describe("look_status: the new look's id."),
@@ -1993,7 +2003,7 @@ export function createMcpServer(): McpServer {
     async (params) => {
       const t = params.tenant_id;
       try {
-        const { listCast, addActor, removeActor } = await import("./core/cast.js");
+        const { listCast, addActor, removeActor, getActor } = await import("./core/cast.js");
         const { performerList } = await import("./core/performers/index.js");
         const at = await import("./core/actor-test.js");
         const { startRecast, getRecastStatus } = await import("./core/recast.js");
@@ -2013,8 +2023,20 @@ export function createMcpServer(): McpServer {
           case "look_status":
             if (!params.look_id) return err("look_id is required");
             return ok(await at.getHeygenLook(params.look_id));
-          case "add_actor":
-            return ok(await addActor(t, { name: params.name, image: params.image, heygen_look_id: params.heygen_look_id, voice_id: params.voice_id, consent: params.consent === true, fictional: params.fictional === true, sheet: params.sheet }));
+          case "add_actor": {
+            const added = await addActor(t, { name: params.name, image: params.image, heygen_look_id: params.heygen_look_id, voice_id: params.voice_id, consent: params.consent === true, fictional: params.fictional === true, sheet: params.sheet, real: params.real === true });
+            // A real person: the next step is the human's -- record the foundation.
+            return ok(params.real === true ? { ...added, foundation_url: foundationUrl(t, added.id), next: "Send the person foundation_url: they record three clips (far, close, turn) on their phone. Poll action='foundation'." } : added);
+          }
+          // A REAL PERSON'S FOUNDATION (SPEC-real-person.md): which clips are in,
+          // and the link to record them on.
+          case "foundation": {
+            const a = await getActor(t, needActor());
+            if (!a) return err("No such actor");
+            if (!a.foundation) return err(`${a.name} is not a real person with a foundation (add one with add_actor real: true)`);
+            const { foundationState } = await import("./core/actor-foundation.js");
+            return ok({ actor: a.id, ...foundationState(a), clips: a.foundation.clips, stills: a.foundation.stills.map((x) => x.kind), made_at: a.foundation.made_at, foundation_url: foundationUrl(t, a.id) });
+          }
           case "update_actor": {
             const { updateActor } = await import("./core/cast.js");
             return ok(await updateActor(t, needActor(), { name: params.name, voice_id: params.voice_id, sheet: params.sheet }));

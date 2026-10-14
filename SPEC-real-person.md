@@ -1,6 +1,6 @@
 # SPEC: A real person -- an avatar built from your own recordings
 
-Status: DRAFT (2026-10-14, Marc + Claude). Builds on the Cast
+Status: AGREED (2026-10-14, Marc + Claude); phase 1 (the foundation) BUILT. Builds on the Cast
 (`core/cast.ts`, `cast-page.ts`), the scene performances
 (`core/scene-performance.ts`, `core/seedance.ts`, SPEC-cast-scenes.md) and
 the take page (`take-page.ts`). Replaces the real-person half of "a sheet
@@ -100,10 +100,13 @@ them.
    tenant's default location, 480p draft) so the person sees the avatar
    before using it in a film. Optional, one button.
 
-Recorded on the phone through the existing take page in a new **reference
-mode** (a flag on the take page, like Voice only -- no new page): the
-desktop Cast page shows a QR code that opens it, exactly as a scene's take
-does today, or the clips can be **uploaded** (filmed with any camera).
+Recorded on the phone on the **foundation page** (`/foundation?tenant=&actor=`,
+`src/foundation-page.ts`): the desktop Cast page shows a QR code that opens
+it (`/api/take-qr/{t}/-?actor=`), as a scene's take does today, or the clips
+can be **uploaded** (filmed with any camera). Its own page, not a mode of
+the take page: the take page is a film's booth (a project, a script on a
+prompter, a take to attach); a foundation belongs to a person and has no
+film and no script. It reuses the take page's light check.
 Recording again later replaces the foundation; scenes already made keep
 their takes.
 
@@ -115,7 +118,7 @@ front still from the close clip -- no separate photo upload.
 On the actor (`CastActor`, `cast.json`):
 
 ```ts
-reference?: {
+foundation?: {
   clips: { kind: "far" | "close" | "turn"; file: string; seconds: number; recorded_at: string }[];
   /** Pulled once from the clips when they land (ffmpeg, no model). */
   stills: { kind: "front" | "left" | "right"; file: string }[];
@@ -126,14 +129,14 @@ reference?: {
 };
 ```
 
-A real person is `consent` + `reference`. A consent actor without a
-`reference` (today's Marc) keeps working on today's path until recorded,
+A real person is `consent` + `foundation`. A consent actor without a
+`foundation` (today's Marc) keeps working on today's path until recorded,
 with a note on its card and on the scene's Seedance panel: "Record your
 foundation for a more real you."
 
 ## Performing a scene as a real person
 
-`perform_scene` with Seedance, for an actor with a `reference`:
+`perform_scene` with Seedance, for an actor with a complete `foundation`:
 
 - **No start frame.** `start_frame`, `pick_frame` and `continue_from` do
   not apply (the panel hides them; the tool says so). The shot text and the
@@ -189,13 +192,16 @@ it only sharpens.
 
 - **Cast page**: the "A real person" tab is the guided flow above. A real
   person's card shows "Foundation: recorded Oct 14" with Re-record and View.
-- **Take page**: reference mode -- the three clip screens, the framing
-  guide, the checklist; uploads go to `POST /api/cast/{t}/{actor}/reference`.
+- **Foundation page** (`/foundation`): the checklist, the three clip
+  screens with the framing guide and the light check, a countdown and an
+  auto-stop; each clip goes to `POST /api/cast/{t}/{actor}/foundation/{kind}`
+  (raw bytes), and is served back at `GET .../foundation/{kind}`, its stills
+  at `GET .../still/{front|left|right}`.
 - **Studio, the scene's Seedance panel**: for a real person, no frame
   picker; a line "From your foundation recording (3 clips, Oct 14)".
-- **MCP `cast` tool**: `add_actor` with `real: true` returns the reference
-  link (QR URL); a `reference` action (status, link, upload a clip);
-  `perform_scene` reads the reference with no new arguments.
+- **MCP `cast` tool**: `add_actor` with `real: true` (consent, no image)
+  returns `foundation_url`; a `foundation` action reports which clips are in
+  and the link; `perform_scene` reads the foundation with no new arguments.
 
 ## Clean up (same PRs)
 
@@ -205,14 +211,14 @@ it only sharpens.
   sheet-from-photos prompt, and their tests and doc lines. A generated
   person keeps its uploaded model sheet (that is what it is made of).
 - Saved data: a consent actor's existing `photos` / `sheet` are left on
-  disk but unread once a `reference` exists; no converter needed.
+  disk but unread once a `foundation` exists; no converter needed.
 - Higgsfield recasts read the model sheet as a second reference
   (`sheetFor` in `core/recast.ts`); for a real person with a foundation
   they read the three stills instead, so nothing needs the sheet.
 
 ## Phases (each a PR, merged and live before the next)
 
-1. **Foundation**: the data, reference mode on the take page (three clips +
+1. **Foundation** (BUILT): the data, the foundation page (three clips +
    upload), the stills and the reference segment pulled on arrival, the
    guided Cast flow, the card. No performance change yet.
 2. **Perform from the foundation**: the real-person Seedance path

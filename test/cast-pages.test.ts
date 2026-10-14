@@ -12,17 +12,16 @@ describe("the Cast and Locations pages", () => {
     expect(getCastHtml()).toContain('class="rail-item on" id="nav-cast"');
     expect(getLocationsHtml()).toContain('class="rail-item on" id="nav-locations"');
   });
-  it("Cast adds a generated person (portrait + sheet), a real person (consent) or a HeyGen look, and sets each actor's voice", () => {
+  it("Cast adds a generated person (portrait + sheet), a real person (consent + foundation) or a HeyGen look, and sets each actor's voice", () => {
     const h = getCastHtml();
-    expect(h).toContain("body.fictional = true; else body.consent = true;");
+    expect(h).toContain("var body = { name: name, image: rel, fictional: true };");
     expect(h).toContain("if (sheetRel) body.sheet = sheetRel;");
+    // A real person is a name and consent, then the foundation they record -- no photo.
+    expect(h).toContain("JSON.stringify({ name: name, consent: true, real: true })");
+    expect(h).toContain("foundationPanel(a.id);");
     expect(h).toContain("'/api/upload-asset/' + enc(tenant) + '/library?name='");
     expect(h).toContain("railApi('/api/heygen-avatars/' + enc(tenant) + '?looks=1')");
     expect(h).toContain("patch(a, { voice_id: id, voice_name: v ? v.name : '' }");
-    // More photos add up pick by pick (a picker replaces its selection), up to five, x takes one out.
-    expect(h).toContain("var more = moreFiles.map(function (m) { return m.file; }).slice(0, 5);");
-    expect(h).toContain("this.value = '';");
-    expect(h).toContain('<div id="aMoreList" class="more-list"></div>');
     // The Photos & sheet panel's pictures load signed in with no token in the address.
     expect(h).toContain("pic = function (u) { return withParam(withToken(u), 'v', v); };");
     expect(h).not.toContain("+ bust)");

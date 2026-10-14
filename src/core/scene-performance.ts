@@ -26,7 +26,7 @@ import { config } from "../config.js";
 import { loadProject, saveProject } from "../persistence/project.js";
 import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { resolveVideoPath } from "./video-path.js";
-import { getActor, listCast, portraitPath, type CastActor } from "./cast.js";
+import { getActor, listCast, portraitPath, needPicture, type CastActor } from "./cast.js";
 import { resolvePlan, planState, planLine, planField, writePlan, applyPlanEdit, defaultEngine, type ResolvedPlan } from "./cast-plan.js";
 import { getPerformer } from "./performers/index.js";
 import { getHeygenLook } from "./actor-test.js";
@@ -117,7 +117,7 @@ async function needActor(tenant: string, id: string | undefined): Promise<CastAc
   if (!id) throw new Error("actor is required (a cast actor id)");
   const actor = await getActor(tenant, id);
   if (!actor) throw new Error(`No cast actor "${id}"`);
-  return actor;
+  return needPicture(tenant, actor);
 }
 
 /** The scene's plan (core/cast-plan.ts): its own fields over the film's. */
