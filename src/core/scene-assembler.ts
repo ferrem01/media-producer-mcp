@@ -2645,6 +2645,10 @@ export function buildComponentScript(
     var data = ${JSON.stringify(comp.data)};
     var ctx = {
       duration: ${ctxDuration},
+      // Scene seconds the component's box enters (null: from the start). A
+      // component's clock is the scene's, so an entrance it plays itself
+      // keys off this to land when the box appears, not at second 0.
+      enter_at: ${typeof (comp as any).enter?.at === "number" ? (comp as any).enter.at : "null"},
       fps: ${canvas.fps},
       canvas: { width: ${canvas.width}, height: ${canvas.height} },
       motion: "${options?.motion || "cinematic"}",
@@ -2822,7 +2826,7 @@ export async function loadSharedUtilities(): Promise<string> {
   const thisDir = path.dirname(fileURLToPath(import.meta.url));
   const sharedDir = path.join(thisDir, "..", "components", "shared");
 
-  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js", "motion-physics.js", "capture-performance.js", "activity-feed.js", "samples.js"];
+  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js", "motion-physics.js", "capture-performance.js", "activity-feed.js", "samples.js", "icons.js"];
   const sources: string[] = [];
 
   for (const file of sharedFiles) {

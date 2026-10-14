@@ -6,6 +6,33 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-14 — Cards carry drawn glyphs, and a placed notification lands when it appears
+
+Marc, auditing the education series: the cards "just look like they're low
+quality". Three causes, all in the components:
+
+- Emoji icons (📝 🔥 🎯 ✅) on every notification and checklist row read as a
+  template. `shared/icons.js` is one set of drawn line glyphs (24-unit grid,
+  2px round stroke; `mpIcons.svg`, `mpIcons.resolve`), loaded into every
+  scene. A notification draws its glyph white on a filled app tile in the
+  type's colour (info = brand primary); a checklist row draws it in the
+  accent. Saved films keep their emoji in the data: `resolve` maps them to
+  the glyph that means the same thing (the converter where old data is
+  read); text with no glyph is kept as written.
+- The notification had a Bootstrap-style alert stripe and one flat shadow.
+  The stripe is gone; the card is 20px round with a layered soft shadow.
+- A component's clock is the scene's, so a notification's own entrance
+  played at second 0.4 while its box was still hidden -- only the box's
+  0.25 s rise was ever seen. `ctx.enter_at` now tells a component when its
+  box enters; the notification arrives then (or at `data.at`), and a card
+  placed by geometry (`fill`) LANDS: tipped back 24°, a little low and soft,
+  settling flat and sharp.
+
+Sound, same day (no code): both education films now use one palette --
+`transition` = soft whoosh on every cutaway in and out, `payoff` = bass
+impact on each stamp and turn ("TOMORROW?", ~7x, AGREED, "Set it up once"),
+plus a tick under the First Five Minutes countdown.
+
 ## 2026-10-14 — A notification card can fill its box
 
 Marc on the MQL film: "the borders are fucked up, the spacing is fucked up".
