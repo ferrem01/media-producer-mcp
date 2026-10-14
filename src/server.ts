@@ -2680,7 +2680,7 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string().optional(),
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
-      at_time: z.number().optional().describe("With scene_id: the scene second the still is taken at (default a third of the way in) -- proof the beat you mean, e.g. the moment a card lands"),
+      at_time: z.coerce.number().optional().describe("With scene_id: the scene second the still is taken at (default a third of the way in) -- proof the beat you mean, e.g. the moment a card lands"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
       format: z.enum(["video", "image", "slideshow", "gif", "social", "email-header", "thumbnail"]).optional().describe("Override output format (default: project format)"),
       audio_only: z.boolean().optional().describe("Skip scene rendering; only (re-)apply audio mix + overlays to the existing rendered video. Requires a prior full render."),
