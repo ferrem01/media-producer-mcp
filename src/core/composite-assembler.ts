@@ -43,8 +43,7 @@ import {
   mediaEdlScript,
   timelapseClockScript,
   isCutInProof,
-  isSplitWrapper,
-  isFixedToFrame,
+  pinnedToFrame,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
 import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
@@ -163,6 +162,9 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
     const componentStyles: string[] = [];
     const componentScripts: string[] = [];
 
+    // The person rides this scene's rig (the camera video under its moves,
+    // or a speaker component): a punch-in then holds every graphic still.
+    const personInRig = (isTransparent && !!(options.speakerRefs && options.speakerRefs[scene.id])) || (!!speakerUrl && scene.components.some((c) => isSpeakerLayer(c)));
     for (const comp of scene.components) {
       const parsed = sourceMap.get(comp.type);
       if (!parsed) continue;
@@ -228,7 +230,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       }
 
       componentBlocks.push(
-        `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""}${isCutInProof(comp) ? ' data-mp-cutaway="1"' : ""}${isFixedToFrame(comp.type) || isSplitWrapper(comp) ? ' data-mp-fixed="1"' : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
+        `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""}${isCutInProof(comp) ? ' data-mp-cutaway="1"' : ""}${pinnedToFrame(comp, scene, personInRig) ? ' data-mp-fixed="1"' : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
         `      ${wrapInFitBox(boundHtml, fitBoxFor(comp as any, canvas))}\n` +
         `    </div>`
       );
