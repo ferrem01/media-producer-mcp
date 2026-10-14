@@ -154,6 +154,29 @@ foundation for a more real you."
 - Voice sources are unchanged (script / take / recording), and so is
   `fitVoiceToClip`.
 
+## Looks: what the person wears
+
+Marc, Oct 14: "would be great to specify clothes and looks." The tests
+showed Seedance dresses the person as the prompt says, whatever he wore in
+the references (his polo became a black overshirt with no trouble). So the
+foundation is recorded once, and clothes are words.
+
+- A real person has **looks**: `looks: { id, name, wardrobe, glasses?: boolean }[]`
+  on the actor -- e.g. "Founder" (*a plain black overshirt over a dark
+  t-shirt, dark trousers*), "Keynote" (*a navy suit, white open-collar
+  shirt, no tie*), "Weekend" (*a grey crew-neck sweater, jeans*). One is the
+  **default**; the guided flow ends by asking for it (three suggestions to
+  tap, or type your own).
+- A scene picks a look (`performer.look`), else the film's default
+  (`storyboard.look`), else the actor's. The Seedance panel and the
+  storyboard show it as a chip; `perform_scene` takes `look`.
+- The look's wardrobe goes into the prompt; the references stay the same.
+  Changing a scene's look makes its take stale (another look, another
+  take), like changing its location.
+- What a look cannot do: change the face, the hair or the build (that is
+  the foundation), or reliably add accessories the person never wears
+  (glasses come and go badly -- the flag says only "wears glasses" or not).
+
 ## Finish: Topaz (phase 3, optional per take)
 
 An "Enhance" action on a made take: a Topaz 2160p upscale, kept beside the
@@ -183,9 +206,9 @@ it only sharpens.
   person keeps its uploaded model sheet (that is what it is made of).
 - Saved data: a consent actor's existing `photos` / `sheet` are left on
   disk but unread once a `reference` exists; no converter needed.
-- To confirm with Marc before deleting: whether any recast vendor
-  (Higgsfield reads the sheet) still needs the sheet for real people, or
-  whether the stills replace it there too.
+- Higgsfield recasts read the model sheet as a second reference
+  (`sheetFor` in `core/recast.ts`); for a real person with a foundation
+  they read the three stills instead, so nothing needs the sheet.
 
 ## Phases (each a PR, merged and live before the next)
 
@@ -193,8 +216,8 @@ it only sharpens.
    upload), the stills and the reference segment pulled on arrival, the
    guided Cast flow, the card. No performance change yet.
 2. **Perform from the foundation**: the real-person Seedance path
-   (references, no frame, the prompt), the panel and tool changes, the
-   sample performance; the photos/sheet path for real people deleted.
+   (references, no frame, the prompt), looks, the panel and tool changes,
+   the sample performance; the photos/sheet path for real people deleted.
 3. **Enhance**: the Topaz finish on a take.
 
 ## Exit test
@@ -204,14 +227,12 @@ performs scene 3 of proj_0b19db0e at Profound's distance, and the take
 looks like him -- recognisable to someone who knows him, no drawn look --
 with nothing hand-run outside the platform.
 
-## Open questions
+## Decided (Oct 14)
 
-- **Clothes**: the take wears what the prompt says (the tests changed his
-  polo to a black overshirt without trouble). A default wardrobe per real
-  person, or per scene?
-- **More than one look** (a suit vs a t-shirt, glasses on/off): one
-  foundation per actor in v1; a second look is a second actor.
-- **The far clip's length**: Seedance takes <=15 s of video; we keep 60-90 s
-  so the best segment can be picked (and re-picked) without re-recording.
-- **Retouch**: a beauty pass after the take (under-eyes, shine) if good
-  light in the foundation is not enough.
+- **Clothes and looks**: named looks per person, a default, a pick per
+  scene (above). Phase 2.
+- **The far clip's length**: Seedance takes at most 15 s of reference
+  video, but the person records 60-90 s; the server picks the best 15 s and
+  can re-pick without a re-record.
+- **Retouch**: parked. Good front light in the foundation first (finding
+  5); a beauty pass after the take only if that is not enough.
