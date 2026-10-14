@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-14 — Shadows reach past their box; a solid notification; a still at any second
+
+Marc, watching First Five Minutes (best): the email card at 2.3 s was
+"somehow see-through" and sat on his face; the hot-lead card at 51.8 s and
+the checklist at 57.6 s sat on "a square shadow". Three causes:
+
+- Every `.mp-component` was `overflow: hidden`, so a card's soft shadow (the
+  caption plate, a notification, a checklist) was cut off at the box into a
+  hard grey rectangle -- on every caption of every film. Now `overflow: clip`
+  with `overflow-clip-margin: 48px`: content still clips, its shadow shows.
+  Media components clip their own picture at their root, so no picture bleeds.
+- `notification-stack` is dark-screen glass (4% white + blur): over a person
+  it goes see-through. `surface: "solid"` makes it an opaque white card with
+  dark type and a shadow that fits.
+- Face-safe placement was measured on the drawn START FRAMES; in the takes
+  Seedance performed, the wide shot's face sits lower (y 33-48%, not 19-40%).
+  Measure on the take.
+- `render {scene_id, at_time}`: a still at the second you mean (it was always
+  a third of the way in, which never showed the beat in question).
+
 ## 2026-10-14 — A punch-in on the person holds the graphics still
 
 Marc, on First Five Minutes (best): "when we zoomed in the 7x graphic zoomed

@@ -48,6 +48,13 @@
       "optional": true,
       "enum": ["top-right", "top-left", "bottom-right", "bottom-left"],
       "default": "top-right"
+    },
+    "surface": {
+      "type": "string",
+      "label": "glass (default: a translucent card for dark screens) | solid (an opaque white card with dark type -- over a person or a light plate)",
+      "optional": true,
+      "enum": ["glass", "solid"],
+      "default": "glass"
     }
   }
 }

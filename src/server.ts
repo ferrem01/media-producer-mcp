@@ -2680,6 +2680,7 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string().optional(),
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
+      at_time: z.number().optional().describe("With scene_id: the scene second the still is taken at (default a third of the way in) -- proof the beat you mean, e.g. the moment a card lands"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
       format: z.enum(["video", "image", "slideshow", "gif", "social", "email-header", "thumbnail"]).optional().describe("Override output format (default: project format)"),
       audio_only: z.boolean().optional().describe("Skip scene rendering; only (re-)apply audio mix + overlays to the existing rendered video. Requires a prior full render."),
@@ -2747,7 +2748,9 @@ export function createMcpServer(): McpServer {
           await captureModule.captureSingleFrame({
             htmlPath, outputPath,
             width: project.canvas.width, height: project.canvas.height,
-            atTime: scene.duration_seconds / 3,
+            atTime: params.at_time != null
+              ? Math.max(0, Math.min(params.at_time, scene.duration_seconds - 0.05))
+              : scene.duration_seconds / 3,
           });
 
           return ok({
