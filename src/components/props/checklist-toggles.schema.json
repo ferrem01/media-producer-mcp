@@ -11,7 +11,7 @@
       "items": {
         "type": "object",
         "properties": {
-          "icon": { "type": "string", "label": "Emoji or glyph", "optional": true },
+          "icon": { "type": "string", "label": "A house glyph name (mail, target, bell, check, calendar, dollar, repeat, building, user ... the notification-stack list); an emoji maps to the nearest glyph", "optional": true },
           "label": { "type": "string", "label": "Row label", "required": true },
           "at": { "type": "number", "label": "When the switch flips (scene seconds)", "optional": true },
           "on": { "type": "boolean", "label": "false keeps this row off", "optional": true }

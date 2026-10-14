@@ -20,6 +20,8 @@
   .cktg-icon { flex: 0 0 auto; width: 1.55em; height: 1.55em; border-radius: 50%; display: flex;
     align-items: center; justify-content: center; font-size: 0.92em; line-height: 1;
     background: color-mix(in srgb, var(--ck-on, #22c55e) 14%, transparent); }
+  .cktg-glyph { color: var(--ck-on, #22c55e); }
+  .cktg-glyph svg { width: 64%; height: 64%; display: block; }
   .cktg-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
   .cktg-sw { flex: 0 0 auto; position: relative; width: 2.1em; height: 1.2em; border-radius: 999px;
     background: var(--ck-off, #d5d7de); transition: none; }
@@ -61,7 +63,11 @@
       row.className = 'cktg-row';
       var icon = document.createElement('div');
       icon.className = 'cktg-icon';
-      icon.textContent = it.icon ? String(it.icon) : '';
+      // A drawn glyph in the accent colour (shared/icons.js); a saved emoji
+      // maps to its glyph, text with no glyph is kept as written.
+      var glyph = it.icon && window.mpIcons ? window.mpIcons.resolve(it.icon) : null;
+      if (glyph) { icon.innerHTML = window.mpIcons.svg(glyph, { stroke: 2.2 }); icon.classList.add('cktg-glyph'); }
+      else icon.textContent = it.icon ? String(it.icon) : '';
       if (!it.icon) icon.style.display = 'none';
       var label = document.createElement('div');
       label.className = 'cktg-label';

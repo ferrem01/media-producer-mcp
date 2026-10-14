@@ -53,50 +53,45 @@
   .notification-stack.fill .notification-container.bottom-right,
   .notification-stack.fill .notification-container.bottom-left { bottom: 0; }
 
+  /* The card reads as a real app notification: a filled app tile with a
+     drawn glyph (shared/icons.js -- never an emoji), layered soft shadow,
+     no alert stripe (Marc, Oct 14: the cards "look like they're low
+     quality"). Over a dark screen it is glass; surface 'solid' is white. */
+  .notification-container { perspective: 900px; }
   .notification-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
-    padding: 18px 20px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 20px;
+    padding: 16px 18px;
     display: flex;
     gap: 14px;
-    align-items: flex-start;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    align-items: center;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(0, 0, 0, 0.35);
     position: relative;
     overflow: hidden;
+    transform-origin: 50% 100%;
   }
-
-  .notification-accent {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    border-radius: 3px 0 0 3px;
-  }
-
-  .accent-success { background: #34d399; }
-  .accent-error { background: #f87171; }
-  .accent-info { background: #60a5fa; }
-  .accent-warning { background: #fbbf24; }
 
   .notification-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    --nf-accent: var(--mp-color-primary, #3b5bfd);
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
     flex-shrink: 0;
+    color: #ffffff;
+    background: var(--nf-accent);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 2px 6px rgba(17, 17, 28, 0.18);
   }
-
-  .icon-success { background: rgba(52, 211, 153, 0.12); }
-  .icon-error { background: rgba(248, 113, 113, 0.12); }
-  .icon-info { background: rgba(96, 165, 250, 0.12); }
-  .icon-warning { background: rgba(251, 191, 36, 0.12); }
+  .notification-icon svg { width: 25px; height: 25px; display: block; }
+  .notification-icon .nf-glyph-text { font-size: 20px; line-height: 1; }
+  .icon-success { --nf-accent: #1f9d60; }
+  .icon-error { --nf-accent: #e5484d; }
+  .icon-warning { --nf-accent: #e8890c; }
 
   .notification-body {
     flex: 1;
@@ -114,20 +109,20 @@
   }
 
   .notification-title {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 650;
     color: var(--mp-color-text, #ffffff);
     letter-spacing: -0.01em;
   }
 
   .notification-time {
-    font-size: 11px;
-    color: #6b7280;
+    font-size: 12px;
+    color: #8a8f9c;
     flex-shrink: 0;
   }
 
   .notification-text {
-    font-size: 13px;
+    font-size: 14px;
     color: #94a3b8;
     line-height: 1.5;
   }
@@ -144,7 +139,7 @@
     border: 1px solid rgba(17, 17, 28, 0.08);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    box-shadow: 0 10px 30px rgba(17, 17, 28, 0.22);
+    box-shadow: 0 1px 2px rgba(17, 17, 28, 0.10), 0 8px 20px rgba(17, 17, 28, 0.12), 0 24px 56px rgba(17, 17, 28, 0.16);
   }
   .surface-solid .notification-title { color: #17171c; }
   .surface-solid .notification-text { color: #4b5563; }
@@ -166,12 +161,10 @@
     var isBottom = position.indexOf('bottom') !== -1;
     var slideX = isRight ? 60 : -60;
 
-    var defaultIcons = {
-      success: '✓',
-      error: '✕',
-      info: 'ℹ',
-      warning: '⚠'
-    };
+    // The glyph each type falls back to when the notification names none
+    // (or names an emoji with no house glyph).
+    var defaultIcons = { success: 'check', error: 'x', info: 'bell', warning: 'alert' };
+    var icons = (typeof window !== 'undefined' && window.mpIcons) || null;
 
     var cardEls = [];
 
@@ -182,15 +175,18 @@
       var card = document.createElement('div');
       card.className = 'notification-card';
 
-      // Accent stripe
-      var accent = document.createElement('div');
-      accent.className = 'notification-accent accent-' + type;
-      card.appendChild(accent);
-
-      // Icon
+      // Icon: a drawn glyph on a filled app tile. A saved emoji maps to
+      // its glyph; text that maps to none is kept as written.
       var iconWrap = document.createElement('div');
       iconWrap.className = 'notification-icon icon-' + type;
-      iconWrap.textContent = n.icon || defaultIcons[type] || 'ℹ';
+      var glyph = icons && (icons.resolve(n.icon) || (!n.icon ? defaultIcons[type] : null));
+      if (glyph) iconWrap.innerHTML = icons.svg(glyph, { stroke: 2.1 });
+      else {
+        var gt = document.createElement('span');
+        gt.className = 'nf-glyph-text';
+        gt.textContent = n.icon || '•';
+        iconWrap.appendChild(gt);
+      }
       card.appendChild(iconWrap);
 
       // Body
@@ -231,26 +227,29 @@
       cardEls.push(card);
     }
 
-    // Initial states
-    gsap.set(cardEls, { autoAlpha: 0, x: slideX, scale: 1.05 });
-
     var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.55;
     var stagger = ctx.motion === 'minimal' ? 0.15 : 0.3;
+    // The component's clock is the scene's: arrive when the box appears
+    // (data.at, else the box's own entrance), not at second 0.4 while the
+    // box is still hidden -- the landing used to play unseen.
+    var startAt = typeof data.at === 'number' ? data.at
+      : (typeof ctx.enter_at === 'number' ? ctx.enter_at : 0.4);
 
-    // Slide in one by one
-    tl.to(cardEls, {
-      autoAlpha: 1, x: 0, scale: 1,
-      duration: speed,
-      stagger: stagger,
-      ease: 'power3.out'
-    }, 0.4);
-
-    // Subtle settle glow (the glass card only: the solid one keeps its shadow)
-    if (!solid) tl.to(cardEls, {
-      boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06)',
-      duration: 0.3,
-      stagger: stagger * 0.5
-    }, '-=0.2');
+    if (data.fill) {
+      // A card placed by geometry LANDS: tipped back in depth, a little low
+      // and soft, settling flat and sharp -- weight, not a slide.
+      gsap.set(cardEls, { autoAlpha: 0, y: 26, rotationX: 24, scale: 0.96, filter: 'blur(5px)' });
+      tl.to(cardEls, {
+        autoAlpha: 1, y: 0, rotationX: 0, scale: 1, filter: 'blur(0px)',
+        duration: speed + 0.1, stagger: stagger, ease: 'power3.out'
+      }, startAt);
+    } else {
+      gsap.set(cardEls, { autoAlpha: 0, x: slideX, scale: 1.04, filter: 'blur(4px)' });
+      tl.to(cardEls, {
+        autoAlpha: 1, x: 0, scale: 1, filter: 'blur(0px)',
+        duration: speed, stagger: stagger, ease: 'power3.out'
+      }, startAt);
+    }
 
     // Exit: half a second before the scene ends by default. hold keeps the
     // cards up to the cut (the wrapper's own exit, or the scene's end, takes

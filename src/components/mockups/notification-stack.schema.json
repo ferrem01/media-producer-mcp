@@ -2,7 +2,7 @@
   "type": "notification-stack",
   "label": "Notification Stack",
   "category": "mockups",
-  "description": "Stack of notifications sliding in from a corner with type-specific accent colors.",
+  "description": "App notifications that land as real ones: a filled app tile with a drawn glyph (never an emoji), title, time and body on a card with a soft layered shadow. In a corner they slide in as a stack; placed by geometry (fill) a card lands with weight -- tipped back in depth, settling flat -- when its box appears.",
   "data": {
     "notifications": {
       "type": "array",
@@ -23,14 +23,19 @@
           },
           "icon": {
             "type": "string",
-            "label": "Icon",
+            "label": "Icon: a house glyph name (mail, inbox, bell, flame, target, eye, check, x, doc, megaphone, trash, question, tag, users, user, clock, send, book, dollar, repeat, calendar, building, chart, info, alert, share, chat, star, phone, link, search, zap). An emoji maps to the nearest glyph. Omit for the type's own glyph.",
             "optional": true
           },
           "type": {
             "type": "string",
             "label": "Type",
             "optional": true,
-            "enum": ["success", "error", "info", "warning"],
+            "enum": [
+              "success",
+              "error",
+              "info",
+              "warning"
+            ],
             "default": "info"
           },
           "time": {
@@ -46,25 +51,36 @@
       "type": "string",
       "label": "Position",
       "optional": true,
-      "enum": ["top-right", "top-left", "bottom-right", "bottom-left"],
+      "enum": [
+        "top-right",
+        "top-left",
+        "bottom-right",
+        "bottom-left"
+      ],
       "default": "top-right"
     },
     "fill": {
       "type": "boolean",
-      "label": "true makes the cards fill the component's box: no 40px corner inset, the box's width (default: a 380px column in the corner) -- for a card placed by geometry, so it lines up with its box.",
+      "label": "The cards fill the placed box (no corner inset) and land in depth",
       "optional": true
     },
     "hold": {
       "type": "boolean",
-      "label": "true keeps the cards up to the cut (default: they slide out half a second before the scene ends) -- for a stack that lands late in the scene, or one its own exit takes off.",
+      "label": "Keep the cards up to the cut instead of leaving before the scene ends",
       "optional": true
     },
     "surface": {
       "type": "string",
-      "label": "glass (default: a translucent card for dark screens) | solid (an opaque white card with dark type -- over a person or a light plate)",
+      "label": "'solid' = white card for a person or a light plate (default: glass for dark screens)",
       "optional": true,
-      "enum": ["glass", "solid"],
-      "default": "glass"
+      "enum": [
+        "solid"
+      ]
+    },
+    "at": {
+      "type": "number",
+      "label": "Scene seconds the cards arrive (default: when the box enters)",
+      "optional": true
     }
   }
 }
