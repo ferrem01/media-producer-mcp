@@ -44,6 +44,8 @@ export interface ResolvedPlan {
   /** Where the person is (core/performer-settings.ts): the booth's guidance,
    *  a generated performer's shot. Any how. */
   setting?: string;
+  /** A real person's look (an id of the actor's looks). */
+  look?: string;
   /** No plan anywhere: read off what the scene already plays (a film made
    *  before plans existed reads as what it is, not as stale). */
   inferred?: boolean;
@@ -82,7 +84,8 @@ export function resolvePlan(project: Project, si: number, actors: CastActor[] = 
   const loc = pick("location");
   const location = how === "generate" && engine === "seedance" && loc ? loc : undefined;
   const setting = getSetting(pick("setting"))?.id;
-  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), ...(setting ? { setting } : {}), ...(inferred ? { inferred } : {}) };
+  const look = pick("look") || undefined;
+  return { actor, how, ...(engine ? { engine } : {}), ...(location ? { location } : {}), ...(setting ? { setting } : {}), ...(look ? { look } : {}), ...(inferred ? { inferred } : {}) };
 }
 
 /** One field of a scene's plan as written (no defaults, no checks) -- e.g.
@@ -129,6 +132,8 @@ export function planState(project: Project, si: number, plan: ResolvedPlan,
   if ((pb.engine || "seedance") !== (plan.engine || "seedance")) return { state: "stale", why: `made with ${ENGINE_LABEL[pb.engine || ""] || pb.engine}; the plan is ${ENGINE_LABEL[plan.engine || ""] || plan.engine}` };
   const made = perf.made_with;
   if (made && (made.location || "") !== (plan.location || "")) return { state: "stale", why: plan.location ? `made ${made.location ? "in another location" : "with no location"}; the plan is ${plan.location}` : "made in a location the plan no longer has" };
+  // Another look is another take (a real person's wardrobe).
+  if (made && plan.look && (made.look || "") !== plan.look) return { state: "stale", why: `made in ${made.look ? "another look" : "the default look"}; the plan is ${plan.look}` };
   return { state: "ready" };
 }
 
@@ -158,6 +163,13 @@ export function cleanPlan(input: Record<string, unknown>, actors: CastActor[], l
     const l = input.location === null || input.location === "none" ? null : String(input.location);
     if (l && !locations.some((x) => x.id === l)) throw new Error(`No location "${l}"`);
     out.location = l;
+  }
+  if (input.look !== undefined) {
+    // "" or null: the actor's default look. Checked against the actor's
+    // looks when a scene is performed (the plan may name the actor later).
+    const lk = input.look === null ? "" : String(input.look).trim();
+    if (lk && !/^[a-z0-9-]{1,40}$/.test(lk)) throw new Error("look must be a look id (from the actor's looks)");
+    out.look = lk;
   }
   if (input.setting !== undefined) {
     // "" or null: no setting (the default shot).

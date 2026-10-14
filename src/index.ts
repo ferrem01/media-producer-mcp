@@ -2829,13 +2829,6 @@ Rules:
       // DELETE /api/cast/{tenant}/{actor}         remove an actor
       // GET    /api/cast/{tenant}/{actor}/portrait  the actor's picture
       // GET    /api/cast/{tenant}/{actor}/sheet     the model sheet (a generated person)
-      // POST   /api/cast/{tenant}/{actor}/photos {image}     another photo of the person (up to 5 beside the portrait)
-      // GET    /api/cast/{tenant}/{actor}/photos/{n}         that photo
-      // DELETE /api/cast/{tenant}/{actor}/photos/{n}         remove it
-      // GET    /api/cast/{tenant}/{actor}/sheet-draft        the model sheet drawn from the photos, waiting for approval
-      // POST   /api/cast/{tenant}/{actor}/model-sheet {action: make | use | discard}
-      //        make: draw a sheet from the portrait + photos (GPT Image, ~1 min, in the background); use: the draft
-      //        becomes the actor's sheet; discard: throw the draft away
       // A real person's FOUNDATION (core/actor-foundation.ts, SPEC-real-person.md):
       // POST /api/cast/{tenant}/{actor}/foundation/{far|close|turn}  the clip's raw bytes as the body
       //        (the phone's recording or an upload): 202, made in the background (foundation.work shows it);
@@ -2886,45 +2879,6 @@ Rules:
               await fs.rm(intake, { force: true }).catch(() => {});
               throw e;
             }
-            return;
-          }
-          jsonResponse(res, 405, { error: "Method not allowed" });
-        } catch (e: any) {
-          jsonResponse(res, 400, { error: e?.message || String(e) });
-        }
-        return;
-      }
-      const castExtra = urlPath.match(/^\/api\/cast\/([^/]+)\/([A-Za-z0-9_-]+)\/(photos|sheet-draft|model-sheet)(?:\/(\d+))?$/);
-      if (castExtra) {
-        const [, ceTenantRaw, ceActor, ceWhat, ceN] = castExtra;
-        const ceTenant = decodeURIComponent(ceTenantRaw);
-        const { addActorPhoto, removeActorPhoto, startActorSheet, useSheetDraft, discardSheetDraft } = await import("./core/cast.js");
-        try {
-          const actor = await getActor(ceTenant, ceActor);
-          if (!actor) { jsonResponse(res, 404, { error: "No such actor" }); return; }
-          const sendImage = async (rel: string | undefined, missing: string) => {
-            const img = rel ? await fs.readFile(path.join(config.dataDir, ceTenant, rel)).catch(() => null) : null;
-            if (!img) { jsonResponse(res, 404, { error: missing }); return; }
-            res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=60" });
-            res.end(img);
-          };
-          if (ceWhat === "photos" && method === "GET" && ceN !== undefined) { await sendImage((actor.photos || [])[Number(ceN)], "No such photo"); return; }
-          if (ceWhat === "sheet-draft" && method === "GET") { await sendImage(actor.sheet_draft?.file, "No sheet draft"); return; }
-          if (ceWhat === "photos" && method === "POST" && ceN === undefined) {
-            const body = await parseBody(req).catch(() => ({} as any));
-            jsonResponse(res, 200, await addActorPhoto(ceTenant, ceActor, String(body.image || "")));
-            return;
-          }
-          if (ceWhat === "photos" && method === "DELETE" && ceN !== undefined) { jsonResponse(res, 200, await removeActorPhoto(ceTenant, ceActor, Number(ceN))); return; }
-          if (ceWhat === "model-sheet" && method === "POST") {
-            const body = await parseBody(req).catch(() => ({} as any));
-            const act = String(body.action || "make");
-            if (act === "make") {
-              if (!process.env.OPENAI_API_KEY) { jsonResponse(res, 400, { error: "OPENAI_API_KEY is not set (the sheet is drawn by GPT Image)" }); return; }
-              jsonResponse(res, 202, await startActorSheet(ceTenant, ceActor));
-            } else if (act === "use") jsonResponse(res, 200, await useSheetDraft(ceTenant, ceActor));
-            else if (act === "discard") jsonResponse(res, 200, await discardSheetDraft(ceTenant, ceActor));
-            else jsonResponse(res, 400, { error: "action must be make, use or discard" });
             return;
           }
           jsonResponse(res, 405, { error: "Method not allowed" });
@@ -2996,9 +2950,15 @@ Rules:
             return;
           }
           if (caSub && method === "PATCH") {
-            // PATCH /api/cast/{tenant}/{actor} {name?, voice_id?, voice_name?, sheet?}
+            // PATCH /api/cast/{tenant}/{actor} {name?, voice_id?, voice_name?, sheet?, looks?, default_look?}
+            //       looks: a real person's wardrobes [{id?, name, wardrobe, glasses?}] (the whole list)
             const body = await parseBody(req).catch(() => ({} as any));
             const { updateActor } = await import("./core/cast.js");
+            if (Array.isArray(body.looks) || typeof body.default_look === "string") {
+              const { setLooks } = await import("./core/actor-foundation.js");
+              const cur = await getActor(caTenant, caSub);
+              await setLooks(caTenant, caSub, Array.isArray(body.looks) ? body.looks : (cur?.looks || []), typeof body.default_look === "string" ? body.default_look : undefined);
+            }
             jsonResponse(res, 200, await updateActor(caTenant, caSub, {
               name: typeof body.name === "string" ? body.name : undefined,
               voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
@@ -3278,6 +3238,7 @@ Rules:
                 voice_speed: Number(body.voice_speed) || undefined,
                 motion: str(body.motion),
                 move: str(body.move),
+                look: typeof body.look === "string" ? body.look : undefined,
               }));
               return;
             }

@@ -109,4 +109,58 @@ describe("a real person's foundation, in the browser", () => {
       expect(sent.map((s) => s.path)).toEqual(["/api/cast/t/marc/foundation/turn", "/api/cast/t/marc/foundation/close"]);
     } finally { await browser.close(); }
   }, 60000);
+
+  it("looks: the Cast panel adds, picks the default and removes; the phone ends by picking one", async () => {
+    const browser = await launch();
+    try {
+      const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+      const patches: any[] = [];
+      const done = { clips: [{ kind: "far", file: "a", seconds: 75, recorded_at: "1" }, { kind: "close", file: "b", seconds: 30, recorded_at: "2" }, { kind: "turn", file: "c", seconds: 12, recorded_at: "3" }], stills: [{ kind: "front", file: "s" }], ref_video: "r", made_at: "2026-10-14T00:00:00Z" };
+      let actor: any = { id: "marc", name: "Marc", consent: { at: "x" }, foundation: done, created_at: "2026-10-14T00:00:00Z" };
+      await page.route("**/*", async (route) => {
+        const u = new URL(route.request().url());
+        const json = (o: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+        if (u.pathname === "/cast") return route.fulfill({ status: 200, contentType: "text/html", body: getCastHtml() });
+        if (u.pathname === "/foundation") return route.fulfill({ status: 200, contentType: "text/html", body: getFoundationHtml() });
+        if (u.pathname === "/auth/me") return json({ tenant_id: "t", email: "m@x" });
+        if (u.pathname === "/api/cast/t/marc" && route.request().method() === "PATCH") {
+          const b = JSON.parse(route.request().postData() || "{}"); patches.push(b);
+          const looks = (b.looks || []).map((l: any) => ({ id: l.id || l.name.toLowerCase(), ...l }));
+          actor = { ...actor, looks, default_look: b.default_look || (looks[0] && looks[0].id) };
+          return json(actor);
+        }
+        if (u.pathname === "/api/cast/t") return json({ cast: [actor] });
+        if (u.pathname.startsWith("/api/take-qr/")) return route.fulfill({ status: 200, contentType: "image/svg+xml", body: "<svg xmlns='http://www.w3.org/2000/svg'/>" });
+        if (u.pathname.startsWith("/api/")) return route.fulfill({ status: 404, body: "" });
+        return route.fulfill({ status: 404, body: "" });
+      });
+      await page.goto("http://studio.test/cast?tenant=t");
+      await page.waitForSelector("#actors .card .found");
+      await page.click("#actors .card .found");
+      await page.waitForSelector("#foundationPanel");
+      expect(await page.textContent("#foundationPanel")).toContain("No looks yet");
+      await page.click('#foundationPanel [data-lk-sug="Founder"]');
+      await page.waitForSelector('#foundationPanel [data-lk-def="founder"]');
+      expect(patches[0].looks).toEqual([{ name: "Founder", wardrobe: expect.stringContaining("black overshirt") }]);
+      await page.fill("#lkName", "Keynote"); await page.fill("#lkWear", "a navy suit, white open-collar shirt");
+      await page.click("#lkAdd");
+      await page.waitForSelector('#foundationPanel [data-lk-def="keynote"]');
+      expect(patches[1].looks.map((l: any) => l.name)).toEqual(["Founder", "Keynote"]);
+      await page.check('#foundationPanel [data-lk-def="keynote"]');
+      await page.waitForFunction(() => /Default look set/.test(document.getElementById("status")?.textContent || ""));
+      expect(patches[2].default_look).toBe("keynote");
+      await page.click('#foundationPanel [data-lk-del="0"]');
+      await page.waitForFunction(() => !document.querySelector('#foundationPanel [data-lk-def="founder"]'));
+      expect(patches[3].looks.map((l: any) => l.name)).toEqual(["Keynote"]);
+
+      // The phone: a finished foundation with no looks asks what they wear.
+      actor = { ...actor, looks: undefined, default_look: undefined };
+      await page.goto("http://localhost/foundation?tenant=t&actor=marc&token=tok");
+      await page.waitForSelector("#lookPick", { state: "visible" });
+      await page.click("#lookBtns button:has-text('Weekend')");
+      await page.waitForFunction(() => /Weekend is your look/.test(document.getElementById("msg")?.textContent || ""));
+      expect(patches.at(-1)).toEqual({ looks: [{ name: "Weekend", wardrobe: "a grey crew-neck sweater and jeans" }] });
+      expect(await page.isVisible("#lookPick")).toBe(false);
+    } finally { await browser.close(); }
+  }, 60000);
 });

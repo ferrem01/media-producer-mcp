@@ -37,7 +37,8 @@ import { takeWindow, playClock, cutFileFor } from "./take-clock.js";
 import { detectSilence } from "./idle-silence.js";
 import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
-import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
+import { seedanceShot, seedanceFinal, speakingPrompt, silentPrompt, realPersonPrompt, seedanceRatio, seedanceRefs } from "./seedance.js";
+import { foundationReady, resolveLook } from "./actor-foundation.js";
 import { withVendorStatus, type VendorStatus } from "./vendor-status.js";
 import { PERFORMER_SETTINGS, shotForSetting, moveForSetting } from "./performer-settings.js";
 import { getCamera, DEFAULT_CAMERA, CAMERA_IDS, filmCameraOf, getMove, resolveMove, setShotMove, MOVE_IDS } from "./shot-camera.js";
@@ -113,6 +114,11 @@ async function loadScene(tenant: string, projectId: string, si: number) {
   return { project, scene };
 }
 
+/** A real person has no start frame: they are made from their foundation. */
+function noStartFrame(actor: CastActor): void {
+  if (actor.foundation) throw new Error(`${actor.name} is a real person, made from their foundation: there is no start frame to draw or pick -- perform the scene directly`);
+}
+
 async function needActor(tenant: string, id: string | undefined): Promise<CastActor> {
   if (!id) throw new Error("actor is required (a cast actor id)");
   const actor = await getActor(tenant, id);
@@ -134,6 +140,7 @@ function followPlan(scene: any, project: any, want: Partial<CastPlan>, before: R
   if (want.how !== undefined && want.how !== before.how) fields.how = want.how;
   if (want.engine !== undefined && want.engine !== before.engine) fields.engine = want.engine;
   if (want.location !== undefined && (want.location || "") !== (before.location || "")) fields.location = want.location || "";
+  if (want.look !== undefined && (want.look || "") !== (before.look || "")) fields.look = want.look || "";
   if (!Object.keys(fields).length) return;
   const next = writePlan(scene.performer, fields);
   if (next) scene.performer = next; else delete scene.performer;
@@ -225,6 +232,7 @@ export async function startSceneFrame(tenant: string, projectId: string, si: num
   const prev: ScenePerformance | undefined = scene.performance;
   const plan = await planOf(tenant, project, si);
   const actor = await needActor(tenant, opts.actor || plan.actor || prev?.actor);
+  noStartFrame(actor);
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (the start frame is drawn by GPT Image)");
   const key = `${tenant}/${projectId}/${si}`;
   if (running.has(key)) throw new Error(`Scene ${si + 1} is already being worked on`);
@@ -290,6 +298,7 @@ export async function continueSceneFrom(tenant: string, projectId: string, si: n
   const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
   const actor = await needActor(tenant, opts.actor || (await planOf(tenant, project, si)).actor || prev?.actor);
+  noStartFrame(actor);
   const from = Number(opts.from_scene);
   if (!Number.isInteger(from) || from < 0 || from === si) throw new Error("from_scene must be another scene (0-based)");
   const key = `${tenant}/${projectId}/${si}`;
@@ -669,6 +678,8 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   /** The camera move (core/shot-camera.ts), kept on the scene as its
    *  `shot_move`; "" back to the setting's. Speaking: gentle moves only. */
   move?: string;
+  /** A real person's look (one of the actor's looks); "" back to their default. */
+  look?: string;
 }): Promise<ScenePerformance> {
   const doAttach = attacher;
   if (!doAttach) throw new Error("Takes cannot be attached here");
@@ -695,10 +706,18 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   if (!finishingDraft && where) await locationImage(tenant, where);
   // A move the shot cannot take is refused before anything starts.
   setShotMove({}, opts.move, true);
+  // A REAL PERSON performs from their foundation (SPEC-real-person.md): no
+  // start frame, and the look they wear is checked before anything is spent.
+  const real = foundationReady(actor);
+  if (actor.foundation && !real) throw new Error(`${actor.name}'s foundation is not finished: record all three clips on the Cast page first`);
+  if (opts.look && !real) throw new Error("A look is for a real person performing from their foundation");
+  const lookNow = real ? resolveLook(actor, opts.look !== undefined ? (opts.look || undefined) : planField(project, si, "look"))?.id || "" : "";
+  // A draft made in another look is not this shot: the final starts over.
+  const lookChanged = real && !!prev?.draft && (prev.made_with?.look || "") !== lookNow;
   running.add(key);
   const perf = await patch(tenant, projectId, si, (p, sc) => {
     if (p.actor && p.actor !== actor.id) { delete p.frames; delete p.frame; delete p.draft; delete p.final; }
-    if (p.shot !== shot || p.voice_source !== source) delete p.draft;
+    if (p.shot !== shot || p.voice_source !== source || lookChanged) delete p.draft;
     if (opts.recording_from !== undefined && (opts.recording_from || undefined) !== p.recording_from) {
       if (opts.recording_from) p.recording_from = opts.recording_from; else delete p.recording_from;
       delete p.draft;
@@ -711,7 +730,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     // so the person does not change between cuts (Five Tools, Oct 8: three
     // scenes redrawn from scene 1's frame by hand). A custom frame prompt
     // still draws its own.
-    if (!p.frame && opts.frame_prompt === undefined) {
+    if (!real && !p.frame && opts.frame_prompt === undefined) {
       const shared = sharedStartFrame(project, si, actor.id, shot, finishingDraft ? (p.location || "") : where);
       if (shared) {
         p.frames = [...(p.frames || []), { url: shared.url, shot, ...(shared.location ? { location: shared.location } : {}), from_scene: shared.scene, from_kind: "start" as const, made_at: new Date().toISOString() }].slice(-6);
@@ -729,7 +748,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     // A new move is a new shot: the draft no longer stands.
     if (setShotMove(sc, opts.move, true)) delete p.draft;
     // Performing it IS the choice: the scene's plan is this actor, generated with Seedance.
-    followPlan(sc, project, { actor: actor.id, how: "generate", engine: "seedance", ...(opts.location !== undefined ? { location: opts.location } : {}) }, plan);
+    followPlan(sc, project, { actor: actor.id, how: "generate", engine: "seedance", ...(opts.location !== undefined ? { location: opts.location } : {}), ...(opts.look !== undefined ? { look: opts.look } : {}) }, plan);
     p.status = "running"; p.stage = "voice"; delete p.error; delete p.pitch_check; p.started_at = new Date().toISOString(); delete p.finished_at;
   });
   const release = () => { running.delete(key); vendorNow.delete(key); };
@@ -850,9 +869,13 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   // The location's plate: the room the frame is drawn in and Seedance keeps.
   const locationAbs = !finishing && perf.location ? await locationImage(tenant, perf.location) : undefined;
   const roomAbs = locationAbs;
+  // A real person: the foundation instead of a drawn frame, in the look the
+  // scene wears (SPEC-real-person.md).
+  const real = foundationReady(actor);
+  const look = real ? resolveLook(actor, planField(project, si, "look")) : undefined;
   if (!finishing) {
-    // The frame: the one picked, else one drawn now.
-    if (!frame) {
+    // The frame: the one picked, else one drawn now (a real person has none).
+    if (!frame && !real) {
       await stage("frame");
       frame = await drawFrame(tenant, projectId, actor, perf.shot, W, H, perf.frame_prompt, locationAbs, cam);
       const made = frame;
@@ -892,9 +915,13 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     await fs.copyFile(voice.file, path.join(assetsDir(tenant, projectId), voiceName));
     voiceUrl = assetUrl(tenant, projectId, voiceName);
     const voiceHash = crypto.createHash("sha1").update(await fs.readFile(voice.file)).digest("hex").slice(0, 12);
-    inputs = [actor.id, actor.sheet || "", frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.location || "", cam.camera?.id || "", cam.move?.id || ""].join("|");
+    inputs = [actor.id, real ? `foundation:${actor.foundation!.made_at}:${look?.wardrobe || ""}` : actor.sheet || "", real ? "" : frame, perf.shot, perf.voice_source, voiceHash, perf.video_prompt || "", perf.location || "", cam.camera?.id || "", cam.move?.id || ""].join("|");
   }
-  const videoPrompt = perf.video_prompt || speakingPrompt(perf.shot, cam);
+  const STILL_ORDER = ["front", "left", "right"];
+  const stills = real ? actor.foundation!.stills.slice().sort((a, b) => STILL_ORDER.indexOf(a.kind) - STILL_ORDER.indexOf(b.kind)) : [];
+  const videoPrompt = perf.video_prompt || (real
+    ? realPersonPrompt(perf.shot, cam, { stills: stills.length, room: !!roomAbs, ...(look ? { wardrobe: look.wardrobe, ...(typeof look.glasses === "boolean" ? { glasses: look.glasses } : {}) } : {}) })
+    : speakingPrompt(perf.shot, cam));
 
   await stage(quality === "final" ? "final" : "draft");
   const kept = path.join(workDir, `seedance-${quality}.json`);
@@ -904,6 +931,19 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   const vkey = `${tenant}/${projectId}/${si}`;
   const result = await withVendorStatus((v) => { vendorNow.set(vkey, v); }, async () => {
     if (finishing) return seedanceFinal(perf.draft!.draft_id!, { resume, onSubmit });
+    if (real) {
+      // Who they are: the stills of their recording; how they move: its
+      // reference video; where: the room; what they say: the voice.
+      const tenantFile = (rel: string) => path.join(config.dataDir, tenant, rel);
+      const images: string[] = [];
+      for (const st of stills) images.push(await publicUrl(tenant, projectId, tenantFile(st.file)));
+      if (roomAbs) images.push(await publicUrl(tenant, projectId, roomAbs));
+      return seedanceShot({
+        images, videos: [await publicUrl(tenant, projectId, tenantFile(actor.foundation!.ref_video!))],
+        audio: await publicUrl(tenant, projectId, voice!.file), prompt: videoPrompt, room: !!roomAbs,
+        seconds: voice!.clip!, ratio: seedanceRatio(W, H), draft: quality === "draft", resume, onSubmit,
+      });
+    }
     const frameAbs = resolveVideoPath(frame!, config.dataDir);
     const images = [await publicUrl(tenant, projectId, frameAbs)];
     if (actor.sheet) images.push(await publicUrl(tenant, projectId, path.join(config.dataDir, tenant, actor.sheet)));
@@ -935,7 +975,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     if (quality === "draft") p.draft = { url, ...(result.draftId ? { draft_id: result.draftId } : {}), inputs, made_at: now };
     else p.final = { url, made_at: now };
     if (voiceUrl) p.voice_url = voiceUrl; else delete p.voice_url;
-    p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id && perf.voice_source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(from ? { from } : {}), ...(p.location ? { location: p.location } : {}) };
+    p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id && perf.voice_source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(from ? { from } : {}), ...(p.location ? { location: p.location } : {}), ...(real ? { foundation: true, ...(look ? { look: look.id } : {}) } : {}) };
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
 }
@@ -1074,7 +1114,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
   return ((project as any).storyboard?.scenes || []).map((s: any, i: number) => {
     const pa = s.performance?.actor ? actors.find((a) => a.id === s.performance.actor) : null;
     const cam = sceneCamera(project, i);
-    const defaults = defaultPrompts(sceneShot(undefined, s.performance?.shot, s.performer?.setting), vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location, cam);
+    const shotNow = sceneShot(undefined, s.performance?.shot, s.performer?.setting);
     const clip = clips.find((c: any) => c.scene_index === i);
     const take: any = clip ? takeForClip(project as any, clip) : null;
     const cast = s.cast !== undefined ? s.cast : (project as any).speaker_cast ?? null;
@@ -1089,6 +1129,15 @@ export async function getScenePerformances(tenant: string, projectId: string) {
     if (st.state === "ready" && plan.how === "generate" && madeFrom && nowFrom && madeFrom !== nowFrom) { st.state = "stale"; st.why = "made from an earlier recording"; }
     const vt = sceneVoiceTake(project, i);
     const using = pickRecording(project, i, s.performance?.recording_from);
+    // A REAL PERSON (SPEC-real-person.md): performed from their foundation --
+    // no frame to draw, and the look the scene wears.
+    const who = actors.find((a) => a.id === (plan.how === "generate" && plan.actor ? plan.actor : s.performance?.actor)) || pa || null;
+    const realWho = who && foundationReady(who) ? who : null;
+    let lookNow: ReturnType<typeof resolveLook> | undefined;
+    try { lookNow = realWho ? resolveLook(realWho, plan.look) : undefined; } catch { lookNow = undefined; }
+    const defaults = realWho
+      ? { frame_prompt: "", video_prompt: realPersonPrompt(shotNow, cam, { stills: realWho.foundation!.stills.length, room: !!s.performance?.location, ...(lookNow ? { wardrobe: lookNow.wardrobe, ...(typeof lookNow.glasses === "boolean" ? { glasses: lookNow.glasses } : {}) } : {}) }) }
+      : defaultPrompts(shotNow, vertical, pa ? !!pa.sheet : true, !!s.performance?.location, !!s.performance?.location, cam);
     return {
       scene_index: i, label: s.label, lines: String(s.voiceover_text || ""),
       take: take ? { performed_by: take.performed_by || null, recast_by: Object.keys(take.actors || {}) } : null,
@@ -1115,6 +1164,7 @@ export async function getScenePerformances(tenant: string, projectId: string) {
       film_camera: cam.camera?.id, shot_move: s.shot_move || null, move: cam.move?.id || null, ...(cam.note ? { move_note: cam.note } : {}),
       // What the scene uses when it writes no prompt of its own.
       defaults,
+      ...(realWho ? { real_person: { actor: realWho.id, stills: realWho.foundation!.stills.map((x) => x.kind), made_at: realWho.foundation!.made_at, looks: realWho.looks || [], look: lookNow?.id || null } } : {}),
       actor_clips: s.actor_clips || [],
       running: running.has(`${tenant}/${projectId}/${i}`),
       vendor: vendorNow.get(`${tenant}/${projectId}/${i}`) || null,

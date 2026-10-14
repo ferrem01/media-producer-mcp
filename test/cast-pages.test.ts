@@ -22,7 +22,7 @@ describe("the Cast and Locations pages", () => {
     expect(h).toContain("'/api/upload-asset/' + enc(tenant) + '/library?name='");
     expect(h).toContain("railApi('/api/heygen-avatars/' + enc(tenant) + '?looks=1')");
     expect(h).toContain("patch(a, { voice_id: id, voice_name: v ? v.name : '' }");
-    // The Photos & sheet panel's pictures load signed in with no token in the address.
+    // The foundation panel's pictures load signed in with no token in the address.
     expect(h).toContain("pic = function (u) { return withParam(withToken(u), 'v', v); };");
     expect(h).not.toContain("+ bust)");
   });

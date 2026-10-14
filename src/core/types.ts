@@ -583,6 +583,9 @@ export interface CastPlan {
    *  outdoor-sit | doing | second-camera. The booth's guidance; the shot a
    *  generated performer is given when none is named. */
   setting?: string;
+  /** A real person's look (their wardrobe, SPEC-real-person.md): one of the
+   *  actor's `looks` by id; absent = the actor's default look. */
+  look?: string;
 }
 
 export interface StoryboardAudioDirection {
@@ -672,6 +675,8 @@ export interface ScenePerformance {
   voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take" | "recording"; from?: string; line?: string; delivery?: string; speed?: number; made_at: string };
   /** What the scene's current take was made with (the plan it answers). */
   made_with?: { actor: string; engine: string; voice_id?: string; location?: string;
+    /** A real person: the look worn, and that it was made from their foundation. */
+    look?: string; foundation?: boolean;
     /** The recording the voice came from (a voice take's file, a video take's source). */
     from?: string };
   /** Which recording "my recording" uses when the scene has both: the
