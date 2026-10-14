@@ -82,6 +82,10 @@
     });
 
     if (data.color) container.style.color = data.color;
+    // Bold type straight over the person (no plate): a soft drop shadow, the
+    // creator-reel convention, holds it off a light shirt or a white door
+    // (Marc, Oct 14: the pills became plain bold text over his room).
+    if (data.shadow) container.style.textShadow = '0 2px 4px rgba(0, 0, 0, 0.55), 0 4px 18px rgba(0, 0, 0, 0.45)';
     // Over live pixels (a camera take, b-roll) no single ink is safe: the
     // room behind the words is whatever it is. A plate carries the type.
     if (data.plate) {
