@@ -374,7 +374,12 @@ html, body {
 /* ── Component containers ── */
 .mp-component {
   position: absolute;
-  overflow: hidden;
+  /* Clip the content, not its shadow: a card's soft shadow (the caption
+     plate, a notification, a checklist) was cut off at the box into a hard
+     grey rectangle (Marc, Oct 14: "a square shadow that's sitting there").
+     Media components clip their own picture at their root. */
+  overflow: clip;
+  overflow-clip-margin: 48px;
 }
 
 .mp-component * {
