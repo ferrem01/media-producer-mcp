@@ -40,6 +40,19 @@
     left: 40px;
   }
 
+  /* Fill: the cards ARE the box -- no corner inset, the box's own width.
+     A card placed by geometry (over a person, on a plate) lines up with
+     the box it was given instead of floating 40px in from a corner. */
+  .notification-stack.fill .notification-container {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+  .notification-stack.fill .notification-container.top-right,
+  .notification-stack.fill .notification-container.top-left { top: 0; }
+  .notification-stack.fill .notification-container.bottom-right,
+  .notification-stack.fill .notification-container.bottom-left { bottom: 0; }
+
   .notification-card {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -147,6 +160,7 @@
     container.classList.add(position);
     var solid = data.surface === 'solid';
     if (solid) el.querySelector('.notification-stack').classList.add('surface-solid');
+    if (data.fill) el.querySelector('.notification-stack').classList.add('fill');
 
     var isRight = position.indexOf('right') !== -1;
     var isBottom = position.indexOf('bottom') !== -1;

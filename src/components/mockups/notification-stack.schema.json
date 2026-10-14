@@ -49,6 +49,11 @@
       "enum": ["top-right", "top-left", "bottom-right", "bottom-left"],
       "default": "top-right"
     },
+    "fill": {
+      "type": "boolean",
+      "label": "true makes the cards fill the component's box: no 40px corner inset, the box's width (default: a 380px column in the corner) -- for a card placed by geometry, so it lines up with its box.",
+      "optional": true
+    },
     "hold": {
       "type": "boolean",
       "label": "true keeps the cards up to the cut (default: they slide out half a second before the scene ends) -- for a stack that lands late in the scene, or one its own exit takes off.",

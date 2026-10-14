@@ -78,3 +78,33 @@ describe("notification-stack hold", () => {
     expect(await cardOpacityAt({ hold: true }, 3.9)).toBe(1);
   }, 60000);
 });
+
+describe("notification-stack fill", () => {
+  it("lines the card up with its box instead of a 380px corner column", async () => {
+    const scene = { id: "s", label: "s", duration_seconds: 3, background: "#ffffff", components: [
+      { id: "n", type: "notification-stack", data: { surface: "solid", fill: true, hold: true, notifications: [{ title: "Marketing promises", body: "Only send leads that match" }] },
+        position: { x: "6%", y: "36%", width: "78%", height: "14%" }, z_index: 5 },
+    ] };
+    const html = await assembleScene({ scene: scene as any,
+      components: [{ type: "notification-stack", source: await fs.readFile(path.join(LIB, "mockups/notification-stack.component.html"), "utf-8") }],
+      brandKit: { colors: { primary: "#393bf5", background: "#ffffff", text: "#17171c" }, fonts: [] } as any,
+      canvas: { width: 1080, height: 1920 } as any, gsapDir: path.resolve(HERE, "../vendor/gsap") } as any);
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "fill-"));
+    await fs.writeFile(path.join(tmp, "s.html"), html);
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+      await page.goto(`file://${path.join(tmp, "s.html")}`);
+      await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 30000 });
+      const m = await page.evaluate(() => {
+        (window as any).__MP_TIMELINE.time(2);
+        const w = document.querySelector("[data-cid='n']")!.getBoundingClientRect();
+        const c = document.querySelector(".notification-card")!.getBoundingClientRect();
+        return { dl: c.left - w.left, dr: w.right - c.right, dt: c.top - w.top };
+      });
+      expect(Math.abs(m.dl)).toBeLessThan(2);
+      expect(Math.abs(m.dr)).toBeLessThan(2);
+      expect(Math.abs(m.dt)).toBeLessThan(2);
+    } finally { await browser.close(); await fs.rm(tmp, { recursive: true, force: true }); }
+  }, 60000);
+});
