@@ -238,9 +238,12 @@
       stagger: stagger * 0.5
     }, '-=0.2');
 
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.5;
+    // Exit: half a second before the scene ends by default. hold keeps the
+    // cards up to the cut (the wrapper's own exit, or the scene's end, takes
+    // them off): a stack that lands late in a scene was fading out a moment
+    // after it arrived (Marc, Oct 14).
+    var exitAt = data.hold ? null : (ctx.duration > 2 ? ctx.duration - 0.5 : null);
+    if (exitAt !== null) {
       tl.to(cardEls, {
         autoAlpha: 0, x: slideX * 0.5,
         duration: 0.3,

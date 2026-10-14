@@ -49,6 +49,11 @@
       "enum": ["top-right", "top-left", "bottom-right", "bottom-left"],
       "default": "top-right"
     },
+    "hold": {
+      "type": "boolean",
+      "label": "true keeps the cards up to the cut (default: they slide out half a second before the scene ends) -- for a stack that lands late in the scene, or one its own exit takes off.",
+      "optional": true
+    },
     "surface": {
       "type": "string",
       "label": "glass (default: a translucent card for dark screens) | solid (an opaque white card with dark type -- over a person or a light plate)",
