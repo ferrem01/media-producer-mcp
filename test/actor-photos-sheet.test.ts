@@ -102,7 +102,8 @@ describe("an actor's photos and the model sheet drawn from them", () => {
     const { getCastHtml } = await import("../src/cast-page.js");
     const html = getCastHtml();
     expect(html).toContain("function photosPanel(id)");
-    expect(html).toContain('id="aMore" accept="image/*" multiple');
+    // Photos are added under Photos & sheet; adding a real person is the foundation flow now.
+    expect(html).toContain('<input type="file" id="phAdd" accept="image/*" multiple>');
     expect(html).toContain("Use this sheet");
     expect(html).toMatch(/railApi\(base \+ '\/model-sheet', \{ method: 'POST', body: JSON\.stringify\(\{ action: 'make' \}\) \}\)/);
   });

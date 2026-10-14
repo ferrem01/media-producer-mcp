@@ -19,6 +19,7 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getUploadHtml } from "./upload-page.js";
 import { getTakeHtml } from "./take-page.js";
+import { getFoundationHtml } from "./foundation-page.js";
 import { getRemoteBoothHtml, getRemoteCameraHtml } from "./remote-booth-page.js";
 import { boothFilms } from "./core/booth-films.js";
 import { getPhoneStudioHtml } from "./studio-phone.js";
@@ -112,7 +113,7 @@ import { solveMediaEdits, inferIntents, contractSceneToEdl } from "./core/media-
 import { sceneCompositesOverSpeaker } from "./core/speaker-mode.js";
 import { repairBrandAssetPath } from "./core/scene-assembler.js";
 import { spawn } from "node:child_process";
-import { openSync, readFileSync } from "node:fs";
+import { openSync, readFileSync, createWriteStream } from "node:fs";
 
 /**
  * Resolve all component sources for a scene by reading .component.html files
@@ -1395,6 +1396,14 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       if (urlPath === "/take") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(getTakeHtml());
+        return;
+      }
+
+      // ── Foundation page: where a real person records the three clips their
+      // avatar is made from (SPEC-real-person.md). Same token-in-the-link auth. ──
+      if (urlPath === "/foundation") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getFoundationHtml());
         return;
       }
 
@@ -2814,6 +2823,8 @@ Rules:
       // GET    /api/cast/{tenant}                 the tenant's actors and the vendors (performers) that can play them
       // POST   /api/cast/{tenant} {name?, image | from:{project,test,file,at} | heygen_look_id, voice_id?, voice_name?, consent?}
       //        a portrait needs consent: true (this is me, or a person who agreed to be cast)
+      // POST   /api/cast/{tenant} {name, consent: true, real: true}   a real person with no picture yet: the
+      //        foundation they record next (/foundation) makes it
       // GET    /api/cast/{tenant}/voices          voices to pick: ElevenLabs (stock + clones) and HeyGen (the account's own)
       // DELETE /api/cast/{tenant}/{actor}         remove an actor
       // GET    /api/cast/{tenant}/{actor}/portrait  the actor's picture
@@ -2825,6 +2836,64 @@ Rules:
       // POST   /api/cast/{tenant}/{actor}/model-sheet {action: make | use | discard}
       //        make: draw a sheet from the portrait + photos (GPT Image, ~1 min, in the background); use: the draft
       //        becomes the actor's sheet; discard: throw the draft away
+      // A real person's FOUNDATION (core/actor-foundation.ts, SPEC-real-person.md):
+      // POST /api/cast/{tenant}/{actor}/foundation/{far|close|turn}  the clip's raw bytes as the body
+      //        (the phone's recording or an upload): 202, made in the background (foundation.work shows it);
+      //        the stills, the portrait and the reference are remade from it
+      // GET  /api/cast/{tenant}/{actor}/foundation/{far|close|turn}  the clip
+      // GET  /api/cast/{tenant}/{actor}/still/{front|left|right}     a still pulled from it
+      const castFoundation = urlPath.match(/^\/api\/cast\/([^/]+)\/([A-Za-z0-9_-]+)\/(foundation|still)\/(far|close|turn|front|left|right)$/);
+      if (castFoundation) {
+        const [, cfTenantRaw, cfActor, cfWhat, cfKind] = castFoundation;
+        const cfTenant = decodeURIComponent(cfTenantRaw);
+        try {
+          const actor = await getActor(cfTenant, cfActor);
+          if (!actor) { jsonResponse(res, 404, { error: "No such actor" }); return; }
+          const { startFoundationClip, FOUNDATION_KINDS } = await import("./core/actor-foundation.js");
+          if (cfWhat === "still" && method === "GET") {
+            const rel = (actor.foundation?.stills || []).find((s) => s.kind === cfKind)?.file;
+            const img = rel ? await fs.readFile(path.join(config.dataDir, cfTenant, rel)).catch(() => null) : null;
+            if (!img) { jsonResponse(res, 404, { error: "No such still" }); return; }
+            res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, no-cache" });
+            res.end(img);
+            return;
+          }
+          if (cfWhat !== "foundation" || !(FOUNDATION_KINDS as string[]).includes(cfKind)) { jsonResponse(res, 404, { error: "Not found" }); return; }
+          if (method === "GET") {
+            const rel = (actor.foundation?.clips || []).find((c) => c.kind === cfKind)?.file;
+            const { serveFile } = await import("./core/serve-file.js");
+            if (!rel || !(await serveFile(req, res, path.join(config.dataDir, cfTenant, rel), { contentType: "video/mp4", cacheControl: "private, no-cache" }))) jsonResponse(res, 404, { error: "Not recorded yet" });
+            return;
+          }
+          if (method === "POST") {
+            const MAX_CLIP = 512 * 1024 * 1024;
+            const intake = path.join(config.dataDir, cfTenant, "cast", `_foundation-${cfActor}-${cfKind}-${Date.now()}.bin`);
+            await fs.mkdir(path.dirname(intake), { recursive: true });
+            try {
+              await new Promise<void>((resolve, reject) => {
+                let got = 0;
+                const out = createWriteStream(intake);
+                req.on("data", (c: Buffer) => { got += c.length; if (got > MAX_CLIP) { reject(new Error("clip exceeds 512MB")); req.destroy(); } });
+                req.pipe(out);
+                out.on("finish", () => (got ? resolve() : reject(new Error("empty request body"))));
+                out.on("error", reject);
+                req.on("error", reject);
+              });
+              // Made in the background (a phone's 75 s clip outlasts a
+              // request); the actor shows foundation.work until it lands.
+              jsonResponse(res, 202, await startFoundationClip(cfTenant, cfActor, cfKind as any, intake));
+            } catch (e) {
+              await fs.rm(intake, { force: true }).catch(() => {});
+              throw e;
+            }
+            return;
+          }
+          jsonResponse(res, 405, { error: "Method not allowed" });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
       const castExtra = urlPath.match(/^\/api\/cast\/([^/]+)\/([A-Za-z0-9_-]+)\/(photos|sheet-draft|model-sheet)(?:\/(\d+))?$/);
       if (castExtra) {
         const [, ceTenantRaw, ceActor, ceWhat, ceN] = castExtra;
@@ -2922,6 +2991,7 @@ Rules:
               heygen_look_id: typeof body.heygen_look_id === "string" ? body.heygen_look_id : undefined,
               consent: body.consent === true, fictional: body.fictional === true,
               sheet: typeof body.sheet === "string" ? body.sheet : undefined,
+              real: body.real === true,
             }));
             return;
           }
@@ -3812,6 +3882,7 @@ Rules:
       // ── API: THE PHONE CODE -- the take link for one scene as a QR (SVG) ──
       // GET /api/take-qr/{tenant}/{project}?scene=N  (drawn here: the link carries the token)
       //     /api/take-qr/{tenant}/{project}?session=rb_...  (the remote booth's camera link)
+      //     /api/take-qr/{tenant}/-?actor=<id>  (a real person's foundation page, SPEC-real-person.md)
       const takeQrMatch = urlPath.match(/^\/api\/take-qr\/([^/]+)\/([^/]+)$/);
       if (takeQrMatch && method === "GET") {
         const [, tqTenant, tqProject] = takeQrMatch.map(decodeURIComponent);
@@ -3827,7 +3898,11 @@ Rules:
         // it between films and the phone never re-scans.
         const session = q.get("session") || "";
         if (session && !/^rb_[A-Za-z0-9_-]{16,64}$/.test(session)) { jsonResponse(res, 400, { error: "bad session id" }); return; }
-        const link = session
+        const qrActor = q.get("actor") || "";
+        if (qrActor && !/^[A-Za-z0-9_-]{1,64}$/.test(qrActor)) { jsonResponse(res, 400, { error: "bad actor id" }); return; }
+        const link = qrActor
+          ? `${proto}://${host}/foundation?tenant=${encodeURIComponent(tqTenant)}&actor=${encodeURIComponent(qrActor)}${token ? `&token=${encodeURIComponent(token)}` : ""}`
+          : session
           ? `${proto}://${host}/remote-camera?tenant=${encodeURIComponent(tqTenant)}&session=${encodeURIComponent(session)}${token ? `&token=${encodeURIComponent(token)}` : ""}`
           : `${proto}://${host}/take?tenant=${encodeURIComponent(tqTenant)}&project=${encodeURIComponent(tqProject)}&scene=${encodeURIComponent(scene)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
         try {
