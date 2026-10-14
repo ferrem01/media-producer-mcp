@@ -15,7 +15,7 @@ the checklist at 57.6 s sat on "a square shadow". Three causes:
 - Every `.mp-component` was `overflow: hidden`, so a card's soft shadow (the
   caption plate, a notification, a checklist) was cut off at the box into a
   hard grey rectangle -- on every caption of every film. Now `overflow: clip`
-  with `overflow-clip-margin: 48px`: content still clips, its shadow shows.
+  with `overflow-clip-margin: 160px`: content still clips, its shadow shows.
   Media components clip their own picture at their root, so no picture bleeds.
 - `notification-stack` is dark-screen glass (4% white + blur): over a person
   it goes see-through. `surface: "solid"` makes it an opaque white card with
