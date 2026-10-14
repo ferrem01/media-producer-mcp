@@ -434,7 +434,7 @@ html, body {
      grey rectangle (Marc, Oct 14: "a square shadow that's sitting there").
      Media components clip their own picture at their root. */
   overflow: clip;
-  overflow-clip-margin: 48px;
+  overflow-clip-margin: 160px;
 }
 
 /* ── Ambient visual layer (continuous flow between scenes) ── */
