@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-14 — A notification card can fill its box
+
+Marc on the MQL film: "the borders are fucked up, the spacing is fucked up".
+Measured: `notification-stack` draws a fixed 380px column 40px in from a
+corner of its box, so a card placed by geometry never lined up with the box
+it was given -- under the phone zoom (1.8x) it sat 72px in and stopped short
+of the column the checklists filled; zoomed further to fill the width it ran
+off the left of the frame. `fill: true` makes the cards the box: no inset,
+the box's width. The default stays the corner column (a stack docked in a
+corner of a screen).
+
 ## 2026-10-14 — Shadows reach past their box; a solid notification; a still at any second
 
 Marc, watching First Five Minutes (best): the email card at 2.3 s was
