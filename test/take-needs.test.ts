@@ -300,3 +300,29 @@ describe("a continuous speaker track keeps no scene markers", () => {
     expect(studio).toMatch(/function closeTakeStudio\(\) \{\n\s*var f = document\.getElementById\('take-studio'\);\n\s*if \(f\) \{ try \{ f\.src = 'about:blank'; \} catch \(e\) \{\} f\.remove\(\); \}/);
   });
 });
+
+// Marc, Oct 14 (proj_d09387ab): ids were `take_<count>`, a board scene
+// removed took its takes with it, and the next take reused a live id -- a
+// trim found by id then edited the older take and re-pointed the clip at it.
+describe("take ids", () => {
+  it("a new take never reuses a live id, even after takes were dropped", () => {
+    const p = speakerProject(["one", "two", "three"]);
+    for (const i of [0, 1, 2]) attachTake(p, { scene_index: i, source: `/a/${i}.mp4`, recorded_at: "now", capture: "canvas" });
+    p.takes = p.takes.filter((t: any) => t.scene_index !== 0); // the scene left the board
+    const t = attachTake(p, { scene_index: 1, source: "/a/new.mp4", recorded_at: "now", capture: "canvas" });
+    expect(t.id).toBe("take_3");
+    expect(new Set(p.takes.map((x: any) => x.id)).size).toBe(p.takes.length);
+  });
+
+  it("a film saved with a repeated id is renumbered on load; the first keeps it", () => {
+    const p = speakerProject(["one", "two"]);
+    p.takes = [
+      { id: "take_0", scene_index: 0, source: "/a/old.mp4" },
+      { id: "take_1", scene_index: 1, source: "/a/b.mp4" },
+      { id: "take_0", scene_index: 0, source: "/a/new.mp4" },
+    ];
+    const m: any = migrateProject(p);
+    expect(m.takes.map((t: any) => t.id)).toEqual(["take_0", "take_1", "take_2"]);
+    expect(m.takes[2].source).toBe("/a/new.mp4");
+  });
+});

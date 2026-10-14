@@ -10630,3 +10630,16 @@ model-sheet routes, the MCP actions, the Cast page's Photos & sheet panel,
 `sheetPrompt` and test/actor-photos-sheet.test.ts. An old actor's `photos`
 and `sheet_draft` are saved data only (removed with the actor). Not built:
 the Cast page's "Try it" sample performance (it needs a film).
+
+## Take ids are unique; an earlier performance can be put back from the tool (Oct 14)
+
+On What an MQL Actually Is (proj_d09387ab) three scenes played their Oct-13
+takes after a trim. Take ids were `take_<count>`, and removing board scenes
+drops their takes (`followScenes`), so the new drafts reused ids still held
+by older takes; `editSceneTake` saves by id, found the older one first and
+re-pointed the clip at its file. `nextTakeId` now numbers past the highest
+`take_<n>`, and `migrateProject` renumbers a repeated id on load (the first
+keeps it), which repairs saved films. The cast tool gains `restore_take`
+(Studio's existing re-attach, `restoreSceneTake`): an earlier performance of
+a scene back as its take with nothing made -- the way to put the MQL scenes
+back on their Oct-14 drafts.
