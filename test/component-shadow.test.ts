@@ -53,3 +53,28 @@ describe("component shadows and the solid notification", () => {
     } finally { await browser.close(); await fs.rm(tmp, { recursive: true, force: true }); }
   }, 60000);
 });
+
+describe("notification-stack hold", () => {
+  async function cardOpacityAt(data: Record<string, unknown>, t: number) {
+    const scene = { id: "s", label: "s", duration_seconds: 4, background: "#ffffff", components: [
+      { id: "n", type: "notification-stack", data: { notifications: [{ title: "Opened by Sales" }], ...data }, position: { x: "10%", y: "30%", width: "60%", height: "20%" }, z_index: 5 },
+    ] };
+    const html = await assembleScene({ scene: scene as any,
+      components: [{ type: "notification-stack", source: await fs.readFile(path.join(LIB, "mockups/notification-stack.component.html"), "utf-8") }],
+      brandKit: { colors: { primary: "#393bf5", background: "#ffffff", text: "#17171c" }, fonts: [] } as any,
+      canvas: { width: 1080, height: 1920 } as any, gsapDir: path.resolve(HERE, "../vendor/gsap") } as any);
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "hold-"));
+    await fs.writeFile(path.join(tmp, "s.html"), html);
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+      await page.goto(`file://${path.join(tmp, "s.html")}`);
+      await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 30000 });
+      return await page.evaluate((tt) => { (window as any).__MP_TIMELINE.time(tt); return Number(getComputedStyle(document.querySelector(".notification-card")!).opacity); }, t);
+    } finally { await browser.close(); await fs.rm(tmp, { recursive: true, force: true }); }
+  }
+  it("slides out before the scene ends by default, and holds to the cut when asked", async () => {
+    expect(await cardOpacityAt({}, 3.9)).toBeLessThan(0.05);
+    expect(await cardOpacityAt({ hold: true }, 3.9)).toBe(1);
+  }, 60000);
+});
