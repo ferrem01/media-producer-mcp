@@ -178,13 +178,21 @@ export function openTakeNeeds(project: Project): number[] {
   return out;
 }
 
+/** A take id no take on the film has: one past the highest `take_<n>`, so
+ *  a take dropped with its scene never frees its id for the next one. */
+export function nextTakeId(takes: Array<{ id?: string }>): string {
+  let max = -1;
+  for (const t of takes) { const m = /^take_(\d+)$/.exec(String(t?.id || "")); if (m) max = Math.max(max, Number(m[1])); }
+  return `take_${max + 1}`;
+}
+
 /**
  * Attach a take as the base for one scene. The scene's previous clip (if
  * any) is replaced; clips stay in scene order; the take is recorded in
  * `takes[]`; the scene's need flips to provided.
  */
 export function attachTake(project: Project, take: Omit<Take, "id">): Take {
-  const id = `take_${(project.takes || []).length}`;
+  const id = nextTakeId(project.takes || []);
   const lines = String(project.storyboard?.scenes?.[take.scene_index]?.voiceover_text || "").trim();
   const rec: Take = { id, ...take, ...(lines && take.lines == null ? { lines } : {}) };
   project.takes = [...(project.takes || []), rec];

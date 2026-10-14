@@ -10,7 +10,7 @@ import path from "node:path";
 import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Project, OutputFormat, Canvas, BrandKit, Scene, Storyboard, StoryboardScene } from "../core/types.js";
-import { ensureSpeakerNeeds, dropVoiceUnderTakes } from "../core/take-needs.js";
+import { ensureSpeakerNeeds, dropVoiceUnderTakes, nextTakeId } from "../core/take-needs.js";
 import { type Frame, FRAME_SPECS, frameFromDims } from "../core/types.js";
 import {
   projectsDir,
@@ -184,6 +184,19 @@ export function migrateProject(p: any): Project {
   if (p && p.take && !Array.isArray(p.takes)) {
     p.takes = [{ id: "take_0", scene_index: 0, capture: "raw", ...p.take }];
     delete p.take;
+  }
+  // Take ids were `take_<count>`, and a board scene removed takes its takes
+  // with it, so a later take could reuse a live id; an edit found by id then
+  // landed on the older take (Marc, Oct 14, proj_d09387ab: three scenes
+  // played their Oct-13 takes after a trim). A repeated id is renumbered.
+  if (p && Array.isArray(p.takes)) {
+    const seen = new Set<string>();
+    for (const t of p.takes) {
+      if (!t || typeof t !== "object") continue;
+      if (t.id && !seen.has(t.id)) { seen.add(t.id); continue; }
+      t.id = nextTakeId(p.takes);
+      seen.add(t.id);
+    }
   }
   // A clip that is a recorded take belongs to that take's scene. Any other
   // clip carries NO scene_index: it is the continuous-track model -- one
