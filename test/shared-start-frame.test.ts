@@ -17,6 +17,6 @@ describe("one start frame for the film", () => {
 
   it("a scene performed with no frame takes the shared one before anything is drawn", async () => {
     const src = await fs.readFile("src/core/scene-performance.ts", "utf8");
-    expect(src).toMatch(/if \(!p\.frame && opts\.frame_prompt === undefined\) \{\n\s*const shared = sharedStartFrame\(project, si, actor\.id, shot,/);
+    expect(src).toMatch(/if \(!real && !p\.frame && opts\.frame_prompt === undefined\) \{\n\s*const shared = sharedStartFrame\(project, si, actor\.id, shot,/);
   });
 });

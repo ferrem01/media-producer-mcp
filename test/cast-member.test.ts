@@ -84,7 +84,7 @@ describe("a cast member from a model sheet", () => {
 
   it("a recast made before the sheet is made again once the actor has one (Genjutsu only)", () => {
     const src = (require("node:fs") as typeof import("node:fs")).readFileSync(path.join(__dirname, "..", "src/core/recast.ts"), "utf8");
-    expect(src).toMatch(/&& \(existing\.sheet \|\| undefined\) === \(sheetFor\(tenant, actor, performer\.id\) \? actor\.sheet : undefined\)/);
-    expect(src).toMatch(/return pid === "higgsfield" && actor\.sheet \?/);
+    expect(src).toMatch(/&& \(existing\.sheet \|\| undefined\) === \(sheetFor\(tenant, actor, performer\.id\) \? sheetRel\(actor\) : undefined\)/);
+    expect(src).toMatch(/const rel = pid === "higgsfield" \? sheetRel\(actor\) : undefined;/);
   });
 });
