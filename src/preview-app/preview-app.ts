@@ -1239,6 +1239,7 @@ ${QUOTIENT_CSS}
   .pf-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
   .pf-shotview { display: flex; gap: 12px; align-items: flex-start; margin-top: 8px; }
   .pf-shotbig { width: 180px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; background: #111; flex: 0 0 180px; }
+  .pf-still { width: 72px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 6px; background: #111; }
   .pf-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-secondary); }
   .pf-nav-r { display: flex; align-items: center; gap: 8px; } .pf-nav-r small { color: var(--content-tertiary, #888); font-size: 12px; }
   .pf-sum { border-collapse: collapse; font-size: 13px; margin: 0 0 6px; }
@@ -11885,7 +11886,8 @@ ${QUOTIENT_CSS}
     var what = (making && making.what) || (perf.stage === 'final' ? 'final' : perf.stage === 'heygen' ? 'heygen' : 'draft');
     if (what === 'heygen') return [['voice', 'Voicing the line'], ['heygen', 'HeyGen performs it'], ['attach', 'Putting it on the scene']];
     if (what === 'final' && perf.draft && perf.draft.draft_id) return [['final', 'Seedance renders the 1080p final'], ['attach', 'Putting it on the scene']];
-    return [['frame', 'Drawing the first frame'], ['voice', 'Voicing the line'], [what === 'final' ? 'final' : 'draft', what === 'final' ? 'Seedance makes the 1080p take' : 'Seedance makes the 480p draft'], ['attach', 'Putting it on the scene']];
+    var made = [['voice', 'Voicing the line'], [what === 'final' ? 'final' : 'draft', what === 'final' ? 'Seedance makes the 1080p take' : 'Seedance makes the 480p draft'], ['attach', 'Putting it on the scene']];
+    return pfReal(pfActor(perf.actor)) ? made : [['frame', 'Drawing the first frame']].concat(made);
   }
   function pfClock(sec) { sec = Math.max(0, Math.round(sec)); return Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2); }
   function pfStatusHtml(project, si, s, perf) {
@@ -12052,6 +12054,10 @@ ${QUOTIENT_CSS}
   }
   // The shot step's frames belong to the actor they were drawn for.
   function pfFrameOf(perf, a) { return perf && a && perf.actor === a.id && perf.frame ? perf.frame : ''; }
+  // A REAL PERSON (SPEC-real-person.md): made from their foundation -- the
+  // three clips they recorded -- so there is no first frame to draw.
+  function pfReal(a) { return !!(a && a.foundation); }
+  function pfFoundationDone(a) { var f = a && a.foundation; return !!(f && (f.clips || []).length >= 3 && f.ref_video); }
   function pfWizSteps(kind, a, eng) {
     var st = [['who', 'Who']];
     if (kind === 'recast') {
@@ -12068,9 +12074,10 @@ ${QUOTIENT_CSS}
   }
   // Why a step cannot move on yet ('' = it can).
   function pfStepWhy(kind, step, s, perf, a, eng, dr) {
-    if (step === 'who') return a ? '' : 'Pick who plays the scene.';
+    if (step === 'who') return !a ? 'Pick who plays the scene.' : kind !== 'recast' && pfReal(a) && !pfFoundationDone(a) ? a.name + '’s foundation is not finished: record it on the Cast page.' : '';
     if (step === 'with') return pfPerformer(eng).available ? '' : pfEngLabel(kind, eng) + ' is not set up on this server.';
     if (step === 'shot') {
+      if (kind !== 'recast' && pfReal(a)) return '';
       if (perf.status === 'running' && perf.stage === 'frame') return 'Drawing the shot…';
       if (kind === 'recast' && dr.rcamera) return '';
       if (!pfFrameOf(perf, a)) return 'Draw the shot first, so you see it before ' + (kind === 'recast' ? pfEngLabel(kind, eng) : 'Seedance') + ' makes it.';
@@ -12124,7 +12131,7 @@ ${QUOTIENT_CSS}
     var cast = pf.data.cast || [], h = '';
     if (step === 'who') {
       // Faces, not a list of names: grouped by what each one is.
-      var groups = [['Generated people', function(x) { return !x.heygen_look_id && x.fictional; }], ['HeyGen looks', function(x) { return !!x.heygen_look_id; }], ['Photos', function(x) { return !x.heygen_look_id && !x.fictional; }]];
+      var groups = [['Real people', function(x) { return !!x.foundation; }], ['Generated people', function(x) { return !x.heygen_look_id && x.fictional; }], ['HeyGen looks', function(x) { return !!x.heygen_look_id; }], ['Photos', function(x) { return !x.heygen_look_id && !x.fictional && !x.foundation; }]];
       groups.forEach(function(g) {
         var list = cast.filter(g[1]);
         if (!list.length) return;
@@ -12205,6 +12212,20 @@ ${QUOTIENT_CSS}
           + PF_MOVES.filter(function(m) { return m.speaking; }).map(function(m) { return pfOpt(m.id, 'Move: ' + m.name.toLowerCase(), s.shot_move || ''); }).join('') + '</select>'
           + '<small>the camera is the whole film’s; the move is this shot’s</small></div></div>';
         if (s.move_note) h += '<div class="np-hint">' + escHtml(s.move_note) + '</div>';
+      }
+      if (kind !== 'recast' && pfReal(a)) {
+        // No first frame: the person comes from their own recording; the
+        // look is what they wear (words), saved on the scene's plan.
+        var rp = s.real_person || {}, looks = a.looks || [], lk = (plan && plan.look) || rp.look || a.default_look || '';
+        h += '<div class="pf-sub">3 &#183; ' + escHtml(a.name) + ', from their foundation</div>';
+        h += '<div class="pf-acts">' + ['front', 'left', 'right'].filter(function(k) { return (rp.stills || []).indexOf(k) >= 0; }).map(function(k) {
+          return '<img class="pf-still" alt="" src="' + escAttr(withToken('/api/cast/' + pfT() + '/' + encodeURIComponent(a.id) + '/still/' + k)) + '">';
+        }).join('') + '</div>';
+        h += '<div class="np-hint">No first frame is drawn: Seedance makes ' + escHtml(a.name) + ' from their own recording, in this place and framing.</div>';
+        h += '<div class="pf-row"><label>Look</label><div class="pf-acts">' + (looks.length
+          ? '<select data-pf="look" title="What they wear in this scene">' + looks.map(function(l) { return pfOpt(l.id, l.name + ' — ' + l.wardrobe, lk); }).join('') + '</select>'
+          : '<small>No looks yet: they wear what they wore in the recording. Add looks on the Cast page.</small>') + '</div></div>';
+        return h;
       }
       h += '<div class="pf-sub">3 &#183; See ' + escHtml(a.name) + ' there</div>';
       var waitPlace = place && !place.image;
@@ -12390,6 +12411,7 @@ ${QUOTIENT_CSS}
       if (k === 'film_camera') { pfPost(project, panel, kind, si, { action: 'film_camera', film_camera: t.value }, 'The whole film is shot on ' + t.options[t.selectedIndex].text + ': the next frames are drawn in that look.'); return; }
       if (k === 'cut_move' || k === 'cut_camera') { d[k] = t.value; return; }
       if (k === 'location') { d.location = t.value; pfPost(project, panel, kind, si, { action: 'location', location: t.value }, t.value ? 'Set: the frame is drawn there, and every take keeps the room.' : 'No location.'); return; }
+      if (k === 'look') { pfPost(project, panel, kind, null, { action: 'plan', scenes: [{ index: si, performer: { look: t.value } }] }, 'Set: ' + t.options[t.selectedIndex].text.split(' — ')[0] + ' for this scene.', si); return; }
       if (k === 'voice_source') { d.voice_source = t.value; pfRender(project, panel, kind, si); return; }
       if (k === 'recording_from') { d.recording_from = t.value; pfRender(project, panel, kind, si); return; }
       if (k === 'rvoice') { d.rvoice = t.value; return; }

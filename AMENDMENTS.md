@@ -10603,3 +10603,30 @@ and recast / generate / perform say "record their foundation first"
 `foundation` action reports the clips. Nothing performs FROM the foundation
 yet -- that is phase 2, which also deletes the photos/sheet path for real
 people.
+
+## A real person performs from their foundation; looks; the photos path is gone (Oct 14, SPEC-real-person.md phase 2)
+
+`perform_scene` for an actor whose foundation is complete draws no start
+frame: Seedance gets the foundation's stills (front, three-quarter left and
+right: who they are), its 15 s reference video (`reference_videos`: how
+they move), the location's room and the scene's voice, with
+`realPersonPrompt` -- the framing first ("the references say WHO, never how
+close the camera is", the Oct 13 finding), the video for identity and motion
+only (not its room, chair, framing or light), then the look. `start_frame`
+and `continue_from` refuse a real person; a half-recorded foundation is
+refused before anything is spent.
+
+LOOKS: a real person carries named wardrobes in words (`looks`,
+`default_look`; Cast page panel, `update_actor looks`, the phone's last
+step picks one). A scene's plan names one (`performer.look`, Studio's look
+picker, `perform_scene look`); another look makes the take stale.
+Higgsfield recasts take the foundation's three-quarter still as their
+second picture.
+
+DELETED with it, per the clean-code rule: the photos + sheet-from-photos
+path -- `addActorPhoto` / `removeActorPhoto` / `startActorSheet` /
+`useSheetDraft` / `discardSheetDraft`, the photos / sheet-draft /
+model-sheet routes, the MCP actions, the Cast page's Photos & sheet panel,
+`sheetPrompt` and test/actor-photos-sheet.test.ts. An old actor's `photos`
+and `sheet_draft` are saved data only (removed with the actor). Not built:
+the Cast page's "Try it" sample performance (it needs a film).

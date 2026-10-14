@@ -44,6 +44,64 @@ export interface ActorFoundation {
   work?: { kind: FoundationKind; status: "processing" | "failed"; started_at: string; error?: string }[];
 }
 
+/** A look: what a real person wears in a scene -- words, since Seedance
+ *  dresses the person as the prompt says whatever they wore in the
+ *  references (Oct 13: a polo became a black overshirt). */
+export interface ActorLook { id: string; name: string; wardrobe: string; glasses?: boolean }
+
+/** Three looks to start from (the guided flow offers them). */
+export const SUGGESTED_LOOKS: Omit<ActorLook, "id">[] = [
+  { name: "Founder", wardrobe: "a plain black overshirt over a dark t-shirt, dark trousers" },
+  { name: "Keynote", wardrobe: "a navy suit and a white open-collar shirt, no tie" },
+  { name: "Weekend", wardrobe: "a grey crew-neck sweater and jeans" },
+];
+
+/** A real person ready to perform from their foundation: all three clips,
+ *  the reference video and the stills made. */
+export function foundationReady(actor: CastActor): boolean {
+  const f = actor.foundation;
+  return isRealPerson(actor) && !!f && foundationState(actor).complete && !!f.ref_video && f.stills.length > 0;
+}
+
+/** The look a scene wears: the one it names, else the actor's default, else
+ *  the first; none when the actor has no looks (they wear what they wore). */
+export function resolveLook(actor: CastActor, want?: string | null): ActorLook | undefined {
+  const looks = actor.looks || [];
+  if (want) {
+    const hit = looks.find((l) => l.id === want);
+    if (!hit) throw new Error(`${actor.name} has no look "${want}" (${looks.map((l) => l.id).join(", ") || "no looks yet"})`);
+    return hit;
+  }
+  return looks.find((l) => l.id === actor.default_look) || looks[0];
+}
+
+/** Set a real person's looks (the whole list) and default. Ids come from
+ *  the names; a look keeps its id while its name is the same. */
+export async function setLooks(tenant: string, actorId: string, looks: { id?: string; name: string; wardrobe: string; glasses?: boolean }[], defaultLook?: string): Promise<CastActor> {
+  const cast = await listCast(tenant);
+  const actor = cast.find((a) => a.id === actorId);
+  if (!actor) throw new Error("No such actor");
+  if (!isRealPerson(actor)) throw new Error("Looks are for a real person");
+  if (looks.length > 12) throw new Error("At most 12 looks");
+  const out: ActorLook[] = [];
+  for (const l of looks) {
+    const name = String(l.name || "").trim().slice(0, 40);
+    const wardrobe = String(l.wardrobe || "").trim().slice(0, 300);
+    if (!name || !wardrobe) throw new Error("A look needs a name and what they wear");
+    let id = (l.id && /^[a-z0-9-]{1,40}$/.test(l.id) ? l.id : name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32)) || "look";
+    while (out.some((x) => x.id === id)) id = `${id}-2`;
+    out.push({ id, name, wardrobe, ...(typeof l.glasses === "boolean" ? { glasses: l.glasses } : {}) });
+  }
+  actor.looks = out;
+  const want = defaultLook !== undefined ? defaultLook : actor.default_look;
+  if (want && out.some((l) => l.id === want)) actor.default_look = want;
+  else if (out.length) actor.default_look = out[0].id;
+  else delete actor.default_look;
+  if (!out.length) delete actor.looks;
+  await writeCast(tenant, cast);
+  return actor;
+}
+
 /** What each clip asks of the person, and the least we accept: a clip cut
  *  short is no foundation (a 3 s far clip holds no 15 s of talking). */
 export const FOUNDATION_CLIPS: Record<FoundationKind, { target: number; min: number }> = {

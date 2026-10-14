@@ -16,6 +16,7 @@
  * as Team.
  */
 import { SHELL_TOKENS, RAIL_CSS, RAIL_JS, railHtml } from "./preview-app/home-shell.js";
+import { SUGGESTED_LOOKS } from "./core/actor-foundation.js";
 
 const PAGE_CSS = `
   header.page-head {
@@ -33,10 +34,9 @@ const PAGE_CSS = `
   .card .pic { position: relative; background: #111; aspect-ratio: 4 / 5; }
   .card.wide .pic { aspect-ratio: 4 / 3; }
   .card .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .look-row { display: flex; gap: 8px; align-items: baseline; margin: 4px 0; flex-wrap: wrap; }
+  .look-row button { padding: 0 6px; }
   .card .pic .nopic { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; color: #bbb; font-size: 13px; }
-  .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-  .ph-item { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 12px; color: #666; }
-  .ph-item img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; background: #f2f2f4; }
   .card .pic .wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 13px; text-align: center; padding: 10px; }
   .card .body { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
   .card .name { font-weight: 600; display: flex; justify-content: space-between; gap: 6px; align-items: center; }
@@ -141,6 +141,7 @@ export function getCastHtml(): string {
     </div>
   </main>`;
   const script = `
+  var SUGGESTED_LOOKS = ${JSON.stringify(SUGGESTED_LOOKS)};
   var actors = [], voices = { elevenlabs: [], heygen: [] }, tab = 'gen', looks = null, people = null, peopleToken = null, person = null, pubGender = '', audio = null;
   function start() {
     railApi('/api/cast/' + enc(tenant) + '/voices').then(function (v) { voices = v || voices; render(); }).catch(function () {});
@@ -165,7 +166,7 @@ export function getCastHtml(): string {
         + '<div class="body"><div class="name"><span class="nm"></span><span class="badge">' + kindOf(a) + '</span></div>'
         + '<div class="meta">' + metaOf(a) + '</div>'
         + '<div class="row"><select class="voice" title="The ElevenLabs voice this actor speaks with">' + opts + '</select><button class="quiet hear" title="Hear the voice">&#9654;</button></div>'
-        + '<div class="row">' + (a.sheet ? '<button class="quiet sheet">Model sheet</button>' : '') + (a.foundation ? '<button class="quiet found">Foundation</button>' : a.heygen_look_id ? '' : '<button class="quiet photos">Photos &amp; sheet</button>') + '<button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
+        + '<div class="row">' + (a.sheet ? '<button class="quiet sheet">Model sheet</button>' : '') + (a.foundation ? '<button class="quiet found">Foundation</button>' : '') + '<button class="quiet ren">Rename</button><button class="quiet del">Remove</button></div></div>';
       card.querySelector('.nm').textContent = a.name;
       card.querySelector('.voice').onchange = function (ev) {
         var id = ev.target.value, v = (voices.elevenlabs || []).filter(function (x) { return x.id === id; })[0];
@@ -181,7 +182,6 @@ export function getCastHtml(): string {
       card.querySelector('.pic').onclick = function () { viewActor(a, false); };
       if (a.sheet) card.querySelector('.sheet').onclick = function () { viewActor(a, true); };
       if (a.foundation) card.querySelector('.found').onclick = function () { foundationPanel(a.id); };
-      else if (!a.heygen_look_id) card.querySelector('.photos').onclick = function () { photosPanel(a.id); };
       // A real person with no foundation yet has no picture: say so, not a broken image.
       card.querySelector('.pic img').onerror = function () { this.parentNode.innerHTML = '<div class="nopic">Record the foundation</div>'; };
       card.querySelector('.ren').onclick = function () { var n = prompt('Rename ' + a.name, a.name); if (n && n.trim()) patch(a, { name: n.trim() }, 'Renamed.'); };
@@ -199,31 +199,7 @@ export function getCastHtml(): string {
       var got = (a.foundation.clips || []).length;
       return got >= 3 ? 'Foundation recorded ' + new Date(a.foundation.made_at || a.created_at).toLocaleDateString() : 'Foundation: ' + got + ' of 3 clips';
     }
-    var n = (a.photos || []).length;
-    var bits = [n ? 'Portrait + ' + n + ' photo' + (n === 1 ? '' : 's') : 'Portrait'];
-    if (a.sheet) bits.push('model sheet');
-    if (sheetDrawing(a)) bits.push('sheet drawing…');
-    else if (a.sheet_draft) bits.push('a sheet to approve');
-    return bits.join(' · ');
-  }
-  // A sheet is drawing for at most ten minutes; past that the server was
-  // restarted under it and it can be started again.
-  function sheetDrawing(a) {
-    return !!(a.sheet_job && a.sheet_job.status === 'drawing' && (Date.now() - Date.parse(a.sheet_job.started_at)) < 600000);
-  }
-  // PHOTOS & MODEL SHEET: more photos of the person (up to five beside the
-  // portrait), a sheet drawn from them, approved before anything uses it.
-  var panelTimer = null;
-  // Photos one by one: one that fails (a HEIC the server can't read) is
-  // named, and the rest still go in.
-  function addPhotos(base, files) {
-    var out = { added: 0, failed: [] };
-    return files.reduce(function (p, f) {
-      return p.then(function () {
-        return upload(f, 'cast-photo').then(function (rel) { return railApi(base + '/photos', { method: 'POST', body: JSON.stringify({ image: rel }) }); })
-          .then(function () { out.added++; }, function (e) { out.failed.push(f.name + ': ' + (e.message || String(e))); });
-      });
-    }, Promise.resolve()).then(function () { return out; });
+    return a.sheet ? 'Portrait · model sheet' : 'Portrait';
   }
   // A REAL PERSON (SPEC-real-person.md): not a photo and a drawn sheet -- a
   // name, consent, then the foundation they record: three clips everything
@@ -242,6 +218,40 @@ export function getCastHtml(): string {
         say(a.name + ' is in the cast: record the foundation next.', 'ok');
         return railApi('/api/cast/' + enc(tenant)).then(function (r) { actors = r.cast || []; render(); foundationPanel(a.id); });
       }).catch(function (e) { say(e.message || String(e), 'err'); });
+    };
+  }
+  // LOOKS: what a real person wears in a scene -- words, since Seedance
+  // dresses them as described; the foundation is who they are.
+  function looksHtml(a) {
+    var looks = a.looks || [];
+    var rows = looks.map(function (l, i) {
+      return '<div class="look-row"><label><input type="radio" name="lkDef" data-lk-def="' + railEsc(l.id) + '"' + (l.id === a.default_look ? ' checked' : '') + '> <b>' + railEsc(l.name) + '</b></label> <span class="sub" style="margin:0">' + railEsc(l.wardrobe) + (l.glasses === true ? ' · glasses' : '') + '</span> <button class="quiet" data-lk-del="' + i + '" title="Remove this look">&times;</button></div>';
+    }).join('');
+    var sug = SUGGESTED_LOOKS.filter(function (g) { return !looks.some(function (l) { return l.name === g.name; }); }).map(function (g, i) {
+      return '<button class="quiet" data-lk-sug="' + railEsc(g.name) + '" title="' + railEsc(g.wardrobe) + '">+ ' + railEsc(g.name) + '</button>';
+    }).join(' ');
+    return '<div style="margin-top:16px;border-top:1px solid #eee;padding-top:12px"><div class="lead" style="margin-bottom:4px">Looks</div>'
+      + '<p class="sub" style="margin:0 0 8px">What ' + railEsc(a.name) + ' wears in a scene, in words: each scene can pick a look (the selected one is the default). The face, hair and build come from the foundation.</p>'
+      + (rows || '<p class="sub" style="margin:0 0 6px">No looks yet: they wear what they wore in the recording.</p>')
+      + (sug ? '<div style="margin:6px 0">' + sug + '</div>' : '')
+      + '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><input type="text" id="lkName" placeholder="Name (e.g. Keynote)" style="width:140px"><input type="text" id="lkWear" placeholder="What they wear (e.g. a navy suit, white open-collar shirt)" style="flex:1;min-width:200px"><label class="sub" style="margin:0"><input type="checkbox" id="lkGlasses"> glasses</label><button class="btn small" id="lkAdd">Add look</button></div></div>';
+  }
+  function wireLooks(box, a, reload) {
+    var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
+    var looks = (a.looks || []).slice();
+    var save = function (list, def, msg) {
+      return railApi(base, { method: 'PATCH', body: JSON.stringify({ looks: list, default_look: def }) }).then(function () { say(msg, 'ok'); return reload(); }).catch(function (e) { say(e.message || String(e), 'err'); });
+    };
+    Array.prototype.forEach.call(box.querySelectorAll('[data-lk-def]'), function (r) { r.onchange = function () { save(looks, r.getAttribute('data-lk-def'), 'Default look set.'); }; });
+    Array.prototype.forEach.call(box.querySelectorAll('[data-lk-del]'), function (b) { b.onclick = function () { var k = Number(b.getAttribute('data-lk-del')); var gone = looks.splice(k, 1)[0]; save(looks, a.default_look === (gone && gone.id) ? '' : a.default_look || '', 'Look removed.'); }; });
+    Array.prototype.forEach.call(box.querySelectorAll('[data-lk-sug]'), function (b) {
+      b.onclick = function () { var g = SUGGESTED_LOOKS.filter(function (x) { return x.name === b.getAttribute('data-lk-sug'); })[0]; if (g) save(looks.concat([{ name: g.name, wardrobe: g.wardrobe }]), a.default_look || '', g.name + ' added.'); };
+    });
+    var add = box.querySelector('#lkAdd');
+    if (add) add.onclick = function () {
+      var n = box.querySelector('#lkName').value.trim(), w = box.querySelector('#lkWear').value.trim();
+      if (!n || !w) { say('A look needs a name and what they wear.', 'err'); return; }
+      save(looks.concat([{ name: n, wardrobe: w, glasses: box.querySelector('#lkGlasses').checked }]), a.default_look || '', n + ' added.');
     };
   }
   // THE FOUNDATION PANEL: where the three clips stand, and the way to record
@@ -272,9 +282,12 @@ export function getCastHtml(): string {
       + '<div style="flex:1;min-width:240px"><ol style="margin:0 0 10px;padding-left:18px;line-height:1.6">' + rows + '</ol>'
       + '<a class="btn small" target="_blank" rel="noopener" href="' + railEsc(page) + '">Open the recorder on this device</a>'
       + (stills.length ? '<div style="display:flex;gap:6px;margin-top:12px">' + stills.map(function (s) { return '<img alt="" style="width:30%;aspect-ratio:3/4;object-fit:cover;border-radius:6px;background:#f2f2f4" src="' + railEsc(pic(base + '/still/' + s.kind)) + '">'; }).join('') + '</div>' : '')
-      + '</div></div></div>';
+      + '</div></div>'
+      + looksHtml(a)
+      + '</div>';
     box.querySelector('.lead span').textContent = a.name + ': foundation';
     document.body.appendChild(box);
+    wireLooks(box, a, function () { return railApi('/api/cast/' + enc(tenant)).then(function (r) { actors = r.cast || []; render(); clearInterval(timer); if (document.getElementById('foundationPanel')) foundationPanel(id); }); });
     var timer = setInterval(function () {
       // The phone records while this panel is open: follow it.
       railApi('/api/cast/' + enc(tenant)).then(function (r) {
@@ -288,62 +301,6 @@ export function getCastHtml(): string {
     function close() { clearInterval(timer); box.remove(); }
     box.onclick = function (ev) { if (ev.target === box) close(); };
     box.querySelector('#fdClose').onclick = close;
-  }
-  function photosPanel(id) {
-    var old = document.getElementById('photosPanel'); if (old) old.remove();
-    if (panelTimer) { clearTimeout(panelTimer); panelTimer = null; }
-    var a = actors.filter(function (x) { return x.id === id; })[0];
-    if (!a) return;
-    var base = '/api/cast/' + enc(tenant) + '/' + enc(a.id);
-    // A fresh copy each time the panel opens. withParam, not '&v=': with no
-    // token in the page's address (a signed-in session) withToken adds no '?',
-    // and '/portrait&v=1' is another path -- every picture here was blank.
-    var v = Date.now(), pic = function (u) { return withParam(withToken(u), 'v', v); };
-    var box = document.createElement('div'); box.id = 'photosPanel';
-    box.setAttribute('style', 'position:fixed;inset:0;z-index:50;background:rgba(10,10,12,0.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;');
-    var photos = a.photos || [];
-    var drawing = sheetDrawing(a);
-    var thumbs = '<div class="ph-item"><img alt="" src="' + railEsc(pic(base + '/portrait')) + '"><span>Portrait</span></div>'
-      + photos.map(function (p, i) { return '<div class="ph-item"><img alt="" src="' + railEsc(pic(base + '/photos/' + i)) + '"><button class="quiet ph-del" data-i="' + i + '" title="Remove this photo">Remove</button></div>'; }).join('');
-    box.innerHTML = '<div class="box" style="max-width:860px;width:100%;margin:0;background:#fff">'
-      + '<div class="lead" style="display:flex;justify-content:space-between;align-items:center"><span></span><button class="quiet" id="phClose">Close</button></div>'
-      + '<p class="sub" style="margin:0 0 10px">The more angles the vendors see, the more it stays you when you turn, look down or laugh. Add up to 5 photos beside the portrait (front, three-quarter, side, smiling; good light), then draw a model sheet from them. You approve it before anything uses it.</p>'
-      + '<div class="ph-grid">' + thumbs + '</div>'
-      + (photos.length < 5 ? '<div class="field" style="margin-top:10px"><span>Add photos</span><input type="file" id="phAdd" accept="image/*" multiple></div>' : '<p class="sub">Five photos: remove one to add another.</p>')
-      + '<div class="row" style="margin-top:12px;gap:8px;align-items:center"><button class="btn primary" id="phMake"' + (drawing ? ' disabled' : '') + '>' + (drawing ? 'Drawing the sheet…' : a.sheet ? 'Draw a new model sheet' : 'Make model sheet') + '</button><span class="sub" id="phNote" style="margin:0"></span></div>'
-      + (a.sheet_job && a.sheet_job.status === 'failed' ? '<p class="sub err" style="color:#b42318"></p>' : '')
-      + (a.sheet_draft ? '<div style="margin-top:14px"><div class="lead">The new sheet: use it?</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(pic(base + '/sheet-draft')) + '"><div class="row" style="margin-top:8px;gap:8px"><button class="btn primary" id="phUse">Use this sheet</button><button class="quiet" id="phDiscard">Discard</button></div></div>' : '')
-      + (a.sheet ? '<div style="margin-top:14px"><div class="lead">The sheet in use</div><img alt="" style="width:100%;border-radius:8px;background:#f2f2f4" src="' + railEsc(pic(base + '/sheet')) + '"></div>' : '')
-      + '</div>';
-    box.querySelector('.lead span').textContent = a.name + ': photos & model sheet';
-    var errP = box.querySelector('.err'); if (errP) errP.textContent = 'The last sheet could not be drawn: ' + (a.sheet_job.error || 'unknown error');
-    document.body.appendChild(box);
-    function close() { box.remove(); if (panelTimer) { clearTimeout(panelTimer); panelTimer = null; } }
-    box.onclick = function (ev) { if (ev.target === box) close(); };
-    box.querySelector('#phClose').onclick = close;
-    function reload(msg) {
-      return railApi('/api/cast/' + enc(tenant)).then(function (r) { actors = r.cast || []; render(); if (document.getElementById('photosPanel')) photosPanel(id); if (msg) say(msg, 'ok'); });
-    }
-    function fail(e) { say(e.message || String(e), 'err'); var n = document.getElementById('phNote'); if (n) n.textContent = e.message || String(e); }
-    Array.prototype.forEach.call(box.querySelectorAll('.ph-del'), function (b) {
-      b.onclick = function () { railApi(base + '/photos/' + b.getAttribute('data-i'), { method: 'DELETE' }).then(function () { return reload('Photo removed.'); }).catch(fail); };
-    });
-    var inp = box.querySelector('#phAdd');
-    if (inp) inp.onchange = function () {
-      var files = Array.prototype.slice.call(inp.files || [], 0, 5 - photos.length);
-      if (!files.length) return;
-      box.querySelector('#phNote').textContent = 'Uploading ' + files.length + ' photo' + (files.length === 1 ? '' : 's') + '…';
-      addPhotos(base, files).then(function (r) { return reload(r.failed.length ? r.added + ' added; not added: ' + r.failed.join(' \u00b7 ') : 'Photos added.'); }).catch(fail);
-    };
-    box.querySelector('#phMake').onclick = function () {
-      railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'make' }) }).then(function () { return reload('Drawing ' + a.name + "'s model sheet (about a minute)…"); }).catch(fail);
-    };
-    var useB = box.querySelector('#phUse');
-    if (useB) useB.onclick = function () { railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'use' }) }).then(function () { return reload(a.name + "'s model sheet is in use: recasts and generated scenes read it."); }).catch(fail); };
-    var disB = box.querySelector('#phDiscard');
-    if (disB) disB.onclick = function () { railApi(base + '/model-sheet', { method: 'POST', body: JSON.stringify({ action: 'discard' }) }).then(function () { return reload('Draft discarded.'); }).catch(fail); };
-    // While it draws, look again every five seconds.
-    if (drawing) panelTimer = setTimeout(function () { panelTimer = null; reload(); }, 5000);
   }
   // A look at an actor's pictures, full size: the portrait (the start frame)
   // and, for a generated person, the model sheet it was drawn from.

@@ -49,6 +49,26 @@ export function speakingPrompt(shot: string, cam: ShotCamera = {}): string {
     "not a dry studio voiceover. No music. Realistic, natural light. " + (cam.camera ? `${cam.camera.video} ` : "") + NO_TEXT;
 }
 
+/** A REAL PERSON speaking (SPEC-real-person.md): no first frame -- the
+ *  person comes from their foundation (stills and a reference video of their
+ *  own recording), the room from the location, the framing from the words.
+ *  The framing leads: with a close still among the references the Oct 13
+ *  test came out a medium close-up instead of the medium-wide asked for. */
+export function realPersonPrompt(shot: string, cam: ShotCamera = {}, opts: { stills: number; room: boolean; wardrobe?: string; glasses?: boolean }): string {
+  const n = Math.max(1, opts.stills);
+  const imgs = Array.from({ length: n }, (_, i) => `@Image${i + 1}`).join(", ");
+  const wear = opts.wardrobe ? `They are wearing ${opts.wardrobe.trim().replace(/\.?$/, ".")} ` : "";
+  const glasses = opts.glasses === true ? "They wear their glasses. " : opts.glasses === false ? "No glasses. " : "";
+  return `THE SHOT: ${shotWords(shot, cam)}Frame it exactly as described -- the references say WHO the person is, never how close the camera is. ` +
+    `${imgs} ${n > 1 ? "are real photographs" : "is a real photograph"} of this person, from their own recording: match their real face, hair, skin and build exactly -- photographic, never smoothed or redrawn. ` +
+    "@Video1 is real footage of this person talking: use it ONLY for who they are and how they move -- their face in motion, expressions, posture and the way they gesture. Do NOT copy its room, its chair, its framing or its light. " +
+    (opts.room ? `@Image${n + 1} is the room: keep this exact room, its furniture, windows and light. ` : "") +
+    wear + glasses +
+    "They talk directly to the camera. They speak exactly the words in @Audio1, in that exact voice and timing, with accurate lip sync. " +
+    "Sound: their voice as it really sounds where they are in this shot -- the acoustics of that place; not a dry studio voiceover. No music. " +
+    (cam.camera ? `${cam.camera.video} ` : "") + NO_TEXT;
+}
+
 /** A shot with no speech (b-roll): the person in the action asked for. */
 export function silentPrompt(shot: string, cam: ShotCamera = {}): string {
   return `The person from the first frame${cam.sheet === false ? "" : " and the character sheet"} (the same face, hair, clothes and accessories). ` +
@@ -107,6 +127,8 @@ async function submit(body: Record<string, unknown>, what: string): Promise<stri
  *  shot, no audio made at all). */
 export async function seedanceShot(opts: {
   images: string[]; audio?: string; prompt: string; seconds: number; ratio: string;
+  /** Reference videos (a real person's foundation: who they are and how they move). */
+  videos?: string[];
   /** The last image is the room reference (labelled so in the prompt). */
   room?: boolean;
   draft?: boolean; resolution?: string; resume?: string; onSubmit?: (predictionId: string) => Promise<void> | void;
@@ -120,6 +142,7 @@ export async function seedanceShot(opts: {
       prompt: /@Image1\b/.test(opts.prompt) ? opts.prompt : `${seedanceRefs(opts.images.length, !!opts.audio, false, !!opts.room)} ${opts.prompt}`,
       reference_images: opts.images.slice(0, 30),
       ...(opts.audio ? { reference_audios: [opts.audio] } : {}),
+      ...(opts.videos?.length ? { reference_videos: opts.videos.slice(0, 3) } : {}),
       duration: Math.max(4, Math.min(30, Math.ceil(opts.seconds))),
       ratio: opts.ratio,
       resolution: opts.resolution || (opts.draft === false ? "1080p" : "480p"),

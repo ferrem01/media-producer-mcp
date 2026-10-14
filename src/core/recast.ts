@@ -382,10 +382,17 @@ function madeBy(entry: any): string {
  *  the recording's, "actor" converts to the actor's ElevenLabs voice, any
  *  other id to that ElevenLabs voice.
  *  Returns at once; the work runs on. */
-/** The actor's model sheet, for the vendors that take more than one image
- *  (Genjutsu); the others draw from the portrait alone. */
+/** The actor's second picture, for the vendors that take more than one
+ *  image (Genjutsu); the others draw from the portrait alone. A real person
+ *  (SPEC-real-person.md) has no model sheet: a three-quarter still of their
+ *  own foundation is the other angle (the portrait is its front still). */
+function sheetRel(actor: CastActor): string | undefined {
+  if (actor.foundation) return actor.foundation.stills.find((s) => s.kind === "left")?.file;
+  return actor.sheet;
+}
 function sheetFor(tenant: string, actor: CastActor, pid: string): string | undefined {
-  return pid === "higgsfield" && actor.sheet ? path.join(config.dataDir, tenant, actor.sheet) : undefined;
+  const rel = pid === "higgsfield" ? sheetRel(actor) : undefined;
+  return rel ? path.join(config.dataDir, tenant, rel) : undefined;
 }
 
 /** Who performs some scenes: an actor id (their recast plays where it
@@ -498,7 +505,7 @@ export async function startRecast(tenant: string, projectId: string, actorId: st
       // film sat off centre, so an older HeyGen recast is made again.
       && (performer.id !== "heygen" || existing.framing === FRAMING)
       // A sheet added or changed is a new performance for a vendor that reads it.
-      && (existing.sheet || undefined) === (sheetFor(tenant, actor, performer.id) ? actor.sheet : undefined)
+      && (existing.sheet || undefined) === (sheetFor(tenant, actor, performer.id) ? sheetRel(actor) : undefined)
       // Another shot is another performance (a selfie vs seated at a table).
       && (existing.shot || undefined) === shot
       && (!picked || existing.start_frame === picked)
@@ -564,7 +571,7 @@ async function runRecast(tenant: string, projectId: string, actor: CastActor, pe
     const now = new Date().toISOString();
     for (const t of (project as any).takes || []) {
       const hit = ok.find((f) => f.raw === takeCopies(t).raw);
-      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: actor.sheet } : {}), ...(hit.shot ? { shot: hit.shot, ...(hit.start_frame ? { start_frame: hit.start_frame } : {}) } : {}), framing: FRAMING, ...(hit.frame ? { frame: hit.frame } : {}), ...(hit.wide ? { wide: hit.wide } : {}), made_at: now } };
+      if (hit && hit.status === "done") t.actors = { ...(t.actors || {}), [actor.id]: { file: hit.file, performer: performer.id, ...(voiceId ? { voice_id: voiceId } : {}), ...(actor.heygen_look_id ? { heygen_look_id: actor.heygen_look_id } : {}), ...(motion ? { motion } : {}), ...(sheetFor(tenant, actor, performer.id) ? { sheet: sheetRel(actor) } : {}), ...(hit.shot ? { shot: hit.shot, ...(hit.start_frame ? { start_frame: hit.start_frame } : {}) } : {}), framing: FRAMING, ...(hit.frame ? { frame: hit.frame } : {}), ...(hit.wide ? { wide: hit.wide } : {}), made_at: now } };
     }
     // The actor performs only when every file made it: half a film in one
     // face and half in another is worse than none. A recast of some scenes

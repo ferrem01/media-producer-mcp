@@ -21,7 +21,7 @@
  */
 import { QUOTIENT_CSS, QUOTIENT_FONT_LINKS } from "./quotient-theme.js";
 import { LIGHT_CHECK_JS } from "./core/light-check.js";
-import { FOUNDATION_CLIPS } from "./core/actor-foundation.js";
+import { FOUNDATION_CLIPS, SUGGESTED_LOOKS } from "./core/actor-foundation.js";
 
 /** What each clip asks of the person -- the page's words, one source. */
 export const FOUNDATION_STEPS = [
@@ -66,6 +66,7 @@ export function getFoundationHtml(): string {
   const clips = JSON.stringify(FOUNDATION_CLIPS);
   const steps = JSON.stringify(FOUNDATION_STEPS);
   const setup = JSON.stringify(FOUNDATION_SETUP);
+  const looks = JSON.stringify(SUGGESTED_LOOKS);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -126,7 +127,8 @@ ${QUOTIENT_CSS}
   <div class="card setup"><h2>Before you start</h2><ul id="setupList"></ul></div>
   <div id="clips"></div>
   <div id="msg"></div>
-  <div class="card" id="doneCard" style="display:none"><h2>Your foundation is in</h2><p>Your avatar is made from these clips. Go back to the Cast page to use it in a film.</p></div>
+  <div class="card" id="doneCard" style="display:none"><h2>Your foundation is in</h2><p>Your avatar is made from these clips. Go back to the Cast page to use it in a film.</p>
+    <div id="lookPick" style="display:none"><p style="margin-top:10px"><b>What do you wear in your films?</b> Pick one to start -- add more, or change it, on the Cast page.</p><div class="row" id="lookBtns" style="display:flex;gap:8px;flex-wrap:wrap"></div></div></div>
 </main>
 <div id="stage">
   <video id="live" autoplay playsinline muted></video>
@@ -142,7 +144,7 @@ ${QUOTIENT_CSS}
   var $ = function (id) { return document.getElementById(id); };
   var qp = new URLSearchParams(location.search);
   var tenant = qp.get('tenant') || '', actorId = qp.get('actor') || '', token = qp.get('token') || '';
-  var CLIPS = ${clips}, STEPS = ${steps}, SETUP = ${setup};
+  var CLIPS = ${clips}, STEPS = ${steps}, SETUP = ${setup}, LOOKS = ${looks};
   ${LIGHT_CHECK_JS}
   var actor = null, stream = null, rec = null, chunks = [], mime = '', step = null, timer = null, back = false, lightTimer = null, lightCanvas = null;
   function withToken(u) { return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
@@ -189,6 +191,23 @@ ${QUOTIENT_CSS}
     });
     var all = STEPS.every(function (s) { return clipOf(s.kind); });
     $('doneCard').style.display = all ? '' : 'none';
+    // THE LOOK (SPEC-real-person.md): what they wear is words, picked here
+    // once; the Cast page edits the list.
+    var noLooks = !(actor.looks && actor.looks.length);
+    $('lookPick').style.display = all && noLooks ? '' : 'none';
+    if (all && noLooks) {
+      var lb = $('lookBtns'); lb.innerHTML = '';
+      LOOKS.forEach(function (g) {
+        var b = document.createElement('button'); b.className = 'btn small'; b.textContent = g.name; b.title = g.wardrobe;
+        b.onclick = function () {
+          fetch(withToken(base()), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ looks: [{ name: g.name, wardrobe: g.wardrobe }] }) })
+            .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Could not save'); return j; }); })
+            .then(function (a) { actor = a; render(); say(g.name + ' is your look: ' + g.wardrobe + '.', 'ok'); })
+            .catch(function (e) { say(e.message || String(e), 'err'); });
+        };
+        lb.appendChild(b);
+      });
+    }
   }
 
   // UPLOAD: the clip's bytes as the body. The server answers at once and

@@ -76,7 +76,7 @@ describe("Studio: the Cast card", () => {
 describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
   it("the generate panel: who first (grouped), the engine follows from who, no first-frame row, a progress screen while it is made, extra shots in plain words", () => {
     const html = getPreviewHtml();
-    expect(html).toContain("['Generated people', function(x) { return !x.heygen_look_id && x.fictional; }], ['HeyGen looks'");
+    expect(html).toContain("['Real people', function(x) { return !!x.foundation; }], ['Generated people', function(x) { return !x.heygen_look_id && x.fictional; }], ['HeyGen looks'");
     expect(html).toContain("function pfGenEngine(a) { return a && a.heygen_look_id ? 'heygen' : 'seedance'; }");
     expect(html).not.toContain('<label>First frame</label>');
     expect(html).toContain("if (run) { panel.innerHTML = pfStatusHtml(project, si, s, perf); return; }");
@@ -84,6 +84,18 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(html).toContain('<video class="pf-video" controls playsinline');
     expect(html).toContain("Extra shots over this scene (");
     expect(html).not.toContain("Cutaways over this scene");
+  });
+
+  it("a real person: no first frame to draw -- their foundation, the look picker, and no frame step while it is made", () => {
+    const html = getPreviewHtml();
+    expect(html).toContain("function pfReal(a) { return !!(a && a.foundation); }");
+    expect(html).toContain("if (kind !== 'recast' && pfReal(a)) return '';");                       // the shot step needs no frame
+    expect(html).toContain("from their foundation</div>");
+    expect(html).toContain("No first frame is drawn: Seedance makes ");
+    expect(html).toContain('<select data-pf="look" title="What they wear in this scene">');
+    expect(html).toContain("{ action: 'plan', scenes: [{ index: si, performer: { look: t.value } }] }");
+    expect(html).toContain("return pfReal(pfActor(perf.actor)) ? made : [['frame', 'Drawing the first frame']].concat(made);");
+    expect(html).toContain("’s foundation is not finished: record it on the Cast page.");
   });
 
   it("pace on all scenes: Play waits, the edits run quietly, ONE reload at the start -- a reload mid-playback froze the preview", () => {

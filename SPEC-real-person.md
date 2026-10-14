@@ -1,6 +1,6 @@
 # SPEC: A real person -- an avatar built from your own recordings
 
-Status: AGREED (2026-10-14, Marc + Claude); phase 1 (the foundation) BUILT. Builds on the Cast
+Status: AGREED (2026-10-14, Marc + Claude); phases 1 (the foundation) and 2 (performing from it, looks) BUILT. Builds on the Cast
 (`core/cast.ts`, `cast-page.ts`), the scene performances
 (`core/scene-performance.ts`, `core/seedance.ts`, SPEC-cast-scenes.md) and
 the take page (`take-page.ts`). Replaces the real-person half of "a sheet
@@ -96,7 +96,7 @@ them.
    and the stills pulled from the close and turn clips (front, three-quarter
    left, three-quarter right). Re-record any clip that is off (too dark, cap
    on, cut off) -- each clip is replaceable on its own.
-5. **Try it** -- one short sample performance (a fixed ~6 s line in the
+5. **Try it** (not built yet) -- one short sample performance (a fixed ~6 s line in the
    tenant's default location, 480p draft) so the person sees the avatar
    before using it in a film. Optional, one button.
 
@@ -170,9 +170,10 @@ foundation is recorded once, and clothes are words.
   shirt, no tie*), "Weekend" (*a grey crew-neck sweater, jeans*). One is the
   **default**; the guided flow ends by asking for it (three suggestions to
   tap, or type your own).
-- A scene picks a look (`performer.look`), else the film's default
-  (`storyboard.look`), else the actor's. The Seedance panel and the
-  storyboard show it as a chip; `perform_scene` takes `look`.
+- A scene picks a look (`performer.look`, the scene's plan), else the
+  actor's default. The Seedance panel picks it (saved on the plan);
+  `perform_scene` takes `look`; the storyboard's `performer.look` sets it.
+  (A film-wide default look is not built.)
 - The look's wardrobe goes into the prompt; the references stay the same.
   Changing a scene's look makes its take stale (another look, another
   take), like changing its location.
@@ -197,33 +198,40 @@ it only sharpens.
   auto-stop; each clip goes to `POST /api/cast/{t}/{actor}/foundation/{kind}`
   (raw bytes), and is served back at `GET .../foundation/{kind}`, its stills
   at `GET .../still/{front|left|right}`.
-- **Studio, the scene's Seedance panel**: for a real person, no frame
-  picker; a line "From your foundation recording (3 clips, Oct 14)".
+- **Studio, the scene's Seedance panel**: for a real person, no frame to
+  draw or pick -- their foundation's stills, a line saying Seedance makes
+  them from their own recording, and the look picker.
 - **MCP `cast` tool**: `add_actor` with `real: true` (consent, no image)
   returns `foundation_url`; a `foundation` action reports which clips are in
-  and the link; `perform_scene` reads the foundation with no new arguments.
+  and the link; `perform_scene` reads the foundation (and takes `look`);
+  `update_actor` takes `looks` / `default_look`; `start_frame` and
+  `continue_from` refuse a real person.
 
-## Clean up (same PRs)
+## Clean up (done in phase 2)
 
-- The real-person **photos + model sheet** path goes: the "More photos" and
-  "Photos & sheet" UI for real people, `add_photo` / `remove_photo` /
-  `make_sheet` / `use_sheet` / `discard_sheet` for consent actors, the
-  sheet-from-photos prompt, and their tests and doc lines. A generated
-  person keeps its uploaded model sheet (that is what it is made of).
-- Saved data: a consent actor's existing `photos` / `sheet` are left on
-  disk but unread once a `foundation` exists; no converter needed.
-- Higgsfield recasts read the model sheet as a second reference
-  (`sheetFor` in `core/recast.ts`); for a real person with a foundation
-  they read the three stills instead, so nothing needs the sheet.
+- The **photos + sheet-from-photos** path is gone: the "Photos & sheet"
+  panel, `add_photo` / `remove_photo` / `make_sheet` / `use_sheet` /
+  `discard_sheet`, the photos / sheet-draft / model-sheet routes, the
+  sheet-from-photos prompt and its tests. A generated person keeps its
+  uploaded model sheet (that is what it is made of).
+- Saved data: an actor's old `photos` / `sheet_draft` are read by nothing;
+  their files go when the actor is removed. A consent actor made before the
+  foundation (a portrait, maybe a sheet) still performs the old way -- a
+  drawn start frame -- until they are made again as a real person.
+- Higgsfield recasts take a second picture (`sheetFor` in
+  `core/recast.ts`); for a real person it is their foundation's
+  three-quarter still (the portrait is its front still).
 
 ## Phases (each a PR, merged and live before the next)
 
 1. **Foundation** (BUILT): the data, the foundation page (three clips +
    upload), the stills and the reference segment pulled on arrival, the
    guided Cast flow, the card. No performance change yet.
-2. **Perform from the foundation**: the real-person Seedance path
-   (references, no frame, the prompt), looks, the panel and tool changes,
-   the sample performance; the photos/sheet path for real people deleted.
+2. **Perform from the foundation** (BUILT): the real-person Seedance path
+   (stills + reference video + room + voice, no frame, `realPersonPrompt`),
+   looks, the Studio panel and tool changes; the photos/sheet path deleted.
+   The "Try it" sample performance on the Cast page is NOT built: it needs a
+   film to perform in -- for now, try the avatar on a real scene.
 3. **Enhance**: the Topaz finish on a take.
 
 ## Exit test
