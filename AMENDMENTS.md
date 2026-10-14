@@ -6,6 +6,27 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-14 — A punch-in on the person holds the graphics still
+
+Marc, on First Five Minutes (best): "when we zoomed in the 7x graphic zoomed
+in too. that should not happen." The scene camera adopts the whole
+`.mp-camera` layer, and only a list of frame chrome (caption lane, lower
+third, ...) was pinned out of it; the stat card, its plate and the engine
+chip rode the zoom.
+
+- `pinnedToFrame` (scene-assembler.ts), used by the render and the Studio
+  composite: when the person rides the rig (the camera video under moves, or
+  a speaker component), a whole-scene move pins every component but the
+  person, a travel-safe ground, and a component a move frames by `anchor`
+  (zooming INTO a graphic still zooms it). Full-frame graphic scenes and
+  targeted media zooms are unchanged.
+- The hoist keeps the pinned box: pinned components land in a plain layer
+  over the container they left, so they sit where they sit on a scene with
+  no move (the caption lane used to jump ~18 px between the two).
+- Marc, Oct 14: "sometimes you do want to zoom into motion graphics" -- the
+  anchor case covers zooming into one graphic; a per-move "graphics too"
+  switch is offered, not built.
+
 ## 2026-10-13 — A build keeps the voice recorded on the board
 
 Marc recorded all seven scenes of What an MQL Actually Is (proj_d09387ab)

@@ -361,9 +361,10 @@ describe("THE SLICE UNDER THE SCREEN: the rig slides the person under the split,
     expect(js).toMatch(/if \(H < CH \* 0\.6\) sc = Math\.max\(sc, Math\.min\(3\.2, \(H \* 0\.88\) \/ r\.h\)\);/);
     const fs = await import("node:fs/promises");
     const src = await fs.readFile(new URL("../src/core/scene-assembler.ts", import.meta.url), "utf-8");
-    expect(src).toMatch(/isFixedToFrame\(comp\.type\) \|\| isSplitWrapper\(comp\) \? ` data-mp-fixed="1"`/);
+    expect(src).toMatch(/if \(isFixedToFrame\(comp\.type\) \|\| isSplitWrapper\(comp\)\) return true;/);
+    expect(src).toMatch(/pinnedToFrame\(comp, scene, personInRig\) \? ` data-mp-fixed="1"`/);
     expect(src).toMatch(/else if \(m\.type === 'slide'\) \{/);
     const comp = await fs.readFile(new URL("../src/core/composite-assembler.ts", import.meta.url), "utf-8");
-    expect(comp).toMatch(/isFixedToFrame\(comp\.type\) \|\| isSplitWrapper\(comp\) \? ' data-mp-fixed="1"'/);
+    expect(comp).toMatch(/pinnedToFrame\(comp, scene, personInRig\) \? ' data-mp-fixed="1"'/);
   });
 });

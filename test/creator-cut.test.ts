@@ -364,9 +364,9 @@ describe("the cut, the words, and the camera (Marc: motion graphics by default, 
     expect(asm).toMatch(/if \(n\.hasAttribute && n\.hasAttribute\('data-mp-fixed'\)\) return;/);
     // ...hoisted out of the full-frame .mp-camera container first, which the rig adopts whole (measured: the attribute
     // alone left the lane inside, at 87%-103% under the punch-in).
-    expect(asm).toMatch(/root\.querySelectorAll\('\[data-mp-fixed\]'\)\)\.forEach\(function\(f\) \{\s*if \(f\.parentNode !== root\) root\.appendChild\(f\);/);
+    expect(asm).toMatch(/root\.querySelectorAll\('\[data-mp-fixed\]'\)\)\.forEach\(function\(f\) \{\s*var from = f\.parentNode;\s*if \(from === root\) return;/);
     const composite = await read("../src/core/composite-assembler.ts");
-    expect(composite).toMatch(/isFixedToFrame\(comp\.type\) \|\| isSplitWrapper\(comp\) \? ' data-mp-fixed="1"' : ""/);
+    expect(composite).toMatch(/pinnedToFrame\(comp, scene, personInRig\) \? ' data-mp-fixed="1"' : ""/);
     expect(composite).toMatch(/isCutInProof\(comp\) \? ' data-mp-cutaway="1"' : ""/);
     // Over a cutaway the pinned lane drops to the chest band for the cut window and comes back (measured live: the
     // captions "cracked out over the main part of the screen" on the mock).

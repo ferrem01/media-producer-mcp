@@ -53,6 +53,26 @@ const FIXED_TO_FRAME = new Set(["reel-caption-lane", "stack-list",
   // Five Tools proj_85782f74, scene 2 at 4.3 s).
   "lower-third"]);
 export function isFixedToFrame(type: string): boolean { return FIXED_TO_FRAME.has(type); }
+/** A PUNCH-IN ON THE PERSON MOVES THE PERSON, NEVER THE GRAPHICS. Over a
+ *  person, a whole-scene camera move is an editor punching in on the take;
+ *  the stat card, the chip and the plates hold still, as they do in every
+ *  reference reel (Marc, Oct 14: "when we zoomed in the 7x graphic zoomed in
+ *  too. that should not happen"). So on such a scene every component but the
+ *  person, a travel-safe ground and a component a move frames by anchor is
+ *  pinned like the caption lane. `personInRig` is the caller's fact that the
+ *  person rides the rig (the camera video, or a speaker component). */
+const WORLD_GROUNDS = new Set(["paper-ground", "sky-backdrop", "cream-ground"]);
+export function pinnedToFrame(
+  comp: { id?: string; type: string; data?: unknown },
+  scene: { camera_moves?: Array<{ target?: string; anchor?: string }> },
+  personInRig: boolean,
+): boolean {
+  if (isFixedToFrame(comp.type) || isSplitWrapper(comp)) return true;
+  if (!personInRig || isSpeakerLayer(comp as any) || WORLD_GROUNDS.has(comp.type)) return false;
+  const moves = (scene.camera_moves || []).filter((m) => !m.target);
+  if (!moves.length) return false;
+  return !moves.some((m) => typeof m.anchor === "string" && m.anchor.split(".")[0] === comp.id);
+}
 /** The scatter caption lane (core/captions.ts, the Air cut): words around
  *  the person that stay; over a cutaway the choreography flags the window
  *  with --mp-cut and the lane's CSS moves the running phrase down. */
@@ -303,6 +323,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // rig, so a zoom zooms the PERSON (Marc: "I should be able to zoom in on
   // myself"). Without moves the camera stays a fixed underlay / the base.
   const rigCamera = !!speakerUrl && isTransparent && !!(scene.camera_moves && scene.camera_moves.length);
+  const personInRig = rigCamera || (!!speakerUrl && scene.components.some((c) => isSpeakerLayer(c)));
 
   // Process each scene component
   const componentBlocks: string[] = [];
@@ -351,7 +372,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""}${isFixedToFrame(comp.type) || isSplitWrapper(comp) ? ` data-mp-fixed="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""}${(comp as any).frame_anchor ? ` data-mp-frame="${String((comp as any).frame_anchor).replace(/"/g, "")}"` : ""}${isCutInProof(comp) ? ` data-mp-cutaway="1"` : ""}${pinnedToFrame(comp, scene, personInRig) ? ` data-mp-fixed="1"` : ""} style="${posStyle}${isCutInProof(comp) ? "; background:#fff" : ""}">\n` +
       `    ${wrapInFitBox(boundHtml, fitBoxFor(comp as any, canvas))}\n` +
       `  </div>`
     );
@@ -1298,9 +1319,27 @@ export function cameraMovesScript(
       // because the components live inside a full-frame container
       // (.mp-camera) that rides the rig whole -- then parked outside, above
       // the rig by its own z-index, so a punch-in never moves the words.
+      // The hoisted component keeps its box: it lands in a plain layer laid
+      // over the container it left (.mp-camera's overscan inset), so a
+      // pinned graphic sits exactly where it sits on a scene with no moves.
+      // No z-index on the layer: its children still stack against the rig.
       try {
+        var pinLayers = [];
         Array.prototype.slice.call(root.querySelectorAll('[data-mp-fixed]')).forEach(function(f) {
-          if (f.parentNode !== root) root.appendChild(f);
+          var from = f.parentNode;
+          if (from === root) return;
+          var layer = null;
+          for (var i = 0; i < pinLayers.length; i++) if (pinLayers[i].from === from) layer = pinLayers[i].el;
+          if (!layer) {
+            var l = 0, t = 0, n = from;
+            while (n && n !== root && n.nodeType === 1) { l += n.offsetLeft || 0; t += n.offsetTop || 0; n = n.offsetParent; }
+            layer = document.createElement('div');
+            layer.className = '__mp_frame_pin';
+            layer.style.cssText = 'position:absolute;left:' + l + 'px;top:' + t + 'px;width:' + from.offsetWidth + 'px;height:' + from.offsetHeight + 'px;pointer-events:none;';
+            root.appendChild(layer);
+            pinLayers.push({ from: from, el: layer });
+          }
+          layer.appendChild(f);
         });
       } catch (eFix) {}
       // A backdrop ABOVE THE RIG'S z -- a timed plate over the speaker and
@@ -1316,6 +1355,7 @@ export function cameraMovesScript(
           if (t === 'SCRIPT' || t === 'STYLE') return;
           if (n.id === '__mp_speaker_base') return;
           if (n.hasAttribute && n.hasAttribute('data-mp-fixed')) return;
+          if (n.className === '__mp_frame_pin') return;
           // Flat-laid backdrops (the composite path): a travel-safe surface
           // now rides the rig -- Studio finally previews the same moving
           // sheet the render produces. A plate above the rig's z rides it
