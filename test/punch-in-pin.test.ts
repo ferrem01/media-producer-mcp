@@ -46,7 +46,7 @@ import { assembleScene } from "../src/core/scene-assembler.js";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const LIB = path.resolve(HERE, "../src/components");
 
-async function statBoxes(moves: any[] | undefined, times: number[]) {
+async function statBoxes(moves: any[] | undefined, times: number[], speakerUrl: string | null = "file:///nonexistent/speaker.mp4") {
   const scene = {
     id: "s", label: "s", duration_seconds: 3, background: "#ffffff", transparent_background: true,
     camera_moves: moves,
@@ -60,7 +60,7 @@ async function statBoxes(moves: any[] | undefined, times: number[]) {
       { type: "video", source: await fs.readFile(path.join(LIB, "media/video.component.html"), "utf-8") },
       { type: "kinetic-text", source: await fs.readFile(path.join(LIB, "titles/kinetic-text.component.html"), "utf-8") },
     ],
-    speakerUrl: "file:///nonexistent/speaker.mp4",
+    speakerUrl: speakerUrl || undefined,
     brandKit: { colors: { primary: "#393bf5", background: "#ffffff", text: "#17171c" }, fonts: [] } as any,
     canvas: { width: 1080, height: 1920 } as any, gsapDir: path.resolve(HERE, "../vendor/gsap") } as any);
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pin-"));
@@ -89,5 +89,13 @@ describe("a punch-in on the person, in the browser", () => {
     const [before, mid] = await statBoxes([{ at: 0.5, type: "zoom", x: 50, y: 38, scale: 1.3, duration: 0.3 }], [0.2, 1.5]);
     expect(mid).toEqual(before);
     expect(mid).toEqual(still);
+  }, 60000);
+
+  // The layout probe (get target:'layout') assembles with no take: the
+  // speaker component alone says the person is there, so it measures what
+  // the render draws.
+  it("holds it still with no take attached, as the layout probe assembles it", async () => {
+    const [before, mid] = await statBoxes([{ at: 0.5, type: "zoom", x: 50, y: 38, scale: 1.3, duration: 0.3 }], [0.2, 1.5], null);
+    expect(mid).toEqual(before);
   }, 60000);
 });

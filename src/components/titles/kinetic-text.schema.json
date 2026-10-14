@@ -14,6 +14,11 @@
       "label": "Text color override (CSS color). Default is the brand text color -- on dark scenes set an explicit light color, e.g. #f5f6fa.",
       "optional": true
     },
+    "shadow": {
+      "type": "boolean",
+      "label": "A soft drop shadow under the type -- bold words set straight over a camera take or b-roll, no plate behind them. Default off.",
+      "optional": true
+    },
     "entrance": {
       "type": "string",
       "label": "line-rise (default) | type-on (words appear in place on a beat) | assemble (words fly up from below into the laid-out line; *starred* word lands with a scale pop -- the print-film gathering beat) | focus (each word comes into focus in place on its beat -- blur to sharp; at / word_interval / word_times time it)",

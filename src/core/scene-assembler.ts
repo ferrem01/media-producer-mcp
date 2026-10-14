@@ -323,7 +323,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // rig, so a zoom zooms the PERSON (Marc: "I should be able to zoom in on
   // myself"). Without moves the camera stays a fixed underlay / the base.
   const rigCamera = !!speakerUrl && isTransparent && !!(scene.camera_moves && scene.camera_moves.length);
-  const personInRig = rigCamera || (!!speakerUrl && scene.components.some((c) => isSpeakerLayer(c)));
+  const personInRig = rigCamera || scene.components.some((c) => isSpeakerLayer(c));
 
   // Process each scene component
   const componentBlocks: string[] = [];
