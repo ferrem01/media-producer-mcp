@@ -164,7 +164,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
 
     // The person rides this scene's rig (the camera video under its moves,
     // or a speaker component): a punch-in then holds every graphic still.
-    const personInRig = (isTransparent && !!(options.speakerRefs && options.speakerRefs[scene.id])) || (!!speakerUrl && scene.components.some((c) => isSpeakerLayer(c)));
+    const personInRig = (isTransparent && !!(options.speakerRefs && options.speakerRefs[scene.id])) || scene.components.some((c) => isSpeakerLayer(c));
     for (const comp of scene.components) {
       const parsed = sourceMap.get(comp.type);
       if (!parsed) continue;
