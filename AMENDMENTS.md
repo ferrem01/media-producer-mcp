@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-16 — A final keeps the scene's pace
+
+Marc set every take of The First Five Minutes to 1.1x, then asked for the
+1080p finals: each final came back at 1x and the film slowed down. A final
+is attached as a fresh take record, and the pace (`speed`, set with
+`edit_speaker`) lived on the take it replaced. `performScene` now reads the
+scene's pace before a final attaches (`scenePace`) and, when it was not 1x,
+puts it back through `editSceneTake` -- the same path the speed tool takes,
+so the paced copies are baked and the scene re-times (captions, sound cues
+and word anchors follow). A draft is a new performance and keeps the old
+rule (made at 1x).
+
 ## 2026-10-14 — Cards carry drawn glyphs, and a placed notification lands when it appears
 
 Marc, auditing the education series: the cards "just look like they're low

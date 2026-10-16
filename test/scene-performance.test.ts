@@ -741,10 +741,19 @@ describe("a scene's state follows its own plan", () => {
     expect((await sp.getScenePerformances(T, P3))[0]).toMatchObject({ state: "stale" });
     await sp.editCastPlan(T, P3, { scenes: [{ index: 0, performer: null }] });
 
+    // The draft plays at 1.1x (edit_speaker speed)...
+    const { editSceneTake } = await import("../src/core/take-edits.js");
+    await editSceneTake(T, P3, 0, { op: "speed", speed: 1.1 }, DATA);
     // The final: the draft's shot at 1080p, from its id.
     await sp.startScenePerformance(T, P3, 0, { quality: "final" });
     await until(async () => (await sp.getScenePerformances(T, P3))[0].performance?.status === "done" && !!(await sp.getScenePerformances(T, P3))[0].performance?.final, 40000);
     expect(atlas.at(-1)).toEqual({ model: "bytedance/seedance-2.5/draft-complete", draft_id: "ppd", watermark: false });
+    // ...and so does its final: a fresh take record kept the scene's pace
+    // (Oct 16: every final came back at 1x and the film slowed down).
+    const { activeTake } = await import("../src/core/take-needs.js");
+    const fin: any = activeTake((await lp(T, P3)) as any, 0);
+    expect(fin.performed_by).toMatchObject({ quality: "final" });
+    expect(fin.speed).toBe(1.1);
   }, 120000);
 });
 

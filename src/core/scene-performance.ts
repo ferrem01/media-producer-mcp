@@ -33,7 +33,9 @@ import { getHeygenLook } from "./actor-test.js";
 import { ffmpeg, download, durationOf, convertVoice } from "./actor-test.js";
 import { elevenSpeech, heygenSpeech, spokenParts, DEFAULT_MOTION } from "./generated-take.js";
 import { takeForClip, takeCopies } from "./speaker-layer.js";
-import { takeWindow, playClock, cutFileFor } from "./take-clock.js";
+import { takeWindow, playClock, cutFileFor, speedOf } from "./take-clock.js";
+import { activeTake } from "./take-needs.js";
+import { editSceneTake } from "./take-edits.js";
 import { detectSilence } from "./idle-silence.js";
 import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
@@ -957,6 +959,11 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
 
   vendorNow.delete(vkey);
   await stage("attach");
+  // A FINAL KEEPS THE SCENE'S PACE: the take it replaces may play sped up
+  // (edit_speaker speed); attached as a fresh record the final played at 1x
+  // and the film slowed down again (Marc, Oct 16, proj_35a99832: 1.1 lost
+  // on every final). Read before the attach, put back after it.
+  const paceBefore = quality === "final" ? await scenePace(tenant, projectId, si) : 1;
   const raw = `take-performed-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
   await download(result.url, path.join(assetsDir(tenant, projectId), raw));
@@ -967,6 +974,10 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   const url = assetUrl(tenant, projectId, raw);
   const out = await attach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "seedance", quality } });
   if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
+  if (paceBefore !== 1) {
+    try { await editSceneTake(tenant, projectId, si, { op: "speed", speed: paceBefore }, config.dataDir); }
+    catch (e: any) { console.warn(`  final: scene ${si + 1} kept 1x, its ${paceBefore}x pace did not carry: ${e?.message || e}`); }
+  }
   await fs.rm(kept, { force: true }).catch(() => {});
   // Free before "done": a poll that reads done may start the final at once.
   release();
@@ -978,6 +989,12 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id && perf.voice_source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(from ? { from } : {}), ...(p.location ? { location: p.location } : {}), ...(real ? { foundation: true, ...(look ? { look: look.id } : {}) } : {}) };
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
+}
+
+/** The pace the scene's current take plays at (1 = as made). */
+export async function scenePace(tenant: string, projectId: string, si: number): Promise<number> {
+  const project = await loadProject(tenant, projectId);
+  return project ? speedOf(activeTake(project, si)) : 1;
 }
 
 /** Put an EARLIER performance of this scene back as its take: a
