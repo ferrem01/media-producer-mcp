@@ -261,7 +261,22 @@ export async function mintSticker(dataDir: string, name: string, subject?: strin
 }
 
 /** Components that address stickers by name. */
-const STICKER_TYPES = new Set(["sticker-prop", "sticker-rain"]);
+const STICKER_TYPES = new Set(["sticker-prop", "sticker-rain", "sticker-headline"]);
+
+/** The "[name]" / "[>name]" stickers set between a sticker-headline's words. */
+export function headlineStickerNames(text: unknown): string[] {
+  return [...String(text || "").matchAll(/\[>?\s*([^\]]+?)\s*\]/g)].map((m) => m[1]);
+}
+
+/** A BRAND STICKER: the tenant's own sticker art (the brand kit's image
+ *  assets tagged "sticker") answers to its name before the house library
+ *  does -- "sticker-flows" is the brand's drawing, never a new one. */
+type StickerKit = { assets?: Array<{ name: string; url: string; type?: string; tags?: string[] }> } | null | undefined;
+export function brandStickerUrl(name: string, kit: StickerKit): string | null {
+  const slug = stickerSlug(name);
+  const hit = (kit?.assets || []).find((a) => a.type === "image" && (a.tags || []).includes("sticker") && stickerSlug(a.name) === slug);
+  return hit ? hit.url : null;
+}
 
 /** Every sticker name a set of components uses. */
 export function stickerNamesIn(components: Array<{ type?: string; data?: any }>): Array<{ name: string; subject?: string }> {
@@ -269,16 +284,17 @@ export function stickerNamesIn(components: Array<{ type?: string; data?: any }>)
   for (const c of components || []) {
     if (!c || !STICKER_TYPES.has(String(c.type))) continue;
     const d = c.data || {};
-    const names = [d.sticker, ...(Array.isArray(d.stickers) ? d.stickers : [])].filter((n) => typeof n === "string" && n.trim());
+    const names = [d.sticker, ...(Array.isArray(d.stickers) ? d.stickers : []), ...(c.type === "sticker-headline" ? headlineStickerNames(d.text) : [])].filter((n) => typeof n === "string" && n.trim());
     for (const n of names) out.push({ name: n, subject: typeof d.sticker_subject === "string" ? d.sticker_subject : undefined });
   }
   return out;
 }
 
 /** Make sure every sticker the components name exists (minting the missing
- *  ones). Returns the names it minted and any it could not. */
-export async function ensureStickerFiles(dataDir: string, components: Array<{ type?: string; data?: any }>): Promise<{ minted: string[]; failed: Array<{ name: string; error: string }> }> {
-  const wanted = stickerNamesIn(components);
+ *  ones; a brand sticker is never minted). Returns the names it minted and
+ *  any it could not. */
+export async function ensureStickerFiles(dataDir: string, components: Array<{ type?: string; data?: any }>, kit?: StickerKit): Promise<{ minted: string[]; failed: Array<{ name: string; error: string }> }> {
+  const wanted = stickerNamesIn(components).filter((w) => !brandStickerUrl(w.name, kit));
   const res = { minted: [] as string[], failed: [] as Array<{ name: string; error: string }> };
   if (!wanted.length) return res;
   const lib = await ensureStickerLibrary(dataDir);
@@ -293,15 +309,19 @@ export async function ensureStickerFiles(dataDir: string, components: Array<{ ty
 /** Assembly: a sticker named in the data becomes the file it names (a
  *  sticker-prop with a sticker is an image sticker). Returns new data; the
  *  stored component keeps its name, so the library can redraw it. */
-export function stickerData(type: string, data: Record<string, any>): Record<string, any> {
+export function stickerData(type: string, data: Record<string, any>, kit?: StickerKit): Record<string, any> {
   if (!STICKER_TYPES.has(String(type)) || !data) return data;
   const d = { ...data };
+  const url = (n: string) => brandStickerUrl(n, kit) || stickerUrl(n);
   if (typeof d.sticker === "string" && d.sticker.trim() && !d.src) {
-    d.src = stickerUrl(d.sticker);
+    d.src = url(d.sticker);
     if (type === "sticker-prop" && (!d.kind || d.kind === "sticker")) d.kind = "image";
   }
   if (type === "sticker-rain" && Array.isArray(d.stickers) && !Array.isArray(d.srcs)) {
-    d.srcs = d.stickers.filter((n: unknown) => typeof n === "string" && (n as string).trim()).map((n: string) => stickerUrl(n));
+    d.srcs = d.stickers.filter((n: unknown) => typeof n === "string" && (n as string).trim()).map((n: string) => url(n));
+  }
+  if (type === "sticker-headline") {
+    d.srcs = Object.fromEntries(headlineStickerNames(d.text).map((n) => [n, url(n)]));
   }
   return d;
 }

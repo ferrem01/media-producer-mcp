@@ -1292,7 +1292,7 @@ export function createMcpServer(): McpServer {
         await landAnchorsOnWords(project, params.scene_id);
         // A sticker named from the house library: a name it lacks is drawn
         // now, in the house style, so the preview finds it.
-        const stk = await ensureStickerFiles(config.dataDir, [params.component as any]).catch((e: any) => ({ minted: [], failed: [{ name: "?", error: String(e?.message || e) }] }));
+        const stk = await ensureStickerFiles(config.dataDir, [params.component as any], await loadBrandKit(params.tenant_id).catch(() => null)).catch((e: any) => ({ minted: [], failed: [{ name: "?", error: String(e?.message || e) }] }));
         if (stk.minted.length || stk.failed.length) return ok({ ...withStudio(project), stickers: stk });
         return ok(withStudio(project));
       }
@@ -1874,7 +1874,7 @@ export function createMcpServer(): McpServer {
           // replaced by a shorter one): the dead ones go.
           if (params.anchors !== undefined || params.data !== undefined || params.enter !== undefined || params.exit !== undefined) pruneDeadAnchors(comp as any);
           if (params.data !== undefined) {
-            const stk = await ensureStickerFiles(config.dataDir, [comp as any]).catch(() => null);
+            const stk = await ensureStickerFiles(config.dataDir, [comp as any], await loadBrandKit(params.tenant_id).catch(() => null)).catch(() => null);
             if (stk?.failed.length) pipWarning = [pipWarning, `Sticker not drawn: ${stk.failed.map((f) => `${f.name} (${f.error})`).join("; ")}`].filter(Boolean).join(" ");
           }
         }

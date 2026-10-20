@@ -84,7 +84,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
   // family that actually exists (see font-resolve.ts).
   const brandKit = await resolveBrandKitFonts(options.brandKit);
   // Stickers named from the house library: a name it lacks is drawn now.
-  try { await ensureStickerFiles(config.dataDir, sceneInputs.flatMap((si: any) => si.scene?.components || [])); }
+  try { await ensureStickerFiles(config.dataDir, sceneInputs.flatMap((si: any) => si.scene?.components || []), brandKit); }
   catch (e: any) { console.warn(`  stickers: ${e?.message || e}`); }
 
   // Load GSAP + shared utilities once
@@ -176,7 +176,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       const ref = options.speakerRefs && options.speakerRefs[scene.id];
       const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: ref?.alpha, url: ref?.url || speakerUrl, offset: ref ? ref.offset : sceneStarts[si] }, { type: comp.type });
       if (!layerData) continue;
-      const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : stickerData(comp.type, bakeDirectLogoData({ ...comp, data: layerData }));
+      const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : stickerData(comp.type, bakeDirectLogoData({ ...comp, data: layerData }), brandKit);
       // Same assembly-time hook as the render path: the accent's animation
       // JSON is inlined into its data (no fetch at play time).
       const preData = comp.type === "lottie-accent" ? await inlineLottieAnimation(preData0) : preData0;
