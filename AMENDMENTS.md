@@ -6,6 +6,27 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-20 — Brand stickers, and a headline with stickers between the words
+
+Marc brought the refreshed brand (cream ground, PP Museum Light headlines,
+hand-inked stickers per product area) and wants it in the Meta ads. The
+stickers were cut from his screenshots into the tenant kit (`sticker-*`
+image assets tagged `sticker`), and the kit's colours, fonts and guidelines
+were rewritten (Newsreader 300 stands in for PP Museum until the font file
+arrives; the dark neon imagery was removed).
+
+- ONE RULE FOR A STICKER NAME: the brand kit's sticker by name first
+  (`brandStickerUrl`), then the house library, and only a name neither has
+  is minted. Before this, "sticker-flows" on a sticker-prop would have been
+  redrawn by the image model. `stickerData` and `ensureStickerFiles` take the
+  kit on every assembly path and in both server edit paths.
+- `sticker-headline` (titles): the hero line, a light serif with `[name]`
+  stickers set between the words (`[>name]` flies in from the left, the
+  paper plane). Words land in reading order, each sticker pops after the
+  word before it at a small tilt. Each sticker gets a fixed 1.3em slot, so
+  the fit-to-box never depends on the image having loaded (the first still
+  ran the last sticker off the frame).
+
 ## 2026-10-20 — A music-first cut makes its own song
 
 Marc on Ad 2 (Oct 18): "I can't stand that fucking song. That you keep

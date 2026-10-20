@@ -303,7 +303,8 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // Stickers named from the house library exist before they are drawn: a
   // name the library lacks is minted in the house style here (once, for
   // every tenant) so a preview, a layout probe and a render all find it.
-  try { await ensureStickerFiles(config.dataDir, scene.components || []); }
+  // The brand kit's own stickers answer to their names first and are never minted.
+  try { await ensureStickerFiles(config.dataDir, scene.components || [], brandKit); }
   catch (e: any) { console.warn(`  stickers: ${e?.message || e}`); }
 
   // Build a lookup of component sources by type
@@ -347,7 +348,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     if (!layerData) continue;
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
-    const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : stickerData(comp.type, bakeDirectLogoData({ ...comp, data: bakeLogoPillData({ ...comp, data: layerData }, brandKit) }));
+    const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : stickerData(comp.type, bakeDirectLogoData({ ...comp, data: bakeLogoPillData({ ...comp, data: layerData }, brandKit) }), brandKit);
     // Option-A backstop: a PiP pointing at the speaker clip by URL becomes the
     // "speaker" token regardless of how it was authored (generate, hand-edit,
     // or a client that skipped the update-tool guardrail) -- so preview dedups

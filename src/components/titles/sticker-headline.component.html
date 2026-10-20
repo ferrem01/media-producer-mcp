@@ -1,0 +1,89 @@
+<template>
+  <div class="shl"></div>
+</template>
+<style scoped>
+  /* ── sticker-headline: the brand hero line -- a light editorial serif with
+     stickers set BETWEEN the words ("All [notebook] that's left / is the
+     [checklist] marketing. [pie chart]"). Words land by line, each sticker
+     pops in after the word before it and settles at a small tilt. ── */
+  .shl { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+    pointer-events: none; color: var(--shl-c, var(--mp-color-text, #17171c)); }
+  .shl-line { display: block; width: max-content; white-space: nowrap; }
+  .shl-w { display: inline-block; }
+  /* A fixed slot per sticker, the art contained in it: the line measures the
+     same before and after the image loads, so the fit never overflows. */
+  .shl-s { display: inline-block; width: 1.3em; height: 1.02em; object-fit: contain; vertical-align: -0.2em; margin: 0 0.04em; }
+</style>
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.shl');
+    var srcs = data.srcs && typeof data.srcs === 'object' ? data.srcs : {};
+    host.style.fontFamily = data.font || "'Newsreader', Georgia, 'Times New Roman', serif";
+    host.style.fontWeight = String(data.font_weight || 300);
+    host.style.letterSpacing = data.letter_spacing || '-0.04em';
+    host.style.lineHeight = String(data.line_height || 1.05);
+    host.style.alignItems = data.align === 'left' ? 'flex-start' : 'center';
+    if (data.color) host.style.setProperty('--shl-c', data.color);
+
+    // "[name]" is a sticker that pops in; "[>name]" flies in from the left
+    // (the paper plane). A name with no file is dropped, never a broken image.
+    var words = [], stickers = [];
+    String(data.text || '').split('\n').forEach(function (raw) {
+      var line = document.createElement('div'); line.className = 'shl-line';
+      raw.split(/(\[[^\]]+\])/).forEach(function (part) {
+        var m = /^\[(>?)\s*([^\]]+?)\s*\]$/.exec(part);
+        if (m) {
+          if (!srcs[m[2]]) return;
+          var img = document.createElement('img'); img.className = 'shl-s'; img.src = srcs[m[2]]; img.alt = '';
+          img.setAttribute('data-fly', m[1] ? '1' : '');
+          line.appendChild(img); line.appendChild(document.createTextNode(' '));
+          stickers.push({ el: img, after: words.length - 1 });
+          return;
+        }
+        part.split(/\s+/).filter(Boolean).forEach(function (w) {
+          var s = document.createElement('span'); s.className = 'shl-w'; s.textContent = w;
+          line.appendChild(s); line.appendChild(document.createTextNode(' '));
+          words.push(s);
+        });
+      });
+      host.appendChild(line);
+    });
+
+    // FIT: the widest line fills 94% of the box, the lines fill at most 90%
+    // of its height. The type size is the only knob; nothing wraps.
+    var bw = host.clientWidth || 800, bh = host.clientHeight || 400;
+    var lines = host.querySelectorAll('.shl-line');
+    var fs0 = data.size ? null : 100;
+    if (data.size) host.style.fontSize = data.size;
+    else {
+      host.style.fontSize = fs0 + 'px';
+      var widest = 1;
+      lines.forEach(function (l) { widest = Math.max(widest, l.scrollWidth); });
+      var lh = Number(data.line_height) || 1.05;
+      var byW = fs0 * (bw * 0.94) / widest;
+      var byH = (bh * 0.9) / (lines.length * lh);
+      host.style.fontSize = Math.max(18, Math.floor(Math.min(byW, byH))) + 'px';
+    }
+
+    var at = typeof data.at === 'number' ? data.at : (typeof ctx.enter_at === 'number' ? ctx.enter_at : 0.3);
+    var step = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.09;
+    var TILTS = [-7, 6, -4, 8, -5];
+    words.forEach(function (w, i) {
+      gsap.set(w, { autoAlpha: 0, y: '0.22em' });
+      tl.to(w, { autoAlpha: 1, y: 0, duration: 0.38, ease: 'power3.out' }, at + i * step);
+    });
+    stickers.forEach(function (s, i) {
+      var t = at + (s.after + 1) * step + 0.06;
+      var rot = TILTS[i % TILTS.length];
+      if (s.el.getAttribute('data-fly')) {
+        gsap.set(s.el, { autoAlpha: 0, x: '-3.2em', y: '1.1em', rotation: rot - 18, scale: 0.7 });
+        tl.to(s.el, { autoAlpha: 1, x: 0, y: 0, rotation: rot, scale: 1, duration: 0.7, ease: 'power2.out' }, t);
+      } else {
+        gsap.set(s.el, { autoAlpha: 0, scale: 0.4, rotation: rot - 14, transformOrigin: '50% 60%' });
+        tl.to(s.el, { autoAlpha: 1, scale: 1, rotation: rot, duration: 0.5, ease: 'back.out(2.2)' }, t);
+      }
+    });
+    return tl;
+  }
+</script>

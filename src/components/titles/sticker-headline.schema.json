@@ -1,0 +1,58 @@
+{
+  "type": "sticker-headline",
+  "label": "Sticker Headline",
+  "category": "titles",
+  "description": "The brand hero line: a large light editorial serif with STICKERS SET BETWEEN THE WORDS, like a printed headline with die-cut illustrations dropped into it (\"All [sticker-notebook] that's left\\nis the [sticker-checklist] marketing. [sticker-pie-chart]\"). Words land in reading order; each sticker pops in right after the word before it and settles at a small tilt; [>name] flies in from the left (a paper plane). A sticker name is the brand kit's sticker asset by name first, then the house sticker library. One per scene, the scene's subject: the hook, a promise, the close. 1-3 lines, 2-4 stickers.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "The headline. \\n breaks lines (each line stays on one line, the type sizes to fit the box). [name] sets a sticker between words, [>name] flies it in from the left. Use the brand kit's sticker names (sticker-flows, sticker-checklist ...) or house library names.",
+      "required": true
+    },
+    "font": {
+      "type": "string",
+      "label": "Font-family override (default the brand's headline serif stand-in, 'Newsreader')",
+      "optional": true
+    },
+    "font_weight": {
+      "type": "number",
+      "label": "Weight (default 300, light)",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Type colour (default the brand text colour)",
+      "optional": true
+    },
+    "size": {
+      "type": "string",
+      "label": "Fixed type size (CSS); default fits the widest line to the box",
+      "optional": true
+    },
+    "align": {
+      "type": "string",
+      "label": "center (default) | left",
+      "optional": true
+    },
+    "letter_spacing": {
+      "type": "string",
+      "label": "Tracking (default -0.04em)",
+      "optional": true
+    },
+    "line_height": {
+      "type": "number",
+      "label": "Line height (default 1.05)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the first word lands (default the component's entrance, else 0.3)",
+      "optional": true
+    },
+    "word_interval": {
+      "type": "number",
+      "label": "Seconds between words (default 0.09)",
+      "optional": true
+    }
+  }
+}
