@@ -6,6 +6,28 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-20 — A music-first cut makes its own song
+
+Marc on Ad 2 (Oct 18): "I can't stand that fucking song. That you keep
+using." The Oct 8 fix (`ownMusicBed`) gave each film its own ElevenLabs bed
+at build time, but it skipped a voiceless music-first cut, because that
+film's storyboard was cut on the library track's bars. And the library pick
+was always the same song: Jamendo searched by `popularity_total` and took
+the first hit.
+
+- `runGrammarPrep` now makes the film's own bed BEFORE the storyboard
+  (`ownFilmBed`: the mood, the estimated length + 25%) and beat-maps that,
+  so the cut sits on the bed the film carries. The brand kit's music and
+  the board's chosen bed still win; with no ElevenLabs key, or when the
+  generation fails, the library is the fallback.
+- The bed is staged under the tenant (`_staging/music`, the project has no
+  id yet) and moved into the film's `assets/audio` when the build attaches it.
+  The build's `ownMusicBed` leaves a `generated` bed alone.
+- The library fallback picks a random playable hit from the top 20, not
+  the first of 5.
+- `filmMusicPrompt` puts a mood outside its table ("upbeat", "calm") at the
+  head of the prompt instead of dropping it.
+
 ## 2026-10-16 — A final keeps the scene's pace
 
 Marc set every take of The First Five Minutes to 1.1x, then asked for the

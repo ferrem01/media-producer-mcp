@@ -20,6 +20,7 @@
 import type { FilmGrammar } from "./creative-director.js";
 import type { MusicTrack } from "../audio/music.js";
 import type { BeatMap } from "../audio/beat-map.js";
+import path from "node:path";
 
 export type GrammarMandate = "generate" | "assemble";
 
@@ -52,6 +53,11 @@ export interface GrammarPrepCtx {
    *  chose in the board. Given, the pick is skipped and the beat grid is
    *  read from this file; the film is cut against the bed it will carry. */
   chosenMusic?: MusicTrack | null;
+  /** Where the film's own generated bed is written (staged until the
+   *  project exists; the build moves it into the film's audio folder). */
+  musicDir?: string;
+  /** A voice will sit over the bed (it is made sparse to stay out of the way). */
+  voiced?: boolean;
 }
 
 /** Mood keyword heuristic for music selection (music-first + legacy fallback). */
@@ -94,7 +100,18 @@ export async function runGrammarPrep(grammar: FilmGrammar, ctx: GrammarPrepCtx):
       if (ctx.chosenMusic) {
         music = ctx.chosenMusic;
         console.log(`  [prep:${grammar}] Music-first: the chosen bed "${music.title}" (${music.source})`);
-      } else {
+      } else if (wantsOwnBed(ctx)) {
+        // THE FILM'S OWN SONG, before the storyboard (Marc, Oct 18: "I can't
+        // stand that song that you keep using"): a voiceless cut sits on its
+        // bed's bars, so the bed it carries is the one made here. The library
+        // is only the fallback when ElevenLabs fails.
+        music = await ownFilmBed(ctx, mood, estDuration).catch((e: any) => {
+          console.warn(`  [prep:${grammar}] Music-first: own bed not made (${e?.message || e}) -- picking from the library`);
+          return null;
+        });
+        if (music) console.log(`  [prep:${grammar}] Music-first: the film's own bed made (${music.duration}s, "${mood}")`);
+      }
+      if (!music) {
         console.log(`  [prep:${grammar}] Music-first: searching for "${mood}" mood...`);
         music = await selectMusic({
           mood,
@@ -121,4 +138,39 @@ export async function runGrammarPrep(grammar: FilmGrammar, ctx: GrammarPrepCtx):
   }
 
   return { grammar, mandate: "generate", music, beatMap };
+}
+
+/** A film makes its own bed unless the brand kit carries music (the brand's
+ *  own track wins) or ElevenLabs is not set up here. */
+function wantsOwnBed(ctx: GrammarPrepCtx): boolean {
+  if (!ctx.musicDir || !process.env.ELEVENLABS_API_KEY) return false;
+  return !(ctx.brandKit?.assets || []).some((a: any) => a?.type === "music");
+}
+
+/** Make the film's bed at its estimated length, with a margin: the board is
+ *  cut before its length is final, and a bed that runs out is worse than one
+ *  that fades out early. */
+export async function ownFilmBed(
+  ctx: Pick<GrammarPrepCtx, "musicDir" | "voiced">,
+  mood: string,
+  estSeconds: number,
+  make?: typeof import("../audio/music-generate.js").generateMusic,
+): Promise<MusicTrack> {
+  const { generateMusic, filmMusicPrompt } = await import("../audio/music-generate.js");
+  const seconds = Math.ceil(Math.max(20, estSeconds * 1.25));
+  const made = await (make || generateMusic)({
+    prompt: filmMusicPrompt({ mood, seconds, voiced: ctx.voiced }),
+    seconds,
+    name: mood,
+    outDir: ctx.musicDir!,
+  });
+  return {
+    id: `generated-${made.song_id || path.basename(made.file, ".mp3")}`,
+    title: `Own bed (${mood})`,
+    artist: "ElevenLabs music",
+    duration: made.seconds || seconds,
+    path: made.file,
+    source: "generated",
+    license: "Generated for this film (ElevenLabs)",
+  };
 }
