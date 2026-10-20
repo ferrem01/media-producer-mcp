@@ -109,7 +109,10 @@ const MOOD_MUSIC: Record<string, string> = {
 /** A prompt for a film's own bed: its mood, its tempo when the cut follows
  *  one, a build into the close, under a voice when there is one. */
 export function filmMusicPrompt(o: { mood?: string; bpm?: number; seconds: number; voiced?: boolean }): string {
-  const base = MOOD_MUSIC[String(o.mood || "")] || MOOD_MUSIC.driving;
+  // A mood outside the table (the director's own words, "upbeat", "calm")
+  // leads the prompt over the driving bed instead of being dropped.
+  const mood = String(o.mood || "").trim();
+  const base = MOOD_MUSIC[mood] || (mood ? `${mood}, modern instrumental, light punchy drums, warm bass, forward momentum` : MOOD_MUSIC.driving);
   // UNDER A VOICE THE BED STAYS OUT OF THE WAY (Marc on the Six Tabs build:
   // "multiple audio tracks playing over the very techno music"): sparse,
   // no lead line, no four-on-the-floor kick.

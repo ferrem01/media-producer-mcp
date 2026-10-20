@@ -52,7 +52,7 @@ import { deriveWorld, deriveMotionPhysics, worldPromptBlock, type WorldSpec } fr
 import { enforceFilmContinuity } from "./continuity.js";
 import { assembleNarratedScreencast } from "./narrated-screencast.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
-import { tenantComponentsDir, projectDir, projectAssetsDir } from "../persistence/paths.js";
+import { tenantComponentsDir, tenantDir, projectDir, projectAssetsDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateVideoClip } from "../media/video-gen.js";
@@ -2652,9 +2652,11 @@ async function runUnifiedPipeline(
     musicMood: treatment?.audioSystem?.music_mood !== "none" ? treatment?.audioSystem?.music_mood : undefined,
     sceneCount,
     chosenMusic: opts.chosenMusic || undefined,
+    musicDir: path.join(tenantDir(opts.tenant_id), "_staging", "music"),
+    voiced: !!opts.voiceover || personCarries(filmGrammar),
   });
   if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && wantsMusic && !prep.beatMap) {
-    console.warn("  TEMPO-CUT: music selection produced NO beat grid (JAMENDO_CLIENT_ID unset or selection failed) -- cuts will not be bar-quantized.");
+    console.warn("  TEMPO-CUT: music prep produced NO beat grid (no bed made or found, or its grid too uncertain) -- cuts will not be bar-quantized.");
   }
   var musicTrack: import("../audio/music.js").MusicTrack | null = prep.music || null;
   var beatMap: import("../audio/beat-map.js").BeatMap | undefined = prep.beatMap;
@@ -3282,6 +3284,19 @@ async function runUnifiedPipeline(
   // trim_start aligns the track's first downbeat with video t=0 so the bar
   // math the storyboard was cut against is the bar math the viewer hears.
   if (musicTrack) {
+    // The film's own bed was made before the film had an id: it moves into
+    // the film's audio folder now, so it belongs to the film.
+    if (musicTrack.source === "generated") {
+      const audioDir = path.join(projectDir(opts.tenant_id, projectId), "assets", "audio");
+      const dest = path.join(audioDir, path.basename(musicTrack.path));
+      try {
+        await fs.mkdir(audioDir, { recursive: true });
+        await fs.rename(musicTrack.path, dest);
+        musicTrack = { ...musicTrack, path: dest };
+      } catch (e: any) {
+        console.warn(`  Music-first: the own bed stays at ${musicTrack.path} (${e?.message || e})`);
+      }
+    }
     project.audio = {
       tracks: [{
         id: "music_bed",
@@ -4424,12 +4439,13 @@ async function runUnifiedPipeline(
   // THE FILM'S OWN MUSIC (audio/music-generate.ts ownMusicBed): the bed the
   // library picked is replaced by one ElevenLabs makes for this film at its
   // final length (Marc, Oct 8: "it's the same fucking song. Every time").
-  // Kept as picked when it is the board's chosen bed or the brand kit's, and
-  // on a music-first cut (the cuts sit on THAT track's bars). A failed or
+  // Kept as picked when it is the board's chosen bed, the brand kit's, one
+  // the music-first prep already made for this film, or a music-first cut
+  // on a library fallback (the cuts sit on THAT track's bars). A failed or
   // unconfigured generation keeps the picked bed.
   {
     const musicFirstCut = !!beatMap && !opts.voiceover && !personCarries(filmGrammar);
-    if ((format === "video" || format === "slideshow") && !opts.chosenMusic && musicTrack?.source !== "brand-kit" && !musicFirstCut && process.env.ELEVENLABS_API_KEY) {
+    if ((format === "video" || format === "slideshow") && !opts.chosenMusic && musicTrack?.source !== "brand-kit" && musicTrack?.source !== "generated" && !musicFirstCut && process.env.ELEVENLABS_API_KEY) {
       try {
         const bed = await ownMusicBed(project as any, {
           mood: treatment?.audioSystem?.music_mood as string | undefined,

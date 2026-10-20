@@ -18,7 +18,8 @@ export interface MusicTrack {
   artist: string;
   duration: number;
   path: string;          // local file path (ready to use)
-  source: "brand-kit" | "stock" | "jamendo";
+  /** generated = made for this film by ElevenLabs (grammar-prep ownFilmBed). */
+  source: "brand-kit" | "stock" | "jamendo" | "generated";
   license: string;
 }
 
@@ -337,7 +338,7 @@ async function searchJamendo(mood: string, minDuration?: number, instrumental?: 
       client_id: clientId,
       format: "json",
       fuzzytags: tag,          // fuzzy: exact `tags=` is brittle and often empty
-      limit: "5",
+      limit: "20",
       order: "popularity_total",
       ccnc: "false",           // commercial-safe: exclude NonCommercial
       ccnd: "false",           // and NoDerivs (syncing into video is a derivative)
@@ -356,9 +357,11 @@ async function searchJamendo(mood: string, minDuration?: number, instrumental?: 
       console.warn(`  Music: Jamendo auth/query failed: ${data.headers.error_message || data.headers.status}`);
       return "AUTH_FAIL" as const;
     }
-    const results = data.results || [];
-    if (!results.length) return null;
-    return results.find((t) => t.audiodownload || t.audio) || null;
+    // A RANDOM playable hit, not the first: the search is ordered by
+    // popularity, so the first hit was the same song for every film.
+    const playable = (data.results || []).filter((t) => t.audiodownload || t.audio);
+    if (!playable.length) return null;
+    return playable[Math.floor(Math.random() * playable.length)];
   };
 
   try {
