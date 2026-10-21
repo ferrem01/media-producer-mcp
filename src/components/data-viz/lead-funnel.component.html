@@ -3,6 +3,9 @@
     <svg class="lfn-svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet">
       <defs>
         <clipPath class="lfn-clip"><path class="lfn-clip-path"/></clipPath>
+        <marker class="lfn-loop-head" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M1 1 L8 5 L1 9" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
       </defs>
       <g class="lfn-bands"></g>
       <path class="lfn-outline" data-anchor="funnel"/>
@@ -15,6 +18,10 @@
         <circle class="lfn-hand-ring"/>
         <text class="lfn-hand-initials" text-anchor="middle" dominant-baseline="central"></text>
         <text class="lfn-hand-name" dominant-baseline="central"></text>
+      </g>
+      <g class="lfn-loop" data-anchor="loop">
+        <path class="lfn-loop-path"/>
+        <text class="lfn-loop-label" text-anchor="middle" dominant-baseline="central"></text>
       </g>
     </svg>
   </div>
@@ -43,6 +50,11 @@
   .lfn-hand-ring { fill: var(--lfn-hot); }
   .lfn-hand-initials { font-family: Inter, system-ui, sans-serif; font-weight: 600; font-size: 20px; fill: #fff; }
   .lfn-hand-name { font-family: Inter, system-ui, sans-serif; font-weight: 600; font-size: 24px; fill: var(--lfn-ink); }
+  /* THE LOOP: what the funnel learns goes back to the top. One arc from the
+     hand-off round the right side to the channel chips, one line above them. */
+  .lfn-loop-path { fill: none; stroke: var(--lfn-warm); stroke-width: 3; stroke-linecap: round; }
+  .lfn-loop-head path { stroke: var(--lfn-warm); }
+  .lfn-loop-label { font-family: var(--lfn-serif); font-style: italic; font-weight: 400; font-size: 30px; fill: var(--lfn-ink); }
 </style>
 
 <script>
@@ -238,6 +250,41 @@
       tl.fromTo(tn, { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.4, ease: 'power2.out', immediateRender: false }, ht + 0.9);
     } else {
       handG.style.display = 'none';
+    }
+
+    // ── THE LOOP: after the hand-off, an arc runs from the bottom back up to
+    // the chips, the chips pulse once and the line lands above them -- the
+    // funnel gets smarter with every click. Off unless data.loop is set.
+    var loopG = el.querySelector('.lfn-loop');
+    var loop = data.loop ? (data.loop === true ? {} : data.loop) : null;
+    if (loop) {
+      var headId = 'lfnhead' + window.__lfnClipN;
+      el.querySelector('.lfn-loop-head').setAttribute('id', headId);
+      var lp = el.querySelector('.lfn-loop-path');
+      // From right of the named lead (or the spout) round the right side, clear
+      // of the funnel's wall, to the last chip.
+      var x0 = hand ? 452 : CX + NW + 10, y0 = hand ? 730 : SPOUT;
+      var endX = sources.length ? Math.min(560, sources[sources.length - 1].x + 30) : CX + TW, endY = sources.length ? 100 : TOP - 10;
+      lp.setAttribute('d', 'M' + x0 + ' ' + y0 + ' Q 590 ' + y0 + ' 588 430 Q 586 ' + (endY + 40) + ' ' + endX + ' ' + endY);
+      lp.setAttribute('marker-end', 'url(#' + headId + ')');
+      var ll = el.querySelector('.lfn-loop-label');
+      ll.setAttribute('x', CX); ll.setAttribute('y', 18);
+      ll.textContent = loop.label != null ? String(loop.label) : 'Smarter with every click';
+      var lastBand = num(bandDefs[BN - 1].at, DEFAULT_AT[BN - 1]);
+      var lt = P(loop.at != null ? num(loop.at, 0) : (hand ? (hand.at != null ? num(hand.at, 0) : lastBand + 1.3) + 0.9 : lastBand + 1));
+      var plen = lp.getTotalLength();
+      gsap.set(lp, { strokeDasharray: plen + ' ' + plen, strokeDashoffset: plen, opacity: 0 });
+      gsap.set(ll, { opacity: 0 });
+      tl.to(lp, { opacity: 1, duration: 0.01 }, lt);
+      tl.to(lp, { strokeDashoffset: 0, duration: 0.6, ease: 'power2.inOut' }, lt);
+      sources.forEach(function (s, i) {
+        var bg = s.g.querySelector('.lfn-chip-bg');
+        tl.fromTo(s.g, { scale: 1, transformOrigin: '50% 50%' }, { scale: 1.08, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out', immediateRender: false }, lt + 0.55 + i * 0.06);
+        if (bg) tl.to(bg, { stroke: warm, strokeWidth: 2.5, duration: 0.3 }, lt + 0.55 + i * 0.06);
+      });
+      tl.fromTo(ll, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', immediateRender: false }, lt + 0.55);
+    } else {
+      loopG.style.display = 'none';
     }
     return tl;
   }

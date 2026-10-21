@@ -105,4 +105,59 @@ describe("lead-funnel", () => {
       expect(end.hand).toBe(1);
     });
   }, 60000);
+
+  // Marc, Oct 21: "our loop is a big differentiator" -- the funnel gets
+  // smarter with every click, so what it learns goes back to the top.
+  const loopState = (page: import("playwright").Page, t: number) =>
+    page.evaluate((tt) => {
+      (window as any).__MP_TIMELINE.time(tt);
+      const g = document.querySelector(".lfn-loop") as SVGGElement;
+      const path = document.querySelector(".lfn-loop-path") as SVGPathElement;
+      const label = document.querySelector(".lfn-loop-label") as SVGTextElement;
+      const box = (e: Element) => { const b = (e as SVGGraphicsElement).getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height }; };
+      const chips = [...document.querySelectorAll(".lfn-sources > g")].map(box);
+      const funnel = box(document.querySelector(".lfn-outline")!);
+      return {
+        shown: getComputedStyle(g).display !== "none",
+        drawn: parseFloat(getComputedStyle(path).strokeDashoffset),
+        pathOp: Number(getComputedStyle(path).opacity),
+        labelOp: Number(getComputedStyle(label).opacity),
+        label: label.textContent,
+        labelBox: box(label),
+        pathBox: box(path),
+        chipTop: Math.min(...chips.map((c) => c.y)),
+        funnelRight: funnel.x + funnel.width,
+      };
+    }, t);
+
+  it("the loop is off unless asked for", async () => {
+    await withPage(await assemble({}), async (page) => {
+      expect((await loopState(page, 7.9)).shown).toBe(false);
+    });
+  }, 60000);
+
+  it("with loop on, an arc runs from the hand-off back to the chips and the line lands above them", async () => {
+    await withPage(await assemble({ handoff: { at: 4.6 }, loop: true }), async (page) => {
+      const before = await loopState(page, 5.2);
+      expect(before.shown).toBe(true);
+      expect(before.pathOp).toBe(0);
+      expect(before.labelOp).toBe(0);
+      const after = await loopState(page, 7);
+      expect(after.pathOp).toBe(1);
+      expect(after.drawn).toBeLessThan(1);
+      expect(after.labelOp).toBeGreaterThan(0.95);
+      expect(after.label).toBe("Smarter with every click");
+      // the line sits above the chips, the arc outside the funnel's wall
+      expect(after.labelBox.y + after.labelBox.height).toBeLessThanOrEqual(after.chipTop + 1);
+      expect(after.pathBox.x + after.pathBox.width).toBeGreaterThan(after.funnelRight);
+    });
+  }, 60000);
+
+  it("the loop's line and cue are data", async () => {
+    await withPage(await assemble({ loop: { label: "Learns from every send", at: 2 } }), async (page) => {
+      const s = await loopState(page, 3.5);
+      expect(s.label).toBe("Learns from every send");
+      expect(s.labelOp).toBeGreaterThan(0.95);
+    });
+  }, 60000);
 });
