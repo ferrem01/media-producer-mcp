@@ -103,3 +103,17 @@ describe("the phone Preview's joined take", () => {
     expect(getPhoneStudioHtml()).toMatch(/view=watch/);
   });
 });
+
+describe("the phone Preview's music level", () => {
+  it("routes each track's level through a Web Audio gain on a phone, resumed inside the tap", async () => {
+    const src = await fs.readFile(path.join(here, "../src/preview-app/preview-app.ts"), "utf8");
+    // iOS ignores <audio>.volume: the element stays at 1, the gain carries the level.
+    expect(src).toMatch(/if \(IS_MOBILE\) levelThroughGain\(audio\);/);
+    expect(src).toMatch(/createMediaElementSource\(audio\)\.connect\(gain\)/);
+    expect(src).toMatch(/getOwnPropertyDescriptor\(HTMLMediaElement\.prototype, 'volume'\)\.set\.call\(audio, 1\)/);
+    expect(src).toMatch(/set: function\(v\) \{ level = [^}]*gain\.gain\.value = level; \}/);
+    // A phone starts the context suspended: both taps resume it.
+    expect(src).toMatch(/function playAudio\(\) \{\s*resumeAudioLevels\(\);/);
+    expect(src).toMatch(/function watchPrimeMedia\(\) \{\s*resumeAudioLevels\(\);/);
+  });
+});
