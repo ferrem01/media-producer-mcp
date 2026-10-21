@@ -438,8 +438,9 @@ export interface Scene {
   /** The film's PHYSICS CONTRACT (visual_system.motion), stamped per scene the
    *  same way `entrance` is, because the assembler is where it can actually be
    *  enforced. "cutout-physics" quantizes element motion to 12fps and boils
-   *  inked edges (shared/motion-physics.js); "calm" and "punchy" are checked
-   *  by the motion inspector's banned-moves list. Absent = house behavior. */
+   *  inked edges; "calm" turns every back / elastic / bounce ease into a power
+   *  ease (shared/motion-physics.js); the motion inspector's banned-moves list
+   *  checks what is left (tilts, keyframed overshoot). Absent = house behavior. */
   motion_physics?: "punchy" | "calm" | "cutout-physics";
 }
 

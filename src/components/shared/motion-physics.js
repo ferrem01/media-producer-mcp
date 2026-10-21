@@ -172,3 +172,31 @@ function mpInkBoil(timeline, elements, opts) {
   }
   return n;
 }
+
+/**
+ * CALM: settle, never bounce. Every overshooting ease on the timeline
+ * (back, elastic, bounce -- a sticker's pop, a dot's bounce, a chip's spring)
+ * becomes a plain power ease in the same direction, so things land and stop.
+ * Components keep their choreography; only the overshoot goes. Run on the
+ * master before it plays: the ease is read when a tween initialises, so the
+ * timeline is invalidated once at the end and every tween re-reads it.
+ *
+ * @param {gsap.core.Timeline} timeline  Usually the scene master.
+ * @returns {number} how many tweens were calmed (0 = nothing to do).
+ */
+function mpCalmEases(timeline) {
+  if (!timeline || typeof timeline.getChildren !== 'function') return 0;
+  var OVER = /^(back|elastic|bounce)/i;
+  var n = 0;
+  var tweens;
+  try { tweens = timeline.getChildren(true, true, false); } catch (e) { return 0; }
+  for (var i = 0; i < tweens.length; i++) {
+    var v = tweens[i].vars;
+    if (!v || typeof v.ease !== 'string' || !OVER.test(v.ease)) continue;
+    var dir = /inout/i.test(v.ease) ? 'inOut' : /\.in\b|easein\b/i.test(v.ease) ? 'in' : 'out';
+    v.ease = dir === 'out' ? 'power3.out' : 'power2.' + dir;
+    n++;
+  }
+  if (n) timeline.invalidate();
+  return n;
+}

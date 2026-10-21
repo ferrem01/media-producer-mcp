@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — calm physics settles instead of bouncing
+
+Max on the inbound ads: "jarring animations". The logos popped, the type
+sprang, everything overshot -- the components' default eases are back.out and
+elastic, and `motion_physics: "calm"` promised "settle, never bounce" but had
+no machinery: only the motion inspector reported the overshoot after the fact.
+Now calm acts at assembly, the way cutout-physics does: `mpCalmEases`
+(shared/motion-physics.js) walks the built master timeline and turns every
+back / elastic / bounce ease into a power ease of the same direction, so every
+component, template and codegen scene lands without passing its mark. Brand,
+timing and layout are untouched. The inspector keeps checking what an ease
+swap can't reach (tilts, keyframed overshoot). Test: test/calm-physics.test.ts.
+
 ## 2026-10-21 — lead-funnel: the inbound engine as an object
 
 The inbound ads argue that marketing needs a funnel the way sales has a

@@ -800,11 +800,16 @@ export function timelapseClockScript(
  * components, templates and codegen scenes alike without any of them opting
  * in, and without any of them able to opt out.
  *
- * Only cutout-physics has positive machinery today. `calm` and `punchy` are
- * enforced negatively, by the motion inspector's banned-moves list, so they
- * deliberately emit nothing here rather than pretend.
+ * cutout-physics steps and boils; calm takes the overshoot out of every ease
+ * (settle, never bounce). `punchy` is the house default and emits nothing.
  */
 export function motionPhysicsScript(motion: string | undefined, sceneDuration: number): string {
+  if (motion === "calm") return `
+  // ── physics contract: calm (shared/motion-physics.js) ──
+  // Settle, never bounce: back / elastic / bounce eases become power eases.
+  try { if (typeof mpCalmEases === 'function') mpCalmEases(master); }
+  catch (e) { console.warn('calm not applied: ' + e.message); }
+`;
   if (motion !== "cutout-physics") return "";
   return `
   // ── physics contract: cutout-physics (shared/motion-physics.js) ──
