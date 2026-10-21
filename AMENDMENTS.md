@@ -6,6 +6,23 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — quotient-lead-score: the lead-scoring screen as a library component
+
+Marc captured the product's lead-scoring page (the Rules / People tab bar, the
+People tab's ranked list with the selected person's "How this score was
+calculated", and the Rules tab's scoring-rule cards). Like #1021 / #1025 it is
+rebuilt by hand as ONE scriptable library component, not shipped as frozen
+markup: the captures carry real leads' names and emails, so every person,
+rule and number is data with made-up defaults (Sarah Chen at Northwind, 92
+from five matched rules). The beat the inbound ads need is the SCORE CLIMBING:
+`climb:true` starts the matched rules unmatched and ticks them on in turn, the
+published score and her row counting up; script `match {target: rule}` flips
+one rule on a spoken cue. `switch-tab` really swaps Rules and People. A tall
+(9x16) box stacks three rows over the breakdown, and `layout:'detail'` crops to
+the person's score and rules -- desktop UI shrunk into a phone frame was
+unreadable on B5, so the tall layouts are sized for a phone, not scaled down.
+The tenant captures stay in Marc's tenant untouched.
+
 ## 2026-10-21 — The tenant's own components, readable over MCP
 
 A web capture or a playground save lived only behind the playground HTTP API:
