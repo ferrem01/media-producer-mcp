@@ -6,6 +6,18 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — lead-funnel draws the loop
+
+Marc, on the B1 and HubSpot ads: "our loop is a big differentiator" -- the
+funnel "gets smarter with every click", but the graphic only showed leads
+going in and one coming out. `lead-funnel` takes `loop` (true, or {label, at}):
+after the hand-off an arc runs from the named lead round the right side back
+up to the channel chips, the chips pulse once and take the warm outline, and
+"Smarter with every click" lands above them. One arc and one line, so it reads
+as how the funnel works, not a second idea beside it. Off unless set; about a
+second after the hand-off (default 0.9 s after it). Tests in
+`test/lead-funnel.test.ts`.
+
 ## 2026-10-21 — The phone Preview plays the music at its level
 
 Marc, on his phone: "a thumping music track that is on both and it is very
