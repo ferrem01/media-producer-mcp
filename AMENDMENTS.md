@@ -6,6 +6,17 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — update keeps tags sent with a storyboard edit
+
+Six HubSpot ads were tagged in the same `update` call that set their opener
+lines; the lines landed, the tags did not, and the tool still answered
+"updated". The storyboard branch returned before it looked at tags. The tag
+arithmetic (tags replaces, add_tags / remove_tags adjust) is now one helper
+in the update handler, applied in every branch that saves the project: tags
+alone, the storyboard branch (its response now echoes the tags) and the
+property branch. `test/update-tags.test.ts` drives the real tool in-process;
+the two storyboard cases fail on the old code.
+
 ## 2026-10-21 — lead-funnel draws the loop
 
 Marc, on the B1 and HubSpot ads: "our loop is a big differentiator" -- the

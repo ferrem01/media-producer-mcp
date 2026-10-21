@@ -1517,12 +1517,21 @@ export function createMcpServer(): McpServer {
       // (updated_at stays, so tagging never marks a render stale).
       const tagKeys = ["tags", "add_tags", "remove_tags"];
       const given = Object.keys(params).filter((k) => (params as any)[k] !== undefined && k !== "tenant_id" && k !== "project_id");
+      const tagsGiven = given.some((k) => tagKeys.includes(k));
+      // The film's tags after this call: tags replaces, add_tags / remove_tags
+      // adjust. Every branch that saves the project applies it -- a storyboard
+      // edit sent with tags used to drop the tags and still report "updated".
+      const nextTags = (current: unknown): string[] => {
+        let next = params.tags !== undefined ? normalizeTags(params.tags) : normalizeTags(current);
+        if (params.add_tags) next = normalizeTags([...next, ...params.add_tags]);
+        if (params.remove_tags) { const drop = normalizeTags(params.remove_tags); next = next.filter((t) => !drop.includes(t)); }
+        return next;
+      };
+      const setTags = (project: any) => { const next = nextTags(project.tags); if (next.length) project.tags = next; else delete project.tags; };
       if (given.length && given.every((k) => tagKeys.includes(k))) {
         const project = await loadProject(params.tenant_id, params.project_id);
         if (!project) return err("Project not found");
-        let next = params.tags !== undefined ? normalizeTags(params.tags) : normalizeTags(project.tags);
-        if (params.add_tags) next = normalizeTags([...next, ...params.add_tags]);
-        if (params.remove_tags) { const drop = normalizeTags(params.remove_tags); next = next.filter((t) => !drop.includes(t)); }
+        const next = nextTags(project.tags);
         await updateProject(params.tenant_id!, params.project_id, { tags: next });
         forgetProject(params.tenant_id!, params.project_id);
         return ok({ status: "updated", project_id: params.project_id, tags: next });
@@ -1698,12 +1707,13 @@ export function createMcpServer(): McpServer {
         }
         if ((params.storyboard?.scenes || []).some((u: any) => u.voiceover_text !== undefined)) ensureSpeakerNeeds(project);
         try { await ensureSoundFiles(project, (id) => resolveSfxChoice(id, projectAssetsDir(params.tenant_id, project.project_id))); } catch (e: any) { console.warn(`  sound cues: ${e?.message || e}`); }
+        if (tagsGiven) setTags(project);
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         // The stills must follow the data: a direct board edit re-photographs
         // the cards in the background.
         reshootStoryboardCardsSoon(params.tenant_id, project.project_id);
-        return ok({ status: "updated", project_id: project.project_id, storyboard: project.storyboard, ...(params.world !== undefined ? { world: (project as any).world } : {}) });
+        return ok({ status: "updated", project_id: project.project_id, storyboard: project.storyboard, ...(params.world !== undefined ? { world: (project as any).world } : {}), ...(tagsGiven ? { tags: (project as any).tags || [] } : {}) });
       }
 
       // ── Property updates (status, name, canvas, scene/component props) ──
@@ -1756,13 +1766,7 @@ export function createMcpServer(): McpServer {
         // audio). It must persist on a project-level update, independent of any
         // scene_id -- gating it behind the scene branch below silently dropped
         // it on `update({canvas, speaker_track})` while still reporting success.
-        if (params.tags !== undefined || params.add_tags !== undefined || params.remove_tags !== undefined) {
-          let next = params.tags !== undefined ? normalizeTags(params.tags) : normalizeTags((project as any).tags);
-          if (params.add_tags) next = normalizeTags([...next, ...params.add_tags]);
-          if (params.remove_tags) { const drop = normalizeTags(params.remove_tags); next = next.filter((t) => !drop.includes(t)); }
-          if (next.length) (project as any).tags = next; else delete (project as any).tags;
-          updated = true;
-        }
+        if (tagsGiven) { setTags(project); updated = true; }
         if (params.sfx_palette !== undefined) {
           const pal: Record<string, string> = params.sfx_palette === null ? {} : { ...((project as any).sfx_palette || {}) };
           for (const [role, id] of Object.entries(params.sfx_palette || {})) {
