@@ -1,0 +1,44 @@
+{
+  "type": "quotient-lead-score",
+  "label": "Quotient lead scoring (Rules / People)",
+  "category": "mockups",
+  "description": "The Quotient LEAD SCORING screen, hand-built from the real product. A tab bar (Rules / People, a green 'Scores ready' pill, the kebab and a Save button) over one of two tabs. PEOPLE (default): a search bar, the ranked list of people (initials avatar, name over email, score in the product's magenta) and, beside it, the selected person's 'Published score' with 'How this score was calculated' -- every scoring rule as a row, matched (magenta check, 'Matched · 2 visits', its points) or not (a dash, \"Didn't match\", 0). RULES: 'Scoring rules' + 'Add rule', then rule cards -- criteria chips (Event Attendance | greater than or equal to | # 1 | all time) and 'Add filter' on the left, 'Add points' and the Amount on the right. Every name, email, rule and number is data (defaults: made-up leads, Sarah Chen at Northwind on top with 92 from five matched rules). THE SCORE CLIMBS: climb:true starts the matched rules unmatched and ticks them on one by one from climb_at, the published score and her row counting up with each -- the 'she's warming up' beat; or script 'match' flips one named rule at its own time (lands on a spoken word). TALL BOX (9x16): stacks a short list over the breakdown, sized to read on a phone; layout 'detail' shows only the person's score and rules (the strongest proof crop), 'list' only the ranked list. Entrance: rows slide in and their scores roll up, the score counts up, the rule rows land in turn; entrance:'none' is settled at frame 0. SCRIPT verbs (data.script, [{action, at, ...}]): match {target: rule label} -- the rule turns Matched and the score climbs by its points; count {target: person name | 'score' | rule card name, to, duration?} rolls a number; switch-tab {to: 'Rules'|'People'} swaps the view; highlight {target: rule | person | rule card | 'score' | 'breakdown' | 'list' | any visible text}; set-text {target, to}; plus the shared cursor verbs move-cursor / click / hover / wait (targets by visible text). CAMERA ANCHORS: header, tabs, people, search, list, row-N, detail, score, breakdown, rule-N, rules, card-N. Standalone it is a white rounded card with a visible border; docked:true sits flush in quotient-app-shell's content well.",
+  "data": {
+    "tab": { "type": "string", "label": "people (default) | rules", "optional": true },
+    "layout": { "type": "string", "label": "People tab layout: split (list beside the score; default on a wide box) | stack (a short list over the score; default on a tall box) | detail (only the person's score and rules) | list (only the ranked list)", "optional": true },
+    "people": { "type": "array", "label": "The ranked list: [{name, email, score, initials?, color?: avatar CSS background}] -- top first", "optional": true },
+    "rows": { "type": "number", "label": "How many list rows show (default 12; 3 when stacked)", "optional": true },
+    "selected": { "type": "string", "label": "The person whose score is open (default the first)", "optional": true },
+    "breakdown": { "type": "array", "label": "The open person's rules: [{label, points, matched: true|false, note?: 'Matched · <note>' e.g. '2 visits', off_note?}] -- the published score is the sum of matched points unless score is set", "optional": true },
+    "score": { "type": "number", "label": "Published score override (else the matched points, or the person's list score)", "optional": true },
+    "climb": { "type": "boolean", "label": "true = the matched rules start unmatched and tick on one by one, the score climbing with each", "optional": true },
+    "climb_at": { "type": "number", "label": "When the first rule matches (default 1.4 s)", "optional": true },
+    "climb_interval": { "type": "number", "label": "Seconds between matches (default 0.55)", "optional": true },
+    "rules": { "type": "array", "label": "Rules tab cards: [{name, criteria: [{icon?: event|noshow|page|email|click|form|user, field, op?, value?, window?}], action?: 'Add points'|'Subtract points', amount}]", "optional": true },
+    "status": { "type": "string", "label": "The pill beside Save (default 'Scores ready'); false hides it", "optional": true },
+    "evaluated": { "type": "string", "label": "Under the score (default 'Evaluated today, 9:41 AM')", "optional": true },
+    "score_label": { "type": "string", "label": "Above the score (default 'Published score')", "optional": true },
+    "breakdown_title": { "type": "string", "label": "Default 'How this score was calculated'", "optional": true },
+    "breakdown_subtitle": { "type": "string", "label": "Default 'Rules from the last completed evaluation.'", "optional": true },
+    "rules_title": { "type": "string", "label": "Rules tab heading (default 'Scoring rules')", "optional": true },
+    "search_placeholder": { "type": "string", "label": "Default 'Search people...'", "optional": true },
+    "show_header": { "type": "boolean", "label": "false hides the tab bar (the view alone)", "optional": true },
+    "score_color": { "type": "string", "label": "Score / matched color (default the product's magenta #b4357b)", "optional": true },
+    "accent": { "type": "string", "label": "Highlight ring color (default Quotient #393bf5)", "optional": true },
+    "entrance": { "type": "string", "label": "rise (default) | none (settled from frame 0, for stills)", "optional": true },
+    "at": { "type": "number", "label": "Shift the whole entrance by this many seconds", "optional": true },
+    "docked": { "type": "boolean", "label": "true = flush in quotient-app-shell's content well (no border/shadow)", "optional": true },
+    "scale": { "type": "number", "label": "Type/layout scale multiplier (default 1)", "optional": true },
+    "card_background": { "type": "string", "label": "Card background override", "optional": true },
+    "script": { "type": "array", "label": "Performance: match {target: rule}, count {target, to, duration?}, switch-tab {to}, highlight {target, duration?, color?}, set-text {target, to}, move-cursor / click / hover {target: visible text} / wait -- each with at (seconds)", "optional": true },
+    "cursor_targets": { "type": "object", "label": "Explicit named cursor positions (optional)", "optional": true }
+  },
+  "example": {
+    "layout": "detail",
+    "climb": true,
+    "script": [
+      { "action": "highlight", "target": "score", "at": 4.6 }
+    ]
+  },
+  "tier": "performable-surface"
+}

@@ -1,0 +1,577 @@
+<template>
+  <div class="qls">
+    <div class="qls-card">
+      <div class="qls-top" data-anchor="header">
+        <div class="qls-tabs-wrap">
+          <div class="qls-tabs" data-anchor="tabs" role="tablist">
+            <div class="qls-tab" role="tab" data-tab="rules" data-cursor-target="tab-rules"><svg viewBox="0 0 24 24"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></svg><span>Rules</span></div>
+            <div class="qls-tab" role="tab" data-tab="people" data-cursor-target="tab-people"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg><span>People</span></div>
+          </div>
+        </div>
+        <div class="qls-actions">
+          <span class="qls-status" data-cursor-target="status"><span class="qls-dot"></span><span class="qls-status-label"></span></span>
+          <button class="qls-sq" data-cursor-target="more"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          <button class="qls-save" data-cursor-target="save">Save</button>
+        </div>
+      </div>
+
+      <div class="qls-view qls-people" data-anchor="people">
+        <div class="qls-search" data-anchor="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="qls-search-ph"></span></div>
+        <div class="qls-split">
+          <div class="qls-list" data-anchor="list">
+            <div class="qls-list-head"><span>Person</span><span class="qls-sort">Score<svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span></div>
+            <div class="qls-rows"></div>
+          </div>
+          <div class="qls-detail" data-anchor="detail">
+            <div class="qls-d-head">
+              <div class="qls-d-who">
+                <span class="qls-av qls-d-av"></span>
+                <div class="qls-d-id">
+                  <div class="qls-d-name"><span class="qls-d-name-text"></span><svg viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></div>
+                  <div class="qls-d-email"></div>
+                </div>
+              </div>
+              <div class="qls-d-score" data-anchor="score">
+                <div class="qls-d-score-label"></div>
+                <div class="qls-d-score-val"></div>
+                <div class="qls-d-eval"></div>
+              </div>
+            </div>
+            <div class="qls-d-rule-head">
+              <div class="qls-d-title"></div>
+              <div class="qls-d-sub"></div>
+            </div>
+            <div class="qls-breakdown" data-anchor="breakdown"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qls-view qls-rules" data-anchor="rules">
+        <div class="qls-rules-head">
+          <div class="qls-rules-title"></div>
+          <button class="qls-btn" data-cursor-target="add-rule"><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span class="qls-add-rule"></span></button>
+        </div>
+        <div class="qls-rule-list"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  /* QUOTIENT LEAD SCORING. Hand-authored from the real screen
+     (getquotient.ai lead-scoring/<id>): the tab bar (Rules / People, a
+     "Scores ready" pill, the kebab and Save), the PEOPLE tab (search, the
+     ranked list with each person's score, and the selected person's
+     "Published score" with "How this score was calculated" -- every rule,
+     matched or not, and its points) and the RULES tab (scoring-rule cards:
+     criteria chips on the left, Add points + Amount on the right). Sizes are
+     the capture's CSS px as calc(N * var(--u)); the script sets --u from the
+     box. A TALL box stacks: a short list over the breakdown, or one panel. */
+  .qls, .qls * { box-sizing: border-box; max-width: none; }
+  .qls {
+    --u: 1px;
+    --qls-accent: #393bf5;
+    --qls-score: #b4357b;
+    position: absolute; inset: 0;
+    font-family: Inter, 'Inter Fallback', system-ui, -apple-system, sans-serif;
+    color: #17171c; font-size: calc(16 * var(--u)); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 6px 4px;
+  }
+  .qls svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex: none; }
+  .qls button { font-family: inherit; color: inherit; margin: 0; padding: 0; background: none; }
+  .qls-card {
+    position: relative; width: 100%; height: 100%;
+    background: #fff;
+    border: 2px solid #dedcd6; border-radius: calc(14 * var(--u));
+    box-shadow: 0 10px 32px rgba(23, 23, 28, 0.16);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .qls.is-docked { padding: 0; }
+  .qls.is-docked .qls-card { border: 0; box-shadow: none; border-radius: 0; }
+  .qls.no-header .qls-top { display: none; }
+
+  /* ── tab bar ── */
+  .qls-top {
+    flex: none; position: relative; z-index: 2;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: calc(8 * var(--u));
+    height: calc(56 * var(--u)); padding: 0 calc(8 * var(--u));
+    border-bottom: 1px solid #eff0f6; background: #fff; font-weight: 500;
+  }
+  .qls-tabs-wrap { flex: none; display: flex; align-items: flex-end; padding-left: calc(16 * var(--u)); }
+  .qls-tabs { display: flex; align-items: center; transform: translateY(calc(1.5 * var(--u))); }
+  .qls-tab {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    height: calc(34 * var(--u)); padding: calc(6 * var(--u)) calc(12 * var(--u));
+    border-bottom: calc(2 * var(--u)) solid rgba(23, 23, 28, 0);
+    color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); white-space: nowrap;
+  }
+  .qls-tab svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-right: calc(8 * var(--u)); }
+  .qls-tab.is-active { color: #17171c; border-bottom-color: #17171c; }
+  .qls-actions { flex: none; align-self: center; display: flex; align-items: center; gap: calc(8 * var(--u)); }
+  .qls-status { display: flex; align-items: center; gap: calc(4 * var(--u)); height: calc(23 * var(--u)); padding: 0 calc(8 * var(--u));
+                border: 1px solid #eff0f6; border-radius: calc(8 * var(--u)); color: #54545f;
+                font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); white-space: nowrap;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+  .qls-dot { width: calc(6 * var(--u)); height: calc(6 * var(--u)); border-radius: 50%; background: #479e66; }
+  .qls-sq { display: flex; align-items: center; justify-content: center; width: calc(36 * var(--u)); height: calc(36 * var(--u));
+            border: 1px solid #eff0f6; border-radius: calc(12 * var(--u)); background: #fff; }
+  .qls-sq svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .qls-save { display: flex; align-items: center; height: calc(36 * var(--u)); padding: 0 calc(12 * var(--u)) !important;
+              border-radius: calc(12 * var(--u)); background: #8b8b8e !important; color: #fff !important;
+              font-size: calc(14 * var(--u)); font-weight: 500; border: 0; }
+
+  .qls-view { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .qls-view.is-on { display: flex; }
+
+  /* ── PEOPLE ── */
+  .qls-people { padding: calc(20 * var(--u)) calc(20 * var(--u)) calc(16 * var(--u)); gap: calc(16 * var(--u)); }
+  .qls-search { flex: none; display: flex; align-items: center; gap: calc(12 * var(--u)); height: calc(36 * var(--u)); padding: 0 calc(12 * var(--u));
+                border: 1px solid #eff0f6; border-radius: calc(12 * var(--u)); color: #6b6b76; font-size: calc(14 * var(--u)); }
+  .qls-search svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); color: #54545f; }
+  .qls-split { flex: 1; min-height: 0; display: flex; border: 1px solid #eff0f6; border-radius: calc(12 * var(--u)); overflow: hidden; }
+  .qls-list { flex: none; width: calc(296 * var(--u)); border-right: 1px solid #eff0f6; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .qls-list-head { flex: none; display: flex; align-items: center; justify-content: space-between; height: calc(44 * var(--u));
+                   padding: 0 calc(26 * var(--u)) 0 calc(16 * var(--u)); border-bottom: 1px solid #eff0f6;
+                   color: #54545f; font-size: calc(12 * var(--u)); font-weight: 500; }
+  .qls-sort { display: flex; align-items: center; gap: calc(4 * var(--u)); font-size: calc(13 * var(--u)); }
+  .qls-sort svg { width: calc(12 * var(--u)); height: calc(12 * var(--u)); }
+  .qls-rows { flex: 1; min-height: 0; overflow: hidden; }
+  .qls-row { position: relative; display: flex; align-items: center; gap: calc(12 * var(--u)); height: calc(62 * var(--u));
+             padding: 0 calc(16 * var(--u)); border-bottom: 1px solid #eff0f6; border-left: calc(3 * var(--u)) solid transparent; }
+  .qls-row.is-sel { background: #fbf4f8; border-left-color: var(--qls-score); }
+  .qls-av { flex: none; display: flex; align-items: center; justify-content: center; width: calc(28 * var(--u)); height: calc(28 * var(--u));
+            border-radius: 50%; color: #fff; font-size: calc(11 * var(--u)); font-weight: 500; letter-spacing: 0.02em; }
+  .qls-who { flex: 1; min-width: 0; }
+  .qls-name { font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qls-email { color: #54545f; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qls-row-score { flex: none; color: var(--qls-score); font-size: calc(14 * var(--u)); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .qls-detail { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: calc(20 * var(--u)) calc(20 * var(--u)) 0; overflow: hidden; }
+  .qls-d-head { flex: none; display: flex; justify-content: space-between; align-items: flex-start; gap: calc(16 * var(--u));
+                padding-bottom: calc(26 * var(--u)); border-bottom: 1px solid #eff0f6; }
+  .qls-d-who { display: flex; gap: calc(12 * var(--u)); min-width: 0; }
+  .qls-d-av { width: calc(28 * var(--u)); height: calc(28 * var(--u)); margin-top: calc(2 * var(--u)); }
+  .qls-d-id { min-width: 0; }
+  .qls-d-name { display: flex; align-items: center; gap: calc(8 * var(--u)); font-size: calc(16 * var(--u)); line-height: calc(24 * var(--u)); font-weight: 500; white-space: nowrap; }
+  .qls-d-name svg { width: calc(12 * var(--u)); height: calc(12 * var(--u)); color: #54545f; }
+  .qls-d-email { color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); white-space: nowrap; }
+  .qls-d-score { flex: none; text-align: right; }
+  .qls-d-score-label { color: #54545f; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); font-weight: 500; }
+  .qls-d-score-val { color: var(--qls-score); font-size: calc(30 * var(--u)); line-height: calc(36 * var(--u)); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .qls-d-eval { color: #54545f; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); white-space: nowrap; }
+  .qls-d-rule-head { flex: none; padding: calc(24 * var(--u)) 0 calc(6 * var(--u)); }
+  .qls-d-title { font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; }
+  .qls-d-sub { color: #54545f; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); }
+  .qls-breakdown { flex: 1; min-height: 0; overflow: hidden; }
+  .qls-br { position: relative; display: flex; align-items: flex-start; gap: calc(12 * var(--u)); padding: calc(12 * var(--u)) 0; border-bottom: 1px solid #eff0f6; }
+  .qls-br-ico { position: relative; flex: none; width: calc(14 * var(--u)); height: calc(20 * var(--u)); }
+  .qls-br-ico svg { position: absolute; left: 0; top: calc(3 * var(--u)); width: calc(14 * var(--u)); height: calc(14 * var(--u)); }
+  .qls-br-dash { color: #54545f; }
+  .qls-br-check { color: var(--qls-score); stroke-width: 2.5; }
+  .qls-br-main { flex: 1; min-width: 0; }
+  .qls-br-label { color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qls-br-note { color: #54545f; font-size: calc(12 * var(--u)); line-height: calc(16 * var(--u)); }
+  .qls-br-pts { flex: none; color: #54545f; font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .qls-br.is-on .qls-br-label { color: #17171c; }
+  .qls-br.is-on .qls-br-pts { color: var(--qls-score); }
+
+  /* tall box: list over breakdown (stack), or one panel */
+  .qls.is-stack .qls-split { flex-direction: column; }
+  .qls.is-stack .qls-list { width: auto; flex: none; border-right: 0; border-bottom: 1px solid #eff0f6; }
+  .qls.is-stack .qls-rows { flex: none; }
+  .qls.is-detail .qls-list, .qls.is-detail .qls-search { display: none; }
+  .qls.is-list .qls-detail { display: none; }
+  .qls.is-list .qls-list { width: auto; flex: 1; border-right: 0; }
+
+  /* ── RULES ── */
+  .qls-rules { padding: calc(16 * var(--u)) calc(20 * var(--u)) calc(16 * var(--u)); gap: calc(16 * var(--u)); }
+  .qls-rules-head { flex: none; display: flex; align-items: center; justify-content: space-between; }
+  .qls-rules-title { font-size: calc(16 * var(--u)); line-height: calc(24 * var(--u)); font-weight: 500; }
+  .qls-btn { display: flex; align-items: center; gap: calc(8 * var(--u)); height: calc(36 * var(--u)); padding: 0 calc(12 * var(--u)) !important;
+             border: 1px solid #eff0f6 !important; border-radius: calc(12 * var(--u)); background: #fff !important;
+             font-size: calc(14 * var(--u)); font-weight: 500; white-space: nowrap; box-shadow: 0 calc(1.5 * var(--u)) calc(1.5 * var(--u)) rgba(44, 51, 69, 0.04); }
+  .qls-btn svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .qls-rule-list { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: calc(14 * var(--u)); }
+  .qls-rule { position: relative; flex: none; border: 1px solid #eff0f6; border-radius: calc(12 * var(--u)); overflow: hidden; background: #fff; }
+  .qls-rule-top { display: flex; align-items: center; justify-content: space-between; height: calc(54 * var(--u)); padding: 0 calc(16 * var(--u)) 0 calc(20 * var(--u)); border-bottom: 1px solid #eff0f6; }
+  .qls-rule-name { font-size: calc(14 * var(--u)); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qls-rule-tools { display: flex; gap: calc(16 * var(--u)); color: #17171c; }
+  .qls-rule-tools svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .qls-rule-body { display: flex; }
+  .qls-crit { flex: 1; min-width: 0; padding: calc(16 * var(--u)) calc(20 * var(--u)) calc(18 * var(--u)); }
+  .qls-sec { display: flex; align-items: center; justify-content: space-between; margin-bottom: calc(14 * var(--u)); font-size: calc(14 * var(--u)); font-weight: 500; }
+  .qls-sec-l { display: flex; align-items: center; gap: calc(8 * var(--u)); }
+  .qls-sec svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); color: var(--qls-score); }
+  .qls-sec .qls-dots { color: #54545f; }
+  .qls-chips { display: inline-flex; align-items: stretch; flex-wrap: nowrap; border: 1px solid #eff0f6; border-radius: calc(10 * var(--u));
+               box-shadow: 0 calc(1 * var(--u)) calc(2 * var(--u)) rgba(196, 196, 215, 0.25); max-width: 100%; overflow: hidden; }
+  .qls-chip { display: flex; align-items: center; gap: calc(6 * var(--u)); height: calc(34 * var(--u)); padding: 0 calc(10 * var(--u));
+              border-right: 1px solid #eff0f6; font-size: calc(13 * var(--u)); white-space: nowrap; }
+  .qls-chip:last-child { border-right: 0; }
+  .qls-chip svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); color: #54545f; }
+  .qls-addf { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); margin-top: calc(12 * var(--u)); height: calc(30 * var(--u));
+              padding: 0 calc(10 * var(--u)); border: 1px solid #eff0f6; border-radius: calc(10 * var(--u)); font-size: calc(13 * var(--u)); font-weight: 500; }
+  .qls-addf svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); color: #54545f; }
+  .qls-pts { flex: none; width: calc(360 * var(--u)); padding: calc(16 * var(--u)) calc(20 * var(--u)) calc(18 * var(--u)); background: #f7f7fa; border-left: 1px solid #eff0f6; }
+  .qls-select { display: flex; align-items: center; justify-content: space-between; height: calc(34 * var(--u)); padding: 0 calc(12 * var(--u));
+                background: #fff; border: 1px solid #eff0f6; border-radius: calc(10 * var(--u)); font-size: calc(13 * var(--u)); }
+  .qls-select svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); color: #54545f; }
+  .qls-amt-label { margin: calc(14 * var(--u)) 0 calc(6 * var(--u)); font-size: calc(13 * var(--u)); font-weight: 500; }
+  .qls-amt { display: flex; align-items: center; width: calc(150 * var(--u)); height: calc(34 * var(--u)); padding: 0 calc(12 * var(--u));
+             background: #fff; border: 1px solid #eff0f6; border-radius: calc(10 * var(--u)); font-size: calc(13 * var(--u)); font-variant-numeric: tabular-nums; }
+  .qls.is-tall .qls-rule-body { flex-direction: column; }
+  .qls.is-tall .qls-pts { width: auto; border-left: 0; border-top: 1px solid #eff0f6; display: flex; align-items: flex-end; gap: calc(12 * var(--u)); }
+  .qls.is-tall .qls-pts .qls-sec { display: none; }
+  .qls.is-tall .qls-select { flex: 1; }
+  .qls.is-tall .qls-amt-wrap { flex: none; }
+  .qls.is-tall .qls-amt-label { margin-top: 0; }
+
+  /* highlight ring (script verb) */
+  .qls-hl { position: absolute; inset: calc(-3 * var(--u)); border-radius: calc(10 * var(--u)); pointer-events: none; z-index: 3;
+            border: calc(2.5 * var(--u)) solid var(--qls-accent); opacity: 0; visibility: hidden; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.qls');
+    var card = el.querySelector('.qls-card');
+    var docked = !!data.docked;
+    if (docked) root.classList.add('is-docked');
+    if (data.show_header === false) root.classList.add('no-header');
+    var num = function (v, d) { var n = Number(v); return isFinite(n) ? n : d; };
+    var norm = function (s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim(); };
+    var slug = function (s) { return norm(s).replace(/\s+/g, '-'); };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    var accent = data.accent || '#393bf5';
+    root.style.setProperty('--qls-accent', accent);
+    if (data.score_color) root.style.setProperty('--qls-score', data.score_color);
+    if (data.card_background) card.style.background = data.card_background;
+
+    // ── which tab, and the layout of the People tab ──
+    var tab = norm(data.tab || 'people') === 'rules' ? 'rules' : 'people';
+    var w0 = el.clientWidth || 1600, h0 = el.clientHeight || 900;
+    var tall = h0 > w0 * 1.1;
+    var layout = data.layout || (tall ? 'stack' : 'split');
+    if (['split', 'stack', 'detail', 'list'].indexOf(layout) < 0) layout = 'split';
+    if (layout !== 'split') root.classList.add('is-' + layout);
+    if (tall) root.classList.add('is-tall');
+
+    // ── Size: 1u = one CSS px of the real screen. Wide: the People split is
+    // ~1040 across, Rules ~1300. Tall: ~600 across so a phone reads it. ──
+    var BASE = { split: [1040, 640], stack: [560, 1000], detail: [520, 700], list: [460, 640] };
+    var fit = function () {
+      var w = el.clientWidth || root.clientWidth || 1600, h = el.clientHeight || root.clientHeight || 900;
+      var b = tab === 'rules' ? (tall ? [640, 900] : [1300, 760]) : BASE[layout];
+      var u = Math.max(0.5, Math.min(w / b[0], h / b[1]) * num(data.scale, 1));
+      root.style.setProperty('--u', u.toFixed(4) + 'px');
+    };
+    fit();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { fit(); }).observe(el);
+
+    var tabs = [].slice.call(el.querySelectorAll('.qls-tab')).map(function (t) { return { el: t, name: t.getAttribute('data-tab') }; });
+    var views = { people: el.querySelector('.qls-people'), rules: el.querySelector('.qls-rules') };
+    var showTab = function (name) {
+      tabs.forEach(function (t) { t.el.classList.toggle('is-active', t.name === name); });
+      views.people.classList.toggle('is-on', name === 'people');
+      views.rules.classList.toggle('is-on', name === 'rules');
+    };
+    showTab(tab);
+    el.querySelector('.qls-status-label').textContent = data.status != null ? data.status : 'Scores ready';
+    if (data.status === false) el.querySelector('.qls-status').style.display = 'none';
+
+    // ── PEOPLE: the ranked list ──
+    var AV = ['linear-gradient(135deg,#f08a4b,#d9562b)', 'linear-gradient(135deg,#b07cf5,#8b5cf6)', 'linear-gradient(135deg,#7c8cf8,#5563e8)',
+      'linear-gradient(135deg,#f4a259,#e07a2f)', 'linear-gradient(135deg,#a78bfa,#7c3aed)'];
+    var initials = function (n) { var p = String(n || '').trim().split(/\s+/); return ((p[0] || '')[0] || '').toUpperCase() + ((p[1] || '')[0] || (p[0] || '')[1] || '').toUpperCase(); };
+    var peopleDefs = Array.isArray(data.people) && data.people.length ? data.people : [
+      { name: 'Sarah Chen', email: 'sarah@northwind.co', score: 92 },
+      { name: 'Marcus Reed', email: 'marcus@lumenlabs.io', score: 77 },
+      { name: 'Priya Nair', email: 'priya@fernhealth.com', score: 68 },
+      { name: 'Diego Alvarez', email: 'diego@kilnworks.co', score: 61 },
+      { name: 'Hannah Brooks', email: 'hannah@atlasrow.com', score: 56 },
+      { name: 'Tom Okafor', email: 'tom@bonsaihq.com', score: 52 },
+      { name: 'Lena Fischer', email: 'lena@marestudio.de', score: 48 },
+      { name: 'Owen Park', email: 'owen@voltgrid.io', score: 41 }
+    ];
+    var maxRows = num(data.rows, layout === 'stack' ? 3 : 12);
+    var selName = norm(data.selected || peopleDefs[0].name);
+    var rowsWrap = el.querySelector('.qls-rows');
+    var people = peopleDefs.slice(0, Math.max(1, maxRows)).map(function (p, i) {
+      var r = document.createElement('div');
+      r.className = 'qls-row';
+      r.setAttribute('data-anchor', 'row-' + i);
+      r.setAttribute('data-cursor-target', 'row-' + slug(p.name));
+      r.innerHTML = '<span class="qls-av" style="background:' + (p.color || AV[i % AV.length]) + '">' + esc(p.initials || initials(p.name)) + '</span>' +
+        '<div class="qls-who"><div class="qls-name">' + esc(p.name) + '</div><div class="qls-email">' + esc(p.email || '') + '</div></div>' +
+        '<span class="qls-row-score"></span>';
+      rowsWrap.appendChild(r);
+      var sc = r.querySelector('.qls-row-score');
+      var v = num(p.score, 0);
+      sc.textContent = String(v);
+      return { el: r, scoreEl: sc, name: norm(p.name), def: p, value: v, last: v, color: p.color || AV[i % AV.length] };
+    });
+    var sel = people.filter(function (p) { return p.name === selName; })[0] || people[0];
+    sel.el.classList.add('is-sel');
+    el.querySelector('.qls-search-ph').textContent = data.search_placeholder != null ? data.search_placeholder : 'Search people...';
+
+    // ── PEOPLE: the selected person's score and how it was calculated ──
+    var dav = el.querySelector('.qls-d-av');
+    dav.textContent = sel.def.initials || initials(sel.def.name);
+    dav.style.background = sel.color;
+    el.querySelector('.qls-d-name-text').textContent = sel.def.name;
+    el.querySelector('.qls-d-email').textContent = sel.def.email || '';
+    el.querySelector('.qls-d-score-label').textContent = data.score_label != null ? data.score_label : 'Published score';
+    el.querySelector('.qls-d-eval').textContent = data.evaluated != null ? data.evaluated : 'Evaluated today, 9:41 AM';
+    el.querySelector('.qls-d-title').textContent = data.breakdown_title != null ? data.breakdown_title : 'How this score was calculated';
+    el.querySelector('.qls-d-sub').textContent = data.breakdown_subtitle != null ? data.breakdown_subtitle : 'Rules from the last completed evaluation.';
+    var brDefs = Array.isArray(data.breakdown) && data.breakdown.length ? data.breakdown : [
+      { label: 'Viewed the pricing page', points: 30, matched: true, note: '2 visits' },
+      { label: 'Webinar attendance', points: 25, matched: true, note: '1 event' },
+      { label: 'Recent marketing email clicks', points: 20, matched: true, note: '4 events' },
+      { label: 'Read a blog post', points: 10, matched: true, note: '3 events' },
+      { label: 'Replied to an email', points: 7, matched: true, note: '1 event' },
+      { label: 'Webinar no-show', points: 2, matched: false },
+      { label: 'Unsubscribed contacts', points: -50, matched: false }
+    ];
+    var DASH = '<svg class="qls-br-dash" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>';
+    var CHECK = '<svg class="qls-br-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
+    var brWrap = el.querySelector('.qls-breakdown');
+    var climb = !!data.climb && tab === 'people';
+    var rules = brDefs.map(function (b, i) {
+      var r = document.createElement('div');
+      r.className = 'qls-br';
+      r.setAttribute('data-anchor', 'rule-' + i);
+      r.innerHTML = '<span class="qls-br-ico">' + DASH + CHECK + '</span>' +
+        '<div class="qls-br-main"><div class="qls-br-label">' + esc(b.label) + '</div><div class="qls-br-note"></div></div>' +
+        '<span class="qls-br-pts"></span>';
+      brWrap.appendChild(r);
+      var o = { el: r, def: b, name: norm(b.label), pts: num(b.points, 0),
+        noteEl: r.querySelector('.qls-br-note'), ptsEl: r.querySelector('.qls-br-pts'),
+        dash: r.querySelector('.qls-br-dash'), check: r.querySelector('.qls-br-check') };
+      o.onNote = 'Matched' + (b.note ? ' · ' + b.note : '');
+      o.offNote = b.off_note || "Didn't match";
+      // climb: the matched rules START unmatched and match on the timeline.
+      o.final = !!b.matched;
+      o.on = o.final && !climb;
+      return o;
+    });
+    var paint = function (o, on) {
+      o.el.classList.toggle('is-on', on);
+      o.noteEl.textContent = on ? o.onNote : o.offNote;
+      o.ptsEl.textContent = on ? String(o.pts) : '0';
+      o.dash.style.opacity = on ? 0 : 1;
+      o.check.style.opacity = on ? 1 : 0;
+    };
+    rules.forEach(function (o) { paint(o, o.on); });
+    var scoreEl = el.querySelector('.qls-d-score-val');
+    var settled = rules.reduce(function (s, o) { return s + (o.final ? o.pts : 0); }, 0);
+    var published = data.score != null ? num(data.score, settled) : (Array.isArray(data.breakdown) ? settled : sel.value);
+    var base = published - settled;   // points from rules the list doesn't show
+    var scoreNow = climb ? base : published;
+    scoreEl.textContent = String(scoreNow);
+    if (climb) sel.scoreEl.textContent = String(base);
+
+    // ── RULES tab ──
+    el.querySelector('.qls-rules-title').textContent = data.rules_title != null ? data.rules_title : 'Scoring rules';
+    el.querySelector('.qls-add-rule').textContent = 'Add rule';
+    var CICON = {
+      event: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>',
+      noshow: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5"/><path d="m22 8-5 5"/>',
+      page: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>',
+      email: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+      click: '<path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/>',
+      form: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 13H8"/><path d="M16 17H8"/>',
+      user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+    };
+    var ico = function (k, cls) { return '<svg viewBox="0 0 24 24"' + (cls ? ' class="' + cls + '"' : '') + '>' + (CICON[k] || CICON.event) + '</svg>'; };
+    var CLOCK = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+    var TRASH = '<svg viewBox="0 0 24 24"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+    var ruleDefs = Array.isArray(data.rules) && data.rules.length ? data.rules : [
+      { name: 'Viewed the pricing page', criteria: [{ icon: 'page', field: 'Page View', op: 'contains', value: '/pricing', window: 'last 30 days' }], amount: 30 },
+      { name: 'Webinar attendance', criteria: [{ icon: 'event', field: 'Event Attendance', op: 'greater than or equal to', value: '# 1', window: 'all time' }], amount: 25 },
+      { name: 'Recent marketing email clicks', criteria: [{ icon: 'click', field: 'Email Click', op: 'greater than or equal to', value: '# 1', window: 'last 30 days' }], amount: 20 },
+      { name: 'Unsubscribed contacts', criteria: [{ icon: 'email', field: 'Email Subscription', op: 'is', value: 'Unsubscribed' }], action: 'Subtract points', amount: 50 }
+    ];
+    var ruleList = el.querySelector('.qls-rule-list');
+    var ruleCards = ruleDefs.map(function (r, i) {
+      var c = document.createElement('div');
+      c.className = 'qls-rule';
+      c.setAttribute('data-anchor', 'card-' + i);
+      var chips = (Array.isArray(r.criteria) ? r.criteria : []).map(function (k) {
+        return '<div class="qls-chips">' +
+          '<span class="qls-chip">' + ico(k.icon) + esc(k.field || '') + '</span>' +
+          (k.op ? '<span class="qls-chip">' + esc(k.op) + '</span>' : '') +
+          (k.value != null ? '<span class="qls-chip">' + esc(k.value) + '</span>' : '') +
+          (k.window ? '<span class="qls-chip">' + CLOCK + esc(k.window) + '</span>' : '') +
+          '<span class="qls-chip">' + TRASH + '</span></div>';
+      }).join('<div style="height:calc(8 * var(--u))"></div>');
+      c.innerHTML = '<div class="qls-rule-top"><span class="qls-rule-name">' + esc(r.name) + '</span><span class="qls-rule-tools">' +
+        '<svg viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg><svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>' + TRASH + '</span></div>' +
+        '<div class="qls-rule-body"><div class="qls-crit">' +
+          '<div class="qls-sec"><span class="qls-sec-l"><svg viewBox="0 0 24 24"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg>Criteria</span>' +
+          '<svg class="qls-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></div>' +
+          chips + '<div><span class="qls-addf"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>Add filter</span></div></div>' +
+        '<div class="qls-pts"><div class="qls-sec"><span class="qls-sec-l"><svg viewBox="0 0 24 24"><path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"/></svg>Points</span></div>' +
+          '<div class="qls-select"><span>' + esc(r.action || 'Add points') + '</span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>' +
+          '<div class="qls-amt-wrap"><div class="qls-amt-label">Amount</div><div class="qls-amt">' + esc(String(num(r.amount, 0))) + '</div></div></div></div>';
+      ruleList.appendChild(c);
+      return { el: c, name: norm(r.name), amtEl: c.querySelector('.qls-amt'), last: num(r.amount, 0) };
+    });
+
+    // ── ENTRANCE (scrub-safe, all on tl) ──
+    var AT = num(data.at, 0);
+    var P = function (t) { return Math.max(0, t + AT); };
+    var uPx = function () { return parseFloat(getComputedStyle(root).getPropertyValue('--u')) || 1; };
+    var countTo = function (elx, from, to, at, dur) {
+      var o = { v: from };
+      tl.fromTo(o, { v: from }, { v: to, duration: dur, ease: 'power2.out', immediateRender: false,
+        onUpdate: function () { elx.textContent = String(this.progress() >= 1 ? to : Math.round(o.v)); } }, at);
+    };
+    var matchAt = function (o, at) {
+      if (o.on) return;
+      o.on = true;
+      var flip = { p: 0 };
+      tl.fromTo(flip, { p: 0 }, { p: 1, duration: 0.01, immediateRender: false,
+        onUpdate: function () { var on = this.progress() > 0; o.el.classList.toggle('is-on', on); o.noteEl.textContent = on ? o.onNote : o.offNote; } }, at);
+      tl.fromTo(o.dash, { opacity: 1 }, { opacity: 0, duration: 0.15, immediateRender: false }, at);
+      tl.fromTo(o.check, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(2.4)', immediateRender: false }, at);
+      countTo(o.ptsEl, 0, o.pts, at, 0.5);
+      countTo(scoreEl, scoreNow, scoreNow + o.pts, at, 0.6);
+      countTo(sel.scoreEl, scoreNow, scoreNow + o.pts, at, 0.6);
+      scoreNow += o.pts; sel.last = scoreNow;
+    };
+    var entrance = data.entrance || 'rise';
+    if (entrance !== 'none') {
+      var u = uPx();
+      if (!docked) {
+        gsap.set(card, { autoAlpha: 0, y: 16 * u });
+        tl.to(card, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, P(0.05));
+      }
+      var topBits = [].slice.call(el.querySelectorAll('.qls-tab, .qls-actions > *'));
+      gsap.set(topBits, { autoAlpha: 0, y: 6 * u });
+      tl.to(topBits, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power2.out', stagger: 0.04 }, P(0.12));
+      if (tab === 'people') {
+        var srch = el.querySelector('.qls-search');
+        gsap.set(srch, { autoAlpha: 0, y: 8 * u });
+        tl.to(srch, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, P(0.2));
+        people.forEach(function (p, i) {
+          var at = 0.3 + i * 0.06;
+          gsap.set(p.el, { autoAlpha: 0, x: -10 * u });
+          tl.to(p.el, { autoAlpha: 1, x: 0, duration: 0.35, ease: 'power3.out' }, P(at));
+          if (!(climb && p === sel)) countTo(p.scoreEl, 0, p.value, P(at + 0.05), 0.8);
+        });
+        var head = el.querySelector('.qls-d-head');
+        gsap.set(head, { autoAlpha: 0, y: 10 * u });
+        tl.to(head, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power3.out' }, P(0.35));
+        if (!climb) countTo(scoreEl, 0, published, P(0.45), 1.1);
+        var rh = el.querySelector('.qls-d-rule-head');
+        gsap.set(rh, { autoAlpha: 0 });
+        tl.to(rh, { autoAlpha: 1, duration: 0.35 }, P(0.55));
+        rules.forEach(function (o, i) {
+          var at = 0.65 + i * 0.08;
+          gsap.set(o.el, { autoAlpha: 0, y: 8 * u });
+          tl.to(o.el, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, P(at));
+        });
+      } else {
+        var rhd = el.querySelector('.qls-rules-head');
+        gsap.set(rhd, { autoAlpha: 0, y: 8 * u });
+        tl.to(rhd, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power3.out' }, P(0.2));
+        ruleCards.forEach(function (c, i) {
+          gsap.set(c.el, { autoAlpha: 0, y: 16 * u });
+          tl.to(c.el, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power3.out' }, P(0.3 + i * 0.12));
+        });
+      }
+    }
+    // CLIMB: the matched rules tick on one by one and the score climbs.
+    if (climb) {
+      var ci = num(data.climb_interval, 0.55), c0 = num(data.climb_at, 1.4);
+      rules.filter(function (o) { return o.final; }).forEach(function (o, k) { matchAt(o, P(c0 + k * ci)); });
+    }
+
+    // ── SCRIPT ──
+    var findRule = function (t) { var n = norm(t); return rules.filter(function (o) { return o.name === n; })[0] || rules.filter(function (o) { return n && o.name.indexOf(n) >= 0; })[0] || null; };
+    var findPerson = function (t) { var n = norm(t); return people.filter(function (p) { return p.name === n; })[0] || null; };
+    var findCard = function (t) { var n = norm(t); return ruleCards.filter(function (c) { return c.name === n; })[0] || null; };
+    var findTab = function (t) { var n = norm(t); return tabs.filter(function (x) { return x.name === n; })[0] || null; };
+    var REGIONS = { header: '.qls-top', tabs: '.qls-tabs', list: '.qls-list', detail: '.qls-detail', breakdown: '.qls-breakdown',
+      score: '.qls-d-score', search: '.qls-search', status: '.qls-status', save: '.qls-save', 'add rule': '.qls-btn' };
+    var findEl = function (t) {
+      var r = findRule(t); if (r) return r.el;
+      var p = findPerson(t); if (p) return p.el;
+      var c = findCard(t); if (c) return c.el;
+      var tb = findTab(t); if (tb) return tb.el;
+      var g = REGIONS[norm(t)]; if (g) return el.querySelector(g);
+      var n = norm(t); if (!n) return null;
+      var all = el.querySelectorAll('.qls-card *');
+      for (var i = 0; i < all.length; i++) if (all[i].children.length === 0 && norm(all[i].textContent) === n) return all[i];
+      return null;
+    };
+    var cursorSlug = function (t) {
+      var e = findEl(t);
+      while (e && e !== root) { if (e.getAttribute && e.getAttribute('data-cursor-target')) return e.getAttribute('data-cursor-target'); e = e.parentNode; }
+      return t;
+    };
+    var script = (Array.isArray(data.script) ? data.script : []).filter(Boolean).slice()
+      .sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+    var passOn = [];
+    script.forEach(function (a) {
+      var at = Math.max(0, num(a.at, 0));
+      var act = a.action;
+      var tgt = a.target != null ? a.target : a.text;
+      if (act === 'match') { var mr = findRule(tgt); if (mr) matchAt(mr, at); return; }
+      if (act === 'count' || act === 'count-up') {
+        var to = num(a.to, 0), dur = num(a.duration, 1);
+        var pp = findPerson(tgt);
+        if (pp) { countTo(pp.scoreEl, pp.last, to, at, dur); if (pp === sel) { countTo(scoreEl, scoreNow, to, at, dur); scoreNow = to; } pp.last = to; return; }
+        if (norm(tgt) === 'score' || norm(tgt) === 'published score') { countTo(scoreEl, scoreNow, to, at, dur); countTo(sel.scoreEl, scoreNow, to, at, dur); scoreNow = to; sel.last = to; return; }
+        var cc = findCard(tgt);
+        if (cc) { countTo(cc.amtEl, cc.last, to, at, dur); cc.last = to; }
+        return;
+      }
+      if (act === 'switch-tab') {
+        var tt = findTab(a.to != null ? a.to : tgt);
+        if (!tt) return;
+        var sw = { p: 0 }, from = tab;
+        tl.fromTo(sw, { p: 0 }, { p: 1, duration: 0.01, immediateRender: false,
+          onUpdate: function () { showTab(this.progress() > 0 ? tt.name : from); } }, at);
+        var v = views[tt.name];
+        tl.fromTo(v, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.25, immediateRender: false }, at);
+        tab = tt.name;
+        return;
+      }
+      if (act === 'highlight') {
+        var host = findEl(tgt);
+        if (!host) return;
+        if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+        var ring = document.createElement('div'); ring.className = 'qls-hl';
+        var col = a.color || accent;
+        ring.style.borderColor = col;
+        var m = /^#?([0-9a-f]{6})$/i.exec(col);
+        if (m) { var n = parseInt(m[1], 16); ring.style.background = 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',0.07)'; }
+        host.appendChild(ring);
+        var hold = num(a.duration, 1.6);
+        tl.fromTo(ring, { autoAlpha: 0, scale: 1.04 }, { autoAlpha: 1, scale: 1, duration: 0.25, ease: 'power2.out', immediateRender: false }, at);
+        if (a.hold !== true) tl.to(ring, { autoAlpha: 0, duration: 0.35, ease: 'power1.in' }, at + 0.25 + hold);
+        return;
+      }
+      if (act === 'set-text') {
+        var te = findEl(tgt);
+        if (!te) return;
+        var was = te.textContent, now = String(a.to != null ? a.to : '');
+        var st = { p: 0 };
+        tl.fromTo(st, { p: 0 }, { p: 1, duration: 0.01, immediateRender: false,
+          onUpdate: function () { te.textContent = this.progress() > 0 ? now : was; } }, at);
+        return;
+      }
+      var copy = {}; for (var key in a) copy[key] = a[key];
+      if (copy.target != null) copy.target = cursorSlug(copy.target);
+      passOn.push(copy);
+    });
+    if (passOn.length) runScript(tl, el, passOn, data.cursor_targets || {}, ctx, {});
+    return tl;
+  }
+</script>
