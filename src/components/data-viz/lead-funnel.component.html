@@ -77,7 +77,7 @@
     var shapeD = 'M' + (CX - TW) + ' ' + TOP + ' L' + (CX + TW) + ' ' + TOP + ' L' + (CX + NW) + ' ' + NECK + ' L' + (CX - NW) + ' ' + NECK + ' Z';
     var outline = el.querySelector('.lfn-outline');
     outline.setAttribute('d', outlineD);
-    var clipId = 'lfnclip' + Math.random().toString(36).slice(2, 8);
+    var clipId = 'lfnclip' + (window.__lfnClipN = (window.__lfnClipN || 0) + 1);
     el.querySelector('.lfn-clip').setAttribute('id', clipId);
     el.querySelector('.lfn-clip-path').setAttribute('d', shapeD);
     var bandsG = el.querySelector('.lfn-bands');
