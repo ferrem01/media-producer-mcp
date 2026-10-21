@@ -84,6 +84,7 @@ function canvasFor(frame: Frame | undefined, w?: number, h?: number): Canvas {
 
 import { normalizeBeats } from "./core/beats.js";
 import { normalizeSpeakerPipRefs } from "./core/scene-assembler.js";
+import { listTenantComponents, readTenantComponent } from "./core/tenant-components.js";
 import { speak, voiceSpeed, VOICE_DESCRIBE } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { listSfxOptions, resolveSfxChoice } from "./audio/sfx.js";
@@ -1121,7 +1122,8 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string().optional(),
       project_id: z.string().optional(),
       scene_id: z.string().optional(),
-      target: z.enum(["project", "brand_kit", "job", "jobs", "layout", "motion"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs, 'layout' for measured scene geometry, 'motion' (with project_id + scene_id) for sampled per-component motion across scene time -- verify 'did the zoom/entrance actually fire' without rendering."),
+      target: z.enum(["project", "brand_kit", "job", "jobs", "layout", "motion", "component"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs, 'layout' for measured scene geometry, 'motion' (with project_id + scene_id) for sampled per-component motion across scene time -- verify 'did the zoom/entrance actually fire' without rendering. 'component' (with component_type) opens one of the TENANT'S OWN components (a web capture or a playground save, listed by list target='components' with tenant: true): its schema, html source and, for a capture, the reference screenshot."),
+      component_type: z.string().optional().describe("The tenant component to open (use with target='component')"),
       job_id: z.string().optional().describe("Job ID to check status (use with target='job')"),
       job_type: z.enum(["render", "generate", "take"]).optional().describe("Filter jobs by type (use with target='jobs')"),
       selector: z.string().optional().describe("CSS selector to also measure specific element(s) (use with target='layout')"),
@@ -1141,6 +1143,19 @@ export function createMcpServer(): McpServer {
           samples: params.samples,
         });
         return motion.ok ? ok(motion) : err(motion.error || "Motion inspection failed");
+      }
+
+      if (target === "component") {
+        if (!params.tenant_id || !params.component_type) return err("tenant_id and component_type are required for target='component'");
+        const comp = await readTenantComponent(params.tenant_id, params.component_type);
+        if (!comp) return err(`No tenant component "${params.component_type}" (list target='components' shows the tenant's own with tenant: true)`);
+        const { refPath, source, ...meta } = comp;
+        const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [
+          { type: "text", text: JSON.stringify({ ...meta, source_bytes: source.length }, null, 2) },
+          { type: "text", text: source },
+        ];
+        if (refPath) content.push({ type: "image", data: (await fs.readFile(refPath)).toString("base64"), mimeType: "image/png" });
+        return { content };
       }
 
       if (target === "brand_kit") {
@@ -1211,7 +1226,10 @@ export function createMcpServer(): McpServer {
 
       if (target === "components") {
         const catalog = await listComponentCatalog();
-        return ok(catalog);
+        // The tenant's own captures and saves sit after the library, marked
+        // tenant: true -- open one with get target='component'.
+        const own = params.tenant_id ? await listTenantComponents(params.tenant_id) : [];
+        return ok([...catalog, ...own.map((c) => ({ ...c, tenant: true }))]);
       }
       if (target === "vocabulary") return ok(vocabulary());
       if (target === "samples") return ok(listSamples(params.samples || {}));

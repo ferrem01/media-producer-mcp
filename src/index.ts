@@ -62,6 +62,7 @@ import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-
 import { projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp, reshootStoryboardCardsSoon } from "./server.js";
 import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits } from "./core/web-capture.js";
+import { listTenantComponents, readTenantComponent } from "./core/tenant-components.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
@@ -2542,28 +2543,10 @@ Rules:
       const tenantSourceMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
       if (tenantSourceMatch && method === "GET") {
         const [, tid, compType] = tenantSourceMatch.map(decodeURIComponent);
-        // FLAT first (captured components mint their html at the root -- that
-        // is where render/critique look), then the category subdirs.
-        const tenantCompDir = path.join(config.dataDir, tid, "components");
-        try {
-          const candidates = [path.join(tenantCompDir, `${compType}.component.html`)];
-          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
-          for (const cat of cats) {
-            if (!cat.isDirectory()) continue;
-            candidates.push(path.join(tenantCompDir, cat.name, `${compType}.component.html`));
-          }
-          for (const filePath of candidates) {
-            try {
-              const source = await fs.readFile(filePath, "utf-8");
-              res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-              res.end(source);
-              return;
-            } catch { continue; }
-          }
-          jsonResponse(res, 404, { error: "Component not found" });
-        } catch {
-          jsonResponse(res, 404, { error: "Component not found" });
-        }
+        const comp = await readTenantComponent(tid, compType);
+        if (!comp) { jsonResponse(res, 404, { error: "Component not found" }); return; }
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(comp.source);
         return;
       }
 
@@ -2573,21 +2556,9 @@ Rules:
       const tenantSchemaMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/schema$/);
       if (tenantSchemaMatch && method === "GET") {
         const [, tid, compType] = tenantSchemaMatch.map(decodeURIComponent);
-        const tenantCompDir = path.join(config.dataDir, tid, "components");
-        try {
-          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
-          for (const cat of cats) {
-            if (!cat.isDirectory()) continue;
-            try {
-              const raw = await fs.readFile(path.join(tenantCompDir, cat.name, `${compType}.schema.json`), "utf-8");
-              jsonResponse(res, 200, JSON.parse(raw));
-              return;
-            } catch { continue; }
-          }
-          jsonResponse(res, 404, { error: "Schema not found" });
-        } catch {
-          jsonResponse(res, 404, { error: "Schema not found" });
-        }
+        const comp = await readTenantComponent(tid, compType);
+        if (!comp?.schema) { jsonResponse(res, 404, { error: "Schema not found" }); return; }
+        jsonResponse(res, 200, comp.schema);
         return;
       }
 
@@ -2627,64 +2598,8 @@ Rules:
       const tenantCompMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)$/);
       if (tenantCompMatch && method === "GET") {
         const tid = decodeURIComponent(tenantCompMatch[1]);
-        const tenantCompDir = path.join(config.dataDir, tid, "components");
-        const components: Array<{ type: string; category: string; label: string }> = [];
-
-        const label = (t: string) => t.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-        try {
-          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
-          for (const cat of cats) {
-            // FLAT root files are captured components (mintCapturedComponent
-            // writes the html at the root so render/critique find it; the
-            // schema lives under captured/).
-            if (cat.isFile() && cat.name.endsWith(".component.html")) {
-              const t = cat.name.replace(".component.html", "");
-              components.push({ type: t, category: "captured", label: label(t) });
-              continue;
-            }
-            if (!cat.isDirectory()) continue;
-            const catPath = path.join(tenantCompDir, cat.name);
-            const files = await fs.readdir(catPath);
-            for (const f of files) {
-              if (!f.endsWith(".component.html")) continue;
-              const t = f.replace(".component.html", "");
-              components.push({ type: t, category: cat.name, label: label(t) });
-            }
-          }
-        } catch {
-          // No custom components yet
-        }
-
+        const components = (await listTenantComponents(tid)).map(({ type, category, label }) => ({ type, category, label }));
         jsonResponse(res, 200, components);
-        return;
-      }
-
-      // ── Playground API: Get tenant component source ──
-      const tenantCompSrcMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
-      if (tenantCompSrcMatch && method === "GET") {
-        const [, tid, compType] = tenantCompSrcMatch.map(decodeURIComponent);
-        const tenantCompDir = path.join(config.dataDir, tid, "components");
-
-        // Search all categories
-        let found = false;
-        try {
-          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
-          for (const cat of cats) {
-            if (!cat.isDirectory()) continue;
-            const fp = path.join(tenantCompDir, cat.name, `${compType}.component.html`);
-            try {
-              const source = await fs.readFile(fp, "utf-8");
-              res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
-              res.end(source);
-              found = true;
-              break;
-            } catch { /* not in this cat */ }
-          }
-        } catch { /* no dir */ }
-
-        if (!found) {
-          jsonResponse(res, 404, { error: "Component source not found" });
-        }
         return;
       }
 
