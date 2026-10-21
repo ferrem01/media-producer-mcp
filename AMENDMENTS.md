@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — The phone Preview plays the takes as one file
+
+Marc, watching proj_7d01a9e0 and proj_33f4fd99 in the phone Preview: "in
+between scenes the music and sound stopped ... it is not loading". A film
+with one take per scene plays in the Studio as one <video> per take, swapped
+at each cut, the next take loaded a few seconds ahead into a hidden standby.
+A phone does not load a hidden video ahead, so every cut waited for the next
+take from nothing, and watch mode holds the film while the speaker is
+starved: silence at every cut.
+
+The render already joins the takes into one base on the film's clock
+(buildSpeakerBase with slots). Watch mode now asks for that same join at half
+size (`GET /api/preview-speaker/<t>/<p>`, core/preview-speaker.ts: made on
+first request, cached in the output folder, keyed by the sources, their file
+times, the trims and the slots) and plays it as ONE continuous clip: one
+element for the whole film, nothing to load at a cut. Watch mode edits
+nothing, so the swapped track is never saved, and its live reload is off.
+Checked in a phone emulator (iPhone 13 profile): one element plays 0 to 12 s
+through both cuts, unmuted, no hold. Test: test/preview-speaker.test.ts.
+
 ## 2026-10-21 — The phone Studio shows a built scene, not its board card
 
 Marc, on his phone: two films the Library called built "show boards when I

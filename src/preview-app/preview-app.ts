@@ -3311,6 +3311,8 @@ ${QUOTIENT_CSS}
   function liveSyncReload() {
     var p = state.currentProject;
     if (!p) return;
+    // Watch mode edits nothing, and its track is the joined take (watchJoinTakes).
+    if (WATCH) return;
     api('/projects/' + state.tenantId + '/' + p.project_id).then(function(project) {
       if (!state.currentProject || state.currentProject.project_id !== project.project_id) return;
       // Draft/storyboard-state projects have their own view -- full reload path.
@@ -3361,9 +3363,26 @@ ${QUOTIENT_CSS}
   }
 
   // Load a specific project
+  // WATCH MODE plays the takes as ONE file (core/preview-speaker.ts): a phone
+  // does not load the next take ahead of a cut, so the per-scene swap waited
+  // for each take from nothing and the sound stopped between scenes (Marc,
+  // Oct 21). The server joins the takes on the film's clock, the way the
+  // render does; here the track becomes that one continuous clip. Watch mode
+  // edits nothing, so the swap is never saved.
+  function watchJoinTakes(project) {
+    var clips = (project && project.speaker_track && project.speaker_track.clips) || [];
+    var perScene = clips.some(function(c) { return c.scene_index !== undefined && c.scene_index !== null; });
+    if (!WATCH || !perScene || clips.length < 2) return project;
+    watchBuffering(true);
+    watchBufferText('Preparing the takes');
+    return api('/preview-speaker/' + state.tenantId + '/' + project.project_id).then(function(r) {
+      if (r && r.url) project.speaker_track = Object.assign({}, project.speaker_track, { clips: [{ source: withToken(r.url), trim_start: 0 }] });
+      return project;
+    }).catch(function() { return project; }).then(function(p) { watchBuffering(false); return p; });
+  }
   function loadProject(projectId) {
     if (!projectId || !state.tenantId) return;
-    api('/projects/' + state.tenantId + '/' + projectId).then(function(project) {
+    api('/projects/' + state.tenantId + '/' + projectId).then(watchJoinTakes).then(function(project) {
       state.currentProject = project;
       showProjectName(project);
       showProjectTags(project);
