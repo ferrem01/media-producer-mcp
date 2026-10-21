@@ -1,0 +1,244 @@
+<template>
+  <div class="lfn">
+    <svg class="lfn-svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <clipPath class="lfn-clip"><path class="lfn-clip-path"/></clipPath>
+      </defs>
+      <g class="lfn-bands"></g>
+      <path class="lfn-outline" data-anchor="funnel"/>
+      <g class="lfn-dividers"></g>
+      <g class="lfn-icons"></g>
+      <g class="lfn-labels"></g>
+      <g class="lfn-sources"></g>
+      <g class="lfn-dots"></g>
+      <g class="lfn-handoff" data-anchor="handoff">
+        <circle class="lfn-hand-ring"/>
+        <text class="lfn-hand-initials" text-anchor="middle" dominant-baseline="central"></text>
+        <text class="lfn-hand-name" dominant-baseline="central"></text>
+      </g>
+    </svg>
+  </div>
+</template>
+
+<style scoped>
+  /* LEAD FUNNEL: the inbound engine as an object. A funnel draws itself in
+     ink; three bands (Attract / Nurture / Qualify by default) light up on
+     their cues; people fall in as dots from the channel chips above, the
+     nurtured ones warm and drop a band, the qualified ones run hot, and one
+     leaves through the neck as a named person -- the hand-off to the next
+     piece (a lead score, a sales note). Everything draws in one SVG
+     (viewBox 600x800, contained), so it reads the same in a tall phone box
+     or a wide split. */
+  .lfn { position: absolute; inset: 0; }
+  .lfn-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .lfn-outline { fill: none; stroke: var(--lfn-ink); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+  .lfn-divider { stroke: var(--lfn-ink); stroke-width: 1.5; stroke-dasharray: 5 7; opacity: 0.35; }
+  .lfn-band { fill: var(--lfn-warm); opacity: 0; }
+  .lfn-label { font-family: var(--lfn-serif); font-weight: 300; font-size: 46px; letter-spacing: -0.03em; fill: var(--lfn-ink); }
+  .lfn-chip-bg { fill: #fff; stroke: var(--lfn-ink); stroke-width: 1.5; }
+  .lfn-chip-text { font-family: Inter, system-ui, sans-serif; font-weight: 500; font-size: 19px; fill: var(--lfn-ink); }
+  .lfn-icon-bg { fill: #fff; stroke: var(--lfn-warm); stroke-width: 2; }
+  .lfn-icon path, .lfn-icon rect, .lfn-icon circle.g { fill: none; stroke: var(--lfn-warm); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .lfn-dot { fill: var(--lfn-cold); }
+  .lfn-hand-ring { fill: var(--lfn-hot); }
+  .lfn-hand-initials { font-family: Inter, system-ui, sans-serif; font-weight: 600; font-size: 20px; fill: #fff; }
+  .lfn-hand-name { font-family: Inter, system-ui, sans-serif; font-weight: 600; font-size: 24px; fill: var(--lfn-ink); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var NS = 'http://www.w3.org/2000/svg';
+    var root = el.querySelector('.lfn');
+    var num = function (v, d) { var n = Number(v); return isFinite(n) ? n : d; };
+    var mk = function (tag, attrs, parent) {
+      var n = document.createElementNS(NS, tag);
+      for (var k in attrs) n.setAttribute(k, attrs[k]);
+      if (parent) parent.appendChild(n);
+      return n;
+    };
+    var css = getComputedStyle(el);
+    var brand = function (v, d) { var s = css.getPropertyValue(v).trim(); return s || d; };
+    var ink = data.ink_color || brand('--mp-color-text', '#17171c');
+    var warm = data.warm_color || brand('--mp-color-primary', '#e2784e');
+    var hot = data.hot_color || '#b4357b';
+    var cold = data.cold_color || '#c9bfb2';
+    root.style.setProperty('--lfn-ink', ink);
+    root.style.setProperty('--lfn-warm', warm);
+    root.style.setProperty('--lfn-hot', hot);
+    root.style.setProperty('--lfn-cold', cold);
+    root.style.setProperty('--lfn-serif', data.font || "'Newsreader', Georgia, 'Times New Roman', serif");
+
+    // ── geometry (viewBox units) ──
+    var CX = 300, TOP = 160, NECK = 610, SPOUT = 655, TW = 262, NW = 40;
+    var halfAt = function (y) { var t = Math.max(0, Math.min(1, (y - TOP) / (NECK - TOP))); return TW + (NW - TW) * t; };
+    var outlineD = 'M' + (CX - TW) + ' ' + TOP + ' L' + (CX - NW) + ' ' + NECK + ' L' + (CX - NW) + ' ' + SPOUT +
+      ' M' + (CX + NW) + ' ' + SPOUT + ' L' + (CX + NW) + ' ' + NECK + ' L' + (CX + TW) + ' ' + TOP;
+    var shapeD = 'M' + (CX - TW) + ' ' + TOP + ' L' + (CX + TW) + ' ' + TOP + ' L' + (CX + NW) + ' ' + NECK + ' L' + (CX - NW) + ' ' + NECK + ' Z';
+    var outline = el.querySelector('.lfn-outline');
+    outline.setAttribute('d', outlineD);
+    var clipId = 'lfnclip' + (window.__lfnClipN = (window.__lfnClipN || 0) + 1);
+    el.querySelector('.lfn-clip').setAttribute('id', clipId);
+    el.querySelector('.lfn-clip-path').setAttribute('d', shapeD);
+    var bandsG = el.querySelector('.lfn-bands');
+    bandsG.setAttribute('clip-path', 'url(#' + clipId + ')');
+
+    var AT = num(data.at, 0);
+    var P = function (t) { return Math.max(0, t + AT); };
+    var bandDefs = Array.isArray(data.bands) && data.bands.length ? data.bands.slice(0, 4) : [{ label: 'Attract' }, { label: 'Nurture' }, { label: 'Qualify' }];
+    var BN = bandDefs.length, BH = (NECK - TOP) / BN;
+    var DEFAULT_AT = [0.9, 2.2, 3.4, 4.4];
+    var bands = bandDefs.map(function (b, i) {
+      var y0 = TOP + i * BH, y1 = y0 + BH, mid = (y0 + y1) / 2;
+      var rect = mk('rect', { class: 'lfn-band', x: 0, y: y0, width: 600, height: BH, 'data-anchor': 'band-' + i }, bandsG);
+      if (i > 0) mk('line', { class: 'lfn-divider', x1: CX - halfAt(y0), y1: y0, x2: CX + halfAt(y0), y2: y0 }, el.querySelector('.lfn-dividers'));
+      var label = mk('text', { class: 'lfn-label', x: CX, y: mid, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, el.querySelector('.lfn-labels'));
+      label.textContent = String(b.label || '');
+      var size = Math.min(46, (halfAt(mid) * 2 - 30) / Math.max(4, String(b.label || '').length) * 1.9);
+      label.style.fontSize = size.toFixed(1) + 'px';
+      return { y0: y0, y1: y1, mid: mid, rect: rect, label: label, at: P(b.at != null ? num(b.at, 0) : DEFAULT_AT[i]), labelW: size * 0.55 * String(b.label || '').length, labelH: size };
+    });
+
+    // Places a dot never sits on: the band labels (above) and the touch icons.
+    var keepOut = [];
+    // ── deterministic randomness ──
+    var seed = num(data.seed, 7) >>> 0 || 7;
+    var rnd = function () { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    var spot = function (band) {
+      for (var k = 0; k < 40; k++) {
+        var y = band.y0 + 14 + rnd() * (BH - 28);
+        var hw = halfAt(y) - 16;
+        var x = CX - hw + rnd() * hw * 2;
+        if (Math.abs(x - CX) < band.labelW / 2 + 18 && Math.abs(y - band.mid) < band.labelH / 2 + 14) continue;
+        if (keepOut.some(function (o) { return Math.hypot(x - o.x, y - o.y) < o.r; })) continue;
+        return { x: x, y: y };
+      }
+      return { x: CX + (rnd() < 0.5 ? -1 : 1) * (band.labelW / 2 + 24), y: band.mid };
+    };
+
+    // ── sources: channel chips above the mouth ──
+    var srcDefs = data.sources === false ? [] : (Array.isArray(data.sources) && data.sources.length ? data.sources.slice(0, 5) : [{ label: 'Blog' }, { label: 'LinkedIn' }, { label: 'Search' }, { label: 'Webinars' }]);
+    var srcG = el.querySelector('.lfn-sources');
+    var sources = srcDefs.map(function (s, i) {
+      var x = srcDefs.length === 1 ? CX : 70 + (460 * i) / (srcDefs.length - 1);
+      var g = mk('g', { 'data-anchor': 'source-' + i }, srcG);
+      var w = 0;
+      if (s.src) {
+        mk('rect', { class: 'lfn-chip-bg', x: x - 46, y: 46, width: 92, height: 48, rx: 24 }, g);
+        mk('image', { href: s.src, x: x - 30, y: 52, width: 60, height: 36, preserveAspectRatio: 'xMidYMid meet' }, g);
+      } else {
+        var label = String(s.label || '');
+        w = Math.max(70, label.length * 10.5 + 34);
+        mk('rect', { class: 'lfn-chip-bg', x: x - w / 2, y: 48, width: w, height: 44, rx: 22 }, g);
+        var t = mk('text', { class: 'lfn-chip-text', x: x, y: 70, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, g);
+        t.textContent = label;
+      }
+      return { g: g, x: x, at: P(s.at != null ? num(s.at, 0) : 0.35 + i * 0.12) };
+    });
+
+    // ── nurture touches: email / webinar / content chips in the middle band ──
+    var iconsG = el.querySelector('.lfn-icons');
+    var touches = [];
+    if (data.touches !== false && BN >= 2) {
+      var nb = bands[1];
+      var ICON = {
+        email: '<rect x="-11" y="-8" width="22" height="16" rx="3"/><path d="M-11 -6 L0 2 L11 -6"/>',
+        webinar: '<rect x="-11" y="-9" width="22" height="15" rx="3"/><path d="M-4 10 H4"/><path d="M-2 -5 L4 -1.5 L-2 2 Z"/>',
+        content: '<path d="M-7 -10 H4 L8 -6 V10 H-7 Z"/><path d="M-3 -2 H4"/><path d="M-3 3 H4"/>'
+      };
+      var kinds = Array.isArray(data.touches) ? data.touches : ['email', 'webinar', 'content'];
+      kinds.slice(0, 4).forEach(function (k, i) {
+        // at the band's edges, clear of its label: left high, right low, left low, right high
+        var y = nb.mid + [-26, 26, 30, -30][i];
+        var side = i % 2 ? 1 : -1;
+        var x = CX + side * (halfAt(y) - 34);
+        keepOut.push({ x: x, y: y, r: 36 });
+        var g = mk('g', { class: 'lfn-icon', transform: 'translate(' + x + ' ' + y + ')', 'data-x': x.toFixed(1), 'data-y': y.toFixed(1) }, iconsG);
+        mk('circle', { class: 'lfn-icon-bg', r: 21 }, g);
+        var inner = mk('g', {}, g); inner.innerHTML = ICON[k] || ICON.email;
+        touches.push({ g: g, at: nb.at + 0.15 + i * 0.22 });
+      });
+    }
+
+    // ── dots: people ──
+    var N = Math.max(6, Math.min(60, Math.round(num(data.dots, 28))));
+    var dotsG = el.querySelector('.lfn-dots');
+    var fracN = num(data.nurture_share, 0.55), fracQ = num(data.qualify_share, 0.22);
+    var dots = [];
+    for (var i = 0; i < N; i++) {
+      var s = sources.length ? sources[i % sources.length] : { x: CX, at: P(0.3) };
+      var c = mk('circle', { class: 'lfn-dot', r: 8.5, cx: s.x, cy: sources.length ? 70 : 40 }, dotsG);
+      var d = { el: c, src: s, home: spot(bands[0]), stage: 0 };
+      if (BN >= 2 && i < Math.round(N * fracN)) { d.stage = 1; d.n = spot(bands[1]); }
+      if (BN >= 3 && i < Math.round(N * fracQ)) { d.stage = 2; d.q = spot(bands[2]); }
+      dots.push(d);
+    }
+    // nurtured / qualified pick: spread over the order the dots arrived in
+    dots.sort(function () { return rnd() - 0.5; });
+
+    // ── ENTRANCE ──
+    var len = 2 * Math.hypot(TW - NW, NECK - TOP) + 2 * (SPOUT - NECK);
+    gsap.set(outline, { strokeDasharray: len + ' ' + len, strokeDashoffset: len });
+    tl.to(outline, { strokeDashoffset: 0, duration: 0.9, ease: 'power2.inOut' }, P(0.05));
+    var divs = [].slice.call(el.querySelectorAll('.lfn-divider'));
+    gsap.set(divs, { opacity: 0 });
+    tl.to(divs, { opacity: 0.35, duration: 0.4, stagger: 0.1 }, P(0.6));
+    sources.forEach(function (s) {
+      gsap.set(s.g, { opacity: 0, y: -10 });
+      tl.to(s.g, { opacity: 1, y: 0, duration: 0.35, ease: 'back.out(2)' }, s.at);
+    });
+    bands.forEach(function (b, i) {
+      gsap.set(b.label, { opacity: 0.18 });
+      tl.to(b.rect, { opacity: i === BN - 1 ? 0.32 : 0.16, duration: 0.45, ease: 'power2.out' }, b.at);
+      tl.to(b.label, { opacity: 1, duration: 0.35 }, b.at);
+      tl.fromTo(b.label, { scale: 0.92, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.45, ease: 'back.out(2)', immediateRender: false }, b.at);
+    });
+    touches.forEach(function (t) {
+      gsap.set(t.g, { opacity: 0 });
+      tl.fromTo(t.g, { opacity: 0, scale: 0.4, transformOrigin: '50% 50%' }, { opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(2.5)', immediateRender: false }, t.at);
+    });
+    // fall in: a stream from the chips into the top band
+    var attractAt = bands[0].at, stream = num(data.stream, 1.3);
+    dots.forEach(function (d, k) {
+      var t0 = attractAt - 0.25 + (k / N) * stream;
+      gsap.set(d.el, { opacity: 0 });
+      tl.to(d.el, { opacity: 1, duration: 0.12 }, t0);
+      tl.to(d.el, { attr: { cx: d.home.x }, duration: 0.6, ease: 'power1.out' }, t0);
+      tl.to(d.el, { attr: { cy: d.home.y }, duration: 0.6, ease: 'bounce.out' }, t0);
+    });
+    // nurture: the warmed ones drop a band
+    if (BN >= 2) dots.filter(function (d) { return d.stage >= 1; }).forEach(function (d, k, arr) {
+      var t0 = bands[1].at + 0.1 + (k / arr.length) * 0.9;
+      tl.to(d.el, { attr: { cx: d.n.x, cy: d.n.y }, fill: warm, duration: 0.55, ease: 'power2.inOut' }, t0);
+    });
+    if (BN >= 3) dots.filter(function (d) { return d.stage >= 2; }).forEach(function (d, k, arr) {
+      var t0 = bands[2].at + 0.1 + (k / arr.length) * 0.6;
+      tl.to(d.el, { attr: { cx: d.q.x, cy: d.q.y, r: 10 }, fill: hot, duration: 0.5, ease: 'power2.inOut' }, t0);
+    });
+
+    // ── HAND-OFF: one qualified lead leaves through the neck, named ──
+    var handG = el.querySelector('.lfn-handoff');
+    var hand = data.handoff === false ? null : (data.handoff || {});
+    var hero = dots.filter(function (d) { return d.stage === BN - 1; })[0] || dots[0];
+    if (hand) {
+      var name = hand.name != null ? String(hand.name) : 'Sarah Chen';
+      var ini = hand.initials || name.split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase();
+      var HY = 730, HR = 30;
+      var ring = el.querySelector('.lfn-hand-ring'), ti = el.querySelector('.lfn-hand-initials'), tn = el.querySelector('.lfn-hand-name');
+      var hx = name ? CX - 70 : CX;
+      ring.setAttribute('cx', hx); ring.setAttribute('cy', HY); ring.setAttribute('r', HR);
+      ti.setAttribute('x', hx); ti.setAttribute('y', HY); ti.textContent = ini;
+      tn.setAttribute('x', hx + HR + 14); tn.setAttribute('y', HY); tn.textContent = name;
+      gsap.set(handG, { opacity: 0 });
+      var ht = P(hand.at != null ? num(hand.at, 0) : (BN >= 3 ? num(bandDefs[BN - 1].at, DEFAULT_AT[BN - 1]) + 1.3 : 4.6));
+      tl.to(hero.el, { attr: { cx: CX, cy: NECK - 14 }, duration: 0.35, ease: 'power2.in' }, ht);
+      tl.to(hero.el, { attr: { cx: hx, cy: HY, r: HR }, fill: hot, duration: 0.55, ease: 'power3.out' }, ht + 0.35);
+      tl.to(handG, { opacity: 1, duration: 0.01 }, ht + 0.85);
+      tl.to(hero.el, { opacity: 0, duration: 0.01 }, ht + 0.86);
+      tl.fromTo(tn, { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.4, ease: 'power2.out', immediateRender: false }, ht + 0.9);
+    } else {
+      handG.style.display = 'none';
+    }
+    return tl;
+  }
+</script>
