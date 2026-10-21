@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — The tenant's own components, readable over MCP
+
+A web capture or a playground save lived only behind the playground HTTP API:
+`list target:'components'` showed the shared library alone, and nothing on
+MCP could open a capture's markup or its reference screenshot. Rebuilding a
+capture as a scriptable library component (the #1021/#1025 pattern) needs
+both. `core/tenant-components.ts` is now the ONE reader -- captures flat at
+the root with schema + reference under `captured/`, saves in a category dir --
+and every surface uses it: `list target:'components'` appends the tenant's own
+(marked `tenant: true`), `get target:'component', component_type` returns the
+schema, the html and the reference PNG, and the playground's tenant list /
+source / schema routes call it too. A second, unreachable copy of the
+playground source route (shadowed by the first, and blind to flat captures)
+is deleted.
+
 ## 2026-10-20 — Brand stickers, and a headline with stickers between the words
 
 Marc brought the refreshed brand (cream ground, PP Museum Light headlines,
