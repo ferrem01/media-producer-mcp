@@ -97,6 +97,7 @@ import os from "node:os";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled, requireTenant, tenantAllowed } from "./auth/auth.js";
 import { serveFile, contentTypeFor } from "./core/serve-file.js";
+import { ensurePreviewSpeaker } from "./core/preview-speaker.js";
 import { ensureFaststart } from "./core/encode.js";
 import { createShare, getShare, listShares, revokeShare, shareFiles, watchPageHtml, type Share } from "./core/shares.js";
 import { protectedResourceMetadata, authorizationServerMetadata, registerClient, wwwAuthenticateChallenge } from "./auth/mcp-oauth.js";
@@ -1372,7 +1373,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|sample-options|music-level|speaker-waveform|speaker-transcript|speaker-level|voice-line|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|library|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|share|job|generate-scenes|actor-test|heygen-avatars|cast|locations|recast|generated-take|scene-performance|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|booth-films|speaker-cut|speaker-restore|take-edit|speaker-background|take-look|take-status|blur-preview|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|scene-sfx|sample-options|music-level|speaker-waveform|preview-speaker|speaker-transcript|speaker-level|voice-line|compress-waiting|timelapse|media-edits|generate-image|need-source|stock-search|music|music-options|sfx-options|arm-need|armed-need|take-qr|traces|take|take-poster|storyboard|provide-asset|team)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -5065,6 +5066,25 @@ Rules:
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         jsonResponse(res, 200, { ok: true, component_id: compId, data: (comp as any).data });
+        return;
+      }
+
+      // ── API: The film's takes joined into one file, for the phone Preview ──
+      // GET /api/preview-speaker/{tenant}/{project} -> {url} (null: nothing to
+      // join). A phone cannot load the next take ahead of a cut, so the
+      // Preview plays this one file through (core/preview-speaker.ts).
+      const pvSpkMatch = urlPath.match(/^\/api\/preview-speaker\/([^/]+)\/([^/]+)$/);
+      if (pvSpkMatch && method === "GET") {
+        const [, pvTenant, pvProject] = pvSpkMatch.map(decodeURIComponent);
+        const project = await loadProject(pvTenant, pvProject);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        try {
+          const name = await ensurePreviewSpeaker(project, config.dataDir);
+          jsonResponse(res, 200, { url: name ? `/output/${encodeURIComponent(pvTenant)}/projects/${encodeURIComponent(pvProject)}/${name}` : null });
+        } catch (err: any) {
+          console.warn(`  preview-speaker: ${pvProject} ${err?.message || err}`);
+          jsonResponse(res, 500, { error: `Could not join the takes: ${err?.message || err}` });
+        }
         return;
       }
 
