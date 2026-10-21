@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — lead-funnel: the inbound engine as an object
+
+The inbound ads argue that marketing needs a funnel the way sales has a
+pipeline -- attract, nurture, qualify -- and nothing in the library could show
+it: funnel-chart is a chart of shrinking numbers, not a system with people in
+it. lead-funnel draws a funnel in ink whose bands light on their spoken cues;
+people are dots that pour in from channel chips, warm and drop a band as
+nurture touches ping, run hot when they qualify, and one leaves through the
+neck as a named person -- the hand-off (anchor `handoff`) into the next piece,
+a lead score or a sales note. One SVG, contained, so it reads in a phone box;
+dots keep off the labels and icons (the test checks it). Built for "Ask your
+sales team" and the B1 / B3 rebuilds, which share the object.
+
 ## 2026-10-21 — quotient-lead-score: the lead-scoring screen as a library component
 
 Marc captured the product's lead-scoring page (the Rules / People tab bar, the
