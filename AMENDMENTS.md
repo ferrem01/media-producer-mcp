@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — The phone Studio shows a built scene, not its board card
+
+Marc, on his phone: two films the Library called built "show boards when I
+click in". The phone Studio pictured every scene card with its storyboard
+card (`storyboard_card_scene_N.png`) whether or not the scene was built, so a
+built film looked like an unbuilt board, and a copy whose board had changed
+showed drawings of scenes it no longer had. A built scene's card now shows the
+scene itself through the poster route the Library already pages through
+(`/api/projects/<t>/<p>/poster?scene=i`); an unbuilt scene keeps its card.
+
 ## 2026-10-21 — calm physics settles instead of bouncing
 
 Max on the inbound ads: "jarring animations". The logos popped, the type

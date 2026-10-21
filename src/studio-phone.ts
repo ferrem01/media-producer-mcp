@@ -461,8 +461,14 @@ ${QUOTIENT_CSS}
       var dur = document.createElement('div'); dur.className = 'dur'; dur.textContent = s.duration_seconds ? fmt(s.duration_seconds) : '';
       head.appendChild(label); head.appendChild(dur); card.appendChild(head);
 
+      // A built scene shows ITSELF (the poster route photographs it, the same
+      // pictures the Library pages through); only an unbuilt one shows its
+      // board card. The board card of a built film is the plan before the
+      // build -- every built film looked like a board (Marc, Oct 21).
       var img = document.createElement('img'); img.className = 'still'; img.alt = '';
-      img.src = withToken('/output/' + encodeURIComponent(tenant) + '/projects/' + encodeURIComponent(project) + '/storyboard_card_scene_' + (i + 1) + '.png?v=' + encodeURIComponent(P.updated_at || ''));
+      img.src = (P.scenes || [])[i]
+        ? withToken('/api/projects/' + encodeURIComponent(tenant) + '/' + encodeURIComponent(project) + '/poster?scene=' + i + '&v=' + encodeURIComponent(P.updated_at || ''))
+        : withToken('/output/' + encodeURIComponent(tenant) + '/projects/' + encodeURIComponent(project) + '/storyboard_card_scene_' + (i + 1) + '.png?v=' + encodeURIComponent(P.updated_at || ''));
       img.onerror = function () { img.style.display = 'none'; };
       card.appendChild(img);
 
