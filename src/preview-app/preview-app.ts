@@ -1766,6 +1766,7 @@ ${QUOTIENT_CSS}
   // Inside the user's tap: give the speaker players the opening take and
   // play/pause them, so the phone lets them play (with sound) later.
   function watchPrimeMedia() {
+    resumeAudioLevels();
     try {
       var first = speakerClipForTime(0);
       var els2 = [els.speakerBg, els.speakerBg2];
@@ -2647,6 +2648,36 @@ ${QUOTIENT_CSS}
     return source;
   }
 
+  // A PHONE IGNORES A MEDIA ELEMENT'S VOLUME: iOS plays every <audio> at full
+  // level whatever .volume says, so the music bed set to 0.14 under the voice
+  // played at 1.0 in the phone Preview (Marc, Oct 21: "a thumping music track
+  // ... very loud"). On a phone each track's level goes through a Web Audio
+  // gain instead, which iOS honours: the element stays at 1 and its .volume
+  // reads and writes the gain, so every fade, duck and slider in this file
+  // works unchanged. The context is resumed inside the tap (resumeAudioLevels).
+  var audioLevelCtx = null;
+  function levelThroughGain(audio) {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioLevelCtx) audioLevelCtx = new AC();
+      var gain = audioLevelCtx.createGain();
+      audioLevelCtx.createMediaElementSource(audio).connect(gain);
+      gain.connect(audioLevelCtx.destination);
+      var level = audio.volume;
+      Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'volume').set.call(audio, 1);
+      gain.gain.value = level;
+      Object.defineProperty(audio, 'volume', {
+        configurable: true,
+        get: function() { return level; },
+        set: function(v) { level = Math.max(0, Math.min(1, Number(v) || 0)); gain.gain.value = level; }
+      });
+    } catch (e) {}
+  }
+  // Inside a tap: a phone starts an audio context suspended.
+  function resumeAudioLevels() {
+    try { if (audioLevelCtx && audioLevelCtx.state !== 'running') audioLevelCtx.resume(); } catch (e) {}
+  }
   function initAudio() {
     destroyAudio();
     state.musicStarted = false;
@@ -2694,6 +2725,7 @@ ${QUOTIENT_CSS}
       audio._trimStart = Number(track.trim_start) > 0 ? Number(track.trim_start) : 0;
       audio._clipDur = Number(track.duration) > 0 ? Number(track.duration) : 0;
       audio._cue = !!track._cue;
+      if (IS_MOBILE) levelThroughGain(audio);
 
       // Kick off buffering now (on project load) so the first clip is decoded
       // well before the user hits play -- avoids a cold-start garble on scene 1.
@@ -2793,6 +2825,7 @@ ${QUOTIENT_CSS}
   // user gesture and sets levels. It never forces currentTime -- doing so made
   // every staggered voiceover restart from 0 and overlap.
   function playAudio() {
+    resumeAudioLevels();
     state.audioElements.forEach(function(audio) {
       // Apply fade-in (music) or the track's level, scaled by master volume.
       if (!state.musicStarted && audio._fadeIn > 0) {

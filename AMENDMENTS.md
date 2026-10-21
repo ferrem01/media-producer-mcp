@@ -6,6 +6,19 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-21 — The phone Preview plays the music at its level
+
+Marc, on his phone: "a thumping music track that is on both and it is very
+loud", then "maybe the preview is just not respecting the volume of the
+music?". It was not: iOS ignores an <audio> element's .volume and plays every
+element at full level, so the bed set to 0.14 under the voice played at 1.0.
+On a phone each audio track now carries its level through a Web Audio gain
+(levelThroughGain in preview-app.ts): the element stays at 1, and the
+element's .volume reads and writes the gain, so the fades, the ducking and the
+volume slider work unchanged. The context is resumed inside the tap. Desktop
+is unchanged (no gain). Checked in an iPhone 13 emulation: gain 0.14, element
+1, context running, music playing; a desktop load creates no gain.
+
 ## 2026-10-21 — The phone Preview plays the takes as one file
 
 Marc, watching proj_7d01a9e0 and proj_33f4fd99 in the phone Preview: "in
