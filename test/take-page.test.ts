@@ -68,7 +68,17 @@ describe("what the booth does", () => {
     expect(html).not.toMatch(/#stage\.wide/);
     // Echo cancellation OFF: the same choice the extension made after the
     // combined-I/O device nulled the mic. Consistent behaviour on every device.
-    expect(html).toMatch(/echoCancellation: false, noiseSuppression: true, autoGainControl: true/);
+    expect(html).toMatch(/echoCancellation: false, noiseSuppression: true, autoGainControl: false/);
+  });
+
+  it("every recorder takes the mic as it is: no echo cancellation, no auto gain", async () => {
+    // The browser's auto gain rode Marc's level down ~10 dB after the first
+    // two seconds of every take (B5, Oct 23); the server sets loudness itself.
+    for (const f of ["src/take-page.ts", "src/remote-booth-page.ts", "src/preview-app/preview-app.ts"]) {
+      const src = await readFile(path.join(HERE, "..", f), "utf-8");
+      expect(src, f).toMatch(/autoGainControl: false/);
+      expect(src, f).not.toMatch(/autoGainControl: true|echoCancellation: true/);
+    }
   });
 
   it("records the picture on screen -- a portrait canvas -- not the raw camera track", () => {
