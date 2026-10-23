@@ -324,6 +324,18 @@ function recastStem(url: string | undefined): string | null {
   return m ? m[1] : null;
 }
 
+/** A clip sent without its scene (the update tool's clip list) keeps the
+ *  scene the clip with the same source had: a film with one take per scene
+ *  ties each clip to its scene by scene_index, and a list resent without it
+ *  left every take but the first unclaimed (proj_66020d70, Oct 23). */
+export function keepClipScenes<T extends { source: string; scene_index?: number }>(prev: ClipLike[] | undefined, next: T[]): T[] {
+  return next.map((c) => {
+    if (c.scene_index !== undefined) return c;
+    const was = (prev || []).find((p) => p.source === c.source && p.scene_index !== undefined);
+    return was ? { ...c, scene_index: was.scene_index } : c;
+  });
+}
+
 /** The newest take behind a clip. */
 export function takeForClip(project: ProjectLike, clip: ClipLike): TakeLike | undefined {
   return [...(project.takes || [])].reverse().find((t) => t.scene_index === clip.scene_index && takeOwns(t, clip.source));

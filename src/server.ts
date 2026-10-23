@@ -7,6 +7,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { vocabulary } from "./core/vocabulary.js";
+import { keepClipScenes } from "./core/speaker-layer.js";
 import { FILM_CAMERAS, SHOT_MOVES, setShotMove } from "./core/shot-camera.js";
 import { listSamples } from "./core/sample-work.js";
 import { FILL_WHEN_UNSET } from "./core/take-studio.js";
@@ -1284,6 +1285,7 @@ export function createMcpServer(): McpServer {
           start: z.number().optional(),
           trim_start: z.number().optional(),
           trim_end: z.number().optional(),
+          scene_index: z.number().int().min(0).optional().describe("The scene this clip plays (a film with one take per scene). Omitted: a clip with the same source keeps the scene it had."),
           fit: z.boolean().optional().describe("Time-fit this clip to the film's total duration (single-clip bases). Use when a raw screen recording runs longer than a separately de-silenced narration so the whole walkthrough plays start-to-finish instead of being truncated."),
         })),
       }).optional().describe("Speaker track: continuous speaker video as base layer with content overlaid on top. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to the string \"speaker\" — the render pipeline resolves it to the actual speaker video path automatically."),
@@ -1438,6 +1440,7 @@ export function createMcpServer(): McpServer {
           start: z.number().optional(),
           trim_start: z.number().optional(),
           trim_end: z.number().optional(),
+          scene_index: z.number().int().min(0).optional().describe("The scene this clip plays (a film with one take per scene). Omitted: a clip with the same source keeps the scene it had."),
           fit: z.boolean().optional().describe("Time-fit this clip to the film's total duration (single-clip bases). Use when a raw screen recording runs longer than a separately de-silenced narration so the whole walkthrough plays start-to-finish instead of being truncated."),
         })).optional(),
         volume: z.number().min(0).max(1).optional().describe("The voice's level in the film, 0-1 (default 1, the take as normalised). Pass alone ({volume: 0.7}) to change only the level; the clips are kept."),
@@ -1795,7 +1798,7 @@ export function createMcpServer(): McpServer {
             delete project.speaker_track;
           } else {
             const keepVol = vol !== undefined ? vol : project.speaker_track?.volume;
-            project.speaker_track = { ...st, ...(keepVol !== undefined ? { volume: keepVol } : {}) };
+            project.speaker_track = { ...st, clips: keepClipScenes(project.speaker_track?.clips, st.clips), ...(keepVol !== undefined ? { volume: keepVol } : {}) };
             await sanitizeSpeakerClips(project);
           }
           updated = true;
