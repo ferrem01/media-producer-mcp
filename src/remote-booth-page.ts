@@ -839,7 +839,7 @@ ${QUOTIENT_CSS}
       // (7:5) for a 3840x2160 ask (Marc's laptop, 2026-09-27), and a
       // 16x9 crop of that is ~3K.
       if (sz) v.aspectRatio = { ideal: sz[0] / sz[1] };
-      return navigator.mediaDevices.getUserMedia({ video: v, audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } })
+      return navigator.mediaDevices.getUserMedia({ video: v, audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: false } })
         .catch(function (e) { if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e; i += 1; if (i < sizes.length) return attempt(); throw e; });
     }
     return attempt().then(function (s) {

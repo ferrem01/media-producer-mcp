@@ -9047,7 +9047,10 @@ ${QUOTIENT_CSS}
     var row = document.getElementById('vl-rec-row');
     if (!row) return;
     if (!navigator.mediaDevices || !window.MediaRecorder) { studioStatus('This browser cannot record here', 'err'); return; }
-    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function(stream) {
+    // The mic as it is: the browser's call processing rode Marc's level down
+    // ~10 dB after the first two seconds of every take (B5, Oct 23), and
+    // the server sets each line's loudness anyway.
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: false } }).then(function(stream) {
       var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].filter(function(m) { return MediaRecorder.isTypeSupported(m); })[0] || '';
       var rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       var chunks = [];
@@ -10702,7 +10705,7 @@ ${QUOTIENT_CSS}
     var ready = booth.stream
       ? Promise.resolve(booth.stream)
       : navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: false },
           video: booth.wantCam ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false
         });
     ready.then(function(stream) {

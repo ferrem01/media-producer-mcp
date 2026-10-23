@@ -992,7 +992,7 @@ ${QUOTIENT_CSS}
   function micPick() { try { return localStorage.getItem(MIC_KEY) || ''; } catch (e) { return ''; } }
   function micAudio() {
     // Mirrors the recorder extension so a take behaves the same on every device.
-    var a = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
+    var a = { echoCancellation: false, noiseSuppression: true, autoGainControl: false };
     var id = micPick(); if (id) a.deviceId = { exact: id };
     return a;
   }
