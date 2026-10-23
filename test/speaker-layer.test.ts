@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fsp from "node:fs/promises";
 import fs from "node:fs";
-import { SPEAKER_SRC, SPEAKER_ALPHA_SRC, groundOf, castSpeakerLayer, setSpeakerBackground, speakerLayerOf, speakerLayersOf, isSpeakerLayer, sceneSpeakerBackground, speakerRendersInside, speakerUsesBase, bindSpeakerLayerData, takeCopies, takeOwns, syncSpeakerClips, missingSpeakerCopies, asSpeakerBackground } from "../src/core/speaker-layer.js";
+import { SPEAKER_SRC, SPEAKER_ALPHA_SRC, groundOf, castSpeakerLayer, setSpeakerBackground, speakerLayerOf, speakerLayersOf, isSpeakerLayer, sceneSpeakerBackground, speakerRendersInside, speakerUsesBase, bindSpeakerLayerData, takeCopies, takeOwns, syncSpeakerClips, missingSpeakerCopies, asSpeakerBackground, keepClipScenes } from "../src/core/speaker-layer.js";
 import { sceneCompositesOverSpeaker } from "../src/core/speaker-mode.js";
 import { speakerClipForScene } from "../src/core/speaker-track.js";
 import { activeTake } from "../src/core/take-needs.js";
@@ -354,5 +354,23 @@ describe("the choice, wherever it is made", () => {
     expect(matte).toMatch(/const synced = syncSpeakerClips\(project\);\s*ensureSpeakerNeeds\(project\);/);
     expect(matte).not.toMatch(/t\.source = blurUrl/);
     expect(matte).toMatch(/if \(again\.blur \|\| again\.alpha\) queueTakeMatte\(\{ \.\.\.opts, \.\.\.again \}\);/);
+  });
+});
+
+describe("keepClipScenes: a resent clip list keeps each clip's scene", () => {
+  const prev = [
+    { source: "/a/s1.mp4", scene_index: 0 },
+    { source: "/a/s3.mp4", scene_index: 1 },
+    { source: "/a/s4.mp4", scene_index: 2 },
+  ];
+  it("a clip sent without scene_index keeps the one its source had", () => {
+    const out = keepClipScenes(prev, [{ source: "/a/s1.mp4" }, { source: "/a/s3.mp4", trim_start: 0.3 }, { source: "/a/s4.mp4" }]);
+    expect(out.map((c) => c.scene_index)).toEqual([0, 1, 2]);
+    expect(out[1].trim_start).toBe(0.3);
+  });
+  it("a scene_index sent wins, and a new source stays untied", () => {
+    const out = keepClipScenes(prev, [{ source: "/a/s3.mp4", scene_index: 2 }, { source: "/a/new.mp4" }]);
+    expect(out[0].scene_index).toBe(2);
+    expect(out[1].scene_index).toBeUndefined();
   });
 });
