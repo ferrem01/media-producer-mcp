@@ -75,6 +75,13 @@
     box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 26) color-mix(in srgb, var(--mp-color-primary, #393bf5) 32%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   }
   .cta-arrow { display: inline-block; font-weight: 500; }
+  /* button_size 'large': the button IS the call to action (Marc, Oct 23:
+     "make the call to action button larger" -- a bigger box only grew the
+     headline with it). About 1.5-2x the button, the headline as it was, and
+     the URL under it big enough to read, with room above it. */
+  .cta-root.btn-large .cta-button { height: calc(var(--u) * 128); padding: 0 calc(var(--u) * 56); gap: calc(var(--u) * 20); font-size: calc(var(--u) * 48); }
+  .cta-root.btn-large .cta-actions { margin-top: calc(var(--u) * 48); }
+  .cta-root.btn-large .cta-url { margin-top: calc(var(--u) * 44); font-size: calc(var(--u) * 40); }
   .cta-shine {
     position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
     background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%);
@@ -108,6 +115,7 @@
     root.classList.add('t-' + theme);
     if (data.surface === 'none') root.classList.add('surface-none');
     if (data.actions === 'stack') root.classList.add('stack');
+    if (data.button_size === 'large') root.classList.add('btn-large');
     if (data.button_color) {
       btn.style.background = String(data.button_color);
       // The glow follows the button, not the brand: a black button with a

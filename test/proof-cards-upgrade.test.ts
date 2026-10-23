@@ -80,6 +80,35 @@ describe("cta-card", () => {
   }, 60000);
 });
 
+describe("cta-card button_size large", () => {
+  // Marc, Oct 23: "make the call to action button larger" -- a bigger box only
+  // grew the headline with it, so the button stayed a small pill under it.
+  it("makes the button the hero and enlarges the URL in a 9:16 end card, whole and inside the frame", async () => {
+    const pos = { x: "3%", y: "46%", width: "94%", height: "42%" };
+    const data = { headline: "Start your free trial", button_text: "Start free trial", url: "getquotient.ai", surface: "none", theme: "light" };
+    const measure = (page: Page) => page.evaluate(() => {
+      const b = document.querySelector(".cta-button")!, r = b.getBoundingClientRect();
+      const label = document.querySelector(".cta-arrow")!.getBoundingClientRect();
+      return { h: r.height, left: r.left, right: r.right, clipped: label.right > r.right - 8,
+        headline: parseFloat(getComputedStyle(document.querySelector(".cta-headline")!).fontSize),
+        url: parseFloat(getComputedStyle(document.querySelector(".cta-url")!).fontSize) };
+    });
+    let normal = { h: 0, headline: 0, url: 0 };
+    await open([{ type: "cta-card", data, position: pos }], async (page, seek) => { await seek(4); normal = await measure(page); }, { w: 1080, h: 1920 });
+    await open([{ type: "cta-card", data: { ...data, button_size: "large" }, position: pos }], async (page, seek) => {
+      await seek(4);
+      const big = await measure(page);
+      if (process.env.MP_STILL_OUT) await page.screenshot({ path: process.env.MP_STILL_OUT });
+      expect(big.h).toBeGreaterThan(normal.h * 1.4);
+      expect(big.clipped).toBe(false);
+      expect(big.left).toBeGreaterThan(20);
+      expect(big.right).toBeLessThan(1080 - 20);
+      expect(big.headline).toBeGreaterThan(normal.headline * 0.7); // the headline stays big
+      expect(big.url).toBeGreaterThan(normal.url * 1.4); // and the URL reads
+    }, { w: 1080, h: 1920 });
+  }, 90000);
+});
+
 describe("pricing-card", () => {
   it("counts the price up, builds every feature row, and fills its slot", async () => {
     const data = { name: "Growth", price: "$49", period: "/month", highlighted: true, cta: "Start trial", features: ["Unlimited campaigns", "AI drafts", "Brand kit", "CRM sync", "Priority support"] };

@@ -87,6 +87,15 @@
       "type": "number",
       "label": "When the button (and link) land, if not right after the lines -- e.g. when a dot-logo's travelling dot arrives there",
       "optional": true
+    },
+    "button_size": {
+      "type": "string",
+      "label": "'large' makes the button the hero (about 1.5-2x the size, a bigger URL under it; the headline stays)",
+      "optional": true,
+      "enum": [
+        "normal",
+        "large"
+      ]
     }
   }
 }
