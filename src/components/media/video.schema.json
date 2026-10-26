@@ -32,7 +32,7 @@
     },
     "fill": {
       "type": "string",
-      "label": "'blur': show the whole clip (contain) over a blurred, scaled-up copy of itself filling the box -- for off-aspect footage (a 16:9 clip in a 9:16 frame)",
+      "label": "'blur': show the whole clip (contain) over a blurred, scaled-up copy of itself filling the box -- for off-aspect footage (a 16:9 clip in a 9:16 frame; the speaker's 9:16 take in a 4:5 LinkedIn frame, pulled back with blurred sides)",
       "optional": true,
       "enum": [
         "blur"

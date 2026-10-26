@@ -77,6 +77,10 @@
       return tl;
     }
 
+    // The person filling the frame (a speaker on fill 'blur', drawn here in
+    // place of the camera base) cuts with the scene like the base does.
+    if (data.fill === 'blur' && typeof data.background === 'string') return tl;
+
     // Fade in
     gsap.set(container, { autoAlpha: 0 });
     tl.to(container, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, 0);

@@ -104,6 +104,13 @@ describe("casting the speaker component", () => {
     const two: any = { duration_seconds: 8, components: [{ id: "a", type: "video", z_index: 1, position: full, data: { src: SPEAKER_SRC } }, { id: "b", type: "video", z_index: 2, position: { x: "76%", y: "60%", width: "20%", height: "35.6%" }, data: { src: SPEAKER_SRC } }] };
     expect(speakerLayersOf(two)).toHaveLength(2);
     expect(speakerUsesBase(two)).toBe(false);
+    // fill 'blur': the whole take over a blurred copy of itself (a 9:16 take
+    // in a 4:5 frame) -- the base would crop it, so the component draws it.
+    const pillar: any = { duration_seconds: 8, components: [{ id: "spk", type: "video", z_index: 1, position: full, data: { src: SPEAKER_SRC, background: "room", fill: "blur" } }] };
+    expect(speakerUsesBase(pillar)).toBe(false);
+    expect(speakerRendersInside(pillar)).toBe(true);
+    expect(bindSpeakerLayerData(pillar.components[0].data, { url: "/assets/t/take.mp4", offset: 1.5 })).toMatchObject({ src: "/assets/t/take.mp4", fill: "blur", start_at: 1.5 });
+    expect(fs.readFileSync("src/components/media/video.component.html", "utf8")).toMatch(/if \(data\.fill === 'blur' && typeof data\.background === 'string'\) return tl;/);
     expect(speakerUsesBase({ duration_seconds: 8, components: [lower()] })).toBe(false);
     expect(speakerRendersInside({ duration_seconds: 8, components: [lower()] })).toBe(false);
   });
