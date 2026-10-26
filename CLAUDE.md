@@ -105,8 +105,9 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
   position, size, shape (`rectangle|rounded|circle`) and place in the stack; its
   `data.background` = `room` | `blur` | `alpha` picks the copy of the take it plays. The
   ffmpeg camera BASE is an optimisation only (`speakerUsesBase`: one full-frame speaker on
-  room/blur with nothing under it -> transparent scene over the base, component draws
-  nothing); anything else draws where it sits and the scene renders opaque
+  room/blur, cropped to the frame (no `fill`), with nothing under it -> transparent scene over
+  the base, component draws nothing; `fill: "blur"` pulls the take back over a blurred copy
+  of itself and draws inside); anything else draws where it sits and the scene renders opaque
   (`speakerRendersInside`). Copies are made once per take by the matte
   (`core/take-matte.ts`), on request (booth choice, Studio Inspect/take card,
   `POST /api/speaker-background`); the raw take is always kept and `syncSpeakerClips`

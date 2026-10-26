@@ -159,8 +159,8 @@ export function sceneSpeakerBackground(scene: SceneLike | null | undefined): Spe
 
 /**
  * THE FAST PATH: the scene has exactly one speaker component, full-frame,
- * on room or blur, with nothing under it in the stack (the lowest z, no
- * ground). The camera is then the ffmpeg base under a transparent scene
+ * on room or blur, cropped to the frame (no fill), with nothing under it in
+ * the stack (the lowest z, no ground). The camera is then the ffmpeg base under a transparent scene
  * and the component draws nothing -- the picture is the same.
  */
 export function speakerUsesBase(scene: SceneLike | null | undefined): boolean {
@@ -170,6 +170,10 @@ export function speakerUsesBase(scene: SceneLike | null | undefined): boolean {
   if (speakerBackgroundOf(c) === "alpha") return false;
   if (!fullStage(c.position)) return false;
   if (asSpeakerShape(c.data?.shape) && c.data!.shape !== "rectangle") return false;
+  // fill 'blur' (the whole take in the middle over a blurred copy of itself
+  // -- a 9:16 take in a 4:5 LinkedIn frame) is drawn by the component; the
+  // base would cover-crop it.
+  if (c.data?.fill === "blur") return false;
   if (groundOf(scene)) return false;
   const z = Number(c.z_index);
   const zc = Number.isFinite(z) ? z : 0;
