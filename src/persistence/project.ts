@@ -21,6 +21,7 @@ import {
   tenantDir,
 } from "./paths.js";
 import { loadBrandKit } from "./brand-kit.js";
+import { withProjectLock } from "../core/project-lock.js";
 
 // ── Defaults ──
 
@@ -361,18 +362,20 @@ export async function updateProject(
   projectId: string,
   updates: Partial<Pick<Project, "name" | "canvas" | "brand_kit" | "status" | "audio" | "tags">>,
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  if (updates.name !== undefined) project.name = updates.name;
-  if (updates.canvas) project.canvas = { ...project.canvas, ...updates.canvas };
-  if (updates.brand_kit) project.brand_kit = { ...project.brand_kit, ...updates.brand_kit };
-  if (updates.status !== undefined) project.status = updates.status;
-  if (updates.audio !== undefined) project.audio = updates.audio;
-  if (updates.tags !== undefined) { if (updates.tags.length) project.tags = updates.tags; else delete project.tags; }
+    if (updates.name !== undefined) project.name = updates.name;
+    if (updates.canvas) project.canvas = { ...project.canvas, ...updates.canvas };
+    if (updates.brand_kit) project.brand_kit = { ...project.brand_kit, ...updates.brand_kit };
+    if (updates.status !== undefined) project.status = updates.status;
+    if (updates.audio !== undefined) project.audio = updates.audio;
+    if (updates.tags !== undefined) { if (updates.tags.length) project.tags = updates.tags; else delete project.tags; }
 
-  await saveProject(project);
-  return project;
+    await saveProject(project);
+    return project;
+  });
 }
 
 // ── Delete ──
@@ -396,17 +399,19 @@ export async function addScene(
   scene: Scene,
   position?: number,
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  if (position !== undefined && position >= 0 && position <= project.scenes.length) {
-    project.scenes.splice(position, 0, scene);
-  } else {
-    project.scenes.push(scene);
-  }
+    if (position !== undefined && position >= 0 && position <= project.scenes.length) {
+      project.scenes.splice(position, 0, scene);
+    } else {
+      project.scenes.push(scene);
+    }
 
-  await saveProject(project);
-  return project;
+    await saveProject(project);
+    return project;
+  });
 }
 
 export async function updateScene(
@@ -415,20 +420,22 @@ export async function updateScene(
   sceneId: string,
   updates: Partial<Pick<Scene, "label" | "duration_seconds" | "background" | "transition_in" | "components">>,
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  const scene = project.scenes.find((s) => s.id === sceneId);
-  if (!scene) return null;
+    const scene = project.scenes.find((s) => s.id === sceneId);
+    if (!scene) return null;
 
-  if (updates.label !== undefined) scene.label = updates.label;
-  if (updates.duration_seconds !== undefined) scene.duration_seconds = updates.duration_seconds;
-  if (updates.background !== undefined) scene.background = updates.background;
-  if (updates.transition_in !== undefined) scene.transition_in = updates.transition_in;
-  if (updates.components !== undefined) scene.components = updates.components;
+    if (updates.label !== undefined) scene.label = updates.label;
+    if (updates.duration_seconds !== undefined) scene.duration_seconds = updates.duration_seconds;
+    if (updates.background !== undefined) scene.background = updates.background;
+    if (updates.transition_in !== undefined) scene.transition_in = updates.transition_in;
+    if (updates.components !== undefined) scene.components = updates.components;
 
-  await saveProject(project);
-  return project;
+    await saveProject(project);
+    return project;
+  });
 }
 
 export async function removeScene(
@@ -436,12 +443,14 @@ export async function removeScene(
   projectId: string,
   sceneId: string,
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  project.scenes = project.scenes.filter((s) => s.id !== sceneId);
-  await saveProject(project);
-  return project;
+    project.scenes = project.scenes.filter((s) => s.id !== sceneId);
+    await saveProject(project);
+    return project;
+  });
 }
 
 export async function reorderScenes(
@@ -449,24 +458,26 @@ export async function reorderScenes(
   projectId: string,
   sceneIds: string[],
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  const sceneMap = new Map(project.scenes.map((s) => [s.id, s]));
-  const reordered: Scene[] = [];
+    const sceneMap = new Map(project.scenes.map((s) => [s.id, s]));
+    const reordered: Scene[] = [];
 
-  for (const id of sceneIds) {
-    const scene = sceneMap.get(id);
-    if (!scene) return null; // invalid scene id
-    reordered.push(scene);
-  }
+    for (const id of sceneIds) {
+      const scene = sceneMap.get(id);
+      if (!scene) return null; // invalid scene id
+      reordered.push(scene);
+    }
 
-  // Verify all scenes accounted for
-  if (reordered.length !== project.scenes.length) return null;
+    // Verify all scenes accounted for
+    if (reordered.length !== project.scenes.length) return null;
 
-  project.scenes = reordered;
-  await saveProject(project);
-  return project;
+    project.scenes = reordered;
+    await saveProject(project);
+    return project;
+  });
 }
 
 // ── Component operations (within a scene) ──
@@ -477,18 +488,20 @@ export async function addComponent(
   sceneId: string,
   component: import("../core/types.js").SceneComponent,
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  const scene = project.scenes.find((s) => s.id === sceneId);
-  if (!scene) return null;
+    const scene = project.scenes.find((s) => s.id === sceneId);
+    if (!scene) return null;
 
-  const { zOverSpeaker } = await import("../core/speaker-layer.js");
-  const { BACKDROP_TYPES } = await import("../core/scene-assembler.js");
-  const z = zOverSpeaker(scene as any, component as any, (t) => BACKDROP_TYPES.has(t));
-  scene.components.push(z == null ? component : { ...component, z_index: z });
-  await saveProject(project);
-  return project;
+    const { zOverSpeaker } = await import("../core/speaker-layer.js");
+    const { BACKDROP_TYPES } = await import("../core/scene-assembler.js");
+    const z = zOverSpeaker(scene as any, component as any, (t) => BACKDROP_TYPES.has(t));
+    scene.components.push(z == null ? component : { ...component, z_index: z });
+    await saveProject(project);
+    return project;
+  });
 }
 
 export async function updateComponent(
@@ -498,23 +511,25 @@ export async function updateComponent(
   componentId: string,
   updates: Partial<Pick<import("../core/types.js").SceneComponent, "data" | "position" | "z_index" | "enter" | "exit">>,
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  const scene = project.scenes.find((s) => s.id === sceneId);
-  if (!scene) return null;
+    const scene = project.scenes.find((s) => s.id === sceneId);
+    if (!scene) return null;
 
-  const comp = scene.components.find((c) => c.id === componentId);
-  if (!comp) return null;
+    const comp = scene.components.find((c) => c.id === componentId);
+    if (!comp) return null;
 
-  if (updates.data !== undefined) comp.data = { ...comp.data, ...updates.data };
-  if (updates.position !== undefined) comp.position = updates.position;
-  if (updates.z_index !== undefined) comp.z_index = updates.z_index;
-  if (updates.enter !== undefined) comp.enter = updates.enter;
-  if (updates.exit !== undefined) comp.exit = updates.exit;
+    if (updates.data !== undefined) comp.data = { ...comp.data, ...updates.data };
+    if (updates.position !== undefined) comp.position = updates.position;
+    if (updates.z_index !== undefined) comp.z_index = updates.z_index;
+    if (updates.enter !== undefined) comp.enter = updates.enter;
+    if (updates.exit !== undefined) comp.exit = updates.exit;
 
-  await saveProject(project);
-  return project;
+    await saveProject(project);
+    return project;
+  });
 }
 
 export async function removeComponent(
@@ -523,19 +538,21 @@ export async function removeComponent(
   sceneId: string,
   componentId: string,
 ): Promise<Project | null> {
-  const project = await loadProject(tenantId, projectId);
-  if (!project) return null;
+  return withProjectLock(tenantId, projectId, async () => {
+    const project = await loadProject(tenantId, projectId);
+    if (!project) return null;
 
-  const scene = project.scenes.find((s) => s.id === sceneId);
-  if (!scene) return null;
+    const scene = project.scenes.find((s) => s.id === sceneId);
+    if (!scene) return null;
 
-  const removed = scene.components.find((c) => c.id === componentId);
-  scene.components = scene.components.filter((c) => c.id !== componentId);
-  // A scene's custom graphic (a codegen scene_* component) is what its
-  // critique report described: with it gone, the report goes too -- it read
-  // "6 unresolved" on a scene that was then just the person and captions
-  // (proj_d872a7e4, Oct 5).
-  if (removed && /^scene_/.test(String(removed.type || "")) && (scene as any).quality) delete (scene as any).quality;
-  await saveProject(project);
-  return project;
+    const removed = scene.components.find((c) => c.id === componentId);
+    scene.components = scene.components.filter((c) => c.id !== componentId);
+    // A scene's custom graphic (a codegen scene_* component) is what its
+    // critique report described: with it gone, the report goes too -- it read
+    // "6 unresolved" on a scene that was then just the person and captions
+    // (proj_d872a7e4, Oct 5).
+    if (removed && /^scene_/.test(String(removed.type || "")) && (scene as any).quality) delete (scene as any).quality;
+    await saveProject(project);
+    return project;
+  });
 }

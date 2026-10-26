@@ -37,6 +37,7 @@ const execFileAsync = promisify(execFile);
 import { takeCopies, syncSpeakerClips, missingSpeakerCopies } from "./speaker-layer.js";
 import { ensureSpeakerNeeds } from "./take-needs.js";
 import { takeJobSet, takeJobProgress, takeJobDone, markTakeJobError } from "./take-jobs.js";
+import { withProjectLock } from "./project-lock.js";
 
 export const MATTE_MODEL_FILE = "rvm_mobilenetv3_fp32.onnx";
 export const MATTE_MODEL_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx";
@@ -446,23 +447,30 @@ export function queueTakeMatte(opts: {
       } });
       const blurUrl = m.output ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.output)) : undefined;
       const alphaUrl = m.alpha ? opts.rawUrl.replace(/[^/]+$/, path.basename(m.alpha)) : undefined;
-      const project = await opts.loadProject(opts.tenantId, opts.projectId);
-      if (!project) return;
-      let owned = 0;
-      for (const t of project.takes || []) {
-        if (takeCopies(t).raw !== opts.rawUrl) continue;
-        if (blurUrl) { t.blur = blurUrl; if (typeof strength === "number") t.blur_strength = strength; }
-        if (alphaUrl) t.alpha = alphaUrl;
-        if (alphaUrl && m.silhouette) t.silhouette = m.silhouette;
-        owned++;
-        const miss = missingSpeakerCopies(project, t);
-        again.blur = again.blur || miss.blur; again.alpha = again.alpha || miss.alpha;
-      }
-      const synced = syncSpeakerClips(project);
-      ensureSpeakerNeeds(project);
-      markTakeJobError(project, opts.rawUrl, "matte", null, (t) => takeCopies(t).raw);
-      project.updated_at = new Date().toISOString();
-      await opts.saveProject(project);
+      // Load to save holds the film (core/project-lock.ts): the matte runs
+      // minutes after the take, while the film is being edited.
+      const done = await withProjectLock(opts.tenantId, opts.projectId, async () => {
+        const project = await opts.loadProject(opts.tenantId, opts.projectId);
+        if (!project) return null;
+        let owned = 0;
+        for (const t of project.takes || []) {
+          if (takeCopies(t).raw !== opts.rawUrl) continue;
+          if (blurUrl) { t.blur = blurUrl; if (typeof strength === "number") t.blur_strength = strength; }
+          if (alphaUrl) t.alpha = alphaUrl;
+          if (alphaUrl && m.silhouette) t.silhouette = m.silhouette;
+          owned++;
+          const miss = missingSpeakerCopies(project, t);
+          again.blur = again.blur || miss.blur; again.alpha = again.alpha || miss.alpha;
+        }
+        const synced = syncSpeakerClips(project);
+        ensureSpeakerNeeds(project);
+        markTakeJobError(project, opts.rawUrl, "matte", null, (t) => takeCopies(t).raw);
+        project.updated_at = new Date().toISOString();
+        await opts.saveProject(project);
+        return { owned, synced };
+      });
+      if (!done) return;
+      const { owned, synced } = done;
       // A take cut by hand: the new copies get cut copies too.
       await recutProjectTakes(opts.tenantId, opts.projectId, opts.dataDir).catch((e) => console.warn(`  take matte: cutting the copies failed: ${e?.message || e}`));
       console.log(`  take matte: ${[m.output, m.alpha].filter(Boolean).map((f) => path.basename(f!)).join(" + ")} in ${Math.round(m.ms / 1000)}s (${m.frames} frames); ${owned} take(s) updated, ${synced} clip field(s) re-pointed`);
@@ -471,11 +479,13 @@ export function queueTakeMatte(opts: {
       console.warn(`  take matte failed for ${path.basename(opts.rawUrl)}: ${e?.message || e}`);
       // Left on the take, so Studio can say so and offer a retry.
       try {
-        const project = await opts.loadProject(opts.tenantId, opts.projectId);
-        if (project && markTakeJobError(project, opts.rawUrl, "matte", String(e?.message || e), (t) => takeCopies(t).raw)) {
-          project.updated_at = new Date().toISOString();
-          await opts.saveProject(project);
-        }
+        await withProjectLock(opts.tenantId, opts.projectId, async () => {
+          const project = await opts.loadProject(opts.tenantId, opts.projectId);
+          if (project && markTakeJobError(project, opts.rawUrl, "matte", String(e?.message || e), (t) => takeCopies(t).raw)) {
+            project.updated_at = new Date().toISOString();
+            await opts.saveProject(project);
+          }
+        });
       } catch { /* the log line above is the record */ }
     } finally {
       matteJobs.delete(key);

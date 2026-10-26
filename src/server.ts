@@ -101,6 +101,7 @@ import { resolveVideoPath } from "./core/video-path.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 import { generateImage } from "./media/image-gen.js";
 import { generateVideoClip, generatePresenterVideo, lastVideoGenError } from "./media/video-gen.js";
+import { withProjectLock } from "./core/project-lock.js";
 
 // ── Shared Zod schemas ──
 
@@ -976,17 +977,22 @@ export function queueSurgicalSceneOp(
     j.progress = { step: "scene-revise", percent: 20,
       detail: op.delete_index !== undefined ? "Removing the scene"
         : op.insert_at !== undefined ? "Authoring the new scene" : "Revising the scene" };
-    const project = await loadProject(tenantId, projectId);
-    if (!project?.storyboard?.scenes) throw new Error("Project has no storyboard");
-    if (!EDITABLE_BOARD_STATES.has(project.status)) {
-      throw new Error(`Cannot revise storyboard: project is in '${project.status}' state`);
-    }
-    let catalog: import("./llm/catalog.js").ComponentCatalogEntry[] | undefined;
-    try { catalog = await buildComponentCatalog(config.componentLibDir, tenantComponentsDir(tenantId)); } catch { catalog = undefined; }
-    const scene = await reviseDraftSceneSurgical(project, op, llmConfig, catalog);
-    project.updated_at = new Date().toISOString();
-    try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
-    await saveProject(project);
+    // The writer from load to save holds the film: an edit made while the
+    // scene is being written waits, and is not saved over.
+    const { project, scene } = await withProjectLock(tenantId, projectId, async () => {
+      const project = await loadProject(tenantId, projectId);
+      if (!project?.storyboard?.scenes) throw new Error("Project has no storyboard");
+      if (!EDITABLE_BOARD_STATES.has(project.status)) {
+        throw new Error(`Cannot revise storyboard: project is in '${project.status}' state`);
+      }
+      let catalog: import("./llm/catalog.js").ComponentCatalogEntry[] | undefined;
+      try { catalog = await buildComponentCatalog(config.componentLibDir, tenantComponentsDir(tenantId)); } catch { catalog = undefined; }
+      const scene = await reviseDraftSceneSurgical(project, op, llmConfig, catalog);
+      project.updated_at = new Date().toISOString();
+      try { await castBoardStandIns(project, config.dataDir); } catch (e: any) { console.warn(`  Board stand-ins: ${e?.message || e}`); }
+      await saveProject(project);
+      return { project, scene };
+    });
     j.progress = { step: "storyboard-cards", percent: 75, detail: "Photographing the storyboard" };
     try {
       await renderStoryboardCards(project as any, {
@@ -1037,6 +1043,12 @@ export function reshootStoryboardCardsSoon(tenantId: string, projectId: string):
   }, 1500);
 }
 
+/** The tools that change a film in the call itself (load, edit, save): one
+ *  at a time per film. The ones that start a job (generate, render, cast,
+ *  storyboard) return at once; the storyboard op, a performance, a take's
+ *  attach and matte and the render's status take the lock where they save. */
+const FILM_EDIT_TOOLS = new Set(["add", "update", "delete", "reorder", "audio", "edit_speaker"]);
+
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "media-producer-mcp",
@@ -1063,6 +1075,12 @@ export function createMcpServer(): McpServer {
       if (params && params.tenant_id !== resolved.tenantId) {
         if (params.tenant_id) console.warn(`  [mcp] ${name}: tenant_id "${params.tenant_id}" overridden by session tenant "${resolved.tenantId}"`);
         params.tenant_id = resolved.tenantId;
+      }
+      // An edit to a film holds the film for its whole call: a slow one (a
+      // storyboard update re-timing every scene) makes the next edit wait
+      // instead of saving the film it loaded before it (core/project-lock.ts).
+      if (FILM_EDIT_TOOLS.has(name) && typeof params?.project_id === "string" && params.project_id) {
+        return withProjectLock(resolved.tenantId, params.project_id, async () => handler(params, extra));
       }
       return handler(params, extra);
     }) as any);

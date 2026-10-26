@@ -6,6 +6,7 @@
 
 import { renderProject as renderProjectCore, type RenderOptions } from "./render.js";
 import { loadProject, saveProject } from "../persistence/project.js";
+import { withProjectLock } from "./project-lock.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "../persistence/paths.js";
 import { ensureSoundFiles } from "./scene-sfx.js";
 import { resolveSfxChoice } from "../audio/sfx.js";
@@ -132,31 +133,37 @@ async function runRender(
   const trace = options?.trace || new TraceBuilder("render", job.tenantId, projectId, "render");
 
   try {
-    const project = await loadProject(job.tenantId, projectId);
-    if (!project) {
-      job.status = "failed";
-      job.error = "Project not found";
-      job.completedAt = Date.now();
-      return;
-    }
+    // Load to save holds the film (core/project-lock.ts): the render's
+    // start writes its status and the cues' files on the film as it is.
+    const project = await withProjectLock(job.tenantId, projectId, async () => {
+      const project = await loadProject(job.tenantId, projectId);
+      if (!project) {
+        job.status = "failed";
+        job.error = "Project not found";
+        job.completedAt = Date.now();
+        return null;
+      }
 
-    if (project.scenes.length === 0) {
-      job.status = "failed";
-      job.error = "Project has no scenes";
-      job.completedAt = Date.now();
-      return;
-    }
+      if (project.scenes.length === 0) {
+        job.status = "failed";
+        job.error = "Project has no scenes";
+        job.completedAt = Date.now();
+        return null;
+      }
 
-    // The scenes' sound cues get their files before the render mixes them
-    // (a cue planned on the board has an id; the file is copied in once).
-    try {
-      const assets = projectAssetsDir(job.tenantId, projectId);
-      await ensureSoundFiles(project, (id) => resolveSfxChoice(id, assets));
-    } catch (e: any) { console.warn(`  sound cues: ${e?.message || e}`); }
+      // The scenes' sound cues get their files before the render mixes them
+      // (a cue planned on the board has an id; the file is copied in once).
+      try {
+        const assets = projectAssetsDir(job.tenantId, projectId);
+        await ensureSoundFiles(project, (id) => resolveSfxChoice(id, assets));
+      } catch (e: any) { console.warn(`  sound cues: ${e?.message || e}`); }
 
-    // Update project status
-    project.status = "rendering";
-    await saveProject(project);
+      // Update project status
+      project.status = "rendering";
+      await saveProject(project);
+      return project;
+    });
+    if (!project) return;
 
     job.progress = { step: "rendering", percent: 0 };
 
@@ -244,11 +251,13 @@ async function runRender(
     // snapshot loaded when the job STARTED -- renders run for many minutes,
     // and saving the stale object here silently clobbers any edit the user
     // made mid-render (scenes added, copy changed). Patch status only.
-    const projectAtEnd = await loadProject(job.tenantId, projectId);
-    if (projectAtEnd) {
-      projectAtEnd.status = "rendered";
-      await saveProject(projectAtEnd);
-    }
+    await withProjectLock(job.tenantId, projectId, async () => {
+      const projectAtEnd = await loadProject(job.tenantId, projectId);
+      if (projectAtEnd) {
+        projectAtEnd.status = "rendered";
+        await saveProject(projectAtEnd);
+      }
+    });
   } catch (err: any) {
     job.status = "failed";
     job.error = err.message || "Unknown error";
@@ -258,11 +267,13 @@ async function runRender(
 
     // Try to update project status
     try {
-      const project = await loadProject(job.tenantId, projectId);
-      if (project) {
-        project.status = "failed";
-        await saveProject(project);
-      }
+      await withProjectLock(job.tenantId, projectId, async () => {
+        const project = await loadProject(job.tenantId, projectId);
+        if (project) {
+          project.status = "failed";
+          await saveProject(project);
+        }
+      });
     } catch {
       // ignore
     }
