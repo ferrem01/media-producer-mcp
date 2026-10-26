@@ -61,10 +61,11 @@ describe("video fill 'blur' in a render", () => {
     // The sharp clip is ~281 px wide (500 * 9/16), leaving ~59 px each side;
     // measure well inside each part, clear of the seam between them.
     const left = region(img, 2, 30), right = region(img, W - 30, W - 2), mid = region(img, 120, 280);
+    const seen = JSON.stringify({ left, mid, right, whole: region(img, 0, W) });
     // Both sides show the blurred copy (not black), and stay soft.
-    expect(left.mean).toBeGreaterThan(40);
-    expect(right.mean).toBeGreaterThan(40);
+    expect(left.mean, seen).toBeGreaterThan(40);
+    expect(right.mean, seen).toBeGreaterThan(40);
     // The middle is the sharp clip: far more detail than the blurred sides.
-    expect(mid.edge).toBeGreaterThan(2 * Math.max(left.edge, right.edge));
+    expect(mid.edge, seen).toBeGreaterThan(2 * Math.max(left.edge, right.edge));
   }, 240000);
 });
