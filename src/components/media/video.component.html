@@ -64,7 +64,10 @@
         startAt: timedStart,
       });
       container.style.overflow = 'hidden'; container.style.position = 'relative';
-      style = 'position:relative;width:100%;height:100%;object-fit:contain;display:block;';
+      // Absolute, not in flow: the render hides each <video> and appends an
+      // <img> of its frames to the container -- an in-flow copy's img landed
+      // below the hidden video, out of the frame, and only the blur rendered.
+      style = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;';
     }
     var video = loadVideoForCapture(container, data.src, { style: style, startAt: timedStart });
 
