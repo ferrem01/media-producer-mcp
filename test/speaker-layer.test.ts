@@ -171,14 +171,24 @@ describe("binding the component at assembly (alpha)", () => {
       const src = await fsp.readFile(f, "utf8");
       expect(src).toMatch(/if \(isSpeakerLayer\(comp\) && !speakerRendersInside\(scene\)\) continue;/);
     }
-    expect(await fsp.readFile("src/core/scene-assembler.ts", "utf8")).toMatch(/alphaUrl: options\.speakerAlphaUrl, alphaOffset: options\.speakerAlphaOffset, url: speakerUrl, offset: options\.speakerOffset/);
+    expect(await fsp.readFile("src/core/scene-assembler.ts", "utf8")).toMatch(/alphaUrl: options\.speakerAlphaUrl, alphaOffset: options\.speakerAlphaOffset, url: options\.speakerClipUrl \|\| speakerUrl, offset: options\.speakerClipUrl \? options\.speakerClipOffset : options\.speakerOffset/);
     const render = await fsp.readFile("src/core/render.ts", "utf8");
     expect(render).toMatch(/for \(const comp of scene\.components\) \{\s*if \(isSpeakerLayer\(comp as any\)\) continue;/);
     expect(render).toMatch(/speakerAlphaUrl: `file:\/\/\$\{path\.resolve\(resolveVideoPath\(ownRef\.alpha\)\)\}`, speakerAlphaOffset: ownRef\.offset/);
+    expect(render).toMatch(/speakerClipUrl: `file:\/\/\$\{path\.resolve\(resolveVideoPath\(ownRef\.source\)\)\}`, speakerClipOffset: ownRef\.offset/);
     const worker = await fsp.readFile("src/core/scene-worker.ts", "utf8");
-    expect(worker).toMatch(/speakerAlphaUrl: args\.speakerAlphaUrl,\s*speakerAlphaOffset: args\.speakerAlphaOffset,/);
+    expect(worker).toMatch(/speakerAlphaUrl: args\.speakerAlphaUrl,\s*speakerAlphaOffset: args\.speakerAlphaOffset,\s*speakerClipUrl: args\.speakerClipUrl,\s*speakerClipOffset: args\.speakerClipOffset,/);
     const video = await fsp.readFile("src/components/media/video.component.html", "utf8");
     expect(video).toMatch(/if \(data\.shape === 'circle'\) \{ container\.style\.borderRadius = '50%'; container\.style\.overflow = 'hidden'; \}/);
+  });
+  it("a speaker drawn inside plays the scene's own take in its own shape, not the base fitted to the frame (fill 'blur', Oct 26)", async () => {
+    const { assembleScene } = await import("../src/core/scene-assembler.js");
+    const scene: any = { id: "s", label: "s", duration_seconds: 4, components: [{ id: "spk", type: "video", z_index: 1, position: full, data: { src: SPEAKER_SRC, background: "room", object_fit: "cover", fill: "blur" } }] };
+    const html = await assembleScene({ scene, components: [{ type: "video", source: await fsp.readFile("src/components/media/video.component.html", "utf8") }],
+      brandKit: { colors: { primary: "#000", secondary: "#000", background: "#fff", text: "#000" }, fonts: [] } as any, canvas: { width: 1080, height: 1350 } as any, gsapDir: "vendor/gsap",
+      speakerUrl: "file:///w/speaker_base.mp4", speakerOffset: 12.5, speakerClipUrl: "file:///a/take-s1.mp4", speakerClipOffset: 0.4 } as any);
+    expect(html).toContain("file:///a/take-s1.mp4");
+    expect(html).not.toContain("file:///w/speaker_base.mp4");
   });
   it("the scene's clip lookup carries the alpha copy", () => {
     const scenes = [{ duration_seconds: 5 }, { duration_seconds: 5 }];

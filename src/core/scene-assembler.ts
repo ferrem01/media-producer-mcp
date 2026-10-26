@@ -184,6 +184,12 @@ export interface AssembleOptions {
    *  own trim; defaults to speakerOffset). */
   speakerAlphaUrl?: string;
   speakerAlphaOffset?: number;
+  /** The scene's own take on room or blur (file://), at its trim: a speaker
+   *  drawn inside plays it in its own shape. The base is fitted to the frame,
+   *  so a 9:16 take on fill 'blur' in a 4:5 frame had nothing left to
+   *  contain (Oct 26). Defaults to the base at speakerOffset. */
+  speakerClipUrl?: string;
+  speakerClipOffset?: number;
 }
 
 /** Component type prefixes that indicate an LLM-generated (codegen) scene. */
@@ -264,7 +270,7 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
     });
   }
 
-  return assembleScene({ scene, components, brandKit, canvas, gsapDir: options.gsapDir, preview, speakerUrl, speakerOffset: options.speakerOffset, speakerAlphaUrl: options.speakerAlphaUrl, speakerAlphaOffset: options.speakerAlphaOffset });
+  return assembleScene({ scene, components, brandKit, canvas, gsapDir: options.gsapDir, preview, speakerUrl, speakerOffset: options.speakerOffset, speakerAlphaUrl: options.speakerAlphaUrl, speakerAlphaOffset: options.speakerAlphaOffset, speakerClipUrl: options.speakerClipUrl, speakerClipOffset: options.speakerClipOffset });
 }
 
 /**
@@ -344,7 +350,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     // alpha) at the take's trim; with no take at all it is left out (a
     // black window would bury the ground).
     if (isSpeakerLayer(comp) && !speakerRendersInside(scene)) continue;
-    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: options.speakerAlphaUrl, alphaOffset: options.speakerAlphaOffset, url: speakerUrl, offset: options.speakerOffset }, { type: comp.type });
+    const layerData = bindSpeakerLayerData(comp.data, { alphaUrl: options.speakerAlphaUrl, alphaOffset: options.speakerAlphaOffset, url: options.speakerClipUrl || speakerUrl, offset: options.speakerClipUrl ? options.speakerClipOffset : options.speakerOffset }, { type: comp.type });
     if (!layerData) continue;
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol

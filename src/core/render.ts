@@ -722,13 +722,15 @@ async function renderVideoWithSpeakerTrack(
     const promises: Promise<{ framesDir: string; frameCount: number }>[] = [];
 
     for (let idx = batch; idx < batchEnd; idx++) {
-      // The scene's own clip for a speaker drawn inside: its alpha copy at
-      // its trim (the base at the scene's film start shows the same frames
-      // for room and blur, so the base serves those).
+      // The scene's own clip for a speaker drawn inside, at its trim: its
+      // alpha copy, and the take itself for room and blur. Not the base --
+      // the base is fitted to the frame, so a take of another shape (a 9:16
+      // take on fill 'blur' in a 4:5 frame) came out already cropped.
       const ownRef = speakerClipForScene(speaker_track.clips, project.scenes, idx);
       promises.push(renderSceneTransparentFrames(project, idx, workDir, critiqueOpts, extraComponentDirs, speakerWorkers, {
         speakerUrl: speakerFileUrl,
         speakerOffset: sceneStartTimes[idx],
+        ...(ownRef ? { speakerClipUrl: `file://${path.resolve(resolveVideoPath(ownRef.source))}`, speakerClipOffset: ownRef.offset } : {}),
         ...(ownRef?.alpha ? { speakerAlphaUrl: `file://${path.resolve(resolveVideoPath(ownRef.alpha))}`, speakerAlphaOffset: ownRef.offset } : {}),
       }));
     }
@@ -909,7 +911,7 @@ async function renderSceneTransparentFrames(
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
   workerRegistry?: Set<ChildProcess>,
-  speakerRef?: { speakerUrl: string; speakerOffset: number; speakerAlphaUrl?: string; speakerAlphaOffset?: number },
+  speakerRef?: { speakerUrl: string; speakerOffset: number; speakerAlphaUrl?: string; speakerAlphaOffset?: number; speakerClipUrl?: string; speakerClipOffset?: number },
 ): Promise<{ framesDir: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `speaker_scene_${sceneIndex}`);
@@ -947,6 +949,7 @@ async function renderSceneTransparentFrames(
     workerArgs.speakerUrl = speakerRef.speakerUrl;
     workerArgs.speakerOffset = speakerRef.speakerOffset;
     if (speakerRef.speakerAlphaUrl) { workerArgs.speakerAlphaUrl = speakerRef.speakerAlphaUrl; workerArgs.speakerAlphaOffset = speakerRef.speakerAlphaOffset; }
+    if (speakerRef.speakerClipUrl) { workerArgs.speakerClipUrl = speakerRef.speakerClipUrl; workerArgs.speakerClipOffset = speakerRef.speakerClipOffset; }
   }
 
   if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
