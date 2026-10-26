@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-26 — One writer at a time per film
+
+Four email ads (Oct 24) lost the graphics added to them. Their storyboard
+`update` calls ran past the client's 60 s timeout under load, kept running on
+the server, and then saved the film they had loaded at the start -- after a
+burst of component adds and deletes had landed. Every writer loads the whole
+film and saves the whole film, and only the take grade and take edits took
+`withProjectLock`; the rest raced.
+
+The lock (`core/project-lock.ts`) is now re-entrant (an AsyncLocalStorage of
+the films a context holds; a job started inside a lock and still running
+after it waits like anyone) and is taken by: the MCP edit tools for their
+whole call (`add`, `update`, `delete`, `reorder`, `audio`, `edit_speaker`),
+the persistence helpers (`updateProject`, scene and component ops), Studio's
+edit routes (`studioEditFilm`: projects/scenes/components, storyboard lines
+and order, camera moves, sfx, media edits, levels, take edits), the
+storyboard tool's job, a scene's performance (its own `chains` queue is
+gone), a take's attach from its fresh load to its save, the matte, and the
+render's status writes. A slow edit now makes the next one wait instead of
+being saved over. `test/project-lock.test.ts`: a writer that loads before an
+add and saves after it keeps the add; the edit tools wait for a held film;
+a storyboard update and component edits sent together all land (the three
+fail on the old code).
+
+Open: the generate pipeline, `scene-revise`, `recast` and image enrichment
+still load early and save late without the lock. They rebuild or revise a
+film rather than edit it, so they rarely run beside edits, but they can
+still save over one.
+
 ## 2026-10-21 — update keeps tags sent with a storyboard edit
 
 Six HubSpot ads were tagged in the same `update` call that set their opener

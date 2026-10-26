@@ -36,6 +36,7 @@ import { takeForClip, takeCopies } from "./speaker-layer.js";
 import { takeWindow, playClock, cutFileFor, speedOf } from "./take-clock.js";
 import { activeTake } from "./take-needs.js";
 import { editSceneTake } from "./take-edits.js";
+import { withProjectLock } from "./project-lock.js";
 import { detectSilence } from "./idle-silence.js";
 import { editImage } from "../media/image-gen.js";
 import { locationImage } from "./locations.js";
@@ -72,12 +73,10 @@ export function registerSceneAttacher(fn: Attacher): void { attacher = fn; }
 const running = new Set<string>();
 /** The vendor's last reply per scene job (queue place, status): Studio's wait. */
 const vendorNow = new Map<string, VendorStatus>();
-const chains = new Map<string, Promise<unknown>>();
 
 /** Change a scene's performance: load, mutate, save, one writer per film. */
 async function patch(tenant: string, projectId: string, si: number, fn: (perf: ScenePerformance, scene: any, project: any) => void): Promise<ScenePerformance> {
-  const k = `${tenant}/${projectId}`;
-  const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+  const next = withProjectLock(tenant, projectId, async () => {
     const project = await loadProject(tenant, projectId);
     if (!project) throw new Error("Project not found");
     const scene: any = (project as any).storyboard?.scenes?.[si];
@@ -89,7 +88,6 @@ async function patch(tenant: string, projectId: string, si: number, fn: (perf: S
     await saveProject(project);
     return perf;
   });
-  chains.set(k, next);
   return next as Promise<ScenePerformance>;
 }
 
@@ -347,8 +345,7 @@ export async function setSceneMove(tenant: string, projectId: string, si: number
 /** Set the film's camera (SPEC-shot-camera.md); "" back to the default.
  *  Frames already drawn stay; the next one is drawn in the new look. */
 export async function setFilmCamera(tenant: string, projectId: string, camera: string): Promise<{ film_camera: string }> {
-  const k = `${tenant}/${projectId}`;
-  const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+  const next = withProjectLock(tenant, projectId, async () => {
     const project = await loadProject(tenant, projectId);
     if (!project) throw new Error("Project not found");
     const bad = pinFilmAxes(project, { film_camera: camera });
@@ -357,22 +354,19 @@ export async function setFilmCamera(tenant: string, projectId: string, camera: s
     await saveProject(project);
     return { film_camera: filmCameraOf(project).id };
   });
-  chains.set(k, next);
   return next;
 }
 
 /** Change the cast plan (the film's and/or scenes'), on the film's writer
  *  chain so it never loses a perform's write. Nothing is made. */
 export async function editCastPlan(tenant: string, projectId: string, edit: Parameters<typeof applyPlanEdit>[2]): Promise<void> {
-  const k = `${tenant}/${projectId}`;
-  const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+  const next = withProjectLock(tenant, projectId, async () => {
     const project = await loadProject(tenant, projectId);
     if (!project) throw new Error("Project not found");
     await applyPlanEdit(tenant, project, edit);
     project.updated_at = new Date().toISOString();
     await saveProject(project);
   });
-  chains.set(k, next);
   await next;
 }
 
@@ -1106,14 +1100,12 @@ export async function voicePlanScenes(tenant: string, projectId: string): Promis
     if (!vp) continue;
     done.push(si);
     // The scratch read under the scene plays the actor's voice.
-    const k = `${tenant}/${projectId}`;
     const abs = resolveVideoPath(vp.url, config.dataDir);
-    const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+    const next = withProjectLock(tenant, projectId, async () => {
       const p: any = await loadProject(tenant, projectId);
       const tr = (p?.audio?.tracks || []).find((t: any) => t.id === `vo_scene_${si}`);
       if (tr) { tr.source = abs; tr.voice_of = actor.id; p.updated_at = new Date().toISOString(); await saveProject(p); }
     });
-    chains.set(k, next);
     await next;
   }
   return done;
@@ -1240,8 +1232,7 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
   if (running.has(key)) throw new Error(`A clip at ${at} s in scene ${si + 1} is already being made`);
   const W = Number(project.canvas?.width) || 1080, H = Number(project.canvas?.height) || 1920;
   const setClip = (fn: (c: any, sc: any, p: any) => void) => {
-    const k = `${tenant}/${projectId}`;
-    const next = (chains.get(k) || Promise.resolve()).catch(() => {}).then(async () => {
+    const next = withProjectLock(tenant, projectId, async () => {
       const p = await loadProject(tenant, projectId);
       const sc: any = (p as any)?.storyboard?.scenes?.[si];
       if (!p || !sc) throw new Error("The scene is gone");
@@ -1253,7 +1244,6 @@ export async function startActorClip(tenant: string, projectId: string, si: numb
       await saveProject(p);
       return c;
     });
-    chains.set(k, next);
     return next;
   };
   running.add(key);
