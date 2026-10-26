@@ -67,6 +67,39 @@ describe("video fill:'blur'", () => {
       expect(v[0].src).toBe(v[1].src);
     }, { w: 1080, h: 1920 });
   }, 60000);
+
+  // Oct 26: a 9:16 take on fill 'blur' in a 4:5 frame rendered only its
+  // blurred copy. The render worker (scene-worker.ts) hides each <video> and
+  // appends an <img> of its frames with the video's inline style; the sharp
+  // copy was in flow (position: relative), so its img landed below the
+  // hidden video, out of the frame. Both imgs must land in the frame.
+  it("both copies' render frames land in the frame, the sharp one on top", async () => {
+    await open("video", { src: "clip.webm", fill: "blur" }, async (page) => {
+      const r = await page.evaluate((still) => {
+        const vids = [...document.querySelectorAll("video")];
+        const imgs = vids.map((video) => {
+          video.style.setProperty("visibility", "hidden", "important");
+          const img = document.createElement("img");
+          img.style.cssText = video.style.cssText;
+          if (!video.style.position) { img.style.position = "absolute"; img.style.top = "0"; img.style.left = "0"; img.style.width = "100%"; img.style.height = "100%"; }
+          img.src = still;
+          video.parentElement?.appendChild(img);
+          return img;
+        });
+        const rect = (e: Element) => { const b = e.getBoundingClientRect(); return { t: b.top, b: b.bottom, l: b.left, r: b.right }; };
+        return { box: rect(vids[0].parentElement!), imgs: imgs.map((i) => ({ ...rect(i), fit: getComputedStyle(i).objectFit, blur: /blur/.test(i.style.filter) })) };
+      }, svg(360, 640));
+      expect(r.imgs.length).toBe(2);
+      const [blur, sharp] = r.imgs, box = r.box;
+      expect(blur.blur).toBe(true);
+      // The blurred copy overfills its box on EVERY side (the right went short).
+      expect(blur.l).toBeLessThan(box.l); expect(blur.r).toBeGreaterThan(box.r); expect(blur.t).toBeLessThan(box.t); expect(blur.b).toBeGreaterThan(box.b);
+      // The sharp copy fills the box exactly (the picture contained in it), not pushed below.
+      expect(sharp.blur).toBe(false);
+      expect(sharp.fit).toBe("contain");
+      expect([sharp.t, sharp.l, sharp.b, sharp.r]).toEqual([box.t, box.l, box.b, box.r]);
+    }, { w: 1080, h: 1350, position: { x: 0, y: 0, width: "100%", height: "100%" } });
+  }, 60000);
 });
 
 describe("feature-map", () => {

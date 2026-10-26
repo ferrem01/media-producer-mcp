@@ -87,6 +87,15 @@ async function getVideoDuration(filePath: string): Promise<number> {
 
 // ── Speaker Base Builder ──
 
+/** The camera base COVERS the frame, centred -- what Studio plays (the
+ *  base <video> is object-fit: cover) and what the speaker component asks
+ *  for. It letterboxed: a 9:16 take in a 4:5 LinkedIn copy rendered with
+ *  black bars beside the person (Oct 26). A take that should show whole sits
+ *  on its component's fill 'blur' instead, which draws inside. */
+export function coverToFrame(width: number, height: number): string {
+  return `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`;
+}
+
 /**
  * Build a single continuous speaker base video from one or more clips.
  *
@@ -282,7 +291,7 @@ async function buildSlottedBase(
     const leadV = lead > 0 ? `,tpad=start_mode=add:start_duration=${lead.toFixed(3)}:color=black` : "";
     const leadA = lead > 0 ? `,adelay=${Math.round(lead * 1000)}:all=1` : "";
     args.push("-filter_complex",
-      `[${vIn}]fps=30,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1` +
+      `[${vIn}]fps=30,${coverToFrame(width, height)},setsar=1` +
       `${leadV},tpad=stop_mode=clone:stop_duration=${len.toFixed(3)},trim=0:${len.toFixed(3)},setpts=PTS-STARTPTS[v];` +
       `[${aIn}]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo${leadA},apad,atrim=0:${len.toFixed(3)},asetpts=PTS-STARTPTS[a]`,
       "-map", "[v]", "-map", "[a]",
@@ -368,15 +377,15 @@ function buildSingleClipArgs(
     args.push("-t", String(totalDuration));
   }
 
-  // Scale to canvas dimensions, preserve aspect ratio with letterbox/pillarbox black.
-  // When fitting, prepend a setpts remap so the whole (trimmed) clip plays in
+  // Scale to canvas dimensions, covering the frame (coverToFrame). When
+  // fitting, prepend a setpts remap so the whole (trimmed) clip plays in
   // totalDuration; the -t totalDuration above then caps it cleanly.
   // setpts only rewrites timestamps (all source frames survive at a new
   // cadence); normalise to a stable 30fps so the downstream overlay composite
   // and stitch see the same frame rate the black-canvas synth path uses.
   const setptsPrefix = fitSpeedFactor && fitSpeedFactor > 0 ? `setpts=${fitSpeedFactor.toFixed(6)}*PTS,fps=30,` : "";
   args.push(
-    "-vf", `${setptsPrefix}scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
+    "-vf", `${setptsPrefix}${coverToFrame(width, height)}`,
     "-c:v", "libx264",
     "-preset", "medium",
     "-crf", "23",

@@ -58,3 +58,27 @@ describe("the speaker base: one take per scene, each in its slot", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }, 120000);
 });
+
+// THE BASE COVERS THE FRAME, as Studio plays it (Oct 26: a 9:16 take in a
+// 4:5 LinkedIn copy rendered with black bars beside the person).
+describe("the speaker base covers the frame", () => {
+  it.skipIf(!hasFfmpeg)("a tall take in a shorter frame fills it edge to edge, no black bars", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cover-"));
+    const take = path.join(dir, "take.mp4");
+    // A 9:16 take, bright all over.
+    execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y",
+      "-f", "lavfi", "-i", "color=c=white:s=180x320:r=24:d=1",
+      "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
+      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", take]);
+    const clips = [{ source: take, start: 0, scene_index: 0 }, { source: take, start: 0, scene_index: 1 }];
+    for (const [i, slots] of [[0, speakerSlots(clips, [{ duration_seconds: 1 }, { duration_seconds: 1 }], 2)], [1, undefined]] as const) {
+      const out = path.join(dir, `base${i}.mp4`);
+      // 4:5, 160x200: a contained 9:16 picture would leave ~22 px black each side.
+      await buildSpeakerBase({ speakerTrack: { clips: slots ? clips : clips.slice(0, 1) } as any, totalDuration: slots ? 2 : 1, width: 160, height: 200, outputPath: out, workDir: dir, ...(slots ? { slots } : {}) });
+      const px = execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-ss", "0.5", "-i", out, "-frames:v", "1", "-vf", "crop=6:200:0:0", "-f", "rawvideo", "-pix_fmt", "gray", "-"]);
+      const mean = px.reduce((a, b) => a + b, 0) / px.length;
+      expect(mean).toBeGreaterThan(200);
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }, 120000);
+});
