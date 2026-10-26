@@ -182,6 +182,9 @@ interface WorkerArgs {
   /** The scene's take as an alpha copy (file://), and where it stands at the scene's start. */
   speakerAlphaUrl?: string;
   speakerAlphaOffset?: number;
+  /** The scene's own take on room or blur (file://) and its trim, for a speaker drawn inside. */
+  speakerClipUrl?: string;
+  speakerClipOffset?: number;
 }
 
 async function main() {
@@ -239,6 +242,8 @@ async function main() {
     speakerOffset: args.speakerOffset,
     speakerAlphaUrl: args.speakerAlphaUrl,
     speakerAlphaOffset: args.speakerAlphaOffset,
+    speakerClipUrl: args.speakerClipUrl,
+    speakerClipOffset: args.speakerClipOffset,
   });
 
   // Download any remote media (e.g. a directly-embedded Pexels clip) to local
