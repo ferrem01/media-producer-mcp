@@ -6,6 +6,29 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-27 — The funnel carries across cuts
+
+The inbound homepage-test ads (C, D) tell the funnel one stage per scene --
+Attract, Collect, Nurture, Qualify -- each its own spoken line, the funnel at
+the same box with the camera locked. Marc: "we're resetting the animation
+from 3 to 4, not just picking up where 3 ended". `lead-funnel` drew itself
+in on every mount: the outline inked again, bands cued at 0 re-lit, and
+every dot poured in from the chips again.
+
+- `data.continue: true` -- the funnel picks up where the scene before left
+  it: the outline is drawn, and every band, source and touch cued at 0 or
+  before is already done (lit, its dots where they landed). Only the later
+  cues play. SPEC-relay.md says how a through-line crosses cuts.
+- Four bands now carry the dots through all four (they stopped at the third,
+  so Qualify stayed empty and the hand-off took a cold dot); `collect_share`
+  sets the second band's share, `nurture_share` / `qualify_share` the third
+  and fourth. Two and three bands place and move exactly as before.
+- `touch_band` puts the nurture touches in the band named for nurture (the
+  third of Attract / Collect / Nurture / Qualify) instead of always the second.
+
+Test: `test/lead-funnel.test.ts` (four bands; continue holds the cut frame
+and plays only the later cue).
+
 ## 2026-10-26 — One writer at a time per film
 
 Four email ads (Oct 24) lost the graphics added to them. Their storyboard

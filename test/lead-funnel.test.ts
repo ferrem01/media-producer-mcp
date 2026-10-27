@@ -59,7 +59,13 @@ const state = (page: import("playwright").Page, t: number) =>
       ? { x: Number(e.getAttribute("data-x")) - 21, y: Number(e.getAttribute("data-y")) - 21, width: 42, height: 42 }
       : e.getBBox()));
     return {
-      perBand: [0, 1, 2].map((i) => live.filter((d) => bandOf(d.y) === i).length),
+      perBand: bands.map((_, i) => live.filter((d) => bandOf(d.y) === i).length),
+      dotsXY: dots.map((d) => `${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(" "),
+      hotDots: live.filter((d) => d.fill === "rgb(180, 53, 123)").length,
+      outlineOffset: parseFloat(getComputedStyle(document.querySelector(".lfn-outline")!).strokeDashoffset) || 0,
+      outlineDash: getComputedStyle(document.querySelector(".lfn-outline")!).strokeDasharray,
+      iconBands: q(".lfn-icon").map((e) => bandOf(Number(e.getAttribute("data-y")))),
+      iconOp: q(".lfn-icon").map((e) => Number(getComputedStyle(e).opacity)),
       bandOp: q(".lfn-band").map((b) => Number(getComputedStyle(b).opacity)),
       labels: q(".lfn-label").map((e) => e.textContent),
       hand: Number(getComputedStyle(document.querySelector(".lfn-handoff")!).opacity),
@@ -103,6 +109,55 @@ describe("lead-funnel", () => {
       expect(end.perBand[1]).toBeGreaterThan(5);
       expect(end.handName).toBe("Ana Ruiz");
       expect(end.hand).toBe(1);
+    });
+  }, 60000);
+
+  // Marc, Oct 27: Attract / Collect / Nurture / Qualify. With four bands the
+  // dots step down through every one -- the fourth band used to stay empty --
+  // and the nurture touches ping in the band named for them.
+  it("four bands: the dots reach the last band and run hot there; touches ping in touch_band", async () => {
+    const FOUR = [{ label: "Attract", at: 0.8 }, { label: "Collect", at: 2 }, { label: "Nurture", at: 3.8 }, { label: "Qualify", at: 5.4 }];
+    await withPage(await assemble({ bands: FOUR, touch_band: 2, handoff: false }), async (page) => {
+      const collect = await state(page, 3.7);
+      expect(collect.perBand[1]).toBeGreaterThan(18);
+      expect(collect.perBand[2] + collect.perBand[3]).toBe(0);
+      const end = await state(page, 7);
+      expect(end.labels).toEqual(["Attract", "Collect", "Nurture", "Qualify"]);
+      expect(end.perBand[3]).toBeGreaterThan(3);
+      expect(end.hotDots).toBe(end.perBand[3]);
+      expect(new Set(end.iconBands)).toEqual(new Set([2]));
+      expect(end.onLabel).toBe(0);
+    });
+  }, 60000);
+
+  // Marc, Oct 27: "we're resetting the animation from 3 to 4, not just picking
+  // up where 3 ended". One funnel carried across cuts: the next scene's funnel
+  // continues -- drawn, the earlier bands lit, their dots where they landed --
+  // and only its own cue plays.
+  it("continue: what was cued at 0 is already done at the cut, and only the later cue moves", async () => {
+    const FOUR = [{ label: "Attract", at: 0 }, { label: "Collect", at: 0 }, { label: "Nurture", at: 2 }, { label: "Qualify", at: 99 }];
+    const data = { bands: FOUR, sources: [{ label: "Email", at: 0 }, { label: "Blog", at: 0 }], touch_band: 2, handoff: false, continue: true };
+    await withPage(await assemble(data), async (page) => {
+      const cut = await state(page, 0);
+      expect(cut.outlineOffset).toBe(0);
+      expect(cut.outlineDash).toBe("none");
+      expect(cut.bandOp[0]).toBeGreaterThan(0.1);
+      expect(cut.bandOp[1]).toBeGreaterThan(0.1);
+      expect(cut.bandOp[2]).toBeLessThan(0.05);
+      expect(cut.perBand[1]).toBeGreaterThan(12);
+      expect(cut.perBand[0] + cut.perBand[1]).toBe(28);
+      expect(cut.iconOp.every((o) => o === 0)).toBe(true);
+      // nothing replays before the scene's own cue
+      expect((await state(page, 1.5)).dotsXY).toBe(cut.dotsXY);
+      const after = await state(page, 3.5);
+      expect(after.perBand[2]).toBeGreaterThan(8);
+      expect(after.bandOp[2]).toBeGreaterThan(0.1);
+      expect(after.iconOp.every((o) => o > 0.95)).toBe(true);
+    });
+    // the same funnel without continue draws itself in from nothing
+    await withPage(await assemble({ ...data, continue: undefined }), async (page) => {
+      const start = await state(page, 0);
+      expect(start.outlineOffset).toBeGreaterThan(100);
     });
   }, 60000);
 
