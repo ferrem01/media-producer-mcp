@@ -8910,9 +8910,20 @@ ${QUOTIENT_CSS}
       takeEditRequest(si, { op: 'cut', from: Math.max(0, a), to: z }, 'Cutting the take');
     });
   }
+  // The scene's voice is kept as read; its pace is played on top (the take
+  // gets it once Seedance hands the take back), so the heard read plays it too.
+  document.addEventListener('play', function(e) {
+    var el = e.target, r = el && el.getAttribute && Number(el.getAttribute('data-rate'));
+    if (r > 0 && el.playbackRate !== r) { try { el.playbackRate = r; } catch (eR) {} }
+  }, true);
   function takePaceRow(tk) {
-    var cur = tk.speed || 1;
-    var btns = [1, 1.1, 1.15, 1.2].map(function(v) {
+    // The take's own speed is always one of the buttons, lit: a pace set
+    // anywhere but these presets (edit_speaker speed 1.09) showed every
+    // button unlit, and read as 1x.
+    var cur = Math.round((tk.speed || 1) * 100) / 100;
+    var paces = [1, 1.1, 1.15, 1.2];
+    if (paces.indexOf(cur) < 0) paces = paces.concat([cur]).sort(function(a, b) { return a - b; });
+    var btns = paces.map(function(v) {
       return '<button class="rv-go ' + (Math.abs(cur - v) < 0.001 ? '' : 'secondary') + '" data-tk-pace="' + v + '">' + v + 'x</button>';
     }).join('');
     return '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Pace</span>' + btns + '</div>'
@@ -10473,10 +10484,20 @@ ${QUOTIENT_CSS}
   els.playBtn.addEventListener('click', togglePlay);
   els.slider.addEventListener('input', function() { scrub(parseFloat(els.slider.value)); });
   if (els.volSlider) {
+    // THE LISTENING LEVEL IS YOURS, NOT THE FILM'S: kept in this browser, so a
+    // film opens at the level you left it. It came back at 100 on every load,
+    // so the speaker track got turned down instead -- and that is saved into
+    // the film (Marc, Oct 27: two ads left at 55% voice under their music).
+    // A mute is not kept: a film never opens silent.
+    try {
+      var savedVol = parseInt(localStorage.getItem('mp_volume') || '', 10);
+      if (savedVol > 0 && savedVol <= 100) { els.volSlider.value = String(savedVol); state.masterVolume = savedVol / 100; }
+    } catch (eVs) {}
     els.volSlider.addEventListener('input', function() {
       var v = parseInt(els.volSlider.value, 10);
       if (isNaN(v)) v = 100;
       state.masterVolume = v / 100;
+      if (v > 0) { try { localStorage.setItem('mp_volume', String(v)); } catch (eVw) {} }
       // Live-apply: non-music directly; music too when the ducking loop isn't
       // running (when it is, it re-reads masterVolume every tick).
       state.audioElements.forEach(function(audio) {
@@ -12347,7 +12368,7 @@ ${QUOTIENT_CSS}
       var vp = perf.voice_preview;
       var vpFresh = vp && vp.actor === a.id && (src !== 'script' || (vp.delivery || '') === (perf.delivery || ''));
       h += '<div class="pf-row"><label></label><div class="pf-acts"><button class="np-btn" data-pf-go="hear">' + (vpFresh ? 'Hear it again' : 'Hear the voice') + '</button>'
-        + (vp ? '<audio controls src="' + escAttr(withToken(vp.url)) + '" style="height:32px;max-width:260px"></audio><small>' + (vpFresh ? '&#10003; voice ready' : 'the last one heard') + ' &#183; ' + vp.seconds + ' s' + (vp.hz ? ' &#183; ' + vp.hz + ' Hz' : '') + '</small>' : '<small>just the voice, no video: cents</small>') + '</div></div>';
+        + (vp ? '<audio controls src="' + escAttr(withToken(vp.url)) + '"' + (perf.voice_speed && perf.voice_speed !== 1 ? ' data-rate="' + perf.voice_speed + '"' : '') + ' style="height:32px;max-width:260px"></audio><small>' + (vpFresh ? '&#10003; voice ready' : 'the last one heard') + ' &#183; ' + vp.seconds + ' s' + (vp.hz ? ' &#183; ' + vp.hz + ' Hz' : '') + '</small>' : '<small>just the voice, no video: cents</small>') + '</div></div>';
       return h;
     }
     // MAKE IT: the summary, then the one button that spends.

@@ -888,8 +888,10 @@ describe("the voice picker", () => {
   });
 });
 
-describe("the read speed", () => {
-  it("speeds the voice up with its pitch kept, keeps it on the scene, and a heard read at another speed is not the one sent", async () => {
+describe("the pace", () => {
+  // Marc, Oct 27: "whatever comes back from Seedance is the pace ... if we
+  // want to accelerate it, that's an increase in pace."
+  it("keeps the voice as read (never sped before Seedance), keeps the pace on the scene, and a read heard sped up is not the one sent", async () => {
     process.env.ELEVENLABS_API_KEY = "ek";
     const m = await media(path.join(DATA, "_media_speed"));
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -898,14 +900,21 @@ describe("the read speed", () => {
     }));
     const sp = await import("../src/core/scene-performance.js");
     const P4 = "proj_vp";
-    const slow = await sp.previewSceneVoice(T, P4, 1 - 1, { voice_speed: 1 });
-    const fast = await sp.previewSceneVoice(T, P4, 0, { voice_speed: 1.2 });
-    expect(fast.seconds).toBeLessThan(slow.seconds * 0.9);
-    const perf = JSON.parse(await fs.readFile(path.join(DATA, T, "projects", P4, "project.json"), "utf8")).storyboard.scenes[0].performance;
+    const plain = await sp.previewSceneVoice(T, P4, 0, { voice_speed: 1 });
+    const paced = await sp.previewSceneVoice(T, P4, 0, { voice_speed: 1.2 });
+    expect(Math.abs(paced.seconds - plain.seconds)).toBeLessThan(0.1);
+    const file = path.join(DATA, T, "projects", P4, "project.json");
+    const pj = JSON.parse(await fs.readFile(file, "utf8"));
+    const perf = pj.storyboard.scenes[0].performance;
     expect(perf.voice_speed).toBe(1.2);
-    expect(perf.voice_preview.speed).toBe(1.2);
+    expect(perf.voice_preview.speed).toBeUndefined();
     expect(sp.voiceSpeedOf({ voice_speed: 3 } as any)).toBe(1.25);
     expect(sp.voiceSpeedOf({} as any)).toBe(1);
+    const src = await fs.readFile("src/core/scene-performance.ts", "utf8");
+    expect(src).not.toMatch(/atempo=\$\{speed\}/);
+    expect(src).toContain('if ((vp as { speed?: number }).speed) return null;');
+    expect(src).toContain('const pace = quality === "final" ? await scenePace(tenant, projectId, si) : voiceSpeedOf(perf);');
+    expect(src).toContain("await paceTake(tenant, projectId, si, voiceSpeedOf(perf));");
   });
 });
 

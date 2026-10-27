@@ -587,9 +587,12 @@ async function sceneVoice(tenant: string, projectId: string, si: number, actor: 
     else await convertVoice(w("take.wav"), src, actor.voice_id!);
   }
   const file = w("voice.mp3");
-  // The scene's pace: a tempo change (pitch kept) before anyone hears it.
-  const speed = voiceSpeedOf((await loadScene(tenant, projectId, si)).scene.performance);
-  await ffmpeg(["-i", src, "-af", `${speed !== 1 ? `atempo=${speed},` : ""}loudnorm=I=-14:TP=-1.5:LRA=11`, "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);
+  // At the pace it was read: the scene's pace is the take's playback speed,
+  // set once the take is back (paceTake). A voice sped up BEFORE Seedance
+  // came back anywhere from 0.84x to 1.25x -- Seedance re-times the line to
+  // fill its whole-second clip (Marc, Oct 27: "whatever comes back from
+  // Seedance is the pace ... if we want to accelerate it, that's an increase").
+  await ffmpeg(["-i", src, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", file]);
   const seconds = (await durationOf(file)) || 0;
   if (seconds > MAX_VOICE_SECONDS) throw new Error(`Scene ${si + 1}'s line runs ${seconds.toFixed(1)} s; one Seedance shot holds ${MAX_VOICE_SECONDS} s -- split the scene`);
   return { file, seconds };
@@ -618,7 +621,7 @@ export async function fitVoiceToClip(file: string, workDir: string): Promise<{ f
 }
 
 function perfDelivery(scene: any): string | undefined { return scene?.performance?.delivery || undefined; }
-/** A scene's read speed, clamped to what still sounds like a person. */
+/** A scene's pace, clamped to what still sounds like a person. */
 export function voiceSpeedOf(perf: ScenePerformance | undefined): number {
   const v = Number(perf?.voice_speed);
   return v > 0 ? Math.round(Math.max(0.8, Math.min(1.25, v)) * 100) / 100 : 1;
@@ -640,7 +643,9 @@ function heardVoice(perf: ScenePerformance, actorId: string, line: string, voice
   if (voiceId !== undefined && vp.voice_id && vp.voice_id !== voiceId) return null;
   if (vp.line !== undefined && vp.line !== line) return null;
   if (vp.source === "script" && (vp.delivery || "") !== (perf.delivery || "")) return null;
-  if ((vp.speed || 1) !== voiceSpeedOf(perf)) return null;
+  // Heard sped up (saved before Oct 27, when the pace went into the voice):
+  // not the read to send -- the take would get the pace twice.
+  if ((vp as { speed?: number }).speed) return null;
   return vp;
 }
 async function useHeard(vp: NonNullable<ScenePerformance["voice_preview"]>, workDir: string): Promise<{ file: string; seconds: number }> {
@@ -669,7 +674,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
   engine?: "seedance" | "heygen";
   /** HeyGen: a direction for the movement ("" for none). */
   motion?: string;
-  /** The read speed (1 = as voiced, up to 1.25). */
+  /** The pace (1 = as Seedance performs it, up to 1.25): the take's speed. */
   voice_speed?: number;
   /** The camera move (core/shot-camera.ts), kept on the scene as its
    *  `shot_move`; "" back to the setting's. Speaking: gentle moves only. */
@@ -738,8 +743,7 @@ export async function startScenePerformance(tenant: string, projectId: string, s
     if (setPrompt(p, "video_prompt", opts.video_prompt)) delete p.draft;
     p.actor = actor.id; p.shot = shot; p.voice_source = source;
     if (opts.delivery !== undefined) { const d = String(opts.delivery).trim().slice(0, 4000); if (d) p.delivery = d; else delete p.delivery; }
-    // A new pace is a new read: the draft no longer stands.
-    if (setSpeed(p, opts.voice_speed)) delete p.draft;
+    setSpeed(p, opts.voice_speed);
     if (!finishingDraft) setLocation(p, where);
     // A new move is a new shot: the draft no longer stands.
     if (setShotMove(sc, opts.move, true)) delete p.draft;
@@ -827,6 +831,7 @@ async function startSceneHeygen(tenant: string, projectId: string, si: number, a
     const url = assetUrl(tenant, projectId, name);
     const out = await doAttach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "heygen", quality: "final" } });
     if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
+    await paceTake(tenant, projectId, si, voiceSpeedOf(perf));
     release();
     await patch(tenant, projectId, si, (p) => {
       const now = new Date().toISOString();
@@ -953,11 +958,12 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
 
   vendorNow.delete(vkey);
   await stage("attach");
-  // A FINAL KEEPS THE SCENE'S PACE: the take it replaces may play sped up
-  // (edit_speaker speed); attached as a fresh record the final played at 1x
-  // and the film slowed down again (Marc, Oct 16, proj_35a99832: 1.1 lost
-  // on every final). Read before the attach, put back after it.
-  const paceBefore = quality === "final" ? await scenePace(tenant, projectId, si) : 1;
+  // THE PACE IS PLAYED ON THE TAKE: a draft gets the scene's voice_speed.
+  // A FINAL KEEPS THE PACE of the take it replaces (edit_speaker speed);
+  // attached as a fresh record the final played at 1x and the film slowed
+  // down again (Marc, Oct 16, proj_35a99832: 1.1 lost on every final). Read
+  // before the attach, put back after it.
+  const pace = quality === "final" ? await scenePace(tenant, projectId, si) : voiceSpeedOf(perf);
   const raw = `take-performed-${actor.id}-s${si + 1}-${quality}-${stamp()}.mp4`;
   await fs.mkdir(assetsDir(tenant, projectId), { recursive: true });
   await download(result.url, path.join(assetsDir(tenant, projectId), raw));
@@ -968,10 +974,7 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
   const url = assetUrl(tenant, projectId, raw);
   const out = await attach(tenant, projectId, url, si, { performed_by: { actor: actor.id, engine: "seedance", quality } });
   if (out.status !== 200) throw new Error(String(out.body?.error || `attach failed (${out.status})`));
-  if (paceBefore !== 1) {
-    try { await editSceneTake(tenant, projectId, si, { op: "speed", speed: paceBefore }, config.dataDir); }
-    catch (e: any) { console.warn(`  final: scene ${si + 1} kept 1x, its ${paceBefore}x pace did not carry: ${e?.message || e}`); }
-  }
+  await paceTake(tenant, projectId, si, pace);
   await fs.rm(kept, { force: true }).catch(() => {});
   // Free before "done": a poll that reads done may start the final at once.
   release();
@@ -983,6 +986,14 @@ async function runPerformance(tenant: string, projectId: string, si: number, act
     p.made_with = { actor: actor.id, engine: "seedance", ...(actor.voice_id && perf.voice_source !== "recording" ? { voice_id: actor.voice_id } : {}), ...(from ? { from } : {}), ...(p.location ? { location: p.location } : {}), ...(real ? { foundation: true, ...(look ? { look: look.id } : {}) } : {}) };
     p.status = "done"; delete p.stage; p.finished_at = now;
   });
+}
+
+/** The scene's pace on the take just attached: its playback speed, pitch
+ *  kept -- the one number Studio's Pace row shows. */
+async function paceTake(tenant: string, projectId: string, si: number, pace: number): Promise<void> {
+  if (pace === 1) return;
+  try { await editSceneTake(tenant, projectId, si, { op: "speed", speed: pace }, config.dataDir); }
+  catch (e: any) { console.warn(`  scene ${si + 1} plays at 1x, its ${pace}x pace did not take: ${e?.message || e}`); }
 }
 
 /** The pace the scene's current take plays at (1 = as made). */
@@ -1031,7 +1042,7 @@ export async function previewSceneVoice(tenant: string, projectId: string, si: n
   /** Hear the line in ANOTHER voice (the voice picker): nothing on the scene
    *  or the actor changes. */
   voice_id?: string;
-  /** The read speed (1 = as voiced, up to 1.25), kept on the scene. */
+  /** The pace (1 = as read, up to 1.25), kept on the scene. */
   voice_speed?: number }): Promise<{ url: string; seconds: number; hz: number; delivery?: string; voice_id: string }> {
   const { project, scene } = await loadScene(tenant, projectId, si);
   const prev: ScenePerformance | undefined = scene.performance;
@@ -1062,7 +1073,7 @@ export async function previewSceneVoice(tenant: string, projectId: string, si: n
   // Kept on the scene: the take panel shows the voice is ready (Marc: "it
   // doesn't seem to acknowledge that there was already voice generated").
   const after = await patch(tenant, projectId, si, (p) => {
-    p.voice_preview = { url, seconds, hz, actor: actor.id, voice_id: actor.voice_id, source, ...(from ? { from } : {}), line: String(scene.voiceover_text || ""), ...(p.delivery ? { delivery: p.delivery } : {}), ...(voiceSpeedOf(p) !== 1 ? { speed: voiceSpeedOf(p) } : {}), made_at: new Date().toISOString() };
+    p.voice_preview = { url, seconds, hz, actor: actor.id, voice_id: actor.voice_id, source, ...(from ? { from } : {}), line: String(scene.voiceover_text || ""), ...(p.delivery ? { delivery: p.delivery } : {}), made_at: new Date().toISOString() };
   });
   return { url, seconds, hz, voice_id: String(actor.voice_id || ""), ...(after?.delivery ? { delivery: after.delivery } : {}) };
 }
@@ -1099,8 +1110,15 @@ export async function voicePlanScenes(tenant: string, projectId: string): Promis
     }
     if (!vp) continue;
     done.push(si);
-    // The scratch read under the scene plays the actor's voice.
-    const abs = resolveVideoPath(vp.url, config.dataDir);
+    // The scratch read under the scene plays the actor's voice, at the
+    // scene's pace (the voice is kept as read; the take gets the pace).
+    let abs = resolveVideoPath(vp.url, config.dataDir);
+    const pace = voiceSpeedOf(perf);
+    if (pace !== 1) {
+      const paced = abs.replace(/\.mp3$/, `-at${pace}.mp3`);
+      try { await fs.access(paced); } catch { await ffmpeg(["-y", "-i", abs, "-af", `atempo=${pace}`, "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", paced]); }
+      abs = paced;
+    }
     const next = withProjectLock(tenant, projectId, async () => {
       const p: any = await loadProject(tenant, projectId);
       const tr = (p?.audio?.tracks || []).find((t: any) => t.id === `vo_scene_${si}`);

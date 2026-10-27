@@ -22,4 +22,13 @@ describe("the voice: its level in Studio, its sound from the setting", () => {
     expect(index).toContain("|speaker-level|");
     expect(index).toContain("slProj.speaker_track.volume = ");
   });
+
+  // Marc, Oct 27: the listening slider came back at 100 on every load, so the
+  // speaker track got turned down instead -- and that is saved in the film.
+  it("the listening level is kept in the browser, never in the film, and a mute is not kept", () => {
+    const html = getPreviewHtml();
+    expect(html).toContain("localStorage.getItem('mp_volume')");
+    expect(html).toMatch(/if \(v > 0\) \{ try \{ localStorage\.setItem\('mp_volume', String\(v\)\)/);
+    expect(html).toMatch(/savedVol > 0 && savedVol <= 100\) \{ els\.volSlider\.value = String\(savedVol\); state\.masterVolume = savedVol \/ 100;/);
+  });
 });

@@ -111,6 +111,19 @@ describe("Studio cast: scene by scene (core/scene-performance.ts)", () => {
     expect(html).not.toContain('pace-all" checked');
   });
 
+  // Marc, Oct 27: corrected takes (speed 1.09) lit no Pace button and read as 1x.
+  it("the Pace row always lights the take's real speed, adding it when it is not a preset", () => {
+    const html = getPreviewHtml();
+    const src = /function takePaceRow\(tk\) \{[\s\S]*?\n  \}\n/.exec(html)![0];
+    const row = new Function(src + "return takePaceRow;")() as (tk: { speed?: number }) => string;
+    const lit = (h: string) => [...h.matchAll(/class="rv-go " data-tk-pace="([\d.]+)"/g)].map((m) => m[1]);
+    expect(lit(row({}))).toEqual(["1"]);
+    expect(lit(row({ speed: 1.15 }))).toEqual(["1.15"]);
+    const odd = row({ speed: 1.0900001 });
+    expect(lit(odd)).toEqual(["1.09"]);
+    expect([...odd.matchAll(/data-tk-pace="([\d.]+)"/g)].map((m) => m[1])).toEqual(["1", "1.09", "1.1", "1.15", "1.2"]);
+  });
+
   it("the take popover has one way out to a new take: Replace this take, opening the take dialog on what made it", () => {
     const html = getPreviewHtml();
     expect(html).toContain('id="tk-replace" style="flex:1;">Replace this take&#8230;</button>');
