@@ -73,6 +73,16 @@ span its whole path, because the component wrapper clips. A search bar that
 rises from mid-frame to the top needs a box from `y: 0%` with `height:
 111%` (measured: the bar vanished the moment it rose).
 
+A through-line can also cross cuts, when each beat needs its own scene (one
+spoken line per scene on a person film). Every scene carries the same
+component at the same box with `locked_camera: true` and transition `none`,
+and the component itself must pick up where the last scene left it rather
+than draw itself in again. `lead-funnel` does this with `data.continue:
+true`: anything cued at 0 or before is already done at the cut (outline
+drawn, those bands lit, their dots where they landed) and only that scene's
+own cue plays (Marc, Oct 27: "we're resetting the animation from 3 to 4, not
+just picking up where 3 ended").
+
 ## The handoff kit (coordinates, not prose)
 
 | From | To | The data that joins them |
