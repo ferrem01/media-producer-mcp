@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-27 — Studio's Pace shows the take's real speed
+
+The Pace row lit a button only on an exact preset (1, 1.1, 1.15, 1.2). The
+per-scene corrections on C and D (`edit_speaker` speed 1.06-1.21, set to bring
+each Seedance take back to the pace it was asked for) lit nothing, so Marc read
+every scene as 1x. The take's speed is now always a lit button, added in order
+when it is not a preset ("1.09x"). It is the playback speed on top of the take,
+not the heard pace -- Seedance's own read sets that. Test:
+`test/studio-cast.test.ts`.
+
 ## 2026-10-27 — Studio keeps your listening level
 
 The transport's volume slider came back at 100 on every load, so Marc turned

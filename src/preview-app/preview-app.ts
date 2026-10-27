@@ -8911,8 +8911,13 @@ ${QUOTIENT_CSS}
     });
   }
   function takePaceRow(tk) {
-    var cur = tk.speed || 1;
-    var btns = [1, 1.1, 1.15, 1.2].map(function(v) {
+    // The take's own speed is always one of the buttons, lit: a pace set
+    // anywhere but these presets (edit_speaker speed 1.09) showed every
+    // button unlit, and read as 1x.
+    var cur = Math.round((tk.speed || 1) * 100) / 100;
+    var paces = [1, 1.1, 1.15, 1.2];
+    if (paces.indexOf(cur) < 0) paces = paces.concat([cur]).sort(function(a, b) { return a - b; });
+    var btns = paces.map(function(v) {
       return '<button class="rv-go ' + (Math.abs(cur - v) < 0.001 ? '' : 'secondary') + '" data-tk-pace="' + v + '">' + v + 'x</button>';
     }).join('');
     return '<div class="tk-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-secondary);"><span class="tk-lab">Pace</span>' + btns + '</div>'
