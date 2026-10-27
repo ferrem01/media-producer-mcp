@@ -10473,10 +10473,20 @@ ${QUOTIENT_CSS}
   els.playBtn.addEventListener('click', togglePlay);
   els.slider.addEventListener('input', function() { scrub(parseFloat(els.slider.value)); });
   if (els.volSlider) {
+    // THE LISTENING LEVEL IS YOURS, NOT THE FILM'S: kept in this browser, so a
+    // film opens at the level you left it. It came back at 100 on every load,
+    // so the speaker track got turned down instead -- and that is saved into
+    // the film (Marc, Oct 27: two ads left at 55% voice under their music).
+    // A mute is not kept: a film never opens silent.
+    try {
+      var savedVol = parseInt(localStorage.getItem('mp_volume') || '', 10);
+      if (savedVol > 0 && savedVol <= 100) { els.volSlider.value = String(savedVol); state.masterVolume = savedVol / 100; }
+    } catch (eVs) {}
     els.volSlider.addEventListener('input', function() {
       var v = parseInt(els.volSlider.value, 10);
       if (isNaN(v)) v = 100;
       state.masterVolume = v / 100;
+      if (v > 0) { try { localStorage.setItem('mp_volume', String(v)); } catch (eVw) {} }
       // Live-apply: non-music directly; music too when the ducking loop isn't
       // running (when it is, it re-reads masterVolume every tick).
       state.audioElements.forEach(function(audio) {

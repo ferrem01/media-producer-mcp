@@ -6,6 +6,16 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-27 — Studio keeps your listening level
+
+The transport's volume slider came back at 100 on every load, so Marc turned
+the speaker track down instead -- and the speaker track's level is saved in
+the film. Two homepage-test ads (C, D) ended up at 55% voice under their
+music, and the music read "really loud" at 12%. The slider is now kept in the
+browser (`mp_volume`, 1-100): a film opens at the level you left it. A mute is
+not kept, so a film never opens silent. The film's own voice and music levels
+are unchanged by it. Test: `test/voice-level-sound.test.ts`.
+
 ## 2026-10-27 — The funnel carries across cuts
 
 The inbound homepage-test ads (C, D) tell the funnel one stage per scene --
