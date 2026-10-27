@@ -631,9 +631,10 @@ export interface ScenePerformance {
    *  for emphasis, /IPA/ for a pronunciation. Kept apart from the script, so
    *  the marks never reach captions or any other voice. Absent: the line. */
   delivery?: string;
-  /** How fast the line is read: 1 = as voiced, up to 1.25 (a creator ad's
-   *  pace -- the reel Marc is replicating runs ~3 words a second). Applied as
-   *  a tempo change, the pitch kept, before Seedance hears it. */
+  /** The scene's pace: 1 = as Seedance performs the line, up to 1.25 (a
+   *  creator ad's pace -- the reel Marc is replicating runs ~3 words a
+   *  second). The voice goes to Seedance as read; the pace is the take's
+   *  playback speed (pitch kept), set when the take lands. */
   voice_speed?: number;
   /** The LOCATION the scene is set in (a tenant location id, core/locations.ts):
    *  the start frame is drawn in it and its clean plate goes to Seedance as
@@ -673,7 +674,7 @@ export interface ScenePerformance {
   voice_url?: string;
   /** The voice last heard for the scene ("Hear the voice"): what Seedance
    *  will be given unless the line, delivery or actor change. */
-  voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take" | "recording"; from?: string; line?: string; delivery?: string; speed?: number; made_at: string };
+  voice_preview?: { url: string; seconds: number; hz: number; actor: string; voice_id?: string; source: "script" | "take" | "recording"; from?: string; line?: string; delivery?: string; made_at: string };
   /** What the scene's current take was made with (the plan it answers). */
   made_with?: { actor: string; engine: string; voice_id?: string; location?: string;
     /** A real person: the look worn, and that it was made from their foundation. */

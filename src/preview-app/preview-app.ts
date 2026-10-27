@@ -8910,6 +8910,12 @@ ${QUOTIENT_CSS}
       takeEditRequest(si, { op: 'cut', from: Math.max(0, a), to: z }, 'Cutting the take');
     });
   }
+  // The scene's voice is kept as read; its pace is played on top (the take
+  // gets it once Seedance hands the take back), so the heard read plays it too.
+  document.addEventListener('play', function(e) {
+    var el = e.target, r = el && el.getAttribute && Number(el.getAttribute('data-rate'));
+    if (r > 0 && el.playbackRate !== r) { try { el.playbackRate = r; } catch (eR) {} }
+  }, true);
   function takePaceRow(tk) {
     // The take's own speed is always one of the buttons, lit: a pace set
     // anywhere but these presets (edit_speaker speed 1.09) showed every
@@ -12362,7 +12368,7 @@ ${QUOTIENT_CSS}
       var vp = perf.voice_preview;
       var vpFresh = vp && vp.actor === a.id && (src !== 'script' || (vp.delivery || '') === (perf.delivery || ''));
       h += '<div class="pf-row"><label></label><div class="pf-acts"><button class="np-btn" data-pf-go="hear">' + (vpFresh ? 'Hear it again' : 'Hear the voice') + '</button>'
-        + (vp ? '<audio controls src="' + escAttr(withToken(vp.url)) + '" style="height:32px;max-width:260px"></audio><small>' + (vpFresh ? '&#10003; voice ready' : 'the last one heard') + ' &#183; ' + vp.seconds + ' s' + (vp.hz ? ' &#183; ' + vp.hz + ' Hz' : '') + '</small>' : '<small>just the voice, no video: cents</small>') + '</div></div>';
+        + (vp ? '<audio controls src="' + escAttr(withToken(vp.url)) + '"' + (perf.voice_speed && perf.voice_speed !== 1 ? ' data-rate="' + perf.voice_speed + '"' : '') + ' style="height:32px;max-width:260px"></audio><small>' + (vpFresh ? '&#10003; voice ready' : 'the last one heard') + ' &#183; ' + vp.seconds + ' s' + (vp.hz ? ' &#183; ' + vp.hz + ' Hz' : '') + '</small>' : '<small>just the voice, no video: cents</small>') + '</div></div>';
       return h;
     }
     // MAKE IT: the summary, then the one button that spends.

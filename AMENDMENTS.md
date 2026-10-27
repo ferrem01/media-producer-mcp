@@ -6,6 +6,24 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-27 — The pace is played on the take, never sped into the voice
+
+`voice_speed` used to speed the scene's voice (atempo) BEFORE Seedance heard
+it. Seedance re-times the line to fill its whole-second clip (4 s at least),
+so the take came back anywhere from 0.84x to 1.25x of the natural read, a
+different amount each scene, and C and D needed hand-measured `edit_speaker`
+speeds (1.06-1.21) on top. Marc: "whatever comes back from Seedance is the
+pace ... if we want to accelerate it, then that's an increase in pace."
+
+Now the voice goes to Seedance (and HeyGen) as read, and the scene's
+`voice_speed` is the take's playback speed (pitch kept), set when the take
+lands (`paceTake`): a draft gets `voice_speed`, a final keeps the pace of the
+take it replaces. That is the one number Studio's Pace row shows. A new pace
+no longer drops the draft (it is no longer a new read). The heard voice in
+Studio and the board's scratch read play at the pace; the kept file is the
+read as sent. Saved `voice_preview.speed` (a read heard sped up) is never
+sent -- the take would get the pace twice. Test: `test/scene-performance.test.ts`.
+
 ## 2026-10-27 — Studio's Pace shows the take's real speed
 
 The Pace row lit a button only on an exact preset (1, 1.1, 1.15, 1.2). The
@@ -1838,8 +1856,8 @@ place, their word anchors moved onto `at` / `exit_at`.
 ## 2026-10-05 — The voice picker
 
 **Read speed** (same PR): `performance.voice_speed` (0.8-1.25, 1 = as voiced)
-speeds the scene's voice with a tempo change (pitch kept) before anyone hears
-it -- for the shot-for-shot replica of Marc's reel, whose creator talks ~3
+(superseded Oct 27: now the take's playback speed) speeds the scene's voice
+with a tempo change (pitch kept) before anyone hears it -- for the shot-for-shot replica of Marc's reel, whose creator talks ~3
 words a second. Kept on the scene; a heard read at another speed is not the
 one sent; a new speed drops the draft. `hear_voice` / `perform_scene` take
 `voice_speed`.
