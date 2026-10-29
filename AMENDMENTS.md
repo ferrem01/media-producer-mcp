@@ -6,6 +6,22 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-10-29 — A render cleans up its work dir
+
+Every render writes its scratch into `<project>/_work/<job_id>`: each scene's
+PNG frames, the transitions, the speaker base. Nothing removed it. By Oct 28
+those dirs held 90 GB of the droplet's 155 GB disk; at 100% full, takes failed
+to attach, a Seedance perform stuck as "already being worked on", and MegaMedia
+calls timed out until Marc deleted them by hand.
+
+Now `runRender` removes its job's work dir in `finally`, success or failure.
+Nothing reads it after the job: the scene cache copies its mp4s out to
+`scene-cache/`, `audio_only` re-muxes `output.mp4`, and Studio's speaker comes
+from the project's assets. At startup `sweepRenderWorkDirs` clears `_work/job_*`
+dirs older than an hour, the ones a killed or redeployed server left behind.
+The other `_work` entries (performs, voice previews, recasts) are reused caches
+and stay. Test: `test/render-work-cleanup.test.ts`.
+
 ## 2026-10-27 — The pace is played on the take, never sped into the voice
 
 `voice_speed` used to speed the scene's voice (atempo) BEFORE Seedance heard

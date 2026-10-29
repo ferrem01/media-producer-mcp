@@ -73,7 +73,7 @@ import { normalizeSoundCues, ensureSoundFiles, hasCueWithoutFile } from "./core/
 import { getLibraryHtml } from "./preview-app/library-app.js";
 import { getBrandPageHtml } from "./preview-app/brand-page.js";
 import { ensureProjectPoster } from "./core/poster.js";
-import { queueRender, getJobStatus, listJobs, activeRender } from "./core/render-queue.js";
+import { queueRender, getJobStatus, listJobs, activeRender, sweepRenderWorkDirs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { deployLockPath, writeDeployLock, isDeploying, machineStats, sweepOrphans } from "./core/server-health.js";
 import { assembleSceneAuto, loadSharedUtilities, generateBrandCSS, generateFontLinks, type ComponentSource } from "./core/scene-assembler.js";
@@ -785,6 +785,8 @@ async function main() {
   // Render workers and browsers a killed server left behind hold memory the
   // next render needs (Oct 6: Chromium's GPU process killed, exit 9).
   try { const n = sweepOrphans(); if (n) console.log(`  Stopped ${n} leftover render process(es) from a previous server`); } catch { /* best-effort */ }
+  // ...and their work dirs hold every frame they captured (90 GB on Oct 28).
+  sweepRenderWorkDirs().then((n) => { if (n) console.log(`  Removed ${n} leftover render work dir(s)`); }).catch(() => { /* best-effort */ });
 
   // Create MCP server
   const server = createMcpServer();

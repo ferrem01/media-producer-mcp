@@ -131,6 +131,13 @@ async function runRender(
   },
 ): Promise<void> {
   const trace = options?.trace || new TraceBuilder("render", job.tenantId, projectId, "render");
+  // Per-JOB work dir, not a shared per-project one: when a render fails,
+  // its still-running sibling scene workers are killed, but any that slip
+  // through (or a crashed server's orphans) must never share frame dirs
+  // with a later render of the same project -- a leftover worker's
+  // post-encode cleanup deleting the new run's frames mid-capture was the
+  // "Could find no file ... frames" stitch failure.
+  const workDir = renderWorkDir(job.tenantId, projectId, job.id);
 
   try {
     // Load to save holds the film (core/project-lock.ts): the render's
@@ -196,13 +203,7 @@ async function runRender(
 
     const renderOpts: RenderOptions = {
       project: projectForRender,
-      // Per-JOB work dir, not a shared per-project one: when a render fails,
-      // its still-running sibling scene workers are killed, but any that slip
-      // through (or a crashed server's orphans) must never share frame dirs
-      // with a later render of the same project -- a leftover worker's
-      // post-encode cleanup deleting the new run's frames mid-capture was the
-      // "Could find no file ... frames" stitch failure.
-      workDir: path.join(projectDir(job.tenantId, projectId), "_work", job.id),
+      workDir,
       componentLibDir: config.componentLibDir,
       gsapDir: config.gsapDir,
       // Project-local scene components first, then the TENANT component
@@ -278,8 +279,49 @@ async function runRender(
       // ignore
     }
   } finally {
+    // The work dir is scratch: every scene's PNG frames, transitions, the
+    // speaker base. Nothing reads it once the job ends (the scene cache copies
+    // its mp4s out, audio_only re-muxes output.mp4), and left behind it filled
+    // the droplet's disk -- 90 GB of _work/job_* by Oct 28, renders and takes
+    // failing on a full disk.
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     if (!options?.trace) {
       trace.finish();
     }
   }
+}
+
+function renderWorkDir(tenantId: string, projectId: string, jobId: string): string {
+  return path.join(projectDir(tenantId, projectId), "_work", jobId);
+}
+
+/**
+ * Delete render work dirs (`<project>/_work/job_*`) older than `maxAgeMs`,
+ * across every tenant. A job removes its own dir when it ends; this catches
+ * the ones a killed or redeployed server never got to. Only `job_*` dirs --
+ * the other _work entries (performs, voice previews, recasts) are reused
+ * caches. Returns how many dirs it removed.
+ */
+export async function sweepRenderWorkDirs(
+  dataDir: string = config.dataDir,
+  maxAgeMs: number = 60 * 60 * 1000,
+): Promise<number> {
+  const cutoff = Date.now() - maxAgeMs;
+  const list = (dir: string) => fs.readdir(dir).catch(() => [] as string[]);
+  let removed = 0;
+  for (const tenant of await list(dataDir)) {
+    const projects = path.join(dataDir, tenant, "projects");
+    for (const project of await list(projects)) {
+      const work = path.join(projects, project, "_work");
+      for (const entry of await list(work)) {
+        if (!entry.startsWith("job_")) continue;
+        const dir = path.join(work, entry);
+        const stat = await fs.stat(dir).catch(() => null);
+        if (!stat?.isDirectory() || stat.mtimeMs > cutoff) continue;
+        await fs.rm(dir, { recursive: true, force: true });
+        removed++;
+      }
+    }
+  }
+  return removed;
 }
