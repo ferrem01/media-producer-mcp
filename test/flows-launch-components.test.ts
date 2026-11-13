@@ -293,3 +293,38 @@ describe("flows launch: the product's triggers", () => {
     } finally { await close(); }
   }, 60000);
 });
+
+describe("flows launch: ai-step-stream (one AI step, a different email for each person)", () => {
+  const LEADS = [
+    { name: "Sarah Chen", company: "Northwind", did: "Signed up", subject: "Welcome, Sarah", line: "Start with the issue on finding your first ten accounts." },
+    { name: "Daniel Fischer", company: "Meridian", did: "Viewed pricing 3 times", subject: "Growth or Scale, Daniel?", line: "For a team your size, Growth covers it." },
+    { name: "Tom Lee", company: "Copperline", did: "Quiet for 6 months", subject: "Still rebuilding the funnel?", line: "Here is what changed since we talked." },
+  ];
+  it("the slow ones go one at a time, each email is that person's, then it becomes a stream", async () => {
+    const { page, errors, close } = await open("ai-step-stream", { leads: LEADS, at: 0.1, slow: 2, slow_gap: 1, fast_gap: 0.2 }, 4);
+    try {
+      // Mails fully on screen at a moment: who they are addressed to.
+      const shown = () => page.evaluate(() => [...document.querySelectorAll(".as-mail")].filter((m) => {
+        const cs = getComputedStyle(m); const r = m.getBoundingClientRect();
+        return cs.visibility !== "hidden" && Number(cs.opacity) > 0.9 && r.left >= 0 && r.right <= innerWidth;
+      }).map((m) => [m.querySelector(".as-to b")!.textContent, m.querySelector(".as-sj")!.textContent]));
+      // Lead 1 starts at 0.1, its email is out by 1.2 and rests until the
+      // next one comes out at 2.2.
+      await seek(page, 1.8);
+      expect(await shown()).toEqual([["Sarah Chen", "Welcome, Sarah"]]);
+      await shot(page, "ai-stream-1");
+      await seek(page, 2.8);
+      expect(await shown()).toEqual([["Daniel Fischer", "Growth or Scale, Daniel?"]]);
+      await shot(page, "ai-stream-2");
+      // The stream: several leads on the move at once.
+      await seek(page, 3.5);
+      const moving = await page.evaluate(() => [...document.querySelectorAll(".as-lead")].filter((l) => {
+        const cs = getComputedStyle(l); const r = l.getBoundingClientRect();
+        return cs.visibility !== "hidden" && Number(cs.opacity) > 0.2 && r.right > 0 && r.left < innerWidth;
+      }).length);
+      expect(moving).toBeGreaterThanOrEqual(2);
+      await shot(page, "ai-stream-3");
+      expect(errors).toEqual([]);
+    } finally { await close(); }
+  }, 60000);
+});

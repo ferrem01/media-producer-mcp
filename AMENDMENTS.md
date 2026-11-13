@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-11-13 — The Flows launch pieces
+
+The Flows launch film (proj_e515e3df, built on the Analytics story cut) needed
+the lead's side of each use case and a flow that performs, not just sits.
+
+- **Lead-side screens** (#1247): `signup-form`, `booking-confirmed`,
+  `onboarding-checklist`. Captions are plain uppercase type, never pills (Marc
+  hates pills). Photos for the people (#1249): `email-reader.avatar_url`,
+  `booking-confirmed.rows[].avatars`. `quotient-home.hide_chips` drops the
+  pill-shaped category row.
+- **quotient-flow**: every trigger type from the docs; script `card` (the
+  agent's findings), `send` (an envelope leaves a step; `to: camera` fills the
+  frame for the cut into the inbox, flying OVER the cards, #1248), `live` (many
+  leads, counted); `open_on` (#1250): the shot starts tight on the trigger and
+  pulls back fast -- the lead's click landing in the system. The script's eased
+  camera moves are a fixed 0.9 s, too slow for 1.5 s cuts.
+- **ai-step-stream** (new): one AI step, a different email for every person.
+  Leads stream into a single step and each comes out with their own subject
+  and line; the first few one at a time, readable, then a stream spread over
+  rows. Marc: the AI step was "pretty cool" but the film did not show it; the
+  side-by-side flows in the pull were "not the most exciting thing". This
+  replaced them.
+- **What the cut taught**: seven use cases in ~28 s left half-second flow
+  shots where all you saw was the envelope. Four distinct use cases (signup,
+  pricing intent, meeting + agent, handoff), each flow shot 2.5-4 s. The
+  customer in the examples is a made-up brand (Lumen AI, from the Sample
+  library), never Quotient: a Quotient film showing Quotient pages as the
+  customer's was confusing.
+
 ## 2026-10-29 — A render cleans up its work dir
 
 Every render writes its scratch into `<project>/_work/<job_id>`: each scene's
