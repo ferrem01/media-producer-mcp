@@ -68,6 +68,9 @@
     var ink = String(data.ink || '#0b0b0c'), accent = String(data.accent || '#393bf5');
     root.style.setProperty('--trl-ink', ink);
     root.style.setProperty('--trl-accent', accent);
+    // font: 'brand' sets the type in the film's own font (the brand kit's
+    // first face) instead of the house Geist.
+    if (data.font === 'brand') block.style.fontFamily = 'var(--mp-font-family, system-ui), sans-serif';
     if (data.background) root.style.background = String(data.background);
     if (has(data.weight)) block.style.fontWeight = String(num(data.weight, 600));
     var rgb = function (c) {

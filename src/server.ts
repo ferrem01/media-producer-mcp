@@ -1467,6 +1467,11 @@ export function createMcpServer(): McpServer {
       tags: z.array(z.string()).optional().describe("Project: the film's whole TAG list for the library (free-form, e.g. ['analytics', 'creator ad']); [] clears. Not an edit to the film."),
       add_tags: z.array(z.string()).optional().describe("Project: tags to add to the film (kept with the ones it has)."),
       remove_tags: z.array(z.string()).optional().describe("Project: tags to take off the film."),
+      fonts: z.array(z.object({
+        family: z.string(),
+        source: z.enum(["google", "custom", "system"]).optional(),
+        weights: z.array(z.number()).optional(),
+      })).min(1).optional().describe("Project: THIS film's fonts, in order (the first is the face every mockup and `font: 'brand'` type uses), e.g. [{family: 'Inter', weights: [400, 500, 600, 700]}]. Edits the film's own copy of the brand kit; the tenant kit and other films are untouched. A family that is not on Google Fonts is swapped for the closest free face at render."),
       sfx_palette: z.record(z.enum(["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"]), z.string()).nullable().optional()
         .describe("The film's SOUND PALETTE: the one sound each job plays (e.g. {transition: 'camera-flash', payoff: 'gen-impact-1a2b3c'}); every cue with that role plays it. Merged into the current palette; null clears it (house defaults). Re-points the film's role cues at once."),
 
@@ -1788,6 +1793,10 @@ export function createMcpServer(): McpServer {
         // scene_id -- gating it behind the scene branch below silently dropped
         // it on `update({canvas, speaker_track})` while still reporting success.
         if (tagsGiven) { setTags(project); updated = true; }
+        if (params.fonts) {
+          project.brand_kit = { ...project.brand_kit, fonts: params.fonts.map((f: { family: string; source?: "google" | "custom" | "system"; weights?: number[] }) => ({ family: f.family, source: f.source || "google", weights: f.weights?.length ? f.weights : [400, 500, 600, 700] })) };
+          updated = true;
+        }
         if (params.sfx_palette !== undefined) {
           const pal: Record<string, string> = params.sfx_palette === null ? {} : { ...((project as any).sfx_palette || {}) };
           for (const [role, id] of Object.entries(params.sfx_palette || {})) {
