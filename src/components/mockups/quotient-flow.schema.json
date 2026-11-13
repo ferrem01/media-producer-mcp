@@ -1,6 +1,6 @@
 {
   "type": "quotient-flow",
-  "label": "Quotient flow — builds itself",
+  "label": "Quotient flow \u2014 builds itself",
   "category": "mockups",
   "description": "A Quotient flow (automation) diagram in the product's own look -- white step cards with icons, grey curved connectors, green True / red False branch pills, the dotted canvas -- drawn from a list of STEPS and laid out automatically (branches spread side by side, a step with two `after`s merges them). It UNFURLS: row by row, each connector draws in and its step pops, branches together (`pace` seconds per row, or a step's own `at`). Then a SCRIPT performs on it: `highlight` (blue glow + a twinkle of sparkles), `path` (a lit dot runs through a list of steps, lighting each connector and pulsing each step it reaches -- 'this is what happened for Sarah'), `focus` (camera pushes in on a step), `fit` (back out), `card` (the agent's findings: a card opens beside a step, rows landing one by one, the camera framing both), `send` (an envelope lifts off a step and flies out of the flow -- 'right' / 'left' / 'down', or 'camera': at the viewer until it fills the frame, the join into the lead's inbox) and `live` (many leads at once: a dot leaves every `every` seconds along the listed `paths`, each step pings on arrival and counts how many reached it -- the funnel running). Every step card publishes a [data-anchor] named by its id (camera moves and morphs can target 'flow.welcome'). Every `at` takes a word anchor (\"@acts\"). With no steps it shows a real onboarding flow. Use it full-frame for 'Quotient acts on it' beats: the logic building itself, then one customer's path through it. On a 9x16 frame keep it to 2-3 branches and 4-6 rows, or use camera \"follow\": UI-size text is small when a wide flow fits a phone.",
   "data": {
@@ -89,6 +89,27 @@
       "label": "Follow zoom",
       "optional": true,
       "placeholder": "1.35"
+    },
+    "open_on": {
+      "type": "string",
+      "label": "Open on a step: the shot starts framed tight on this step (the lead's click landing as the trigger) and pulls back to the whole flow",
+      "optional": true,
+      "placeholder": "trigger"
+    },
+    "open_zoom": {
+      "type": "number",
+      "label": "Open on: how tight (default 2.6)",
+      "optional": true
+    },
+    "open_at": {
+      "type": "number",
+      "label": "Open on: the pull-back starts at (s, default 0.08)",
+      "optional": true
+    },
+    "open_out": {
+      "type": "number",
+      "label": "Open on: seconds the pull-back takes (default 0.45)",
+      "optional": true
     },
     "accent": {
       "type": "string",

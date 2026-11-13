@@ -725,6 +725,15 @@
     keys.sort(function (a, b) { return a.t - b.t; });
     var start = mode === 'follow' && keys.length ? keys[0].v : FIT;
     gsap.set(cam, { x: start.x, y: start.y, scale: start.scale, transformOrigin: '0 0' });
+    // OPEN ON a step: the shot starts framed tight on that card (the click
+    // the lead just made, landing as the trigger) and pulls back fast to the
+    // whole flow -- the join from the lead's screen into the system.
+    var openId = data.open_on ? String(data.open_on) : '';
+    if (openId && G[openId] && mode !== 'follow') {
+      var ov = view(G[openId].x, G[openId].y + G[openId].h / 2, num(data.open_zoom, 2.6));
+      gsap.set(cam, { x: ov.x, y: ov.y, scale: ov.scale });
+      tl.to(cam, { x: start.x, y: start.y, scale: start.scale, duration: num(data.open_out, 0.45), ease: 'power3.inOut' }, num(data.open_at, 0.08));
+    }
     // No pre-roll into the first move: the whole flow holds until the
     // script asks for the camera (a path that rides in starts ON its word,
     // not while the flow is still unfurling).
