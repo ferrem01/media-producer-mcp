@@ -1,0 +1,228 @@
+<template>
+  <div class="ar-root">
+    <div class="ar-stage">
+      <div class="ar-left">
+        <div class="ar-step">
+          <div class="ar-chip"><span class="ar-chip-ic"></span><span class="ar-chip-t">Step</span></div>
+          <div class="ar-hd"><span class="ar-ic"></span><span class="ar-title"></span></div>
+          <div class="ar-sub"></div>
+        </div>
+        <div class="ar-lt"></div>
+        <div class="ar-list"><div class="ar-sel"></div></div>
+      </div>
+      <div class="ar-mail">
+        <div class="ar-from"><span class="ar-k">From</span><span class="ar-fv"></span></div>
+        <div class="ar-to"><span class="ar-k">To</span><span class="ar-tph"></span><span class="ar-tv p"></span></div>
+        <div class="ar-sj"><span class="ar-k">Subject</span><span class="ar-sv p"></span></div>
+        <div class="ar-body">
+          <div class="ar-hi p"></div>
+          <div class="ar-line p"></div>
+          <div class="ar-fixed"></div>
+          <div class="ar-sign"></div>
+        </div>
+        <div class="ar-shine"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  /* AI EMAIL REWRITE: one AI step, one email, rewritten for every person.
+     Left: the step (the product's card look) over a list of leads -- face,
+     name, company, what they did. Right: the email the step writes. As the
+     selection moves down the list, the parts that are the same for everyone
+     (From, the closing, the sign-off) hold still and the parts that are only
+     theirs (To, the subject, the greeting, the opening line, lit in the
+     accent) erase and write themselves again for that person. The first few
+     type out slowly enough to read; then the selection races and the email
+     flickers through name after name. 1440-wide design stage at the box's
+     aspect, scaled to the box. */
+  .ar-root, .ar-root * { max-width: none; }
+  .ar-root { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
+  .ar-stage {
+    position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden;
+    background-color: var(--ar-bg, #f9f9fb);
+    background-image: radial-gradient(rgba(23, 23, 28, 0.12) 1.4px, transparent 1.6px);
+    background-size: 26px 26px;
+    color: #17171c; font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+  .ar-left { position: absolute; display: flex; flex-direction: column; align-items: stretch; }
+  .ar-step {
+    position: relative; box-sizing: border-box; padding: 18px 18px; margin-top: 34px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: #fff; border: 1.5px solid rgb(232, 233, 242); border-radius: 16px;
+    box-shadow: 0 14px 30px rgba(12, 12, 66, 0.06), 0 1px 3px rgba(40, 28, 65, 0.06);
+  }
+  .ar-chip {
+    position: absolute; left: 50%; top: -34px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
+    height: 34px; box-sizing: border-box; padding: 4px 14px; white-space: nowrap;
+    border: 1.5px solid rgb(232, 233, 242); border-bottom: 0; border-radius: 14px 14px 0 0;
+    background: #f9f9fb; font-size: 18px; color: #3b3b46;
+  }
+  .ar-chip-ic svg, .ar-ic svg { display: block; }
+  .ar-hd { display: flex; align-items: center; gap: 8px; font-size: 24px; font-weight: 600; }
+  .ar-sub { font-size: 18px; color: rgb(84, 84, 95); }
+  .ar-sub:empty { display: none; }
+  .ar-lt { margin: 26px 0 10px 4px; font-size: 15px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8a96; }
+  .ar-lt:empty { display: none; }
+  .ar-list {
+    position: relative; background: #fff; border: 1.5px solid #ececf3; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 10px 24px rgba(20, 20, 60, 0.05);
+  }
+  .ar-sel { position: absolute; left: 0; right: 0; top: 0; background: color-mix(in srgb, var(--ar-acc, #393bf5) 9%, #fff);
+    border-left: 4px solid var(--ar-acc, #393bf5); box-sizing: border-box; }
+  .ar-row { position: relative; display: flex; align-items: center; gap: 14px; padding: 0 18px; box-sizing: border-box; }
+  .ar-row + .ar-row { border-top: 1px solid #f1f1f6; }
+  .ar-ph { flex: none; border-radius: 50%; background: #e9e9ef center 22% / 128% no-repeat; }
+  .ar-row .ar-ph { width: 46px; height: 46px; }
+  .ar-nm { font-size: 19px; font-weight: 700; white-space: nowrap; }
+  .ar-did { font-size: 15px; color: #6b6b78; white-space: nowrap; margin-top: 2px; }
+  .ar-mail {
+    position: absolute; box-sizing: border-box; padding: 34px 40px; background: #fff; overflow: hidden;
+    border: 1.5px solid #ececf3; border-radius: 20px; box-shadow: 0 24px 50px rgba(20, 20, 60, 0.08);
+  }
+  .ar-from, .ar-to, .ar-sj { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #f1f1f6; font-size: 20px; }
+  .ar-k { width: 84px; flex: none; color: #8a8a96; font-size: 17px; }
+  .ar-tph { width: 32px; height: 32px; flex: none; border-radius: 50%; background: #e9e9ef center 22% / 128% no-repeat; }
+  .ar-sj .ar-sv { font-weight: 700; font-size: 23px; }
+  .ar-body { padding-top: 24px; font-size: 24px; line-height: 1.55; color: #33333c; }
+  .ar-body > div + div { margin-top: 14px; }
+  .ar-fixed { color: #54545f; }
+  .ar-sign { color: #54545f; white-space: pre-line; }
+  /* The parts written for this person: lit in the accent. */
+  .p { background: color-mix(in srgb, var(--ar-acc, #393bf5) 10%, transparent); border-radius: 6px; padding: 1px 6px; margin: 0 -6px;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .ar-hi, .ar-line { display: block; }
+  .ar-hi > span, .ar-line > span { background: color-mix(in srgb, var(--ar-acc, #393bf5) 10%, transparent); border-radius: 6px; padding: 1px 4px;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .ar-hi.p, .ar-line.p { background: none; padding: 0; margin: 0; }
+  .ar-shine { position: absolute; inset: 0; pointer-events: none; opacity: 0; overflow: hidden; }
+  .ar-shine:before {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -45%;
+    background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--ar-acc, #393bf5) 16%, transparent), transparent);
+    transform: translateX(var(--ar-sx, 0%));
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var q = function (s) { return el.querySelector(s); };
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var root = q('.ar-root'), stage = q('.ar-stage');
+    var DUR = (ctx && ctx.duration) || 6;
+
+    var bw = el.clientWidth || 1440, bh = el.clientHeight || 810;
+    var DW = 1440, DH = Math.max(760, Math.round(DW * bh / bw));
+    stage.style.width = DW + 'px'; stage.style.height = DH + 'px';
+    var S = bw / DW;
+    if (DH * S > bh + 1) { S = bh / DH; stage.style.transform = 'translateX(' + ((bw - DW * S) / 2) + 'px) scale(' + S + ')'; }
+    else stage.style.transform = 'scale(' + S + ')';
+    var ACC = String(data.accent || '#393bf5');
+    root.style.setProperty('--ar-acc', ACC);
+    if (data.background) root.style.setProperty('--ar-bg', String(data.background));
+
+    var SPARK = '<svg viewBox="0 0 24 24" width="26" height="26" fill="' + ACC + '"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>';
+    var ZAP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#3b3b46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>';
+    q('.ar-ic').innerHTML = SPARK;
+    q('.ar-chip-ic').innerHTML = ZAP;
+    q('.ar-chip-t').textContent = String(data.chip || 'Step');
+    q('.ar-title').textContent = String(data.title || 'AI Email');
+    q('.ar-sub').textContent = data.subtitle !== undefined ? String(data.subtitle || '') : 'Written for each person';
+    q('.ar-lt').textContent = data.list_title !== undefined ? String(data.list_title || '') : 'Recipients';
+    q('.ar-fv').textContent = String(data.from || 'Lumen AI');
+    q('.ar-fixed').textContent = String(data.fixed !== undefined ? data.fixed : 'Happy to walk you through it whenever suits.');
+    q('.ar-sign').textContent = String(data.sign_off !== undefined ? data.sign_off : 'Jordan\nLumen AI');
+
+    // Layout: the list column on the left, the email on the right.
+    var PAD = 70, LW = 440, GAP = 60;
+    var left = q('.ar-left'), mail = q('.ar-mail');
+    gsap.set(left, { left: PAD, top: 60, width: LW });
+    // The email hugs its content, its top level with the step's.
+    gsap.set(mail, { left: PAD + LW + GAP, top: 94, width: DW - PAD * 2 - LW - GAP, minHeight: 520 });
+
+    var people = (Array.isArray(data.leads) ? data.leads : []).filter(function (p) { return p && typeof p === 'object'; });
+    if (!people.length) people = [
+      { name: 'Daniel Fischer', company: 'Meridian', did: 'Viewed pricing 3 times', subject: 'Growth or Scale, Daniel?', line: 'You have compared plans three times this week. For a team your size, Growth covers it.' },
+      { name: 'Tom Lee', company: 'Copperline', did: 'Quiet for 6 months', subject: 'Still rebuilding the funnel?', line: 'Last spring you were rebuilding the funnel at Copperline. Here is what changed since.' }
+    ];
+    var first = function (p) { return String(p.greeting || ('Hi ' + String(p.name || '').split(/\s+/)[0] + ',')); };
+    var to = function (p) { return String(p.name || '') + (p.company ? ', ' + p.company : ''); };
+    var photo = function (url) { return url ? 'url("' + String(url).replace(/"/g, '%22') + '")' : 'none'; };
+
+    // The list: as many rows as fit under the step.
+    var list = q('.ar-list'), sel = q('.ar-sel');
+    var stepH = 34 + 112, listTop = 60 + stepH + 26 + 30;
+    var RH = 84, ROWS = Math.max(2, Math.min(people.length, Math.floor((DH - listTop - 60) / RH)));
+    for (var r = 0; r < ROWS; r++) {
+      var p0 = people[r];
+      var row = document.createElement('div'); row.className = 'ar-row'; row.style.height = RH + 'px';
+      row.innerHTML = '<div class="ar-ph"></div><div><div class="ar-nm"></div><div class="ar-did"></div></div>';
+      row.querySelector('.ar-ph').style.backgroundImage = photo(p0.photo);
+      row.querySelector('.ar-nm').textContent = String(p0.name || '');
+      row.querySelector('.ar-did').textContent = [p0.company, p0.did].filter(Boolean).join(' · ');
+      list.appendChild(row);
+    }
+    gsap.set(sel, { height: RH, y: 0 });
+
+    // The parts written for each person.
+    var tv = q('.ar-tv'), tph = q('.ar-tph'), sv = q('.ar-sv');
+    var hiW = document.createElement('span'), lnW = document.createElement('span');
+    q('.ar-hi').appendChild(hiW); q('.ar-line').appendChild(lnW);
+    function put(p) { tv.textContent = to(p); tph.style.backgroundImage = photo(p.photo); sv.textContent = String(p.subject || ''); hiW.textContent = first(p); lnW.textContent = String(p.line || ''); }
+    put(people[0]);
+    var shine = q('.ar-shine');
+
+    // Schedule: `slow` people typed out one at a time, then a fast flicker.
+    var AT = num(data.at, 0.2), SLOW = Math.max(1, Math.round(num(data.slow, 2)));
+    var SG = num(data.slow_gap, 1.8), FG = Math.max(0.08, num(data.fast_gap, 0.14));
+    var UNTIL = Math.min(DUR, num(data.until, DUR));
+    var times = [];
+    for (var i = 0; i < SLOW; i++) times.push(AT + i * SG);
+    for (var tf = AT + SLOW * SG; tf < UNTIL - 0.05; tf += FG) times.push(tf);
+
+    // Type a string into an element over `d` seconds starting at `t`.
+    function typeInto(node, s, t, d) {
+      var n = s.length, steps = Math.max(1, Math.min(n, Math.round(d / 0.03)));
+      tl.set(node, { textContent: '' }, t);
+      for (var k = 1; k <= steps; k++) tl.set(node, { textContent: s.slice(0, Math.round(n * k / steps)) }, t + d * k / steps);
+    }
+    times.forEach(function (t, k) {
+      var idx = k % people.length, p = people[idx];
+      var slow = k < SLOW;
+      var rowI = idx % ROWS;
+      // The selection moves to this person.
+      tl.to(sel, { y: rowI * RH, duration: slow ? 0.25 : 0.08, ease: 'power2.inOut' }, t);
+      if (idx >= ROWS) {
+        // A person past the visible rows takes the last row's place.
+        var last = list.querySelectorAll('.ar-row')[rowI];
+        tl.set(last.querySelector('.ar-nm'), { textContent: String(p.name || '') }, t);
+        tl.set(last.querySelector('.ar-did'), { textContent: [p.company, p.did].filter(Boolean).join(' · ') }, t);
+        tl.set(last.querySelector('.ar-ph'), { backgroundImage: photo(p.photo) }, t);
+      }
+      var w = t + (slow ? 0.25 : 0.06);
+      // A sheen crosses the email while it writes.
+      tl.fromTo(shine, { opacity: 1, '--ar-sx': '0%' }, { '--ar-sx': '360%', duration: slow ? 0.5 : 0.18, ease: 'power1.inOut', immediateRender: false }, w);
+      tl.set(shine, { opacity: 0 }, w + (slow ? 0.5 : 0.18));
+      tl.set(tv, { textContent: to(p) }, w);
+      tl.set(tph, { backgroundImage: photo(p.photo) }, w);
+      if (slow && k > 0) {
+        typeInto(sv, String(p.subject || ''), w + 0.05, 0.25);
+        typeInto(hiW, first(p), w + 0.32, 0.08);
+        typeInto(lnW, String(p.line || ''), w + 0.42, 0.42);
+      } else {
+        tl.set(sv, { textContent: String(p.subject || '') }, w);
+        tl.set(hiW, { textContent: first(p) }, w);
+        tl.set(lnW, { textContent: String(p.line || '') }, w);
+      }
+    });
+    // The first person's email is already written when the shot opens (read
+    // it first); each slow one after types itself in, about a second, and
+    // holds for the rest of its slow_gap.
+    if (data.still !== true) {
+      tl.from([left, mail], { autoAlpha: 0, y: 24, duration: 0.4, stagger: 0.08, ease: 'power3.out' }, Math.max(0, AT - 0.2));
+    }
+    return tl;
+  }
+</script>

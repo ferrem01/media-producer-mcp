@@ -22,12 +22,14 @@ the lead's side of each use case and a flow that performs, not just sits.
   leads, counted); `open_on` (#1250): the shot starts tight on the trigger and
   pulls back fast -- the lead's click landing in the system. The script's eased
   camera moves are a fixed 0.9 s, too slow for 1.5 s cuts.
-- **ai-step-stream** (new): one AI step, a different email for every person.
-  Leads stream into a single step and each comes out with their own subject
-  and line; the first few one at a time, readable, then a stream spread over
-  rows. Marc: the AI step was "pretty cool" but the film did not show it; the
-  side-by-side flows in the pull were "not the most exciting thing". This
-  replaced them.
+- **ai-email-rewrite** (new): one AI step, one email, rewritten for each
+  person. The selection moves down a list of leads and the parts that are only
+  theirs (To, subject, greeting, opening line) type themselves again while the
+  same-for-everyone parts hold still. Marc: the AI step was "pretty cool" but
+  the film did not show it. A first try, leads streaming through a step box
+  with emails coming out (ai-step-stream), "does not visually make sense": a
+  diagram the viewer has to decode. One email changing in place reads at once,
+  and the still parts make the contrast with a template.
 - **What the cut taught**: seven use cases in ~28 s left half-second flow
   shots where all you saw was the envelope. Four distinct use cases (signup,
   pricing intent, meeting + agent, handoff), each flow shot 2.5-4 s. The

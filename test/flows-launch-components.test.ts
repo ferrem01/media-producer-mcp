@@ -294,36 +294,39 @@ describe("flows launch: the product's triggers", () => {
   }, 60000);
 });
 
-describe("flows launch: ai-step-stream (one AI step, a different email for each person)", () => {
+describe("flows launch: ai-email-rewrite (one AI step, one email, rewritten for each person)", () => {
   const LEADS = [
-    { name: "Sarah Chen", company: "Northwind", did: "Signed up", subject: "Welcome, Sarah", line: "Start with the issue on finding your first ten accounts." },
-    { name: "Daniel Fischer", company: "Meridian", did: "Viewed pricing 3 times", subject: "Growth or Scale, Daniel?", line: "For a team your size, Growth covers it." },
+    { name: "Daniel Fischer", company: "Meridian", did: "Viewed pricing 3 times", subject: "Growth or Scale, Daniel?", line: "You have compared plans three times this week." },
     { name: "Tom Lee", company: "Copperline", did: "Quiet for 6 months", subject: "Still rebuilding the funnel?", line: "Here is what changed since we talked." },
+    { name: "Sarah Chen", company: "Northwind", did: "Signed up", subject: "Welcome, Sarah", line: "Start with the issue on your first ten accounts." },
   ];
-  it("the slow ones go one at a time, each email is that person's, then it becomes a stream", async () => {
-    const { page, errors, close } = await open("ai-step-stream", { leads: LEADS, at: 0.1, slow: 2, slow_gap: 1, fast_gap: 0.2 }, 4);
+  it("the personal parts rewrite for each person while the rest holds still, then it flickers", async () => {
+    const { page, errors, close } = await open("ai-email-rewrite", { leads: LEADS, at: 0.2, slow: 2, slow_gap: 1.8, fast_gap: 0.15 }, 5);
     try {
-      // Mails fully on screen at a moment: who they are addressed to.
-      const shown = () => page.evaluate(() => [...document.querySelectorAll(".as-mail")].filter((m) => {
-        const cs = getComputedStyle(m); const r = m.getBoundingClientRect();
-        return cs.visibility !== "hidden" && Number(cs.opacity) > 0.9 && r.left >= 0 && r.right <= innerWidth;
-      }).map((m) => [m.querySelector(".as-to b")!.textContent, m.querySelector(".as-sj")!.textContent]));
-      // Lead 1 starts at 0.1, its email is out by 1.2 and rests until the
-      // next one comes out at 2.2.
-      await seek(page, 1.8);
-      expect(await shown()).toEqual([["Sarah Chen", "Welcome, Sarah"]]);
-      await shot(page, "ai-stream-1");
-      await seek(page, 2.8);
-      expect(await shown()).toEqual([["Daniel Fischer", "Growth or Scale, Daniel?"]]);
-      await shot(page, "ai-stream-2");
-      // The stream: several leads on the move at once.
-      await seek(page, 3.5);
-      const moving = await page.evaluate(() => [...document.querySelectorAll(".as-lead")].filter((l) => {
-        const cs = getComputedStyle(l); const r = l.getBoundingClientRect();
-        return cs.visibility !== "hidden" && Number(cs.opacity) > 0.2 && r.right > 0 && r.left < innerWidth;
-      }).length);
-      expect(moving).toBeGreaterThanOrEqual(2);
-      await shot(page, "ai-stream-3");
+      const mail = () => page.evaluate(() => ({
+        to: document.querySelector(".ar-tv")!.textContent, sj: document.querySelector(".ar-sv")!.textContent,
+        hi: document.querySelector(".ar-hi")!.textContent, ln: document.querySelector(".ar-line")!.textContent,
+        fixed: document.querySelector(".ar-fixed")!.textContent, from: document.querySelector(".ar-fv")!.textContent,
+      }));
+      // Daniel's email is there when the shot opens.
+      await seek(page, 0.6);
+      const a = await mail();
+      expect(a).toMatchObject({ to: "Daniel Fischer, Meridian", sj: "Growth or Scale, Daniel?", hi: "Hi Daniel,", ln: LEADS[0].line });
+      await shot(page, "ai-rewrite-1");
+      // Mid-write for Tom (selected at 2.0, his line types from about 2.6).
+      await seek(page, 2.75);
+      const mid = await mail();
+      expect(mid.to).toBe("Tom Lee, Copperline");
+      expect(mid.ln.length).toBeLessThan(LEADS[1].line.length);
+      await seek(page, 3.4);
+      const b = await mail();
+      expect(b).toMatchObject({ sj: "Still rebuilding the funnel?", hi: "Hi Tom,", ln: LEADS[1].line });
+      expect(b.fixed).toBe(a.fixed); expect(b.from).toBe(a.from);   // the same-for-everyone parts hold still
+      await shot(page, "ai-rewrite-2");
+      // The flicker: the selection is on someone else by the end.
+      const seen = new Set<string>();
+      for (let t = 3.85; t < 4.9; t += 0.1) { await seek(page, t); seen.add((await mail()).to || ""); }
+      expect(seen.size).toBeGreaterThanOrEqual(3);
       expect(errors).toEqual([]);
     } finally { await close(); }
   }, 60000);

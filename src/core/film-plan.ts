@@ -31,7 +31,7 @@ export const SHOT_LABEL: Record<ShotKind, string> = {
 
 /** A product surface: the library's mockups, and a tenant's captured screens
  *  (which carry the product's name as their prefix, e.g. quotient-email). */
-const SCREEN_TYPE = /^(quotient-|audience-|claude-|slack-|gmail-|email-|chat-|canva-|code-|browser-|device-|screencast|video-call|calendar-view|kanban-board|form-wizard|dashboard-kpi|notification-stack|tool-screen|retro-post|composer|signup-form|booking-confirmed|onboarding-checklist|ai-step-stream)/;
+const SCREEN_TYPE = /^(quotient-|audience-|claude-|slack-|gmail-|email-|chat-|canva-|code-|browser-|device-|screencast|video-call|calendar-view|kanban-board|form-wizard|dashboard-kpi|notification-stack|tool-screen|retro-post|composer|signup-form|booking-confirmed|onboarding-checklist|ai-email-rewrite)/;
 
 function compTypes(scene: StoryboardScene): string[] {
   return (scene.components || []).map((c: any) => (typeof c === "string" ? c : c?.type)).filter(Boolean);
