@@ -164,6 +164,25 @@ describe("flows launch: quotient-flow actions", () => {
       await shot(page, "flow-send");
       await seek(page, 1.95); const b = (await envs())[0];
       expect(b.x).toBeGreaterThan(a.x + 300);
+      // Mid-flight to the camera the envelope is still over the card it left:
+      // it must paint OVER the step cards, not behind them.
+      await seek(page, 2.5);
+      const onTop = await page.evaluate(() => {
+        const env = document.querySelectorAll(".qf-env")[1];
+        const r = env.getBoundingClientRect();
+        // The middle of the largest overlap between the envelope and a card.
+        let best = null, area = 0;
+        for (const c of document.querySelectorAll(".qf-card")) {
+          const q = c.getBoundingClientRect();
+          const l = Math.max(r.left, q.left), t = Math.max(r.top, q.top);
+          const w = Math.min(r.right, q.right) - l, h = Math.min(r.bottom, q.bottom) - t;
+          if (w > 0 && h > 0 && w * h > area) { area = w * h; best = [l + w / 2, t + h / 2]; }
+        }
+        if (!best) return "no overlap";
+        const hit = document.elementFromPoint(best[0], best[1]);
+        return !!hit && env.contains(hit);
+      });
+      expect(onTop).toBe(true);
       await seek(page, 3.05); const c = (await envs())[1];
       expect(c.w).toBeGreaterThan(1920);   // at the viewer: past the frame
       expect(errors).toEqual([]);

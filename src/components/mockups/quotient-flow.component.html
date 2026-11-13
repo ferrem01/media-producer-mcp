@@ -8,6 +8,7 @@
           <svg class="qf-trail" xmlns="http://www.w3.org/2000/svg"></svg>
           <div class="qf-runner"></div>
           <div class="qf-nodes"></div>
+          <div class="qf-fly"></div>
         </div>
       </div>
     </div>
@@ -38,6 +39,8 @@
   .qf-world { position: absolute; left: 0; top: 0; }
   .qf-edges, .qf-trail { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; }
   .qf-runner { position: absolute; left: 0; top: 0; }
+  /* The sent envelope flies OVER the cards (the runner's dots travel under them). */
+  .qf-fly { position: absolute; left: 0; top: 0; }
   .qf-nodes { position: absolute; left: 0; top: 0; }
   .qf-node { position: absolute; width: 192px; display: flex; justify-content: center; }
   .qf-card {
@@ -112,6 +115,7 @@
     var edgesSvg = el.querySelector('.qf-edges');
     var trailSvg = el.querySelector('.qf-trail');
     var runner = el.querySelector('.qf-runner');
+    var fly = el.querySelector('.qf-fly');
     var nodesEl = el.querySelector('.qf-nodes');
     var SVGNS = 'http://www.w3.org/2000/svg';
     var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
@@ -753,7 +757,7 @@
       var env = document.createElement('div'); env.className = 'qf-env';
       env.innerHTML = ENV;
       env.style.filter = 'drop-shadow(0 8px 14px ' + rgba(ACC, 0.35) + ')';
-      runner.appendChild(env);
+      fly.appendChild(env);
       var sx = n.x, sy = n.y + n.h / 2;
       var to = s.to || 'right', ex, ey, es = num(s.scale, 1.4);
       if (to === 'camera') {
