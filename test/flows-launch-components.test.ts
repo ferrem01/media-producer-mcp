@@ -175,6 +175,18 @@ describe("flows launch: quotient-flow actions", () => {
     } finally { await close(); }
   }, 60000);
 
+  it("open_on starts framed tight on the trigger and pulls back to the whole flow", async () => {
+    const { page, errors, close } = await open("quotient-flow", { ...FLOW, open_on: "trig", open_out: 0.4 }, 2);
+    try {
+      const cam = () => page.evaluate(() => Number(getComputedStyle(document.querySelector(".qf-cam")!).transform.split(",")[0].replace("matrix(", "")));
+      await seek(page, 0); const tight = await cam();
+      await seek(page, 1); const fit = await cam();
+      expect(tight).toBeGreaterThan(fit * 1.5);   // starts well inside the flow
+      await seek(page, 1.5); expect(await cam()).toBeCloseTo(fit, 3);   // and stays on the whole flow
+      expect(errors).toEqual([]);
+    } finally { await close(); }
+  }, 60000);
+
   it("send lifts an envelope off the step and flies it out (right) or at the camera (fills the frame)", async () => {
     const { page, errors, close } = await open("quotient-flow", { ...FLOW, script: [
       { action: "send", step: "email", at: 1, to: "right" },
