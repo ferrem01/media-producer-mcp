@@ -45,6 +45,9 @@
   .bc-k { font-size: 22px; font-weight: 600; color: #17171c; }
   .bc-v { font-size: 22px; line-height: 1.4; color: #3b3b46; white-space: pre-line; }
   .bc-v .bc-dim { color: #8a8a96; }
+  .bc-line { display: flex; align-items: center; gap: 12px; }
+  .bc-line + .bc-line { margin-top: 6px; }
+  .bc-av { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #e9e9ef center 22% / 128% no-repeat; }
   .bc-stamp {
     margin-top: 34px; font-size: 24px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
     color: #8a8a96;
@@ -81,7 +84,19 @@
     rows.forEach(function (r) {
       if (!r || typeof r !== 'object') return;
       var k = document.createElement('div'); k.className = 'bc-k'; k.textContent = String(r.label || '');
-      var v = document.createElement('div'); v.className = 'bc-v'; v.textContent = String(r.value || '');
+      var v = document.createElement('div'); v.className = 'bc-v';
+      // avatars: one photo per line of the value (a person beside each name).
+      var avs = Array.isArray(r.avatars) ? r.avatars : [];
+      String(r.value || '').split('\n').forEach(function (line, li) {
+        var ln = document.createElement('div'); ln.className = 'bc-line';
+        if (avs.length) {
+          var a = document.createElement('span'); a.className = 'bc-av';
+          if (avs[li]) a.style.backgroundImage = 'url("' + String(avs[li]).replace(/"/g, '%22') + '")';
+          else a.style.visibility = 'hidden';
+          ln.appendChild(a);
+        }
+        ln.appendChild(document.createTextNode(line)); v.appendChild(ln);
+      });
       box.appendChild(k); box.appendChild(v); rowEls.push([k, v]);
     });
 

@@ -22,6 +22,11 @@
       "optional": true,
       "placeholder": "sarah@brightloop.io"
     },
+    "avatar_url": {
+      "type": "string",
+      "label": "Sender photo (fills the avatar circle instead of initials)",
+      "optional": true
+    },
     "timestamp": {
       "type": "string",
       "label": "Timestamp",
@@ -60,8 +65,17 @@
     }
   ],
   "default_cursor_targets": {
-    "subject": { "x": "50%", "y": "24%" },
-    "quote": { "x": "50%", "y": "62%" },
-    "archive-button": { "x": "38%", "y": "10%" }
+    "subject": {
+      "x": "50%",
+      "y": "24%"
+    },
+    "quote": {
+      "x": "50%",
+      "y": "62%"
+    },
+    "archive-button": {
+      "x": "38%",
+      "y": "10%"
+    }
   }
 }
