@@ -53,7 +53,9 @@
       img.alt = ''; img.src = srcs[i % srcs.length];
       d.appendChild(img);
       spinner.appendChild(d);
-      var asp = ASPECTS[Math.floor(rnd(i, 1) * ASPECTS.length)];
+      // `aspect` pins every tile to one shape (cards whose text must not be
+      // cropped); otherwise each tile takes one of the masonry aspects.
+      var asp = num(data.aspect, 0) > 0 ? num(data.aspect, 1) : ASPECTS[Math.floor(rnd(i, 1) * ASPECTS.length)];
       items.push({ el: d, i: i, asp: asp });
     }
     // Every item is placed by its CENTRE: xPercent/yPercent -50.
