@@ -1,0 +1,146 @@
+<template>
+  <div class="oc-root">
+    <div class="oc-stage">
+      <div class="oc-card">
+        <div class="oc-head">
+          <div class="oc-title"></div>
+          <div class="oc-count"></div>
+        </div>
+        <div class="oc-bar"><div class="oc-fill"></div></div>
+        <div class="oc-list"></div>
+      </div>
+      <div class="oc-idle"></div>
+    </div>
+  </div>
+</template>
+
+<style>
+  /* ONBOARDING CHECKLIST: a product's "get started" checklist, stuck part
+     way -- the stalled new user. Tasks with check circles (done ones filled),
+     the current one marked, a progress bar and count, an optional plain idle
+     line ("Last active 3 days ago"). Script `complete` ticks tasks off, the
+     bar and count follow: the nudge worked. 1440-wide design stage at the
+     box's aspect, scaled to the box. */
+  .oc-root, .oc-root * { max-width: none; }
+  .oc-root { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
+  .oc-stage {
+    position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden;
+    background: var(--oc-bg, #f9f9fb); color: #17171c;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .oc-card {
+    width: 820px; box-sizing: border-box; padding: 44px 48px 36px; background: #fff;
+    border: 1px solid rgb(239, 240, 246); border-radius: 18px;
+    box-shadow: 0 24px 50px rgba(12, 12, 66, 0.06), 0 1px 3px rgba(40, 28, 65, 0.06);
+  }
+  .oc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
+  .oc-title { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+  .oc-count { font-size: 22px; color: #6b6b78; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .oc-bar { margin: 22px 0 18px; height: 10px; border-radius: 6px; background: #ececf3; overflow: hidden; }
+  .oc-fill { height: 100%; width: 0; border-radius: 6px; background: var(--oc-acc, #393bf5); }
+  .oc-list { display: flex; flex-direction: column; }
+  .oc-row {
+    position: relative; display: flex; align-items: center; gap: 22px; padding: 20px 18px; margin: 0 -18px;
+    border-radius: 12px; font-size: 25px;
+  }
+  .oc-row + .oc-row { border-top: 1px solid rgb(243, 243, 248); }
+  .oc-row.cur { background: color-mix(in srgb, var(--oc-acc, #393bf5) 6%, #ffffff); }
+  .oc-circle {
+    position: relative; flex: none; width: 34px; height: 34px; border-radius: 50%; box-sizing: border-box;
+    border: 2.5px solid #cfcfdc;
+  }
+  .oc-tick {
+    position: absolute; inset: -2.5px; border-radius: 50%; background: #16a34a; color: #fff;
+    display: flex; align-items: center; justify-content: center; visibility: hidden;
+  }
+  .oc-tick svg { width: 20px; height: 20px; }
+  .oc-label { flex: 1; color: #17171c; }
+  .oc-row.done .oc-label { color: #9a9aa6; }
+  .oc-go { font-size: 22px; font-weight: 600; color: var(--oc-acc, #393bf5); white-space: nowrap; visibility: hidden; }
+  .oc-idle { margin-top: 30px; font-size: 24px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9a9aa6; }
+  .oc-idle:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var q = function (s) { return el.querySelector(s); };
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var root = q('.oc-root'), stage = q('.oc-stage');
+
+    var bw = el.clientWidth || 1440, bh = el.clientHeight || 810;
+    var DW = 1440, DH = Math.max(820, Math.round(DW * bh / bw));
+    stage.style.width = DW + 'px'; stage.style.height = DH + 'px';
+    var S = bw / DW;
+    if (DH * S > bh + 1) { S = bh / DH; stage.style.transform = 'translateX(' + ((bw - DW * S) / 2) + 'px) scale(' + S + ')'; }
+    else stage.style.transform = 'scale(' + S + ')';
+    if (data.accent) root.style.setProperty('--oc-acc', String(data.accent));
+    if (data.background) root.style.setProperty('--oc-bg', String(data.background));
+
+    q('.oc-title').textContent = String(data.title || 'Get started');
+    q('.oc-idle').textContent = data.idle ? String(data.idle) : '';
+    var tasks = (Array.isArray(data.tasks) && data.tasks.length ? data.tasks : [
+      { label: 'Connect your website', done: true },
+      { label: 'Import your audience', done: true },
+      { label: 'Send your first email' },
+      { label: 'Build your first flow' },
+      { label: 'Invite your team' }
+    ]).filter(function (t) { return t && typeof t === 'object'; });
+    var TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    var list = q('.oc-list'), rows = [];
+    tasks.forEach(function (t) {
+      var r = document.createElement('div'); r.className = 'oc-row' + (t.done ? ' done' : '');
+      r.innerHTML = '<div class="oc-circle"><div class="oc-tick">' + TICK + '</div></div><div class="oc-label"></div><div class="oc-go">Continue &rarr;</div>';
+      r.querySelector('.oc-label').textContent = String(t.label || '');
+      if (t.done) r.querySelector('.oc-tick').style.visibility = 'visible';
+      list.appendChild(r); rows.push({ el: r, done: !!t.done });
+    });
+    var N = rows.length;
+    var doneN = rows.filter(function (r) { return r.done; }).length;
+    var cnt = q('.oc-count'), fill = q('.oc-fill');
+    function countText(k) { return k + ' of ' + N + ' complete'; }
+    cnt.textContent = countText(doneN);
+    gsap.set(fill, { width: (N ? doneN / N * 100 : 0) + '%' });
+    // The current task: the first not done (the user stopped here).
+    var curI = rows.findIndex(function (r) { return !r.done; });
+    if (curI >= 0) { rows[curI].el.classList.add('cur'); rows[curI].el.querySelector('.oc-go').style.visibility = 'visible'; }
+
+    // Entrance.
+    var AT = num(data.at, 0.1);
+    var card = q('.oc-card');
+    if (data.still !== true) {
+      gsap.set(card, { autoAlpha: 0, y: 30 });
+      tl.to(card, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, AT);
+      tl.from(rows.map(function (r) { return r.el; }), { autoAlpha: 0, x: -12, duration: 0.3, stagger: 0.06, ease: 'power3.out' }, AT + 0.2);
+    }
+    var idle = q('.oc-idle');
+    if (idle.textContent) tl.from(idle, { autoAlpha: 0, y: 10, duration: 0.3 }, num(data.idle_at, AT + 0.5));
+
+    // complete: [{index, at}] -- the circle fills with a pop, the bar and the
+    // count step up, the "current" marker moves to the next open task.
+    var comp = Array.isArray(data.complete) ? data.complete.filter(function (c) { return c && typeof c === 'object'; }) : [];
+    comp.sort(function (a, b) { return num(a.at, 0) - num(b.at, 0); });
+    comp.forEach(function (c) {
+      var i = Math.round(num(c.index, -1));
+      if (!rows[i] || rows[i].done) return;
+      var at = num(c.at, AT + 1);
+      var r = rows[i];
+      r.done = true; doneN++;
+      var tick = r.el.querySelector('.oc-tick');
+      tl.set(tick, { visibility: 'visible' }, at);
+      tl.fromTo(tick, { scale: 0 }, { scale: 1, duration: 0.4, ease: 'back.out(2.6)', immediateRender: false }, at);
+      tl.set(r.el, { className: 'oc-row done' }, at + 0.05);
+      tl.set(r.el.querySelector('.oc-go'), { visibility: 'hidden' }, at);
+      tl.set(cnt, { textContent: countText(doneN) }, at + 0.1);
+      tl.to(fill, { width: (doneN / N * 100) + '%', duration: 0.45, ease: 'power2.out' }, at + 0.05);
+      var next = rows.findIndex(function (x) { return !x.done; });
+      if (next >= 0) {
+        tl.set(rows[next].el, { className: 'oc-row cur' }, at + 0.25);
+        tl.set(rows[next].el.querySelector('.oc-go'), { visibility: 'visible' }, at + 0.25);
+      }
+    });
+    return tl;
+  }
+</script>

@@ -33,6 +33,11 @@
       "type": "number",
       "label": "Changes the arrangement (same seed, same swarm)",
       "optional": true
+    },
+    "aspect": {
+      "type": "number",
+      "label": "Every tile's height / width (e.g. 0.83 for 344x284 cards): no tile crops its image. Default: a mix of masonry shapes, cropped to fill",
+      "optional": true
     }
   }
 }

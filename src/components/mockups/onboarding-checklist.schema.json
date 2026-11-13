@@ -1,0 +1,29 @@
+{
+  "type": "onboarding-checklist",
+  "label": "Onboarding Checklist",
+  "category": "mockups",
+  "description": "A product's 'get started' checklist, stuck part way: the STALLED NEW USER. A card with the title, 'n of N complete', a progress bar and the tasks (done ones with a filled green check, the first open one marked with 'Continue ->'), plus an optional plain idle line under the card ('LAST ACTIVE 3 DAYS AGO'). Script it with `complete`: a task's circle fills with a pop, the bar and count step up and the marker moves on -- the nudge worked. The onboarding beat of a lifecycle or automation film. 1440-wide design stage at the box's aspect, scaled to the box.",
+  "data": {
+    "title": { "type": "string", "label": "Card title", "optional": true, "placeholder": "Get started with Quotient" },
+    "tasks": {
+      "type": "array", "label": "Tasks in order (done: already checked)", "optional": true,
+      "items": { "type": "object", "properties": {
+        "label": { "type": "string", "label": "Task", "placeholder": "Build your first flow" },
+        "done": { "type": "boolean", "label": "Already done" }
+      } }
+    },
+    "idle": { "type": "string", "label": "Plain line under the card (uppercase grey type, no box)", "optional": true, "placeholder": "Last active 3 days ago" },
+    "idle_at": { "type": "number", "label": "Idle line lands at (s or @word)", "optional": true },
+    "complete": {
+      "type": "array", "label": "Tasks ticked off during the scene", "optional": true,
+      "items": { "type": "object", "properties": {
+        "index": { "type": "number", "label": "Task index (0-based)" },
+        "at": { "type": "number", "label": "At (s or @word)" }
+      } }
+    },
+    "accent": { "type": "string", "label": "Accent: the bar, the marker (default #393bf5)", "optional": true },
+    "background": { "type": "string", "label": "Page colour (default #f9f9fb)", "optional": true },
+    "still": { "type": "boolean", "label": "The card is there from the first frame", "optional": true },
+    "at": { "type": "number", "label": "Card lands at (s or @word)", "optional": true }
+  }
+}

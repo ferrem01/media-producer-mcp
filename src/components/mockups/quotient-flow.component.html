@@ -80,6 +80,21 @@
   .qf-lit { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; visibility: hidden; border: 1.5px solid currentColor; }
   .qf-ring { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; visibility: hidden; border: 2px solid currentColor; }
   .qf-spark { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; visibility: hidden; pointer-events: none; }
+  .qf-research {
+    position: absolute; width: 300px; box-sizing: border-box; padding: 12px 14px 10px; background: #fff;
+    border: 1px solid rgb(239, 240, 246); border-radius: 10px; font-size: 12px; line-height: 16px;
+    box-shadow: 0 14px 30px rgba(12, 12, 66, 0.10), 0 1px 2px rgba(40, 28, 65, 0.06); visibility: hidden;
+  }
+  .qf-research .qf-rh { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 8px; }
+  .qf-research .qf-rr { display: flex; gap: 10px; padding: 5px 0; border-top: 1px solid rgb(243, 243, 248); }
+  .qf-research .qf-rk { flex: none; width: 76px; color: rgb(132, 132, 145); }
+  .qf-research .qf-rv { flex: 1; color: rgb(23, 23, 28); font-weight: 500; }
+  .qf-env { position: absolute; left: 0; top: 0; width: 64px; height: 46px; margin: -23px 0 0 -32px; visibility: hidden; transform-origin: 50% 50%; }
+  .qf-env svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .qf-count {
+    position: absolute; right: 10px; top: 7px; font-size: 11px; line-height: 14px; font-weight: 700;
+    font-variant-numeric: tabular-nums; visibility: hidden;
+  }
   .qf-dot {
     position: absolute; left: 0; top: 0; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
     visibility: hidden; border: 2px solid #fff; box-sizing: border-box;
@@ -122,6 +137,11 @@
       message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
       file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
       target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+      globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+      video: '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+      pointer: '<path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/>',
+      inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
       flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>'
     };
     var SLACK = '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="none"><g fill-rule="evenodd" clip-rule="evenodd"><path fill="#E01E5A" d="M2.471 11.318a1.474 1.474 0 001.47-1.471v-1.47h-1.47A1.474 1.474 0 001 9.846c.001.811.659 1.469 1.47 1.47zm3.682-2.942a1.474 1.474 0 00-1.47 1.471v3.683c.002.811.66 1.468 1.47 1.47a1.474 1.474 0 001.47-1.47V9.846a1.474 1.474 0 00-1.47-1.47z"/><path fill="#36C5F0" d="M4.683 2.471c.001.811.659 1.469 1.47 1.47h1.47v-1.47A1.474 1.474 0 006.154 1a1.474 1.474 0 00-1.47 1.47zm2.94 3.682a1.474 1.474 0 00-1.47-1.47H2.47A1.474 1.474 0 001 6.153c.002.812.66 1.469 1.47 1.47h3.684a1.474 1.474 0 001.47-1.47z"/><path fill="#2EB67D" d="M9.847 7.624a1.474 1.474 0 001.47-1.47V2.47A1.474 1.474 0 009.848 1a1.474 1.474 0 00-1.47 1.47v3.684c.002.81.659 1.468 1.47 1.47zm3.682-2.941a1.474 1.474 0 00-1.47 1.47v1.47h1.47A1.474 1.474 0 0015 6.154a1.474 1.474 0 00-1.47-1.47z"/><path fill="#ECB22E" d="M8.377 9.847c.002.811.659 1.469 1.47 1.47h3.683A1.474 1.474 0 0015 9.848a1.474 1.474 0 00-1.47-1.47H9.847a1.474 1.474 0 00-1.47 1.47zm2.94 3.682a1.474 1.474 0 00-1.47-1.47h-1.47v1.47c.001.812.659 1.469 1.47 1.47a1.474 1.474 0 001.47-1.47z"/></g></svg>';
@@ -138,6 +158,15 @@
     var KIND = {
       trigger: { icon: 'play', title: 'Programmatic', chip: 'Trigger' },
       event: { icon: 'zap', title: 'Event', chip: 'Trigger' },
+      // The rest of the product's triggers (docs: Event, Schedule, Person
+      // Update, Person Created, Programmatic, Marketing Event; plus incoming
+      // webhooks and CRM record changes from the launch spec).
+      schedule: { icon: 'clock', title: 'Schedule', chip: 'Trigger' },
+      'person-update': { icon: 'user', title: 'Person Updated', chip: 'Trigger' },
+      'person-created': { icon: 'user', title: 'Person Created', chip: 'Trigger' },
+      'marketing-event': { icon: 'calendar', title: 'Marketing Event', chip: 'Trigger' },
+      webhook: { icon: 'webhook', title: 'Webhook', chip: 'Trigger' },
+      'crm-record': { icon: 'database', title: 'CRM Record Updated', chip: 'Trigger' },
       agent: { icon: 'quotient', title: 'Agent' },
       conditional: { icon: 'branch', title: 'Conditional' },
       email: { icon: 'mail', title: 'Send Email' },
@@ -296,6 +325,23 @@
       B.t = Math.min(B.t, n.y - (n.chip ? 24 : 0)); B.b = Math.max(B.b, n.y + n.h);
     });
 
+    // Research cards (script action 'card') sit beside their step: the fit
+    // frames them too, so a card never opens off the edge.
+    var CARD_W = 300;
+    var cardActs = (Array.isArray(data.script) ? data.script : []).filter(function (s) {
+      return s && typeof s === 'object' && String(s.action || s.do || '').toLowerCase() === 'card' && G[String(s.step)];
+    });
+    cardActs.forEach(function (s) {
+      var n = G[String(s.step)];
+      var rows = Array.isArray(s.rows) ? s.rows.length : 0;
+      var ch = 44 + rows * 27;
+      var left = s.side === 'left';
+      var x0 = left ? n.x - 96 - 28 - CARD_W : n.x + 96 + 28;
+      s._box = { x: x0, y: n.y + n.h / 2 - ch / 2, w: CARD_W, h: ch };
+      B.l = Math.min(B.l, x0); B.r = Math.max(B.r, x0 + CARD_W);
+      B.t = Math.min(B.t, s._box.y); B.b = Math.max(B.b, s._box.y + ch);
+    });
+
     // ---- Draw nodes ----
     var TONES = {
       yes: { bg: '#f3fbf5', border: 'rgba(22, 163, 74, 0.2)', dot: '#dcf5e3', icon: '#16a34a', text: '#166534', glyph: 'check' },
@@ -344,6 +390,7 @@
       var lit = document.createElement('div'); lit.className = 'qf-lit'; lit.style.color = ACC;
       var ring = document.createElement('div'); ring.className = 'qf-ring'; ring.style.color = ACC;
       card.appendChild(lit); card.appendChild(glow); card.appendChild(ring);
+      if (n.type !== 'pill') card.setAttribute('data-anchor', String(n.id));
       box.appendChild(card);
       nodesEl.appendChild(box);
       n.box = box; n.card = card; n.glow = glow; n.lit = lit; n.ring = ring;
@@ -512,6 +559,65 @@
       tl.to(n.card, { keyframes: [{ scale: 1.05, duration: 0.14, ease: 'power2.out' }, { scale: 1, duration: 0.3, ease: 'power2.inOut' }] }, at);
     }
     var trailN = 0;
+    // A ring pulse alone (no card bump): the live run's many arrivals.
+    function ping(n, at) {
+      tl.fromTo(n.ring, { autoAlpha: 0.55, scale: 1 }, { autoAlpha: 0, scale: 1.12, duration: 0.45, ease: 'power2.out', immediateRender: false }, at);
+    }
+    // ONE LEAD'S TRIP through a list of steps: a dot rides the connectors;
+    // opts.trail lights the edges behind it, opts.lit lights each step it
+    // reaches (with a pulse), opts.ride moves the camera with it. Returns the
+    // arrival time at each step (ids[0] = at).
+    function travel(ids, at, opts) {
+      var hop = opts.hop, col = opts.color;
+      var dot = document.createElement('div');
+      dot.className = 'qf-dot'; dot.style.background = col;
+      dot.style.boxShadow = '0 0 0 4px ' + rgba(col, 0.18) + ', 0 0 14px ' + rgba(col, 0.6);
+      if (opts.size) { dot.style.width = dot.style.height = opts.size + 'px'; dot.style.margin = (-opts.size / 2) + 'px 0 0 ' + (-opts.size / 2) + 'px'; }
+      runner.appendChild(dot);
+      gsap.set(dot, { autoAlpha: 0 });
+      var t = at, arrive = {};
+      arrive[ids[0]] = at;
+      if (opts.lit) { tl.to(G[ids[0]].lit, { autoAlpha: 1, duration: 0.2 }, t); pulse(G[ids[0]], t); }
+      else if (opts.ping) ping(G[ids[0]], t);
+      if (opts.ride) keys.push({ t: t, v: view(G[ids[0]].x, G[ids[0]].y + G[ids[0]].h / 2, opts.rideZ) });
+      var frames = [], first = true;
+      for (var i = 1; i < ids.length; i++) {
+        var a = ids[i - 1], b = ids[i];
+        var chain = EDGES[a + '>' + b] ? [EDGES[a + '>' + b]]
+          : (EDGES[a + '>pill:' + b] && EDGES['pill:' + b + '>' + b]) ? [EDGES[a + '>pill:' + b], EDGES['pill:' + b + '>' + b]] : null;
+        if (!chain) continue;
+        var total = 0;
+        chain.forEach(function (e) { total += e.len; });
+        chain.forEach(function (e) {
+          var d = hop * (e.len / total);
+          if (opts.trail) {
+            // The lit trail: an accent copy of the edge drawn behind the dot.
+            var tr = document.createElementNS(SVGNS, 'path');
+            tr.setAttribute('d', e.bez.d); tr.setAttribute('fill', 'none');
+            tr.setAttribute('stroke', col); tr.setAttribute('stroke-width', '2.5'); tr.setAttribute('stroke-linecap', 'round');
+            tr.setAttribute('stroke-dasharray', e.len); tr.setAttribute('stroke-dashoffset', e.len);
+            trailSvg.appendChild(tr); trailN++;
+            tl.to(tr, { attr: { 'stroke-dashoffset': 0 }, duration: d, ease: 'none' }, t);
+          }
+          if (first) { gsap.set(dot, { x: e.pts[0].x, y: e.pts[0].y }); first = false; }
+          frames.push({ x: e.pts[0].x, y: e.pts[0].y, duration: 0.001 });
+          for (var k = 1; k < e.pts.length; k++) frames.push({ x: e.pts[k].x, y: e.pts[k].y, duration: d / (e.pts.length - 1), ease: 'none' });
+          t += d;
+          if (e.to.indexOf('pill:') === 0 && opts.lit) pulse(G[e.to], t);
+        });
+        arrive[b] = t;
+        if (opts.lit) { tl.to(G[b].lit, { autoAlpha: 1, duration: 0.2 }, t); pulse(G[b], t); }
+        else if (opts.ping) ping(G[b], t);
+        if (opts.ride) keys.push({ t: t, v: view(G[b].x, G[b].y + G[b].h / 2, opts.rideZ) });
+      }
+      if (frames.length) {
+        tl.to(dot, { autoAlpha: 1, duration: 0.12 }, at);
+        tl.to(dot, { keyframes: frames }, at);
+        tl.to(dot, { autoAlpha: 0, scale: 0.4, duration: 0.25 }, t);
+      }
+      return arrive;
+    }
+    var sends = [];
     script.forEach(function (s) {
       var act = String(s.action || s.do || '').toLowerCase();
       var at = num(s.at, 0);
@@ -527,54 +633,82 @@
       } else if (act === 'path') {
         var ids = stepsOf(s);
         if (ids.length < 2) return;
-        var hop = num(s.hop, 0.42);
         // A path rides in close when the whole flow is too small to read
         // (a wide flow on a phone frame): unless the board pins camera "fit".
         var ride = mode === 'follow' || s.follow === true || (s.follow !== false && data.camera !== 'fit' && fitZ < 1.5);
-        var rideZ = num(s.zoom, mode === 'follow' ? followZ : Math.min(MAXZ + 0.6, 2.2));
-        var col = s.color || ACC;
-        var dot = document.createElement('div');
-        dot.className = 'qf-dot'; dot.style.background = col;
-        dot.style.boxShadow = '0 0 0 4px ' + rgba(col, 0.18) + ', 0 0 14px ' + rgba(col, 0.6);
-        runner.appendChild(dot);
-        gsap.set(dot, { autoAlpha: 0 });
-        var t = at;
-        tl.to(G[ids[0]].lit, { autoAlpha: 1, duration: 0.2 }, t);
-        pulse(G[ids[0]], t);
-        if (ride) keys.push({ t: t, v: view(G[ids[0]].x, G[ids[0]].y + G[ids[0]].h / 2, rideZ) });
-        var frames = [];
-        var first = true;
-        for (var i = 1; i < ids.length; i++) {
-          var a = ids[i - 1], b = ids[i];
-          var chain = EDGES[a + '>' + b] ? [EDGES[a + '>' + b]]
-            : (EDGES[a + '>pill:' + b] && EDGES['pill:' + b + '>' + b]) ? [EDGES[a + '>pill:' + b], EDGES['pill:' + b + '>' + b]] : null;
-          if (!chain) continue;
-          var total = 0;
-          chain.forEach(function (e) { total += e.len; });
-          chain.forEach(function (e) {
-            var d = hop * (e.len / total);
-            // The lit trail: an accent copy of the edge drawn behind the dot.
-            var tr = document.createElementNS(SVGNS, 'path');
-            tr.setAttribute('d', e.bez.d); tr.setAttribute('fill', 'none');
-            tr.setAttribute('stroke', col); tr.setAttribute('stroke-width', '2.5'); tr.setAttribute('stroke-linecap', 'round');
-            tr.setAttribute('stroke-dasharray', e.len); tr.setAttribute('stroke-dashoffset', e.len);
-            trailSvg.appendChild(tr); trailN++;
-            tl.to(tr, { attr: { 'stroke-dashoffset': 0 }, duration: d, ease: 'none' }, t);
-            if (first) { gsap.set(dot, { x: e.pts[0].x, y: e.pts[0].y }); first = false; }
-            frames.push({ x: e.pts[0].x, y: e.pts[0].y, duration: 0.001 });
-            for (var k = 1; k < e.pts.length; k++) frames.push({ x: e.pts[k].x, y: e.pts[k].y, duration: d / (e.pts.length - 1), ease: 'none' });
-            t += d;
-            if (e.to.indexOf('pill:') === 0) pulse(G[e.to], t);
+        travel(ids, at, {
+          hop: num(s.hop, 0.42), color: s.color || ACC, trail: true, lit: true, ride: ride,
+          rideZ: num(s.zoom, mode === 'follow' ? followZ : Math.min(MAXZ + 0.6, 2.2))
+        });
+      } else if (act === 'live') {
+        // MANY LEADS AT ONCE: from `at` to `until`, a dot leaves every `every`
+        // seconds, taking the listed paths in turn; each step pings on an
+        // arrival and (counts) shows how many have reached it. The flow,
+        // running -- not one lead's story but the funnel working.
+        var paths = (Array.isArray(s.paths) ? s.paths : [s.steps || []]).map(function (pth) {
+          return (Array.isArray(pth) ? pth : []).map(String).filter(function (id) { return G[id]; });
+        }).filter(function (pth) { return pth.length >= 2; });
+        if (!paths.length) return;
+        var lend = Math.min(DUR, num(s.until, DUR));
+        var every = Math.max(0.06, num(s.every, 0.35));
+        var lhop = num(s.hop, 0.32);
+        var tally = {};
+        var k = 0;
+        for (var lt = at; lt < lend - 0.2; lt += every, k++) {
+          var arr = travel(paths[k % paths.length], lt, { hop: lhop, color: s.color || ACC, ping: true, size: num(s.dot, 10) });
+          Object.keys(arr).forEach(function (id) { if (arr[id] <= lend) (tally[id] = tally[id] || []).push(arr[id]); });
+        }
+        if (s.counts !== false) {
+          var from = (s.count_from && typeof s.count_from === 'object') ? s.count_from : {};
+          Object.keys(tally).forEach(function (id) {
+            var n = G[id];
+            if (n.type === 'pill') return;
+            var c = document.createElement('div'); c.className = 'qf-count'; c.style.color = s.color || ACC;
+            var base = Math.max(0, Math.round(num(from[id], 0)));
+            c.textContent = String(base);
+            n.card.appendChild(c);
+            if (base > 0) tl.set(c, { visibility: 'visible' }, at);
+            tally[id].sort(function (x, y) { return x - y; }).forEach(function (t2, j) {
+              if (j === 0 && base === 0) tl.set(c, { visibility: 'visible' }, t2);
+              tl.set(c, { textContent: (base + j + 1).toLocaleString('en-US') }, t2);
+            });
           });
-          tl.to(G[b].lit, { autoAlpha: 1, duration: 0.2 }, t);
-          pulse(G[b], t);
-          if (ride) keys.push({ t: t, v: view(G[b].x, G[b].y + G[b].h / 2, rideZ) });
         }
-        if (frames.length) {
-          tl.to(dot, { autoAlpha: 1, duration: 0.12 }, at);
-          tl.to(dot, { keyframes: frames }, at);
-          tl.to(dot, { autoAlpha: 0, scale: 0.4, duration: 0.25 }, t);
+      } else if (act === 'card') {
+        // THE AGENT'S FINDINGS: a card opens beside the step, its rows
+        // landing one by one (what the research turned up).
+        if (!s._box) return;
+        var n2 = G[String(s.step)];
+        var rc = document.createElement('div'); rc.className = 'qf-research';
+        rc.style.left = s._box.x + 'px'; rc.style.top = s._box.y + 'px'; rc.style.width = s._box.w + 'px';
+        var hd = document.createElement('div'); hd.className = 'qf-rh';
+        hd.innerHTML = '<div class="qf-ic">' + iconHtml(s.icon || 'quotient') + '</div>';
+        var ht = document.createElement('span'); ht.textContent = String(s.title || 'Research'); hd.appendChild(ht);
+        rc.appendChild(hd);
+        var rowEls = [];
+        (Array.isArray(s.rows) ? s.rows : []).forEach(function (r) {
+          if (!r || typeof r !== 'object') return;
+          var row = document.createElement('div'); row.className = 'qf-rr';
+          var kk = document.createElement('div'); kk.className = 'qf-rk'; kk.textContent = String(r.label || '');
+          var vv = document.createElement('div'); vv.className = 'qf-rv'; vv.textContent = String(r.value || '');
+          if (r.color) vv.style.color = String(r.color);
+          row.appendChild(kk); row.appendChild(vv); rc.appendChild(row); rowEls.push(row);
+        });
+        nodesEl.appendChild(rc);
+        gsap.set(rc, { autoAlpha: 0, x: s.side === 'left' ? 16 : -16, scale: 0.94, transformOrigin: s.side === 'left' ? '100% 50%' : '0% 50%' });
+        tl.to(rc, { autoAlpha: 1, x: 0, scale: 1, duration: 0.35, ease: 'back.out(1.6)' }, at);
+        var rs = num(s.stagger, 0.22);
+        rowEls.forEach(function (row, i) {
+          gsap.set(row, { autoAlpha: 0 });
+          tl.to(row, { autoAlpha: 1, duration: 0.2 }, at + 0.25 + i * rs);
+        });
+        if (s.until !== undefined) tl.to(rc, { autoAlpha: 0, duration: 0.25 }, num(s.until, DUR));
+        if (s.focus !== false && n2) {
+          var bx = s._box;
+          keys.push({ t: at, v: view((Math.min(n2.x - 96, bx.x) + Math.max(n2.x + 96, bx.x + bx.w)) / 2, n2.y + n2.h / 2, num(s.zoom, 1.6)), ease: true });
         }
+      } else if (act === 'send') {
+        sends.push(s);
       } else if (act === 'focus') {
         var fid = stepsOf(s)[0];
         if (fid) keys.push({ t: at, v: view(G[fid].x, G[fid].y + G[fid].h / 2, num(s.zoom, 1.8)), ease: true });
@@ -599,6 +733,42 @@
       var st = k.ease ? k.t : Math.max(prevT, k.t - d);
       tl.to(cam, { x: k.v.x, y: k.v.y, scale: k.v.scale, duration: d, ease: 'power2.inOut' }, st);
       prevT = st + d; prevV = k.v;
+    });
+
+    // ---- SEND: an envelope leaves a step -- the email going out to the
+    // lead. It lifts off the card and flies 'right' / 'left' / 'down' out of
+    // the flow, or 'camera': up at the viewer until it fills the frame (cut
+    // to the inbox on the next frame). ----
+    function viewAt(t) {
+      var v = start;
+      keys.forEach(function (k) { if (k.t <= t) v = k.v; });
+      return v;
+    }
+    var ENV = '<svg viewBox="0 0 64 46"><rect x="1" y="1" width="62" height="44" rx="6" fill="#fff" stroke="' + ACC + '" stroke-width="2.4"/>' +
+      '<path d="M3 5 L32 26 L61 5" fill="none" stroke="' + ACC + '" stroke-width="2.4" stroke-linejoin="round"/></svg>';
+    sends.forEach(function (s) {
+      var id = stepsOf(s)[0];
+      if (!id) return;
+      var n = G[id], at = num(s.at, 0), dur = num(s.duration, 0.7);
+      var env = document.createElement('div'); env.className = 'qf-env';
+      env.innerHTML = ENV;
+      env.style.filter = 'drop-shadow(0 8px 14px ' + rgba(ACC, 0.35) + ')';
+      runner.appendChild(env);
+      var sx = n.x, sy = n.y + n.h / 2;
+      var to = s.to || 'right', ex, ey, es = num(s.scale, 1.4);
+      if (to === 'camera') {
+        var v = viewAt(at);
+        ex = (DW / 2 - v.x) / v.scale; ey = (DH / 2 - v.y) / v.scale;
+        es = (DW * 1.6 / v.scale) / 64;
+      } else if (to === 'left') { ex = B.l - 600; ey = sy - 80; }
+      else if (to === 'down') { ex = sx; ey = B.b + 500; }
+      else if (to && typeof to === 'object') { ex = sx + num(to.dx, 400); ey = sy + num(to.dy, 0); }
+      else { ex = B.r + 600; ey = sy - 80; }
+      gsap.set(env, { x: sx, y: sy, scale: 0.3, autoAlpha: 0, rotation: 0 });
+      tl.set(env, { visibility: 'visible' }, at);
+      pulse(n, at);
+      tl.to(env, { autoAlpha: 1, scale: 1, y: sy - 46, duration: 0.25, ease: 'back.out(2)' }, at);
+      tl.to(env, { x: ex, y: ey, scale: es, rotation: to === 'camera' ? 0 : (to === 'left' ? -8 : 8), duration: dur, ease: to === 'camera' ? 'power3.in' : 'power2.in' }, at + 0.25);
     });
     return tl;
   }

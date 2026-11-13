@@ -39,6 +39,11 @@
       "type": "string",
       "label": "Logo image URL for the orb. Defaults to the real Quotient app icon (logo.dev).",
       "optional": true
+    },
+    "hide_chips": {
+      "type": "boolean",
+      "label": "Hide the category chip row (a frame with no pill shapes)",
+      "optional": true
     }
   },
   "match": {

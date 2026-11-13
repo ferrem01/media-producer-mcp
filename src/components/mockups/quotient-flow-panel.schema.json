@@ -2,7 +2,7 @@
   "type": "quotient-flow-panel",
   "label": "Quotient flow — step settings panel",
   "category": "mockups",
-  "description": "The Quotient flow editor's side panel: a selected step's settings, in the product's look (Edit / Analytics / History tabs, sections of labelled fields: dropdowns, text fields, notes, radio choices). Pair it with quotient-flow -- panel beside the diagram reads as the editor -- to show HOW a step is set up: the trigger type picked, the audience chosen, an email chosen for a branch. Two views: `settings` (the step's fields) and `add-step` (the step picker: a grid of step types -- Delay, Send Email, Conditional, AI Email, Update Person, Update Lead Score, Send to CRM, Notify User, Send Slack Message, HTTP Request, Agent). Scriptable: `type` a value into a field (a caret, character by character), `select` an option (dropdown value swaps, radio moves), `highlight` a field with a ring, `view` switch views, `pick` a step type in the picker (hover, press, ring). 'Add step -> pick Send Email -> its settings' is view add-step, pick, view settings. Every `at` takes a word anchor. With no sections it shows the real trigger panel. Designed 350 wide; give it a tall narrow box (about 350x580 proportions).",
+  "description": "The Quotient flow editor's side panel: a selected step's settings, in the product's look (Edit / Analytics / History tabs, sections of labelled fields: dropdowns, text fields, notes, radio choices). Pair it with quotient-flow -- panel beside the diagram reads as the editor -- to show HOW a step is set up: the trigger type picked, the audience chosen, an email chosen for a branch. Two views: `settings` (the step's fields) and `add-step` (the step picker: a grid of step types -- Delay, Send Email, Conditional, AI Email, Update Person, Update Lead Score, Send to CRM, Notify User, Send Slack Message, HTTP Request, Agent). Scriptable: `type` a value into a field (a caret, character by character), `select` an option (dropdown value swaps, radio moves), `highlight` a field with a ring, `view` switch views, `pick` a step type in the picker (hover, press, ring), `menu` open a dropdown (by default the product's trigger types: Event, Schedule, Person Update, Person Created, Programmatic, Marketing Event, Webhook, CRM Record Updated, each with its icon), walk the highlight down to `value` and take it. A trigger type chosen by select or menu swaps the field's icon too. 'Add step -> pick Send Email -> its settings' is view add-step, pick, view settings. Every `at` takes a word anchor. With no sections it shows the real trigger panel. Designed 350 wide; give it a tall narrow box (about 350x580 proportions).",
   "data": {
     "tab": {
       "type": "string",
@@ -111,7 +111,7 @@
           "action": {
             "type": "string",
             "label": "Action",
-            "placeholder": "type | select | highlight | view | pick"
+            "placeholder": "type | select | highlight | view | pick | menu"
           },
           "field": {
             "type": "string",
@@ -119,7 +119,7 @@
           },
           "value": {
             "type": "string",
-            "label": "Value to type / option to select"
+            "label": "Value to type / option to select / option the menu lands on"
           },
           "until": {
             "type": "number",
@@ -134,6 +134,17 @@
             "type": "string",
             "label": "Pick: the step type",
             "placeholder": "Send Email"
+          },
+          "options": {
+            "type": "array",
+            "label": "Menu: the dropdown's options (default the trigger types)",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hold": {
+            "type": "number",
+            "label": "Menu: seconds it stays open before taking the value (default 0.9)"
           }
         }
       }

@@ -121,6 +121,8 @@
       { label: 'Product & Launch', icon: 'rocket' },
     ];
     var chipWrap = q('.qhome-chips');
+    // hide_chips: the frame without the pill-shaped category row.
+    if (data.hide_chips === true) chipWrap.style.display = 'none';
     var chipEls = {};
     chips.forEach(function (c) {
       var d = document.createElement('div');

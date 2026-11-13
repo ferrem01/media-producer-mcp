@@ -2,7 +2,7 @@
   "type": "quotient-flow",
   "label": "Quotient flow — builds itself",
   "category": "mockups",
-  "description": "A Quotient flow (automation) diagram in the product's own look -- white step cards with icons, grey curved connectors, green True / red False branch pills, the dotted canvas -- drawn from a list of STEPS and laid out automatically (branches spread side by side, a step with two `after`s merges them). It UNFURLS: row by row, each connector draws in and its step pops, branches together (`pace` seconds per row, or a step's own `at`). Then a SCRIPT performs on it: `highlight` (blue glow + a twinkle of sparkles), `path` (a lit dot runs through a list of steps, lighting each connector and pulsing each step it reaches -- 'this is what happened for Sarah'), `focus` (camera pushes in on a step) and `fit` (back out). Every `at` takes a word anchor (\"@acts\"). With no steps it shows a real onboarding flow. Use it full-frame for 'Quotient acts on it' beats: the logic building itself, then one customer's path through it. On a 9x16 frame keep it to 2-3 branches and 4-6 rows, or use camera \"follow\": UI-size text is small when a wide flow fits a phone.",
+  "description": "A Quotient flow (automation) diagram in the product's own look -- white step cards with icons, grey curved connectors, green True / red False branch pills, the dotted canvas -- drawn from a list of STEPS and laid out automatically (branches spread side by side, a step with two `after`s merges them). It UNFURLS: row by row, each connector draws in and its step pops, branches together (`pace` seconds per row, or a step's own `at`). Then a SCRIPT performs on it: `highlight` (blue glow + a twinkle of sparkles), `path` (a lit dot runs through a list of steps, lighting each connector and pulsing each step it reaches -- 'this is what happened for Sarah'), `focus` (camera pushes in on a step), `fit` (back out), `card` (the agent's findings: a card opens beside a step, rows landing one by one, the camera framing both), `send` (an envelope lifts off a step and flies out of the flow -- 'right' / 'left' / 'down', or 'camera': at the viewer until it fills the frame, the join into the lead's inbox) and `live` (many leads at once: a dot leaves every `every` seconds along the listed `paths`, each step pings on arrival and counts how many reached it -- the funnel running). Every step card publishes a [data-anchor] named by its id (camera moves and morphs can target 'flow.welcome'). Every `at` takes a word anchor (\"@acts\"). With no steps it shows a real onboarding flow. Use it full-frame for 'Quotient acts on it' beats: the logic building itself, then one customer's path through it. On a 9x16 frame keep it to 2-3 branches and 4-6 rows, or use camera \"follow\": UI-size text is small when a wide flow fits a phone.",
   "data": {
     "steps": {
       "type": "array",
@@ -19,7 +19,7 @@
           "kind": {
             "type": "string",
             "label": "Kind",
-            "placeholder": "trigger | event | agent | conditional | email | ai-email | slack | http | notify | update | lead-score | crm | delay | end"
+            "placeholder": "trigger (Programmatic) | event | schedule | person-update | person-created | marketing-event | webhook | crm-record | agent | conditional | email | ai-email | slack | http | notify | update | lead-score | crm | delay | end"
           },
           "title": {
             "type": "string",
@@ -44,7 +44,7 @@
           "icon": {
             "type": "string",
             "label": "Icon override",
-            "placeholder": "play | zap | branch | mail | slack | webhook | bell | user | clock | eye | sparkles | trending | briefcase | message | file | target | flag | quotient | database"
+            "placeholder": "play | zap | branch | mail | slack | webhook | bell | user | clock | eye | sparkles | trending | briefcase | message | file | target | flag | quotient | database | calendar | globe | video | pointer | inbox"
           },
           "ai": {
             "type": "boolean",
@@ -110,22 +110,22 @@
           "action": {
             "type": "string",
             "label": "Action",
-            "placeholder": "highlight | path | focus | fit"
+            "placeholder": "highlight | path | focus | fit | card | send | live"
           },
           "step": {
             "type": "string",
-            "label": "Step id (highlight / focus)"
+            "label": "Step id (highlight / focus / card / send)"
           },
           "steps": {
             "type": "array",
-            "label": "Step ids (path: in order; highlight: several)",
+            "label": "Step ids (path: in order; highlight: several; live: one path when `paths` is not given)",
             "items": {
               "type": "string"
             }
           },
           "until": {
             "type": "number",
-            "label": "Highlight ends at (default: scene end)"
+            "label": "Highlight / card / live ends at (default: scene end)"
           },
           "twinkle": {
             "type": "boolean",
@@ -133,13 +133,88 @@
           },
           "hop": {
             "type": "number",
-            "label": "Path: seconds per step",
+            "label": "Path / live: seconds per step",
             "placeholder": "0.42"
           },
           "zoom": {
             "type": "number",
-            "label": "Focus zoom",
+            "label": "Focus / card zoom",
             "placeholder": "1.8"
+          },
+          "title": {
+            "type": "string",
+            "label": "Card: header (default 'Research')"
+          },
+          "rows": {
+            "type": "array",
+            "label": "Card: rows of findings",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "label": "Label",
+                  "placeholder": "Role"
+                },
+                "value": {
+                  "type": "string",
+                  "label": "Value",
+                  "placeholder": "VP Marketing, Northwind"
+                },
+                "color": {
+                  "type": "string",
+                  "label": "Value colour"
+                }
+              }
+            }
+          },
+          "side": {
+            "type": "string",
+            "label": "Card: which side of the step (right | left)",
+            "placeholder": "right"
+          },
+          "stagger": {
+            "type": "number",
+            "label": "Card: seconds between rows (default 0.22)"
+          },
+          "focus": {
+            "type": "boolean",
+            "label": "Card: camera frames the step and the card (default true)"
+          },
+          "to": {
+            "type": "string",
+            "label": "Send: where the envelope flies (right | left | down | camera)",
+            "placeholder": "right"
+          },
+          "duration": {
+            "type": "number",
+            "label": "Send: flight seconds (default 0.7)"
+          },
+          "paths": {
+            "type": "array",
+            "label": "Live: the routes leads take, each a list of step ids, used in turn",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "every": {
+            "type": "number",
+            "label": "Live: seconds between leads (default 0.35)"
+          },
+          "counts": {
+            "type": "boolean",
+            "label": "Live: each step counts its arrivals (default true)"
+          },
+          "count_from": {
+            "type": "object",
+            "label": "Live: a step's count before the scene (step id -> number); real numbers only"
+          },
+          "color": {
+            "type": "string",
+            "label": "Path / live dot colour (default the accent)"
           }
         }
       }
