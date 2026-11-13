@@ -52,6 +52,33 @@ const visible = (page: Page, sel: string) => page.evaluate((s) => {
 const text = (page: Page, sel: string) => page.evaluate((s) => (document.querySelector(s)?.textContent || "").trim(), sel);
 
 describe("flows launch: the lead's side", () => {
+  it("lead faces: booking rows put a photo beside each name, the email reader fills its avatar", async () => {
+    const PHOTO = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="red"/></svg>');
+    const b = await open("booking-confirmed", { still: true, rows: [
+      { label: "What", value: "Intro call" },
+      { label: "Who", value: "Elena Ortiz\nMarc Ferrentino", avatars: [PHOTO, ""] },
+    ] }, 2);
+    try {
+      await seek(b.page, 1.5);
+      const avs = await b.page.evaluate(() => [...document.querySelectorAll(".bc-av")].map((a) => ({
+        img: getComputedStyle(a).backgroundImage.includes("svg"), vis: getComputedStyle(a).visibility,
+      })));
+      expect(avs).toEqual([{ img: true, vis: "visible" }, { img: false, vis: "hidden" }]);   // the second name keeps its alignment
+      expect(await b.page.locator(".bc-line").count()).toBe(3);
+      expect(b.errors).toEqual([]);
+    } finally { await b.close(); }
+    const m = await open("email-reader", { sender_name: "Tom Lee", avatar_url: PHOTO, body: "Actually, good timing." }, 2);
+    try {
+      await seek(m.page, 1.5);
+      const av = await m.page.evaluate(() => ({
+        img: getComputedStyle(document.querySelector(".emrd-avatar")!).backgroundImage.includes("svg"),
+        txt: document.querySelector(".emrd-avatar-txt")!.textContent,
+      }));
+      expect(av).toEqual({ img: true, txt: "" });
+      expect(m.errors).toEqual([]);
+    } finally { await m.close(); }
+  }, 60000);
+
   it("signup-form types the email, presses, and turns into the success line", async () => {
     const { page, errors, close } = await open("signup-form", {
       headline: "The *lean marketing* newsletter", subtitle: "One email a week.", url: "getquotient.ai/newsletter",

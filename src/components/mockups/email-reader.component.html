@@ -238,6 +238,12 @@
     timeEl.textContent = data.timestamp || '9:42 AM';
     avatarEl.textContent = senderName.split(/\s+/).slice(0, 2)
       .map(function(w) { return (w[0] || '').toUpperCase(); }).join('') || 'S';
+    // avatar_url: the sender's photo fills the circle instead of initials.
+    if (data.avatar_url) {
+      var av = el.querySelector('.emrd-avatar');
+      av.style.background = '#e9e9ef url("' + String(data.avatar_url).replace(/"/g, '%22') + '") center 22% / 128% no-repeat';
+      avatarEl.textContent = '';
+    }
 
     // Body: paragraphs split on newlines. The money quote is either marked
     // inline with *asterisks* or named via data.highlight_quote (matched as a
