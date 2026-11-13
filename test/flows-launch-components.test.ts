@@ -331,3 +331,30 @@ describe("flows launch: ai-email-rewrite (one AI step, one email, rewritten for 
     } finally { await close(); }
   }, 60000);
 });
+
+describe("flows launch: type-relay font 'brand' (the film's own font, not the house Geist)", () => {
+  it("sets the block in the brand kit's first face; the default stays Geist", async () => {
+    const source = await fs.readFile(path.resolve(__dirname, "../src/components/titles/type-relay.component.html"), "utf-8");
+    const fam = async (data: any) => {
+      const html = await assembleScene({
+        scene: { id: "s", label: "s", duration_seconds: 1, background: "#fff",
+          components: [{ id: "c", type: "type-relay", position: { x: "0%", y: "0%", width: "100%", height: "100%" }, data }] } as any,
+        components: [{ type: "type-relay", source }],
+        brandKit: { colors: {}, fonts: [{ family: "Inter", source: "system", weights: [600] }] } as any,
+        canvas: { width: 1280, height: 720 } as any, gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+      } as any);
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), "tr-"));
+      await fs.writeFile(path.join(dir, "s.html"), html);
+      const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+      try {
+        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+        await page.goto(`file://${dir}/s.html`);
+        await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 30000 });
+        return await page.evaluate(() => getComputedStyle(document.querySelector(".trl-block")!).fontFamily);
+      } finally { await browser.close(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
+    };
+    const lines = [{ text: "Welcome every new signup." }];
+    expect(await fam({ lines })).toMatch(/^"?Geist/);
+    expect(await fam({ lines, font: "brand" })).toMatch(/Inter/);
+  }, 60000);
+});

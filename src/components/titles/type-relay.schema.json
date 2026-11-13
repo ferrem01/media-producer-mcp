@@ -16,6 +16,7 @@
     "y": { "type": "number", "label": "The block's vertical centre, fraction of the box height", "optional": true, "default": 0.5 },
     "max_width": { "type": "number", "label": "Line width before a line wraps, fraction of the box width (default 1 - 2x left, 0.84 centred)", "optional": true },
     "scale": { "type": "number", "label": "Multiplies every line size (1 = xl at 0.15 of the box's shorter side)", "optional": true, "default": 1 },
+    "font": { "type": "string", "label": "'brand' sets the type in the film's own font (the brand kit's first face) instead of the house Geist", "optional": true, "enum": ["brand"] },
     "weight": { "type": "number", "label": "Geist weight (500 | 600 | 700)", "optional": true, "default": 600 },
     "tracking": { "type": "number", "label": "Letter spacing in em (default by size: xl -0.042, l -0.034, m -0.024)", "optional": true },
     "line_height": { "type": "number", "label": "Line height in em", "optional": true, "default": 1.04 },
