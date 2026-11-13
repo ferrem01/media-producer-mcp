@@ -1467,11 +1467,13 @@ export function createMcpServer(): McpServer {
       tags: z.array(z.string()).optional().describe("Project: the film's whole TAG list for the library (free-form, e.g. ['analytics', 'creator ad']); [] clears. Not an edit to the film."),
       add_tags: z.array(z.string()).optional().describe("Project: tags to add to the film (kept with the ones it has)."),
       remove_tags: z.array(z.string()).optional().describe("Project: tags to take off the film."),
-      fonts: z.array(z.object({
+      // Some MCP clients send an array they have no schema for as a JSON
+      // string; accept that form too (as booleans are accepted as strings).
+      fonts: z.preprocess((v) => { if (typeof v !== "string") return v; try { return JSON.parse(v); } catch { return v; } }, z.array(z.object({
         family: z.string(),
         source: z.enum(["google", "custom", "system"]).optional(),
         weights: z.array(z.number()).optional(),
-      })).min(1).optional().describe("Project: THIS film's fonts, in order (the first is the face every mockup and `font: 'brand'` type uses), e.g. [{family: 'Inter', weights: [400, 500, 600, 700]}]. Edits the film's own copy of the brand kit; the tenant kit and other films are untouched. A family that is not on Google Fonts is swapped for the closest free face at render."),
+      })).min(1)).optional().describe("Project: THIS film's fonts, in order (the first is the face every mockup and `font: 'brand'` type uses), e.g. [{family: 'Inter', weights: [400, 500, 600, 700]}]. Edits the film's own copy of the brand kit; the tenant kit and other films are untouched. A family that is not on Google Fonts is swapped for the closest free face at render."),
       sfx_palette: z.record(z.enum(["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"]), z.string()).nullable().optional()
         .describe("The film's SOUND PALETTE: the one sound each job plays (e.g. {transition: 'camera-flash', payoff: 'gen-impact-1a2b3c'}); every cue with that role plays it. Merged into the current palette; null clears it (house defaults). Re-points the film's role cues at once."),
 
