@@ -1,0 +1,35 @@
+{
+  "type": "ai-email-rewrite",
+  "label": "AI Email Rewrite",
+  "category": "mockups",
+  "description": "ONE AI STEP, ONE EMAIL, REWRITTEN FOR EVERY PERSON. Left: the AI step (the product's flow-card look, default 'AI Email' / 'Written for each person') over a list of recipients -- face, name, company and what they did. Right: the email the step writes. The selection moves down the list; for each person the parts that are only theirs (To, the subject, the greeting and the opening line, lit in the accent) erase and type themselves again while the parts that are the same for everyone (From, the closing line, the sign-off) hold still. The first `slow` people type out slowly enough to read, then the selection races and the email flickers through name after name. The AI beat of an automation film: a template sends everyone the same email, this step writes each person's own. Give every lead a subject and a line that could only be theirs. Full frame; 1440-wide design stage at the box's aspect, scaled to the box.",
+  "data": {
+    "leads": {
+      "type": "array", "label": "The recipients, in order (past the visible rows they cycle into the last row)",
+      "items": { "type": "object", "properties": {
+        "name": { "type": "string", "label": "Name", "placeholder": "Daniel Fischer" },
+        "company": { "type": "string", "label": "Company", "placeholder": "Meridian" },
+        "photo": { "type": "string", "label": "Photo URL" },
+        "did": { "type": "string", "label": "What they did (the row's second line)", "placeholder": "Viewed pricing 3 times" },
+        "subject": { "type": "string", "label": "Their subject", "placeholder": "Growth or Scale, Daniel?" },
+        "greeting": { "type": "string", "label": "Their greeting (default 'Hi <first name>,')" },
+        "line": { "type": "string", "label": "Their opening line, only theirs" }
+      } }
+    },
+    "from": { "type": "string", "label": "From (default 'Lumen AI')", "optional": true },
+    "fixed": { "type": "string", "label": "The line that is the same for everyone (after theirs)", "optional": true },
+    "sign_off": { "type": "string", "label": "Sign-off (a newline breaks it; default 'Jordan / Lumen AI')", "optional": true },
+    "title": { "type": "string", "label": "Step title (default 'AI Email')", "optional": true },
+    "subtitle": { "type": "string", "label": "Step subtitle (default 'Written for each person'; '' for none)", "optional": true },
+    "chip": { "type": "string", "label": "The tab over the step (default 'Step')", "optional": true },
+    "list_title": { "type": "string", "label": "Over the list (default 'Recipients'; '' for none)", "optional": true },
+    "at": { "type": "number", "label": "First person is written at (s, default 0.2)", "optional": true },
+    "slow": { "type": "number", "label": "How many are read one at a time before the flicker (default 2; the first is already written, each after types itself in, about a second)", "optional": true },
+    "slow_gap": { "type": "number", "label": "Seconds each slow one stays (default 1.8: the writing plus a read)", "optional": true },
+    "fast_gap": { "type": "number", "label": "Seconds between flicker steps (default 0.14)", "optional": true },
+    "until": { "type": "number", "label": "The flicker stops at (s, default the scene end)", "optional": true },
+    "accent": { "type": "string", "label": "The step icon, selection and the lit personal parts (default #393bf5)", "optional": true },
+    "background": { "type": "string", "label": "Canvas colour under the dots (default #f9f9fb)", "optional": true },
+    "still": { "type": "boolean", "label": "Everything is there from the first frame", "optional": true }
+  }
+}
