@@ -1,0 +1,32 @@
+{
+  "type": "signup-form",
+  "label": "Signup Form",
+  "category": "mockups",
+  "description": "The LEAD'S side of a signup: a page's signup block (a newsletter, a waitlist, a free trial) in a light browser window. The block rises in, the email TYPES into the field character by character, a cursor comes to the button and presses it, and the form turns into its success line with a green check. The 'someone signs up' beat of a lifecycle or automation film -- cut from it (or flood from the pressed button) to the flow that reacts. Every time takes a word anchor. Laid out on a 1440-wide design stage at the box's aspect, scaled to the box: give it the full frame or a large box.",
+  "data": {
+    "headline": { "type": "string", "label": "Headline; *word* in the accent colour, a newline breaks the line", "required": true, "placeholder": "Get the *lean marketing* newsletter" },
+    "subtitle": { "type": "string", "label": "Line under the headline", "optional": true },
+    "eyebrow": { "type": "string", "label": "Small uppercase line above the headline (e.g. 'NEWSLETTER')", "optional": true },
+    "brand": { "type": "string", "label": "Brand name top-left (when no logo_url)", "optional": true },
+    "logo_url": { "type": "string", "label": "Logo image top-left (a real /assets/... path)", "optional": true },
+    "url": { "type": "string", "label": "Address in the browser bar", "optional": true, "placeholder": "getquotient.ai/newsletter" },
+    "chrome": { "type": "boolean", "label": "Browser bar on top (default true)", "optional": true },
+    "placeholder": { "type": "string", "label": "Field placeholder", "optional": true, "placeholder": "you@company.com" },
+    "email": { "type": "string", "label": "The email that types in", "optional": true, "placeholder": "sarah@northwind.co" },
+    "button_text": { "type": "string", "label": "Button label (default 'Subscribe')", "optional": true },
+    "success_text": { "type": "string", "label": "The success line after the press", "optional": true, "placeholder": "You're in. Check your inbox." },
+    "success": { "type": "boolean", "label": "Turn into the success line after the press (default true)", "optional": true },
+    "fine_print": { "type": "string", "label": "Small line under the form", "optional": true },
+    "cursor": { "type": "boolean", "label": "A cursor comes in and presses the button (default true)", "optional": true },
+    "accent": { "type": "string", "label": "Accent colour: the italic word, the focus ring, the button (default #393bf5)", "optional": true },
+    "button_color": { "type": "string", "label": "Button colour (default the accent)", "optional": true },
+    "background": { "type": "string", "label": "Page colour (default warm off-white #f6f5f1)", "optional": true },
+    "ink": { "type": "string", "label": "Text colour", "optional": true },
+    "still": { "type": "boolean", "label": "The block is whole from the first frame (no rise-in)", "optional": true },
+    "at": { "type": "number", "label": "Block rises in at (s or @word)", "optional": true, "placeholder": "0.1" },
+    "type_at": { "type": "number", "label": "Typing starts at (s or @word)", "optional": true },
+    "type_speed": { "type": "number", "label": "Seconds per character (default 0.045)", "optional": true },
+    "press_at": { "type": "number", "label": "Button press at (s or @word; default right after the typing)", "optional": true },
+    "success_at": { "type": "number", "label": "Success line at (default 0.3 s after the press)", "optional": true }
+  }
+}

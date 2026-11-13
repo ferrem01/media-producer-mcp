@@ -1,0 +1,23 @@
+{
+  "type": "booking-confirmed",
+  "label": "Booking Confirmed",
+  "category": "mockups",
+  "description": "The LEAD'S side of a booked meeting: a scheduling page's confirmation in a neutral, Cal-style card -- a green check pops, 'This meeting is scheduled', the invitation line, then What / When / Who / Where rows land one by one, with an optional plain timestamp under the card ('BOOKED TUESDAY, 11:02 PM'). The 'someone books a demo' beat of a lifecycle or automation film; cut from it to the flow that researches the person. Laid out on a 1440-wide design stage at the box's aspect, scaled to the box: give it the full frame or a large box.",
+  "data": {
+    "title": { "type": "string", "label": "Title (default 'This meeting is scheduled')", "optional": true },
+    "subtitle": { "type": "string", "label": "Line under the title ('' for none; default the invitation line)", "optional": true },
+    "rows": {
+      "type": "array", "label": "Rows (label + value; a newline in a value breaks it)", "optional": true,
+      "items": { "type": "object", "properties": {
+        "label": { "type": "string", "label": "Label", "placeholder": "When" },
+        "value": { "type": "string", "label": "Value", "placeholder": "Wednesday, November 18\n10:00 AM - 10:30 AM" }
+      } }
+    },
+    "stamp": { "type": "string", "label": "Plain timestamp under the card (uppercase grey type, no box)", "optional": true, "placeholder": "Booked Tuesday, 11:02 PM" },
+    "stamp_at": { "type": "number", "label": "Timestamp lands at (s or @word)", "optional": true },
+    "background": { "type": "string", "label": "Page colour (default #f3f3f5)", "optional": true },
+    "still": { "type": "boolean", "label": "The card is there from the first frame (the check and rows still play)", "optional": true },
+    "at": { "type": "number", "label": "Card lands at (s or @word)", "optional": true, "placeholder": "0.1" },
+    "row_stagger": { "type": "number", "label": "Seconds between rows (default 0.12)", "optional": true }
+  }
+}

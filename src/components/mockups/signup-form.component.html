@@ -1,0 +1,184 @@
+<template>
+  <div class="sf-root">
+    <div class="sf-stage">
+      <div class="sf-chrome">
+        <span class="sf-lights"><i></i><i></i><i></i></span>
+        <span class="sf-url"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span class="sf-url-t"></span></span>
+      </div>
+      <div class="sf-page">
+        <div class="sf-brand"><img class="sf-logo" alt=""><span class="sf-brand-t"></span></div>
+        <div class="sf-block">
+          <div class="sf-eyebrow"></div>
+          <h1 class="sf-title"></h1>
+          <p class="sf-sub"></p>
+          <div class="sf-form">
+            <div class="sf-field"><span class="sf-ph"></span><span class="sf-val"></span><span class="sf-caret"></span></div>
+            <div class="sf-button"><span class="sf-btn-t"></span></div>
+          </div>
+          <div class="sf-done"><span class="sf-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="sf-done-t"></span></div>
+          <p class="sf-fine"></p>
+        </div>
+      </div>
+      <svg class="sf-cursor" viewBox="0 0 24 24"><path d="M4 2.5 19.5 12l-6.9 1.6 3.9 7.4-2.9 1.5-3.9-7.4L4 20z" fill="#111" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+    </div>
+  </div>
+</template>
+
+<style>
+  /* SIGNUP FORM: the lead's side of a signup -- a page's signup block (a
+     newsletter, a waitlist, a trial) where an email TYPES into the field, the
+     button is pressed and the form turns into its success line. Laid out on
+     a 1440-wide design stage at the box's aspect, scaled to the box. */
+  .sf-root, .sf-root * { max-width: none; }
+  .sf-root { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
+  .sf-stage {
+    position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden;
+    background: var(--sf-bg, #f6f5f1); color: var(--sf-ink, #17171c);
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    display: flex; flex-direction: column;
+  }
+  .sf-chrome {
+    flex: none; height: 64px; display: flex; align-items: center; gap: 28px; padding: 0 28px;
+    background: #ffffff; border-bottom: 1px solid rgba(23, 23, 28, 0.08);
+  }
+  .sf-lights { display: flex; gap: 10px; }
+  .sf-lights i { width: 14px; height: 14px; border-radius: 50%; background: #e3e2e8; display: block; }
+  .sf-url {
+    flex: 1; max-width: 760px; margin: 0 auto; height: 38px; border-radius: 10px; background: #f1f1f4;
+    display: flex; align-items: center; justify-content: center; gap: 10px; color: #6b6b78; font-size: 18px;
+  }
+  .sf-url svg { width: 16px; height: 16px; }
+  .sf-page { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 80px 60px; }
+  .sf-brand { position: absolute; left: 64px; top: 40px; display: flex; align-items: center; gap: 14px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .sf-logo { height: 38px; width: auto; display: none; }
+  .sf-block { display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; }
+  .sf-eyebrow {
+    color: var(--sf-acc, #393bf5); font-size: 20px; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; margin-bottom: 24px;
+  }
+  .sf-eyebrow:empty { display: none; }
+  .sf-title { margin: 0; font-size: 78px; line-height: 1.04; font-weight: 700; letter-spacing: -0.035em; max-width: 15em; white-space: pre-line; }
+  .sf-title em { font-style: normal; color: var(--sf-acc, #393bf5); }
+  .sf-sub { margin: 24px 0 0; max-width: 34em; font-size: 26px; line-height: 1.45; color: #5b5b68; }
+  .sf-sub:empty { display: none; }
+  .sf-form, .sf-done { margin-top: 48px; height: 84px; }
+  .sf-form { display: flex; gap: 14px; width: 860px; }
+  .sf-field {
+    position: relative; flex: 1; height: 84px; box-sizing: border-box; padding: 0 28px; border-radius: 16px;
+    background: #ffffff; border: 2px solid rgba(23, 23, 28, 0.12); display: flex; align-items: center;
+    font-size: 28px; white-space: nowrap; overflow: hidden;
+  }
+  .sf-field.on { border-color: var(--sf-acc, #393bf5); box-shadow: 0 0 0 6px color-mix(in srgb, var(--sf-acc, #393bf5) 14%, transparent); }
+  .sf-ph { color: #9a9aa6; position: absolute; left: 28px; }
+  .sf-val { color: var(--sf-ink, #17171c); }
+  .sf-caret { width: 3px; height: 36px; margin-left: 2px; background: var(--sf-acc, #393bf5); visibility: hidden; }
+  .sf-button {
+    flex: none; height: 84px; padding: 0 44px; border-radius: 16px; box-sizing: border-box;
+    background: var(--sf-btn, var(--sf-acc, #393bf5)); color: #ffffff; font-size: 28px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; white-space: nowrap;
+    box-shadow: 0 14px 30px color-mix(in srgb, var(--sf-btn, var(--sf-acc, #393bf5)) 30%, transparent);
+  }
+  .sf-done { display: flex; align-items: center; gap: 18px; font-size: 32px; font-weight: 600; visibility: hidden; position: absolute; }
+  .sf-check {
+    width: 60px; height: 60px; border-radius: 50%; background: #16a34a; color: #fff;
+    display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .sf-check svg { width: 30px; height: 30px; }
+  .sf-fine { margin: 26px 0 0; font-size: 20px; color: #8a8a96; }
+  .sf-fine:empty { display: none; }
+  .sf-cursor { position: absolute; left: 0; top: 0; width: 44px; height: 44px; visibility: hidden; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25)); }
+  .sf-root.nochrome .sf-chrome { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var q = function (s) { return el.querySelector(s); };
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var root = q('.sf-root'), stage = q('.sf-stage');
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+    // ---- The design stage: 1440 wide at the box's aspect, scaled to the box ----
+    var bw = el.clientWidth || 1440, bh = el.clientHeight || 810;
+    var DW = 1440, DH = Math.max(560, Math.round(DW * bh / bw));
+    stage.style.width = DW + 'px'; stage.style.height = DH + 'px';
+    var S = bw / DW;
+    stage.style.transform = 'scale(' + S + ')';
+    if (DH * S > bh + 1) { S = bh / DH; stage.style.transform = 'translateX(' + ((bw - DW * S) / 2) + 'px) scale(' + S + ')'; }
+
+    if (data.accent) root.style.setProperty('--sf-acc', String(data.accent));
+    if (data.button_color) root.style.setProperty('--sf-btn', String(data.button_color));
+    if (data.background) root.style.setProperty('--sf-bg', String(data.background));
+    if (data.ink) root.style.setProperty('--sf-ink', String(data.ink));
+    if (data.chrome === false) root.classList.add('nochrome');
+    q('.sf-url-t').textContent = String(data.url || 'example.com/newsletter');
+    if (data.logo_url) { var lg = q('.sf-logo'); lg.src = String(data.logo_url); lg.style.display = 'block'; }
+    q('.sf-brand-t').textContent = data.logo_url ? '' : String(data.brand || '');
+    q('.sf-eyebrow').textContent = data.eyebrow ? String(data.eyebrow) : '';
+    q('.sf-title').innerHTML = esc(data.headline || 'Get the newsletter').replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    q('.sf-sub').textContent = data.subtitle ? String(data.subtitle) : '';
+    q('.sf-ph').textContent = String(data.placeholder || 'you@company.com');
+    q('.sf-btn-t').textContent = String(data.button_text || 'Subscribe');
+    q('.sf-done-t').textContent = String(data.success_text || "You're in. Check your inbox.");
+    q('.sf-fine').textContent = data.fine_print ? String(data.fine_print) : '';
+
+    var email = String(data.email || 'sarah@northwind.co');
+    var AT = num(data.at, 0.1);
+    var TYPE_AT = num(data.type_at, AT + 0.4);
+    var SPEED = num(data.type_speed, 0.045);
+    var PRESS = num(data.press_at, TYPE_AT + email.length * SPEED + 0.35);
+    var DONE = num(data.success_at, PRESS + 0.3);
+
+    // Entrance: the block rises in (still:true = whole from frame one).
+    var parts = ['.sf-eyebrow', '.sf-title', '.sf-sub', '.sf-form', '.sf-fine'].map(q).filter(function (x) { return x && getComputedStyle(x).display !== 'none'; });
+    if (data.still !== true) {
+      gsap.set(parts, { autoAlpha: 0, y: 22 });
+      tl.to(parts, { autoAlpha: 1, y: 0, duration: 0.5, stagger: 0.07, ease: 'power3.out' }, AT);
+    }
+
+    // Typing: the field focuses, the placeholder goes, the email lands
+    // character by character (one span, its text set per step: tl.set
+    // renders on any seek, unlike a callback).
+    var field = q('.sf-field'), val = q('.sf-val'), caret = q('.sf-caret'), ph = q('.sf-ph');
+    tl.set(field, { className: 'sf-field on' }, TYPE_AT - 0.08);
+    tl.set(ph, { autoAlpha: 0 }, TYPE_AT);
+    tl.set(caret, { visibility: 'visible' }, TYPE_AT - 0.08);
+    for (var i = 1; i <= email.length; i++) tl.set(val, { textContent: email.slice(0, i) }, TYPE_AT + (i - 1) * SPEED);
+
+    // The press: a cursor comes in to the button, the button dips.
+    var btn = q('.sf-button'), cur = q('.sf-cursor');
+    if (data.cursor !== false) {
+      var bx = 0, by = 0;
+      // Button centre on the stage, measured once laid out.
+      var br = btn.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+      var sc = sr.width / DW || 1;
+      bx = (br.left - sr.left) / sc + (br.width / sc) * 0.55; by = (br.top - sr.top) / sc + (br.height / sc) * 0.6;
+      gsap.set(cur, { x: bx + 260, y: by + 220, autoAlpha: 0 });
+      tl.set(cur, { visibility: 'visible' }, PRESS - 0.6);
+      tl.to(cur, { autoAlpha: 1, duration: 0.15 }, PRESS - 0.6);
+      tl.to(cur, { x: bx, y: by, duration: 0.5, ease: 'power3.inOut' }, PRESS - 0.55);
+      tl.to(cur, { scale: 0.85, duration: 0.08, transformOrigin: '0 0' }, PRESS);
+      tl.to(cur, { scale: 1, duration: 0.15 }, PRESS + 0.08);
+      tl.to(cur, { autoAlpha: 0, duration: 0.2 }, DONE + 0.4);
+    }
+    tl.to(btn, { scale: 0.95, duration: 0.08, ease: 'power2.in' }, PRESS);
+    tl.to(btn, { scale: 1, duration: 0.18, ease: 'power2.out' }, PRESS + 0.08);
+
+    // Success: the form folds away, the check pops with the line.
+    var form = q('.sf-form'), done = q('.sf-done');
+    if (data.success !== false) {
+      tl.to(form, { autoAlpha: 0, scale: 0.96, duration: 0.2, ease: 'power2.in' }, DONE);
+      tl.set(done, { visibility: 'visible' }, DONE);
+      // Same slot as the form: the done line takes its place.
+      var fr = form.getBoundingClientRect(), pr = q('.sf-block').getBoundingClientRect();
+      var k = (stage.getBoundingClientRect().width / DW) || 1;
+      done.style.top = ((fr.top - pr.top) / k) + 'px';
+      q('.sf-block').style.position = 'relative';
+      gsap.set(done, { autoAlpha: 0, y: 10, left: '50%', xPercent: -50 });
+      tl.to(done, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, DONE + 0.12);
+      tl.from(q('.sf-check'), { scale: 0, duration: 0.45, ease: 'back.out(2.4)' }, DONE + 0.12);
+    }
+    return tl;
+  }
+</script>

@@ -1,0 +1,108 @@
+<template>
+  <div class="bc-root">
+    <div class="bc-stage">
+      <div class="bc-card">
+        <div class="bc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <h1 class="bc-title"></h1>
+        <p class="bc-sub"></p>
+        <div class="bc-rule"></div>
+        <div class="bc-rows"></div>
+      </div>
+      <div class="bc-stamp"></div>
+    </div>
+  </div>
+</template>
+
+<style>
+  /* BOOKING CONFIRMED: the lead's side of a booked meeting -- the scheduling
+     page's confirmation (a neutral, Cal-style card: a green check, "This
+     meeting is scheduled", then What / When / Who / Where rows). Laid out on
+     a 1440-wide design stage at the box's aspect, scaled to the box. */
+  .bc-root, .bc-root * { max-width: none; }
+  .bc-root { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
+  .bc-stage {
+    position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden;
+    background: var(--bc-bg, #f3f3f5); color: #17171c;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .bc-card {
+    width: 760px; box-sizing: border-box; padding: 56px 64px 48px; background: #ffffff;
+    border: 1px solid rgba(23, 23, 28, 0.08); border-radius: 20px;
+    box-shadow: 0 30px 60px rgba(20, 20, 40, 0.08), 0 2px 6px rgba(20, 20, 40, 0.05);
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .bc-check {
+    width: 76px; height: 76px; border-radius: 50%; background: #dcf5e3; color: #16a34a;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .bc-check svg { width: 38px; height: 38px; }
+  .bc-title { margin: 30px 0 0; font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+  .bc-sub { margin: 14px 0 0; font-size: 21px; line-height: 1.5; color: #6b6b78; max-width: 30em; }
+  .bc-sub:empty { display: none; }
+  .bc-rule { align-self: stretch; height: 1px; background: rgba(23, 23, 28, 0.09); margin: 36px 0 30px; }
+  .bc-rows { align-self: stretch; display: grid; grid-template-columns: 130px 1fr; row-gap: 22px; text-align: left; }
+  .bc-k { font-size: 22px; font-weight: 600; color: #17171c; }
+  .bc-v { font-size: 22px; line-height: 1.4; color: #3b3b46; white-space: pre-line; }
+  .bc-v .bc-dim { color: #8a8a96; }
+  .bc-stamp {
+    margin-top: 34px; font-size: 24px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #8a8a96;
+  }
+  .bc-stamp:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var q = function (s) { return el.querySelector(s); };
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? d : n; };
+    var root = q('.bc-root'), stage = q('.bc-stage');
+
+    var bw = el.clientWidth || 1440, bh = el.clientHeight || 810;
+    var DW = 1440, DH = Math.max(760, Math.round(DW * bh / bw));
+    stage.style.width = DW + 'px'; stage.style.height = DH + 'px';
+    var S = bw / DW;
+    if (DH * S > bh + 1) { S = bh / DH; stage.style.transform = 'translateX(' + ((bw - DW * S) / 2) + 'px) scale(' + S + ')'; }
+    else stage.style.transform = 'scale(' + S + ')';
+    if (data.background) root.style.setProperty('--bc-bg', String(data.background));
+
+    q('.bc-title').textContent = String(data.title || 'This meeting is scheduled');
+    q('.bc-sub').textContent = data.subtitle !== undefined ? String(data.subtitle || '') : 'We sent an email with a calendar invitation with the details to everyone.';
+    q('.bc-stamp').textContent = data.stamp ? String(data.stamp) : '';
+    var rows = Array.isArray(data.rows) && data.rows.length ? data.rows : [
+      { label: 'What', value: 'Intro call: Quotient + Northwind' },
+      { label: 'When', value: 'Wednesday, November 18\n10:00 AM - 10:30 AM (Eastern Time)' },
+      { label: 'Who', value: 'Sarah Chen\nMarc Ferrentino' },
+      { label: 'Where', value: 'Google Meet' }
+    ];
+    var box = q('.bc-rows'), rowEls = [];
+    rows.forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      var k = document.createElement('div'); k.className = 'bc-k'; k.textContent = String(r.label || '');
+      var v = document.createElement('div'); v.className = 'bc-v'; v.textContent = String(r.value || '');
+      box.appendChild(k); box.appendChild(v); rowEls.push([k, v]);
+    });
+
+    // Motion: the card lands, the check pops, the rows come in line by line.
+    var AT = num(data.at, 0.1);
+    var card = q('.bc-card');
+    if (data.still !== true) {
+      gsap.set(card, { autoAlpha: 0, y: 40, scale: 0.97 });
+      tl.to(card, { autoAlpha: 1, y: 0, scale: 1, duration: 0.5, ease: 'power3.out' }, AT);
+    }
+    var chk = q('.bc-check');
+    tl.from(chk, { scale: 0, rotation: -30, duration: 0.5, ease: 'back.out(2.2)' }, AT + 0.2);
+    tl.from(chk.querySelector('svg'), { scale: 0.2, autoAlpha: 0, duration: 0.3, ease: 'back.out(2)' }, AT + 0.38);
+    var lines = [q('.bc-title'), q('.bc-sub')].filter(function (x) { return x && x.textContent; });
+    tl.from(lines, { autoAlpha: 0, y: 12, duration: 0.35, stagger: 0.08, ease: 'power3.out' }, AT + 0.3);
+    var RS = num(data.row_stagger, 0.12);
+    rowEls.forEach(function (pair, i) {
+      tl.from(pair, { autoAlpha: 0, x: -14, duration: 0.3, ease: 'power3.out' }, AT + 0.55 + i * RS);
+    });
+    var stamp = q('.bc-stamp');
+    if (stamp.textContent) tl.from(stamp, { autoAlpha: 0, y: 10, duration: 0.3, ease: 'power3.out' }, num(data.stamp_at, AT + 0.6 + rowEls.length * RS));
+    return tl;
+  }
+</script>

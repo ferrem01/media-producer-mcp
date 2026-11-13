@@ -82,6 +82,14 @@
   .qp-tile .qp-ti svg, .qp-tile .qp-ti img { width: 24px; height: 24px; display: block; }
   .qp-hover { position: absolute; inset: -1px; border-radius: 10px; background: rgb(249, 249, 251); visibility: hidden; z-index: -1; }
   .qp-tile { z-index: 0; }
+  .qp-menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; padding: 4px; box-sizing: border-box;
+    background: #fff; border: 1px solid rgb(239, 240, 246); border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(12, 12, 66, 0.12), 0 1px 2px rgba(40, 28, 65, 0.06); visibility: hidden;
+  }
+  .qp-opt { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 13px; line-height: 18px; color: rgb(23, 23, 28); }
+  .qp-opt svg { width: 14px; height: 14px; flex: none; color: rgb(84, 84, 95); }
+  .qp-opt.on { background: rgb(243, 243, 248); }
   .qp-ring { position: absolute; inset: -4px; border-radius: 15px; pointer-events: none; visibility: hidden; border: 2px solid currentColor; }
 </style>
 
@@ -109,8 +117,19 @@
       user: '<path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m14.305 16.53.923-.382"/><path d="m15.228 13.852-.923-.383"/><path d="m16.852 12.228-.383-.923"/><path d="m16.852 17.772-.383.924"/><path d="m19.148 12.228.383-.923"/><path d="m19.53 18.696-.382-.924"/><path d="m20.772 13.852.924-.383"/><path d="m20.772 16.148.924.383"/><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/>',
       bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
       webhook: '<path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/>',
-      copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>'
+      copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+      userplus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
+      check: '<path d="M20 6 9 17l-5-5"/>'
     };
+    // The product's trigger types (docs + the launch spec), each with its
+    // icon: a select of one of these swaps the field's icon too.
+    var TRIGGERS = [
+      ['Event', 'zap'], ['Schedule', 'clock'], ['Person Update', 'user'], ['Person Created', 'userplus'],
+      ['Programmatic', 'play'], ['Marketing Event', 'calendar'], ['Webhook', 'webhook'], ['CRM Record Updated', 'database']
+    ];
+    var TRIGGER_ICON = {};
+    TRIGGERS.forEach(function (t) { TRIGGER_ICON[t[0].toLowerCase()] = t[1]; });
     function svg(name, color) {
       return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="' + (color || 'currentColor') +
         '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
@@ -175,7 +194,8 @@
           fs.appendChild(rs); rec.el = rs;
         } else {
           var fe = document.createElement('div'); fe.className = 'qp-field' + (kind === 'select' ? ' sel' : '');
-          if (f.icon && ICONS[f.icon]) { var ic = document.createElement('div'); ic.innerHTML = svg(f.icon); fe.appendChild(ic.firstChild); }
+          var fic = f.icon || (kind === 'select' ? TRIGGER_ICON[String(f.value || '').toLowerCase()] : null);
+          if (fic && ICONS[fic]) { var ic = document.createElement('div'); ic.innerHTML = svg(fic); rec.icon = ic.firstChild; fe.appendChild(rec.icon); }
           var val = document.createElement('div'); val.className = 'qp-val';
           var cur = text('span', '', String(f.value || ''));
           val.appendChild(cur); fe.appendChild(val);
@@ -232,6 +252,18 @@
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(el);
 
     // ---- Script: type into a field, pick an option, ring a field ----
+    // A trigger type picked in a select brings its own icon with it.
+    function swapIcon(f, value, at) {
+      var ni = TRIGGER_ICON[String(value || '').toLowerCase()];
+      if (!f.icon || !ni) return;
+      var holder = document.createElement('div'); holder.innerHTML = svg(ni);
+      var nic = holder.firstChild;
+      f.icon.parentNode.insertBefore(nic, f.icon.nextSibling);
+      gsap.set(nic, { display: 'none' });
+      tl.set(f.icon, { display: 'none' }, at);
+      tl.set(nic, { display: 'block' }, at);
+      f.icon = nic;
+    }
     function field(ref) {
       if (typeof ref === 'number') return FIELDS[ref];
       var r = String(ref || '').toLowerCase();
@@ -265,6 +297,41 @@
         for (var k = 0; k < FIELDS.length; k++) if (FIELDS[k].kind === 'radio' && FIELDS[k].options.indexOf(String(s.value)) !== -1) { f = FIELDS[k]; break; }
       }
       if (!f) return;
+      if (act === 'menu' && f.el && f.val) {
+        // THE DROPDOWN OPENS: its options list drops under the field (the
+        // trigger types by default), the pointer walks to `value`, the row
+        // lights, the list closes and the field takes the value.
+        var opts = (Array.isArray(s.options) && s.options.length ? s.options.map(String) : TRIGGERS.map(function (t) { return t[0]; }));
+        var pick = String(s.value || opts[0]);
+        var pi = Math.max(0, opts.indexOf(pick));
+        var menu = document.createElement('div'); menu.className = 'qp-menu';
+        var rows = opts.map(function (o) {
+          var r = document.createElement('div'); r.className = 'qp-opt';
+          var oi = TRIGGER_ICON[o.toLowerCase()];
+          if (oi) { var w = document.createElement('div'); w.innerHTML = svg(oi); r.appendChild(w.firstChild); }
+          r.appendChild(text('span', '', o));
+          menu.appendChild(r); return r;
+        });
+        f.el.style.position = 'relative';
+        f.el.appendChild(menu);
+        var hold = num(s.hold, 0.9);
+        gsap.set(menu, { autoAlpha: 0, y: -6 });
+        tl.to(menu, { autoAlpha: 1, y: 0, duration: 0.2, ease: 'power2.out' }, at);
+        rows.forEach(function (r, j) {
+          if (j > pi) return;
+          tl.set(r, { className: 'qp-opt on' }, at + 0.2 + j * (hold - 0.3) / Math.max(1, pi + 1));
+          if (j < pi) tl.set(r, { className: 'qp-opt' }, at + 0.2 + (j + 1) * (hold - 0.3) / Math.max(1, pi + 1));
+        });
+        tl.to(menu, { autoAlpha: 0, duration: 0.15 }, at + hold);
+        swapIcon(f, pick, at + hold);
+        var nv = text('span', '', pick);
+        f.val.appendChild(nv);
+        gsap.set(nv, { autoAlpha: 0, y: 8 });
+        tl.to(f.cur, { autoAlpha: 0, y: -8, duration: 0.2 }, at + hold);
+        tl.to(nv, { autoAlpha: 1, y: 0, duration: 0.25 }, at + hold + 0.08);
+        f.cur = nv;
+        return;
+      }
       if (act === 'highlight') {
         tl.fromTo(f.ring, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.25, immediateRender: false }, at);
         if (s.until !== undefined) tl.to(f.ring, { autoAlpha: 0, duration: 0.25 }, num(s.until, at + 1));
@@ -290,6 +357,7 @@
           if (idx < 0 || !f.dots[idx]) return;
           f.dots.forEach(function (d, j) { tl.set(d, { visibility: j === idx ? 'visible' : 'hidden' }, at); });
         } else if (f.val) {
+          swapIcon(f, s.value, at);
           var nx = text('span', '', String(s.value || ''));
           f.val.appendChild(nx);
           gsap.set(nx, { autoAlpha: 0, y: 8 });
