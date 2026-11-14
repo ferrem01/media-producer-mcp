@@ -45,7 +45,11 @@ those dirs held 90 GB of the droplet's 155 GB disk; at 100% full, takes failed
 to attach, a Seedance perform stuck as "already being worked on", and MegaMedia
 calls timed out until Marc deleted them by hand.
 
-Now `runRender` removes its job's work dir in `finally`, success or failure.
+Now `runRender` removes its job's work dir when it ends, success or failure,
+and BEFORE it publishes the job as `completed` or `failed` (Nov 14: in `finally`
+it ran after the status flipped, so a poller could see a finished job with its
+frames still on disk -- the CI flake in this test; a slow-`rm` case now makes
+that race certain and holds the order).
 Nothing reads it after the job: the scene cache copies its mp4s out to
 `scene-cache/`, `audio_only` re-muxes `output.mp4`, and Studio's speaker comes
 from the project's assets. At startup `sweepRenderWorkDirs` clears `_work/job_*`

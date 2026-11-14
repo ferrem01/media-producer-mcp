@@ -229,6 +229,10 @@ async function runRender(
       if (await ensureFaststart(result.outputPath)) console.log(`  render: moved the MP4 index to the front (${path.basename(result.outputPath)})`);
     }
 
+    // The work dir goes BEFORE the job reads as done: a caller that sees
+    // "completed" sees the disk already clean.
+    await dropWorkDir(workDir);
+
     // Update job with results
     job.status = "completed";
     job.completedAt = Date.now();
@@ -260,6 +264,7 @@ async function runRender(
       }
     });
   } catch (err: any) {
+    await dropWorkDir(workDir);
     job.status = "failed";
     job.error = err.message || "Unknown error";
     job.completedAt = Date.now();
@@ -279,16 +284,20 @@ async function runRender(
       // ignore
     }
   } finally {
-    // The work dir is scratch: every scene's PNG frames, transitions, the
-    // speaker base. Nothing reads it once the job ends (the scene cache copies
-    // its mp4s out, audio_only re-muxes output.mp4), and left behind it filled
-    // the droplet's disk -- 90 GB of _work/job_* by Oct 28, renders and takes
-    // failing on a full disk.
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     if (!options?.trace) {
       trace.finish();
     }
   }
+}
+
+/** The work dir is scratch: every scene's PNG frames, transitions, the
+ *  speaker base. Nothing reads it once the job ends (the scene cache copies
+ *  its mp4s out, audio_only re-muxes output.mp4), and left behind it filled
+ *  the droplet's disk -- 90 GB of _work/job_* by Oct 28, renders and takes
+ *  failing on a full disk. Removed before the job is published as completed
+ *  or failed, never after, so no reader of the status races the delete. */
+async function dropWorkDir(workDir: string): Promise<void> {
+  await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
 }
 
 function renderWorkDir(tenantId: string, projectId: string, jobId: string): string {
