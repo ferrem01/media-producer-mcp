@@ -108,8 +108,8 @@
       tl.to(card, { autoAlpha: 1, y: 0, scale: 1, duration: 0.5, ease: 'power3.out' }, AT);
     }
     var chk = q('.bc-check');
-    tl.from(chk, { scale: 0, rotation: -30, duration: 0.5, ease: 'back.out(2.2)' }, AT + 0.2);
-    tl.from(chk.querySelector('svg'), { scale: 0.2, autoAlpha: 0, duration: 0.3, ease: 'back.out(2)' }, AT + 0.38);
+    tl.from(chk, { scale: 0, rotation: -30, duration: 0.5, ease: 'back.out(1.2)' }, AT + 0.2);
+    tl.from(chk.querySelector('svg'), { scale: 0.2, autoAlpha: 0, duration: 0.3, ease: 'back.out(1.2)' }, AT + 0.38);
     var lines = [q('.bc-title'), q('.bc-sub')].filter(function (x) { return x && x.textContent; });
     tl.from(lines, { autoAlpha: 0, y: 12, duration: 0.35, stagger: 0.08, ease: 'power3.out' }, AT + 0.3);
     var RS = num(data.row_stagger, 0.12);
