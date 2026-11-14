@@ -385,3 +385,27 @@ describe("flows launch: motion audit (LottieFiles checklist, Nov 14)", () => {
     } finally { await close(); }
   }, 60000);
 });
+
+describe("flows launch: the flow card as an email (the step's output beside it)", () => {
+  it("opens beside the Send Email step with From, To, subject and body; the personal parts lit", async () => {
+    const { page, errors, close } = await open("quotient-flow", { ...FLOW, script: [
+      { action: "card", step: "email", at: 0.5, zoom: 1.4, email: {
+        from: "Lumen AI", to: "Sarah Chen", subject: "Welcome to the newsletter",
+        body: "Hi Sarah,\nNorthwind is about your size, so start with the issue on your first ten accounts.", lit: ["Hi Sarah,", "Northwind"] } },
+    ] }, 3);
+    try {
+      await seek(page, 2);
+      const r = await page.evaluate(() => {
+        const c = document.querySelector(".qf-mail") as HTMLElement; const step = document.querySelector('[data-anchor="email"]')!.getBoundingClientRect();
+        const b = c.getBoundingClientRect();
+        return { sj: c.querySelector(".qf-ms")!.textContent, lit: [...c.querySelectorAll(".qf-mlit")].map((x) => x.textContent), litShown: [...c.querySelectorAll(".qf-mlit")].every((x) => getComputedStyle(x).visibility === "visible" && (x as HTMLElement).getBoundingClientRect().width > 0),
+          right: b.left > step.right, vis: getComputedStyle(c).visibility, inFrame: b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight };
+      });
+      expect(r.sj).toBe("Welcome to the newsletter");
+      expect(r.lit).toEqual(["Sarah Chen", "Welcome to the newsletter", "Hi Sarah,", "Northwind"]);
+      expect(r).toMatchObject({ right: true, vis: "visible", inFrame: true, litShown: true });
+      await shot(page, "flow-email-card");
+      expect(errors).toEqual([]);
+    } finally { await close(); }
+  }, 60000);
+});

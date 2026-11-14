@@ -92,6 +92,17 @@
   .qf-research .qf-rr { display: flex; gap: 10px; padding: 5px 0; border-top: 1px solid rgb(243, 243, 248); }
   .qf-research .qf-rk { flex: none; width: 76px; color: rgb(132, 132, 145); }
   .qf-research .qf-rv { flex: 1; color: rgb(23, 23, 28); font-weight: 500; }
+  /* card with `email`: the step's output as an email -- From, To (a face),
+     the subject, the opening lines; the parts written for this person lit. */
+  .qf-research.qf-mail { padding: 12px 16px 14px; }
+  .qf-mail .qf-mr { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid rgb(243, 243, 248); color: rgb(84, 84, 95); }
+  .qf-mail .qf-mr:first-of-type { border-top: 0; }
+  .qf-mail .qf-mk { flex: none; width: 34px; color: rgb(132, 132, 145); }
+  .qf-mail .qf-mph { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #e9e9ef center 22% / 128% no-repeat; }
+  .qf-mail .qf-ms { margin-top: 8px; font-size: 14px; line-height: 19px; font-weight: 700; color: rgb(23, 23, 28); }
+  .qf-mail .qf-mb { margin-top: 5px; color: rgb(60, 60, 70); white-space: pre-line; }
+  .qf-mail .qf-mlit { background: color-mix(in srgb, var(--qf-acc, #2b63e3) 11%, transparent); border-radius: 4px; padding: 0 3px; margin: 0 -3px;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .qf-env { position: absolute; left: 0; top: 0; width: 64px; height: 46px; margin: -23px 0 0 -32px; visibility: hidden; transform-origin: 50% 50%; }
   .qf-env svg { width: 100%; height: 100%; display: block; overflow: visible; }
   .qf-count {
@@ -110,6 +121,7 @@
     data = data || {};
     var DUR = (ctx && ctx.duration) || 8;
     var ACC = data.accent || '#2b63e3';
+    el.querySelector('.qf-root').style.setProperty('--qf-acc', ACC);
     var stage = el.querySelector('.qf-stage');
     var cam = el.querySelector('.qf-cam');
     var edgesSvg = el.querySelector('.qf-edges');
@@ -339,6 +351,10 @@
       var n = G[String(s.step)];
       var rows = Array.isArray(s.rows) ? s.rows.length : 0;
       var ch = 44 + rows * 27;
+      var em = s.email && typeof s.email === 'object' ? s.email : null;
+      // An email card: two header rows, the subject, then about 46
+      // characters a line of body.
+      if (em) ch = 24 + 2 * 25 + 27 + 5 + 16 * Math.max(1, String(em.body || '').split('\n').reduce(function (a, l) { return a + Math.max(1, Math.ceil(l.length / 46)); }, 0));
       var left = s.side === 'left';
       var x0 = left ? n.x - 96 - 28 - CARD_W : n.x + 96 + 28;
       s._box = { x: x0, y: n.y + n.h / 2 - ch / 2, w: CARD_W, h: ch };
@@ -685,12 +701,36 @@
         var n2 = G[String(s.step)];
         var rc = document.createElement('div'); rc.className = 'qf-research';
         rc.style.left = s._box.x + 'px'; rc.style.top = s._box.y + 'px'; rc.style.width = s._box.w + 'px';
-        var hd = document.createElement('div'); hd.className = 'qf-rh';
-        hd.innerHTML = '<div class="qf-ic">' + iconHtml(s.icon || 'quotient') + '</div>';
-        var ht = document.createElement('span'); ht.textContent = String(s.title || 'Research'); hd.appendChild(ht);
-        rc.appendChild(hd);
         var rowEls = [];
-        (Array.isArray(s.rows) ? s.rows : []).forEach(function (r) {
+        var em = s.email && typeof s.email === 'object' ? s.email : null;
+        if (em) {
+          // THE STEP'S EMAIL: who it is from, who it is to, the subject and
+          // the opening lines; `lit` (strings) mark the parts only theirs.
+          rc.className = 'qf-research qf-mail';
+          var lits = (Array.isArray(em.lit) ? em.lit : []).map(String).filter(Boolean);
+          var esc = function (t) { var d = document.createElement('div'); d.textContent = String(t || ''); return d.innerHTML; };
+          var lit = function (t, all) {
+            var h = esc(t);
+            if (all) return '<span class="qf-mlit">' + h + '</span>';
+            lits.forEach(function (w) { var e = esc(w); if (e && h.indexOf(e) >= 0) h = h.split(e).join('<span class="qf-mlit">' + e + '</span>'); });
+            return h;
+          };
+          var r1 = document.createElement('div'); r1.className = 'qf-mr';
+          r1.innerHTML = '<span class="qf-mk">From</span><span>' + esc(em.from || '') + '</span>';
+          var r2 = document.createElement('div'); r2.className = 'qf-mr';
+          r2.innerHTML = '<span class="qf-mk">To</span><span class="qf-mph"></span><span>' + lit(em.to, true) + '</span>';
+          if (em.photo) r2.querySelector('.qf-mph').style.backgroundImage = 'url("' + String(em.photo).replace(/"/g, '%22') + '")';
+          else r2.querySelector('.qf-mph').style.display = 'none';
+          var sj = document.createElement('div'); sj.className = 'qf-ms'; sj.innerHTML = lit(em.subject, em.subject_lit !== false);
+          var bd = document.createElement('div'); bd.className = 'qf-mb'; bd.innerHTML = lit(em.body, false);
+          [r1, r2, sj, bd].forEach(function (x) { rc.appendChild(x); rowEls.push(x); });
+        } else {
+          var hd = document.createElement('div'); hd.className = 'qf-rh';
+          hd.innerHTML = '<div class="qf-ic">' + iconHtml(s.icon || 'quotient') + '</div>';
+          var ht = document.createElement('span'); ht.textContent = String(s.title || 'Research'); hd.appendChild(ht);
+          rc.appendChild(hd);
+        }
+        (em ? [] : Array.isArray(s.rows) ? s.rows : []).forEach(function (r) {
           if (!r || typeof r !== 'object') return;
           var row = document.createElement('div'); row.className = 'qf-rr';
           var kk = document.createElement('div'); kk.className = 'qf-rk'; kk.textContent = String(r.label || '');
