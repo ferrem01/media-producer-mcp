@@ -358,3 +358,30 @@ describe("flows launch: type-relay font 'brand' (the film's own font, not the ho
     expect(await fam({ lines, font: "brand" })).toMatch(/Inter/);
   }, 60000);
 });
+
+describe("flows launch: motion audit (LottieFiles checklist, Nov 14)", () => {
+  it("the email winds up (a small dip) before the throw", async () => {
+    const { page, errors, close } = await open("quotient-flow", { ...FLOW, script: [{ action: "send", step: "email", at: 1, to: "right" }] }, 3);
+    try {
+      const top = () => page.evaluate(() => document.querySelector(".qf-env")!.getBoundingClientRect().top);
+      await seek(page, 1.24); const lifted = await top();
+      await seek(page, 1.31); const dipped = await top();
+      expect(dipped).toBeGreaterThan(lifted + 2);   // it sinks before it flies
+      expect(errors).toEqual([]);
+    } finally { await close(); }
+  }, 60000);
+
+  it("the booking check settles with a small overshoot, not a bounce (brand: nothing bounces)", async () => {
+    const { page, errors, close } = await open("booking-confirmed", { at: 0 }, 2);
+    try {
+      let peak = 0;
+      for (let t = 0.2; t < 0.8; t += 0.02) {
+        await seek(page, t);
+        const s = await page.evaluate(() => { const m = getComputedStyle(document.querySelector(".bc-check")!).transform; return m === "none" ? 1 : Math.hypot(...m.slice(7, -1).split(",").slice(0, 2).map(Number)); });
+        peak = Math.max(peak, s);
+      }
+      expect(peak).toBeLessThan(1.07);
+      expect(errors).toEqual([]);
+    } finally { await close(); }
+  }, 60000);
+});

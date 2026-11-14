@@ -130,7 +130,7 @@
       r.done = true; doneN++;
       var tick = r.el.querySelector('.oc-tick');
       tl.set(tick, { visibility: 'visible' }, at);
-      tl.fromTo(tick, { scale: 0 }, { scale: 1, duration: 0.4, ease: 'back.out(2.6)', immediateRender: false }, at);
+      tl.fromTo(tick, { scale: 0 }, { scale: 1, duration: 0.4, ease: 'back.out(1.2)', immediateRender: false }, at);
       tl.set(r.el, { className: 'oc-row done' }, at + 0.05);
       tl.set(r.el.querySelector('.oc-go'), { visibility: 'hidden' }, at);
       tl.set(cnt, { textContent: countText(doneN) }, at + 0.1);

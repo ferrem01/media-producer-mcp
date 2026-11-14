@@ -177,7 +177,7 @@
       q('.sf-block').style.position = 'relative';
       gsap.set(done, { autoAlpha: 0, y: 10, left: '50%', xPercent: -50 });
       tl.to(done, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, DONE + 0.12);
-      tl.from(q('.sf-check'), { scale: 0, duration: 0.45, ease: 'back.out(2.4)' }, DONE + 0.12);
+      tl.from(q('.sf-check'), { scale: 0, duration: 0.45, ease: 'back.out(1.2)' }, DONE + 0.12);
     }
     return tl;
   }
