@@ -67,6 +67,30 @@ describe("render work dirs", () => {
     expect(await exists(seen.at(-1)!)).toBe(false);
   });
 
+  it("the dir is gone the moment the job reads as done, however slow the delete", async () => {
+    // CI flake: the status went terminal before the delete finished, so a
+    // poller could see "completed" with the frames still on disk. A slow rm
+    // makes that race certain instead of occasional.
+    const realRm = fs.rm.bind(fs);
+    const slow = vi.spyOn(fs, "rm").mockImplementation(async (...a: Parameters<typeof fs.rm>) => {
+      await new Promise((r) => setTimeout(r, 300));
+      return realRm(...a);
+    });
+    try {
+      const { queueRender } = await import("../src/core/render-queue.js");
+      await film("proj_slow_ok", "works");
+      const ok = queueRender(T, "proj_slow_ok");
+      expect((await settle(ok.id)).status).toBe("completed");
+      expect(await exists(seen.at(-1)!)).toBe(false);
+      await film("proj_slow_bad", "fails");
+      const bad = queueRender(T, "proj_slow_bad");
+      expect((await settle(bad.id)).status).toBe("failed");
+      expect(await exists(seen.at(-1)!)).toBe(false);
+    } finally {
+      slow.mockRestore();
+    }
+  });
+
   it("the startup sweep clears old job dirs and keeps recent ones and other caches", async () => {
     const work = path.join(DATA, T, "projects", "proj_sweep", "_work");
     const old = path.join(work, "job_old00001");
