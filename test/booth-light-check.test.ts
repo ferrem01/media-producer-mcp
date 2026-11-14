@@ -137,9 +137,14 @@ describe("the light check in a browser (fake camera)", () => {
         // does not) offer manual exposure / white balance.
         await ctx.addInitScript((offer: boolean) => {
           const w = window as any;
-          w.__recOpts = []; w.__applied = [];
+          w.__recOpts = []; w.__applied = []; w.__recBytes = 0;
           const MR = w.MediaRecorder;
-          w.MediaRecorder = function (s: any, o: any) { w.__recOpts.push(o); return new MR(s, o); };
+          w.MediaRecorder = function (s: any, o: any) {
+            w.__recOpts.push(o);
+            const r = new MR(s, o);
+            r.addEventListener("dataavailable", (e: any) => { w.__recBytes += e.data ? e.data.size : 0; });
+            return r;
+          };
           w.MediaRecorder.isTypeSupported = (t: string) => MR.isTypeSupported(t);
           const P = w.MediaStreamTrack.prototype;
           const gs = P.getSettings;
@@ -196,6 +201,11 @@ describe("the light check in a browser (fake camera)", () => {
       await page.waitForFunction(() => (window as any).__recOpts.length > 0, null, { timeout: 8000 });
       expect((await page.evaluate(() => (window as any).__recOpts))[0].videoBitsPerSecond).toBe(12000000);
       expect(await page.isVisible("#oval")).toBe(false);
+      // Stop once the recorder holds real data. Stopped before its first
+      // encoded frame the take is empty and the page (rightly) shows "came
+      // back empty" instead of review -- a slow CI runner got there by
+      // stopping milliseconds after Start.
+      await page.waitForFunction(() => (window as any).__recBytes > 0, null, { timeout: 8000 });
       await page.click("#stopBtn");
       await page.waitForSelector("#review.on", { timeout: 8000 });
       // 4. Hidden for the visit: the next take goes straight to the count-in.
