@@ -100,6 +100,21 @@ describe("hand-drawn physics", () => {
   }, 60000);
 });
 
+describe("hand-drawn physics keeps a from() entrance", () => {
+  it("a from({autoAlpha:0}) entrance still lands: the cut never re-reads the start state as the end", async () => {
+    const s = await open([{ id: "ai", type: "ai-email-rewrite", data: { at: 0.2, from: "Lumen AI", fixed: "Happy to help.",
+      // More than one person: the first lands with the panel, so the
+      // panel's from() has already rendered when the physics runs.
+      leads: ["Daniel", "Tom", "Sarah"].map((name) => ({ name, company: "Meridian", did: "Viewed pricing", subject: `Hi ${name}`, line: "You compared plans." })) } }],
+    { physics: "hand-drawn", dur: 3 });
+    try {
+      const op = async (t: number) => { await seek(s.page, t); return s.page.evaluate(() => [".ar-left", ".ar-mail"].map((q) => Number(getComputedStyle(document.querySelector(q)!).opacity))); };
+      expect(await op(2)).toEqual([1, 1]);
+      expect(await op(1)).toEqual([1, 1]);
+    } finally { await s.close(); }
+  }, 60000);
+});
+
 describe("hand-drawn physics in Studio", () => {
   it("the composite (Studio's preview) cuts, steps and wiggles each hand-drawn scene the way the render does; a plain scene stays still", async () => {
     const big = { type: "type-relay", data: { lines: [{ text: "Hello there." }], at: 0.1, reveal: "cut", word_stagger: 0.2 } };
