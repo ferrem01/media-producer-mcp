@@ -22,8 +22,8 @@ element in the composite), and the composite applies it to each scene last,
 after its components, choreography and camera moves. `mpHandDrawn` takes a
 `root` option and sizes "small piece" from it. Calm and cutout-physics get
 the same scoping. Test: `hand-made-brand.test.ts`, "hand-drawn physics in
-Studio" (a hand-drawn scene wiggles in the composite; a plain scene beside
-it stays still).
+Studio" (a hand-drawn scene's fade is cut in the composite; a plain scene
+beside it still fades).
 
 The same render had a second bug: scene 15's AI email panel rendered as an
 empty white block. The physics passes swapped eases by setting `vars.ease`
@@ -42,6 +42,15 @@ the cut rule saw the fade and cut the whole tween, so the card held still
 and dropped out at the end. Now only a PURE fade is cut (`mpTweenMoves`):
 a tween that also moves keeps its motion, on twos. Test: "hand-drawn
 physics keeps a move that fades".
+
+Then Marc watched the wiggle in Studio and asked for it gone. Hand-drawn
+is now two rules, cut and on twos; the wiggle is deleted along with
+everything that only fed it: `mpHandJitter`, the `data-boil` marks in
+type-relay, symbol-field, symbol-gather, mockup-frame, quotient-lockup and
+quotient-home, type-relay's clear-and-restore of translate/rotate while it
+measures, and the `root` option on `mpHandDrawn`. The "pure fade" check now
+compares start and end, so a fade entrance that also pins x:0, scale:1 is
+still cut.
 
 ## 2026-11-17 — A hand-made brand: the Quotient rebrand in a film
 

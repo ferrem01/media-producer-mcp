@@ -808,7 +808,7 @@ export function timelapseClockScript(
  *
  * cutout-physics steps and boils; calm takes the overshoot out of every ease
  * (settle, never bounce); hand-drawn cuts every fade, steps on twos and
- * wiggles the drawn pieces. `punchy` is the house default and emits nothing.
+ * nothing else. `punchy` is the house default and emits nothing.
  */
 export function motionPhysicsScript(
   motion: string | undefined,
@@ -826,8 +826,8 @@ export function motionPhysicsScript(
 `;
   if (motion === "hand-drawn") return `
   // ── physics contract: hand-drawn (shared/motion-physics.js) ──
-  // Cut, don't fade; everything on twos; the drawn pieces wiggle.
-  try { if (typeof mpHandDrawn === 'function') mpHandDrawn(${tl}, { duration: ${sceneDuration}, root: ${root} }); }
+  // Cut, don't fade; everything on twos.
+  try { if (typeof mpHandDrawn === 'function') mpHandDrawn(${tl}); }
   catch (e) { console.warn('hand-drawn not applied: ' + e.message); }
 `;
   if (motion !== "cutout-physics") return "";

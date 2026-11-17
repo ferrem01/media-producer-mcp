@@ -165,7 +165,7 @@
       var cardEl = q('.qhome-card'), center = q('.qhome-center');
       var symInk = String(data.symbol_color || '#C0BAB6');
       [['home-left', 'left'], ['home-right', 'right']].forEach(function (sp) {
-        var box = document.createElement('div'); box.className = 'qhome-sym'; box.setAttribute('data-boil', sp[0]);
+        var box = document.createElement('div'); box.className = 'qhome-sym';
         center.appendChild(box);
         var f = mpBuildSymbolField(box, { shape: sp[0], cell: 22, color: symInk });
         var top = cardEl.offsetTop, cw = cardEl.offsetWidth;

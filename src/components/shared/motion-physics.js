@@ -220,7 +220,7 @@ function mpCalmEases(timeline) {
 
 /**
  * HAND-DRAWN: the motion of a hand-made brand film (the Quotient rebrand's
- * video rules). Three things, all mechanical:
+ * video rules). Two things, both mechanical:
  *
  *  1. CUT, DON'T FADE. A tween that only fades something in or out lands
  *     in one frame: an entrance is fully there on its first frame, an exit
@@ -229,25 +229,12 @@ function mpCalmEases(timeline) {
  *  2. ON TWOS. Everything else holds each pose for two frames (15 poses a
  *     second at 30 fps), like drawn animation. The camera is exempt, as in
  *     cutout-physics: a stepped camera reads as dropped frames.
- *  3. THE WIGGLE. Every hand-drawn piece -- a component part marked
- *     [data-boil] (a title's words, a symbol field, a squiggle) and any small
- *     component on the frame -- takes a new pose every four frames: a couple
- *     of pixels and under a degree, each piece on its own seed. It moves the
- *     CSS `translate` / `rotate` properties, which compose with the element's
- *     own transform, so it never fights the piece's choreography.
- *
- * Product UI stays still: a full-frame mockup is not a drawing.
  *
  * @param {gsap.core.Timeline} timeline  The scene master.
- * @param {{duration?: number, fps?: number, amount?: number, every?: number, root?: Element}} [opts]
- *   root: where the pieces live -- the document for a single scene, the
- *   scene's own element in the composite (Studio's preview of the whole film).
+ * @returns {{cut: number}|undefined}
  */
-function mpHandDrawn(timeline, opts) {
+function mpHandDrawn(timeline) {
   if (!timeline || typeof timeline.getChildren !== 'function') return;
-  var o = opts || {};
-  var FPS = 30, every = o.every > 0 ? o.every : 4, amount = o.amount > 0 ? o.amount : 3;
-  var duration = o.duration > 0 ? o.duration : (timeline.duration() || 5);
   // 1. Cuts: before stepping, so a fade becomes one jump, not 15 small ones.
   var tweens;
   try { tweens = timeline.getChildren(true, true, false); } catch (e) { tweens = []; }
@@ -261,7 +248,7 @@ function mpHandDrawn(timeline, opts) {
     // Only a pure fade is cut. A tween that also travels (a card flying into
     // the logo while it fades) keeps its motion: cutting it would hold the
     // card still and then drop it at the end. It steps on twos below.
-    if (mpTweenMoves(v)) continue;
+    if (mpTweenMoves(tw)) continue;
     var targets = []; try { targets = tw.targets() || []; } catch (e2) {}
     if (targets.some(mpIsCameraTarget)) continue;
     // A from() tween runs toward the element's own value, the other way round.
@@ -270,58 +257,33 @@ function mpHandDrawn(timeline, opts) {
     mpMarkStepped(tw);
     cut++;
   }
-  // 2. On twos.
-  mpStepQuantize(timeline, { fps: FPS / 2 });
-  // 3. The wiggle.
-  var root = o.root && o.root.querySelectorAll ? o.root : document;
-  var box = root === document ? null : root.getBoundingClientRect();
-  var W = (box && box.width) || window.innerWidth || 1920, H = (box && box.height) || window.innerHeight || 1080;
-  var pieces = [];
-  var add = function (el) { if (el && pieces.indexOf(el) < 0) pieces.push(el); };
-  Array.prototype.forEach.call(root.querySelectorAll('.mp-component [data-boil]'), add);
-  Array.prototype.forEach.call(root.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'), function (el) {
-    if (el.querySelector('video, [data-boil]')) return;
-    var r = el.getBoundingClientRect();
-    if (r.width * r.height > 0 && r.width * r.height < W * H * 0.25) add(el);
-  });
-  if (!pieces.length) return;
-  var seeds = pieces.map(function (el, k) { return 'boil-' + k + '-' + (el.getAttribute('data-boil') || el.getAttribute('data-cid') || ''); });
-  var amp = pieces.map(function (el) { var n = Number(el.getAttribute('data-boil-amount')); return n >= 0 && el.hasAttribute('data-boil-amount') ? n : amount; });
-  var jit = function (seed, pose, axis) { return mpHandJitter(seed + ':' + axis + ':' + pose); };
-  var clock = { t: 0 };
-  var draw = function (t) {
-    var pose = Math.floor(t * FPS / every);
-    for (var k = 0; k < pieces.length; k++) {
-      var s = pieces[k].style, m = amp[k];
-      s.setProperty('translate', (jit(seeds[k], pose, 'x') * m).toFixed(2) + 'px ' + (jit(seeds[k], pose, 'y') * m).toFixed(2) + 'px');
-      s.setProperty('rotate', (jit(seeds[k], pose, 'r') * m * 0.3).toFixed(3) + 'deg');
-    }
-  };
-  draw(0);
-  var wiggle = gsap.fromTo(clock, { t: 0 }, { t: duration, duration: duration, ease: 'none', immediateRender: false,
-    onUpdate: function () { draw(clock.t); } });
-  // Its poses are already on the four-frame grid: never step it again.
-  mpMarkStepped(wiggle);
-  timeline.add(wiggle, 0);
-  return { cut: cut, pieces: pieces.length };
+  // 2. On twos (30 fps / 2).
+  mpStepQuantize(timeline, { fps: 15 });
+  return { cut: cut };
 }
 
 /** Tween settings, not animated properties. */
 var MP_TWEEN_CONFIG = /^(duration|delay|ease|stagger|repeat|repeatDelay|repeatRefresh|yoyo|yoyoEase|paused|immediateRender|lazy|overwrite|inherit|id|data|callbackScope|runBackwards|startAt|keyframes|onStart|onStartParams|onUpdate|onUpdateParams|onComplete|onCompleteParams|onRepeat|onRepeatParams|onReverseComplete|onReverseCompleteParams|onInterrupt|autoRound|reversed|smoothChildTiming|parent)$/;
-/** Does this tween animate anything besides opacity / visibility? */
-function mpTweenMoves(v) {
+/**
+ * Does this tween MOVE anything -- change a property besides opacity /
+ * visibility? A key whose start and end are the same number does not count
+ * (a fade entrance that also pins x:0, scale:1 is still a pure fade). The
+ * start is the tween's startAt (fromTo) or the target's value now; a from()
+ * tween's end is its target's own value, unknown here, so any key counts.
+ */
+function mpTweenMoves(tw) {
+  var v = tw.vars || {}, start = v.startAt || {};
+  var targets = []; try { targets = tw.targets() || []; } catch (e) {}
   for (var k in v) {
     if (!Object.prototype.hasOwnProperty.call(v, k)) continue;
     if (k === 'opacity' || k === 'autoAlpha' || k === 'visibility' || MP_TWEEN_CONFIG.test(k)) continue;
-    return true;
+    if (v.runBackwards || typeof v[k] === 'function' || !targets.length) return true;
+    var end = parseFloat(v[k]);
+    if (isNaN(end)) return true;
+    for (var t = 0; t < targets.length; t++) {
+      var from = k in start ? parseFloat(start[k]) : parseFloat(gsap.getProperty(targets[t], k));
+      if (isNaN(from) || Math.abs(from - end) > 0.001) return true;
+    }
   }
   return false;
-}
-
-/** A stable number in [-1, 1] for a string: the wiggle's pose for one piece. */
-function mpHandJitter(key) {
-  var h = 2166136261;
-  for (var i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
-  h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16;
-  return ((h >>> 0) / 4294967296) * 2 - 1;
 }
