@@ -32,6 +32,13 @@ once things land, they wiggle. A copy of the film carries it
   transform. Product mockups (full-frame) stay still. The stepped-tween
   marker moved from `tween.vars.__mpStepped` to a WeakSet: GSAP re-reads vars
   on invalidate and warned about the unknown key on DOM targets.
+- **type-relay `highlight`** (Nov 17, Marc: the 50% grey second half read
+  "bland"): a flat, square-ended block of brand colour set down a little
+  crooked behind the accent words, cutting in once they land -- the
+  rebrand's own word-search highlight (its brand-video rules dropped pills,
+  highlighter strokes and loops for it). One block per row of accent words.
+  Layout now measures words without the wiggle's translate / rotate, which
+  getBoundingClientRect counts.
 - **type-relay**: `font` names a face (not just `'brand'`), `reveal: "cut"`
   (each word simply there on its beat), `tag` (a mono label with a coloured
   bar on its left over the words) and `squiggle` (the cursive loops under
