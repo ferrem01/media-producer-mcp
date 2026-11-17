@@ -82,15 +82,39 @@
     border: 2px solid #e6e4ee; border-radius: 999px; background: #fff; font-size: 26px;
     font-weight: 500; color: #17171c; white-space: nowrap; }
   .qhome-chip svg { width: 26px; height: 26px; color: #44414e; flex-shrink: 0; }
+  /* look: '2026' -- the home screen as the Quotient rebrand draws it: paper
+     canvas, brown text, the greeting in the brand serif, the new mark, a
+     flat composer (no shadow) with a brown send button, and the math-symbol
+     fields that trail around the composer. */
+  .qhome.qh-y26 { background: #FDFBF8; color: #31231D; font-family: 'Inter', system-ui, sans-serif; }
+  .qh-y26 .qhome-center { position: relative; }
+  .qh-y26 .qhome-orb { width: 84px; height: 84px; }
+  .qh-y26 .qhome-h1 { font-family: 'PP Museum', Georgia, serif; font-weight: 300; font-size: 76px; letter-spacing: -0.03em; }
+  .qh-y26 .qhome-card { border-color: #E0DEDB; box-shadow: none; border-radius: 22px; position: relative; z-index: 1; }
+  .qh-y26 .qhome-ph, .qh-y26 .qhome-ic, .qh-y26 .qhome-model { color: #6E645F; }
+  .qh-y26 .qhome-chars { color: #31231D; }
+  .qh-y26 .qhome-caret { background: #31231D; }
+  .qh-y26 .qhome-star { color: #A34735; }
+  .qh-y26 .qhome-send { border-radius: 14px; background: #C0BAB6; }
+  .qh-y26 .qhome-chip { border-color: #E0DEDB; color: #31231D; }
+  .qh-y26 .qhome-chip svg { color: #6E645F; }
+  .qhome-sym, .qhome-sym svg { max-width: none; }
+  .qhome-sym { position: absolute; line-height: 0; z-index: 0; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var q = function (s) { return el.querySelector(s); };
+    var Y26 = data.look === '2026';
+    var INK = Y26 ? '#31231D' : '#17171c';
+    if (Y26) q('.qhome').classList.add('qh-y26');
 
     var orbImg = q('.qhome-orb-img');
-    orbImg.src = data.logo_url ||
+    if (Y26 && !data.logo_url) {
+      orbImg.style.display = 'none';
+      q('.qhome-orb').insertAdjacentHTML('beforeend', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166.32 166.32"><path fill-rule="evenodd" d="M86.9835 164.959C86.9835 165.67 86.4187 166.257 85.7078 166.279C38.8964 167.731 0 130.162 0 83.16C0 36.158 38.8964 -1.41147 85.7078 0.0407252C86.4187 0.062779 86.9835 0.649697 86.9835 1.36094V164.959ZM64.1982 83.16C64.1982 72.4132 55.4859 63.701 44.7391 63.701C33.9923 63.701 25.2801 72.4132 25.2801 83.16C25.2801 93.9068 33.9923 102.619 44.7391 102.619C55.4859 102.619 64.1982 93.9068 64.1982 83.16ZM147.24 83.16C147.24 94.6233 137.947 103.916 126.484 103.916C115.02 103.916 105.727 94.6233 105.727 83.16C105.727 71.6967 115.02 62.4036 126.484 62.4036C137.947 62.4036 147.24 71.6967 147.24 83.16Z" fill="#31231D"/></svg>');
+    } else orbImg.src = data.logo_url ||
       'https://img.logo.dev/getquotient.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=256';
     orbImg.onerror = function () {
       orbImg.style.display = 'none';
@@ -134,6 +158,22 @@
       chipWrap.appendChild(d);
       chipEls[String(c.label).toLowerCase()] = d;
     });
+
+    // The symbol fields that trail around the composer (the rebrand's home):
+    // down the left and sweeping right, an arc above the right side.
+    if (Y26 && data.symbols !== false && typeof mpBuildSymbolField === 'function') {
+      var cardEl = q('.qhome-card'), center = q('.qhome-center');
+      var symInk = String(data.symbol_color || '#C0BAB6');
+      [['home-left', 'left'], ['home-right', 'right']].forEach(function (sp) {
+        var box = document.createElement('div'); box.className = 'qhome-sym'; box.setAttribute('data-boil', sp[0]);
+        center.appendChild(box);
+        var f = mpBuildSymbolField(box, { shape: sp[0], cell: 22, color: symInk });
+        var top = cardEl.offsetTop, cw = cardEl.offsetWidth;
+        if (sp[1] === 'left') { box.style.left = (-f.width * 0.55) + 'px'; box.style.top = (top - f.height * 0.35) + 'px'; }
+        else { box.style.left = (cw - f.width * 0.3) + 'px'; box.style.top = (top - f.height * 0.25) + 'px'; }
+        box.style.width = f.width + 'px';
+      });
+    }
 
     // ── Entrance: orb pops, hero line rises, card rises, chips stagger in. ──
     var orb = q('.qhome-orb'), h1 = q('.qhome-h1'), card = q('.qhome-card');
@@ -179,15 +219,15 @@
           tl.set(s, { display: 'inline' }, at + i * speed);
         });
         tl.set(ph, { display: 'none' }, at);
-        tl.to(send, { backgroundColor: '#17171c', duration: 0.25 }, at + 0.1);
+        tl.to(send, { backgroundColor: INK, duration: 0.25 }, at + 0.1);
       } else if (a.action === 'send-message') {
         tl.to(send, { scale: 0.84, duration: 0.09, ease: 'power2.in' }, at);
         tl.to(send, { scale: 1, duration: 0.16, ease: 'power2.out' }, at + 0.09);
       } else if (a.action === 'highlight-chip') {
         var chip = chipEls[String(a.label || '').toLowerCase()];
         if (chip) {
-          tl.to(chip, { scale: 1.06, borderColor: '#7a5cff', duration: 0.22, ease: 'power2.out' }, at);
-          tl.to(chip, { scale: 1, borderColor: '#e6e4ee', duration: 0.3, ease: 'power2.inOut' }, at + 0.5);
+          tl.to(chip, { scale: 1.06, borderColor: Y26 ? '#A34735' : '#7a5cff', duration: 0.22, ease: 'power2.out' }, at);
+          tl.to(chip, { scale: 1, borderColor: Y26 ? '#E0DEDB' : '#e6e4ee', duration: 0.3, ease: 'power2.inOut' }, at + 0.5);
         }
       }
     });

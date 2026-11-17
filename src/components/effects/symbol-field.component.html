@@ -1,0 +1,49 @@
+<template>
+  <div class="sfx"><div class="sfx-box" data-boil="symbol-field"></div></div>
+</template>
+
+<style scoped>
+  /* SYMBOL FIELD: the math-symbol motif of a hand-made brand (the Quotient
+     rebrand's SymbolField): + - x / = and the plus-minus filling a shape
+     drawn in ASCII art, in one ink. It can land whole, or build in random
+     handfuls (a build reads as a crescendo), and a few symbols flip into
+     their partners on a cadence once it is there. */
+  .sfx, .sfx * { max-width: none; box-sizing: border-box; }
+  .sfx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .sfx-box { position: absolute; line-height: 0; }
+  .sfx-box svg { display: block; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.sfx'), box = el.querySelector('.sfx-box');
+    if (!root || !box || typeof mpBuildSymbolField !== 'function') return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || typeof v === 'boolean' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || el.clientWidth || 1960, H = root.clientHeight || el.clientHeight || 1120;
+    var DUR = num(ctx && ctx.duration, 5);
+    if (data.background) root.style.background = String(data.background);
+    var f = mpBuildSymbolField(box, { shape: data.shape || 'cluster', seed: data.seed, cell: num(data.cell, 24), color: String(data.color || '#31231D') });
+    box.style.left = (W * num(data.x, 0.5) - f.width / 2).toFixed(1) + 'px';
+    box.style.top = (H * num(data.y, 0.5) - f.height / 2).toFixed(1) + 'px';
+    var AT = num(data.at, 0), HANDS = data.reveal === 'handfuls';
+    var N = Math.max(1, Math.round(num(data.handfuls, 6))), STEP = num(data.step, 0.13);
+    // Which handful each symbol lands in: a seeded shuffle, so a seek anywhere agrees.
+    var rnd = mpHandRandom(String(data.seed || data.shape || 'field') + ':hands');
+    var hand = f.cells.map(function () { return Math.floor(rnd() * N); });
+    var settled = AT + (HANDS ? (N - 1) * STEP : 0);
+    root.setAttribute('data-settle-time', String(Math.round(settled * 1000) / 1000));
+    var render = function (t) {
+      for (var i = 0; i < f.cells.length; i++) {
+        var on = t >= AT + (HANDS ? hand[i] * STEP : 0);
+        f.cells[i].g.style.visibility = on ? 'inherit' : 'hidden';
+      }
+      if (data.flips !== false) mpSymbolFlips(f.cells, t, { from: settled + 0.3, every: num(data.flip_every, 0.8), seed: String(data.seed || 'sf') });
+    };
+    var clock = { t: 0 };
+    render(0);
+    tl.fromTo(clock, { t: 0 }, { t: DUR, duration: DUR, ease: 'none', immediateRender: false, onUpdate: function () { render(clock.t); } }, 0);
+    return tl;
+  }
+</script>

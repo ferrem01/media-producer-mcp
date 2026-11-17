@@ -1,0 +1,21 @@
+{
+  "type": "mockup-frame",
+  "label": "Mockup frame (coloured paper panel under a product)",
+  "category": "layouts",
+  "description": "The coloured paper panel a product mockup sits on in a hand-made brand film (the Quotient rebrand's framed mockup): a full-frame background (default cream #FFEFDE), a flat panel of brand colour (default brick #A34735) whose edges are bitten a pixel or two like handled construction paper, and a math-symbol field (+ - x / = and the plus-minus, cream) poking out from under the window at the top right and the bottom left; a few symbols flip into their partners every flip_every seconds. Give it the WINDOW, the box the product will fill ({x, y (centre), w, h} fractions of the box, default {x:0.5, y:0.5, w:0.8, h:0.72}); the panel pads it by `pad` (0.06) of the panel's width. Then place the product component on that same box, ABOVE this one in the stack (a full-frame slot is the 1960x1120 camera layer, so convert: position x = (window.x - window.w/2) and so on, in % of the frame). The root publishes data-window-box and data-panel-box (\"cx,cy,w,h\" fractions). It appears as a cut at `at` (0). Example: {\"color\":\"#A34735\",\"window\":{\"x\":0.5,\"y\":0.5,\"w\":0.8,\"h\":0.72}}.",
+  "data": {
+    "color": { "type": "string", "label": "Panel colour", "optional": true, "default": "#A34735" },
+    "background": { "type": "string", "label": "Behind the panel ('none': transparent)", "optional": true, "default": "#FFEFDE" },
+    "window": { "type": "object", "label": "The product's box: {x, y (centre), w, h} fractions of the component box", "optional": true,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" } } },
+    "pad": { "type": "number", "label": "Panel padding around the window, fraction of the panel's width", "optional": true, "default": 0.06 },
+    "symbols": { "type": "boolean", "label": "The two symbol fields at the corners", "optional": true, "default": true },
+    "symbol_color": { "type": "string", "label": "Symbol colour", "optional": true, "default": "#FFEFDE" },
+    "flips": { "type": "boolean", "label": "A few symbols flip into their partners on a cadence", "optional": true, "default": true },
+    "flip_every": { "type": "number", "label": "Seconds between flips", "optional": true, "default": 0.8 },
+    "worn": { "type": "boolean", "label": "The bitten paper edge", "optional": true, "default": true },
+    "wear": { "type": "number", "label": "How far the edge wanders, px", "optional": true, "default": 5 },
+    "seed": { "type": "number", "label": "Where the bites fall", "optional": true, "default": 7 },
+    "at": { "type": "number", "label": "When it appears (a cut)", "optional": true, "default": 0 }
+  }
+}

@@ -1,0 +1,73 @@
+<template>
+  <div class="mkf">
+    <div class="mkf-panel"></div>
+    <div class="mkf-sym mkf-tr" data-boil="mkf-tr"></div>
+    <div class="mkf-sym mkf-bl" data-boil="mkf-bl"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* MOCKUP FRAME: the coloured paper panel a product mockup sits on in a
+     hand-made brand (the Quotient rebrand's MockupFrame): a flat block of
+     brand colour, its edges slightly bitten like handled construction
+     paper, with a math-symbol field poking out from under the window at the
+     top right and the bottom left. The product goes ON it: place the
+     product component on the `window` box, above this one in the stack. */
+  .mkf, .mkf * { max-width: none; box-sizing: border-box; }
+  .mkf { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .mkf-panel { position: absolute; }
+  .mkf-sym { position: absolute; line-height: 0; }
+  .mkf-sym svg { display: block; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.mkf'), panel = el.querySelector('.mkf-panel');
+    var tr = el.querySelector('.mkf-tr'), bl = el.querySelector('.mkf-bl');
+    if (!root || !panel) return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || typeof v === 'boolean' || !isFinite(n)) ? d : n; };
+    var W = root.clientWidth || el.clientWidth || 1960, H = root.clientHeight || el.clientHeight || 1120;
+    var DUR = num(ctx && ctx.duration, 6);
+    if (data.background !== 'none') root.style.background = String(data.background || '#FFEFDE');
+    // The window (where the product sits), as a centre-based box of fractions.
+    var wb = data.window && typeof data.window === 'object' ? data.window : {};
+    var ww = W * num(wb.w, 0.8), wh = H * num(wb.h, 0.72);
+    var wx = W * num(wb.x, 0.5) - ww / 2, wy = H * num(wb.y, 0.5) - wh / 2;
+    // The panel pads the window by 6% of its own width, as the site's frame does.
+    var PADF = num(data.pad, 0.06), fw = ww / (1 - 2 * PADF), pad = fw * PADF;
+    var px = wx - pad, py = wy - pad, pw = fw, ph = wh + 2 * pad;
+    panel.style.left = px.toFixed(1) + 'px'; panel.style.top = py.toFixed(1) + 'px';
+    panel.style.width = pw.toFixed(1) + 'px'; panel.style.height = ph.toFixed(1) + 'px';
+    panel.style.background = String(data.color || '#A34735');
+    if (data.worn !== false && typeof mpWornEdgeFilterSvg === 'function') {
+      window.__mkfN = (window.__mkfN || 0) + 1;
+      var fid = 'mkf-worn-' + window.__mkfN;
+      root.insertAdjacentHTML('afterbegin', mpWornEdgeFilterSvg(fid, num(data.seed, 7), num(data.wear, 5)));
+      panel.style.filter = 'url(#' + fid + ')';
+    }
+    var cells = [];
+    if (data.symbols !== false && typeof mpBuildSymbolField === 'function') {
+      // Both fields share one cell size (16 columns over 20% of the panel).
+      var cell = fw * 0.2 / 16, ink = String(data.symbol_color || '#FFEFDE');
+      var a = mpBuildSymbolField(tr, { shape: 'frame-top-right', cell: cell, color: ink });
+      tr.style.left = (px + pw - fw * 0.015 - a.width).toFixed(1) + 'px'; tr.style.top = (py + fw * 0.012).toFixed(1) + 'px';
+      var b = mpBuildSymbolField(bl, { shape: 'frame-bottom-left', cell: cell, color: ink });
+      bl.style.left = (px + fw * 0.005).toFixed(1) + 'px'; bl.style.top = (py + ph - fw * 0.025 - b.height).toFixed(1) + 'px';
+      cells = a.cells.concat(b.cells);
+    }
+    var f4 = function (v) { return (Math.round(v * 10000) / 10000).toString(); };
+    root.setAttribute('data-window-box', [f4((wx + ww / 2) / W), f4((wy + wh / 2) / H), f4(ww / W), f4(wh / H)].join(','));
+    root.setAttribute('data-panel-box', [f4((px + pw / 2) / W), f4((py + ph / 2) / H), f4(pw / W), f4(ph / H)].join(','));
+    var AT = num(data.at, 0), FL = data.flips !== false;
+    var render = function (t) {
+      root.style.visibility = t >= AT ? 'inherit' : 'hidden';
+      if (FL && cells.length) mpSymbolFlips(cells, t, { from: AT + 0.4, every: num(data.flip_every, 0.8), seed: 'mkf' });
+    };
+    var clock = { t: 0 };
+    render(0);
+    tl.fromTo(clock, { t: 0 }, { t: DUR, duration: DUR, ease: 'none', immediateRender: false, onUpdate: function () { render(clock.t); } }, 0);
+    return tl;
+  }
+</script>

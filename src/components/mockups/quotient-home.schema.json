@@ -44,6 +44,22 @@
       "type": "boolean",
       "label": "Hide the category chip row (a frame with no pill shapes)",
       "optional": true
+    },
+    "look": {
+      "type": "string",
+      "label": "'2026': the home as the Quotient rebrand draws it -- paper canvas, brown text, the greeting in PP Museum Light (load it as a custom font in the film's brand kit), the new mark, a flat composer with a brown send button, math-symbol fields trailing around it. Omitted: the earlier look.",
+      "enum": ["2026"],
+      "optional": true
+    },
+    "symbols": {
+      "type": "boolean",
+      "label": "look 2026: the symbol fields around the composer (default true)",
+      "optional": true
+    },
+    "symbol_color": {
+      "type": "string",
+      "label": "look 2026: the symbols' colour (default #C0BAB6)",
+      "optional": true
     }
   },
   "match": {

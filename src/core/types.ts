@@ -441,7 +441,7 @@ export interface Scene {
    *  inked edges; "calm" turns every back / elastic / bounce ease into a power
    *  ease (shared/motion-physics.js); the motion inspector's banned-moves list
    *  checks what is left (tilts, keyframed overshoot). Absent = house behavior. */
-  motion_physics?: "punchy" | "calm" | "cutout-physics";
+  motion_physics?: "punchy" | "calm" | "cutout-physics" | "hand-drawn";
 }
 
 // ── Audio ──

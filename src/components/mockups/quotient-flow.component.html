@@ -113,6 +113,32 @@
     position: absolute; left: 0; top: 0; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
     visibility: hidden; border: 2px solid #fff; box-sizing: border-box;
   }
+  /* look: '2026' -- the product as the Quotient rebrand draws it (the
+     marketing site's mock flow node): a warm canvas, a node in two layers
+     (the step type on a tinted header, what it does on a white card below),
+     brown text, icons in the step family's colour, the new mark, and no
+     shadows anywhere. Email highlights are flat orange blocks. */
+  .qf-root.qf-y26 { background: #F7F5F2; }
+  .qf-y26 .qf-dots { background-image: radial-gradient(circle, #E0DEDB 1.1px, transparent 1.5px); }
+  .qf-y26 .qf-stage { color: #31231D; }
+  .qf-y26 .qf-card { padding: 0; gap: 0; align-items: stretch; justify-content: flex-start;
+    background: #F5F3F0; border-color: #F1EEEC; border-radius: 12px; box-shadow: none; }
+  .qf-root.qf-y26 .qf-hd { padding: 5px 8px; font-size: 11px; line-height: 14px; }
+  .qf-y26 .qf-in { flex: 1; min-width: 0; margin: 0 -1px -1px; display: flex; flex-direction: column; justify-content: center; gap: 1px;
+    padding: 5px 8px 6px; background: #fff; border: 1px solid #F1EEEC; border-radius: 12px; text-align: left; }
+  .qf-y26 .qf-in .qf-hd { padding: 0; }
+  .qf-y26 .qf-pri { font-size: 11.5px; line-height: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qf-y26 .qf-sub { color: #6E645F; text-align: left; font-size: 10.5px; line-height: 15px; }
+  .qf-y26 .qf-handle { background: #786F6A; }
+  .qf-y26 .qf-pill { box-shadow: none; }
+  .qf-y26 .qf-research { border-color: #E0DEDB; border-radius: 12px; box-shadow: none; color: #31231D; }
+  .qf-y26 .qf-research .qf-rr, .qf-y26 .qf-mail .qf-mr { border-top-color: #F1EEEC; }
+  .qf-y26 .qf-research .qf-rk, .qf-y26 .qf-mail .qf-mk { color: #786F6A; }
+  .qf-y26 .qf-research .qf-rv, .qf-y26 .qf-mail .qf-ms { color: #31231D; }
+  .qf-y26 .qf-mail .qf-mr { color: #6E645F; }
+  .qf-y26 .qf-mail .qf-mb { color: #50433E; }
+  .qf-y26 .qf-mail .qf-mph { background-color: #F1EEEC; }
+  .qf-y26 .qf-mail .qf-mlit { background: color-mix(in srgb, var(--qf-mark, #F27141) 42%, transparent); border-radius: 0; color: #31231D; }
 </style>
 
 <script>
@@ -120,8 +146,15 @@
     var tl = gsap.timeline();
     data = data || {};
     var DUR = (ctx && ctx.duration) || 8;
-    var ACC = data.accent || '#2b63e3';
-    el.querySelector('.qf-root').style.setProperty('--qf-acc', ACC);
+    var Y26 = data.look === '2026';
+    // The path's colour: the Flows family's brick in the 2026 look.
+    var ACC = data.accent || (Y26 ? '#A34735' : '#2b63e3');
+    // Email things (the envelope, a written-for-you highlight): the Email family's orange.
+    var MAILC = data.mail_accent || (Y26 ? '#F27141' : ACC);
+    var rootEl = el.querySelector('.qf-root');
+    rootEl.style.setProperty('--qf-acc', ACC);
+    rootEl.style.setProperty('--qf-mark', MAILC);
+    if (Y26) rootEl.classList.add('qf-y26');
     var stage = el.querySelector('.qf-stage');
     var cam = el.querySelector('.qf-cam');
     var edgesSvg = el.querySelector('.qf-edges');
@@ -161,9 +194,11 @@
       flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>'
     };
     var SLACK = '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="none"><g fill-rule="evenodd" clip-rule="evenodd"><path fill="#E01E5A" d="M2.471 11.318a1.474 1.474 0 001.47-1.471v-1.47h-1.47A1.474 1.474 0 001 9.846c.001.811.659 1.469 1.47 1.47zm3.682-2.942a1.474 1.474 0 00-1.47 1.471v3.683c.002.811.66 1.468 1.47 1.47a1.474 1.474 0 001.47-1.47V9.846a1.474 1.474 0 00-1.47-1.47z"/><path fill="#36C5F0" d="M4.683 2.471c.001.811.659 1.469 1.47 1.47h1.47v-1.47A1.474 1.474 0 006.154 1a1.474 1.474 0 00-1.47 1.47zm2.94 3.682a1.474 1.474 0 00-1.47-1.47H2.47A1.474 1.474 0 001 6.153c.002.812.66 1.469 1.47 1.47h3.684a1.474 1.474 0 001.47-1.47z"/><path fill="#2EB67D" d="M9.847 7.624a1.474 1.474 0 001.47-1.47V2.47A1.474 1.474 0 009.848 1a1.474 1.474 0 00-1.47 1.47v3.684c.002.81.659 1.468 1.47 1.47zm3.682-2.941a1.474 1.474 0 00-1.47 1.47v1.47h1.47A1.474 1.474 0 0015 6.154a1.474 1.474 0 00-1.47-1.47z"/><path fill="#ECB22E" d="M8.377 9.847c.002.811.659 1.469 1.47 1.47h3.683A1.474 1.474 0 0015 9.848a1.474 1.474 0 00-1.47-1.47H9.847a1.474 1.474 0 00-1.47 1.47zm2.94 3.682a1.474 1.474 0 00-1.47-1.47h-1.47v1.47c.001.812.659 1.469 1.47 1.47a1.474 1.474 0 001.47-1.47z"/></g></svg>';
+    // The 2026 mark: a half-circle and a dot (a Q, a sideways division sign, a face), brown.
+    var MARK26 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166.32 166.32"><path fill-rule="evenodd" d="M86.9835 164.959C86.9835 165.67 86.4187 166.257 85.7078 166.279C38.8964 167.731 0 130.162 0 83.16C0 36.158 38.8964 -1.41147 85.7078 0.0407252C86.4187 0.062779 86.9835 0.649697 86.9835 1.36094V164.959ZM64.1982 83.16C64.1982 72.4132 55.4859 63.701 44.7391 63.701C33.9923 63.701 25.2801 72.4132 25.2801 83.16C25.2801 93.9068 33.9923 102.619 44.7391 102.619C55.4859 102.619 64.1982 93.9068 64.1982 83.16ZM147.24 83.16C147.24 94.6233 137.947 103.916 126.484 103.916C115.02 103.916 105.727 94.6233 105.727 83.16C105.727 71.6967 115.02 62.4036 126.484 62.4036C137.947 62.4036 147.24 71.6967 147.24 83.16Z" fill="#31231D"/></svg>';
     var QLOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAADAFBMVEVMaXEPCIoNAIwHAY3Em+mtjvgZD431wf4qEqqigvMFAIUFAIXKoOrwvvXAieUOAJmejeP3xPqwj/Hqt/KfgugEAIQQBKZkQMEIAY6IaNgMAJmHaNcYB7IhEL7QmehRK7bfqfGLa9zPof4YALgZAbrSzvDU0PHX0/IzIt4jE8o5IuPr6fo9JOg2IuElF83a1vPe2vUdBb8fC8MbA70eCMHc2PQgD8Y6JOVBJevg3fbz8vtFJ+7u7Pvw7/vj4Pbm4/c4KNMuH9c3J9ccALsWAbRxQerQzO/p5/dKKfEvINtdL9FnONwzI9VaLc4qHdT29f1tPuUjDMe3hv+neP+AT/5qO+E7KtBkNdm0g/+tf/+ddP////9XK8wzI9pfMdTGkv92Re6JV/+RXv9WKsm/jP+ieP8kB8Lqo/9fNf5hM9aYZ/8SALGfbf+FU//gof/Djv8uINLlpP8pG9Dmnf83Jd+NW/8BAJ27if+lcv+Xb/9+Tfh6SfOwgf/Olv8jBL2pff/imP9mOv9ZMftAIuMJAKqdZ/95Sv8rHMwEAKQRAq3Xnf9UKMbRmf8vDb8sC8SXYv/coP/akf/vt/85G9jKlP83JtttP/9NK/XsrP/Vmv+NZP8AAJStev9RJss+LM75+f2AVP7Ti/+lbP9QJcWscv9zRP+Sav+TZP9SL/mJXv8yI85CINvLjf/cmP/Ghf85GNIUA6M2EcFULPXCgP9WLt3Tkv/Mhv9JIMRCHtQnF8QnDLyzff+EWv9CGscuGLS9hv9MJ91BLsw9F79EHMLWzve7gP+6ev+zdv9KIMkBAIlHJeRNI780H7shCLE6FcZHH7lAK8hLJNgAAH8hB6PDvO66m/1wRvdbM+s4Jso7JcFmPPJQK+bltf7Gof5AGK20kf9uSNbSqP/crv8xH8R4Vtp6Uf+JZeA1ELeAVObJw+w8KMaKXvK2ruOUcOWondtlP81TLNKXc/CUiM5XQrh8a8doU8D/0P9INLDIkPfLvfn8yP8yJKi5g/ave+WbZvemce9sgSSVAAAA8HRSTlMARv18SPwh/v7+ncAfpf75+9W7fI7gqalVqNp4xO3Q3PTd8/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////5Sl65aAAAACXBIWXMAABYlAAAWJQFJUiTwAAAXH0lEQVR4nI3be1hU1foH8DFFQeto99u5/R6FUQad8SjCDMwMoDBkKJKmxIimKakpImLHS04qCeJlvKAmJA6ZZVwUND0KCBqiIQnaQUChkkItDAEFNbXT+T3vu9bae+09G07vgPU8/fF++L5rrX3BVCqlerzXM0895eJy9erVqzWsvqv5jtYP3/1A6scffiT17Y/fstr27bZt27b12daHryeffOLpXo8rtlKox595yuVqTc1VsboxOBO2EQJvePjw4b179/o8+fQfMfR6yuXqVRc3Vu+//8YbLm9ERkZGXn0NMbNm1SycPr1m+nfTAbLxh40/SClOYZACxr17fZ7o9Qfau7m53RYq6nZUVNTs2bNnT3z/fcC89957kZGvvfbaP/85a9asWQunT58+ffv27StXbty4MS1t/fr1W6BiY2MXYe1atIsVIh7eu/dkd4THn3Fzcbt9+9atW7+w+j19//7P5s2bt2zZ/PlRS5cunThx4sTdu3cXFRWh4+TJk7NmLVyYm5ubu33lyqNHjx5NS0s7cODAAUAwxttvvy0a7j18ostB9Brg4nbr1q0bN278TAoJM7KWLFkyc+b+/ZvnzVu7dv78+Xv3Ll26b9++3bu/KioqOnPmzJkvvvji4MGDB/+Vm5v78ceA2Lp1KyAOrFq1ajHU24vfJghC6CqEl93coDu2fhNqxYoVK5YvX75gwYIZM2YAYubmzZvnrV27dv7evXv37tu3b99XX3311dmzZ4EAhn9BfQy1FQsJFLFYJDx8+LRS/2dY+2vBwRMmBAcHU8Py5csnTZIY1q5du1ZGOAuEL5wJW1FADEIKffrce8K5/4tut27cuHbtWuMEUsGEIAoWgGAJCjYrCM7+YQEQnAXPuJH2ja9jdQNQyEAAfIGAj4mAEFZRAhsDnYNc8PJt6N/Y+CoWAMQhIMBpCNh/LzeDs7J1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';
     function iconHtml(name, color) {
-      if (name === 'quotient') return '<img alt="" src="' + QLOGO + '">';
+      if (name === 'quotient') return Y26 ? MARK26 : '<img alt="" src="' + QLOGO + '">';
       if (name === 'slack') return SLACK;
       var body = ICONS[name] || ICONS.zap;
       return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="' + (color || 'currentColor') +
@@ -279,6 +314,7 @@
       var n = G[id];
       if (n.type === 'pill') n.h = 34;
       else if (n.type === 'end') n.h = 34;
+      else if (Y26) n.h = n.chip ? 72 : (n.subtitle && n.subtitle.length > 30) ? 70 : 56;
       else n.h = (n.subtitle && n.subtitle.length > 30) ? 70 : 56;
     });
 
@@ -363,7 +399,20 @@
     });
 
     // ---- Draw nodes ----
-    var TONES = {
+    // The step families' colours (the product's icon sheet): Flows brick for
+    // the flow's own steps, Email orange, Audience mauve, the agent brown.
+    function famColor(n) {
+      var k = n.kind;
+      if (k === KIND.email || k === KIND['ai-email']) return '#F27141';
+      if (k === KIND.agent) return '#31231D';
+      if (k === KIND.update || k === KIND['lead-score'] || k === KIND.crm) return '#995674';
+      return '#A34735';
+    }
+    var TONES = Y26 ? {
+      yes: { bg: '#E5EEE4', border: 'rgba(16, 118, 45, 0.2)', dot: 'rgba(16, 118, 45, 0.15)', icon: '#10762D', text: '#12702C', glyph: 'check' },
+      no: { bg: '#F7E7E3', border: 'rgba(190, 55, 42, 0.2)', dot: 'rgba(190, 55, 42, 0.15)', icon: '#BE372A', text: '#BE372A', glyph: 'x' },
+      neutral: { bg: '#ffffff', border: '#F1EEEC', dot: '#F1EEEC', icon: '#6E645F', text: '#31231D', glyph: 'branch' }
+    } : {
       yes: { bg: '#f3fbf5', border: 'rgba(22, 163, 74, 0.2)', dot: '#dcf5e3', icon: '#16a34a', text: '#166534', glyph: 'check' },
       no: { bg: '#fef6f6', border: 'rgba(220, 38, 38, 0.2)', dot: '#fde2e2', icon: '#dc2626', text: '#991b1b', glyph: 'x' },
       neutral: { bg: '#ffffff', border: 'rgb(239, 240, 246)', dot: 'rgb(239, 240, 246)', icon: 'rgb(84, 84, 95)', text: 'rgb(23, 23, 28)', glyph: 'branch' }
@@ -385,6 +434,28 @@
         pd.innerHTML = iconHtml(n.type === 'end' ? 'stop' : t.glyph, t.icon);
         var pl = document.createElement('span'); pl.textContent = n.type === 'end' ? n.title : n.label;
         card.appendChild(pd); card.appendChild(pl);
+      } else if (Y26) {
+        // The rebrand's node: the step type on the header, what it does below.
+        card = document.createElement('div');
+        card.className = 'qf-card';
+        card.style.height = n.h + 'px';
+        var fam = famColor(n);
+        var hd26 = document.createElement('div'); hd26.className = 'qf-hd';
+        hd26.innerHTML = '<div class="qf-ic">' + iconHtml(n.chip ? 'zap' : n.icon, n.chip ? '#A34735' : fam) + '</div>';
+        var ht26 = document.createElement('span'); ht26.textContent = n.chip ? String(n.chip) : n.title; hd26.appendChild(ht26);
+        if (n.step.ai) { var ai26 = document.createElement('div'); ai26.className = 'qf-ic'; ai26.innerHTML = iconHtml('quotient'); hd26.appendChild(ai26); }
+        card.appendChild(hd26);
+        var inn = document.createElement('div'); inn.className = 'qf-in';
+        if (n.chip) {
+          var row = document.createElement('div'); row.className = 'qf-hd';
+          row.innerHTML = '<div class="qf-ic">' + iconHtml(n.icon, '#31231D') + '</div>';
+          var rt = document.createElement('span'); rt.className = 'qf-pri'; rt.textContent = n.title; row.appendChild(rt);
+          inn.appendChild(row);
+          if (n.subtitle) { var s26 = document.createElement('p'); s26.className = 'qf-sub'; s26.textContent = n.subtitle; inn.appendChild(s26); }
+        } else {
+          var pri = document.createElement('p'); pri.className = 'qf-sub qf-pri'; pri.style.color = '#31231D'; pri.textContent = n.subtitle || n.title; inn.appendChild(pri);
+        }
+        card.appendChild(inn);
       } else {
         card = document.createElement('div');
         card.className = 'qf-card';
@@ -406,7 +477,8 @@
       // Handles: in on top (unless a root), out at the bottom (unless a leaf).
       if (n.parents.length) { var hi = document.createElement('div'); hi.className = 'qf-handle'; hi.style.top = '-3px'; card.appendChild(hi); }
       var glow = document.createElement('div'); glow.className = 'qf-glow'; glow.style.color = ACC;
-      glow.style.boxShadow = '0 0 0 4px ' + rgba(ACC, 0.14) + ', 0 10px 28px ' + rgba(ACC, 0.28);
+      // No glows in the 2026 look: the lit step is a flat ring of the path's colour.
+      glow.style.boxShadow = Y26 ? '0 0 0 3px ' + rgba(ACC, 0.16) : '0 0 0 4px ' + rgba(ACC, 0.14) + ', 0 10px 28px ' + rgba(ACC, 0.28);
       var lit = document.createElement('div'); lit.className = 'qf-lit'; lit.style.color = ACC;
       var ring = document.createElement('div'); ring.className = 'qf-ring'; ring.style.color = ACC;
       card.appendChild(lit); card.appendChild(glow); card.appendChild(ring);
@@ -460,7 +532,7 @@
         var b = bez(p.x, p.y + p.h, n.x, n.y);
         var path = document.createElementNS(SVGNS, 'path');
         path.setAttribute('d', b.d); path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', 'rgb(208, 208, 226)'); path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('stroke', Y26 ? '#D2CFCD' : 'rgb(208, 208, 226)'); path.setAttribute('stroke-width', '1.5');
         edgesSvg.appendChild(path);
         var s = samples(b.p);
         EDGES[pid + '>' + id] = { from: pid, to: id, el: path, bez: b, pts: s.pts, len: s.len };
@@ -554,7 +626,7 @@
         s.style.left = sp[0] + 'px'; s.style.top = sp[1] + 'px';
         s.style.width = sp[2] + 'px'; s.style.height = sp[2] + 'px';
         s.style.margin = (-sp[2] / 2) + 'px 0 0 ' + (-sp[2] / 2) + 'px';
-        s.style.filter = 'drop-shadow(0 0 3px ' + rgba(ACC, 0.55) + ')';
+        if (!Y26) s.style.filter = 'drop-shadow(0 0 3px ' + rgba(ACC, 0.55) + ')';
         var p = document.createElementNS(SVGNS, 'path');
         p.setAttribute('d', 'M12 0C12.9 8 16 11.1 24 12C16 12.9 12.9 16 12 24C11.1 16 8 12.9 0 12C8 11.1 11.1 8 12 0Z');
         p.setAttribute('fill', i % 2 ? '#ffffff' : ACC);
@@ -591,7 +663,7 @@
       var hop = opts.hop, col = opts.color;
       var dot = document.createElement('div');
       dot.className = 'qf-dot'; dot.style.background = col;
-      dot.style.boxShadow = '0 0 0 4px ' + rgba(col, 0.18) + ', 0 0 14px ' + rgba(col, 0.6);
+      dot.style.boxShadow = Y26 ? '0 0 0 3px ' + rgba(col, 0.2) : '0 0 0 4px ' + rgba(col, 0.18) + ', 0 0 14px ' + rgba(col, 0.6);
       if (opts.size) { dot.style.width = dot.style.height = opts.size + 'px'; dot.style.margin = (-opts.size / 2) + 'px 0 0 ' + (-opts.size / 2) + 'px'; }
       runner.appendChild(dot);
       gsap.set(dot, { autoAlpha: 0 });
@@ -797,15 +869,20 @@
       keys.forEach(function (k) { if (k.t <= t) v = k.v; });
       return v;
     }
-    var ENV = '<svg viewBox="0 0 64 46"><rect x="1" y="1" width="62" height="44" rx="6" fill="#fff" stroke="' + ACC + '" stroke-width="2.4"/>' +
-      '<path d="M3 5 L32 26 L61 5" fill="none" stroke="' + ACC + '" stroke-width="2.4" stroke-linejoin="round"/></svg>';
+    // The envelope: the Email family's orange in the 2026 look, drawn flat
+    // with a brown outline like the brand's illustrations.
+    var ENV = Y26
+      ? '<svg viewBox="0 0 64 46"><rect x="1.5" y="1.5" width="61" height="43" rx="3" fill="' + MAILC + '" stroke="#31231D" stroke-width="2.4"/>' +
+        '<path d="M4 6 L32 26 L60 6" fill="none" stroke="#31231D" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>'
+      : '<svg viewBox="0 0 64 46"><rect x="1" y="1" width="62" height="44" rx="6" fill="#fff" stroke="' + ACC + '" stroke-width="2.4"/>' +
+        '<path d="M3 5 L32 26 L61 5" fill="none" stroke="' + ACC + '" stroke-width="2.4" stroke-linejoin="round"/></svg>';
     sends.forEach(function (s) {
       var id = stepsOf(s)[0];
       if (!id) return;
       var n = G[id], at = num(s.at, 0), dur = num(s.duration, 0.7);
       var env = document.createElement('div'); env.className = 'qf-env';
       env.innerHTML = ENV;
-      env.style.filter = 'drop-shadow(0 8px 14px ' + rgba(ACC, 0.35) + ')';
+      if (!Y26) env.style.filter = 'drop-shadow(0 8px 14px ' + rgba(ACC, 0.35) + ')';
       fly.appendChild(env);
       var sx = n.x, sy = n.y + n.h / 2;
       var to = s.to || 'right', ex, ey, es = num(s.scale, 1.4);

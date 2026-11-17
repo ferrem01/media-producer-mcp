@@ -24,6 +24,13 @@
  *  stepping the camera reads as a dropped frame, not as stop-motion. */
 var MP_CUTOUT_FPS = 12;
 
+/** Tweens already put on a grid (stepped, or cut). Kept outside the tween's
+ *  vars: GSAP re-reads vars on invalidate() and warns about any key it does
+ *  not know on a DOM target. */
+var MP_STEPPED = typeof WeakSet === 'function' ? new WeakSet() : null;
+function mpIsStepped(tw) { return !!(MP_STEPPED && MP_STEPPED.has(tw)); }
+function mpMarkStepped(tw) { if (MP_STEPPED) MP_STEPPED.add(tw); }
+
 /** Is this tween target part of the camera rig? */
 function mpIsCameraTarget(t) {
   if (!t || !t.classList) return false;
@@ -66,7 +73,7 @@ function mpStepQuantize(timeline, opts) {
     }
     if (exempt) continue;
     // Already quantized (a re-run, or a component that stepped itself).
-    if (tw.vars && tw.vars.__mpStepped) continue;
+    if (mpIsStepped(tw)) continue;
 
     var steps = Math.max(1, Math.round(dur * fps));
     // One step over the whole tween is just a hard cut -- leave it smooth
@@ -78,7 +85,7 @@ function mpStepQuantize(timeline, opts) {
     catch (e3) { base = function (p) { return p; }; }
 
     tw.vars.ease = mpMakeStepEase(base, steps);
-    tw.vars.__mpStepped = true;
+    mpMarkStepped(tw);
     // Safe here and only here: the assembler runs this before the master has
     // rendered, so re-recording start values reads the same frame-0 state.
     try { tw.invalidate(); } catch (e4) {}
@@ -199,4 +206,92 @@ function mpCalmEases(timeline) {
   }
   if (n) timeline.invalidate();
   return n;
+}
+
+/**
+ * HAND-DRAWN: the motion of a hand-made brand film (the Quotient rebrand's
+ * video rules). Three things, all mechanical:
+ *
+ *  1. CUT, DON'T FADE. Any tween that fades something in or out lands in
+ *     one frame: an entrance is fully there on its first frame, an exit is
+ *     gone on its last. A fade-up reads corporate; a cut reads made by hand.
+ *  2. ON TWOS. Everything else holds each pose for two frames (15 poses a
+ *     second at 30 fps), like drawn animation. The camera is exempt, as in
+ *     cutout-physics: a stepped camera reads as dropped frames.
+ *  3. THE WIGGLE. Every hand-drawn piece -- a component part marked
+ *     [data-boil] (a title's words, a symbol field, a squiggle) and any small
+ *     component on the frame -- takes a new pose every four frames: a couple
+ *     of pixels and under a degree, each piece on its own seed. It moves the
+ *     CSS `translate` / `rotate` properties, which compose with the element's
+ *     own transform, so it never fights the piece's choreography.
+ *
+ * Product UI stays still: a full-frame mockup is not a drawing.
+ *
+ * @param {gsap.core.Timeline} timeline  The scene master.
+ * @param {{duration?: number, fps?: number, amount?: number, every?: number}} [opts]
+ */
+function mpHandDrawn(timeline, opts) {
+  if (!timeline || typeof timeline.getChildren !== 'function') return;
+  var o = opts || {};
+  var FPS = 30, every = o.every > 0 ? o.every : 4, amount = o.amount > 0 ? o.amount : 3;
+  var duration = o.duration > 0 ? o.duration : (timeline.duration() || 5);
+  // 1. Cuts: before stepping, so a fade becomes one jump, not 15 small ones.
+  var tweens;
+  try { tweens = timeline.getChildren(true, true, false); } catch (e) { tweens = []; }
+  var cut = 0;
+  for (var i = 0; i < tweens.length; i++) {
+    var tw = tweens[i], v = tw.vars || {};
+    var dur; try { dur = tw.duration(); } catch (e1) { continue; }
+    if (!dur || mpIsStepped(tw)) continue;
+    var a = v.autoAlpha !== undefined ? v.autoAlpha : v.opacity;
+    if (typeof a !== 'number') continue;
+    var targets = []; try { targets = tw.targets() || []; } catch (e2) {}
+    if (targets.some(mpIsCameraTarget)) continue;
+    // A from() tween runs toward the element's own value, the other way round.
+    var appears = v.runBackwards ? a < 0.5 : a >= 0.5;
+    v.ease = appears ? function (p) { return p > 0 ? 1 : 0; } : function (p) { return p >= 1 ? 1 : 0; };
+    mpMarkStepped(tw);
+    try { tw.invalidate(); } catch (e3) {}
+    cut++;
+  }
+  // 2. On twos.
+  mpStepQuantize(timeline, { fps: FPS / 2 });
+  // 3. The wiggle.
+  var W = window.innerWidth || 1920, H = window.innerHeight || 1080;
+  var pieces = [];
+  var add = function (el) { if (el && pieces.indexOf(el) < 0) pieces.push(el); };
+  Array.prototype.forEach.call(document.querySelectorAll('.mp-component [data-boil]'), add);
+  Array.prototype.forEach.call(document.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'), function (el) {
+    if (el.querySelector('video, [data-boil]')) return;
+    var r = el.getBoundingClientRect();
+    if (r.width * r.height > 0 && r.width * r.height < W * H * 0.25) add(el);
+  });
+  if (!pieces.length) return;
+  var seeds = pieces.map(function (el, k) { return 'boil-' + k + '-' + (el.getAttribute('data-boil') || el.getAttribute('data-cid') || ''); });
+  var amp = pieces.map(function (el) { var n = Number(el.getAttribute('data-boil-amount')); return n >= 0 && el.hasAttribute('data-boil-amount') ? n : amount; });
+  var jit = function (seed, pose, axis) { return mpHandJitter(seed + ':' + axis + ':' + pose); };
+  var clock = { t: 0 };
+  var draw = function (t) {
+    var pose = Math.floor(t * FPS / every);
+    for (var k = 0; k < pieces.length; k++) {
+      var s = pieces[k].style, m = amp[k];
+      s.setProperty('translate', (jit(seeds[k], pose, 'x') * m).toFixed(2) + 'px ' + (jit(seeds[k], pose, 'y') * m).toFixed(2) + 'px');
+      s.setProperty('rotate', (jit(seeds[k], pose, 'r') * m * 0.3).toFixed(3) + 'deg');
+    }
+  };
+  draw(0);
+  var wiggle = gsap.fromTo(clock, { t: 0 }, { t: duration, duration: duration, ease: 'none', immediateRender: false,
+    onUpdate: function () { draw(clock.t); } });
+  // Its poses are already on the four-frame grid: never step it again.
+  mpMarkStepped(wiggle);
+  timeline.add(wiggle, 0);
+  return { cut: cut, pieces: pieces.length };
+}
+
+/** A stable number in [-1, 1] for a string: the wiggle's pose for one piece. */
+function mpHandJitter(key) {
+  var h = 2166136261;
+  for (var i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16;
+  return ((h >>> 0) / 4294967296) * 2 - 1;
 }
