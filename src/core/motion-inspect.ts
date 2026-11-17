@@ -178,6 +178,93 @@ export function checkBannedMoves(
   return out;
 }
 
+/** Raw per-component state at one moment, as the page reports it. */
+export interface MotionSnapshot {
+  comps: Record<string, { opacity: number; visible: boolean; rect: { x: number; y: number; w: number; h: number }; transform: string; glow: number }>;
+  camera: { transform: string } | null;
+}
+
+/**
+ * Seek an assembled scene's timeline to `t` and read every component wrapper.
+ * Exported so a test can run the exact probe against a scene it assembled.
+ *
+ * Content visibility walks each wrapper's subtree BREADTH-first under a node
+ * budget rather than a fixed depth: product mockups nest their text deep
+ * (quotient-email-editor: qee > canvas > scroll > frame > col > block > t),
+ * and a depth cap there found only a hidden shallow node and called a
+ * plainly visible editor NEVER VISIBLE. Breadth-first keeps a huge subtree
+ * from starving its shallower siblings when the budget runs out.
+ */
+export async function sampleMotionAt(page: import("playwright").Page, t: number): Promise<MotionSnapshot> {
+  return page.evaluate((tt: number) => {
+    try { (window as any).__MP_TIMELINE.pause(); (window as any).__MP_TIMELINE.time(tt); } catch { /* best-effort */ }
+    const comps: Record<string, any> = {};
+    document.querySelectorAll(".mp-component[data-cid]").forEach((el) => {
+      const cs = getComputedStyle(el as HTMLElement);
+      const r = (el as HTMLElement).getBoundingClientRect();
+      // Entrances usually animate elements INSIDE the wrapper (the
+      // wrapper itself stays opacity 1) -- so "is content visible" walks
+      // the subtree carrying the cumulative opacity product and takes
+      // the max over content-bearing nodes (text/svg/img/video/canvas).
+      let effOpacity = 0;
+      let contentExists = false; // ANY content node, visible or not
+      const queue: Array<{ node: Element; product: number; depth: number }> = [{ node: el, product: 1, depth: 0 }];
+      let budget = 3000; // nodes per component per sample
+      for (let qi = 0; qi < queue.length && budget > 0; qi++, budget--) {
+        const { node, product, depth } = queue[qi];
+        // A helper the page hides from people (the image component's
+        // preload <img>) is not content.
+        if ((node as HTMLElement).getAttribute && (node as HTMLElement).getAttribute("aria-hidden") === "true") continue;
+        const ncs = getComputedStyle(node as HTMLElement);
+        // A hidden branch still PROVES content exists (a gsap autoAlpha
+        // entrance is visibility:hidden before its `at`); it just
+        // contributes zero visible opacity.
+        const hidden = ncs.display === "none" || ncs.visibility === "hidden";
+        const p = hidden ? 0 : product * (parseFloat(ncs.opacity) || 0);
+        const tag = node.tagName;
+        const hasText = !!(node.childNodes && Array.from(node.childNodes).some((n) => n.nodeType === 3 && (n.textContent || "").trim()));
+        // A CSS background picture is content too (the image component
+        // paints its photo that way).
+        const hasBgImage = !!ncs.backgroundImage && ncs.backgroundImage !== "none" && /url\(/.test(ncs.backgroundImage);
+        if (hasText || hasBgImage || tag === "svg" || tag === "IMG" || tag === "VIDEO" || tag === "CANVAS" || tag === "PATH") {
+          contentExists = true;
+          if (p > effOpacity) effOpacity = p;
+          if (effOpacity >= 0.999) break; // fully visible content: nothing can beat it
+        }
+        if (depth >= 40) continue; // runaway-nesting guard only
+        let kids = 0;
+        for (const child of Array.from(node.children)) {
+          if (++kids > 24) break;
+          queue.push({ node: child, product: p, depth: depth + 1 });
+        }
+      }
+      if (!contentExists) effOpacity = parseFloat(cs.opacity) || 0; // truly content-less: fall back to the wrapper
+      comps[(el as HTMLElement).getAttribute("data-cid") || ""] = {
+        opacity: Math.round(effOpacity * 100) / 100,
+        visible: cs.visibility !== "hidden" && cs.display !== "none" && r.width > 0 && r.height > 0 && effOpacity > 0.02,
+        rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
+        transform: cs.transform,
+        // Largest blur radius the wrapper or its shallow content paints
+        // with -- the measurable signature of a "glow".
+        glow: (function () {
+          let px = 0;
+          for (const node of [el as HTMLElement, ...Array.from(el.children).slice(0, 6)]) {
+            const s2 = getComputedStyle(node as HTMLElement);
+            for (const decl of [s2.boxShadow, s2.textShadow, s2.filter]) {
+              if (!decl || decl === "none") continue;
+              for (const m of decl.matchAll(/(-?[\d.]+)px/g)) px = Math.max(px, Math.abs(parseFloat(m[1])));
+            }
+          }
+          return Math.round(px);
+        })(),
+      };
+    });
+    const rig = document.querySelector(".__mp_camera_rig") as HTMLElement | null;
+    const camera = rig ? { transform: getComputedStyle(rig).transform } : null;
+    return { comps, camera };
+  }, t);
+}
+
 export async function inspectSceneMotion(opts: {
   tenantId: string;
   projectId: string;
@@ -238,70 +325,7 @@ export async function inspectSceneMotion(opts: {
 
     const series: Array<{ t: number; comps: Record<string, any>; camera: { scale: number; tx: number; ty: number } | null }> = [];
     for (const t of times) {
-      const snap = await page.evaluate((tt: number) => {
-        try { (window as any).__MP_TIMELINE.pause(); (window as any).__MP_TIMELINE.time(tt); } catch { /* best-effort */ }
-        const comps: Record<string, any> = {};
-        document.querySelectorAll(".mp-component[data-cid]").forEach((el) => {
-          const cs = getComputedStyle(el as HTMLElement);
-          const r = (el as HTMLElement).getBoundingClientRect();
-          // Entrances usually animate elements INSIDE the wrapper (the
-          // wrapper itself stays opacity 1) -- so "is content visible" walks
-          // the subtree carrying the cumulative opacity product and takes
-          // the max over content-bearing nodes (text/svg/img/video/canvas).
-          let effOpacity = 0;
-          let contentExists = false; // ANY content node, visible or not
-          const walk = (node: Element, product: number, depth: number) => {
-            if (depth > 6) return;
-            const ncs = getComputedStyle(node as HTMLElement);
-            // A hidden branch still PROVES content exists (a gsap autoAlpha
-            // entrance is visibility:hidden before its `at`); it just
-            // contributes zero visible opacity.
-            const hidden = ncs.display === "none" || ncs.visibility === "hidden";
-            const p = hidden ? 0 : product * (parseFloat(ncs.opacity) || 0);
-            const tag = node.tagName;
-            // A helper the page hides from people (the image component's
-            // preload <img>) is not content.
-            if ((node as HTMLElement).getAttribute && (node as HTMLElement).getAttribute("aria-hidden") === "true") return;
-            const hasText = !!(node.childNodes && Array.from(node.childNodes).some((n) => n.nodeType === 3 && (n.textContent || "").trim()));
-            // A CSS background picture is content too (the image component
-            // paints its photo that way).
-            const hasBgImage = !!ncs.backgroundImage && ncs.backgroundImage !== "none" && /url\(/.test(ncs.backgroundImage);
-            if (hasText || hasBgImage || tag === "svg" || tag === "IMG" || tag === "VIDEO" || tag === "CANVAS" || tag === "PATH") {
-              contentExists = true;
-              if (p > effOpacity) effOpacity = p;
-            }
-            let kids = 0;
-            for (const child of Array.from(node.children)) {
-              if (++kids > 24) break;
-              walk(child, p, depth + 1);
-            }
-          };
-          walk(el, 1, 0);
-          if (!contentExists) effOpacity = parseFloat(cs.opacity) || 0; // truly content-less: fall back to the wrapper
-          comps[(el as HTMLElement).getAttribute("data-cid") || ""] = {
-            opacity: Math.round(effOpacity * 100) / 100,
-            visible: cs.visibility !== "hidden" && cs.display !== "none" && r.width > 0 && r.height > 0 && effOpacity > 0.02,
-            rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
-            transform: cs.transform,
-            // Largest blur radius the wrapper or its shallow content paints
-            // with -- the measurable signature of a "glow".
-            glow: (function () {
-              let px = 0;
-              for (const node of [el as HTMLElement, ...Array.from(el.children).slice(0, 6)]) {
-                const s2 = getComputedStyle(node as HTMLElement);
-                for (const decl of [s2.boxShadow, s2.textShadow, s2.filter]) {
-                  if (!decl || decl === "none") continue;
-                  for (const m of decl.matchAll(/(-?[\d.]+)px/g)) px = Math.max(px, Math.abs(parseFloat(m[1])));
-                }
-              }
-              return Math.round(px);
-            })(),
-          };
-        });
-        const rig = document.querySelector(".__mp_camera_rig") as HTMLElement | null;
-        const camera = rig ? { transform: getComputedStyle(rig).transform } : null;
-        return { comps, camera };
-      }, t);
+      const snap = await sampleMotionAt(page, t);
       series.push({
         t,
         comps: snap.comps,
