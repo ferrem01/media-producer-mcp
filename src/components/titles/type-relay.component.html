@@ -1,7 +1,9 @@
 <template>
   <div class="trl">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Instrument+Serif:ital,wght@1,400&display=swap">
+    <div class="trl-tag" data-boil="tag"></div>
     <div class="trl-block"></div>
+    <svg class="trl-squig" data-boil="squiggle" xmlns="http://www.w3.org/2000/svg"><path/></svg>
     <div class="trl-caret"></div>
     <div class="trl-from"></div>
     <div class="trl-to"></div>
@@ -33,6 +35,12 @@
   .trl-caret { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; background: var(--trl-accent, #393bf5); }
   .trl-from, .trl-to { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; will-change: left, top, width, height; }
   .trl-from { z-index: 3; }
+  /* The hand-made extras: a mono label with a coloured bar on its left, like
+     a file-folder tab, above the words; a cursive squiggle under them. */
+  .trl-tag { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; font-weight: 500;
+    letter-spacing: -0.02em; line-height: 1.35; border-left-style: solid; }
+  .trl-squig { position: absolute; left: 0; top: 0; overflow: visible; visibility: hidden; }
+  .trl-squig path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .trl-to { z-index: 4; }
 </style>
 
@@ -71,6 +79,8 @@
     // font: 'brand' sets the type in the film's own font (the brand kit's
     // first face) instead of the house Geist.
     if (data.font === 'brand') block.style.fontFamily = 'var(--mp-font-family, system-ui), sans-serif';
+    // A face by name: one the film's brand kit loads (a custom serif, say).
+    else if (typeof data.font === 'string' && data.font.trim()) block.style.fontFamily = "'" + data.font.replace(/['"\\]/g, '') + "', var(--mp-font-family, system-ui), serif";
     if (data.background) root.style.background = String(data.background);
     if (has(data.weight)) block.style.fontWeight = String(num(data.weight, 600));
     var rgb = function (c) {
@@ -97,7 +107,8 @@
     var TRACK = { xl: -0.042, l: -0.034, m: -0.024 };
     var LH = num(data.line_height, 1.04);
     var SCALE = num(data.scale, 1);
-    var REVEAL = data.reveal === 'lines' || data.reveal === 'type' ? data.reveal : 'words';
+    // 'cut': each word is simply THERE on its beat -- no rise, no blur, no fade.
+    var REVEAL = data.reveal === 'lines' || data.reveal === 'type' || data.reveal === 'cut' ? data.reveal : 'words';
     var ALIGN = data.align === 'center' ? 'center' : 'left';
     var X = W * num(data.x, ALIGN === 'center' ? 0.5 : 0.08), Y = H * num(data.y, 0.5);
     var MAXW = W * num(data.max_width, ALIGN === 'center' ? 0.84 : Math.max(0.2, 1 - 2 * num(data.x, 0.08)));
@@ -124,7 +135,7 @@
       var re = /\S+/g, m, wi = 0;
       while ((m = re.exec(text))) {
         if (wi > 0) ld.appendChild(document.createTextNode(' '));
-        var wd = document.createElement('span'); wd.className = 'trl-word';
+        var wd = document.createElement('span'); wd.className = 'trl-word'; wd.setAttribute('data-boil', 'w' + li + '-' + wi);
         var w = { el: wd, line: li, idx: wi, text: m[0], chars: [], runs: [], acc: false, start: m.index };
         var run = null, runAcc = null;
         for (var k = 0; k < m[0].length; k++) {
@@ -211,6 +222,7 @@
       root.setAttribute('data-font-px', lines.map(function (ln) { return ln._fs.toFixed(1); }).join(','));
       lastSig = bw + 'x' + bh;
       placeTargets();
+      placeExtras();
       // The squeeze's motion smear: two copies of the settled block under it.
       ghosts.forEach(function (g) { if (g.parentNode) g.parentNode.removeChild(g); });
       ghosts = [];
@@ -227,6 +239,50 @@
       }
     };
     var ghosts = [], SMEAR = 0.006;
+
+    // ── The tag (a mono label over the words) and the squiggle (under them).
+    var tagEl = el.querySelector('.trl-tag'), sqEl = el.querySelector('.trl-squig');
+    var TG = data.tag ? (typeof data.tag === 'object' ? data.tag : { text: data.tag }) : null;
+    if (TG && !String(TG.text || '').trim()) TG = null;
+    var SG = data.squiggle ? (typeof data.squiggle === 'object' ? data.squiggle : {}) : null;
+    var SGLEN = 0;
+    if (TG && tagEl) {
+      tagEl.textContent = String(TG.text);
+      tagEl.style.fontFamily = "'" + String(TG.font || 'JetBrains Mono').replace(/['"\\]/g, '') + "', ui-monospace, monospace";
+      tagEl.style.color = String(TG.color || ink);
+      tagEl.style.borderLeftColor = String(TG.bar || accent);
+      if (TG.background) tagEl.style.background = String(TG.background);
+    }
+    if (SG && sqEl && typeof mpSquigglePath === 'function') {
+      var sqp = mpSquigglePath(num(SG.loops, 3), SG.seed || 'squiggle');
+      sqEl.setAttribute('viewBox', [sqp.box.x, sqp.box.y, sqp.box.w, sqp.box.h].map(function (v) { return v.toFixed(2); }).join(' '));
+      var sqPath = sqEl.querySelector('path');
+      sqPath.setAttribute('d', sqp.d);
+      sqPath.setAttribute('stroke', String(SG.color || ink));
+      sqPath.setAttribute('stroke-width', String(sqp.stroke));
+      SG._box = sqp.box;
+      try { SGLEN = sqPath.getTotalLength(); } catch (e) { SGLEN = 0; }
+      if (SGLEN > 0) sqPath.style.strokeDasharray = SGLEN.toFixed(2);
+    } else SG = null;
+    var placeExtras = function () {
+      var fs0 = lines[0]._fs;
+      if (TG && tagEl) {
+        var tfs = M * num(TG.size, 0.026);
+        tagEl.style.fontSize = tfs.toFixed(2) + 'px';
+        tagEl.style.borderLeftWidth = Math.max(2, tfs * 0.22).toFixed(1) + 'px';
+        tagEl.style.padding = '0 ' + (tfs * 0.4).toFixed(1) + 'px 0 ' + (tfs * 0.45).toFixed(1) + 'px';
+        var tw = tagEl.offsetWidth, th = tagEl.offsetHeight;
+        var tx = ALIGN === 'center' ? TB.cx - tw / 2 : TB.x;
+        tagEl.style.left = tx.toFixed(2) + 'px';
+        tagEl.style.top = (TB.y - fs0 * num(TG.gap, 0.42) - th).toFixed(2) + 'px';
+      }
+      if (SG && sqEl) {
+        var sw = W * num(SG.width, 0.16), sh = sw * SG._box.h / SG._box.w;
+        sqEl.style.width = sw.toFixed(2) + 'px'; sqEl.style.height = sh.toFixed(2) + 'px';
+        sqEl.style.left = (ALIGN === 'center' ? TB.cx - sw / 2 : TB.x).toFixed(2) + 'px';
+        sqEl.style.top = (TB.y + TB.h + fs0 * num(SG.gap, 0.3)).toFixed(2) + 'px';
+      }
+    };
     var sqAt = function (ex) {
       // The squeeze leads (power2.in), the travel follows (power3.in): it condenses, then drops in.
       var p = clamp01(ex / (0.62 * TD)), e = in2(p), et = in3(p), s = 1 - (1 - SQ.sEnd) * e;
@@ -270,7 +326,7 @@
       if (has(ln.at)) { LS[li] = num(ln.at, 0); return; }
       if (li === 0) { LS[li] = F ? F.end : AT; return; }
       var prev = lines[li - 1];
-      var gap = REVEAL === 'type' ? prev._text.length / CPS + 0.12 : REVEAL === 'lines' ? 0.16 : prev._words.length * STAG + 0.1;
+      var gap = REVEAL === 'type' ? prev._text.length / CPS + 0.12 : REVEAL === 'lines' ? 0.16 : prev._words.length * STAG + (REVEAL === 'cut' ? STAG : 0.1);
       LS[li] = LS[li - 1] + gap;
     });
     var accentFirst = F && accLine >= 0;
@@ -278,7 +334,7 @@
     // accent is already there under it, the rest radiate from it in order of
     // distance (lines with their own later `at` keep their own stagger).
     var planReveal = function () {
-      words.forEach(function (w) { w.rs = LS[w.line] + (REVEAL === 'words' ? w.idx * STAG : 0); w.instant = false; });
+      words.forEach(function (w) { w.rs = LS[w.line] + (REVEAL === 'words' || REVEAL === 'cut' ? w.idx * STAG : 0); w.instant = false; });
       chars.forEach(function (c) { c.ts = LS[c.line] + c.pos / CPS; });
       if (!F) return;
       var cx = ACC.cx, cy = ACC.cy;
@@ -307,7 +363,7 @@
       planReveal();
       SETTLE = 0;
       words.forEach(function (w) {
-        var end = REVEAL === 'type' ? (w.chars.length ? w.chars[w.chars.length - 1].ts : w.rs) : (w.instant ? F.end + F.wipe : w.rs + REV);
+        var end = REVEAL === 'type' ? (w.chars.length ? w.chars[w.chars.length - 1].ts : w.rs) : REVEAL === 'cut' ? w.rs : (w.instant ? F.end + F.wipe : w.rs + REV);
         SETTLE = Math.max(SETTLE, end);
       });
       TAT = num(TO.at, SETTLE + 1);
@@ -361,6 +417,8 @@
           w.chars.forEach(function (c) { c.el.style.visibility = t >= c.ts ? 'inherit' : 'hidden'; });
         } else if (w.instant) {
           vis = t >= F.end - 1e-4;
+        } else if (REVEAL === 'cut') {
+          vis = t >= w.rs;
         } else {
           var p = (t - w.rs) / REV;
           if (p <= 0) vis = false;
@@ -387,6 +445,15 @@
         w.el.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none';
         w.el.style.opacity = op < 0.999 ? op.toFixed(3) : '1';
       });
+      // The tag and the squiggle leave with the words (a cut, never a fade).
+      var extrasGone = (TMODE !== 'hold' && exOn) || (THIDE !== null && t >= THIDE);
+      if (TG && tagEl) tagEl.style.visibility = !extrasGone && t >= num(TG.at, LS[0]) ? 'inherit' : 'hidden';
+      if (SG && sqEl) {
+        var sAt = num(SG.at, SETTLE + 0.1), poses = 3, pose = Math.floor((t - sAt) / 0.1) + 1;
+        sqEl.style.visibility = !extrasGone && t >= sAt ? 'inherit' : 'hidden';
+        // Drawn in three poses on threes: a quick scratch that still reads as a cut.
+        if (SGLEN > 0) sqEl.querySelector('path').style.strokeDashoffset = (SGLEN * (1 - Math.min(poses, Math.max(0, pose)) / poses)).toFixed(2);
+      }
       // Squeeze: the whole block condenses like an accordion (letters narrow
       // faster than they shorten) into the band inside the target, taking the
       // shape's colour; two lagged copies smear it while it moves.

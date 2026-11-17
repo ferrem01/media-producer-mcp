@@ -97,6 +97,30 @@
     box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .ar-hi.p, .ar-line.p { background: none; padding: 0; margin: 0; }
   .ar-shine { position: absolute; inset: 0; pointer-events: none; opacity: 0; overflow: hidden; }
+  /* look: '2026' -- the Quotient rebrand's product: a warm canvas, brown
+     text, the step drawn as the new two-layer node (its type on a tinted
+     header with the new mark, what it does on the white card below), flat
+     cards with no shadows, and the written-for-you parts as flat orange
+     blocks. No shimmer: the rebrand has no gradients. */
+  .ar-y26 .ar-stage { background-color: var(--ar-bg, #F7F5F2); background-image: radial-gradient(#E0DEDB 1.4px, transparent 1.6px); color: #31231D;
+    font-family: 'Inter', system-ui, sans-serif; }
+  .ar-y26 .ar-chip, .ar-y26 .ar-shine { display: none; }
+  .ar-y26 .ar-step { padding: 0; gap: 0; align-items: stretch; background: #F5F3F0; border-color: #F1EEEC; border-radius: 18px; box-shadow: none; }
+  .ar-y26 .ar-hd { padding: 10px 16px; font-size: 20px; font-weight: 500; }
+  .ar-y26 .ar-sub { margin: 0 -1.5px -1.5px; padding: 16px 18px; background: #fff; border: 1.5px solid #F1EEEC; border-radius: 18px; color: #31231D; font-size: 21px; font-weight: 500; }
+  .ar-y26 .ar-lt { color: #786F6A; }
+  .ar-y26 .ar-list { border-color: #E0DEDB; box-shadow: none; }
+  .ar-y26 .ar-row + .ar-row { border-top-color: #F1EEEC; }
+  .ar-y26 .ar-sel { background: color-mix(in srgb, var(--ar-acc) 14%, #fff); }
+  .ar-y26 .ar-did { color: #6E645F; }
+  .ar-y26 .ar-ph, .ar-y26 .ar-tph { background-color: #F1EEEC; }
+  .ar-y26 .ar-mail { border-color: #E0DEDB; box-shadow: none; }
+  .ar-y26 .ar-from, .ar-y26 .ar-to, .ar-y26 .ar-sj { border-bottom-color: #F1EEEC; }
+  .ar-y26 .ar-k { color: #786F6A; }
+  .ar-y26 .ar-body { color: #50433E; }
+  .ar-y26 .ar-fixed, .ar-y26 .ar-sign { color: #6E645F; }
+  .ar-y26 .p, .ar-y26 .ar-hi > span, .ar-y26 .ar-line > span { background: color-mix(in srgb, var(--ar-acc) 42%, transparent); border-radius: 0; color: #31231D; }
+  .ar-y26 .ar-hi.p, .ar-y26 .ar-line.p { background: none; }
   .ar-shine:before {
     content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -45%;
     background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--ar-acc, #393bf5) 16%, transparent), transparent);
@@ -119,13 +143,16 @@
     var S = bw / DW;
     if (DH * S > bh + 1) { S = bh / DH; stage.style.transform = 'translateX(' + ((bw - DW * S) / 2) + 'px) scale(' + S + ')'; }
     else stage.style.transform = 'scale(' + S + ')';
-    var ACC = String(data.accent || '#393bf5');
+    var Y26 = data.look === '2026';
+    if (Y26) root.classList.add('ar-y26');
+    // The written-for-you colour: the Email family's orange in the 2026 look.
+    var ACC = String(data.accent || (Y26 ? '#F27141' : '#393bf5'));
     root.style.setProperty('--ar-acc', ACC);
     if (data.background) root.style.setProperty('--ar-bg', String(data.background));
 
     var SPARK = '<svg viewBox="0 0 24 24" width="26" height="26" fill="' + ACC + '"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>';
     var ZAP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#3b3b46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>';
-    q('.ar-ic').innerHTML = SPARK;
+    q('.ar-ic').innerHTML = Y26 ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166.32 166.32" width="24" height="24"><path fill-rule="evenodd" d="M86.9835 164.959C86.9835 165.67 86.4187 166.257 85.7078 166.279C38.8964 167.731 0 130.162 0 83.16C0 36.158 38.8964 -1.41147 85.7078 0.0407252C86.4187 0.062779 86.9835 0.649697 86.9835 1.36094V164.959ZM64.1982 83.16C64.1982 72.4132 55.4859 63.701 44.7391 63.701C33.9923 63.701 25.2801 72.4132 25.2801 83.16C25.2801 93.9068 33.9923 102.619 44.7391 102.619C55.4859 102.619 64.1982 93.9068 64.1982 83.16ZM147.24 83.16C147.24 94.6233 137.947 103.916 126.484 103.916C115.02 103.916 105.727 94.6233 105.727 83.16C105.727 71.6967 115.02 62.4036 126.484 62.4036C137.947 62.4036 147.24 71.6967 147.24 83.16Z" fill="#31231D"/></svg>' : SPARK;
     q('.ar-chip-ic').innerHTML = ZAP;
     q('.ar-chip-t').textContent = String(data.chip || 'Step');
     q('.ar-title').textContent = String(data.title || 'AI Email');

@@ -807,7 +807,8 @@ export function timelapseClockScript(
  * in, and without any of them able to opt out.
  *
  * cutout-physics steps and boils; calm takes the overshoot out of every ease
- * (settle, never bounce). `punchy` is the house default and emits nothing.
+ * (settle, never bounce); hand-drawn cuts every fade, steps on twos and
+ * wiggles the drawn pieces. `punchy` is the house default and emits nothing.
  */
 export function motionPhysicsScript(motion: string | undefined, sceneDuration: number): string {
   if (motion === "calm") return `
@@ -815,6 +816,12 @@ export function motionPhysicsScript(motion: string | undefined, sceneDuration: n
   // Settle, never bounce: back / elastic / bounce eases become power eases.
   try { if (typeof mpCalmEases === 'function') mpCalmEases(master); }
   catch (e) { console.warn('calm not applied: ' + e.message); }
+`;
+  if (motion === "hand-drawn") return `
+  // ── physics contract: hand-drawn (shared/motion-physics.js) ──
+  // Cut, don't fade; everything on twos; the drawn pieces wiggle.
+  try { if (typeof mpHandDrawn === 'function') mpHandDrawn(master, { duration: ${sceneDuration} }); }
+  catch (e) { console.warn('hand-drawn not applied: ' + e.message); }
 `;
   if (motion !== "cutout-physics") return "";
   return `
@@ -2072,11 +2079,23 @@ ${motionPhysicsScript(options.motionPhysics, duration)}
 }
 
 /**
- * Generate Google Fonts link tags from the brand kit.
+ * Load the brand kit's faces: Google families by link tag, and a custom face
+ * that carries a `url` (a font file in the tenant's assets, e.g. a licensed
+ * display serif) by @font-face. A custom face with no url is left to the
+ * system, as before.
  */
 export function generateFontLinks(brand: BrandKit): string {
   const links: string[] = [];
   for (const font of brand.fonts || []) {
+    if (font.source === "custom" && font.url) {
+      const w = font.weights?.length ? font.weights : [];
+      // One weight names the file's weight; none or several means a variable
+      // file that covers them all.
+      const weight = w.length === 1 ? String(w[0]) : w.length ? `${Math.min(...w)} ${Math.max(...w)}` : "100 900";
+      const family = font.family.replace(/["\\]/g, "");
+      links.push(`<style>@font-face { font-family: "${family}"; src: url(${font.url}); font-weight: ${weight}; font-style: normal; font-display: block; }</style>`);
+      continue;
+    }
     if (font.source === "google") {
       const weights = font.weights?.join(";") || "400;700";
       const family = font.family.replace(/\s+/g, "+");
@@ -2838,7 +2857,7 @@ export async function loadSharedUtilities(): Promise<string> {
   const thisDir = path.dirname(fileURLToPath(import.meta.url));
   const sharedDir = path.join(thisDir, "..", "components", "shared");
 
-  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js", "motion-physics.js", "capture-performance.js", "activity-feed.js", "samples.js", "icons.js"];
+  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js", "motion-physics.js", "hand-motifs.js", "capture-performance.js", "activity-feed.js", "samples.js", "icons.js"];
   const sources: string[] = [];
 
   for (const file of sharedFiles) {

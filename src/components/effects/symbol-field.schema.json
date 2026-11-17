@@ -1,0 +1,21 @@
+{
+  "type": "symbol-field",
+  "label": "Symbol field (math-symbol motif)",
+  "category": "effects",
+  "description": "The math-symbol motif of a hand-made brand film (the Quotient rebrand's symbol field): + - x / = and the plus-minus filling a shape, in one ink, centred on (x, y). `shape` is a preset (home-left: a trail down the left sweeping right; home-right: an arc trailing down; cluster: a loose corner cluster; frame-top-right, frame-bottom-left: the mockup frame's corners) or your own ASCII art (`#` always a symbol, `:` one about half the time, anything else empty; rows separated by newlines). reveal 'all' (default) lands it whole at `at`; 'handfuls' builds it in `handfuls` random handfuls `step` seconds apart (a crescendo). Once it is there, a few symbols flip into their partners every flip_every seconds (+ into x, - into /, = into the plus-minus). cell is the px size of one symbol. A pure function of the time. Example: {\"shape\":\"home-left\",\"color\":\"#FFEFDE\",\"x\":0.16,\"y\":0.55,\"cell\":30,\"reveal\":\"handfuls\",\"at\":0.3}.",
+  "data": {
+    "shape": { "type": "string", "label": "Preset (home-left | home-right | cluster | frame-top-right | frame-bottom-left) or ASCII art", "optional": true, "default": "cluster" },
+    "seed": { "type": "string", "label": "Picks the symbols (same seed, same field)", "optional": true },
+    "color": { "type": "string", "label": "Ink", "optional": true, "default": "#31231D" },
+    "cell": { "type": "number", "label": "Px per symbol", "optional": true, "default": 24 },
+    "x": { "type": "number", "label": "Centre x, fraction of the box", "optional": true, "default": 0.5 },
+    "y": { "type": "number", "label": "Centre y, fraction of the box", "optional": true, "default": 0.5 },
+    "at": { "type": "number", "label": "When it lands (or starts building)", "optional": true, "default": 0 },
+    "reveal": { "type": "string", "label": "all | handfuls", "enum": ["all", "handfuls"], "optional": true, "default": "all" },
+    "handfuls": { "type": "number", "label": "handfuls: how many", "optional": true, "default": 6 },
+    "step": { "type": "number", "label": "handfuls: seconds apart", "optional": true, "default": 0.13 },
+    "flips": { "type": "boolean", "label": "Symbols flip into their partners on a cadence", "optional": true, "default": true },
+    "flip_every": { "type": "number", "label": "Seconds between flips", "optional": true, "default": 0.8 },
+    "background": { "type": "string", "label": "Fill behind it (omitted: transparent)", "optional": true }
+  }
+}

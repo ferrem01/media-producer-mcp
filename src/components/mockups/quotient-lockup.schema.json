@@ -1,0 +1,71 @@
+{
+  "type": "quotient-lockup",
+  "label": "Quotient lockup (the 2026 logo, built)",
+  "category": "mockups",
+  "description": "An end card: the 2026 Quotient logo built the way the product's loader builds it -- a + spins into x, on into -, grows two dots into a division sign, turns on its side and swells into the mark (a half-circle and a dot) over `build` seconds from `at` -- then the wordmark \"Quotient\" (PP Museum, outlined, so no font is needed) cuts in one letter every letter_step seconds beside it, and an optional mono tag (e.g. the URL, with a coloured bar on its left) lands under the lockup. All of it is a pure function of the time. The lockup is centred on (x, y) at `width` of the box. Example: {\"background\":\"#FFEFDE\",\"tag\":{\"text\":\"getquotient.ai\"}}.",
+  "data": {
+    "color": {
+      "type": "string",
+      "label": "Ink",
+      "optional": true,
+      "default": "#31231D"
+    },
+    "background": {
+      "type": "string",
+      "label": "Card fill (omitted: transparent)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the build starts",
+      "optional": true,
+      "default": 0
+    },
+    "build": {
+      "type": "number",
+      "label": "Seconds from the + to the finished mark",
+      "optional": true,
+      "default": 2.2
+    },
+    "wordmark": {
+      "type": "boolean",
+      "label": "false: the mark alone",
+      "optional": true,
+      "default": true
+    },
+    "letters_at": {
+      "type": "number",
+      "label": "When the first letter lands (default 0.25 s after the mark)",
+      "optional": true
+    },
+    "letter_step": {
+      "type": "number",
+      "label": "Seconds between letters",
+      "optional": true,
+      "default": 0.09
+    },
+    "width": {
+      "type": "number",
+      "label": "Lockup width, fraction of the box (mark alone: 0.14)",
+      "optional": true,
+      "default": 0.46
+    },
+    "x": {
+      "type": "number",
+      "label": "Centre x, fraction of the box",
+      "optional": true,
+      "default": 0.5
+    },
+    "y": {
+      "type": "number",
+      "label": "Centre y, fraction of the box",
+      "optional": true,
+      "default": 0.5
+    },
+    "tag": {
+      "type": "object",
+      "label": "A mono label under the lockup: {text, at, bar, color, background, font, size, gap}; a string is the text",
+      "optional": true
+    }
+  }
+}

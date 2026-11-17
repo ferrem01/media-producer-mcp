@@ -6,6 +6,54 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-11-17 — A hand-made brand: the Quotient rebrand in a film
+
+Marc asked for the Flows launch film in Quotient's new brand (the `rebrand`
+branch of quotientai/quotient: cream and brown, flat brand colours, PP Museum
+serif headlines, mono labels, math-symbol motifs, no shadows or gradients) and
+said to follow its video rules everywhere: cut, don't fade; animate on twos;
+once things land, they wiggle. A copy of the film carries it
+(proj_a2a460dc) so he can compare. What the library gained:
+
+- **Custom faces load.** `BrandFont.url` existed and nothing read it.
+  `generateFontLinks` now writes an `@font-face` for a custom face with a url
+  (one weight names the file's weight, several mean a variable file). The
+  update tool's `fonts` takes `url`; its claim that an unknown family "is
+  swapped for the closest free face" was false and is gone. PP Museum Light
+  went into the tenant's brand kit as a Latin subset (15 KB woff2).
+- **`motion_physics: "hand-drawn"`** (`mpHandDrawn` in
+  `shared/motion-physics.js`): every opacity / autoAlpha tween lands in one
+  frame (an entrance is there on its first frame, an exit gone on its last);
+  everything else is stepped at 15 fps (on twos; the camera exempt, as in
+  cutout-physics); and every drawn piece -- a component part marked
+  `[data-boil]` and any non-video component under a quarter of the frame --
+  takes a new pose every four frames, up to 3 px and 0.9 degrees, through the
+  CSS `translate` / `rotate` properties so it never fights the piece's own
+  transform. Product mockups (full-frame) stay still. The stepped-tween
+  marker moved from `tween.vars.__mpStepped` to a WeakSet: GSAP re-reads vars
+  on invalidate and warned about the unknown key on DOM targets.
+- **type-relay**: `font` names a face (not just `'brand'`), `reveal: "cut"`
+  (each word simply there on its beat), `tag` (a mono label with a coloured
+  bar on its left over the words) and `squiggle` (the cursive loops under
+  them, drawn in three poses on threes). Every word is a drawn piece.
+- **`look: "2026"`** on quotient-flow, quotient-home and ai-email-rewrite: the
+  product as the rebrand's marketing site draws it (`mock-flow-node.tsx`):
+  warm canvas, two-layer nodes (the step type on a tinted header, what it does
+  on a white card), brown text, icons in the family colour (flow steps brick,
+  email orange, people mauve, the agent's new mark), no shadows, flat orange
+  highlights, a flat envelope. Omitted, the old look renders exactly as
+  before (tested).
+- **New motifs**, ported from the rebrand's brand components into
+  `shared/hand-motifs.js` (seeded random, symbol layouts and glyphs with the
+  partner flip, the squiggle path, the worn-edge filter): `mockup-frame` (the
+  brick paper panel under a product, worn edges, symbol fields at two
+  corners), `symbol-field` (a field that lands whole or builds in handfuls,
+  then flips), `quotient-lockup` (the logo built as the product's loader
+  builds it, + to x to - to division sign to the mark, then the wordmark a
+  letter at a time). Test: `test/hand-made-brand.test.ts`.
+
+---
+
 ## 2026-11-13 — The Flows launch pieces
 
 The Flows launch film (proj_e515e3df, built on the Analytics story cut) needed

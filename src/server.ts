@@ -1415,7 +1415,7 @@ export function createMcpServer(): McpServer {
       entrance: z.enum(["settled", "animated"]).optional().describe("'settled': component entrances are pre-rolled so the cut lands on standing content (editorial fast-cut holds). 'animated' (default) plays entrances normally."),
       clear_quality: z.boolean().optional().describe("Scene: true dismisses the scene's critique report (the 'N unresolved' badge) when it no longer describes the scene -- e.g. its custom graphic was removed by hand."),
       locked_camera: z.boolean().optional().describe("Scene: true locks the frame -- no ambient drift or dot layer, so scene joins land on identical frames (relay's continuous take). camera_moves still play."),
-      motion_physics: z.enum(["punchy", "calm", "cutout-physics"]).nullable().optional().describe("The scene's physics contract (same shape as entrance -- a film-level fact stamped per scene). 'cutout-physics' steps element motion at 12fps like stop-motion while the camera stays smooth, and adds the sub-pixel ink boil -- most of the print feel on a paper world. 'calm' takes the overshoot out of every entrance and move (back / elastic / bounce eases become power eases): settle, never bounce. Generated films get it from visual_system.motion; hand-built scenes had NO way to switch it on. Pass null to clear."),
+      motion_physics: z.enum(["punchy", "calm", "cutout-physics", "hand-drawn"]).nullable().optional().describe("The scene's physics contract (same shape as entrance -- a film-level fact stamped per scene). 'cutout-physics' steps element motion at 12fps like stop-motion while the camera stays smooth, and adds the sub-pixel ink boil -- most of the print feel on a paper world. 'hand-drawn' is a hand-made brand film: every fade becomes a cut, everything moves on twos (15 poses a second), and the drawn pieces (a title's words, symbol fields, squiggles, small components) wiggle a few pixels every four frames; product mockups stay still. 'calm' takes the overshoot out of every entrance and move (back / elastic / bounce eases become power eases): settle, never bounce. Generated films get it from visual_system.motion; hand-built scenes had NO way to switch it on. Pass null to clear."),
       beats: z.array(beatSchema).optional().describe("Replace the scene's beat timeline"),
       content_region: z.object({
         side: z.enum(["left", "right"]),
@@ -1473,7 +1473,8 @@ export function createMcpServer(): McpServer {
         family: z.string(),
         source: z.enum(["google", "custom", "system"]).optional(),
         weights: z.array(z.number()).optional(),
-      })).min(1)).optional().describe("Project: THIS film's fonts, in order (the first is the face every mockup and `font: 'brand'` type uses), e.g. [{family: 'Inter', weights: [400, 500, 600, 700]}]. Edits the film's own copy of the brand kit; the tenant kit and other films are untouched. A family that is not on Google Fonts is swapped for the closest free face at render."),
+        url: z.string().optional(),
+      })).min(1)).optional().describe("Project: THIS film's fonts, in order (the first is the face every mockup and `font: 'brand'` type uses), e.g. [{family: 'Inter', weights: [400, 500, 600, 700]}]. A face that is not on Google Fonts loads from its file: source 'custom' with url = the font uploaded to the brand kit (upload asset_type 'font'), weights = the weight the file draws (one value) or its range (variable). Type components name a face with font: '<family>'. Edits the film's own copy of the brand kit; the tenant kit and other films are untouched."),
       sfx_palette: z.record(z.enum(["attention", "transition", "tension", "payoff", "right", "wrong", "comedy"]), z.string()).nullable().optional()
         .describe("The film's SOUND PALETTE: the one sound each job plays (e.g. {transition: 'camera-flash', payoff: 'gen-impact-1a2b3c'}); every cue with that role plays it. Merged into the current palette; null clears it (house defaults). Re-points the film's role cues at once."),
 
@@ -1796,7 +1797,7 @@ export function createMcpServer(): McpServer {
         // it on `update({canvas, speaker_track})` while still reporting success.
         if (tagsGiven) { setTags(project); updated = true; }
         if (params.fonts) {
-          project.brand_kit = { ...project.brand_kit, fonts: params.fonts.map((f: { family: string; source?: "google" | "custom" | "system"; weights?: number[] }) => ({ family: f.family, source: f.source || "google", weights: f.weights?.length ? f.weights : [400, 500, 600, 700] })) };
+          project.brand_kit = { ...project.brand_kit, fonts: params.fonts.map((f: { family: string; source?: "google" | "custom" | "system"; weights?: number[]; url?: string }) => ({ family: f.family, source: f.source || (f.url ? "custom" : "google"), weights: f.weights?.length ? f.weights : [400, 500, 600, 700], ...(f.url ? { url: f.url } : {}) })) };
           updated = true;
         }
         if (params.sfx_palette !== undefined) {

@@ -113,9 +113,20 @@
     },
     "accent": {
       "type": "string",
-      "label": "Highlight / path color",
+      "label": "Highlight / path color (default #2b63e3; look 2026: the Flows brick #A34735)",
       "optional": true,
       "placeholder": "#2b63e3"
+    },
+    "look": {
+      "type": "string",
+      "label": "'2026': the flow editor as the Quotient rebrand draws it -- a warm canvas, each step in two layers (its type on a tinted header, what it does on a white card), brown text, icons in the step family's colour (flow steps brick, email orange, people mauve, the agent's new mark), and no shadows; email highlights are flat blocks and the sent envelope is drawn flat. Omitted: the earlier look.",
+      "enum": ["2026"],
+      "optional": true
+    },
+    "mail_accent": {
+      "type": "string",
+      "label": "The envelope and the email card's highlight (default: the accent; look 2026: Email orange #F27141)",
+      "optional": true
     },
     "script": {
       "type": "array",
