@@ -257,7 +257,13 @@ describe("the motifs", () => {
         return { n: gs.length, ySpread: Math.max(...ys) - Math.min(...ys), svg: getComputedStyle(document.querySelector(".sg-svg")!).visibility,
           solid: getComputedStyle(document.querySelector(".sg-solid")!).visibility, tag: getComputedStyle(document.querySelector(".sg-tag")!).visibility };
       }); };
-      const word = await st(0.05), mark = await st(2.3), done = await st(3.2);
+      const word = await st(0.05), mark = await st(2.3), done = await st(3.6);
+      // Mid-fill: the solid mark is clipped to a circle growing from the dot, symbols still showing outside it.
+      await seek(s.page, 2.9);
+      const mid = await s.page.evaluate(() => ({ clip: (document.querySelector(".sg-solid") as SVGElement).style.clipPath,
+        live: [...document.querySelectorAll(".sg-svg g")].filter((g) => (g as SVGGElement).style.opacity !== "0").length }));
+      expect(mid.clip).toMatch(/^circle\(/);
+      expect(mid.live).toBeGreaterThan(0);
       expect(word.n).toBeGreaterThan(300);
       expect(word.svg).toBe("visible");
       // The word is wide and short; the mark is tall.
