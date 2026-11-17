@@ -810,17 +810,24 @@ export function timelapseClockScript(
  * (settle, never bounce); hand-drawn cuts every fade, steps on twos and
  * wiggles the drawn pieces. `punchy` is the house default and emits nothing.
  */
-export function motionPhysicsScript(motion: string | undefined, sceneDuration: number): string {
+export function motionPhysicsScript(
+  motion: string | undefined,
+  sceneDuration: number,
+  /** The timeline to apply it to: "master" in a single scene, "sceneTl" in the composite. */
+  tl = "master",
+  /** A JS expression for the element to search: the document, or one scene of the composite. */
+  root = "document",
+): string {
   if (motion === "calm") return `
   // ── physics contract: calm (shared/motion-physics.js) ──
   // Settle, never bounce: back / elastic / bounce eases become power eases.
-  try { if (typeof mpCalmEases === 'function') mpCalmEases(master); }
+  try { if (typeof mpCalmEases === 'function') mpCalmEases(${tl}); }
   catch (e) { console.warn('calm not applied: ' + e.message); }
 `;
   if (motion === "hand-drawn") return `
   // ── physics contract: hand-drawn (shared/motion-physics.js) ──
   // Cut, don't fade; everything on twos; the drawn pieces wiggle.
-  try { if (typeof mpHandDrawn === 'function') mpHandDrawn(master, { duration: ${sceneDuration} }); }
+  try { if (typeof mpHandDrawn === 'function') mpHandDrawn(${tl}, { duration: ${sceneDuration}, root: ${root} }); }
   catch (e) { console.warn('hand-drawn not applied: ' + e.message); }
 `;
   if (motion !== "cutout-physics") return "";
@@ -830,12 +837,12 @@ export function motionPhysicsScript(motion: string | undefined, sceneDuration: n
   // Inked elements boil on the same grid. The backdrop does neither: the
   // paper is the one thing in a print film that holds perfectly still.
   try {
-    if (typeof mpStepQuantize === 'function') mpStepQuantize(master);
+    if (typeof mpStepQuantize === 'function') mpStepQuantize(${tl});
     if (typeof mpInkBoil === 'function') {
       var __inked = Array.prototype.slice.call(
-        document.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'))
+        (${root}).querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'))
         .filter(function (el) { return !el.querySelector('video'); });
-      mpInkBoil(master, __inked, { duration: ${sceneDuration}, seed: 11 });
+      mpInkBoil(${tl}, __inked, { duration: ${sceneDuration}, seed: 11 });
     }
   } catch (e) { console.warn('cutout-physics not applied: ' + e.message); }
 `;

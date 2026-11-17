@@ -36,6 +36,7 @@ import {
   resolveSpeakerVideoTags,
   stripEagerVideoLoading,
   cameraMovesScript,
+  motionPhysicsScript,
   speakerRigVideoHtml,
   wrapperChoreoScript,
   BACKDROP_TYPES,
@@ -287,6 +288,18 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
         "sceneTl",
       ));
     }
+
+    // Motion physics, last: it reshapes every tween already on the scene's
+    // timeline (hand-drawn cuts fades, steps on twos, wiggles the drawn
+    // pieces). The render applies it per scene; without it here Studio
+    // played a smooth, still film that renders stepped and wiggling.
+    const physics = motionPhysicsScript(
+      scene.motion_physics,
+      scene.duration_seconds,
+      "sceneTl",
+      `document.querySelector('.mp-scene[data-scene-id="${scene.id}"]')`,
+    );
+    if (physics) componentScripts.push(physics);
 
     // Determine scene background. An explicit scene.background must be used
     // LITERALLY: the composite defines --mp-color-background once globally,

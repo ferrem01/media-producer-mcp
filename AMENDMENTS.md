@@ -6,6 +6,35 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-11-17 — Studio plays the scene's motion physics
+
+Marc rendered the rebranded Flows film and it did not match Studio: the
+words shook the whole time, and the symbol ball at 7.4s collapsed
+differently. Studio's preview builds the whole film with
+`assembleComposite`, which never applied a scene's `motion_physics`; the
+render (`assembleScene`) always did. So Studio played smooth fades and
+still words, and the render played the hand-drawn layer: fades cut, motion
+on twos, the drawn pieces wiggling.
+
+The fix: `motionPhysicsScript` takes the timeline and the root to search
+(`master` and the document for one scene; `sceneTl` and that scene's
+element in the composite), and the composite applies it to each scene last,
+after its components, choreography and camera moves. `mpHandDrawn` takes a
+`root` option and sizes "small piece" from it. Calm and cutout-physics get
+the same scoping. Test: `hand-made-brand.test.ts`, "hand-drawn physics in
+Studio" (a hand-drawn scene wiggles in the composite; a plain scene beside
+it stays still).
+
+The same render had a second bug: scene 15's AI email panel rendered as an
+empty white block. The physics passes swapped eases by setting `vars.ease`
+and calling `invalidate()`. An invalidated `from()` re-reads its END state
+from the element, and its own immediate render had already set that to the
+START state, so `from({autoAlpha:0})` became 0 -> 0 and the panel never
+appeared. Now `mpSetEase` swaps the ease in place (`vars.ease`, plus the
+parsed `_ease` on a tween that has already initialised) and nothing
+invalidates; calm and cutout-physics use it too. Test: "hand-drawn physics
+keeps a from() entrance" (fails without the fix).
+
 ## 2026-11-17 — A hand-made brand: the Quotient rebrand in a film
 
 Marc asked for the Flows launch film in Quotient's new brand (the `rebrand`

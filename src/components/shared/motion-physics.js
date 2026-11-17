@@ -31,6 +31,21 @@ var MP_STEPPED = typeof WeakSet === 'function' ? new WeakSet() : null;
 function mpIsStepped(tw) { return !!(MP_STEPPED && MP_STEPPED.has(tw)); }
 function mpMarkStepped(tw) { if (MP_STEPPED) MP_STEPPED.add(tw); }
 
+/**
+ * Give a tween a new ease WITHOUT invalidating it. A tween reads its ease
+ * when it initialises; one that has not yet will read vars.ease. One that
+ * already has (a from() renders its start state the moment it is built)
+ * keeps its parsed ease in `_ease`, so that is replaced in place.
+ * Never invalidate here: an invalidated from() re-reads its END state from
+ * the element, which its own immediate render has already set to the START
+ * state -- `from({autoAlpha:0})` became 0 -> 0 and the element never
+ * appeared (the AI email panel in the Flows film rendered blank).
+ */
+function mpSetEase(tw, ease) {
+  tw.vars.ease = ease;
+  if (tw._initted) tw._ease = typeof ease === 'function' ? ease : gsap.parseEase(ease);
+}
+
 /** Is this tween target part of the camera rig? */
 function mpIsCameraTarget(t) {
   if (!t || !t.classList) return false;
@@ -84,11 +99,8 @@ function mpStepQuantize(timeline, opts) {
     try { base = gsap.parseEase((tw.vars && tw.vars.ease) || 'none') || function (p) { return p; }; }
     catch (e3) { base = function (p) { return p; }; }
 
-    tw.vars.ease = mpMakeStepEase(base, steps);
+    mpSetEase(tw, mpMakeStepEase(base, steps));
     mpMarkStepped(tw);
-    // Safe here and only here: the assembler runs this before the master has
-    // rendered, so re-recording start values reads the same frame-0 state.
-    try { tw.invalidate(); } catch (e4) {}
     n++;
   }
   return n;
@@ -185,8 +197,7 @@ function mpInkBoil(timeline, elements, opts) {
  * (back, elastic, bounce -- a sticker's pop, a dot's bounce, a chip's spring)
  * becomes a plain power ease in the same direction, so things land and stop.
  * Components keep their choreography; only the overshoot goes. Run on the
- * master before it plays: the ease is read when a tween initialises, so the
- * timeline is invalidated once at the end and every tween re-reads it.
+ * master before it plays; each ease is swapped in place (mpSetEase).
  *
  * @param {gsap.core.Timeline} timeline  Usually the scene master.
  * @returns {number} how many tweens were calmed (0 = nothing to do).
@@ -201,10 +212,9 @@ function mpCalmEases(timeline) {
     var v = tweens[i].vars;
     if (!v || typeof v.ease !== 'string' || !OVER.test(v.ease)) continue;
     var dir = /inout/i.test(v.ease) ? 'inOut' : /\.in\b|easein\b/i.test(v.ease) ? 'in' : 'out';
-    v.ease = dir === 'out' ? 'power3.out' : 'power2.' + dir;
+    mpSetEase(tweens[i], dir === 'out' ? 'power3.out' : 'power2.' + dir);
     n++;
   }
-  if (n) timeline.invalidate();
   return n;
 }
 
@@ -228,7 +238,9 @@ function mpCalmEases(timeline) {
  * Product UI stays still: a full-frame mockup is not a drawing.
  *
  * @param {gsap.core.Timeline} timeline  The scene master.
- * @param {{duration?: number, fps?: number, amount?: number, every?: number}} [opts]
+ * @param {{duration?: number, fps?: number, amount?: number, every?: number, root?: Element}} [opts]
+ *   root: where the pieces live -- the document for a single scene, the
+ *   scene's own element in the composite (Studio's preview of the whole film).
  */
 function mpHandDrawn(timeline, opts) {
   if (!timeline || typeof timeline.getChildren !== 'function') return;
@@ -249,19 +261,20 @@ function mpHandDrawn(timeline, opts) {
     if (targets.some(mpIsCameraTarget)) continue;
     // A from() tween runs toward the element's own value, the other way round.
     var appears = v.runBackwards ? a < 0.5 : a >= 0.5;
-    v.ease = appears ? function (p) { return p > 0 ? 1 : 0; } : function (p) { return p >= 1 ? 1 : 0; };
+    mpSetEase(tw, appears ? function (p) { return p > 0 ? 1 : 0; } : function (p) { return p >= 1 ? 1 : 0; });
     mpMarkStepped(tw);
-    try { tw.invalidate(); } catch (e3) {}
     cut++;
   }
   // 2. On twos.
   mpStepQuantize(timeline, { fps: FPS / 2 });
   // 3. The wiggle.
-  var W = window.innerWidth || 1920, H = window.innerHeight || 1080;
+  var root = o.root && o.root.querySelectorAll ? o.root : document;
+  var box = root === document ? null : root.getBoundingClientRect();
+  var W = (box && box.width) || window.innerWidth || 1920, H = (box && box.height) || window.innerHeight || 1080;
   var pieces = [];
   var add = function (el) { if (el && pieces.indexOf(el) < 0) pieces.push(el); };
-  Array.prototype.forEach.call(document.querySelectorAll('.mp-component [data-boil]'), add);
-  Array.prototype.forEach.call(document.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'), function (el) {
+  Array.prototype.forEach.call(root.querySelectorAll('.mp-component [data-boil]'), add);
+  Array.prototype.forEach.call(root.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'), function (el) {
     if (el.querySelector('video, [data-boil]')) return;
     var r = el.getBoundingClientRect();
     if (r.width * r.height > 0 && r.width * r.height < W * H * 0.25) add(el);
