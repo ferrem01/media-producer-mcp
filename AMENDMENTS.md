@@ -32,6 +32,12 @@ once things land, they wiggle. A copy of the film carries it
   transform. Product mockups (full-frame) stay still. The stepped-tween
   marker moved from `tween.vars.__mpStepped` to a WeakSet: GSAP re-reads vars
   on invalidate and warned about the unknown key on DOM targets.
+- **`symbol-gather`** (Nov 17, Marc saw it in the rebrand's animated share
+  images): "Quotient" in symbols (the rebrand's `wordmark` preset, now in
+  `hand-motifs.js` with `mpMarkFormation`, the mark drawn in symbols) flies
+  into the mark and back -- `gatherAnimation` from `lib/og/video`, the same
+  pairing, bowed flights and ripples. `end: "mark"` stops on the mark, turns
+  it solid at `solid_at` and lands a mono tag: the Flows film's end card.
 - **type-relay `highlight`** (Nov 17, Marc: the 50% grey second half read
   "bland"): a flat, square-ended block of brand colour set down a little
   crooked behind the accent words, cutting in once they land -- the

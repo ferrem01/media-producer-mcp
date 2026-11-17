@@ -1,0 +1,151 @@
+<template>
+  <div class="sg">
+    <svg class="sg-svg" xmlns="http://www.w3.org/2000/svg" stroke-linecap="round"></svg>
+    <svg class="sg-solid" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166.32 166.32">
+      <path fill-rule="evenodd" d="M86.9835 164.959C86.9835 165.67 86.4187 166.257 85.7078 166.279C38.8964 167.731 0 130.162 0 83.16C0 36.158 38.8964 -1.41147 85.7078 0.0407252C86.4187 0.062779 86.9835 0.649697 86.9835 1.36094V164.959ZM64.1982 83.16C64.1982 72.4132 55.4859 63.701 44.7391 63.701C33.9923 63.701 25.2801 72.4132 25.2801 83.16C25.2801 93.9068 33.9923 102.619 44.7391 102.619C55.4859 102.619 64.1982 93.9068 64.1982 83.16ZM147.24 83.16C147.24 94.6233 137.947 103.916 126.484 103.916C115.02 103.916 105.727 94.6233 105.727 83.16C105.727 71.6967 115.02 62.4036 126.484 62.4036C137.947 62.4036 147.24 71.6967 147.24 83.16Z"/>
+    </svg>
+    <div class="sg-tag" data-boil="sg-tag"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* SYMBOL GATHER (the Quotient rebrand's "gather"): "Quotient" spelled in
+     math symbols ripples, its symbols lift off one by one on bowed flights
+     and land as the logo mark drawn in symbols; the mark ripples out from its
+     dot, then the symbols fly home -- or, for an end card, the mark turns
+     solid and a mono tag lands under it. Ported from the rebrand's animated
+     share images (lib/og/video), the same math, as a pure function of time. */
+  .sg, .sg * { max-width: none; box-sizing: border-box; }
+  .sg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .sg-svg { position: absolute; left: 0; top: 0; overflow: visible; }
+  .sg-solid { position: absolute; visibility: hidden; overflow: visible; }
+  .sg-tag { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; font-weight: 500;
+    letter-spacing: -0.02em; line-height: 1.35; border-left-style: solid; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    var root = el.querySelector('.sg'), svg = el.querySelector('.sg-svg'), solid = el.querySelector('.sg-solid'), tag = el.querySelector('.sg-tag');
+    if (!root || !svg || typeof mpMarkFormation !== 'function') return tl;
+    var num = function (v, d) { var n = Number(v); return (v === null || v === undefined || v === '' || typeof v === 'boolean' || !isFinite(n)) ? d : n; };
+    var clamp = function (v) { return Math.min(1, Math.max(0, v)); };
+    var mix = function (a, b, p) { return a + (b - a) * p; };
+    var through = function (t, start, len) { return clamp((t - start) / len); };
+    var easeInOut = function (a) { return a < 0.5 ? 4 * a * a * a : 1 - Math.pow(-2 * a + 2, 3) / 2; };
+    var swell = function (a) { return Math.sin(Math.PI * a); };
+    var W = root.clientWidth || el.clientWidth || 1960, H = root.clientHeight || el.clientHeight || 1120;
+    var DUR = num(ctx && ctx.duration, 7);
+    var INK = String(data.color || '#FFEFDE');
+    if (data.background) root.style.background = String(data.background);
+    svg.setAttribute('width', String(W)); svg.setAttribute('height', String(H));
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('fill', INK); svg.setAttribute('stroke', INK);
+    var seed = String(data.seed || 'quotient');
+    var CX = W * num(data.x, 0.5), CY = H * num(data.y, 0.5);
+
+    // The word: the wordmark preset, `word_width` of the box wide.
+    var wl = mpSymbolLayout('wordmark', seed);
+    var wc = W * num(data.word_width, 0.84) / wl.columns;
+    var wx0 = CX - wl.columns * wc / 2, wy0 = CY - wl.rows * wc / 2;
+    var word = wl.cells.map(function (p) {
+      return { x: wx0 + (p.column + 0.5) * wc, y: wy0 + (p.row + 0.5) * wc, size: wc, glyph: p.glyph, across: p.column / wl.columns, down: p.row / wl.rows };
+    });
+    // The mark: `mark_height` of the box tall, in cells of `mark_cell` (default the word's, a little bigger).
+    var MHT = H * num(data.mark_height, 0.48), mcell = num(data.mark_cell, 0) > 0 ? num(data.mark_cell, 0) : wc * 1.25;
+    var mk = mpMarkFormation(CX, CY, MHT, mcell, seed + ':mark');
+
+    // Pair the two formations left to right, so the crowd flows instead of
+    // crossing itself, with a little shuffle so it doesn't look combed.
+    var rnd = mpHandRandom('gather-' + seed);
+    var jig = 90 * W / 1200;
+    var order = function (pts) {
+      return pts.map(function (p) { return { p: p, o: p.x + rnd() * jig }; }).sort(function (a, b) { return a.o - b.o; }).map(function (q) { return q.p; });
+    };
+    var homes = order(word), perches = order(mk.points);
+    var far = 0;
+    mk.points.forEach(function (p) { far = Math.max(far, Math.hypot(p.x - mk.dot.x, p.y - mk.dot.y)); });
+    // `speed` scales every beat of the dance (1 = the share image's 7 s loop).
+    var SP = num(data.speed, 1), AT = num(data.at, 0), FLIGHT = 1.6 * SP;
+    var RETURN = data.end !== 'mark';
+    var NS = 'http://www.w3.org/2000/svg';
+    var flyers = [];
+    for (var i = 0, n = Math.max(homes.length, perches.length); i < n; i++) {
+      var home = homes[i], perch = perches[i];
+      // A symbol with no home grows out of nothing at its perch; one with no
+      // perch shrinks away into a random part of the mark.
+      var crowd = perches[Math.floor(rnd() * perches.length)];
+      var start = home || { x: (perch || crowd).x, y: (perch || crowd).y, size: 0, glyph: (perch || crowd).glyph, down: (perch || crowd).down };
+      var end = perch || { x: crowd.x, y: crowd.y, size: 0, glyph: crowd.glyph, down: crowd.down };
+      var ord = (home || end).down;
+      var g = document.createElementNS(NS, 'g');
+      svg.appendChild(g);
+      flyers.push({
+        g: g, glyph: (home || end).glyph, start: start, end: end, last: -1,
+        rippleAt: AT + (0.3 + 0.7 * ord) * SP,
+        leaveAt: AT + (1.4 + 0.5 * ord + rnd() * 0.2) * SP,
+        markRippleAt: AT + (3.6 + 0.55 * (Math.hypot(end.x - mk.dot.x, end.y - mk.dot.y) / far)) * SP,
+        returnAt: AT + (4.8 + 0.5 * ord + rnd() * 0.08) * SP,
+        bend: 0.16 * (0.6 + 0.8 * rnd())
+      });
+    }
+    var SW = num(data.stroke, 2.2), REST = num(data.resting_opacity, 1);
+
+    // The end card: the symbol mark turns solid where it stands, and a tag lands under it.
+    var SOLID = RETURN ? null : (data.solid_at !== undefined ? num(data.solid_at, 0) : AT + 4.6 * SP);
+    var sk = MHT / 166.32, mw = 147.24 * sk;
+    solid.style.width = (166.32 * sk).toFixed(1) + 'px'; solid.style.height = MHT.toFixed(1) + 'px';
+    solid.style.left = (CX - mw / 2).toFixed(1) + 'px'; solid.style.top = (CY - MHT / 2).toFixed(1) + 'px';
+    solid.setAttribute('fill', INK);
+    var TG = data.tag ? (typeof data.tag === 'object' ? data.tag : { text: data.tag }) : null;
+    if (TG) {
+      var tfs = Math.min(W, H) * num(TG.size, 0.03);
+      tag.textContent = String(TG.text || '');
+      tag.style.fontFamily = "'" + String(TG.font || 'JetBrains Mono').replace(/['"\\]/g, '') + "', ui-monospace, monospace";
+      tag.style.fontSize = tfs.toFixed(1) + 'px';
+      tag.style.color = String(TG.color || '#31231D');
+      tag.style.background = String(TG.background || '#FFEFDE');
+      tag.style.borderLeftColor = String(TG.bar || '#EE80B7');
+      tag.style.borderLeftWidth = Math.max(2, tfs * 0.22).toFixed(1) + 'px';
+      tag.style.padding = '0 ' + (tfs * 0.4).toFixed(1) + 'px 0 ' + (tfs * 0.45).toFixed(1) + 'px';
+      tag.style.left = (CX - tag.offsetWidth / 2).toFixed(1) + 'px';
+      tag.style.top = (CY + MHT / 2 + MHT * num(TG.gap, 0.14)).toFixed(1) + 'px';
+    }
+    var tagAt = TG ? num(TG.at, (SOLID !== null ? SOLID : AT) + 0.35) : 0;
+
+    var render = function (t) {
+      root.style.visibility = t >= AT ? 'inherit' : 'hidden';
+      var isSolid = SOLID !== null && t >= SOLID;
+      solid.style.visibility = isSolid ? 'inherit' : 'hidden';
+      svg.style.visibility = isSolid ? 'hidden' : 'inherit';
+      if (TG) tag.style.visibility = t >= tagAt ? 'inherit' : 'hidden';
+      if (isSolid) return;
+      for (var k = 0; k < flyers.length; k++) {
+        var f = flyers[k];
+        var back = RETURN && t >= f.returnAt;
+        var flown = back ? 1 - through(t, f.returnAt, FLIGHT) : through(t, f.leaveAt, FLIGHT);
+        var tr = easeInOut(flown);
+        var dx = f.end.x - f.start.x, dy = f.end.y - f.start.y;
+        // Bow out to one side of the straight line, both going and coming back.
+        var bow = swell(tr) * f.bend * (dy <= 0 ? 1 : -1);
+        var arriving = swell(through(back ? 1 - flown : flown, 0.75, 0.25));
+        var ripple = swell(through(t, f.rippleAt, 0.8 * SP)) + swell(through(t, f.markRippleAt, 0.75 * SP));
+        var x = mix(f.start.x, f.end.x, tr) - dy * bow, y = mix(f.start.y, f.end.y, tr) + dx * bow;
+        var size = mix(f.start.size, f.end.size, tr) * (1 + 0.1 * arriving + 0.16 * ripple);
+        var prog = Math.round(easeInOut(clamp(ripple)) * 12) / 12;
+        if (prog !== f.last) { f.g.innerHTML = mpSymbolGlyphSvg(f.glyph, prog); f.last = prog; }
+        var sc = size / 16;
+        f.g.setAttribute('transform', 'translate(' + (x - size / 2).toFixed(2) + ' ' + (y - size / 2).toFixed(2) + ') scale(' + sc.toFixed(4) + ')');
+        f.g.setAttribute('stroke-width', String(SW));
+        f.g.style.opacity = size < 0.5 ? '0' : mix(mix(REST, 1, tr), 1, clamp(ripple)).toFixed(3);
+      }
+    };
+    root.setAttribute('data-landed-at', String(Math.round((AT + (1.9 + 0.2) * SP + FLIGHT) * 1000) / 1000));
+    if (SOLID !== null) root.setAttribute('data-solid-at', String(Math.round(SOLID * 1000) / 1000));
+    var clock = { t: 0 };
+    render(0);
+    tl.fromTo(clock, { t: 0 }, { t: DUR, duration: DUR, ease: 'none', immediateRender: false, onUpdate: function () { render(clock.t); } }, 0);
+    return tl;
+  }
+</script>
