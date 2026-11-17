@@ -126,6 +126,34 @@ describe("type-relay: the hand-made title", () => {
   }, 60000);
 });
 
+describe("type-relay: the highlight block", () => {
+  it("one flat crooked block per row of accent words, behind them, cutting in after they land", async () => {
+    const s = await open([{ type: "type-relay", data: {
+      reveal: "cut", at: 0.1, word_stagger: 0.1, align: "center", highlight: { color: "#EFD800" },
+      lines: [{ text: "Most leads never get" }, { text: "a real follow-up.", accent: "real follow-up." }],
+    } }], { physics: "hand-drawn" });
+    try {
+      const st = async (t: number) => { await seek(s.page, t); return s.page.evaluate(() => [...document.querySelectorAll(".trl-hl")].map((h) => {
+        const e = h as HTMLElement, cs = getComputedStyle(e);
+        return { vis: cs.visibility, bg: cs.backgroundColor, radius: cs.borderRadius, tilt: e.style.transform, behind: !!(e.compareDocumentPosition(document.querySelector(".trl-block")!) & Node.DOCUMENT_POSITION_FOLLOWING) };
+      })); };
+      // Words: 4 on line one, then "a" "real" "follow-up." at 0.5, 0.6, 0.7.
+      const before = await st(0.75);
+      expect(before.length).toBe(1);
+      expect(before[0].vis).toBe("hidden");
+      const after = await st(1.2);
+      expect(after[0]).toMatchObject({ vis: "visible", bg: "rgb(239, 216, 0)", radius: "0px", behind: true });
+      expect(after[0].tilt).toMatch(/^rotate\(-?\d/);
+      const box = await s.page.evaluate(() => {
+        const h = document.querySelector(".trl-hl")!.getBoundingClientRect();
+        const ws = [...document.querySelectorAll(".trl-word")].slice(-2).map((w) => w.getBoundingClientRect());
+        return { coversL: h.left <= ws[0].left + 2, coversR: h.right >= ws[1].right - 2 };
+      });
+      expect(box).toEqual({ coversL: true, coversR: true });
+    } finally { await s.close(); }
+  }, 60000);
+});
+
 describe("the 2026 product look", () => {
   it("quotient-flow: two-layer nodes, family colours, the new mark, no shadows -- and the old look is untouched", async () => {
     const steps = [{ id: "a", kind: "event", title: "Viewed /pricing", subtitle: "3 times in 7 days" }, { id: "b", kind: "ai-email", subtitle: "Questions?" }, { id: "c", kind: "email", subtitle: "Thanks" }];

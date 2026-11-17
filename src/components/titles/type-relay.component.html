@@ -41,6 +41,10 @@
     letter-spacing: -0.02em; line-height: 1.35; border-left-style: solid; }
   .trl-squig { position: absolute; left: 0; top: 0; overflow: visible; visibility: hidden; }
   .trl-squig path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  /* The highlight: a flat, square-ended block of brand colour set down a
+     little crooked behind the accent words (the hand-made brand's
+     word-search highlight -- pills read as UI). */
+  .trl-hl { position: absolute; left: 0; top: 0; visibility: hidden; transform-origin: 50% 50%; }
   .trl-to { z-index: 4; }
 </style>
 
@@ -177,7 +181,10 @@
       block.style.maxWidth = MAXW.toFixed(1) + 'px';
     };
     var layout = function () {
-      words.forEach(function (w) { w.el.style.transform = 'none'; w.el.style.filter = 'none'; w.el.style.opacity = '1'; });
+      // Measured still: no transform, and none of the hand-drawn wiggle's
+      // translate / rotate either (they show up in getBoundingClientRect).
+      var wig = words.map(function (w) { var st = w.el.style; return [st.translate, st.rotate]; });
+      words.forEach(function (w) { w.el.style.transform = 'none'; w.el.style.filter = 'none'; w.el.style.opacity = '1'; w.el.style.translate = ''; w.el.style.rotate = ''; });
       block.style.transform = 'none';
       block.style.left = '0px'; block.style.top = '0px';
       fit = 1;
@@ -220,6 +227,7 @@
       root.setAttribute('data-text-box', [f4(TB.cx / W), f4(TB.cy / H), f4(TB.w / W), f4(TB.h / H)].join(','));
       root.setAttribute('data-accent-box', [f4(ACC.cx / W), f4(ACC.cy / H), f4(ACC.w / W), f4(ACC.h / H)].join(','));
       root.setAttribute('data-font-px', lines.map(function (ln) { return ln._fs.toFixed(1); }).join(','));
+      words.forEach(function (w, i) { w.el.style.translate = wig[i][0]; w.el.style.rotate = wig[i][1]; });
       lastSig = bw + 'x' + bh;
       placeTargets();
       placeExtras();
@@ -264,7 +272,44 @@
       try { SGLEN = sqPath.getTotalLength(); } catch (e) { SGLEN = 0; }
       if (SGLEN > 0) sqPath.style.strokeDasharray = SGLEN.toFixed(2);
     } else SG = null;
+    // ── The highlight blocks: one per run of accent words on a row.
+    var HL = data.highlight ? (typeof data.highlight === 'object' ? data.highlight : { color: data.highlight }) : null;
+    var hls = [];
+    var placeHighlights = function () {
+      hls.forEach(function (h) { if (h.el.parentNode) h.el.parentNode.removeChild(h.el); });
+      hls = [];
+      if (!HL) return;
+      // Accent words on the same row of the same line share one block.
+      var groups = [];
+      words.forEach(function (w) {
+        if (!w.acc) return;
+        var g = groups.filter(function (q) { return q[0].line === w.line && Math.abs(q[0].y - w.y) < w.h * 0.5; })[0];
+        if (g) g.push(w); else groups.push([w]);
+      });
+      var k = 0;
+      groups.forEach(function (ws) {
+        var parts = [];
+        ws.forEach(function (w) { w.runs.forEach(function (ru) { if (ru.acc) parts.push({ x: ru.x, y: w.y, w: ru.w, h: w.h }); }); });
+        if (!parts.length) return;
+        var u = boxUnion(parts), fs = lines[ws[0].line]._fs, pad = fs * num(HL.pad, 0.1);
+        var el2 = document.createElement('div');
+        el2.className = 'trl-hl'; el2.setAttribute('data-boil', 'hl' + k);
+        el2.style.background = String(HL.color || '#EFD800');
+        el2.style.left = (u.x - pad).toFixed(2) + 'px'; el2.style.width = (u.w + 2 * pad).toFixed(2) + 'px';
+        el2.style.top = (u.y + u.h * 0.08).toFixed(2) + 'px'; el2.style.height = (u.h * 0.9).toFixed(2) + 'px';
+        // A little crooked, a different way each time (seeded, so every frame agrees).
+        var tilt = num(HL.tilt, 1.4) * (rnd(k, 11) * 2 - 1);
+        if (Math.abs(tilt) < 0.4) tilt = tilt < 0 ? -0.6 : 0.6;
+        el2.style.transform = 'rotate(' + tilt.toFixed(2) + 'deg)';
+        root.insertBefore(el2, block);
+        var last = 0;
+        ws.forEach(function (w) { last = Math.max(last, w.instant ? F.end : w.rs); });
+        hls.push({ el: el2, at: has(HL.at) ? num(HL.at, 0) : last + num(HL.delay, 0.12) });
+        k++;
+      });
+    };
     var placeExtras = function () {
+      placeHighlights();
       var fs0 = lines[0]._fs;
       if (TG && tagEl) {
         var tfs = M * num(TG.size, 0.026);
@@ -447,6 +492,7 @@
       });
       // The tag and the squiggle leave with the words (a cut, never a fade).
       var extrasGone = (TMODE !== 'hold' && exOn) || (THIDE !== null && t >= THIDE);
+      hls.forEach(function (h) { h.el.style.visibility = !extrasGone && t >= h.at ? 'inherit' : 'hidden'; });
       if (TG && tagEl) tagEl.style.visibility = !extrasGone && t >= num(TG.at, LS[0]) ? 'inherit' : 'hidden';
       if (SG && sqEl) {
         var sAt = num(SG.at, SETTLE + 0.1), poses = 3, pose = Math.floor((t - sAt) / 0.1) + 1;
