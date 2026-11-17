@@ -222,9 +222,10 @@ function mpCalmEases(timeline) {
  * HAND-DRAWN: the motion of a hand-made brand film (the Quotient rebrand's
  * video rules). Three things, all mechanical:
  *
- *  1. CUT, DON'T FADE. Any tween that fades something in or out lands in
- *     one frame: an entrance is fully there on its first frame, an exit is
- *     gone on its last. A fade-up reads corporate; a cut reads made by hand.
+ *  1. CUT, DON'T FADE. A tween that only fades something in or out lands
+ *     in one frame: an entrance is fully there on its first frame, an exit
+ *     is gone on its last. A fade-up reads corporate; a cut reads made by
+ *     hand. A tween that also MOVES keeps its motion (on twos).
  *  2. ON TWOS. Everything else holds each pose for two frames (15 poses a
  *     second at 30 fps), like drawn animation. The camera is exempt, as in
  *     cutout-physics: a stepped camera reads as dropped frames.
@@ -257,6 +258,10 @@ function mpHandDrawn(timeline, opts) {
     if (!dur || mpIsStepped(tw)) continue;
     var a = v.autoAlpha !== undefined ? v.autoAlpha : v.opacity;
     if (typeof a !== 'number') continue;
+    // Only a pure fade is cut. A tween that also travels (a card flying into
+    // the logo while it fades) keeps its motion: cutting it would hold the
+    // card still and then drop it at the end. It steps on twos below.
+    if (mpTweenMoves(v)) continue;
     var targets = []; try { targets = tw.targets() || []; } catch (e2) {}
     if (targets.some(mpIsCameraTarget)) continue;
     // A from() tween runs toward the element's own value, the other way round.
@@ -299,6 +304,18 @@ function mpHandDrawn(timeline, opts) {
   mpMarkStepped(wiggle);
   timeline.add(wiggle, 0);
   return { cut: cut, pieces: pieces.length };
+}
+
+/** Tween settings, not animated properties. */
+var MP_TWEEN_CONFIG = /^(duration|delay|ease|stagger|repeat|repeatDelay|repeatRefresh|yoyo|yoyoEase|paused|immediateRender|lazy|overwrite|inherit|id|data|callbackScope|runBackwards|startAt|keyframes|onStart|onStartParams|onUpdate|onUpdateParams|onComplete|onCompleteParams|onRepeat|onRepeatParams|onReverseComplete|onReverseCompleteParams|onInterrupt|autoRound|reversed|smoothChildTiming|parent)$/;
+/** Does this tween animate anything besides opacity / visibility? */
+function mpTweenMoves(v) {
+  for (var k in v) {
+    if (!Object.prototype.hasOwnProperty.call(v, k)) continue;
+    if (k === 'opacity' || k === 'autoAlpha' || k === 'visibility' || MP_TWEEN_CONFIG.test(k)) continue;
+    return true;
+  }
+  return false;
 }
 
 /** A stable number in [-1, 1] for a string: the wiggle's pose for one piece. */

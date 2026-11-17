@@ -115,6 +115,21 @@ describe("hand-drawn physics keeps a from() entrance", () => {
   }, 60000);
 });
 
+describe("hand-drawn physics keeps a move that fades", () => {
+  it("a card flying into a point while it fades still flies (on twos); only a pure fade is cut", async () => {
+    const s = await open([{ id: "sw", type: "image-swarm", data: { images: ["data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2230%22/%3E"], count: 12, seed: 4,
+      formations: [{ at: 0, shape: "sphere", duration: 0.3, radius: 0.3 }, { at: 1, duration: 0.8, shape: "point", x: 0.5, y: 0.5 }] } }],
+    { physics: "hand-drawn", dur: 2.5 });
+    try {
+      const sizes = async (t: number) => { await seek(s.page, t); return s.page.evaluate(() => [...document.querySelectorAll(".isw-item")].map((e) => Math.round(e.getBoundingClientRect().width))); };
+      const before = await sizes(0.9), mid = await sizes(1.7);
+      // Mid-collapse the cards are already shrinking: they did not hold
+      // their pose until the end and drop out.
+      expect(mid.some((w, i) => w < before[i] * 0.8)).toBe(true);
+    } finally { await s.close(); }
+  }, 60000);
+});
+
 describe("hand-drawn physics in Studio", () => {
   it("the composite (Studio's preview) cuts, steps and wiggles each hand-drawn scene the way the render does; a plain scene stays still", async () => {
     const big = { type: "type-relay", data: { lines: [{ text: "Hello there." }], at: 0.1, reveal: "cut", word_stagger: 0.2 } };

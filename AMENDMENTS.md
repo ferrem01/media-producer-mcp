@@ -35,6 +35,14 @@ parsed `_ease` on a tween that has already initialised) and nothing
 invalidates; calm and cutout-physics use it too. Test: "hand-drawn physics
 keeps a from() entrance" (fails without the fix).
 
+And a third: with Studio now playing the physics, Marc saw the image-swarm
+ball (Flows film, ~7.4s) stop collapsing into the logo; the cards just
+vanished. Each card's collapse is ONE tween that flies, shrinks and fades;
+the cut rule saw the fade and cut the whole tween, so the card held still
+and dropped out at the end. Now only a PURE fade is cut (`mpTweenMoves`):
+a tween that also moves keeps its motion, on twos. Test: "hand-drawn
+physics keeps a move that fades".
+
 ## 2026-11-17 — A hand-made brand: the Quotient rebrand in a film
 
 Marc asked for the Flows launch film in Quotient's new brand (the `rebrand`
