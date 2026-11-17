@@ -38,6 +38,9 @@ once things land, they wiggle. A copy of the film carries it
   into the mark and back -- `gatherAnimation` from `lib/og/video`, the same
   pairing, bowed flights and ripples. `end: "mark"` stops on the mark, turns
   it solid at `solid_at` and lands a mono tag: the Flows film's end card.
+  The swap was a hard cut (Marc: "jarring"); the solid now spreads out from
+  the dot over `solid_over` (0.6 s), the mark's own ripple carried on, each
+  symbol swelling and thickening as the edge reaches it, then swallowed.
 - **type-relay `highlight`** (Nov 17, Marc: the 50% grey second half read
   "bland"): a flat, square-ended block of brand colour set down a little
   crooked behind the accent words, cutting in once they land -- the
