@@ -6,6 +6,25 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-11-17 — Studio plays the scene's motion physics
+
+Marc rendered the rebranded Flows film and it did not match Studio: the
+words shook the whole time, and the symbol ball at 7.4s collapsed
+differently. Studio's preview builds the whole film with
+`assembleComposite`, which never applied a scene's `motion_physics`; the
+render (`assembleScene`) always did. So Studio played smooth fades and
+still words, and the render played the hand-drawn layer: fades cut, motion
+on twos, the drawn pieces wiggling.
+
+The fix: `motionPhysicsScript` takes the timeline and the root to search
+(`master` and the document for one scene; `sceneTl` and that scene's
+element in the composite), and the composite applies it to each scene last,
+after its components, choreography and camera moves. `mpHandDrawn` takes a
+`root` option and sizes "small piece" from it. Calm and cutout-physics get
+the same scoping. Test: `hand-made-brand.test.ts`, "hand-drawn physics in
+Studio" (a hand-drawn scene wiggles in the composite; a plain scene beside
+it stays still).
+
 ## 2026-11-17 — A hand-made brand: the Quotient rebrand in a film
 
 Marc asked for the Flows launch film in Quotient's new brand (the `rebrand`

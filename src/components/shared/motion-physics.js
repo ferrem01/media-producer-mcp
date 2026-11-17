@@ -228,7 +228,9 @@ function mpCalmEases(timeline) {
  * Product UI stays still: a full-frame mockup is not a drawing.
  *
  * @param {gsap.core.Timeline} timeline  The scene master.
- * @param {{duration?: number, fps?: number, amount?: number, every?: number}} [opts]
+ * @param {{duration?: number, fps?: number, amount?: number, every?: number, root?: Element}} [opts]
+ *   root: where the pieces live -- the document for a single scene, the
+ *   scene's own element in the composite (Studio's preview of the whole film).
  */
 function mpHandDrawn(timeline, opts) {
   if (!timeline || typeof timeline.getChildren !== 'function') return;
@@ -257,11 +259,13 @@ function mpHandDrawn(timeline, opts) {
   // 2. On twos.
   mpStepQuantize(timeline, { fps: FPS / 2 });
   // 3. The wiggle.
-  var W = window.innerWidth || 1920, H = window.innerHeight || 1080;
+  var root = o.root && o.root.querySelectorAll ? o.root : document;
+  var box = root === document ? null : root.getBoundingClientRect();
+  var W = (box && box.width) || window.innerWidth || 1920, H = (box && box.height) || window.innerHeight || 1080;
   var pieces = [];
   var add = function (el) { if (el && pieces.indexOf(el) < 0) pieces.push(el); };
-  Array.prototype.forEach.call(document.querySelectorAll('.mp-component [data-boil]'), add);
-  Array.prototype.forEach.call(document.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'), function (el) {
+  Array.prototype.forEach.call(root.querySelectorAll('.mp-component [data-boil]'), add);
+  Array.prototype.forEach.call(root.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'), function (el) {
     if (el.querySelector('video, [data-boil]')) return;
     var r = el.getBoundingClientRect();
     if (r.width * r.height > 0 && r.width * r.height < W * H * 0.25) add(el);

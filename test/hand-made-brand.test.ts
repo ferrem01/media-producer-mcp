@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { assembleScene, generateFontLinks } from "../src/core/scene-assembler.js";
+import { assembleComposite } from "../src/core/composite-assembler.js";
 
 // The hand-made brand pieces (the Quotient rebrand, Nov 17): a custom face
 // loaded from the brand kit, the hand-drawn physics (cut, on twos, the
@@ -96,6 +97,42 @@ describe("hand-drawn physics", () => {
       expect(await s.page.evaluate(() => getComputedStyle(document.querySelector('[data-cid="big"]')!).translate)).toBe("none");
       expect(s.warnings).toEqual([]);
     } finally { await s.close(); }
+  }, 60000);
+});
+
+describe("hand-drawn physics in Studio", () => {
+  it("the composite (Studio's preview) cuts, steps and wiggles each hand-drawn scene the way the render does; a plain scene stays still", async () => {
+    const big = { type: "type-relay", data: { lines: [{ text: "Hello there." }], at: 0.1, reveal: "cut", word_stagger: 0.2 } };
+    const trl = await source("type-relay");
+    const mk = (id: string, physics?: string) => ({
+      scene: { id, label: id, duration_seconds: 2, background: "#FFEFDE", motion_physics: physics,
+        components: [{ id: "big", position: { x: "0%", y: "0%", width: "100%", height: "100%" }, ...big }] } as any,
+      components: [{ type: "type-relay", source: trl }],
+    });
+    const html = await assembleComposite({
+      scenes: [mk("a", "hand-drawn"), mk("b")],
+      brandKit: { colors: {}, fonts: [] } as any, canvas: { width: 1920, height: 1080 } as any,
+      gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+    } as any);
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "hb-"));
+    await fs.writeFile(path.join(dir, "c.html"), html);
+    const browser = await chromium.launch({ executablePath: process.env.MP_CHROMIUM_PATH || undefined });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+      await page.route(/^https?:/, (r) => r.abort());
+      await page.goto(`file://${path.join(dir, "c.html")}`);
+      await page.waitForFunction(() => !!(window as any).__MP_TIMELINE, undefined, { timeout: 30000 });
+      const pose = async (t: number, sid: string) => {
+        await page.evaluate((tt) => { (window as any).__MP_TIMELINE.time(tt); }, t);
+        return page.evaluate((s) => getComputedStyle(document.querySelector(`.mp-scene[data-scene-id="${s}"] .trl-word`)!).translate, sid);
+      };
+      const a = await pose(1.0, "a"), b = await pose(1.03, "a"), c = await pose(1.2, "a");
+      expect(a).not.toBe("none");
+      expect(a).toBe(b);
+      expect(c).not.toBe(a);
+      // The plain scene after it is untouched: physics is per scene.
+      expect(await pose(3.0, "b")).toBe("none");
+    } finally { await browser.close(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
   }, 60000);
 });
 
