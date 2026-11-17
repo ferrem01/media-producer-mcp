@@ -1,0 +1,23 @@
+{
+  "type": "symbol-gather",
+  "label": "Symbol gather (the word becomes the mark)",
+  "category": "effects",
+  "description": "The Quotient rebrand's \"gather\", ported from its animated share images: \"Quotient\" spelled in math symbols (+ - x / = and the plus-minus, from the real logotype) ripples, then its symbols lift off one by one on bowed flights, paired left to right so the crowd flows, and land as the logo mark drawn in symbols (spare symbols grow or shrink so the counts match); the mark ripples out from its dot. end 'word' (default) flies them home again, the share image's loop; end 'mark' stays on the mark, which turns SOLID at solid_at, and an optional mono tag (e.g. the URL) lands under it -- an end card. speed scales every beat (1 = the 7 s loop: ripple 0.3-1.8 s, lift-off 1.4-2.1 s, 1.6 s flights, mark ripple 3.6-4.9 s, home from 4.8 s); at offsets it. A pure function of the time. Example end card: {\"background\":\"#10762D\",\"color\":\"#FFEFDE\",\"speed\":0.62,\"end\":\"mark\",\"solid_at\":3.3,\"tag\":{\"text\":\"getquotient.ai\"}}.",
+  "data": {
+    "color": { "type": "string", "label": "Symbol ink (and the solid mark)", "optional": true, "default": "#FFEFDE" },
+    "background": { "type": "string", "label": "Card fill (omitted: transparent)", "optional": true },
+    "at": { "type": "number", "label": "When the dance starts", "optional": true, "default": 0 },
+    "speed": { "type": "number", "label": "Time scale of every beat (1 = the 7 s loop; 0.62 fits a 5 s end card)", "optional": true, "default": 1 },
+    "end": { "type": "string", "label": "word (fly home, the loop) | mark (stay on the mark)", "enum": ["word", "mark"], "optional": true, "default": "word" },
+    "solid_at": { "type": "number", "label": "end 'mark': when the symbol mark turns solid (default at + 4.6 x speed)", "optional": true },
+    "word_width": { "type": "number", "label": "The word's width, fraction of the box", "optional": true, "default": 0.84 },
+    "mark_height": { "type": "number", "label": "The mark's height, fraction of the box", "optional": true, "default": 0.48 },
+    "mark_cell": { "type": "number", "label": "Px per symbol in the mark (default 1.25 x the word's)", "optional": true },
+    "stroke": { "type": "number", "label": "Symbol stroke, in the 16-unit glyph box", "optional": true, "default": 2.2 },
+    "resting_opacity": { "type": "number", "label": "The word's symbols before they fly (1 = full)", "optional": true, "default": 1 },
+    "x": { "type": "number", "label": "Centre x, fraction of the box", "optional": true, "default": 0.5 },
+    "y": { "type": "number", "label": "Centre y, fraction of the box", "optional": true, "default": 0.5 },
+    "seed": { "type": "string", "label": "Picks the symbols and the flight order", "optional": true, "default": "quotient" },
+    "tag": { "type": "object", "label": "A mono label under the mark: {text, at (default 0.35 s after solid), bar (#EE80B7), color (#31231D), background (#FFEFDE), font, size, gap}; a string is the text", "optional": true }
+  }
+}

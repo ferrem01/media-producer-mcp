@@ -248,6 +248,24 @@ describe("the motifs", () => {
     } finally { await s.close(); }
   }, 60000);
 
+  it("symbol-gather: the word in symbols flies into the mark, ripples, turns solid and takes its tag", async () => {
+    const s = await open([{ type: "symbol-gather", data: { speed: 0.5, end: "mark", solid_at: 2.6, tag: "getquotient.ai" } }], { dur: 4 });
+    try {
+      const st = async (t: number) => { await seek(s.page, t); return s.page.evaluate(() => {
+        const gs = [...document.querySelectorAll(".sg-svg g")] as SVGGElement[];
+        const ys = gs.filter((g) => g.style.opacity !== "0").map((g) => g.getBoundingClientRect()).map((r) => r.top + r.height / 2);
+        return { n: gs.length, ySpread: Math.max(...ys) - Math.min(...ys), svg: getComputedStyle(document.querySelector(".sg-svg")!).visibility,
+          solid: getComputedStyle(document.querySelector(".sg-solid")!).visibility, tag: getComputedStyle(document.querySelector(".sg-tag")!).visibility };
+      }); };
+      const word = await st(0.05), mark = await st(2.3), done = await st(3.2);
+      expect(word.n).toBeGreaterThan(300);
+      expect(word.svg).toBe("visible");
+      // The word is wide and short; the mark is tall.
+      expect(mark.ySpread).toBeGreaterThan(word.ySpread * 1.5);
+      expect(done).toMatchObject({ svg: "hidden", solid: "visible", tag: "visible" });
+    } finally { await s.close(); }
+  }, 60000);
+
   it("quotient-lockup: a plus becomes the mark, then the wordmark cuts in a letter at a time", async () => {
     const s = await open([{ type: "quotient-lockup", data: { at: 0, build: 2, letter_step: 0.1, tag: "getquotient.ai" } }], { dur: 5 });
     try {

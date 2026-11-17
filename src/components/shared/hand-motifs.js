@@ -38,7 +38,27 @@ var MP_SYMBOL_SHAPES = {
   ].join('\n'),
   cluster: ['   ::#', ' ######', ':##:####', '  ##  ###', '       :##'].join('\n'),
   'frame-top-right': ['##########', '     ######   ##', '     #######: ##', '          ::####', '           :###', '            :##'].join('\n'),
-  'frame-bottom-left': ['####', '####', '####:', '  ::#####', '     ####'].join('\n')
+  'frame-bottom-left': ['####', '####', '####:', '  ::#####', '     ####'].join('\n'),
+  // "Quotient" in symbols, generated from the real logotype (the rebrand's
+  // `wordmark` preset: 82 cells wide, 16 tall).
+  wordmark: [
+    '        #######:                               :      ###                           ::',
+    '      :####:#####                             ###     ###                          ###',
+    '     :###     ###:                           :###     ###                          ###',
+    '     ###       ###                  ::       :###              ::          ::      ###',
+    '    :###       ####  ###   ###    ######    ########  ###    ######   ########   #######',
+    '    ####       ####  ###   ###   ###::###   :#######  ###   ### ####  #########  :#####:',
+    '    ###:       :###  ###   ###  ###:   ###   :###     ###  ###   ###  ###:  ###    ###',
+    '    ###:       :###  ###   ###  ###    ###   :###     ###  ###:::###  ###   ###    ###',
+    '    ####       ####  ###   ###  ###    ###   :###     ###  #########  ###   ###    ###',
+    '    ####       ####  ###   ###  ###    ###   :###     ###  ###        ###   ###    ###',
+    '     ###       ###   ###   ###  ###    ###   :###     ###  ###        ###   ###    ###',
+    '     :###     ####   ###  :###  ###:   ###   :###     ###  ####   #:  ###   ###    ###',
+    '      ####: :####    #########   ###::###     #####   ###   ########  ###   ###    #####',
+    '       :#######:      ########    ######      #####   ###   :######   ###   ###    :####',
+    '          :######      ::           ::          :             :::                    :',
+    '              ###:'
+  ].join('\n')
 };
 
 // Plus and times show up most in the artwork; plain minus least.
@@ -212,4 +232,38 @@ function mpSymbolFlips(cells, t, opts) {
     }
     cells[i].flip(on === -1 ? p : on);
   }
+}
+
+/**
+ * The logo mark drawn in symbols (the rebrand's markFormation): a cell is a
+ * symbol when its centre falls inside the half-circle (minus the hole, cut a
+ * little small since a symbol only fills the middle of its box) or the dot.
+ * Centred on `cx`, `cy`, `height` px tall, `cell` px per symbol.
+ * @returns {{points: Array<{x: number, y: number, size: number, glyph: string, across: number, down: number}>, dot: {x: number, y: number}}}
+ */
+function mpMarkFormation(cx, cy, height, cell, seed) {
+  var MW = 147.24, MH = 166.32, EDGE = 86.98, CY = 83.16, R = 83.16;
+  var HOLE = { x: 44.74, y: 83.16, r: 19.46 }, DOT = { x: 126.48, y: 83.16, r: 20.76 };
+  var k = height / MH, left = cx - MW * k / 2, top = cy - height / 2;
+  var cols = Math.ceil(MW * k / cell), rows = Math.ceil(height / cell), c = cell / k;
+  var lines = [];
+  for (var r = 0; r < rows; r++) {
+    var line = '';
+    for (var q = 0; q < cols; q++) {
+      var x = (q + 0.5) * c, y = (r + 0.5) * c;
+      var inHalf = x <= EDGE && (x - EDGE) * (x - EDGE) + (y - CY) * (y - CY) <= R * R;
+      var hr = HOLE.r - 0.4 * c;
+      var inHole = (x - HOLE.x) * (x - HOLE.x) + (y - HOLE.y) * (y - HOLE.y) <= hr * hr;
+      var inDot = (x - DOT.x) * (x - DOT.x) + (y - DOT.y) * (y - DOT.y) <= DOT.r * DOT.r;
+      line += (inHalf && !inHole) || inDot ? '#' : '.';
+    }
+    lines.push(line);
+  }
+  var lay = mpSymbolLayout(lines.join('\n'), seed);
+  return {
+    points: lay.cells.map(function (p) {
+      return { x: left + (p.column + 0.5) * cell, y: top + (p.row + 0.5) * cell, size: cell, glyph: p.glyph, across: p.column / cols, down: p.row / rows };
+    }),
+    dot: { x: left + DOT.x * k, y: top + DOT.y * k }
+  };
 }
