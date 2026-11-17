@@ -8,8 +8,8 @@ import { assembleScene, generateFontLinks } from "../src/core/scene-assembler.js
 import { assembleComposite } from "../src/core/composite-assembler.js";
 
 // The hand-made brand pieces (the Quotient rebrand, Nov 17): a custom face
-// loaded from the brand kit, the hand-drawn physics (cut, on twos, the
-// wiggle), type-relay's cut reveal / tag / squiggle, the 2026 product look
+// loaded from the brand kit, the hand-drawn physics (cut, on twos),
+// type-relay's cut reveal / tag / squiggle, the 2026 product look
 // of quotient-flow, quotient-home and ai-email-rewrite, and the new motifs:
 // mockup-frame, symbol-field, quotient-lockup.
 
@@ -68,7 +68,7 @@ describe("a custom face from the brand kit", () => {
 });
 
 describe("hand-drawn physics", () => {
-  it("a fade lands in one frame, motion holds each pose for two frames, small pieces wiggle every four frames", async () => {
+  it("a fade lands in one frame, motion holds each pose for two frames, nothing wiggles", async () => {
     const s = await open([
       { id: "label", type: "kinetic-text", position: { x: "0%", y: "80%", width: "100%", height: "10%" }, data: { text: "SATURDAY, 9:14 PM", at: 0.2 } },
       { id: "big", type: "type-relay", data: { lines: [{ text: "Hello there." }], at: 0.1, reveal: "cut", word_stagger: 0.2 } },
@@ -84,17 +84,9 @@ describe("hand-drawn physics", () => {
       const words = async (t: number) => { await seek(s.page, t); return s.page.evaluate(() => [...document.querySelectorAll(".trl-word")].map((w) => getComputedStyle(w).visibility)); };
       expect(await words(0.15)).toEqual(["visible", "hidden"]);
       expect(await words(0.45)).toEqual(["visible", "visible"]);
-      // The wiggle: words and the small label move by the CSS translate
-      // property, a new pose every 4 frames, the same pose within one.
-      const pose = async (t: number) => { await seek(s.page, t); return s.page.evaluate(() => [getComputedStyle(document.querySelector(".trl-word")!).translate, getComputedStyle(document.querySelector('[data-cid="label"]')!).translate]); };
-      const a = await pose(1.0), b = await pose(1.03), c = await pose(1.2);
-      expect(a[0]).not.toBe("none");
-      expect(a).toEqual(b);
-      expect(c).not.toEqual(a);
-      const px = Math.max(...a.flatMap((v) => v.split(" ").map((n) => Math.abs(parseFloat(n)))));
-      expect(px).toBeLessThanOrEqual(3);
-      // The big full-frame word card wrapper itself stays put (only its words move).
-      expect(await s.page.evaluate(() => getComputedStyle(document.querySelector('[data-cid="big"]')!).translate)).toBe("none");
+      // No wiggle: nothing is nudged by the CSS translate / rotate.
+      await seek(s.page, 1.0);
+      expect(await s.page.evaluate(() => [...document.querySelectorAll('.trl-word, [data-cid]')].map((e) => getComputedStyle(e).translate + getComputedStyle(e).rotate).filter((v) => v !== "nonenone"))).toEqual([]);
       expect(s.warnings).toEqual([]);
     } finally { await s.close(); }
   }, 60000);
@@ -115,14 +107,30 @@ describe("hand-drawn physics keeps a from() entrance", () => {
   }, 60000);
 });
 
+describe("hand-drawn physics keeps a move that fades", () => {
+  it("a card flying into a point while it fades still flies (on twos); only a pure fade is cut", async () => {
+    const s = await open([{ id: "sw", type: "image-swarm", data: { images: ["data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2230%22/%3E"], count: 12, seed: 4,
+      formations: [{ at: 0, shape: "sphere", duration: 0.3, radius: 0.3 }, { at: 1, duration: 0.8, shape: "point", x: 0.5, y: 0.5 }] } }],
+    { physics: "hand-drawn", dur: 2.5 });
+    try {
+      const sizes = async (t: number) => { await seek(s.page, t); return s.page.evaluate(() => [...document.querySelectorAll(".isw-item")].map((e) => Math.round(e.getBoundingClientRect().width))); };
+      const before = await sizes(0.9), mid = await sizes(1.7);
+      // Mid-collapse the cards are already shrinking: they did not hold
+      // their pose until the end and drop out.
+      expect(mid.some((w, i) => w < before[i] * 0.8)).toBe(true);
+    } finally { await s.close(); }
+  }, 60000);
+});
+
 describe("hand-drawn physics in Studio", () => {
-  it("the composite (Studio's preview) cuts, steps and wiggles each hand-drawn scene the way the render does; a plain scene stays still", async () => {
-    const big = { type: "type-relay", data: { lines: [{ text: "Hello there." }], at: 0.1, reveal: "cut", word_stagger: 0.2 } };
-    const trl = await source("type-relay");
+  it("the composite (Studio's preview) cuts each hand-drawn scene's fades the way the render does; a plain scene still fades", async () => {
+    // A pure fade: the stage's fade entrance on the wrapper.
+    const label = { type: "kinetic-text", data: { text: "SATURDAY, 9:14 PM", at: 0 }, enter: { effect: "fade", at: 0.2, duration: 0.5 } };
+    const kt = await source("kinetic-text");
     const mk = (id: string, physics?: string) => ({
       scene: { id, label: id, duration_seconds: 2, background: "#FFEFDE", motion_physics: physics,
-        components: [{ id: "big", position: { x: "0%", y: "0%", width: "100%", height: "100%" }, ...big }] } as any,
-      components: [{ type: "type-relay", source: trl }],
+        components: [{ id: "label", position: { x: "0%", y: "80%", width: "100%", height: "10%" }, ...label }] } as any,
+      components: [{ type: "kinetic-text", source: kt }],
     });
     const html = await assembleComposite({
       scenes: [mk("a", "hand-drawn"), mk("b")],
@@ -137,16 +145,17 @@ describe("hand-drawn physics in Studio", () => {
       await page.route(/^https?:/, (r) => r.abort());
       await page.goto(`file://${path.join(dir, "c.html")}`);
       await page.waitForFunction(() => !!(window as any).__MP_TIMELINE, undefined, { timeout: 30000 });
-      const pose = async (t: number, sid: string) => {
-        await page.evaluate((tt) => { (window as any).__MP_TIMELINE.time(tt); }, t);
-        return page.evaluate((s) => getComputedStyle(document.querySelector(`.mp-scene[data-scene-id="${s}"] .trl-word`)!).translate, sid);
+      const ops = async (start: number, sid: string) => {
+        const out: number[] = [];
+        for (const t of [0.25, 0.3, 0.4, 0.6]) {
+          await page.evaluate((tt) => { (window as any).__MP_TIMELINE.time(tt); }, start + t);
+          out.push(await page.evaluate((s) => Number(getComputedStyle(document.querySelector(`.mp-scene[data-scene-id="${s}"] .mp-component`)!).opacity), sid));
+        }
+        return out;
       };
-      const a = await pose(1.0, "a"), b = await pose(1.03, "a"), c = await pose(1.2, "a");
-      expect(a).not.toBe("none");
-      expect(a).toBe(b);
-      expect(c).not.toBe(a);
+      expect((await ops(0, "a")).every((o) => o === 0 || o === 1)).toBe(true);
       // The plain scene after it is untouched: physics is per scene.
-      expect(await pose(3.0, "b")).toBe("none");
+      expect((await ops(2, "b")).some((o) => o > 0 && o < 1)).toBe(true);
     } finally { await browser.close(); await fs.rm(dir, { recursive: true, force: true }).catch(() => {}); }
   }, 60000);
 });

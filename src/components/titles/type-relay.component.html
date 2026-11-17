@@ -1,9 +1,9 @@
 <template>
   <div class="trl">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Instrument+Serif:ital,wght@1,400&display=swap">
-    <div class="trl-tag" data-boil="tag"></div>
+    <div class="trl-tag"></div>
     <div class="trl-block"></div>
-    <svg class="trl-squig" data-boil="squiggle" xmlns="http://www.w3.org/2000/svg"><path/></svg>
+    <svg class="trl-squig" xmlns="http://www.w3.org/2000/svg"><path/></svg>
     <div class="trl-caret"></div>
     <div class="trl-from"></div>
     <div class="trl-to"></div>
@@ -139,7 +139,7 @@
       var re = /\S+/g, m, wi = 0;
       while ((m = re.exec(text))) {
         if (wi > 0) ld.appendChild(document.createTextNode(' '));
-        var wd = document.createElement('span'); wd.className = 'trl-word'; wd.setAttribute('data-boil', 'w' + li + '-' + wi);
+        var wd = document.createElement('span'); wd.className = 'trl-word';
         var w = { el: wd, line: li, idx: wi, text: m[0], chars: [], runs: [], acc: false, start: m.index };
         var run = null, runAcc = null;
         for (var k = 0; k < m[0].length; k++) {
@@ -181,10 +181,8 @@
       block.style.maxWidth = MAXW.toFixed(1) + 'px';
     };
     var layout = function () {
-      // Measured still: no transform, and none of the hand-drawn wiggle's
-      // translate / rotate either (they show up in getBoundingClientRect).
-      var wig = words.map(function (w) { var st = w.el.style; return [st.translate, st.rotate]; });
-      words.forEach(function (w) { w.el.style.transform = 'none'; w.el.style.filter = 'none'; w.el.style.opacity = '1'; w.el.style.translate = ''; w.el.style.rotate = ''; });
+      // Measured still: no transform.
+      words.forEach(function (w) { w.el.style.transform = 'none'; w.el.style.filter = 'none'; w.el.style.opacity = '1'; });
       block.style.transform = 'none';
       block.style.left = '0px'; block.style.top = '0px';
       fit = 1;
@@ -227,7 +225,6 @@
       root.setAttribute('data-text-box', [f4(TB.cx / W), f4(TB.cy / H), f4(TB.w / W), f4(TB.h / H)].join(','));
       root.setAttribute('data-accent-box', [f4(ACC.cx / W), f4(ACC.cy / H), f4(ACC.w / W), f4(ACC.h / H)].join(','));
       root.setAttribute('data-font-px', lines.map(function (ln) { return ln._fs.toFixed(1); }).join(','));
-      words.forEach(function (w, i) { w.el.style.translate = wig[i][0]; w.el.style.rotate = wig[i][1]; });
       lastSig = bw + 'x' + bh;
       placeTargets();
       placeExtras();
@@ -293,7 +290,7 @@
         if (!parts.length) return;
         var u = boxUnion(parts), fs = lines[ws[0].line]._fs, pad = fs * num(HL.pad, 0.1);
         var el2 = document.createElement('div');
-        el2.className = 'trl-hl'; el2.setAttribute('data-boil', 'hl' + k);
+        el2.className = 'trl-hl';
         el2.style.background = String(HL.color || '#EFD800');
         el2.style.left = (u.x - pad).toFixed(2) + 'px'; el2.style.width = (u.w + 2 * pad).toFixed(2) + 'px';
         el2.style.top = (u.y + u.h * 0.08).toFixed(2) + 'px'; el2.style.height = (u.h * 0.9).toFixed(2) + 'px';

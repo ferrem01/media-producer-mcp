@@ -290,9 +290,9 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
     }
 
     // Motion physics, last: it reshapes every tween already on the scene's
-    // timeline (hand-drawn cuts fades, steps on twos, wiggles the drawn
-    // pieces). The render applies it per scene; without it here Studio
-    // played a smooth, still film that renders stepped and wiggling.
+    // timeline (hand-drawn cuts fades and steps on twos; cutout-physics
+    // boils the inked pieces). The render applies it per scene; without it
+    // here Studio played a smooth film that rendered stepped.
     const physics = motionPhysicsScript(
       scene.motion_physics,
       scene.duration_seconds,
